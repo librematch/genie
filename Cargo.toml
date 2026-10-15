@@ -36,7 +36,7 @@ flate2 = { version = "1.0.24", features = [
 encoding_rs = "0.8.31"
 encoding_rs_io = "0.1.7"
 rgb = "0.8.34"
-num_enum = "0.5.7"
+num_enum = "0.7.6"
 arrayvec = "0.7.2"
 # Without the default `verbose-backtrace` feature: error paths stay lean.
 binrw = { version = "0.15", default-features = false, features = ["std"] }
