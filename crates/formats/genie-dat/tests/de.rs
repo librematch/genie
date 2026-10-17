@@ -13,7 +13,9 @@ fn inflated() -> Option<Vec<u8>> {
         return Some(raw);
     }
     let mut data = Vec::new();
-    DeflateDecoder::new(&raw[..]).read_to_end(&mut data).unwrap();
+    DeflateDecoder::new(&raw[..])
+        .read_to_end(&mut data)
+        .unwrap();
     Some(data)
 }
 
@@ -39,7 +41,10 @@ fn the_installed_data_file_has_the_values_genieutils_reads() {
     assert_eq!(civ2.units.len(), 2750);
     // the cow: decay 0.25 per second, default task 0 with action type 107 (the Artifact action)
     let cow = civ2.units[705].as_ref().unwrap();
-    assert_eq!((cow.name.as_str(), cow.resource_decay), ("Cow Black and White".into(), 0.25));
+    assert_eq!(
+        (cow.name.as_str(), cow.resource_decay),
+        ("Cow Black and White".into(), 0.25)
+    );
     let bird = cow.bird.as_ref().unwrap();
     assert_eq!(bird.default_task().map(|t| t.action_type), Some(107));
     // FLARE3: decay 1.0, a static object without the action part

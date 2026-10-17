@@ -186,7 +186,9 @@ fn main() {
             }),
             Err(e) => failed(e),
         };
-        let roundtrip = outcome.roundtrip.map_or("null".to_string(), |b| b.to_string());
+        let roundtrip = outcome
+            .roundtrip
+            .map_or("null".to_string(), |b| b.to_string());
         let error = outcome.error.map_or("null".to_string(), |e| quote(&e));
         println!(
             "{{\"file\": {}, \"read\": {}, \"roundtrip\": {roundtrip}, \"error\": {error}}}",

@@ -52,7 +52,11 @@ impl std::fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "{e}"),
             Error::UnsupportedVersion(v) => {
-                write!(f, "unsupported file version {:?}", String::from_utf8_lossy(v))
+                write!(
+                    f,
+                    "unsupported file version {:?}",
+                    String::from_utf8_lossy(v)
+                )
             }
             Error::Parse(e) => write!(f, "{e}"),
         }
