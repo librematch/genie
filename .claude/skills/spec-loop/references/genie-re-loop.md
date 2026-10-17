@@ -152,6 +152,25 @@ simulation (`SAVE_WORDS = [0..8, 10]`).
 - Known unsupported: builder tasking, placement search, movement ("an order
   moves its units"), computer-player look-around.
 
+## Local Linux build (this box)
+
+- `cargo` lives in `~/.cargo/bin` (not on default PATH); components rustfmt,
+  clippy and target wasm32-unknown-unknown are installed.
+- `just ci` mirrors the CI jobs; `tools/oracle.sh <cargo-cmd>` sets
+  `GENIE_REC_CORPUS`/`GENIE_DAT` from `tools/env.local` (defaults
+  `~/genie/corpus66`, `~/genie/dat/empires2_x2_p1.dat`) and raises
+  `RUST_MIN_STACK=64 MiB` — **required**: the generated readers parse large
+  structs by value and overflow the default test-thread stack.
+- `cargo fmt --check` fails on main's genie-dat with stable rustfmt (the fmt
+  job is red upstream, or the maintainer's toolchain formats differently).
+- The local corpus (30 recordings) is **save 66.39321, build 162286** (patch
+  v101.103.31214.0), *not* tier-1's 66.6/158041: the pinned corpus
+  expectations fail on it by design. First-stop reasons across its 28
+  playable MP lanes: "an order moves its units" 18, "BUILD tasks the
+  builders" 3, "QUEUE the player cannot pay" 1, 2 lanes fully exact, 1
+  without a checkpoint; 2 SP recordings need AIExpert script reading
+  (unsupported in the reader yet).
+
 ## Open gaps (do not invent; leave as gaps or ask)
 
 1. **Corpus access** — recordings, `.dat` and GRTICK1 traces are not public;
