@@ -101,7 +101,7 @@ def parse_spec(path: pathlib.Path) -> dict:
     text = path.read_text(encoding="utf-8")
     m = JSON_BLOCK.search(text)
     if not m:
-        sys.exit(f"error: {path} has no ```json meta header")
+        raise ValueError(f"{path} has no ```json meta header")
     raw = m.group(1)
     try:
         header = json.loads(raw)
@@ -109,7 +109,7 @@ def parse_spec(path: pathlib.Path) -> dict:
         try:
             header = loads_lenient(raw)
         except json.JSONDecodeError as e:
-            sys.exit(f"error: {path} header is not valid JSON: {e}")
+            raise ValueError(f"{path} header is not valid JSON: {e}")
     t = H1.search(text)
     title = header.get("title") or (t.group(1).strip() if t else path.stem)
     spec_id = header.get("id") or path.stem
@@ -153,11 +153,19 @@ def upsert(con: sqlite3.Connection, row: dict) -> None:
 
 def cmd_index(args: argparse.Namespace) -> None:
     con = connect(args.db)
+    indexed = 0
     for f in args.files:
         path = pathlib.Path(f)
-        row = parse_spec(path)
+        try:
+            row = parse_spec(path)
+        except ValueError as e:
+            print(f"skipped: {e}")
+            continue
         upsert(con, row)
+        indexed += 1
         print(f"indexed {row['id']} ({row['status']})")
+    if indexed == 0:
+        sys.exit("error: nothing indexed")
     con.commit()
     con.close()
 

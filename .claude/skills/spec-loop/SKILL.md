@@ -94,6 +94,11 @@ verify → index → repeat.
 ## Adapting to a new project
 
 The loop is generic; only step 1 (diagnose) and step 5 (verify) are
-project-specific. Read `references/genie-re-loop.md` for the genie
-specialization, and write a sibling reference file for any other project that
-adopts this loop (name it after the project, keep it beside this skill).
+project-specific. Follow `references/adopting-a-project.md` to adopt a new
+project (find the oracles, write the reference file, seed the backlog, make
+`verify` runnable on a clean checkout). Worked examples:
+
+- `references/genie-re-loop.md` — genie: ground truth borrowed from the
+  original game binary via the RE harness and replay checkpoints.
+- `references/trade-route-loop.md` — trade-route: ground truth is the
+  project's own deterministic sim (`src/sim/*`) and its replay host.
