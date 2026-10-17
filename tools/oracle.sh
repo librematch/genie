@@ -8,6 +8,9 @@
 # RUST_MIN_STACK is raised here.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if ! command -v cargo >/dev/null; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
 if [[ -f tools/env.local ]]; then source tools/env.local; fi
 export GENIE_REC_CORPUS="${GENIE_REC_CORPUS:-$HOME/genie/corpus66}"
 export GENIE_DAT="${GENIE_DAT:-$HOME/genie/dat/empires2_x2_p1.dat}"
