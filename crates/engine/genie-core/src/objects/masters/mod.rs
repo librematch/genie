@@ -12,6 +12,7 @@ use crate::map::GroundOffset;
 use crate::map::Offset;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::WorkRate;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::technology::TechId;
@@ -266,7 +267,7 @@ pub struct Master {
     /// `+0x880`, the cost slots in their places (an empty one among them).
     pub cost: [CostSlot; COST_SLOTS],
     /// `work_rate` (`+0x798`): what a builder of this master adds to the work per second.
-    pub work_rate: f32,
+    pub work_rate: WorkRate,
     /// `search_radius` (`+0x794`, the object's slot 0x2c8).
     pub search_radius: Distance,
     /// The `.dat`'s `drop_sites` (`+0x7a0`..`+0x7a8`, `FUN_14109d4f0`): the buildings a unit of

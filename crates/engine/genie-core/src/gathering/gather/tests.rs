@@ -29,7 +29,7 @@ use crate::world::{Player, World};
 /// 10, no productivity attribute, no sprites, outside the game's farm setting.
 fn reads() -> GatherReads {
     GatherReads {
-        work_rate: 0.31,
+        work_rate: WorkRate::new(0.31),
         capacity: Amount::new(10.0),
         productivity: 1.0,
         sprites: HuntSprites::default(),
@@ -214,7 +214,7 @@ fn bush() -> Resource {
 /// A villager's rate (work rate 1, capacity 10, no productivity attribute).
 const fn rate() -> StopRate {
     StopRate {
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: 1.0,
     }
@@ -279,7 +279,7 @@ fn a_farm_s_stop_is_a_tile_centre_of_its_footprint_other_than_the_last() {
 #[test]
 fn under_the_farm_setting_a_farm_s_gather_goes_in_four_timed_stops() {
     let rate = StopRate {
-        work_rate: 0.33,
+        work_rate: WorkRate::new(0.33),
         capacity: Amount::new(10.0),
         productivity: 1.0,
     };
@@ -427,7 +427,7 @@ fn a_farm_s_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
         ..target(15.0)
     };
     let r = GatherReads {
-        work_rate: 0.5,
+        work_rate: WorkRate::new(0.5),
         food_sold: 1.0,
         ..reads()
     };

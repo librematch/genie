@@ -47,6 +47,7 @@ use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
@@ -445,7 +446,7 @@ pub(crate) fn builder_masters() -> Masters {
         obstruction_class: ObstructionClass::NONE,
         object_flags: 0,
         combat_level: 0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         hit_points: 25,
         build_time: 0,
         // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
@@ -504,7 +505,7 @@ pub(crate) fn builder_masters() -> Masters {
             obstruction_class: ObstructionClass::UNIT,
             object_flags: 0,
             combat_level: 0,
-            work_rate: 0.0,
+            work_rate: WorkRate::ZERO,
             hit_points: 550,
             build_time: 25,
             // a house's clearance, which BUILD's placement test reads
@@ -2458,7 +2459,7 @@ fn a_work_command_on_a_foundation_starts_a_build_as_its_builder() {
         BuildTask {
             range: Distance::ZERO,
             work_value: 0.0,
-            work_rate: 1.0,
+            work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::test(0),
             moving: None,
@@ -4901,7 +4902,7 @@ fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         });
         for masters in &mut t.masters {
             let hunter = masters.get_mut(master_id(122)).unwrap();
-            (hunter.capacity, hunter.work_rate) = (10, 1.0);
+            (hunter.capacity, hunter.work_rate) = (10, WorkRate::new(1.0));
         }
         let deer = &mut t.players[0].objects[ListIndex::new(0)];
         (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
@@ -4962,7 +4963,7 @@ fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
     });
     for masters in &mut t.masters {
         let hunter = masters.get_mut(master_id(122)).unwrap();
-        (hunter.capacity, hunter.work_rate) = (10, 1.0);
+        (hunter.capacity, hunter.work_rate) = (10, WorkRate::new(1.0));
     }
     let deer = &mut t.players[0].objects[ListIndex::new(0)];
     (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
@@ -7175,7 +7176,7 @@ fn farm_master() -> Master {
         terrain_restriction: Some(RestrictionId::named(0)),
         kind: BUILDING,
         class: class::FARM,
-        work_rate: 0.4,
+        work_rate: WorkRate::new(0.4),
         capacity: 15,
         default_task: Some(0),
         tasks: vec![crate::objects::masters::Task {
@@ -8422,7 +8423,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
     let centre = Master {
         id: ids::TOWN_CENTRE,
         kind: BUILDING,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         ..Master::default()
     };
     let quick = Master {
@@ -10118,7 +10119,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
             task: BuildTask {
                 range: Distance::ZERO,
                 work_value: 0.0,
-                work_rate: 1.0,
+                work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
                 moving: None,
@@ -10221,7 +10222,7 @@ fn deaths_world() -> World {
         radius: Footprint::new(0.5, 0.5),
     };
     let rate = crate::gathering::gather::StopRate {
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: 1.0,
     };
@@ -10248,7 +10249,7 @@ fn deaths_world() -> World {
         task: BuildTask {
             range: Distance::ZERO,
             work_value: 1.0,
-            work_rate: 1.0,
+            work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,
@@ -13661,7 +13662,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
         radius: Footprint::new(0.5, 0.5),
     };
     let rate = crate::gathering::gather::StopRate {
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: 1.0,
     };
@@ -14831,7 +14832,7 @@ fn reseed_world() -> World {
         radius: Footprint::new(1.5, 1.5),
     };
     let rate = crate::gathering::gather::StopRate {
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: 1.0,
     };
@@ -17364,7 +17365,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
     b.task = BuildTask {
         range: Distance::new(0.1),
         work_value: 1.0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
         moving: None,

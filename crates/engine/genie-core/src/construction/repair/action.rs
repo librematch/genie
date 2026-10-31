@@ -15,6 +15,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -28,7 +29,7 @@ use crate::world::step::Step;
 /// `work_value` times the world's `dt`; with more than one repairer (`repairers`, `COMISS` with
 /// `JBE`) it is scaled by `((n − 1) × 0.5 + 1) / n`.
 #[must_use]
-pub fn work_amount(rate: f32, work_value: f32, dt: Seconds, repairers: Option<u8>) -> f32 {
+pub fn work_amount(rate: WorkRate, work_value: f32, dt: Seconds, repairers: Option<u8>) -> f32 {
     let mut amount = rate * work_value * dt;
     if let Some(n) = repairers {
         let n = f32::from(n);

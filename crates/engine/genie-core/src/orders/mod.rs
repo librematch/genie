@@ -19,6 +19,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -462,7 +463,7 @@ const fn clear_powerups(unit: &mut Unit) {
     unit.attack_powerup = 0.0;
     unit.range_powerup = Distance::ZERO;
     unit.reload_powerup = 0.0;
-    unit.work_rate_powerup = 0.0;
+    unit.work_rate_powerup = WorkRate::ZERO;
     unit.hp_powerup.max = HitPoints::ZERO;
     unit.armor_powerups = [0; 2];
 }

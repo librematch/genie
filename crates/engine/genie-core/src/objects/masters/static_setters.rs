@@ -2,6 +2,7 @@
 
 use crate::map::Distance;
 use crate::movement::Speed;
+use crate::objects::WorkRate;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionClass;
@@ -437,7 +438,7 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::WORK_RATE => self.work_rate = v,
+            attribute::WORK_RATE => self.work_rate = WorkRate::new(v),
             attribute::SEARCH_RADIUS => self.search_radius = Distance::new(v),
             attribute::RUN_PATTERN => self.run_pattern = low8(v),
             // the command and move sounds (132 to 135) are the interface's
@@ -457,7 +458,7 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::WORK_RATE => self.work_rate += v,
+            attribute::WORK_RATE => self.work_rate += WorkRate::new(v),
             attribute::SEARCH_RADIUS => self.search_radius += Distance::new(v),
             attribute::RUN_PATTERN => self.run_pattern = self.run_pattern.wrapping_add(low8(v)),
             // the command and move sounds (through slot 0x18) are the interface's

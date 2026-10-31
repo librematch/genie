@@ -222,6 +222,7 @@ mod tests {
     use crate::map::Position;
     use crate::math::fmath::BVector;
     use crate::movement::move_to::MoveToAction;
+    use crate::objects::WorkRate;
     use crate::objects::masters::TaskId;
     use crate::test_ids::object_id;
 
@@ -242,7 +243,7 @@ mod tests {
         let task = BuildTask {
             range: Distance::ZERO,
             work_value: 1.0,
-            work_rate: 1.0,
+            work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,

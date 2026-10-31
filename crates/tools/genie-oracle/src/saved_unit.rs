@@ -13,6 +13,7 @@ use genie_core::map::{Offset, Position};
 use genie_core::objects::HitPoints;
 use genie_core::objects::HpPowerup;
 use genie_core::objects::ObjectId;
+use genie_core::objects::WorkRate;
 use genie_core::objects::lifecycle::Lifecycle;
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
@@ -80,7 +81,9 @@ pub(super) fn unit(
         life,
         ai,
         construction: construction(object, s, objects),
-        work_rate_powerup: object.combat().map_or(0.0, |c| c.work_rate_powerup),
+        work_rate_powerup: object
+            .combat()
+            .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
         attackable: s.unit_attackable_flag != 0,
         untargetable: s.unit_targeting_flag == 0,
         under_attack: s.under_attack_value != 0,

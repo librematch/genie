@@ -12,6 +12,7 @@ use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::MoveWaitState;
 use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
+use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::action_type::BUILD;
@@ -142,7 +143,7 @@ fn import_drawn(
             Ok(BuildTask {
                 range: Distance::new(1.0),
                 work_value: 0.5,
-                work_rate: 2.0,
+                work_rate: WorkRate::new(2.0),
                 resource: None,
                 id: TaskId::of_task(7),
                 moving: Some(9),
@@ -643,7 +644,7 @@ fn a_build_takes_its_task_move_to_and_site() {
     b.target_id = 30;
     b.target2_id = 31;
     let unit = Unit {
-        work_rate_powerup: 0.5,
+        work_rate_powerup: WorkRate::new(0.5),
         ..Unit::default()
     };
     let objects = PlayerObjects::default();
@@ -666,7 +667,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         )
     );
     assert!(a.added);
-    assert_eq!(a.task.work_rate.to_bits(), 2.5_f32.to_bits());
+    assert_eq!(a.task.work_rate.get().to_bits(), 2.5_f32.to_bits());
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(bits3(walk.point), bits3(Position::new(1.0, 2.0, 0.0)));
     assert_eq!(walk.wait.state, MoveWaitState::AskedAgain);

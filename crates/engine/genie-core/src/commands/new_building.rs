@@ -13,6 +13,7 @@ use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::death_parts::count_class;
@@ -288,7 +289,7 @@ impl World {
                 snow,
                 sprite_override: false,
             }),
-            work_rate_powerup: 0.0,
+            work_rate_powerup: WorkRate::ZERO,
             attackable: true,
             untargetable: false,
             under_attack: false,

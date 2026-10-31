@@ -182,6 +182,7 @@ mod tests {
     use super::*;
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
+    use crate::objects::WorkRate;
     use crate::objects::masters::ids;
     use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
@@ -211,7 +212,7 @@ mod tests {
             id,
             kind: master_type::BUILDING,
             class: class::FARM,
-            work_rate: 0.4,
+            work_rate: WorkRate::new(0.4),
             capacity: 15,
             ..Master::default()
         }
@@ -358,7 +359,7 @@ mod tests {
     #[test]
     fn the_farm_s_powerup_adds_to_the_rate() {
         let mut t = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 0.0);
-        t.players[1].objects[ListIndex::new(0)].work_rate_powerup = 0.1;
+        t.players[1].objects[ListIndex::new(0)].work_rate_powerup = WorkRate::new(0.1);
         let (_, _, amount, _) = made(&mut t);
         assert_eq!(amount, (0.4f32 + 0.1) * 1.0 * 0.104);
     }

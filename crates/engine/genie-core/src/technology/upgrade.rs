@@ -686,6 +686,7 @@ mod tests {
     use crate::movement::Speed;
     use crate::objects::ListIndex;
     use crate::objects::ObjectId;
+    use crate::objects::WorkRate;
     use crate::objects::lifecycle::Held;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::action_type;
@@ -1127,7 +1128,7 @@ mod tests {
         let build = BuildTask {
             range: Distance::new(0.25),
             work_value: 0.5,
-            work_rate: 1.0,
+            work_rate: WorkRate::new(1.0),
             resource: Some(AttributeId::numbered(17)),
             id: TaskId::test(3),
             moving: None,
@@ -1163,7 +1164,7 @@ mod tests {
             BuildTask {
                 range: Distance::new(1.5),
                 work_value: 3.0,
-                work_rate: 1.0,
+                work_rate: WorkRate::new(1.0),
                 resource: Some(AttributeId::numbered(17)),
                 id: TaskId::test(7),
                 moving: Some(12),

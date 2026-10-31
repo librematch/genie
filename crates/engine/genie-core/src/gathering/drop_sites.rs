@@ -261,6 +261,7 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::math::rng::Well512;
     use crate::movement::Speed;
+    use crate::objects::WorkRate;
     use crate::objects::actions::ActionList;
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::Master;
@@ -319,7 +320,7 @@ mod tests {
         let task = BuildTask {
             range: Distance::new(0.1),
             work_value: 1.0,
-            work_rate: 1.0,
+            work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,

@@ -5,6 +5,7 @@ use crate::map::Position;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
@@ -77,7 +78,7 @@ pub struct Unit {
     /// A building's construction.
     pub construction: Option<Construction>,
     /// `+0xa30`, `mWorkRatePowerup`: what the unit adds to its master's work rate.
-    pub work_rate_powerup: f32,
+    pub work_rate_powerup: WorkRate,
     /// `+0x68a`, `unit_attackable_flag`.
     pub attackable: bool,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes the

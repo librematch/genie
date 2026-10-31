@@ -12,6 +12,7 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::action_type;
@@ -213,7 +214,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         radius: Footprint::new(0.5, 0.5),
     };
     let rate = crate::gathering::gather::StopRate {
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: 1.0,
     };
@@ -227,7 +228,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     let build_task = crate::construction::build::BuildTask {
         range: Distance::ZERO,
         work_value: 1.0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
         moving: None,

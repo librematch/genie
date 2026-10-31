@@ -18,6 +18,7 @@ use crate::movement::move_to::MoveToAction;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -170,7 +171,7 @@ pub(crate) struct RepairReads {
     pub(crate) scenario: bool,
     /// The repairer's work rate: its `mWorkRatePowerup` (`+0xa30`, slot 0x6e8) plus its
     /// master's `work_rate` (`+0x798`), in that order.
-    pub(crate) rate: f32,
+    pub(crate) rate: WorkRate,
     /// The motion step giving up makes the `MoveTo` wait once (a human player's villager).
     pub(crate) waits: bool,
     /// The unit AI's stance (`+0x1a9`), which sets the wait

@@ -22,6 +22,7 @@ use crate::map::Position;
 use crate::movement::move_to::{MoveDefaults, MoveToAction};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -199,7 +200,7 @@ impl Resource {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct GatherReads {
     /// The master's work rate (`+0x798`) plus the unit's powerup (slot 0x6e8, `+0xa30`).
-    pub(crate) work_rate: f32,
+    pub(crate) work_rate: WorkRate,
     /// The master's `attribute_max_amount` (`+0x61c`): what the unit carries at most.
     pub(crate) capacity: Amount,
     /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.

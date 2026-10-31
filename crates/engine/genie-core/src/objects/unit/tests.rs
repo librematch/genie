@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::{Animated, Body};
 use crate::objects::lifecycle::{Class, Lifecycle};
@@ -376,7 +377,7 @@ fn the_top_action_s_object_is_its_target_unless_it_has_none() {
     let task = BuildTask {
         range: Distance::new(0.1),
         work_value: 1.0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
         moving: None,
@@ -443,7 +444,7 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
         crate::construction::build::BuildTask {
             range: Distance::new(0.1),
             work_value: 1.0,
-            work_rate: 1.0,
+            work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,

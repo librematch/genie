@@ -91,16 +91,16 @@ fn started() -> RepairAction {
 #[test]
 fn the_work_counts_half_for_each_repairer_past_the_first() {
     assert_eq!(
-        work_amount(1.0, 0.5, Seconds::new(0.05), None),
+        work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), None),
         1.0 * 0.5 * 0.05
     );
     assert_eq!(
-        work_amount(1.0, 0.5, Seconds::new(0.05), Some(1)),
+        work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(1)),
         1.0 * 0.5 * 0.05
     );
     let alone = 1.0f32 * 0.5 * 0.05;
     assert_eq!(
-        work_amount(1.0, 0.5, Seconds::new(0.05), Some(3)),
+        work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(3)),
         alone * (((3.0 - 1.0) * 0.5 + 1.0) / 3.0)
     );
 }
@@ -626,7 +626,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     assert_eq!(
         the_house(&t),
         (
-            300.0 + work_amount(1.0, 0.5, Seconds::new(0.05), Some(1)),
+            300.0 + work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(1)),
             1,
             1
         )

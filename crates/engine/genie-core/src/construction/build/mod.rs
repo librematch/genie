@@ -17,6 +17,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::WorkRate;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::TaskId;
@@ -116,7 +117,7 @@ pub struct BuildTask {
     pub work_value: f32,
     /// The builder's work rate: its master's `work_rate` (`+0x798`) plus its `mWorkRatePowerup`
     /// (`+0xa30`).
-    pub work_rate: f32,
+    pub work_rate: WorkRate,
     /// The task's resource (`attribute_type`, `+0x20`, none for any): `UNIT_ORDER`'s drop-off
     /// (slot 0x78) asks a builder carrying another one to its unit AI instead.
     pub resource: Option<AttributeId>,
@@ -130,7 +131,7 @@ pub struct BuildTask {
 impl BuildTask {
     /// The Build task `task` of a builder whose work rate is `work_rate`.
     #[must_use]
-    pub const fn of(task: &Task, work_rate: f32) -> Self {
+    pub const fn of(task: &Task, work_rate: WorkRate) -> Self {
         Self {
             range: task.work_range,
             work_value: task.work_val1,

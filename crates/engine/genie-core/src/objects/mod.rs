@@ -17,9 +17,11 @@ pub(crate) mod release;
 pub mod sprite;
 pub(crate) mod teardown;
 pub mod unit;
+mod work_rate;
 
 pub use self::hit_points::HpPowerup;
 pub use self::hp::HitPoints;
 pub use self::lifecycle::ObjectState;
 pub use self::list_index::{ListIndex, Places};
 pub use self::object_id::{ObjectId, ObjectKey};
+pub use self::work_rate::WorkRate;

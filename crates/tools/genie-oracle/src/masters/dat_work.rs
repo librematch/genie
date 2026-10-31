@@ -4,6 +4,7 @@
 use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::{Footprint, GroundOffset, Radii};
+use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::GatherGroup;
@@ -138,7 +139,10 @@ pub(super) fn dat_work(
             .map(|b| b.default_task_id)
             .filter(|&t| 0 <= t),
         cost: dat_cost(unit)?,
-        work_rate: unit.bird.as_ref().map_or(0.0, |b| b.work_rate),
+        work_rate: unit
+            .bird
+            .as_ref()
+            .map_or(WorkRate::ZERO, |b| WorkRate::new(b.work_rate)),
         drop_sites: unit.bird.as_ref().map_or_else(Vec::new, |b| {
             b.drop_sites
                 .iter()

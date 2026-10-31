@@ -39,7 +39,7 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         obstruction_class: ObstructionClass::NONE,
         object_flags: 0,
         combat_level: 0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         hit_points: 25,
         build_time: 0,
         ..Master::default()
@@ -61,7 +61,7 @@ fn house() -> Master {
         obstruction_class: ObstructionClass::UNIT,
         object_flags: 0,
         combat_level: 0,
-        work_rate: 0.0,
+        work_rate: WorkRate::ZERO,
         hit_points: 550,
         build_time: 25,
         ..Master::default()
@@ -1057,7 +1057,7 @@ fn the_action_and_moving_setters_change_their_values() {
     assert_eq!(m, before);
     assert_eq!(
         (m.work_rate, m.search_radius, m.run_pattern),
-        (1.5, Distance::new(6.0), 1)
+        (WorkRate::new(1.5), Distance::new(6.0), 1)
     );
     assert_eq!(m.turn_speed, Seconds::new(1.0));
     assert_eq!(

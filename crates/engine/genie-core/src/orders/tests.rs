@@ -270,7 +270,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
                 crate::construction::build::BuildTask {
                     range: Distance::new(0.1),
                     work_value: 1.0,
-                    work_rate: 1.0,
+                    work_rate: WorkRate::new(1.0),
                     resource: None,
                     id: TaskId::of_task(-1),
                     moving: None,
@@ -2299,7 +2299,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
         attack_powerup: 2.0,
         reload_powerup: 0.5,
         reload_stinger: 0.25,
-        work_rate_powerup: 0.15,
+        work_rate_powerup: WorkRate::new(0.15),
         hp_powerup: HpPowerup {
             taken: HitPoints::new(10.0),
             max: HitPoints::new(20.0),
@@ -2314,7 +2314,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
             unit.reload_powerup,
             unit.work_rate_powerup
         ),
-        (0.0, 0.0, 0.0)
+        (0.0, 0.0, WorkRate::ZERO)
     );
     assert_eq!(
         (unit.hp_powerup, unit.armor_powerups),
@@ -2822,7 +2822,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
             task: crate::construction::build::BuildTask {
                 range: Distance::new(0.1),
                 work_value: 1.0,
-                work_rate: 1.0,
+                work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
                 moving: None,
@@ -4376,7 +4376,7 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
     let task = crate::construction::build::BuildTask {
         range: Distance::new(0.1),
         work_value: 1.0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         resource: Some(attribute::WOOD),
         id: TaskId::of_task(-1),
         moving: None,
@@ -4757,7 +4757,7 @@ fn a_work_command_s_task_is_retaken_by_the_action_on_top() {
     let build = crate::construction::build::BuildTask {
         range: Distance::new(0.1),
         work_value: 1.0,
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::test(3),
         moving: None,

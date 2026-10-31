@@ -16,6 +16,7 @@ use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::movement::move_to::{TargetMoved, WalkTo};
 use crate::objects::ObjectId;
+use crate::objects::WorkRate;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -70,7 +71,7 @@ pub struct GatherRetarget<'a> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StopRate {
     /// The work rate.
-    pub work_rate: f32,
+    pub work_rate: WorkRate,
     /// The capacity.
     pub capacity: Amount,
     /// The productivity.
@@ -83,7 +84,7 @@ impl StopRate {
     #[must_use]
     pub fn time_per_stop(self, work_value: f32, stops: u8) -> Seconds {
         Seconds::new(
-            ((self.capacity.get() * self.productivity) / (self.work_rate * work_value))
+            ((self.capacity.get() * self.productivity) / (self.work_rate * work_value).get())
                 / f32::from(stops),
         )
     }

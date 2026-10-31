@@ -38,7 +38,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
     HuntReads {
         defaults: MoveDefaults::default(),
         attack: crate::combat::attack::tests::reads(),
-        work_rate: 1.0,
+        work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: 1.0,
         stops_decay: false,

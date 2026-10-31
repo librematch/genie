@@ -9,6 +9,7 @@ use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::TargetMoved;
 use genie_core::objects::ObjectId;
+use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
@@ -166,7 +167,8 @@ pub(super) fn build_task(
         ))?;
     let task = master_build_task(objects, civ, masters, m, master)?;
     Ok(genie_core::construction::build::BuildTask::of(
-        &task, work_rate,
+        &task,
+        WorkRate::new(work_rate),
     ))
 }
 

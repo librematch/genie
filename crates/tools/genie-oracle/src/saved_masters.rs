@@ -9,6 +9,7 @@ use genie_core::map::Footprint;
 use genie_core::map::Offset;
 use genie_core::map::Radii;
 use genie_core::movement::Speed;
+use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
@@ -191,7 +192,7 @@ pub(super) fn work_masters(
         work.capacity = s.attribute_max_amount;
         work.blast_defense = s.area_effect_object_level;
         if let Some(a) = action_part(m) {
-            work.work_rate = a.work_rate;
+            work.work_rate = WorkRate::new(a.work_rate);
             work.search_radius = Distance::new(a.search_radius);
             if let Some(tasks) = a.tasks.as_deref() {
                 work.tasks = match tasks.list.iter().map(|e| task(&e.task)).collect() {
