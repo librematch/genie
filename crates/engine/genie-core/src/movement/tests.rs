@@ -3120,8 +3120,8 @@ fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
         frames: 1,
         facets: 8,
         speed_multiplier: factor,
-        frame_duration: 0.0,
-        replay_delay: 0.0,
+        frame_duration: Seconds::ZERO,
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let mut m = crate::gathering::hunt::tests::walker();

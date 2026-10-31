@@ -944,8 +944,8 @@ fn waters(t: &mut World) {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     for id in [19598, 19599, 19600, 19601] {

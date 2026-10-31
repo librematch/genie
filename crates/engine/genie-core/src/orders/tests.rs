@@ -787,8 +787,8 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let mut t = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
@@ -818,7 +818,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     soldier.attack_sprite = 301;
     soldier.move_sprite = 302;
     soldier.weapon_range = Distance::ZERO;
-    soldier.reload = 2.0;
+    soldier.reload = Seconds::new(2.0);
     soldier.moving = Some(walker.stats);
     t.masters[0] = crate::objects::masters::Masters::new([Master {
         id: master_id(126),
@@ -2101,8 +2101,8 @@ fn switched_in_the_open(
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
-                frame_duration: 0.1,
-                replay_delay: 0.0,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
                 flags: 1,
             };
             (id, g)
@@ -2185,8 +2185,8 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
-                frame_duration: 0.1,
-                replay_delay: 0.0,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
                 flags: 1,
             },
             &mut sprites,
@@ -2297,8 +2297,8 @@ fn a_master_change_s_unmodelled_parts_fail() {
 fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
     let mut unit = Unit {
         attack_powerup: 2.0,
-        reload_powerup: 0.5,
-        reload_stinger: 0.25,
+        reload_powerup: Seconds::new(0.5),
+        reload_stinger: Seconds::new(0.25),
         work_rate_powerup: WorkRate::new(0.15),
         hp_powerup: HpPowerup {
             taken: HitPoints::new(10.0),
@@ -2314,7 +2314,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
             unit.reload_powerup,
             unit.work_rate_powerup
         ),
-        (0.0, 0.0, WorkRate::ZERO)
+        (0.0, Seconds::ZERO, WorkRate::ZERO)
     );
     assert_eq!(
         (unit.hp_powerup, unit.armor_powerups),
@@ -2326,7 +2326,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
             [0, 0]
         )
     );
-    assert_eq!(unit.reload_stinger, 0.25);
+    assert_eq!(unit.reload_stinger, Seconds::new(0.25));
 }
 
 /// `FUN_140a97730`: an empty list and a `MoveTo` head take no move; an Artifact head takes

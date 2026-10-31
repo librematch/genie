@@ -198,6 +198,13 @@ impl std::ops::Mul<f32> for Seconds {
     }
 }
 
+impl std::ops::MulAssign<f32> for Seconds {
+    /// The span scaled by `f` in place (an effect's multiplier).
+    fn mul_assign(&mut self, f: f32) {
+        self.0 *= f;
+    }
+}
+
 impl std::ops::Div<f32> for Seconds {
     type Output = Self;
 
@@ -283,6 +290,9 @@ mod tests {
         assert_eq!(t.get().to_bits(), ((1.0_f32 - 0.069) + 0.069).to_bits());
         assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
         assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        let mut scaled = a;
+        scaled *= 3.0;
+        assert_eq!(scaled, a * 3.0);
         assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
         assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
         assert_eq!((1.5_f32 * a).to_bits(), (1.5_f32 * 0.1).to_bits());

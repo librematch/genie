@@ -6,6 +6,7 @@ use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, 
 use crate::objects::ObjectState;
 use crate::test_ids::object_id;
 use crate::unit_ai::NotifyKind;
+use crate::world::Seconds;
 
 /// A map of zones by column (the tile's x over 10) and terrain flags by a closure; the shore
 /// point the planner gives, recorded.
@@ -54,8 +55,8 @@ const SHOWN: Graphic = Graphic {
     frames: 10,
     facets: 16,
     speed_multiplier: 1.0,
-    frame_duration: 0.1,
-    replay_delay: 0.0,
+    frame_duration: Seconds::new(0.1),
+    replay_delay: Seconds::ZERO,
     flags: 1,
 };
 const STANDING: Graphic = Graphic { id: 300, ..SHOWN };

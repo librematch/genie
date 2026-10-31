@@ -325,8 +325,8 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
         frames: 1,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let (mut sprite, mut rng) = (None, Well512::default());
@@ -964,8 +964,8 @@ fn a_gatherer_facing_its_target_works_it() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let mut rig = Rig::on_the_path();

@@ -17,6 +17,7 @@ use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::test_ids::{attack_category, category_of};
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
+use crate::world::Seconds;
 use crate::world::WorldTime;
 
 fn candidate(id: i32, distance: Distance, speed: f32) -> Candidate {
@@ -30,7 +31,7 @@ fn candidate(id: i32, distance: Distance, speed: f32) -> Candidate {
         reach: Distance::new(1.0),
         damage: 4.0,
         hp: HitPoints::new(40.0),
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         workable: false,
         current: false,
     }

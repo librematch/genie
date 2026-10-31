@@ -149,7 +149,7 @@ pub(super) fn core_task(
         attribute_type2,
         attribute_type3,
         attribute_type4,
-        wait_time: t.search_wait_time,
+        wait_time: Seconds::new(t.search_wait_time),
         work_val1: t.work_val1,
         work_val2: t.work_val2,
         work_range: Distance::new(t.work_range),
@@ -248,7 +248,7 @@ pub(super) fn work_masters(
             work.fire_frame = rc.fire_missile_at_frame;
             work.interrupt_frame = rc.interrupt_frame;
             work.hit_chance = rc.base_hit_chance;
-            work.reload = rc.speed_of_attack;
+            work.reload = Seconds::new(rc.speed_of_attack);
             work.weapons = rc
                 .weapon
                 .iter()

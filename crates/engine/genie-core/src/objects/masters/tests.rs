@@ -383,7 +383,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
     use attribute as a;
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
         (a::ROTATION_SPEED, |m| m.turn_speed.get(), [3.0, 5.0, 10.0]),
-        (a::ATTACK_RELOAD_TIME, |m| m.reload, [3.0, 5.0, 10.0]),
+        (a::ATTACK_RELOAD_TIME, |m| m.reload.get(), [3.0, 5.0, 10.0]),
         (
             a::ACCURACY_PERCENT,
             |m| f32::from(m.hit_chance),
@@ -798,12 +798,15 @@ fn a_missile_s_smart_mode_multiply_sets_it() {
         radius: Radii::ZERO,
         fly_mode: 0,
     });
-    m.reload = 2.0;
+    m.reload = Seconds::new(2.0);
     m.multiply_attribute(attribute::PROJECTILE_SMART_MODE, 3.0, &world(false));
     m.multiply_attribute(attribute::PROJECTILE_ARC, 0.5, &world(false));
     m.multiply_attribute(attribute::ATTACK_RELOAD_TIME, 0.5, &world(false));
     let s = m.missile_stats.unwrap();
-    assert_eq!((s.smart_mode, s.arc, m.reload), (3, 0.25, 1.0));
+    assert_eq!(
+        (s.smart_mode, s.arc, m.reload),
+        (3, 0.25, Seconds::new(1.0))
+    );
 }
 
 /// `FUN_1412661d0` and its add and multiply on the costs: 100 changes the paid entries, 103
@@ -975,8 +978,8 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         frames: 10,
         facets,
         speed_multiplier,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics = [

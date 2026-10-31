@@ -701,6 +701,7 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::world::Millis;
+    use crate::world::Seconds;
     use crate::world::WorldTime;
 
     /// An animated graphic of `frames` frames with a random first frame (flags 5).
@@ -710,8 +711,8 @@ mod tests {
             frames: 10,
             facets: 1,
             speed_multiplier: 1.0,
-            frame_duration: 0.1,
-            replay_delay: 0.0,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
             flags: 5,
         }
     }

@@ -28,6 +28,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
 use crate::world::Millis;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 
 /// records/425906646's update 1883: a TC's gather point on a tree that is gone; its new
@@ -463,8 +464,8 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
-                frame_duration: 0.1,
-                replay_delay: 0.0,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
                 flags: 1,
             },
         );
@@ -601,8 +602,8 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
-                frame_duration: 0.1,
-                replay_delay: 0.0,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
                 flags: 1,
             },
         );
@@ -879,8 +880,8 @@ fn remains_world() -> World {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags,
     };
     for (id, flags) in [(20, 4), (21, 1)] {

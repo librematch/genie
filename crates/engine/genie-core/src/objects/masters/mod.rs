@@ -79,7 +79,7 @@ pub struct Task {
     /// `+0x26`, `attribute_type4` (`unused_resource`).
     pub attribute_type4: Option<AttributeId>,
     /// `+0x1c`, `search_wait_time`: a Fly task's rest between flights.
-    pub wait_time: f32,
+    pub wait_time: Seconds,
     /// `+0x28`, the save's `work_val1`; `+0x2c`, `work_val2`.
     pub work_val1: f32,
     /// `+0x2c`, the save's `work_val2`.
@@ -126,7 +126,7 @@ impl Default for Task {
             attribute_type2: None,
             attribute_type3: None,
             attribute_type4: None,
-            wait_time: 0.0,
+            wait_time: Seconds::ZERO,
             work_val1: 0.0,
             work_val2: 0.0,
             work_range: Distance::ZERO,
@@ -436,7 +436,7 @@ pub struct Master {
     /// `base_hit_chance`.
     pub hit_chance: i16,
     /// `speed_of_attack`: the reload time.
-    pub reload: f32,
+    pub reload: Seconds,
     /// Its weapons (class, amount).
     pub weapons: Vec<ClassAmount>,
     /// Where its missile starts from its place, turned by its facing (`+0x844`..`+0x84c`,

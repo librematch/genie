@@ -285,8 +285,8 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     });
     let attack = add(Unit {

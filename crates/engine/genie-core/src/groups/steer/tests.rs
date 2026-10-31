@@ -48,8 +48,8 @@ const fn graphic(id: i16, factor: f32) -> Graphic {
         frames: 1,
         facets: 8,
         speed_multiplier: factor,
-        frame_duration: 0.0,
-        replay_delay: 0.0,
+        frame_duration: Seconds::ZERO,
+        replay_delay: Seconds::ZERO,
         flags: 0,
     }
 }

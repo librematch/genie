@@ -773,8 +773,8 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         frames: 60,
         facets: 16,
         speed_multiplier: 0.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 7,
     };
     t.graphics = std::collections::BTreeMap::from([(13124, idle(13124)), (13170, idle(13170))]);
@@ -1007,8 +1007,8 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Unit {
         frames: 10,
         facets: 16,
         speed_multiplier: factor,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 7,
     };
     let _ = t.graphics.insert(13171, dying);
@@ -1576,8 +1576,8 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics: std::collections::BTreeMap<i16, Graphic> =
@@ -2542,8 +2542,8 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let _ = t.graphics.insert(7, walking);
@@ -6153,8 +6153,8 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
                 frames: 10,
                 facets: 16,
                 speed_multiplier: 1.0,
-                frame_duration: 0.1,
-                replay_delay: 0.0,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
                 flags: 1,
             };
             let _ = t.graphics.insert(id, g);
@@ -12848,8 +12848,8 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
             frames: 10,
             facets: 1,
             speed_multiplier: 1.0,
-            frame_duration: 0.1,
-            replay_delay: 0.0,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
             flags: 1,
         },
     )]);
@@ -12930,8 +12930,8 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let gate = |id| Master {
@@ -13042,8 +13042,8 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags,
     };
     let master = |id, death_sprite, destruction_sprite| Master {
@@ -13389,8 +13389,8 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let barracks = Master {
@@ -13573,8 +13573,8 @@ fn scout_sprites() -> (Masters, std::collections::BTreeMap<i16, Graphic>) {
                 frames: 10,
                 facets: 16,
                 speed_multiplier: 1.0,
-                frame_duration: 0.1,
-                replay_delay: 0.0,
+                frame_duration: Seconds::new(0.1),
+                replay_delay: Seconds::ZERO,
                 flags: 1,
             };
             (id, g)
@@ -13830,8 +13830,8 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let walking = Graphic {
@@ -13991,8 +13991,8 @@ fn scout_attack_on(
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics = std::collections::BTreeMap::from([
@@ -14012,7 +14012,7 @@ fn scout_attack_on(
         standing_sprite: 300,
         attack_sprite: 301,
         weapon_range: Distance::new(1.0),
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         ..Master::default()
     };
     let wolf = Master {
@@ -14121,8 +14121,8 @@ fn attack_by(
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics = std::collections::BTreeMap::from([
@@ -14142,7 +14142,7 @@ fn attack_by(
         standing_sprite: 300,
         attack_sprite: 301,
         weapon_range: Distance::new(1.0),
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         ..Master::default()
     };
     let wolf = Master {
@@ -14246,7 +14246,7 @@ fn a_villager_s_attack_command_switches_it_to_the_villager_first() {
         standing_sprite: 300,
         attack_sprite: 301,
         weapon_range: Distance::new(0.5),
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         storage,
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         ..Master::default()
@@ -14741,8 +14741,8 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
                 frames: 1,
                 facets: 5,
                 speed_multiplier: 1.0,
-                frame_duration: 0.0,
-                replay_delay: 0.0,
+                frame_duration: Seconds::ZERO,
+                replay_delay: Seconds::ZERO,
                 flags,
             },
         );
@@ -15488,7 +15488,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         missile: Some(master_id(363)),
         weapon_offset: Offset::new(0.0, 0.0, 1.0),
         weapon_range: Distance::new(4.0),
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         hit_chance,
         max_volley,
         volley_spread: [spread, spread, 0.0],
@@ -15564,8 +15564,8 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     t.graphics = std::collections::BTreeMap::from([(300, sprite(300)), (301, sprite(301))]);
@@ -15926,8 +15926,8 @@ fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 7,
     };
     let _ = drawn.graphics.insert(302, sprite);
@@ -16817,7 +16817,7 @@ type Flown = (
 fn flown(move_to: MoveTo, setup: impl FnOnce(&mut Unit)) -> Flown {
     let mut t = forage_world();
     let task = crate::objects::masters::Task {
-        wait_time: 2.0,
+        wait_time: Seconds::new(2.0),
         ..crate::objects::masters::Task::default()
     };
     let v = &mut t.players[1].objects[ListIndex::new(0)];
@@ -16933,8 +16933,8 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let _ = t.graphics.insert(31, walking);
@@ -18444,8 +18444,8 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let _ = t.graphics.insert(id, shown);

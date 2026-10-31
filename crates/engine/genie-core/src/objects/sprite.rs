@@ -36,9 +36,9 @@ pub struct Graphic {
     /// `+0xc`, `speed_multiplier`: at least 1e-7, it scales the frame duration.
     pub speed_multiplier: f32,
     /// `+0x10`, `frame_duration`.
-    pub frame_duration: f32,
+    pub frame_duration: Seconds,
     /// `+0x14`, `replay_delay`.
-    pub replay_delay: f32,
+    pub replay_delay: Seconds,
     /// `+0x1a`, `sequence_type`: bit 0 animated, 2 a random first frame, 3 played once, 4 backwards.
     pub flags: u8,
 }
@@ -109,7 +109,7 @@ pub struct ActiveSprite {
     /// `+0x24`, `frame`.
     pub frame: i16,
     /// `+0x28`, `animate_interval`: one frame's time at the last speed.
-    pub interval: f32,
+    pub interval: Seconds,
     /// `+0x2c`, `animate_last`: the time since the last frame.
     pub last: Seconds,
     /// `+0x30`, `last_frame`: the frame before the last advance.
@@ -148,21 +148,21 @@ impl ActiveSprite {
             animate: 1,
             speed: 0.0,
         };
-        if f64::from(s.interval) < 0.001 {
-            s.interval = SHORTEST;
+        if f64::from(s.interval.get()) < 0.001 {
+            s.interval = Seconds::new(SHORTEST);
         }
         if graphic.flags & 4 != 0 {
-            let d = graphic.frame_duration;
+            let d = graphic.frame_duration.get();
             if 0.0 < d {
                 let draw = sprite_rng.rand15();
                 let t = (draw as i32 as f32
-                    * (f32::from(graphic.frames) * d + graphic.replay_delay))
+                    * (f32::from(graphic.frames) * d + graphic.replay_delay.get()))
                     / 32767.0;
                 let f = (t / d) as i32 as i16;
                 s.frame = f;
                 if graphic.frames <= f {
                     s.frame = last;
-                    s.interval = t - f32::from(last) * d;
+                    s.interval = Seconds::new(t - f32::from(last) * d);
                 }
             } else {
                 let draw = sprite_rng.rand15() as i32;
@@ -193,7 +193,7 @@ impl ActiveSprite {
         Self {
             graphic,
             frame,
-            interval: 0.0,
+            interval: Seconds::ZERO,
             last: Seconds::ZERO,
             last_frame: frame,
             changed: false,
@@ -236,9 +236,9 @@ impl ActiveSprite {
     }
 
     /// The interval of one frame at `speed` (at least 0.001).
-    fn interval_at(&self, speed: f32) -> f32 {
+    fn interval_at(&self, speed: f32) -> Seconds {
         let g = &self.graphic;
-        let mut i = g.frame_duration;
+        let mut i = g.frame_duration.get();
         // COMISS/JA: only an ordered 1e-7 above the multiplier skips it
         if fmath::at_most_or_unordered(EPSILON, g.speed_multiplier) {
             i *= g.speed_multiplier;
@@ -246,7 +246,7 @@ impl ActiveSprite {
         if 0.0 < speed {
             i /= speed;
         }
-        if i < SHORTEST { SHORTEST } else { i }
+        Seconds::new(if i < SHORTEST { SHORTEST } else { i })
     }
 
     /// One update of `dt` seconds at the object's animation speed (`FUN_1413b5070`, the object's
@@ -284,15 +284,15 @@ impl ActiveSprite {
             i
         };
         // COMISS/JC at 0x1413b5149: an unordered time or interval returns too
-        if fmath::below_or_unordered(time.get(), interval) {
+        if fmath::below_or_unordered(time.get(), interval.get()) {
             return;
         }
         let forward = !g.backwards();
         self.changed = true;
         self.last_frame = start;
         // CVTTSS2SI EDX, MOVSX EAX, DX (0x1413b5177)
-        let steps = crate::math::conversions::cvttss2si(time.get() / interval) as i16;
-        self.last = time - Seconds::new(f32::from(steps) * interval);
+        let steps = crate::math::conversions::cvttss2si(time.get() / interval.get()) as i16;
+        self.last = time - Seconds::new(f32::from(steps) * interval.get());
         if 0.0 < speed || g.speed_multiplier == 0.0 {
             let f = start + if forward { steps } else { -steps };
             self.frame = f;
@@ -304,7 +304,7 @@ impl ActiveSprite {
         if self.looped {
             let mut f;
             // COMISS/JBE at 0x1413b521f: an unordered delay loops at once
-            if fmath::at_most_or_unordered(g.replay_delay, 0.0) || self.animate == 2 {
+            if fmath::at_most_or_unordered(g.replay_delay.get(), 0.0) || self.animate == 2 {
                 self.animate = 1;
                 f = self.frame % g.frames;
                 if f < 0 {
@@ -318,7 +318,9 @@ impl ActiveSprite {
                 stop = false;
                 self.looped = false;
                 self.animate = 2;
-                self.interval = g.replay_delay - f32::from(at - g.frames) * g.frame_duration;
+                self.interval = Seconds::new(
+                    g.replay_delay.get() - f32::from(at - g.frames) * g.frame_duration.get(),
+                );
                 f = if forward { 0 } else { last };
             }
             self.frame = f;
@@ -446,8 +448,8 @@ mod tests {
         frames: 45,
         facets: 8,
         speed_multiplier: 0.0,
-        frame_duration: 0.044_444_446,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.044_444_446),
+        replay_delay: Seconds::ZERO,
         flags: 3,
     };
 
@@ -555,7 +557,7 @@ mod tests {
             frames: 4,
             facets: 1,
             speed_multiplier: 0.0,
-            frame_duration: 0.25,
+            frame_duration: Seconds::new(0.25),
             replay_delay,
             flags,
         };
@@ -567,24 +569,24 @@ mod tests {
             s.update(Seconds::new(dt), 1.0);
             s
         };
-        assert_eq!(after(four(1, 0.0), Some(9), 0.1).frame, 3);
-        assert_eq!(after(four(1, 0.0), Some(-2), 0.1).frame, 0);
-        let s = after(four(1, 0.5), None, 1.0);
+        assert_eq!(after(four(1, Seconds::ZERO), Some(9), 0.1).frame, 3);
+        assert_eq!(after(four(1, Seconds::ZERO), Some(-2), 0.1).frame, 0);
+        let s = after(four(1, Seconds::new(0.5)), None, 1.0);
         assert_eq!(
             (s.frame, s.animate, s.interval, s.looped),
-            (1, 2, 0.5, false)
+            (1, 2, Seconds::new(0.5), false)
         );
-        let s = after(four(0x11, 0.5), None, 1.0);
-        assert_eq!((s.frame, s.animate, s.interval), (2, 2, 0.5));
-        let s = after(four(0x11, 0.0), None, 1.25);
+        let s = after(four(0x11, Seconds::new(0.5)), None, 1.0);
+        assert_eq!((s.frame, s.animate, s.interval), (2, 2, Seconds::new(0.5)));
+        let s = after(four(0x11, Seconds::ZERO), None, 1.25);
         assert_eq!((s.frame, s.animate, s.looped), (2, 1, true));
-        let s = after(four(9, 0.0), None, 1.0);
+        let s = after(four(9, Seconds::ZERO), None, 1.0);
         assert_eq!((s.frame, s.animate), (3, 0));
-        let s = after(four(0x19, 0.0), None, 1.0);
+        let s = after(four(0x19, Seconds::ZERO), None, 1.0);
         assert_eq!((s.frame, s.animate), (0, 0));
         let one = Graphic {
             frames: 1,
-            ..four(1, 0.0)
+            ..four(1, Seconds::ZERO)
         };
         let s = after(one, None, 0.25);
         assert_eq!((s.frame, s.looped, s.animate), (0, true, 1));
@@ -595,7 +597,7 @@ mod tests {
     fn a_nan_replay_delay_loops_at_once() {
         let g = Graphic {
             frames: 2,
-            replay_delay: f32::NAN,
+            replay_delay: Seconds::new(f32::NAN),
             ..CHOP
         };
         let mut s = ActiveSprite::start(g, &mut Well512::default());
@@ -611,8 +613,8 @@ mod tests {
             frames: 1,
             facets: 1,
             speed_multiplier: 0.0,
-            frame_duration: 0.0,
-            replay_delay: 0.0,
+            frame_duration: Seconds::ZERO,
+            replay_delay: Seconds::ZERO,
             flags: 0,
         };
         let mut rng = Well512::default();

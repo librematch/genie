@@ -424,7 +424,7 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::ROTATION_SPEED => self.turn_speed = self.turn_speed * v,
+            attribute::ROTATION_SPEED => self.turn_speed *= v,
             attribute::TRAIL_DENSITY => self.trail.density *= v,
             _ => self.multiply_animated(attribute, v, world),
         }

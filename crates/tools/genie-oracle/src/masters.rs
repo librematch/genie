@@ -9,6 +9,7 @@ use genie_core::objects::masters as work;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::players::AmountRate;
 use genie_core::players::attribute::AttributeId;
+use genie_core::world::Seconds;
 use genie_dat::de::DatFile;
 use std::collections::HashMap;
 
@@ -439,8 +440,8 @@ impl MasterTable {
                         frames: g.frame_count,
                         facets: g.angle_count,
                         speed_multiplier: g.speed_multiplier,
-                        frame_duration: g.frame_duration,
-                        replay_delay: g.replay_delay,
+                        frame_duration: Seconds::new(g.frame_duration),
+                        replay_delay: Seconds::new(g.replay_delay),
                         flags: g.sequence_type,
                     },
                 ))
@@ -558,8 +559,8 @@ impl MasterTable {
             frames: 1,
             facets,
             speed_multiplier: speed,
-            frame_duration: 0.1,
-            replay_delay: 0.0,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
             flags,
         };
         let _ = self.graphics.insert(sprite, graphic);

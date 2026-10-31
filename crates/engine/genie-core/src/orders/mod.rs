@@ -35,6 +35,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::TaskTarget;
 use crate::world::Millis;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 
@@ -462,7 +463,7 @@ pub(crate) fn readiness(orders: &mut Vec<crate::unit_ai::QueuedOrder>, drop_read
 const fn clear_powerups(unit: &mut Unit) {
     unit.attack_powerup = 0.0;
     unit.range_powerup = Distance::ZERO;
-    unit.reload_powerup = 0.0;
+    unit.reload_powerup = Seconds::ZERO;
     unit.work_rate_powerup = WorkRate::ZERO;
     unit.hp_powerup.max = HitPoints::ZERO;
     unit.armor_powerups = [0; 2];

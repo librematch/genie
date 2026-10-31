@@ -128,11 +128,11 @@ impl Attack {
             let _ = reset_sprite(&mut unit.sprite, current);
         }
         self.pending = true;
-        let length = f32::from(shown.frames) * shown.frame_duration;
-        self.rest = Seconds::new(r.reload - length);
+        let length = Seconds::new(f32::from(shown.frames) * shown.frame_duration.get());
+        self.rest = r.reload - length;
         set_walker_anim(
             &mut unit.body,
-            if self.rest < Seconds::ZERO && 0.0 < r.reload {
+            if self.rest < Seconds::ZERO && Seconds::ZERO < r.reload {
                 length / r.reload
             } else {
                 1.0

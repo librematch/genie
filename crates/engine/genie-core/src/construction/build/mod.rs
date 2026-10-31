@@ -317,8 +317,8 @@ mod built_sprite_tests {
             frames: 4,
             facets: 1,
             speed_multiplier: 1.0,
-            frame_duration: 0.1,
-            replay_delay: 0.0,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
             flags,
         };
         let graphics = BTreeMap::from([(10, g(10, 1)), (11, g(11, 1))]);

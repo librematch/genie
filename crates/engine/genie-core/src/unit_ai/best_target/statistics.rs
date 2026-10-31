@@ -10,6 +10,7 @@ use crate::objects::masters::ClassMask;
 use crate::unit_ai::best_target::ORDER_WINDOW;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
 use crate::world::Millis;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
 
@@ -91,7 +92,7 @@ pub struct Candidate {
     /// Its hit points (`+0x278`).
     pub hp: HitPoints,
     /// The unit's reload time (slot 0x218).
-    pub reload: f32,
+    pub reload: Seconds,
     /// The unit's unit AI could work on it (its slot 0x1b8 with 0: a priest's conversion).
     pub workable: bool,
     /// It is the unit AI's current target (`+0x48`).
@@ -225,7 +226,7 @@ impl Statistics {
         }
         self.distance.take(c.distance);
         e.kill_time = if crate::math::fmath::below_or_unordered(EPSILON, c.damage) {
-            ((c.hp / c.damage) / c.reload).get()
+            (c.hp.get() / c.damage) / c.reload.get()
         } else if c.workable {
             NO_DAMAGE_KILL
         } else {

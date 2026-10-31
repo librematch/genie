@@ -142,8 +142,8 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
@@ -433,8 +433,8 @@ fn a_sprite_resets_only_for_its_own_graphic() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let other = Graphic { id: 225, ..swing };
@@ -507,8 +507,8 @@ const STANDING: Graphic = Graphic {
     frames: 10,
     facets: 8,
     speed_multiplier: 1.0,
-    frame_duration: 0.1,
-    replay_delay: 0.0,
+    frame_duration: Seconds::new(0.1),
+    replay_delay: Seconds::ZERO,
     flags: 1,
 };
 
@@ -520,7 +520,7 @@ pub(crate) fn reads() -> AttackReads {
         move_defaults: MoveDefaults::default(),
         standing: Some(STANDING),
         volleys: false,
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         hit_chance: 100,
         armed: true,
         swing_sprites: SwingSprites::default(),
@@ -1632,8 +1632,8 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         frames: 1,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.0,
-        replay_delay: 0.0,
+        frame_duration: Seconds::ZERO,
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let mut a = Attack {
@@ -1698,8 +1698,8 @@ fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics: BTreeMap<i16, Graphic> = [10, 11, 12, 20, 21]
@@ -2219,8 +2219,8 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let me = |id| Me {

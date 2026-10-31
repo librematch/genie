@@ -19,6 +19,7 @@ use crate::test_ids::object_id;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::UnitAiType;
+use crate::world::Seconds;
 use crate::world::others::OthersRef;
 
 /// Slot 0x228 (`FUN_141084070`): the attacks above 0 add up in their order from +0; none
@@ -305,7 +306,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         class,
         radius: Footprint::new(0.3, 0.3),
         weapons,
-        reload: 2.0,
+        reload: Seconds::new(2.0),
         // no terrain defense bonus: the damage reads no terrain
         terrain_bonus: -1,
         ..crate::objects::masters::Master::default()
@@ -409,7 +410,13 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     );
     assert_eq!(
         (c.armed, c.reach, c.damage, c.hp, c.reload),
-        (true, Distance::new(0.5), 6.0, HitPoints::new(40.0), 2.0)
+        (
+            true,
+            Distance::new(0.5),
+            6.0,
+            HitPoints::new(40.0),
+            Seconds::new(2.0)
+        )
     );
     assert_eq!((c.workable, c.current), (false, false));
     assert!(

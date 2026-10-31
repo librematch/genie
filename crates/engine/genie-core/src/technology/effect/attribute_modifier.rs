@@ -99,7 +99,7 @@ impl World {
         };
         let masters = self.masters.checked(p.index())?;
         let master = u.master(&self.masters, p)?;
-        if u.garrison.is_empty() || at_most_or_unordered(master.reload, 0.0) {
+        if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
             return Ok(());
         }
         let rate = crate::garrison::attack_rate(master, masters, u.reload_powerup);

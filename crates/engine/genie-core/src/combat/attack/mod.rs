@@ -268,7 +268,7 @@ pub(crate) struct AttackReads {
     pub(crate) volleys: bool,
     /// Slot 0x218 (`FUN_141086c90`): the master's reload time (`speed_of_attack`) with the
     /// unit's reload stinger and powerup.
-    pub(crate) reload: f32,
+    pub(crate) reload: Seconds,
     /// The master's hit chance (`+0x83e`).
     pub(crate) hit_chance: i16,
     /// `FUN_14120ea30` for a building: it can attack (class 51 or 54, a missile, or a firepower

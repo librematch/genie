@@ -10,6 +10,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::objects::masters::{Master, Masters};
+use crate::world::Seconds;
 
 /// A combat master's attack rate needs a weapon range above this (`FUN_14120dc10`).
 pub(super) const RATE_RANGE: f32 = crate::math::image::garrison::RATE_RANGE;
@@ -34,9 +35,9 @@ pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) 
 /// else the pierce and class 38 amounts of its volley missile (a master its player has; not for
 /// classes 4 and 6), else its own melee, pierce, class 31 and 38 amounts, over the reload.
 #[must_use]
-pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: f32) -> f32 {
+pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: Seconds) -> f32 {
     // COMISS reload, 0 and COMISS range, 1.0, each with JBE
-    if at_most_or_unordered(master.reload, 0.0)
+    if at_most_or_unordered(master.reload.get(), 0.0)
         || at_most_or_unordered(master.weapon_range.get(), RATE_RANGE)
     {
         return 0.0;
@@ -65,7 +66,7 @@ pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: f32) -> f
             })
         },
     );
-    sum / (master.reload - reload_powerup)
+    sum / (master.reload - reload_powerup).get()
 }
 
 /// Whether the player's master table has a slot for `id` (`0 <= id < player+0x20`), as far as
@@ -82,7 +83,7 @@ pub(super) fn in_table(masters: &Masters, id: MasterId) -> bool {
 /// whole missiles, `CVTTSS2SI`, the products wrapping), plus its own melee, pierce, class 31 and
 /// 38 amounts, over its reload (none at most 1e-7).
 #[must_use]
-pub fn firepower(master: &Master, masters: &Masters, reload_powerup: f32) -> f32 {
+pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) -> f32 {
     let g = master.garrison_firepower;
     // COMISS 0, g; JC: an unordered firepower goes on
     if g <= 0.0 {
@@ -120,7 +121,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: f32) -> f32
             sum += f32::from(amount);
         }
     }
-    let reload = master.reload - reload_powerup;
+    let reload = (master.reload - reload_powerup).get();
     if reload <= EPSILON {
         return 0.0;
     }
@@ -135,7 +136,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: f32) -> f32
 pub fn share(
     master: &Master,
     masters: &Masters,
-    reload_powerup: f32,
+    reload_powerup: Seconds,
     rate: f32,
 ) -> Result<f32, GenieError> {
     if rate == 0.0 {

@@ -14,6 +14,7 @@ use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
+use genie_core::world::Seconds;
 
 /// The default event id a task's load gives a sound without one (`FUN_141062470`'s
 /// `FUN_1413af9a0` calls, an immediate of the code).
@@ -70,7 +71,7 @@ fn dat_task(
         attribute_type2,
         attribute_type3,
         attribute_type4,
-        wait_time: t.search_wait_time,
+        wait_time: Seconds::new(t.search_wait_time),
         work_val1: t.work_value1,
         work_val2: t.work_value2,
         work_range: Distance::new(t.work_range),

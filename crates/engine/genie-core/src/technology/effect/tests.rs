@@ -31,6 +31,7 @@ use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
 use crate::world::Millis;
 use crate::world::Player;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 
 /// A combat unit's charge after its master's maximum charge changes (`FUN_1412163c0`'s
@@ -76,8 +77,8 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let arms = crate::combat::attack::Arms {
@@ -275,8 +276,8 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let _ = t.graphics.insert(300, standing);
@@ -495,11 +496,11 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     );
     let mut tower_master = combat(master_id(79), class::TOWER, 1020);
     tower_master.kind = master_type::BUILDING;
-    tower_master.reload = 2.0;
+    tower_master.reload = Seconds::new(2.0);
     tower_master.weapon_range = Distance::new(8.0);
     tower_master.weapons = vec![ClassAmount::new(3, 5)];
     let mut archer_master = combat(master_id(4), class::CLASS_0, 30);
-    archer_master.reload = 2.0;
+    archer_master.reload = Seconds::new(2.0);
     archer_master.weapons = vec![ClassAmount::new(3, 4)];
     archer_master.garrison_firepower = 1.0;
     t.masters = vec![Masters::new([archer_master, tower_master])];
@@ -814,8 +815,8 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         frames: 1,
         facets: 1,
         speed_multiplier: 2.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     let moving = |id| {
@@ -1874,8 +1875,8 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let mut rng = crate::math::rng::Well512::default();

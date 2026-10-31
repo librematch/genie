@@ -175,9 +175,9 @@ pub struct Unit {
     /// timer, the attack timer's rate and its terrain look.
     pub abilities: crate::combat::abilities::Abilities,
     /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
-    pub reload_stinger: f32,
+    pub reload_stinger: Seconds,
     /// `mReloadPowerup` (`+0xa28`), taken off its master's reload time.
-    pub reload_powerup: f32,
+    pub reload_powerup: Seconds,
     /// What a hit reads of its unit and its target besides the masters: `+0xa24`
     /// (`mAttackPowerup`, the attacker's slot 0x6d8), the armor powerups (`+0xa48` melee,
     /// `+0xa4c` pierce, slots 0x708 and 0x710; whole numbers), the armor attacks removed

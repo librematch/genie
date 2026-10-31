@@ -197,7 +197,7 @@ impl Attack {
         set_attack_timer(
             unit,
             r.world_time,
-            Seconds::new(r.reload - f32::from(frame) * sprite.graphic.frame_duration),
+            r.reload - Seconds::new(f32::from(frame) * sprite.graphic.frame_duration.get()),
         );
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
@@ -230,9 +230,8 @@ impl Attack {
         if f.victim.hp <= HitPoints::ZERO {
             return self.enter(AttackState::Killed, unit);
         }
-        let rest = Seconds::new(
-            r.reload - f32::from(sprite.graphic.frames) * sprite.graphic.frame_duration,
-        );
+        let rest = r.reload
+            - Seconds::new(f32::from(sprite.graphic.frames) * sprite.graphic.frame_duration.get());
         self.rest = rest;
         self.swing = rest;
         if rest < Seconds::ZERO {

@@ -612,8 +612,8 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
             frames: 1,
             facets: 8,
             speed_multiplier: factor,
-            frame_duration: 0.0,
-            replay_delay: 0.0,
+            frame_duration: Seconds::ZERO,
+            replay_delay: Seconds::ZERO,
             flags: 0,
         };
         let _ = t.graphics.insert(id, graphic);
@@ -631,14 +631,14 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
         frames: 1,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.0,
-        replay_delay: 0.0,
+        frame_duration: Seconds::ZERO,
+        replay_delay: Seconds::ZERO,
         flags: 0,
     };
     t.players[1].objects[ListIndex::new(0)].sprite = Some(crate::objects::sprite::ActiveSprite {
         graphic,
         frame: 0,
-        interval: 0.0,
+        interval: Seconds::ZERO,
         last: Seconds::ZERO,
         last_frame: 0,
         changed: false,

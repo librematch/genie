@@ -21,6 +21,7 @@ use genie_core::objects::sprite::Graphic;
 use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::{ARTIFACT_TYPE, ArtifactState};
 use genie_core::players::attribute;
+use genie_core::world::Seconds;
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByType, RgeActionEnter,
     RgeActionGather, RgeActionMake, RgeActionMissile, RgeActionMoveTo, RgeMissileObject, RgeObject,
@@ -44,7 +45,7 @@ fn task(id: i16, range: f32) -> Task {
         attribute_type2: Some(attribute::STONE),
         attribute_type3: Some(attribute::GOLD),
         attribute_type4: Some(attribute::HEADROOM),
-        wait_time: 0.0,
+        wait_time: Seconds::ZERO,
         work_val1: 0.5,
         work_val2: 0.0,
         work_range: Distance::new(range),
@@ -297,8 +298,8 @@ fn a_move_to_takes_its_sprite_from_the_sprites_table() {
         frames: 10,
         facets: 16,
         speed_multiplier: 1.5,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics = std::collections::BTreeMap::from([(5, walking)]);
@@ -690,8 +691,8 @@ fn a_build_takes_its_task_move_to_and_site() {
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     let graphics = std::collections::BTreeMap::from([(12, carried)]);
@@ -1177,8 +1178,8 @@ fn swing_sprites() -> std::collections::BTreeMap<i16, Graphic> {
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 1,
     };
     std::collections::BTreeMap::from([(21, swing)])

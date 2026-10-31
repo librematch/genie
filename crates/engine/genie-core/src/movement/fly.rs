@@ -145,8 +145,8 @@ impl Fly {
             FlyState::Flying => {
                 if self.timer <= Seconds::ZERO {
                     self.set_state_of(bird, FlyState::Resting, c)?;
-                    if EPSILON < rest {
-                        self.timer = Seconds::new(rest);
+                    if EPSILON < rest.get() {
+                        self.timer = rest;
                     }
                 }
                 // the sub-action list's update (FUN_140a992b0): none left (1), the MoveTo's end
@@ -158,8 +158,8 @@ impl Fly {
                 if code == 0 {
                     return Ok(());
                 }
-                if EPSILON < rest {
-                    self.timer += Seconds::new(rest);
+                if EPSILON < rest.get() {
+                    self.timer += rest;
                     return self.set_state_of(bird, FlyState::Resting, c);
                 }
                 self.set_state_of(bird, FlyState::Choosing, c)
@@ -466,8 +466,8 @@ mod tests {
                     frames: 60,
                     facets: 16,
                     speed_multiplier: 1.0,
-                    frame_duration,
-                    replay_delay: 0.0,
+                    frame_duration: Seconds::new(frame_duration),
+                    replay_delay: Seconds::ZERO,
                     flags: 3,
                 };
                 (id, g)

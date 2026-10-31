@@ -765,8 +765,8 @@ fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 3,
     };
     let ibex = Victim {
@@ -1373,8 +1373,8 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
             frames: 10,
             facets: 8,
             speed_multiplier: 1.0,
-            frame_duration: 0.1,
-            replay_delay: 0.0,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
             flags: 0,
         });
         h.attack = Some(a);
@@ -1681,8 +1681,8 @@ fn a_hunt_s_walk_starts_toward_its_target() {
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
-        frame_duration: 0.1,
-        replay_delay: 0.0,
+        frame_duration: Seconds::new(0.1),
+        replay_delay: Seconds::ZERO,
         flags: 3,
     };
     let start = |range: Distance| {

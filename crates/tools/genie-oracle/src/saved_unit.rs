@@ -165,8 +165,12 @@ pub(super) fn unit(
                 .map_or(Seconds::ZERO, |c| Seconds::new(c.movement_damage_timer)),
             ..genie_core::combat::abilities::Abilities::default()
         },
-        reload_stinger: object.combat().map_or(0.0, |c| c.reload_stinger),
-        reload_powerup: object.combat().map_or(0.0, |c| c.reload_powerup),
+        reload_stinger: object
+            .combat()
+            .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_stinger)),
+        reload_powerup: object
+            .combat()
+            .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_powerup)),
         attack_powerup: object.combat().map_or(0.0, |c| c.attack_powerup),
         range_powerup: object
             .combat()

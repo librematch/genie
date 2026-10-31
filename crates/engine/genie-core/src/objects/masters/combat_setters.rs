@@ -31,7 +31,7 @@ impl Master {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::ARMOR | a::ATTACK => self.set_class_amount(attribute, v, world),
-            a::ATTACK_RELOAD_TIME => self.reload = v,
+            a::ATTACK_RELOAD_TIME => self.reload = Seconds::new(v),
             a::ACCURACY_PERCENT => self.hit_chance = low16(v),
             a::MAXIMUM_RANGE => self.weapon_range = Distance::new(v),
             a::BASE_ARMOR => self.base_armor = low16(v),
@@ -101,7 +101,7 @@ impl Master {
         match attribute {
             a::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
             a::ARMOR | a::ATTACK => self.add_class_amount(attribute, v, world),
-            a::ATTACK_RELOAD_TIME => self.reload += v,
+            a::ATTACK_RELOAD_TIME => self.reload += Seconds::new(v),
             a::ACCURACY_PERCENT => self.hit_chance = self.hit_chance.wrapping_add(low16(v)),
             a::MAXIMUM_RANGE => self.weapon_range += Distance::new(v),
             a::BASE_ARMOR => self.base_armor = self.base_armor.wrapping_add(low16(v)),
@@ -185,7 +185,7 @@ impl Master {
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed = self.turn_speed * v,
+            a::ROTATION_SPEED => self.turn_speed *= v,
             a::ARMOR | a::ATTACK => self.multiply_class_amount(attribute, v, world),
             a::ATTACK_RELOAD_TIME => self.reload *= v,
             a::ACCURACY_PERCENT => self.hit_chance = low16(f32::from(self.hit_chance) * v + ROUND),

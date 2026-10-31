@@ -30,6 +30,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
 use crate::vision::registry::UnitUpdate;
+use crate::world::Seconds;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -473,7 +474,7 @@ impl Unit {
         c: &mut Step<'_>,
         target: Option<ObjectId>,
         bp: PlayerId,
-        reload: f32,
+        reload: Seconds,
         me: &Master,
         bm: &Master,
     ) -> Result<(), GenieError> {

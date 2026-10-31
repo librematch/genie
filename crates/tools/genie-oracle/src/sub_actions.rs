@@ -67,7 +67,7 @@ pub(super) fn saved_sprite(
     Some(genie_core::objects::sprite::ActiveSprite {
         graphic,
         frame: node.rge_active_sprite.frame,
-        interval: node.animate_interval,
+        interval: Seconds::new(node.animate_interval),
         last: Seconds::new(node.animate_last),
         last_frame: node.last_frame as i16,
         changed: node.frame_changed != 0,

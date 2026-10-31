@@ -601,7 +601,7 @@ pub(super) fn garrison_firepower(turns: &mut World) {
         let Some(masters) = turns.masters.get(p) else {
             continue;
         };
-        let units: Vec<(ObjectId, ObjectId, MasterId, f32)> = player
+        let units: Vec<(ObjectId, ObjectId, MasterId, Seconds)> = player
             .objects
             .iter()
             .chain(&player.sleeping)

@@ -518,8 +518,8 @@ mod tests {
             frames: 10,
             facets: 16,
             speed_multiplier: factor,
-            frame_duration: 0.1,
-            replay_delay: 0.0,
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
             flags: 1,
         }
     }
