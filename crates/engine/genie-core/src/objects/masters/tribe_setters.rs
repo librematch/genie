@@ -93,25 +93,14 @@ impl Master {
             a::MIN_CONVERSION_TIME_MODIFIER
             | a::MAX_CONVERSION_TIME_MODIFIER
             | a::CONVERSION_CHANCE_MODIFIER => {
-                *a::lane_mut(
-                    &mut self.conversion,
-                    attribute,
-                    (
-                        a::MIN_CONVERSION_TIME_MODIFIER,
-                        a::MAX_CONVERSION_TIME_MODIFIER,
-                    ),
-                ) = v;
+                *self.conversion.lane_mut(attribute) = v;
             }
             a::FORMATION_CATEGORY => self.formation_category = low8(v),
             a::REGENERATION_HP_PERCENT => self.regeneration = f32::from(self.hit_points) * v,
             a::ATTACK_PRIORITY => self.attack_priority = AttackPriority::of_byte(low8(v)),
             a::INVULNERABILITY_LEVEL => self.invulnerability = v,
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
-                *a::lane_mut(
-                    &mut self.volley_spread,
-                    attribute,
-                    (a::SPAWNING_AREA_WIDTH, a::SPAWNING_AREA_LENGTH),
-                ) = v;
+                *self.volley_spread.lane_mut(attribute) = v;
             }
             // the ability's button, tooltips and hotkey action are the interface's
             a::ABILITY_BUTTON_ICON_ID
@@ -241,14 +230,7 @@ impl Master {
             a::MIN_CONVERSION_TIME_MODIFIER
             | a::MAX_CONVERSION_TIME_MODIFIER
             | a::CONVERSION_CHANCE_MODIFIER => {
-                *a::lane_mut(
-                    &mut self.conversion,
-                    attribute,
-                    (
-                        a::MIN_CONVERSION_TIME_MODIFIER,
-                        a::MAX_CONVERSION_TIME_MODIFIER,
-                    ),
-                ) += v;
+                *self.conversion.lane_mut(attribute) += v;
             }
             a::REGENERATION_HP_PERCENT => {
                 self.regeneration += f32::from(self.hit_points) * v;
@@ -257,11 +239,7 @@ impl Master {
             // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             a::ATTACK_GRAPHIC_2 => add_sprite(&mut self.attack_sprite2, v, world),
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
-                *a::lane_mut(
-                    &mut self.volley_spread,
-                    attribute,
-                    (a::SPAWNING_AREA_WIDTH, a::SPAWNING_AREA_LENGTH),
-                ) += v;
+                *self.volley_spread.lane_mut(attribute) += v;
             }
             a::TRAIN_LOCATIONS_ENTRY_MOD => {
                 let n = cvttss2si(f32::from(self.train_location_entry) + v);
@@ -319,22 +297,11 @@ impl Master {
             a::MIN_CONVERSION_TIME_MODIFIER
             | a::MAX_CONVERSION_TIME_MODIFIER
             | a::CONVERSION_CHANCE_MODIFIER => {
-                *a::lane_mut(
-                    &mut self.conversion,
-                    attribute,
-                    (
-                        a::MIN_CONVERSION_TIME_MODIFIER,
-                        a::MAX_CONVERSION_TIME_MODIFIER,
-                    ),
-                ) *= v;
+                *self.conversion.lane_mut(attribute) *= v;
             }
             a::INVULNERABILITY_LEVEL => self.invulnerability *= v,
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
-                *a::lane_mut(
-                    &mut self.volley_spread,
-                    attribute,
-                    (a::SPAWNING_AREA_WIDTH, a::SPAWNING_AREA_LENGTH),
-                ) *= v;
+                *self.volley_spread.lane_mut(attribute) *= v;
             }
             a::TRAIN_LOCATIONS_ENTRY_MOD => {
                 insert_train_location(&mut self.train_locations, &mut self.train_location_entry, v);

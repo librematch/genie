@@ -330,23 +330,6 @@ pub const TRAIN_LOCATIONS_ENTRY_MOD: MasterAttribute = MasterAttribute(158);
 /// "Train Locations Total Num" (`+0x898`'s count).
 pub const TRAIN_LOCATIONS_TOTAL_NUM: MasterAttribute = MasterAttribute(159);
 
-/// The lane of an attribute that sets one of three consecutive attributes' values: `first` and
-/// `second` name the first two lanes, any other attribute of the range is the third.
-pub(crate) const fn lane_mut(
-    lanes: &mut [f32; 3],
-    attribute: MasterAttribute,
-    (first, second): (MasterAttribute, MasterAttribute),
-) -> &mut f32 {
-    let [one, two, three] = lanes;
-    if attribute.0 == first.0 {
-        one
-    } else if attribute.0 == second.0 {
-        two
-    } else {
-        three
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::objects::masters::attribute::{self, MasterAttribute};
@@ -369,19 +352,5 @@ mod tests {
         for n in [69, 78, 81, 92, 130, 132] {
             assert!(!MasterAttribute::numbered(n).shows_sprite(), "{n}");
         }
-    }
-
-    /// A lane setter picks the first, the second, else the third lane.
-    #[test]
-    fn a_lane_setter_picks_its_lane() {
-        let mut lanes = [0.0; 3];
-        let pair = (
-            attribute::SPAWNING_AREA_WIDTH,
-            attribute::SPAWNING_AREA_LENGTH,
-        );
-        *attribute::lane_mut(&mut lanes, attribute::SPAWNING_AREA_LENGTH, pair) = 2.0;
-        *attribute::lane_mut(&mut lanes, attribute::SPAWNING_AREA_RANDOMNESS, pair) = 3.0;
-        *attribute::lane_mut(&mut lanes, attribute::SPAWNING_AREA_WIDTH, pair) = 1.0;
-        assert_eq!(lanes, [1.0, 2.0, 3.0]);
     }
 }

@@ -24,6 +24,7 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 mod combat_setters;
+mod conversion_adjust;
 mod cost_slot;
 mod derived;
 mod dispatch;
@@ -457,7 +458,7 @@ pub struct Master {
     pub max_volley: u8,
     /// `volley_x_spread`, `volley_y_spread` and `volley_start_spread_adjustment` (`+0x8c8`..
     /// `+0x8d0`, the `.dat`'s projectile spawning area): how far a volley's missiles scatter.
-    pub volley_spread: [f32; 3],
+    pub volley_spread: VolleySpread,
     /// `volley_missile_id` (`+0x8d4`, the `.dat`'s secondary projectile), None for −1.
     pub volley_missile: Option<MasterId>,
     /// `mChargeProjectileUnit` (`+0x928`), None for −1.
@@ -513,7 +514,7 @@ pub struct Master {
     pub charge_event: i16,
     /// `+0x934`, `+0x938`, `+0x93c`: `mMinConversionTimeAdj`, `mMaxConversionTimeAdj`,
     /// `mConversionChanceAdj`.
-    pub conversion: [f32; 3],
+    pub conversion: ConversionAdjust,
     /// `+0x908`, the hero glow sprite (−1 for none).
     pub hero_glow_sprite: i16,
     /// `+0x8f0`, the garrison sprite (−1 for none).
@@ -605,12 +606,14 @@ pub mod master_type;
 mod obstruction_class;
 mod obstruction_type;
 mod sound_events;
+mod volley_spread;
 
 pub use self::action_type::ActionType;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
 pub use self::class_id::ClassId;
 pub use self::class_mask::ClassMask;
+pub use self::conversion_adjust::ConversionAdjust;
 pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::gather_group::GatherGroup;
 pub use self::master_id::MasterId;
@@ -618,6 +621,7 @@ pub use self::master_kind::MasterKind;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
 pub use self::sound_events::SoundEvents;
+pub use self::volley_spread::VolleySpread;
 
 #[cfg(test)]
 mod tests;

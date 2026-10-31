@@ -547,12 +547,12 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         (a::REGENERATION_RATE, |m| m.regeneration, [3.0, 5.0, 10.0]),
         (
             a::MIN_CONVERSION_TIME_MODIFIER,
-            |m| m.conversion[0],
+            |m| m.conversion.min_time,
             [3.0, 5.0, 10.0],
         ),
         (
             a::CONVERSION_CHANCE_MODIFIER,
-            |m| m.conversion[2],
+            |m| m.conversion.chance,
             [3.0, 5.0, 10.0],
         ),
         (
@@ -588,12 +588,12 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SPAWNING_AREA_WIDTH,
-            |m| m.volley_spread[0],
+            |m| m.volley_spread.x,
             [3.0, 5.0, 10.0],
         ),
         (
             a::SPAWNING_AREA_RANDOMNESS,
-            |m| m.volley_spread[2],
+            |m| m.volley_spread.start,
             [3.0, 5.0, 10.0],
         ),
         // the selected entry plus ten times the count, as the damage sprites'
@@ -1114,13 +1114,27 @@ fn the_combat_master_s_own_values_change() {
         (5, Charge::new(15.0), ChargeRate::new(0.5))
     );
     assert_eq!((m.charge_event, m.charge_type), (2, 6));
-    assert_eq!(m.conversion, [0.0, 4.0, 0.0]);
+    assert_eq!(
+        m.conversion,
+        ConversionAdjust {
+            min_time: 0.0,
+            max_time: 4.0,
+            chance: 0.0
+        }
+    );
     assert_eq!(m.regeneration, 30.0);
     assert_eq!(
         (m.volley_fire, m.max_volley, m.attack_sprite2),
         (2.0, 0, 12)
     );
-    assert_eq!(m.volley_spread, [0.0, 0.0, 0.5]);
+    assert_eq!(
+        m.volley_spread,
+        VolleySpread {
+            x: 0.0,
+            y: 0.0,
+            start: 0.5
+        }
+    );
     assert_eq!(
         (m.volley_missile, m.charge_projectile),
         (None, Some(master_id(1500)))

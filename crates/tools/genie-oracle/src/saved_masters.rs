@@ -14,6 +14,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
@@ -217,11 +218,11 @@ pub(super) fn work_masters(
             work.hero_flag = c.hero_flag;
             work.volley_fire = c.volley_fire_amount;
             work.max_volley = c.max_attacks_in_volley;
-            work.volley_spread = [
-                c.volley_x_spread,
-                c.volley_y_spread,
-                c.volley_start_spread_adjustment,
-            ];
+            work.volley_spread = VolleySpread {
+                x: c.volley_x_spread,
+                y: c.volley_y_spread,
+                start: c.volley_start_spread_adjustment,
+            };
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);
             work.volley_missile = id(c.volley_missile_id);
             work.charge_projectile = id(c.charge_projectile_unit);

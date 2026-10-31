@@ -18,6 +18,7 @@ use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::WorkRate;
+use crate::objects::lifecycle::death_parts::FarmBonus;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::TaskId;
@@ -174,10 +175,8 @@ pub struct Construction {
 pub struct Completion<'a> {
     /// The building's master.
     pub master: Option<&'a Master>,
-    /// The owner's attributes 237, 238 and 239 (`player+0x768`..`+0x778`): a farm's bonus when
-    /// built, its amount, its resource and a master near which it is given
-    /// ([`Completion::first_part`]).
-    pub farm_bonus: [f32; 3],
+    /// The owner's farm bonus ([`FarmBonus`], attributes 237 to 239).
+    pub farm_bonus: FarmBonus,
     /// The owner's masters, whose table `FUN_141659d20` reads.
     pub masters: Option<&'a crate::objects::masters::Masters>,
     /// The owner is a computer player (`FUN_141659cf0`).
@@ -234,8 +233,12 @@ impl Completion<'_> {
         }
         let mut part = FirstPart::default();
         if master.class == class::FARM && Seconds::of_master(c.build_time) <= c.progress {
-            let [amount, resource, near] = self.farm_bonus;
-            let (resource, near) = (cvttss2si(resource), cvttss2si(near));
+            let FarmBonus {
+                amount,
+                resource,
+                near,
+            } = self.farm_bonus;
+            let (resource, near) = (cvttss2si(resource.get()), cvttss2si(near.get()));
             if 0 <= resource && 0 <= near {
                 let has = i16::try_from(near)
                     .ok()
@@ -251,7 +254,7 @@ impl Completion<'_> {
                     .ok()
                     .and_then(AttributeId::of_data)
                     .ok_or(crate::world::NO_ATTRIBUTE)?;
-                part.attributes.push((attribute, Amount::new(amount)));
+                part.attributes.push((attribute, amount));
             }
             // the game mode is not the editor's (4) in a game
             part.pasture = matches!(master.id, ids::PASTURE_MANGROVE | ids::PASTURE);

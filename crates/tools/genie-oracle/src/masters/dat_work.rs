@@ -13,6 +13,7 @@ use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
 use genie_core::world::Seconds;
@@ -251,7 +252,10 @@ pub(super) fn dat_work(
         volley_spread: unit
             .creatable
             .as_ref()
-            .map_or([0.0; 3], |c| c.projectile_spawning_area),
+            .map_or_else(VolleySpread::default, |c| {
+                let [x, y, start] = c.projectile_spawning_area;
+                VolleySpread { x, y, start }
+            }),
         volley_missile: unit
             .creatable
             .as_ref()

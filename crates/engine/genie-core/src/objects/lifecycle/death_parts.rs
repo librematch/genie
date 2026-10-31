@@ -27,9 +27,26 @@ use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`Completion::farm_bonus`]);
 /// −1 for those the player has not got.
-pub(crate) fn farm_bonus(attributes: &[Amount]) -> [f32; 3] {
+pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
     let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::new(-1.0));
-    [at(237).get(), at(238).get(), at(239).get()]
+    FarmBonus {
+        amount: at(237),
+        resource: at(238),
+        near: at(239),
+    }
+}
+
+/// The owner's attributes 237, 238 and 239 (`player+0x768`..`+0x778`): a farm's bonus when
+/// built, its amount, the resource it goes to and a master near which it is given
+/// ([`Completion::first_part`]); each −1 when the player has not got it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FarmBonus {
+    /// Attribute 237: the amount.
+    pub amount: Amount,
+    /// Attribute 238: the resource (an attribute id as the player's value holds it).
+    pub resource: Amount,
+    /// Attribute 239: the master near which it is given (an id as the value holds it).
+    pub near: Amount,
 }
 
 /// `FUN_1411980b0`'s visible resources, from `set_state` leaving a state below 4 for one above 6

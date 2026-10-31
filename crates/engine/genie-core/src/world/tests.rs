@@ -59,6 +59,7 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::VolleySpread;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -15504,7 +15505,11 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         reload: Seconds::new(2.0),
         hit_chance,
         max_volley,
-        volley_spread: [spread, spread, 0.0],
+        volley_spread: VolleySpread {
+            x: spread,
+            y: spread,
+            start: 0.0,
+        },
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         ..Master::default()
     };

@@ -20,6 +20,7 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::VolleySpread;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
@@ -110,15 +111,25 @@ impl Unit {
         let missile = master.missile.is_some();
         // what the rest reads of the master, before the notify changes the unit
         let notifies = matches!(master.id, ids::ID_73 | ids::ID_559);
-        let (trebuchet, [x_spread, y_spread, _]) =
-            (master.class == class::CLASS_54, master.volley_spread);
+        let (
+            trebuchet,
+            VolleySpread {
+                x: x_spread,
+                y: y_spread,
+                ..
+            },
+        ) = (master.class == class::CLASS_54, master.volley_spread);
         let (first, extra) = if master.max_volley == 0 {
             (true, 0)
         } else {
             let count = crate::combat::missile::volley_count(self.firepower, master.max_volley);
             let old = self.next_volley;
             let mut n = count - i32::from(old);
-            let [x_spread, y_spread, _] = master.volley_spread;
+            let VolleySpread {
+                x: x_spread,
+                y: y_spread,
+                ..
+            } = master.volley_spread;
             let mut all = true;
             if master.combat_ability & 0x10 == 0 {
                 let k = if 0.0 < x_spread || 0.0 < y_spread {
@@ -267,7 +278,7 @@ impl Unit {
             self.position(),
             facing,
             master.weapon_offset,
-            master.volley_spread[2],
+            master.volley_spread.start,
             scatter,
             building.then_some(aimed.position.ground()),
         );

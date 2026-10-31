@@ -352,10 +352,14 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
         snow: false,
         sprite_override: false,
     };
-    let part = |bonus: [f32; 3], c: &Construction| {
+    let part = |[amount, resource, near]: [f32; 3], c: &Construction| {
         Completion {
             master: Some(&farm),
-            farm_bonus: bonus,
+            farm_bonus: FarmBonus {
+                amount: Amount::new(amount),
+                resource: Amount::new(resource),
+                near: Amount::new(near),
+            },
             masters: Some(&masters),
             computer: false,
             ai: false,
@@ -400,7 +404,11 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
     let searches = |ai: bool| {
         Completion {
             master: Some(&cart),
-            farm_bonus: [0.0; 3],
+            farm_bonus: FarmBonus {
+                amount: Amount::ZERO,
+                resource: Amount::ZERO,
+                near: Amount::ZERO,
+            },
             masters: None,
             computer: false,
             ai,

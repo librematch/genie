@@ -35,6 +35,7 @@ file for what the save does not hold.
 | [`class_id.rs`](class_id.rs) | A master's class as one type: the group of masters the game treats alike (villagers, siege weapons, gates, farms), the value the `.dat` names `unit_class`. |
 | [`class_mask.rs`](class_mask.rs) | A set of classes as the game tests one: a bit mask over the classes below a bound. |
 | [`combat_setters.rs`](combat_setters.rs) | The RGE combat and missile masters' setters: the armor and attack amounts. |
+| [`conversion_adjust.rs`](conversion_adjust.rs) | A master's adjustments of a conversion (`ConversionAdjust`). |
 | [`cost_slot.rs`](cost_slot.rs) | A master's cost (`+0x880`): three slots in their places, an empty one among them. |
 | [`damage_class.rs`](damage_class.rs) | An armor or attack entry's class as one type, and the entry: the `.dat`'s armor and attack classes. |
 | [`derived.rs`](derived.rs) | The values the slice derives from a master after a change (`Master::follow`): the sprites' speed and facets, a moving unit's values. |
@@ -54,6 +55,7 @@ file for what the save does not hold.
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tribe_setters.rs`](tribe_setters.rs) | The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the train locations. |
 | [`values.rs`](values.rs) | What the attribute setters share: the caps, the truncations, the sprite and class amounts, the damage sprites' and train locations' entries. |
+| [`volley_spread.rs`](volley_spread.rs) | How far a volley's missiles scatter (`VolleySpread`). |
 <!-- /files -->
 
 ## How it connects
