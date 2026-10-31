@@ -102,7 +102,7 @@ impl World {
             .map_or_else(|| unit.position(), |m| m.moved_at);
         let flags = self.spatial.terrain.as_ref().map_or(0, |t| {
             t.kind(at.ground().tile())
-                .and_then(|k| t.terrains.get(usize::from(k)))
+                .and_then(|k| t.terrains.get(k.index()))
                 .map_or(0, |k| k.flags)
         });
         let graphics = &self.graphics;

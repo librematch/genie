@@ -201,7 +201,7 @@ pub(crate) fn built_death(
         ));
     }
     let adds = storage_leaves(u, master);
-    if building.foundation_terrain == RESTORED_FOUNDATION {
+    if building.foundation_terrain == Some(RESTORED_FOUNDATION) {
         return Err(GenieError::unsupported(
             "a dying building of foundation terrain 28 (its terrain 1, FUN_1411ce250)",
         ));

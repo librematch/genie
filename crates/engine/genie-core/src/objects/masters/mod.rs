@@ -12,6 +12,7 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
 use crate::map::Offset;
+use crate::map::TerrainId;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
@@ -193,8 +194,8 @@ pub struct BuildingMaster {
     pub disappears_when_built: bool,
     /// `+0x986`, `stack_unit_id`: the building becomes another (−1 for none).
     pub stack_unit: Option<MasterId>,
-    /// `+0x988`, `foundation_terrain_id` (the save's `on_build_make_tile`; −1 for none).
-    pub foundation_terrain: i16,
+    /// `+0x988`, `foundation_terrain_id` (the save's `on_build_make_tile`), none for −1.
+    pub foundation_terrain: Option<TerrainId>,
     /// `+0x98c`, `tech_id`: the technology its completion researches (−1 for none).
     pub tech: Option<TechId>,
     /// `+0x9bc`, `garrison_type`: the kinds of units it takes in (bit 0 villagers, `FUN_14120eb10`).
@@ -397,10 +398,8 @@ pub struct Master {
     /// players who explored its tile but do not see it, at its death and once they lose sight
     /// of it ([`crate::vision::ghost`]).
     pub ghost_on_death: u8,
-    /// The placement terrains (`+0x5f2`..`+0x5f8`, the `.dat`'s `placement_side_terrain` and
-    /// `placement_terrain`, −1 for none): the two side terrains, then the two terrains
-    /// ([`crate::production::spawn::placement_terrains`]).
-    pub placement: [i16; 4],
+    /// The placement terrains (`+0x5f2`..`+0x5f8`).
+    pub placement: PlacementTerrains,
     /// The death sprite (`+0x480`, −1 for none) and the death spawns (`+0x5e4`, `+0x5e6`, −1 for
     /// none), and what a dead object's steps read of the master
     /// ([`crate::objects::lifecycle::MasterData`]), for a new object's [`crate::objects::lifecycle::Lifecycle`].
@@ -605,6 +604,7 @@ mod master_kind;
 pub mod master_type;
 mod obstruction_class;
 mod obstruction_type;
+mod placement_terrains;
 mod sound_events;
 mod task_sprites;
 mod volley_spread;
@@ -621,6 +621,7 @@ pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
+pub use self::placement_terrains::PlacementTerrains;
 pub use self::sound_events::SoundEvents;
 pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;

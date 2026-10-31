@@ -2,6 +2,7 @@
 //! sees them, the visible maps and resources against the game's.
 
 use genie_core::map::Distance;
+use genie_core::map::terrain::TileTerrain;
 use genie_core::map::{GridSize, TileOffset};
 use genie_core::movement::Speed;
 
@@ -35,7 +36,7 @@ pub(super) fn map_terrain(
         .flat_map(|r| {
             r.tiles
                 .iter()
-                .map(|t| (t.terrain_type, t.restore_terrain_type, t.layer))
+                .map(|t| TileTerrain::of_save(t.terrain_type, t.restore_terrain_type, t.layer))
         })
         .collect();
     let mut t = genie_core::map::terrain::Terrain::new(
@@ -95,7 +96,12 @@ pub(super) fn tile_differences(
 ) -> Vec<String> {
     let mut out = Vec::new();
     for (i, &theirs) in tiles.iter().enumerate() {
-        let ours = (slice.kinds[i], slice.restore[i], slice.layers[i]);
+        let ours = TileTerrain {
+            kind: slice.kinds[i],
+            restore: slice.restore[i],
+            layer: slice.layers[i],
+        };
+        let theirs = TileTerrain::of_save(theirs.0, theirs.1, theirs.2);
         if ours != theirs {
             let (x, y) = (i % width, i / width);
             out.push(format!(

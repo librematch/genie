@@ -894,7 +894,7 @@ mod clearing_tests {
                 buildable_on: 1,
                 building: Some(crate::objects::masters::BuildingMaster {
                     stack_unit: None,
-                    foundation_terrain: -1,
+                    foundation_terrain: None,
                     tech: None,
                     annexes: [None; 4],
                     head_unit: None,

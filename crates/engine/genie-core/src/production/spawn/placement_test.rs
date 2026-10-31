@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Radii;
+use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -15,6 +16,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::RELIC;
 use crate::objects::masters::master_type;
@@ -136,7 +138,7 @@ pub struct Placing<'a> {
     /// `hill_mode` (`+0x604`).
     pub hill_mode: u8,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
-    pub placement: [i16; 4],
+    pub placement: PlacementTerrains,
 }
 
 /// What the placement test reads of the map.
@@ -144,7 +146,7 @@ pub trait PlaceMap {
     /// The map's size in tiles.
     fn size(&self) -> GridSize;
     /// A tile's terrain (the map tile's `+0x9`).
-    fn terrain(&self, tile: Tile) -> Result<u8, GenieError>;
+    fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError>;
     /// Terrain `t`'s flags (the `.dat`'s `is_water` byte, the map's terrain record `+2`), None
     /// beyond the terrains.
     fn terrain_flags(&self, _t: usize) -> Option<u8> {
@@ -346,7 +348,7 @@ pub(super) fn build_static_test(
             let t = map.terrain(tile)?;
             let value = site
                 .restriction
-                .get(usize::from(t))
+                .get(t.index())
                 .ok_or(GenieError::unsupported(
                     "a terrain its restriction does not list",
                 ))?;
@@ -533,7 +535,7 @@ pub fn placement(
                 let t = map.terrain(tile)?;
                 let value = me
                     .restriction
-                    .get(usize::from(t))
+                    .get(t.index())
                     .ok_or(GenieError::unsupported(
                         "a terrain its restriction does not list",
                     ))?;

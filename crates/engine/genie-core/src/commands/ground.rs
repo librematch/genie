@@ -4,6 +4,7 @@
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainId;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
@@ -189,7 +190,10 @@ impl World {
         position: Position,
     ) -> Result<(), GenieError> {
         /// The farms and the terrain their foundations lay (`0x1d`, `0x41`).
-        const LAID: [(MasterId, u8); 2] = [(ids::FARM, 29), (ids::ID_1187, 65)];
+        const LAID: [(MasterId, TerrainId); 2] = [
+            (ids::FARM, TerrainId::named(29)),
+            (ids::ID_1187, TerrainId::named(65)),
+        ];
         let Some(&(_, laid)) = LAID.iter().find(|(m, _)| *m == master) else {
             return Ok(());
         };

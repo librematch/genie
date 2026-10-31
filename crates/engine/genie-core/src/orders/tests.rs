@@ -9,6 +9,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::RestrictionId;
 use crate::map::Tile;
+use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
@@ -4036,7 +4037,7 @@ fn searchable(mut t: World) -> World {
     };
     s.terrain = Some(crate::map::terrain::Terrain::new(
         GridSize::new(60, 60),
-        vec![(0, 255, -1); 3600],
+        vec![TileTerrain::of_save(0, 255, -1); 3600],
         vec![kind],
         vec![vec![1.0]],
     ));

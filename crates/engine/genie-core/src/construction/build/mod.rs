@@ -416,6 +416,7 @@ mod stack_tests {
     use crate::map::GroundOffset;
     use crate::map::Radii;
     use crate::map::spatial::{Placed, Tiles};
+    use crate::map::terrain::TileTerrain;
     use crate::movement::Speed;
     use crate::movement::TurnRate;
     use crate::objects::ListIndex;
@@ -464,7 +465,7 @@ mod stack_tests {
             hit_points: hp,
             building: Some(BuildingMaster {
                 stack_unit: None,
-                foundation_terrain: -1,
+                foundation_terrain: None,
                 tech: None,
                 annexes: slots,
                 annex_offsets: offsets,
@@ -602,7 +603,7 @@ mod stack_tests {
         );
         t.spatial.terrain = Some(crate::map::terrain::Terrain::new(
             GridSize::new(200, 200),
-            vec![(0, 255, -1); 200 * 200],
+            vec![TileTerrain::of_save(0, 255, -1); 200 * 200],
             vec![
                 crate::map::terrain::TerrainKind {
                     shown: true,

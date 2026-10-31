@@ -3,6 +3,7 @@
 
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
+use crate::map::TerrainId;
 use crate::objects::HitPoints;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::MasterAttribute;
@@ -336,7 +337,7 @@ impl Master {
             }
             a::FOUNDATION_TERRAIN => {
                 if let Some(b) = self.building.as_mut() {
-                    b.foundation_terrain = low16(v);
+                    b.foundation_terrain = TerrainId::of_data(low16(v));
                 }
             }
             a::GARRISON_HEAL_RATE => {
@@ -377,7 +378,8 @@ impl Master {
             }
             a::FOUNDATION_TERRAIN => {
                 if let Some(b) = self.building.as_mut() {
-                    b.foundation_terrain = b.foundation_terrain.wrapping_add(low16(v));
+                    let was = b.foundation_terrain.map_or(-1, |t| i16::from(t.get()));
+                    b.foundation_terrain = TerrainId::of_data(was.wrapping_add(low16(v)));
                 }
             }
             a::GARRISON_HEAL_RATE => {

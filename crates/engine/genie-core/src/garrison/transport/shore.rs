@@ -35,7 +35,7 @@ pub(crate) fn retry_point(
     loop {
         let tries = left;
         left = tries - 1;
-        if !matches!(seen.wrapping_sub(DEEP_WATER), 0 | 1) && seen != WATER {
+        if !matches!(seen.get().wrapping_sub(DEEP_WATER.get()), 0 | 1) && seen != WATER {
             break;
         }
         let x = (rng.rand15() / RETRY_STEP) as f32 + point.x() - RETRY_SPREAD;

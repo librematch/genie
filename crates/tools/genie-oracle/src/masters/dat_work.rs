@@ -3,6 +3,7 @@
 
 use genie_core::GenieError;
 use genie_core::map::Distance;
+use genie_core::map::TerrainId;
 use genie_core::map::{Footprint, GroundOffset, Radii};
 use genie_core::objects::HitPoints;
 use genie_core::objects::SpriteId;
@@ -13,6 +14,7 @@ use genie_core::objects::masters::GatherGroup;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
+use genie_core::objects::masters::PlacementTerrains;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::VolleySpread;
@@ -199,7 +201,7 @@ pub(super) fn dat_work(
             adjacent_mode: b.adjacent_mode,
             disappears_when_built: b.disappears_when_built != 0,
             stack_unit: MasterId::of_data(b.stack_unit_id),
-            foundation_terrain: b.foundation_terrain_id,
+            foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
             tech: genie_core::technology::TechId::of_data(b.tech_id),
             garrison_type: b.garrison_type,
             garrison_heal_rate: HitPoints::new(b.garrison_heal_rate),
@@ -220,12 +222,12 @@ pub(super) fn dat_work(
         available: unit.enabled != 0,
         disabled: unit.disabled != 0,
         ghost_on_death: unit.create_doppelganger_on_death,
-        placement: [
+        placement: PlacementTerrains::of_data([
             unit.placement_side_terrain[0],
             unit.placement_side_terrain[1],
             unit.placement_terrain[0],
             unit.placement_terrain[1],
-        ],
+        ]),
         special_graphic: unit
             .creatable
             .as_ref()

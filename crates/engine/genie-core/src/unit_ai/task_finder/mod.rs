@@ -13,6 +13,7 @@
 //! its id + 0x609c), the port compares the decoded values and names the encoded ones.
 
 use crate::GenieError;
+use crate::map::TerrainId;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -93,7 +94,7 @@ pub struct TaskOn<'t, 'a> {
     /// The target the general search reads.
     pub general: Option<&'t TaskTarget<'a>>,
     /// The terrain under the point.
-    pub terrain: Option<i16>,
+    pub terrain: Option<TerrainId>,
 }
 
 /// What the finder reads of the world: the players' relations (`FUN_141663dc0`: whether `from`
@@ -321,7 +322,7 @@ fn general<'m>(
     list: &'m Master,
     actor: &Actor<'_>,
     target: Option<&TaskTarget<'_>>,
-    terrain: Option<i16>,
+    terrain: Option<TerrainId>,
     filter: Option<ActionType>,
     dip: &impl Diplomacy,
 ) -> Option<&'m Task> {
@@ -349,7 +350,8 @@ fn general<'m>(
     }
     let kind = terrain?;
     first(list, |task| {
-        task.terrain as u16 == (kind as u16 & 0xff) && wanted(filter, task)
+        // the task's short against the terrain's byte
+        task.terrain as u16 == u16::from(kind.get()) && wanted(filter, task)
     })
 }
 
@@ -405,7 +407,7 @@ pub fn find_task<'m>(
     actor: &Actor<'_>,
     target: Option<&TaskTarget<'_>>,
     general_target: Option<&TaskTarget<'_>>,
-    terrain: Option<i16>,
+    terrain: Option<TerrainId>,
     filter: Option<ActionType>,
     dip: &impl Diplomacy,
 ) -> Result<Option<&'m Task>, GenieError> {
@@ -505,7 +507,7 @@ fn finder_tail<'m>(
     list: &'m Master,
     actor: &Actor<'_>,
     (target, general_target): (Option<&TaskTarget<'_>>, Option<&TaskTarget<'_>>),
-    terrain: Option<i16>,
+    terrain: Option<TerrainId>,
     filter: Option<ActionType>,
     dip: &impl Diplomacy,
 ) -> Result<Option<&'m Task>, GenieError> {
@@ -1316,19 +1318,23 @@ mod tests {
             find_task(&ship, &a, t, t, terrain, filter, &Alone).map(|f| f.map(|k| k.action_type))
         };
         assert_eq!(
-            found(None, Some(2), None),
+            found(None, Some(TerrainId::named(2)), None),
             Ok(Some(crate::garrison::transport::TRANSPORT))
         );
         assert_eq!(
-            found(None, Some(2), Some(crate::garrison::transport::TRANSPORT)),
+            found(
+                None,
+                Some(TerrainId::named(2)),
+                Some(crate::garrison::transport::TRANSPORT)
+            ),
             Ok(Some(crate::garrison::transport::TRANSPORT))
         );
-        assert_eq!(found(None, Some(1), None), Ok(None));
+        assert_eq!(found(None, Some(TerrainId::named(1)), None), Ok(None));
         assert_eq!(found(None, None, None), Ok(None));
         let villager = master(ids::VILLAGER_MALE, COMBAT, class::VILLAGER, vec![]);
         let peasant = building(&villager, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
-            found(Some(&peasant), Some(2), None),
+            found(Some(&peasant), Some(TerrainId::named(2)), None),
             Ok(Some(crate::garrison::transport::TRANSPORT))
         );
     }

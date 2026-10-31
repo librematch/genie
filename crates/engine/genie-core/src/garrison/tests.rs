@@ -13,6 +13,7 @@ use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::terrain::TileTerrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
@@ -1591,7 +1592,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     t.spatial = crate::map::spatial::Spatial::new(GridSize::new(w, h));
     let mut terrain = crate::map::terrain::Terrain::new(
         GridSize::new(w, h),
-        vec![(0, 255, -1); n],
+        vec![TileTerrain::of_save(0, 255, -1); n],
         vec![
             crate::map::terrain::TerrainKind {
                 shown: true,
@@ -2393,6 +2394,7 @@ fn shore_world(at: Point, ship: Point) -> World {
             y if 18 <= y => (2, 255, -1),
             _ => (0, 255, -1),
         })
+        .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
         .collect();
     let kind = |flags| crate::map::terrain::TerrainKind {
         shown: true,
@@ -2669,7 +2671,10 @@ fn coast_world(ship: Point) -> World {
     let restrictions = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
     let mut terrain = crate::map::terrain::Terrain::new(
         GridSize::new(30, 20),
-        tiles,
+        tiles
+            .into_iter()
+            .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
+            .collect(),
         vec![kind(8), kind(1)],
         restrictions.clone(),
     );

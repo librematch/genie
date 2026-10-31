@@ -11,6 +11,7 @@ mod rect;
 mod restriction_id;
 pub mod spatial;
 pub mod terrain;
+mod terrain_id;
 mod terrain_mask;
 mod tile;
 
@@ -22,5 +23,6 @@ pub use self::position::Position;
 pub use self::radii::{Footprint, Radii};
 pub use self::rect::{Rect, Segment};
 pub use self::restriction_id::RestrictionId;
+pub use self::terrain_id::TerrainId;
 pub use self::terrain_mask::TerrainMask;
 pub use self::tile::{Tile, TileOffset, TileRect};

@@ -5,14 +5,17 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
 use crate::map::Radii;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::TileOffset;
+use crate::map::TileRect;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -117,8 +120,8 @@ impl PlaceMap for Hill {
     fn size(&self) -> GridSize {
         GridSize::new(10, 10)
     }
-    fn terrain(&self, _: Tile) -> Result<u8, GenieError> {
-        Ok(0)
+    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
+        Ok(TerrainId::named(0))
     }
     fn explored(&self, _: PlayerId, _: Tile) -> bool {
         true
@@ -268,8 +271,8 @@ impl PlaceMap for Fogged {
     fn size(&self) -> GridSize {
         GridSize::new(120, 120)
     }
-    fn terrain(&self, _: Tile) -> Result<u8, GenieError> {
-        Ok(0)
+    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
+        Ok(TerrainId::named(0))
     }
     fn explored(&self, _: PlayerId, _: Tile) -> bool {
         true
@@ -327,7 +330,7 @@ fn a_fogged_building_blocks_a_build_by_its_visibility_mask() {
         obstructs: true,
         restriction: &[1.0],
         hill_mode: 0,
-        placement: [-1; 4],
+        placement: PlacementTerrains::NONE,
         zones: false,
         own: &[],
     };
@@ -362,8 +365,8 @@ impl PlaceMap for Flat {
     fn size(&self) -> GridSize {
         GridSize::new(120, 120)
     }
-    fn terrain(&self, _: Tile) -> Result<u8, GenieError> {
-        Ok(0)
+    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
+        Ok(TerrainId::named(0))
     }
     fn explored(&self, _: PlayerId, _: Tile) -> bool {
         true
@@ -402,7 +405,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         class: class::VILLAGER,
         restriction: &[1.0],
         hill_mode: 0,
-        placement: [-1; 4],
+        placement: PlacementTerrains::NONE,
     };
     let map = Flat(vec![sheep(ObjectState::Alive)]);
     let at = |x, y| placement(&villager, &map, Point::new(x, y), false).unwrap();
@@ -422,7 +425,7 @@ fn the_first_object_of_a_tile_s_list_reports_the_block() {
         class: class::VILLAGER,
         restriction: &[1.0],
         hill_mode: 0,
-        placement: [-1; 4],
+        placement: PlacementTerrains::NONE,
     };
     // a sheep that stays (state 2) and a soldier that does not, on the same tile
     let soldier = Near {
@@ -1015,8 +1018,8 @@ impl PlaceMap for Dark {
     fn size(&self) -> GridSize {
         GridSize::new(120, 120)
     }
-    fn terrain(&self, _: Tile) -> Result<u8, GenieError> {
-        Ok(0)
+    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
+        Ok(TerrainId::named(0))
     }
     fn explored(&self, _: PlayerId, _: Tile) -> bool {
         false
@@ -1054,7 +1057,7 @@ const fn house_site(restriction: &[f32], human: bool) -> BuildSite<'_> {
         obstructs: true,
         restriction,
         hill_mode: 0,
-        placement: [-1; 4],
+        placement: PlacementTerrains::NONE,
         zones: false,
         own: &[],
     }
@@ -1432,5 +1435,132 @@ fn the_build_s_static_scans_find_a_dying_house_build_passes_over() {
             house
         ),
         0
+    );
+}
+
+/// A 3×3 map of terrains `kinds` (row by row) whose terrain `t` has the flags `flags[t]`, for
+/// the placement terrains' test ([`placement_terrains`]).
+struct Terrains {
+    kinds: [u8; 9],
+    flags: Vec<u8>,
+}
+
+impl PlaceMap for Terrains {
+    fn size(&self) -> GridSize {
+        GridSize::new(3, 3)
+    }
+    fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError> {
+        let i = self
+            .size()
+            .index(tile)
+            .ok_or(GenieError::unsupported("off the map"))?;
+        Ok(TerrainId::named(self.kinds[i]))
+    }
+    fn terrain_flags(&self, t: usize) -> Option<u8> {
+        self.flags.get(t).copied()
+    }
+    fn terrain_count(&self) -> usize {
+        self.flags.len()
+    }
+    fn explored(&self, _: PlayerId, _: Tile) -> bool {
+        true
+    }
+    fn visible(&self, _: PlayerId, _: Tile) -> bool {
+        true
+    }
+    fn vision(&self, _: PlayerId) -> [u64; 2] {
+        [0; 2]
+    }
+    fn elevation(&self, _: Tile) -> Option<u8> {
+        Some(0)
+    }
+    fn shape(&self, _: Tile) -> Option<u8> {
+        Some(0)
+    }
+    fn allied(&self, a: PlayerId, b: PlayerId, _: bool) -> bool {
+        a == b
+    }
+    fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {
+        Ok(Vec::new())
+    }
+}
+
+/// The point's tile must be of one of the master's terrains or share the water flag 4 or the
+/// shallows flag 8 with them; a terrain of none beside a set one reads flags the map has not
+/// got, which is not modelled.
+#[test]
+fn a_placement_terrain_takes_its_own_tile_or_one_of_a_shared_flag() {
+    use crate::production::spawn::terrains::point_terrain_allows;
+    // terrains 0 (land), 1 (water, 4), 2 (water, 4), 3 (shallows, 8)
+    let map = Terrains {
+        kinds: [0, 1, 2, 3, 0, 0, 0, 0, 0],
+        flags: vec![0, 4, 4, 8],
+    };
+    let t = |id: u8| Some(TerrainId::named(id));
+    let at = |i: i32| Tile::new(i % 3, i / 3);
+    assert_eq!(point_terrain_allows(&map, [t(1), t(3)], at(1)), Ok(true));
+    assert_eq!(point_terrain_allows(&map, [t(1), t(3)], at(2)), Ok(true));
+    assert_eq!(point_terrain_allows(&map, [t(2), t(2)], at(3)), Ok(false));
+    assert_eq!(point_terrain_allows(&map, [t(3), t(3)], at(3)), Ok(true));
+    assert_eq!(point_terrain_allows(&map, [t(1), t(2)], at(0)), Ok(false));
+    assert!(point_terrain_allows(&map, [t(1), None], at(0)).is_err());
+}
+
+/// The side terrains: the master's own, then every other terrain with the flag 0x40 (then 0x10)
+/// that one of its own has, in the terrains' order.
+#[test]
+fn side_terrains_take_the_others_of_a_shared_flag() {
+    use crate::production::spawn::terrains::side_terrains;
+    let map = Terrains {
+        kinds: [0; 9],
+        flags: vec![0, 0x40, 0x40, 0x10, 0x50],
+    };
+    let t = |id: u8| Some(TerrainId::named(id));
+    let ids = |v: &[u8]| v.iter().copied().map(TerrainId::named).collect::<Vec<_>>();
+    assert_eq!(side_terrains(&map, [t(0), t(0)]), Ok(ids(&[0, 0])));
+    assert_eq!(side_terrains(&map, [t(1), t(0)]), Ok(ids(&[1, 0, 2, 4])));
+    assert_eq!(side_terrains(&map, [t(3), t(3)]), Ok(ids(&[3, 3, 4])));
+    assert!(side_terrains(&map, [t(1), None]).is_err());
+}
+
+/// The placement terrains of a master: with terrains the point's tile must be of one and the box
+/// shrinks to it; with side terrains a tile beside the box must be of one.
+#[test]
+fn a_master_s_placement_terrains_test_the_point_and_the_tiles_beside() {
+    // the centre (1, 1) of terrain 5, the tile right of it (2, 1) of terrain 6
+    let map = Terrains {
+        kinds: [0, 0, 0, 0, 5, 6, 0, 0, 0],
+        flags: vec![0; 8],
+    };
+    let t = |id: u8| Some(TerrainId::named(id));
+    let centre = Point::new(1.5, 1.5);
+    let whole = TileRect::new(0, 0, 2, 2);
+    let test = |placement| placement_terrains(placement, &map, centre, whole);
+    assert_eq!(test(PlacementTerrains::NONE), Ok(true));
+    let on = |a, b| PlacementTerrains {
+        on: [a, b],
+        ..PlacementTerrains::NONE
+    };
+    assert_eq!(test(on(t(5), t(5))), Ok(true));
+    assert_eq!(test(on(t(6), t(6))), Ok(false));
+    let beside = |a, b| PlacementTerrains {
+        beside: [a, b],
+        ..PlacementTerrains::NONE
+    };
+    // the whole map's box has no tile beside it; the centre's tile has 6 to its right
+    assert_eq!(test(beside(t(6), t(6))), Ok(false));
+    assert_eq!(
+        test(PlacementTerrains {
+            beside: [t(6), t(6)],
+            on: [t(5), t(5)],
+        }),
+        Ok(true)
+    );
+    assert_eq!(
+        test(PlacementTerrains {
+            beside: [t(7), t(7)],
+            on: [t(5), t(5)],
+        }),
+        Ok(false)
     );
 }

@@ -397,6 +397,7 @@ mod tests {
     use crate::map::GridSize;
     use crate::map::Position;
     use crate::map::RestrictionId;
+    use crate::map::terrain::TileTerrain;
     use crate::movement::Speed;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
@@ -474,7 +475,7 @@ mod tests {
         };
         t.spatial.terrain = Some(Terrain::new(
             GridSize::new(20, 20),
-            vec![(0, 255, -1); 400],
+            vec![TileTerrain::of_save(0, 255, -1); 400],
             vec![kind],
             vec![vec![1.0]],
         ));

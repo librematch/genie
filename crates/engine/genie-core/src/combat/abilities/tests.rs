@@ -5,6 +5,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
@@ -940,7 +941,10 @@ fn waters(t: &mut World) {
     };
     t.spatial.terrain = Some(crate::map::terrain::Terrain::new(
         GridSize::new(20, 20),
-        tiles,
+        tiles
+            .into_iter()
+            .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
+            .collect(),
         vec![kind(0), kind(1), kind(0x21)],
         Vec::new(),
     ));

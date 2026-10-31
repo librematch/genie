@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::map::GridSize;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::Speed;
 use crate::objects::masters::master_type::RGE_COMBAT;
@@ -38,7 +39,7 @@ impl PlaceMap for WorldMap<'_> {
         self.turns.spatial.map
     }
 
-    fn terrain(&self, tile: Tile) -> Result<u8, GenieError> {
+    fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError> {
         let t = self
             .turns
             .spatial
@@ -135,7 +136,7 @@ impl PlaceMap for WorldMap<'_> {
                             placed.position.x() as i32,
                             placed.position.y() as i32,
                         ))
-                        .and_then(|k| ter.terrains.get(usize::from(k)))
+                        .and_then(|k| ter.terrains.get(k.index()))
                         .is_some_and(|k| k.forest)
                     }),
                 })

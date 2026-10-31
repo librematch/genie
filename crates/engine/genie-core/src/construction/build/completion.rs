@@ -58,7 +58,7 @@ impl crate::world::World {
         {
             self.construction_starts(p, id)?;
         }
-        if 0 <= building.foundation_terrain && master.object_flags & 0x40 != 0 {
+        if building.foundation_terrain.is_some() && master.object_flags & 0x40 != 0 {
             return Err(GenieError::unsupported(
                 "a completion of a master of object flag 0x40 (its tiles' classes, FUN_141055790)",
             ));

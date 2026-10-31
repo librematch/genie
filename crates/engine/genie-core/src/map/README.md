@@ -29,6 +29,7 @@ vision and the unit AI's searches read it.
 | [`rect.rs`](rect.rs) | A box on the map's ground as one type (`Rect`): two corners, x0 and y0 then x1 and y1, apart from a point (`crate::map::Point`) and a walk between two points (`Segment`). |
 | [`restriction_id.rs`](restriction_id.rs) | A terrain restriction's id: which terrains an object may stand on. |
 | [`terrain.rs`](terrain.rs) | The map's terrain per tile (`RGE_Map`'s tiles, 0x40 bytes each: `+0x9` the terrain, `+0xa` the terrain to restore, `+0xc` the layer) and what the `.dat` says of each terrain, as far as the slice reads them: a completed building's snow check and its foundation terrain (`FUN_1411dbb70`, `FUN_1411ddd90`). |
+| [`terrain_id.rs`](terrain_id.rs) | A terrain's id (`TerrainId`): a map tile's terrain and the `.dat`'s terrain records' index. |
 | [`terrain_mask.rs`](terrain_mask.rs) | The terrain classes an object may stand on, as the obstruction manager's tile words test them. |
 | [`tile.rs`](tile.rs) | A tile of the map as one type (`Tile`): x and y in whole tiles, apart from a point on the ground (`crate::map::Point`) and a step from one tile to another (`TileOffset`). |
 | [`spatial/`](spatial/) | Where the world's objects are, as movement reads them: each live object's position, radii and class, and the obstruction record the game keeps for it in its obstruction manager (`DAT_143f0a088`, queried by `FUN_141051900`). |

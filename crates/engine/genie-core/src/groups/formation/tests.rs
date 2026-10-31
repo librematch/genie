@@ -8,6 +8,7 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::RestrictionId;
 use crate::map::Tile;
+use crate::map::terrain::TileTerrain;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointLevel;
@@ -112,7 +113,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     ];
     t.spatial.terrain = Some(Terrain::new(
         GridSize::new(20, 20),
-        vec![(0, 255, -1); 400],
+        vec![TileTerrain::of_save(0, 255, -1); 400],
         kinds,
         vec![vec![1.0, 0.0]],
     ));
@@ -618,7 +619,7 @@ fn the_passability_tests_with_the_world_s_object_of_the_lead_id() {
         };
         t.spatial.terrain = Some(Terrain::new(
             GridSize::new(20, 20),
-            vec![(0, 255, -1); 400],
+            vec![TileTerrain::of_save(0, 255, -1); 400],
             vec![kind(1), kind(8)],
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         ));

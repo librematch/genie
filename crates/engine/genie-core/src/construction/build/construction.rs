@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::construction::build::{Construction, SITE_GONE, STARTED};
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
@@ -76,7 +77,7 @@ pub(super) fn lay_foundation(
 ) -> Result<(), GenieError> {
     /// The terrain the pasture master 1889's stack unit on mangrove or rice terrain lays
     /// (`0x3f`).
-    const RICE_PASTURE_TERRAIN: u8 = 0x3f;
+    const RICE_PASTURE_TERRAIN: TerrainId = TerrainId::named(0x3f);
     let terrain = world.terrain.as_mut().ok_or(GenieError::unsupported(
         "a completion without the map's terrain",
     ))?;
@@ -88,11 +89,11 @@ pub(super) fn lay_foundation(
     {
         c.snow = true;
     }
-    if 0 <= building.foundation_terrain {
+    if let Some(foundation) = building.foundation_terrain {
         let laid = if stack_master == Some(PASTURE_MANGROVE) {
             RICE_PASTURE_TERRAIN
         } else {
-            building.foundation_terrain as u8
+            foundation
         };
         terrain.cover(&crate::map::terrain::Foundation {
             position: placed.position,

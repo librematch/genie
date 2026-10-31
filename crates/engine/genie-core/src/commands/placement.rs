@@ -25,9 +25,10 @@ impl World {
         }
         let tile = Tile::new(position.x() as i32, position.y() as i32);
         let terrain = self.spatial.terrain.as_ref().and_then(|t| t.kind(tile));
-        match terrain {
-            Some(54 | 55 | 63..=67) => RICE_FARM,
-            _ => master,
+        if terrain.is_some_and(crate::map::terrain::is_rice_terrain) {
+            RICE_FARM
+        } else {
+            master
         }
     }
 

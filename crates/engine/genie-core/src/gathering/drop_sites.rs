@@ -374,7 +374,11 @@ mod tests {
         let mover = crate::gathering::hunt::tests::walker();
         // the search writes the obstruction manager's scratch: it runs on the fixture's copy
         let mut spatial = spatial.clone();
-        let zones = ZoneMap::new(crate::map::GridSize::new(40, 40), &[0; 1600], &[1.0]);
+        let zones = ZoneMap::new(
+            crate::map::GridSize::new(40, 40),
+            &[crate::map::TerrainId::named(0); 1600],
+            &[1.0],
+        );
         let mut pathing = Pathing::default();
         let mut object = Well512::default();
         let groups = crate::groups::UnitGroups::default();

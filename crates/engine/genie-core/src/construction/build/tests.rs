@@ -3,7 +3,9 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
 use crate::map::Point;
+use crate::map::TerrainId;
 use crate::map::Tile;
+use crate::map::terrain::TileTerrain;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToReads, SpriteReads, WalkTo};
 use crate::objects::ObjectId;
@@ -702,7 +704,7 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
             adjacent_mode: 0,
             disappears_when_built: false,
             stack_unit: None,
-            foundation_terrain: -1,
+            foundation_terrain: None,
             tech: None,
             garrison_type: 0,
             garrison_heal_rate: HitPoints::ZERO,
@@ -733,7 +735,7 @@ fn small_map() -> Spatial {
     };
     world.terrain = Some(Terrain::new(
         GridSize::new(4, 4),
-        vec![(0, 255, -1); 16],
+        vec![TileTerrain::of_save(0, 255, -1); 16],
         vec![kind; 40],
         vec![vec![0.0; 40]; 5],
     ));
@@ -771,7 +773,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     kinds[32].flags = 0xa0;
     world.terrain = Some(Terrain::new(
         GridSize::new(4, 4),
-        vec![(32, 255, -1); 16],
+        vec![TileTerrain::of_save(32, 255, -1); 16],
         kinds,
         vec![vec![0.0; 40]; 5],
     ));
@@ -788,7 +790,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         (None, Amount::ZERO, 0),
     ];
     if let Some(b) = master.building.as_mut() {
-        b.foundation_terrain = 27;
+        b.foundation_terrain = Some(TerrainId::named(27));
     }
     let life = Lifecycle {
         state: ObjectState::Foundation,
@@ -826,7 +828,11 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let terrain = t.spatial.terrain.as_ref().unwrap();
     assert_eq!(
         (terrain.kinds[5], terrain.layers[5], terrain.kinds[0]),
-        (6, 32, 32)
+        (
+            TerrainId::named(6),
+            Some(TerrainId::named(32)),
+            TerrainId::named(32)
+        )
     );
 }
 

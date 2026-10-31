@@ -19,6 +19,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, MoveToReads};
 use crate::objects::SpriteId;
@@ -64,8 +65,8 @@ const RETRY_STEP: u32 = 0xccc;
 /// The new point's draws (`FUN_140aa3ba0`).
 const RETRIES: i32 = 100;
 /// The terrains a new point must leave: 22, 23 and 1, the waters (`FUN_140aa3ba0`).
-const DEEP_WATER: u8 = 0x16;
-const WATER: u8 = 1;
+const DEEP_WATER: TerrainId = TerrainId::named(0x16);
+const WATER: TerrainId = TerrainId::named(1);
 /// A drop location's draw scale (`DAT_142eb69cc`) and the gap past the footprints
 /// (`DAT_142eb99cc`).
 const DRAW_SCALE: f32 = crate::math::image::transport::DRAW_SCALE;

@@ -32,6 +32,7 @@ pub(crate) mod step;
 
 use crate::GenieError;
 use crate::map::Distance;
+use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
 use crate::objects::ObjectId;
@@ -157,7 +158,7 @@ pub(crate) const STATIC_TYPES_END: MasterKind = master_type::ACTION;
 const PLANNED_MASTERS: [MasterId; 2] = [MasterId::named(83), MasterId::named(535)];
 
 /// The foundation terrain a building's death covers with terrain 1 (`FUN_1411dbb70`: `0x1c`).
-pub(crate) const RESTORED_FOUNDATION: i16 = 28;
+pub(crate) const RESTORED_FOUNDATION: TerrainId = TerrainId::named(28);
 
 /// What a built building's death leaves its owner's update to do after it
 /// ([`Unit::building_died`]): the count attribute it lowers, and its master with the master's

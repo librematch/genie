@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::combat::victims::{victim_of, write_back};
 use crate::construction::gates::gate_units;
+use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
@@ -146,7 +147,7 @@ impl Unit {
             return Ok(());
         };
         let m = self.master(&c.w.masters, c.player)?;
-        let foundation = m.building.as_ref().map_or(-1, |b| b.foundation_terrain);
+        let foundation = m.building.as_ref().and_then(|b| b.foundation_terrain);
         let Some(terrain) = farm_stage_terrain(
             m.id,
             (self.rice, foundation),
@@ -155,7 +156,7 @@ impl Unit {
         ) else {
             return Ok(());
         };
-        if matches!(terrain, 8 | 27 | 64) {
+        if matches!(terrain.get(), 8 | 27 | 64) {
             return Err(GenieError::unsupported(
                 "a farm's stage terrain the local player's view maps (8, 27, 64)",
             ));
@@ -433,10 +434,10 @@ impl Unit {
 /// another master.
 pub(crate) fn farm_stage_terrain(
     master: MasterId,
-    (rice, foundation): (bool, i16),
+    (rice, foundation): (bool, Option<TerrainId>),
     progress: Seconds,
     build_time: i16,
-) -> Option<u8> {
+) -> Option<TerrainId> {
     /// The stages over the build time (`DAT_142eb1c98`).
     const STAGES: f32 = crate::math::image::turn::FARM_STAGES;
     /// A farm's first stage terrain (`0x1d`).
@@ -444,14 +445,17 @@ pub(crate) fn farm_stage_terrain(
     /// A rice farm's first stage terrain on mangrove or rice (`0x41`).
     const RICE_STAGE: u8 = 65;
     let stage = (((progress.get() * STAGES) / f32::from(build_time)) as i32 as u8).min(2);
-    match master {
-        ids::FARM => Some(FIRST_STAGE + stage),
-        ids::ID_1187 | ids::PASTURE_1889 if rice => Some(RICE_STAGE + stage),
-        ids::ID_1187 | ids::PASTURE_1889 => {
-            Some((foundation as u8).wrapping_add(2).wrapping_add(stage))
-        }
-        _ => None,
-    }
+    let stage_byte = match master {
+        ids::FARM => FIRST_STAGE + stage,
+        ids::ID_1187 | ids::PASTURE_1889 if rice => RICE_STAGE + stage,
+        // none is the short −1, whose low byte is 255
+        ids::ID_1187 | ids::PASTURE_1889 => foundation
+            .map_or(0xff, TerrainId::get)
+            .wrapping_add(2)
+            .wrapping_add(stage),
+        _ => return None,
+    };
+    Some(TerrainId::named(stage_byte))
 }
 
 /// The masters whose units blast about themselves below 1 hit point

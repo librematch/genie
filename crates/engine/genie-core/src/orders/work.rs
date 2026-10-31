@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::{HUNT, HuntTask};
 use crate::map::Position;
+use crate::map::TerrainId;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
@@ -317,7 +318,7 @@ impl World {
 
     /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
     /// [`crate::unit_ai::task_finder::world::point_terrain`] on the map's terrain).
-    pub(crate) fn task_terrain(&self, point: Position) -> Option<i16> {
+    pub(crate) fn task_terrain(&self, point: Position) -> Option<TerrainId> {
         crate::unit_ai::task_finder::world::point_terrain(self.spatial.terrain.as_ref(), point)
     }
 

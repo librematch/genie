@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::map::Position;
+use crate::map::TerrainId;
 use crate::map::terrain::Terrain;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -19,9 +20,8 @@ use crate::world::player::Player;
 
 /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
 /// [`Terrain::at_task_point`]); none on a world without its map's terrain.
-pub(crate) fn point_terrain(map: Option<&Terrain>, point: Position) -> Option<i16> {
+pub(crate) fn point_terrain(map: Option<&Terrain>, point: Position) -> Option<TerrainId> {
     map.and_then(|t| t.at_task_point(point.x(), point.y()))
-        .map(i16::from)
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.
@@ -144,7 +144,7 @@ pub(crate) fn task_search<'m>(
     actor: &Actor<'_>,
     t: &TaskTarget<'_>,
     general: &TaskTarget<'_>,
-    terrain: Option<i16>,
+    terrain: Option<TerrainId>,
     filter: Option<ActionType>,
     dip: &impl Diplomacy,
 ) -> Result<Option<(crate::objects::masters::Task, Option<&'m Master>)>, GenieError> {

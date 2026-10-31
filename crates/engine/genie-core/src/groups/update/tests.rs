@@ -7,6 +7,7 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
+use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::GroupSpeed;
 use crate::movement::PathState;
@@ -1601,7 +1602,7 @@ fn grounded() -> World {
     }];
     t.spatial.terrain = Some(Terrain::new(
         GridSize::new(8, 8),
-        vec![(0, 255, -1); 64],
+        vec![TileTerrain::of_save(0, 255, -1); 64],
         kinds,
         vec![vec![1.0]],
     ));

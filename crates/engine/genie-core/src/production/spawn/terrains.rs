@@ -5,10 +5,12 @@ use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::TileRect;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlacementTerrains;
 use crate::players::PlayerId;
 use crate::production::spawn::PlaceMap;
 
@@ -36,7 +38,7 @@ pub struct BuildSite<'a> {
     /// `hill_mode` (`+0x604`, `p7`).
     pub hill_mode: u8,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
-    pub placement: [i16; 4],
+    pub placement: PlacementTerrains,
     /// The world's zone mode (`+0x820`, `FUN_1415e8e10`).
     pub zones: bool,
     /// The objects the scan passes over (`p12` and, for a building, its annexes, `FUN_14123d090`):
@@ -88,26 +90,29 @@ pub(super) fn hill_fails(
 ///
 /// Where the map cannot tell.
 pub fn placement_terrains(
-    placement: [i16; 4],
+    placement: PlacementTerrains,
     map: &dyn PlaceMap,
     p: Point,
     b: TileRect,
 ) -> Result<bool, GenieError> {
-    let [side1, side2, t1, t2] = placement;
+    let PlacementTerrains {
+        beside: [side1, side2],
+        on: [t1, t2],
+    } = placement;
     let mut b = b;
-    if 0 <= t1 || 0 <= t2 {
+    if t1.is_some() || t2.is_some() {
         let at = Tile::new(p.x() as i32, p.y() as i32);
         if !point_terrain_allows(map, [t1, t2], at)? {
             return Ok(false);
         }
         b = TileRect::of(at);
     }
-    if side1 < 0 && side2 < 0 {
+    if side1.is_none() && side2.is_none() {
         return Ok(true);
     }
     let sides = side_terrains(map, [side1, side2])?;
     for t in tiles_beside(b, map.size()) {
-        if sides.contains(&i16::from(map.terrain(t)?)) {
+        if sides.contains(&map.terrain(t)?) {
             return Ok(true);
         }
     }
@@ -119,10 +124,8 @@ pub fn placement_terrains(
 /// # Errors
 ///
 /// A terrain of −1 or beyond the terrains (its flags read past the table), not modelled.
-pub(super) fn placement_flags(map: &dyn PlaceMap, t: i16) -> Result<u8, GenieError> {
-    usize::try_from(t)
-        .ok()
-        .and_then(|t| map.terrain_flags(t))
+pub(super) fn placement_flags(map: &dyn PlaceMap, t: Option<TerrainId>) -> Result<u8, GenieError> {
+    t.and_then(|t| map.terrain_flags(t.index()))
         .ok_or(GenieError::unsupported(
             "placement terrains with one of -1 or beyond the terrains",
         ))
@@ -136,17 +139,17 @@ pub(super) fn placement_flags(map: &dyn PlaceMap, t: i16) -> Result<u8, GenieErr
 /// Where the map cannot tell, and a terrain whose flags it does not hold.
 pub(super) fn point_terrain_allows(
     map: &dyn PlaceMap,
-    [t1, t2]: [i16; 2],
+    [t1, t2]: [Option<TerrainId>; 2],
     at: Tile,
 ) -> Result<bool, GenieError> {
-    let tile = i16::from(map.terrain(at)?);
-    if tile == t1 || tile == t2 {
+    let tile = map.terrain(at)?;
+    if Some(tile) == t1 || Some(tile) == t2 {
         return Ok(true);
     }
     let (f1, f2, ft) = (
         placement_flags(map, t1)?,
         placement_flags(map, t2)?,
-        placement_flags(map, tile)?,
+        placement_flags(map, Some(tile))?,
     );
     let water = (f1 & 4 != 0 || f2 & 4 != 0) && ft & 4 != 0;
     let shallow = (f1 & 8 != 0 || f2 & 8 != 0) && ft & 8 != 0;
@@ -162,15 +165,16 @@ pub(super) fn point_terrain_allows(
 /// A terrain whose flags the map does not hold.
 pub(super) fn side_terrains(
     map: &dyn PlaceMap,
-    [side1, side2]: [i16; 2],
-) -> Result<Vec<i16>, GenieError> {
+    [side1, side2]: [Option<TerrainId>; 2],
+) -> Result<Vec<TerrainId>, GenieError> {
     let (f1, f2) = (placement_flags(map, side1)?, placement_flags(map, side2)?);
-    let mut sides: Vec<i16> = [side1, side2].into_iter().filter(|&t| 0 <= t).collect();
+    let mut sides: Vec<TerrainId> = [side1, side2].into_iter().flatten().collect();
     for bit in [0x40, 0x10] {
         if f1 & bit != 0 || f2 & bit != 0 {
             for t in 0..map.terrain_count() {
-                let t = i16::try_from(t).unwrap_or(i16::MAX);
-                if placement_flags(map, t)? & bit != 0 && t != side1 && t != side2 {
+                let t = TerrainId::named(u8::try_from(t).unwrap_or(u8::MAX));
+                let other = Some(t) != side1 && Some(t) != side2;
+                if placement_flags(map, Some(t))? & bit != 0 && other {
                     sides.push(t);
                 }
             }

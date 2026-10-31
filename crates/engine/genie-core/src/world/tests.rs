@@ -33,6 +33,7 @@ use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, Spatial};
+use crate::map::terrain::TileTerrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::{Stream, Streams, Well512};
@@ -520,7 +521,7 @@ pub(crate) fn builder_masters() -> Masters {
             // sprite (392 in build 158041's .dat), which it dies on unbuilt
             building: Some(crate::objects::masters::BuildingMaster {
                 stack_unit: None,
-                foundation_terrain: -1,
+                foundation_terrain: None,
                 tech: None,
                 annexes: [None; 4],
                 head_unit: None,
@@ -548,7 +549,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
     t.spatial.map = GridSize::new(w, h);
     let mut terrain = crate::map::terrain::Terrain::new(
         GridSize::new(w, h),
-        vec![(0, 255, -1); n],
+        vec![TileTerrain::of_save(0, 255, -1); n],
         vec![
             crate::map::terrain::TerrainKind {
                 shown: true,
@@ -4167,7 +4168,7 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
         storage: vec![(Some(attribute::HEADROOM), Amount::new(20.0), 4)],
         building: Some(crate::objects::masters::BuildingMaster {
             tech: None,
-            foundation_terrain: -1,
+            foundation_terrain: None,
             stack_unit: None,
             head_unit: None,
             transform_unit: None,
@@ -8054,7 +8055,7 @@ fn gate_world() -> World {
             transform_unit: opt_master(transform_unit),
             stack_unit: None,
             head_unit: None,
-            foundation_terrain: -1,
+            foundation_terrain: None,
             tech: None,
             annexes: [None; 4],
             ..crate::objects::masters::BuildingMaster::default()
@@ -11202,7 +11203,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         obstruction_class: ObstructionClass::UNIT,
         building: Some(crate::objects::masters::BuildingMaster {
             stack_unit: None,
-            foundation_terrain: -1,
+            foundation_terrain: None,
             tech: None,
             head_unit: None,
             transform_unit: None,
@@ -12973,7 +12974,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         death_sprite: Some(SpriteId::named(1751)),
         building: Some(crate::objects::masters::BuildingMaster {
             stack_unit: None,
-            foundation_terrain: -1,
+            foundation_terrain: None,
             tech: None,
             head_unit: None,
             transform_unit: None,
@@ -13086,7 +13087,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         death_sprite,
         building: Some(crate::objects::masters::BuildingMaster {
             stack_unit: None,
-            foundation_terrain: -1,
+            foundation_terrain: None,
             tech: None,
             head_unit: None,
             transform_unit: None,
@@ -15321,35 +15322,65 @@ fn a_fishing_ship_counts_a_near_drop_site_its_path_does_not_reach() {
 fn a_farm_foundation_lays_its_stage_terrain() {
     use crate::construction::building_update::farm_stage_terrain;
     assert_eq!(
-        farm_stage_terrain(ids::FARM, (false, 7), Seconds::ZERO, 15),
-        Some(29)
+        farm_stage_terrain(
+            ids::FARM,
+            (false, Some(TerrainId::named(7))),
+            Seconds::ZERO,
+            15
+        ),
+        Some(TerrainId::named(29))
     );
     assert_eq!(
-        farm_stage_terrain(ids::FARM, (false, 7), Seconds::new(7.5), 15),
-        Some(30)
+        farm_stage_terrain(
+            ids::FARM,
+            (false, Some(TerrainId::named(7))),
+            Seconds::new(7.5),
+            15
+        ),
+        Some(TerrainId::named(30))
     );
     assert_eq!(
-        farm_stage_terrain(ids::FARM, (false, 7), Seconds::new(15.0), 15),
-        Some(31)
+        farm_stage_terrain(
+            ids::FARM,
+            (false, Some(TerrainId::named(7))),
+            Seconds::new(15.0),
+            15
+        ),
+        Some(TerrainId::named(31))
     );
     assert_eq!(
-        farm_stage_terrain(ids::ID_1187, (true, 63), Seconds::new(5.0), 15),
-        Some(66)
+        farm_stage_terrain(
+            ids::ID_1187,
+            (true, Some(TerrainId::named(63))),
+            Seconds::new(5.0),
+            15
+        ),
+        Some(TerrainId::named(66))
     );
     assert_eq!(
-        farm_stage_terrain(ids::ID_1187, (false, 63), Seconds::ZERO, 15),
-        Some(65)
+        farm_stage_terrain(
+            ids::ID_1187,
+            (false, Some(TerrainId::named(63))),
+            Seconds::ZERO,
+            15
+        ),
+        Some(TerrainId::named(65))
     );
     assert_eq!(
-        farm_stage_terrain(ids::PASTURE_1889, (false, 117), Seconds::new(15.0), 15),
-        Some(121)
+        farm_stage_terrain(
+            ids::PASTURE_1889,
+            (false, Some(TerrainId::named(117))),
+            Seconds::new(15.0),
+            15
+        ),
+        Some(TerrainId::named(121))
     );
     assert_eq!(
-        farm_stage_terrain(ids::PASTURE_1889, (false, -1), Seconds::ZERO, 15),
-        Some(1)
+        farm_stage_terrain(ids::PASTURE_1889, (false, None), Seconds::ZERO, 15),
+        Some(TerrainId::named(1))
     );
     assert_eq!(
-        farm_stage_terrain(ids::HOUSE, (false, -1), Seconds::ZERO, 15),
+        farm_stage_terrain(ids::HOUSE, (false, None), Seconds::ZERO, 15),
         None
     );
 }
@@ -15619,7 +15650,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
     t.spatial = Spatial::new(GridSize::new(40, 40));
     let mut terrain = crate::map::terrain::Terrain::new(
         GridSize::new(40, 40),
-        vec![(0, 0, -1); 40 * 40],
+        vec![TileTerrain::of_save(0, 0, -1); 40 * 40],
         vec![crate::map::terrain::TerrainKind {
             shown: true,
             flags: 0,

@@ -9,6 +9,7 @@ use genie_core::map::Distance;
 use genie_core::map::Footprint;
 use genie_core::map::Offset;
 use genie_core::map::Radii;
+use genie_core::map::TerrainId;
 use genie_core::movement::Speed;
 use genie_core::objects::HitPoints;
 use genie_core::objects::SpriteId;
@@ -298,7 +299,7 @@ pub(super) fn work_masters(
             b.garrison_type = saved.garrison_units;
             b.garrison_heal_rate = HitPoints::new(saved.garrison_heal_rate);
             b.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
-            b.foundation_terrain = saved.on_build_make_tile;
+            b.foundation_terrain = TerrainId::of_data(saved.on_build_make_tile);
             // `+0x960`, the third of its sprites (`tempId`)
             b.destruction_sprite = SpriteId::of_data(saved.temp_id_3.cast_signed());
             // `+0x950`, the first (`tempId`)

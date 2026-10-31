@@ -956,7 +956,10 @@ fn the_damage_sprite_attributes_resize_and_select() {
 #[test]
 fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
     let mut m = of_type(master_type::BUILDING);
-    m.building = Some(BuildingMaster::default());
+    m.building = Some(BuildingMaster {
+        foundation_terrain: Some(TerrainId::named(0)),
+        ..BuildingMaster::default()
+    });
     m.hit_points = 600;
     m.set_attribute(attribute::GARRISON_HEAL_RATE, 2.0, &world(false));
     m.multiply_attribute(attribute::GARRISON_HEAL_RATE, 1.5, &world(false));
@@ -966,7 +969,7 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
     let b = m.building.unwrap();
     assert_eq!(
         (b.garrison_heal_rate, b.foundation_terrain),
-        (HitPoints::new(3.0), 2)
+        (HitPoints::new(3.0), Some(TerrainId::named(2)))
     );
     assert_eq!(m.regeneration, 300.0);
     assert_eq!(m, {
@@ -976,6 +979,21 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
         same.regeneration = 300.0;
         same
     });
+}
+
+/// The foundation terrain's add works on the game's short: none is −1, so an add of 2 lays
+/// terrain 1, and a set below 0 is none again.
+#[test]
+fn a_foundation_terrain_add_counts_none_as_minus_one() {
+    let mut m = of_type(master_type::BUILDING);
+    m.building = Some(BuildingMaster::default());
+    m.add_attribute(attribute::FOUNDATION_TERRAIN, 2.0, &world(false));
+    assert_eq!(
+        m.building.as_ref().and_then(|b| b.foundation_terrain),
+        Some(TerrainId::named(1))
+    );
+    m.set_attribute(attribute::FOUNDATION_TERRAIN, -1.0, &world(false));
+    assert_eq!(m.building.as_ref().and_then(|b| b.foundation_terrain), None);
 }
 
 /// What a unit moving with a master reads follows the master's values: its radii, its base

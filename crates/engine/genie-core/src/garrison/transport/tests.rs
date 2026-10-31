@@ -1,6 +1,7 @@
 use super::*;
 use crate::map::GridSize;
 use crate::map::Tile;
+use crate::map::terrain::TileTerrain;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ObjectState;
@@ -623,7 +624,10 @@ fn terrain(size: i32, fill: u8, tiles: &[([i16; 2], u8)]) -> crate::map::terrain
     };
     crate::map::terrain::Terrain::new(
         crate::map::GridSize::new(size, size),
-        kinds,
+        kinds
+            .into_iter()
+            .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
+            .collect(),
         vec![shown; 24],
         Vec::new(),
     )
