@@ -11,6 +11,7 @@ use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
@@ -97,7 +98,7 @@ impl World {
                 .iter()
                 .any(|&d| d == ids::ID_45 || d == ids::ID_2172)
                 && !matches!(master.class, class::FISHING_SHIP | class::TRADE_BOAT));
-        let masters = self.masters.get(p.index()).ok_or(GenieError::unsupported(
+        let masters = self.masters.of(p).ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;
         if !seeks {
@@ -115,7 +116,7 @@ impl World {
             .map_or(ActionState::NO_ACTION, |a| a.state);
         let player = &self.players.player(p)?;
         let mut world = crate::unit_ai::world_view::DropWorld {
-            masters: self.masters.get(p.index()),
+            masters: self.masters.of(p),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,

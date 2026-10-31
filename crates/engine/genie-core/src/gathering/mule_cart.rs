@@ -11,6 +11,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::Foreign;
@@ -141,7 +142,7 @@ impl World {
                     left: None,
                 },
                 every: &self.masters,
-                masters: self.masters.get(p.index()),
+                masters: self.masters.of(p),
                 plan: Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,

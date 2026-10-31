@@ -7,6 +7,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::world::others::OthersRef;
@@ -86,7 +87,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         let drops_here = master.drop_sites.contains(&t.life.master_id);
         let at = |id: ObjectId| {

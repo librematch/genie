@@ -8,6 +8,7 @@ use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::players::PlayerId;
 
@@ -45,7 +46,7 @@ impl Unit {
             m,
             (class, c.player),
             (&mut releases, &mut leaves, by),
-            (c.w.masters.get(c.player.index()), &c.w.graphics, sprite_rng),
+            (c.w.masters.of(c.player), &c.w.graphics, sprite_rng),
         )?;
         crate::world::lets::torn_down(c, self, (leaves, releases))?;
         if sails {
@@ -53,7 +54,7 @@ impl Unit {
             self.transport_sail(
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
-                (c.w.masters.get(c.player.index()), &c.w.graphics, sprite_rng),
+                (c.w.masters.of(c.player), &c.w.graphics, sprite_rng),
             )?;
         }
         Ok(())
@@ -365,7 +366,7 @@ impl Unit {
         )?;
         if move_to.shows_standing() {
             self.shows_standing_sprite(
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;

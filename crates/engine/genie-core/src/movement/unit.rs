@@ -7,6 +7,7 @@ use crate::movement::ASIDE;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::sprite::standing;
 use crate::objects::teardown::HeadCode;
@@ -39,7 +40,7 @@ impl Unit {
         }
         // the velocity step (FUN_140f9ba80) runs for a unit with velocity data (+0x868)
         let group = match self.body.mover().and_then(|m| m.velocity.as_ref()) {
-            Some(_) => self.group_speed(&c.w.groups, c.w.masters.get(c.player.index()))?,
+            Some(_) => self.group_speed(&c.w.groups, c.w.masters.of(c.player))?,
             None => None,
         };
         if let Some(mover) = self.body.mover_mut() {
@@ -124,7 +125,7 @@ impl Unit {
                 villager && !c.w.players[c.player.index()].computer,
                 stance,
                 (
-                    c.w.masters.get(c.player.index()),
+                    c.w.masters.of(c.player),
                     &c.w.graphics,
                     c.w.streams.get(Stream::Sprite),
                 ),
@@ -188,7 +189,7 @@ impl Unit {
                 let master = object_master(
                     self.own_master.as_deref(),
                     (self.id, self.life.master_id),
-                    c.w.masters.get(c.player.index()),
+                    c.w.masters.of(c.player),
                 )
                 .ok();
                 let graphic =

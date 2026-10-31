@@ -20,6 +20,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::{Unit, object_master};
@@ -219,7 +220,7 @@ impl ExploreAction {
         let master = object_master(
             explorer.own_master.as_deref(),
             (explorer.id, explorer.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )
         .ok();
         let villager = master.is_some_and(|m| m.class == class::VILLAGER);
@@ -560,7 +561,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         );
         master.map_or_else(
             |_| ExploreMove {

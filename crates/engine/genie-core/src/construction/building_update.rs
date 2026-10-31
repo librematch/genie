@@ -16,6 +16,7 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::HOUSE;
@@ -227,7 +228,7 @@ impl Unit {
         let Ok(master) = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         ) else {
             return Ok(());
         };
@@ -292,7 +293,7 @@ impl Unit {
             let m = object_master(
                 u.own_master.as_deref(),
                 (u.id, u.life.master_id),
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
             )?;
             // The villager's class (4), which a building's repair by its garrison counts.
             if m.class == class::VILLAGER {

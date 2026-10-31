@@ -16,6 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
@@ -379,7 +380,7 @@ impl Unit {
             carry.get()
         } else if !master.drop_sites.is_empty() {
             let mut w = DropWorld {
-                masters: c.w.masters.get(c.player.index()),
+                masters: c.w.masters.of(c.player),
                 spatial: &mut c.w.spatial,
                 zones: &mut c.w.zones,
                 pathing: &mut c.w.pathing,

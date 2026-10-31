@@ -15,6 +15,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
@@ -302,7 +303,7 @@ impl Unit {
     /// part (notify 0x203) is not modelled.
     pub(crate) fn gather_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let w = DropWorld {
-            masters: c.w.masters.get(c.player.index()),
+            masters: c.w.masters.of(c.player),
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             pathing: &mut c.w.pathing,

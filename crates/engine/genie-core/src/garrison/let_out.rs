@@ -15,6 +15,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -153,9 +154,7 @@ impl World {
         // unit (type 70) takes its share off the volleys (the container's rate by its player's
         // masters, the unit's share by its own)
         let share = if made.kind == COMBAT {
-            let (Some(own), Some(theirs)) =
-                (self.masters.get(player.index()), self.masters.get(up))
-            else {
+            let (Some(own), Some(theirs)) = (self.masters.of(player), self.masters.get(up)) else {
                 return Err(GenieError::unsupported("an unload without the masters"));
             };
             let b = &self.players.player(player)?.objects[container];

@@ -10,6 +10,7 @@ use crate::gathering::hunt::NO_HUNT;
 use crate::movement::move_to::MoveTo;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectState;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
@@ -168,7 +169,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         let me_at =
             c.w.spatial
@@ -268,7 +269,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         let who = crate::gathering::hunt::PointWalker {
             computer: c.w.players.player(c.player)?.computer,

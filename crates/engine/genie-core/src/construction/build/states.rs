@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::ObjectId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FISH_TRAP;
@@ -276,7 +277,7 @@ impl BuildAction {
     /// [`Unit::show_standing`]'s.
     pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
         builder.show_standing(
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )

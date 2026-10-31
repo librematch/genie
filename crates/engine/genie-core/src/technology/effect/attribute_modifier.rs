@@ -10,6 +10,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{AttributeWorld, Master, master_type, player_master};
 use crate::players::PlayerId;
@@ -222,7 +223,7 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        let Some(masters) = self.masters.get(p.index()) else {
+        let Some(masters) = self.masters.of(p) else {
             return Ok(());
         };
         if let Some(unit) = unit.filter(|&u| within_table(masters, u)) {
@@ -275,7 +276,7 @@ impl World {
         unit: Option<MasterId>,
         class: Option<ClassId>,
     ) -> Vec<MasterId> {
-        let Some(masters) = self.masters.get(p.index()) else {
+        let Some(masters) = self.masters.of(p) else {
             return Vec::new();
         };
         if let Some(unit) = unit.filter(|&u| within_table(masters, u)) {
@@ -428,7 +429,7 @@ impl World {
                 capped: CAPPED,
             };
             let terrain = self.spatial.terrain.as_ref();
-            let Some(m) = self.masters.get_mut(p.index()).and_then(|m| m.get_mut(id)) else {
+            let Some(m) = self.masters.of_mut(p).and_then(|m| m.get_mut(id)) else {
                 return Ok(());
             };
             match change {

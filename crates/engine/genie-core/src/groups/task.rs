@@ -12,6 +12,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::players::Amount;
@@ -158,7 +159,7 @@ impl World {
         };
         let mut found = find(own)?;
         if found.is_none() && own.task_by_group != 0 {
-            let masters = self.masters.get(player.index());
+            let masters = self.masters.of(player);
             for candidate in masters.into_iter().flat_map(Masters::iter) {
                 if candidate.class != own.class
                     || candidate.kind != own.kind

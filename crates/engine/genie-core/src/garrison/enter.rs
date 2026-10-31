@@ -15,6 +15,7 @@ use crate::movement::move_to::MoveToReads;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
 use crate::objects::masters::master_type::BUILDING;
 use crate::orders::GARRISON;
@@ -240,7 +241,7 @@ impl World {
             // `+0x470`) and, its `+0x60` 0 in a new Enter, posts notify 0x1f9 with the enter's
             // action value to its unit AI; the update returns 3 then
             action.state = EnterState::Failed;
-            let masters = self.masters.get(player.index());
+            let masters = self.masters.of(player);
             let unit = &mut self.players.player_mut(player)?.objects[idx];
             unit.place_enter(action, sub);
             unit.shows_standing_sprite(

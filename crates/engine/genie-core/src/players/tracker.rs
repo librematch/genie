@@ -36,6 +36,7 @@ use crate::objects::ObjectId;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::Masters;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{ClassId, class};
 use crate::players::PlayerId;
@@ -398,7 +399,7 @@ impl crate::world::World {
     /// [`key`] of player `p`'s master `master`.
     #[must_use]
     pub fn tracker_key(&self, p: PlayerId, master: MasterId) -> Key {
-        key(self.masters.get(p.index()), &self.lines, master)
+        key(self.masters.of(p), &self.lines, master)
     }
 
     /// The load's filing: each player's objects as its lists hold them, the live ones then the

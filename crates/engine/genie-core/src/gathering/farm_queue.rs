@@ -11,6 +11,7 @@
 use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::FISH_TRAP;
@@ -100,7 +101,7 @@ impl World {
         if count < 1 || QUEUE_LIMIT <= self.queued(p, queue)? {
             return Ok(false);
         }
-        let Some(masters) = self.masters.get(p.index()) else {
+        let Some(masters) = self.masters.of(p) else {
             return Ok(false);
         };
         let player = self.players.player_mut(p)?;
@@ -158,7 +159,7 @@ impl World {
     /// (`CVTSI2SS`, `COMISS`). A base id the player lacks makes none (the game reads its table's
     /// slot unchecked; the `.dat`'s masters name their own).
     pub fn can_make(&self, p: PlayerId, master: MasterId) -> Result<bool, GenieError> {
-        let Some(ms) = self.masters.get(p.index()) else {
+        let Some(ms) = self.masters.of(p) else {
             return Ok(false);
         };
         let Some(m) = ms.get(master) else {
@@ -333,7 +334,7 @@ impl World {
     ) -> Result<Option<bool>, GenieError> {
         let mut from_queue = !auto;
         if auto {
-            let Some(masters) = self.masters.get(p.index()) else {
+            let Some(masters) = self.masters.of(p) else {
                 // unreachable: the gatherer's master was found in this table above
                 return Ok(None);
             };

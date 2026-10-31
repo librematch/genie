@@ -21,6 +21,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -1803,7 +1804,7 @@ fn register(t: &mut World) {
         .zip(&t.players)
         .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
         .filter_map(|(p, u)| {
-            let m = t.masters.get(p.index())?.get(u.life.master_id)?;
+            let m = t.masters.of(p)?.get(u.life.master_id)?;
             Some((
                 u.id.get(),
                 crate::map::spatial::Placed {

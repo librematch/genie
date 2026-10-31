@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -60,7 +61,7 @@ impl crate::world::World {
             farm_bonus: crate::objects::lifecycle::death_parts::farm_bonus(
                 &self.players.player(owner)?.attributes,
             ),
-            masters: self.masters.get(owner.index()),
+            masters: self.masters.of(owner),
             computer: self.players.player(owner)?.computer,
             ai: u.ai.is_some(),
         };

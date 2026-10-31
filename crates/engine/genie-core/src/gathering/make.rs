@@ -15,6 +15,7 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
@@ -123,7 +124,7 @@ impl MakeAction {
         let master = object_master(
             farm.own_master.as_deref(),
             (farm.id, farm.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         match self.state {
             // `+0x18`: the state whose update reports the action done (`FUN_140a99e30` returns 1).

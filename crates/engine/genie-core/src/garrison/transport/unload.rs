@@ -14,6 +14,7 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
@@ -99,7 +100,7 @@ impl crate::world::World {
         self.players.player_mut(p)?.objects[i].transport_sail(
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
-            (self.masters.get(p.index()), &self.graphics, rng),
+            (self.masters.of(p), &self.graphics, rng),
         )
     }
 
@@ -120,7 +121,7 @@ impl crate::world::World {
         }
         if c.stands {
             let rng = self.streams.get(crate::math::rng::Stream::Sprite);
-            unit.show_standing(self.masters.get(p.index()), &self.graphics, rng)?;
+            unit.show_standing(self.masters.of(p), &self.graphics, rng)?;
         }
         Ok(())
     }

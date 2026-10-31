@@ -15,7 +15,27 @@ use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
 /// invariant one through [`crate::world::World::master`].
 #[must_use]
 pub fn player_master(every: &[Masters], player: PlayerId, id: MasterId) -> Option<&Master> {
-    every.get(player.index())?.get(id)
+    every.of(player)?.get(id)
+}
+
+/// The world's masters, one table per player (the game's player holds its masters' pointers,
+/// `player+0x28`), looked up by the player.
+pub trait PlayersMasters {
+    /// Player `player`'s masters, none where the world holds no table for it.
+    fn of(&self, player: PlayerId) -> Option<&Masters>;
+
+    /// Player `player`'s masters, to change.
+    fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters>;
+}
+
+impl PlayersMasters for [Masters] {
+    fn of(&self, player: PlayerId) -> Option<&Masters> {
+        self.get(player.index())
+    }
+
+    fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters> {
+        self.get_mut(player.index())
+    }
 }
 
 impl Masters {

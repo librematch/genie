@@ -19,6 +19,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -473,7 +474,7 @@ impl RepairAction {
     ) -> Result<(), GenieError> {
         let standing = |c: &mut Step<'_>, repairer: &mut Unit| {
             repairer.show_standing(
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )

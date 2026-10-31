@@ -19,6 +19,7 @@ use crate::movement::{Mover, footprint_gap, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::layers::Body;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::sprite::new_sprite;
@@ -196,7 +197,7 @@ impl Attack {
         }
         if begun.arrived {
             unit.shows_standing_sprite(
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;

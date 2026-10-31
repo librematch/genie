@@ -17,6 +17,7 @@ use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::player_master;
@@ -169,7 +170,7 @@ impl World {
         (fp, foundation, master): (PlayerId, ObjectId, MasterId),
         position: Position,
     ) -> Result<(MasterId, BuildAction), GenieError> {
-        let masters = self.masters.get(q.index()).ok_or(GenieError::unsupported(
+        let masters = self.masters.of(q).ok_or(GenieError::unsupported(
             "BUILD tasks the builders: no master table",
         ))?;
         let site = player_master(&self.masters, fp, master).ok_or(GenieError::unsupported(

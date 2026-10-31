@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::commands::Command;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::capture::Captured;
 use crate::players::Amount;
@@ -196,7 +197,7 @@ impl World {
                 // in the tracker
                 let asleep = player.objects.swap_remove(i)?;
                 let k = crate::players::tracker::key(
-                    self.masters.get(p.index()),
+                    self.masters.of(p),
                     &self.lines,
                     asleep.life.master_id,
                 );
@@ -275,9 +276,9 @@ impl World {
         // 0x2d0), each tracker by its own masters
         for u in &moved {
             let m = u.life.master_id;
-            let old = crate::players::tracker::key(self.masters.get(p.index()), &self.lines, m);
+            let old = crate::players::tracker::key(self.masters.of(p), &self.lines, m);
             self.players.player_mut(p)?.tracker.remove(u.id, old);
-            let k = crate::players::tracker::key(self.masters.get(new.index()), &self.lines, m);
+            let k = crate::players::tracker::key(self.masters.of(new), &self.lines, m);
             self.players.player_mut(new)?.tracker.add(u.id, k);
         }
         self.players.player_mut(new)?.objects.extend(moved);

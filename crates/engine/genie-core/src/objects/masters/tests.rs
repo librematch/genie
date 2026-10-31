@@ -1400,3 +1400,28 @@ fn a_master_is_found_by_its_player_and_id() {
     assert!(player_master(&every, PlayerId::new(0), ids::VILLAGER_MALE).is_none());
     assert!(player_master(&every, PlayerId::new(2), ids::VILLAGER_MALE).is_none());
 }
+
+/// The world's masters by player: a player's own table, none beyond the tables.
+#[test]
+fn the_world_s_masters_are_looked_up_by_player() {
+    use crate::objects::masters::PlayersMasters;
+    let mut every = [Masters::new([house()]), Masters::new([])];
+    assert!(
+        every
+            .of(PlayerId::new(0))
+            .is_some_and(|m| m.get(house().id).is_some())
+    );
+    assert!(
+        every
+            .of(PlayerId::new(1))
+            .is_some_and(|m| m.get(house().id).is_none())
+    );
+    assert!(every.of(PlayerId::new(2)).is_none());
+    *every.of_mut(PlayerId::new(1)).unwrap() = Masters::new([house()]);
+    assert!(
+        every
+            .of(PlayerId::new(1))
+            .is_some_and(|m| m.get(house().id).is_some())
+    );
+    assert!(every.of_mut(PlayerId::new(2)).is_none());
+}

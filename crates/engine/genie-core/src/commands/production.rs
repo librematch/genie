@@ -10,6 +10,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -70,7 +71,7 @@ impl World {
         let owner = self.players.player(player)?;
         let limit = if owner.computer { 500 } else { 60 };
         let empty = Masters::default();
-        let masters = self.masters.get(player.index()).unwrap_or(&empty);
+        let masters = self.masters.of(player).unwrap_or(&empty);
         let Some(unit) = masters.get(unit_id) else {
             return Ok(());
         };
@@ -373,7 +374,7 @@ impl World {
         let empty = Masters::default();
         let mut n = count;
         loop {
-            let masters = self.masters.get(player.index()).unwrap_or(&empty);
+            let masters = self.masters.of(player).unwrap_or(&empty);
             if pay(
                 masters,
                 master,
@@ -388,7 +389,7 @@ impl World {
             n -= 1;
         }
         let class = self.tracker_key(player, master).class;
-        let masters = self.masters.get(player.index()).unwrap_or(&empty);
+        let masters = self.masters.of(player).unwrap_or(&empty);
         let made = masters.get(master);
         let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
         let owner = self.players.player_mut(player)?;
@@ -565,7 +566,7 @@ impl World {
         let owner = self.players.player(player)?;
         if let Some(master) = master {
             let empty = Masters::default();
-            let masters = self.masters.get(player.index()).unwrap_or(&empty);
+            let masters = self.masters.of(player).unwrap_or(&empty);
             return Ok(as_entry_costs(master_costs(masters, master, owner)?));
         }
         let Some((tech, t)) = tech

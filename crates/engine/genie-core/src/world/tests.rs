@@ -60,6 +60,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::VolleySpread;
@@ -15881,11 +15882,8 @@ fn a_fired_missile_joins_its_owner_s_list_at_its_making() {
         100,
         |unit, c| {
             let _ = unit.update(c)?;
-            let k = crate::players::tracker::key(
-                c.w.masters.get(c.player.index()),
-                &c.w.lines,
-                master_id(363),
-            );
+            let k =
+                crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, master_id(363));
             let listed = OthersRef::of(&c.w.players, c.player)
                 .unwrap()
                 .own(object_id(-2))

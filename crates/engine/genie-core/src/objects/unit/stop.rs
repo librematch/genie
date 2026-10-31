@@ -8,6 +8,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -25,7 +26,7 @@ impl Unit {
         self.stop_with(
             (&mut releases, &mut leaves),
             by,
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
             &c.w.graphics,
             sprite,
         )?;

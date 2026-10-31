@@ -12,6 +12,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
@@ -322,10 +323,7 @@ impl UnitView<'_, '_> {
         let reads = AttackReads::of(
             unit,
             master,
-            (
-                self.c.w.masters.get(self.player.index()),
-                &self.c.w.graphics,
-            ),
+            (self.c.w.masters.of(self.player), &self.c.w.graphics),
             Some(ai),
             (self.computer, self.c.w.world_time),
         );

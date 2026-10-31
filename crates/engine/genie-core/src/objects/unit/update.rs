@@ -7,6 +7,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action;
 use crate::objects::lifecycle::Class;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
@@ -206,7 +207,7 @@ impl Unit {
             if let Ok(master) = object_master(
                 self.own_master.as_deref(),
                 (self.id, self.life.master_id),
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
             ) {
                 let (standing, second) = (master.standing_sprite, master.standing_sprite_2);
                 self.idle_swap(

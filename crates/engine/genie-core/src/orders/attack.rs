@@ -12,6 +12,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
 use crate::world::WorldTime;
@@ -50,7 +51,7 @@ impl World {
         let reads = AttackReads::of(
             u,
             master,
-            (self.masters.get(player.index()), &self.graphics),
+            (self.masters.of(player), &self.graphics),
             u.ai.as_ref(),
             (held.computer, world_time),
         );

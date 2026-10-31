@@ -10,6 +10,7 @@ use crate::combat::volley::armed;
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -88,7 +89,7 @@ impl Unit {
         let r = AttackReads::of(
             self,
             master,
-            (c.w.masters.get(c.player.index()), &c.w.graphics),
+            (c.w.masters.of(c.player), &c.w.graphics),
             self.ai.as_ref(),
             (computer, c.w.world_time),
         );
@@ -113,7 +114,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         let computer =
             c.w.players
@@ -122,7 +123,7 @@ impl Unit {
         let r = AttackReads::of(
             self,
             master,
-            (c.w.masters.get(c.player.index()), &c.w.graphics),
+            (c.w.masters.of(c.player), &c.w.graphics),
             self.ai.as_ref(),
             (computer, c.w.world_time),
         );

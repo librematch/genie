@@ -11,6 +11,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit};
@@ -369,7 +370,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )
         .ok();
         let class = master.map(|ms| ms.class);

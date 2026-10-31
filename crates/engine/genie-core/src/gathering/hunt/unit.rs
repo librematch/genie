@@ -15,6 +15,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
@@ -127,7 +128,7 @@ impl Unit {
             -1
         } else {
             let mut w = DropWorld {
-                masters: c.w.masters.get(c.player.index()),
+                masters: c.w.masters.of(c.player),
                 spatial: &mut c.w.spatial,
                 zones: &mut c.w.zones,
                 pathing: &mut c.w.pathing,
@@ -577,7 +578,7 @@ impl Unit {
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
     pub(crate) fn hunt_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let w = DropWorld {
-            masters: c.w.masters.get(c.player.index()),
+            masters: c.w.masters.of(c.player),
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             pathing: &mut c.w.pathing,

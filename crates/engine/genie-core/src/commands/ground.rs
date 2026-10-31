@@ -10,6 +10,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -287,7 +288,7 @@ impl World {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
-        Ok(Some(clear_look_of(u, self.masters.get(p.index()))?))
+        Ok(Some(clear_look_of(u, self.masters.of(p))?))
     }
 
     /// An object the footprint clearing deletes ([`crate::construction::build::Cleared`]): a wall first goes

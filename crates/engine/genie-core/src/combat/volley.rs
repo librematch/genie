@@ -20,6 +20,7 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::VolleySpread;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -91,7 +92,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         if (matches!(
             master.id,
@@ -551,7 +552,7 @@ impl Unit {
         // then its action takes the target and the shooter
         c.w.players.player_mut(c.player)?.tracker.add(
             id,
-            crate::players::tracker::key(c.w.masters.get(c.player.index()), &c.w.lines, made.id),
+            crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, made.id),
         );
         c.w.players.player_mut(c.player)?.objects.push(missile);
         let missile = Releaser {

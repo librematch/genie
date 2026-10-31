@@ -17,6 +17,7 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::ACTION;
@@ -346,7 +347,7 @@ impl World {
         master: MasterId,
         action: ActionType,
     ) -> Result<bool, GenieError> {
-        let Some(masters) = self.masters.get(player.index()) else {
+        let Some(masters) = self.masters.of(player) else {
             return self.master(player, master).map(|_| false);
         };
         Ok(masters

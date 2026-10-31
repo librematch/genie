@@ -10,6 +10,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
@@ -90,7 +91,7 @@ impl Unit {
                 crate::world::lets::release(c, self, t, by)?;
             }
             self.show_standing(
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;

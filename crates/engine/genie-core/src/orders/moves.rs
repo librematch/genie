@@ -11,6 +11,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::Master;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
@@ -205,7 +206,7 @@ impl World {
             );
             if move_to.shows_standing() {
                 unit.shows_standing_sprite(
-                    self.masters.get(player.index()),
+                    self.masters.of(player),
                     &self.graphics,
                     self.streams.get(Stream::Sprite),
                 )?;
@@ -250,7 +251,7 @@ impl World {
             (class, player),
             (&mut releases, &mut builder_leaves, by),
             (
-                self.masters.get(player.index()),
+                self.masters.of(player),
                 &self.graphics,
                 self.streams.get(Stream::Sprite),
             ),

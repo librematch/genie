@@ -4,6 +4,7 @@
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::master_type::COMBAT;
@@ -79,7 +80,7 @@ impl World {
     /// the limited units' tests not reached.
     #[must_use]
     pub fn trainable_count(&self, p: PlayerId, building: MasterId) -> i16 {
-        let Some(masters) = self.masters.get(p.index()) else {
+        let Some(masters) = self.masters.of(p) else {
             return 0;
         };
         let mut count = 0i16;
@@ -125,7 +126,7 @@ impl World {
     /// [`TechTree`]: crate::players::world_player::tech_tree::TechTree
     #[must_use]
     pub fn upgradable_count(&self, p: PlayerId, building: MasterId) -> i16 {
-        let Some(masters) = self.masters.get(p.index()) else {
+        let Some(masters) = self.masters.of(p) else {
             return 0;
         };
         let Some(player) = self.players.get(p.index()) else {

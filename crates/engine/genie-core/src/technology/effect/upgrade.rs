@@ -9,6 +9,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::ids::{self, RELIC, VILLAGER_FEMALE, VILLAGER_MALE};
 use crate::objects::masters::{CostSlot, Master, master_type, player_master};
 use crate::objects::unit::Unit;
@@ -68,7 +69,7 @@ impl World {
         mode: i16,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
-        let Some(masters) = self.masters.get(p.index()) else {
+        let Some(masters) = self.masters.of(p) else {
             return Ok(());
         };
         let (Some(old), Some(new)) = (masters.get(from), masters.get(to)) else {
@@ -348,7 +349,7 @@ impl World {
         let (Some(units), Some(edit)) = (units, edit) else {
             return;
         };
-        let Some(masters) = self.masters.get_mut(p.index()) else {
+        let Some(masters) = self.masters.of_mut(p) else {
             return;
         };
         for m in masters.iter_mut() {

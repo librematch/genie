@@ -37,7 +37,7 @@ mod tribe_setters;
 mod values;
 
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
-pub use self::lookup::player_master;
+pub use self::lookup::{PlayersMasters, player_master};
 pub use self::task_id::TaskId;
 pub use self::values::AttributeWorld;
 pub(crate) use self::values::cost_resource;

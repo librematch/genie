@@ -18,6 +18,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
@@ -46,7 +47,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         let mut hunt = *self.actions.hunt().ok_or(NO_HUNT)?;
         let victim = hunt_victim(c, &hunt)?;
@@ -103,7 +104,7 @@ impl Unit {
             attack: AttackReads::of(
                 self,
                 master,
-                (c.w.masters.get(c.player.index()), &c.w.graphics),
+                (c.w.masters.of(c.player), &c.w.graphics),
                 self.ai.as_ref(),
                 (owner.computer, c.w.world_time),
             ),

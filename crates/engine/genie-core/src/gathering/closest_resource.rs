@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::Masters;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::owner_view;
@@ -207,7 +208,7 @@ impl UnitView<'_, '_> {
             zones: &mut self.c.w.zones,
             foreign: owner_view(&self.c.w.players, self.c.player, self.new_owner)?.players(),
             every: &self.c.w.masters,
-            masters: self.c.w.masters.get(self.player.index()),
+            masters: self.c.w.masters.of(self.player),
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
                 now: self.c.w.world_time,
@@ -281,7 +282,7 @@ impl Unit {
             zones: &mut c.w.zones,
             foreign: others.players(),
             every: &c.w.masters,
-            masters: c.w.masters.get(c.player.index()),
+            masters: c.w.masters.of(c.player),
             plan: Planning {
                 pathing: &mut c.w.pathing,
                 now: c.w.world_time,

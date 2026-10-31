@@ -9,6 +9,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::MOVING;
@@ -414,7 +415,7 @@ impl World {
         )?;
         if move_to.shows_standing() {
             unit.shows_standing_sprite(
-                self.masters.get(player.index()),
+                self.masters.of(player),
                 &self.graphics,
                 self.streams.get(Stream::Sprite),
             )?;
@@ -493,7 +494,7 @@ impl World {
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
             point,
             player,
-            self.masters.get(player.index()),
+            self.masters.of(player),
             &self.graphics,
         )? {
             crate::movement::ai_moves::PointMove::Declined => return Ok(false),

@@ -8,6 +8,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::players::Amount;
 use std::collections::BTreeMap;
 
@@ -74,7 +75,7 @@ impl Unit {
                 } else {
                     continue;
                 };
-                let l = clear_look_of(u, c.w.masters.get(owner.index()))?;
+                let l = clear_look_of(u, c.w.masters.of(owner))?;
                 let _ = looks.insert(id, l);
             }
         }

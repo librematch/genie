@@ -13,6 +13,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::Masters;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::object_list::ObjectList;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
@@ -293,7 +294,7 @@ impl<'a> Others<'a> {
                 continue;
             };
             woken.life.goto_sleep = false;
-            let k = key(masters.get(q.index()), lines, woken.life.master_id);
+            let k = key(masters.of(q), lines, woken.life.master_id);
             live.push(woken);
             tracker.remove(id, k);
             tracker.add(id, k);

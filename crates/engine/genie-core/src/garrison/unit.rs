@@ -14,6 +14,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
@@ -155,7 +156,7 @@ impl Unit {
         )?;
         for _ in 0..2 {
             self.set_entered(
-                c.w.masters.get(c.player.index()),
+                c.w.masters.of(c.player),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -179,7 +180,7 @@ impl Unit {
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
         )?;
         let given = crate::garrison::transport::TransportAction::given_sprite(t.task, master)?;
         let reads = crate::garrison::transport::TransportReads {
@@ -259,7 +260,7 @@ impl Unit {
     /// notify 0x1f9 with the enter action value.
     pub(crate) fn entered(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         self.set_entered(
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )
@@ -321,12 +322,10 @@ impl Unit {
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
-        let own = c.w.masters.get(c.player.index());
+        let own = c.w.masters.of(c.player);
         let masters = own.ok_or(crate::garrison::NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
-        let bm = building
-            .master_in(c.w.masters.get(tp.index()).or(own))?
-            .clone();
+        let bm = building.master_in(c.w.masters.of(tp).or(own))?.clone();
         let hp = building.life.hp;
         let me = self.master_in(Some(masters))?.clone();
         let owner = c.w.players.player(c.player)?;
@@ -487,7 +486,7 @@ impl Unit {
                 .get(c.player.index())
                 .ok_or(crate::garrison::NO_MASTERS)?;
         let firepower = if me.kind == COMBAT {
-            let own = c.w.masters.get(bp.index()).unwrap_or(masters);
+            let own = c.w.masters.of(bp).unwrap_or(masters);
             let rate = crate::garrison::attack_rate(bm, own, reload);
             crate::garrison::share(me, masters, self.reload_powerup, rate)?
         } else {

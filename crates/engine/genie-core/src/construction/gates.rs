@@ -8,6 +8,7 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::player_master;
 use crate::objects::{ObjectId, ObjectKey};
@@ -84,7 +85,7 @@ impl World {
     /// of class 39 whose master transforms ([`crate::objects::masters::BuildingMaster::transform_unit`]),
     /// newest first.
     pub(crate) fn gate_list(&self, q: PlayerId) -> Result<Vec<ListIndex>, GenieError> {
-        let masters = self.masters.get(q.index());
+        let masters = self.masters.of(q);
         let owner = self.players.player(q)?;
         let mut gates = Vec::new();
         for i in owner.objects.places().rev() {

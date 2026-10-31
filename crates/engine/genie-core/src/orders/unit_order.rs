@@ -7,6 +7,7 @@ use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::TOWN_CENTRE;
@@ -349,7 +350,7 @@ impl World {
         let mut unit = self.players.player_mut(p)?.objects.take_out(idx)?;
         let player = &self.players.player(p)?;
         let world = crate::unit_ai::world_view::DropWorld {
-            masters: self.masters.get(p.index()),
+            masters: self.masters.of(p),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,

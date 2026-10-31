@@ -6,6 +6,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::PlayersMasters;
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
@@ -107,7 +108,7 @@ impl FinderWorld {
         let o = self.objects.get(&id)?;
         Some(genie_core::unit_ai::task_finder::TaskTarget {
             id,
-            master: self.masters.get(o.player.index())?.get(o.master)?,
+            master: self.masters.of(o.player)?.get(o.master)?,
             player: o.player,
             state: o.state,
             held: o.held,
@@ -131,7 +132,7 @@ impl FinderWorld {
         let o = self.objects.get(&id)?;
         Some(genie_core::unit_ai::task_finder::Actor {
             id,
-            master: self.masters.get(o.player.index())?.get(o.master)?,
+            master: self.masters.of(o.player)?.get(o.master)?,
             player: o.player,
             held: o.held,
             attribute_95: self

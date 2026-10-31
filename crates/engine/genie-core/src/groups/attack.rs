@@ -18,6 +18,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
@@ -289,7 +290,7 @@ impl World {
         let Some(filter) = filter else {
             return Ok(NO_RANGE);
         };
-        let Some(master) = self.masters.get(player.index()).and_then(|m| m.get(master)) else {
+        let Some(master) = self.masters.of(player).and_then(|m| m.get(master)) else {
             return Ok(0.0);
         };
         for task in &master.tasks {

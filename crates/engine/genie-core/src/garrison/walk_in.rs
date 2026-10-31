@@ -21,6 +21,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -255,7 +256,7 @@ impl EnterAction {
         self.state = EnterState::Wait;
         self.timer = Seconds::new(WAIT_SECONDS);
         unit.shows_standing_sprite(
-            c.w.masters.get(c.player.index()),
+            c.w.masters.of(c.player),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )

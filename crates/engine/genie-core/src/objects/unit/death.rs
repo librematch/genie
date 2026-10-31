@@ -9,6 +9,7 @@ use crate::objects::lifecycle::Class;
 use crate::objects::lifecycle::death_parts::{built_death, combat_dies, farm_bonus, refund_of};
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::{NO_DYING_SPRITE, Unit};
@@ -161,17 +162,14 @@ impl Unit {
         let completion = Completion {
             master: Some(master),
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
-            masters: c.w.masters.get(c.player.index()),
+            masters: c.w.masters.of(c.player),
             computer: c.w.players.player(c.player)?.computer,
             ai: self.ai.is_some(),
         };
         let part = completion.first_part(construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
-        let k = crate::players::tracker::key(
-            c.w.masters.get(c.player.index()),
-            &c.w.lines,
-            self.life.master_id,
-        );
+        let k =
+            crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, self.life.master_id);
         c.w.players
             .player_mut(c.player)?
             .tracker
