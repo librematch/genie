@@ -1,6 +1,7 @@
 //! A hit's factors: the elevation, the facing offset and the charges (`FUN_1412623d0`).
 
 use crate::GenieError;
+use crate::combat::Charge;
 use crate::combat::damage::{
     Attacker, ElevationBonus, Facing, HIGHER, LOWER, RELIC_BOOST, SPECIFIC_RELIC_BOOST, Victim,
 };
@@ -126,7 +127,7 @@ pub fn charged(a: &Attacker) -> bool {
     if matches!(a.charge_type, 1 | 3) {
         a.max_charge <= a.charge
     } else {
-        1.0 <= a.charge
+        Charge::new(1.0) <= a.charge
     }
 }
 
@@ -159,7 +160,7 @@ pub(super) fn charge_damage(a: &Attacker) -> Result<f32, GenieError> {
     if a.special_attack == 3 && !special_charge_ready(a)? {
         return Ok(0.0);
     }
-    Ok(a.charge)
+    Ok(a.charge.get())
 }
 
 /// Slot 0x2f8 of a combat unit or building (`FUN_14120f510`): a charge of type 6 or 7 (slot

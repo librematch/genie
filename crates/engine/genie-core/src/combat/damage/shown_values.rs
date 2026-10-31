@@ -184,7 +184,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> i16 {
         attack = attack.wrapping_add(whole(bonus_damage(v, t)));
     }
     if charge && matches!(a.charge_type, 1 | 3) {
-        attack = attack.wrapping_add(whole(a.charge));
+        attack = attack.wrapping_add(whole(a.charge.get()));
     }
     attack
 }

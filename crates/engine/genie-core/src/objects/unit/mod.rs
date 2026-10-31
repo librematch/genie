@@ -1,5 +1,6 @@
 //! What the slice tracks of one object ([`Unit`]) and its update, action by action.
 
+use crate::combat::Charge;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HpPowerup;
@@ -192,7 +193,7 @@ pub struct Unit {
     /// The melee and pierce armor taken off it (its charge's hits).
     pub armor_removed: [i16; 2],
     /// Its charge (`+0x9e0`).
-    pub charge: f32,
+    pub charge: Charge,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`): its last hit was its charge's.
     pub charge_hit: bool,
     /// `+0x78c`: which of its master's standing sprites its idle swap last showed (1 the second,

@@ -4,6 +4,7 @@
 use crate::masters::MasterTable;
 use crate::{animated_master, combat_master, moving_master};
 use genie_core::GenieError;
+use genie_core::combat::Charge;
 use genie_core::map::Distance;
 use genie_core::map::Footprint;
 use genie_core::map::Offset;
@@ -227,7 +228,7 @@ pub(super) fn work_masters(
             work.attack_priority =
                 genie_core::objects::masters::AttackPriority::of_byte(c.attack_priority);
             work.special_attack = c.special_attack_flag;
-            work.max_charge = c.max_charge;
+            work.max_charge = Charge::new(c.max_charge);
             work.charge_target = c.charge_target;
         }
         // the combat part a missile master has too (`RGE_Master_Missile_Object`'s base)

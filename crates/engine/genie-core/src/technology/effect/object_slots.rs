@@ -2,6 +2,7 @@
 //! the combat unit's and the building's.
 
 use crate::GenieError;
+use crate::combat::Charge;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -327,14 +328,15 @@ pub(super) const CAPPED: bool = false;
 /// A combat unit's charge after its master's maximum charge (`max`, the old) changes
 /// (`FUN_1412163c0`'s `;`): a set takes `v / max × charge` (`v` without a maximum), an add
 /// `(v + max) / max × charge` (`v + charge` without one), a multiply `v × charge`.
-pub(super) fn charge_after(charge: f32, max: f32, change: Change, v: f32) -> f32 {
-    match change {
+pub(super) fn charge_after(charge: Charge, max: Charge, change: Change, v: f32) -> Charge {
+    let (charge, max) = (charge.get(), max.get());
+    Charge::new(match change {
         Change::Set if max != 0.0 => v / max * charge,
         Change::Set => v,
         Change::Add if max != 0.0 => (v + max) / max * charge,
         Change::Add => v + charge,
         Change::Multiply => v * charge,
-    }
+    })
 }
 
 /// A building's build points after its master's build time (`time`, the old) changes

@@ -4,8 +4,11 @@
 
 pub mod abilities;
 pub mod attack;
+mod charge;
 pub mod damage;
 pub mod missile;
 pub(crate) mod victim_reads;
 pub(crate) mod victims;
 pub(crate) mod volley;
+
+pub use self::charge::{Charge, ChargeRate};

@@ -564,6 +564,7 @@ pub(crate) fn weapon_range(master: &crate::objects::masters::Master) -> Distance
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::combat::Charge;
     use crate::groups::GroupTarget;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
     use crate::map::Footprint;
@@ -607,7 +608,7 @@ mod tests {
         };
         charging(&mut t, 6, -1);
         assert_eq!(range(&t, Some(object_id(20))), Distance::new(1.0));
-        t.players[1].objects[ListIndex::new(0)].charge = 1.0;
+        t.players[1].objects[ListIndex::new(0)].charge = Charge::new(1.0);
         assert_eq!(range(&t, Some(object_id(20))), Distance::new(3.0));
         assert_eq!(range(&t, None), Distance::new(1.0));
         charging(&mut t, 7, 1 << 5);

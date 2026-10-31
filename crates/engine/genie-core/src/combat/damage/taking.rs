@@ -266,7 +266,7 @@ pub(super) fn take_static(
     // slot 0x2f0 of a TRIBE attacker (types 70, 80; [`charge_hit`]) starts the sum at its raw
     // charge (slot 0x310, `+0x9e0`) plus 0
     let mut damage = if COMBAT <= src.kind && charge_hit(src, t) {
-        src.charge + 0.0
+        src.charge.get() + 0.0
     } else {
         0.0f32
     };

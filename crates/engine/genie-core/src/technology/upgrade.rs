@@ -5,6 +5,7 @@
 //! check (`FUN_1411859a0`), which the static part runs around the hit points' change.
 
 use crate::GenieError;
+use crate::combat::Charge;
 use crate::math::rng::{Stream, Well512};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -493,7 +494,7 @@ impl World {
             && 0 < new.charge_type
         {
             let more = (new.max_charge - old.max_charge).abs();
-            if 0.0 < more {
+            if Charge::ZERO < more {
                 self.object_at_mut(place)?.charge += more;
             }
         }
@@ -1598,7 +1599,7 @@ mod tests {
             death_sprite: 302,
             undead_sprite: 303,
             charge_type: 1,
-            max_charge: 2.0,
+            max_charge: Charge::new(2.0),
             ..Master::default()
         };
         let new = Master {
@@ -1608,7 +1609,7 @@ mod tests {
             standing_sprite_2: None,
             death_sprite: 402,
             undead_sprite: 403,
-            max_charge: 5.0,
+            max_charge: Charge::new(5.0),
             ..old.clone()
         };
         let upgraded = |old: &Master, new: &Master, at: i16| {
@@ -1631,7 +1632,7 @@ mod tests {
         };
         assert_eq!(
             upgraded(&old, &new, 300),
-            (HitPoints::new(30.0), Some(400), 3.0)
+            (HitPoints::new(30.0), Some(400), Charge::new(3.0))
         );
         // the second standing sprite becomes the new standing one when the new has none
         assert_eq!(upgraded(&old, &new, 301).1, Some(400));
@@ -1647,6 +1648,6 @@ mod tests {
             charge_type: 0,
             ..new
         };
-        assert_eq!(upgraded(&old, &uncharged, 304).2, 0.0);
+        assert_eq!(upgraded(&old, &uncharged, 304).2, Charge::ZERO);
     }
 }

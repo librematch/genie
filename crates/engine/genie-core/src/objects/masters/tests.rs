@@ -486,8 +486,12 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
             |m| m.train_locations[1].hotkey as f32,
             [3.0; 3],
         ),
-        (a::MAXIMUM_CHARGE, |m| m.max_charge, [3.0, 5.0, 10.0]),
-        (a::RECHARGE_RATE, |m| m.recharge_rate, [3.0, 5.0, 10.0]),
+        (a::MAXIMUM_CHARGE, |m| m.max_charge.get(), [3.0, 5.0, 10.0]),
+        (
+            a::RECHARGE_RATE,
+            |m| m.recharge_rate.get(),
+            [3.0, 5.0, 10.0],
+        ),
         (
             a::CHARGE_EVENT,
             |m| f32::from(m.charge_event),
@@ -1105,7 +1109,10 @@ fn the_combat_master_s_own_values_change() {
     let before = m.clone();
     m.set_attribute(attribute::ABILITY_BUTTON_ICON_ID, 9.0, &world(false));
     assert_eq!(m, before);
-    assert_eq!((m.hero_flag, m.max_charge, m.recharge_rate), (5, 15.0, 0.5));
+    assert_eq!(
+        (m.hero_flag, m.max_charge, m.recharge_rate),
+        (5, Charge::new(15.0), ChargeRate::new(0.5))
+    );
     assert_eq!((m.charge_event, m.charge_type), (2, 6));
     assert_eq!(m.conversion, [0.0, 4.0, 0.0]);
     assert_eq!(m.regeneration, 30.0);

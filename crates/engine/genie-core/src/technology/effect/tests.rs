@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::Charge;
 use crate::gathering::make::MakeState;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -39,11 +40,26 @@ use crate::world::WorldTime;
 /// takes the value and an add adds it, a multiply scales the charge.
 #[test]
 fn a_charge_keeps_its_share_of_a_changed_maximum() {
-    assert_eq!(charge_after(10.0, 20.0, Change::Set, 40.0), 20.0);
-    assert_eq!(charge_after(10.0, 0.0, Change::Set, 40.0), 40.0);
-    assert_eq!(charge_after(10.0, 20.0, Change::Add, 20.0), 20.0);
-    assert_eq!(charge_after(10.0, 0.0, Change::Add, 5.0), 15.0);
-    assert_eq!(charge_after(10.0, 20.0, Change::Multiply, 1.5), 15.0);
+    assert_eq!(
+        charge_after(Charge::new(10.0), Charge::new(20.0), Change::Set, 40.0),
+        Charge::new(20.0)
+    );
+    assert_eq!(
+        charge_after(Charge::new(10.0), Charge::ZERO, Change::Set, 40.0),
+        Charge::new(40.0)
+    );
+    assert_eq!(
+        charge_after(Charge::new(10.0), Charge::new(20.0), Change::Add, 20.0),
+        Charge::new(20.0)
+    );
+    assert_eq!(
+        charge_after(Charge::new(10.0), Charge::ZERO, Change::Add, 5.0),
+        Charge::new(15.0)
+    );
+    assert_eq!(
+        charge_after(Charge::new(10.0), Charge::new(20.0), Change::Multiply, 1.5),
+        Charge::new(15.0)
+    );
 }
 
 /// An object has actions while it holds a top action or its production list holds one (a

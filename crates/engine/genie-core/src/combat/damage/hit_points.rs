@@ -1,6 +1,7 @@
 //! The shield, the invulnerability floor, and the hit points' loss (slot 0xb0) and gain
 //! (slot 0xb8).
 
+use crate::combat::Charge;
 use crate::combat::damage::{Armored, Victim};
 use crate::math::fmath;
 use crate::objects::HitPoints;
@@ -15,8 +16,8 @@ use crate::objects::masters::master_type::COMBAT;
 /// charge type 0.
 pub fn shield(v: &mut Victim, missile: bool) -> bool {
     let kind = if missile { 4 } else { 5 };
-    if v.source.charge_type == kind && fmath::at_most_or_unordered(1.0, v.source.charge) {
-        v.source.charge -= 1.0;
+    if v.source.charge_type == kind && fmath::at_most_or_unordered(1.0, v.source.charge.get()) {
+        v.source.charge -= Charge::new(1.0);
         return true;
     }
     false

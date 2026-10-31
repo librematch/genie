@@ -1,5 +1,6 @@
 //! State 4's walk to the target and state 7's swing with its hit and its trample.
 
+use crate::combat::Charge;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
@@ -387,7 +388,7 @@ impl Attack {
         }
         let a = &mut f.own.source;
         if a.charge_hit && matches!(a.charge_type, 1 | 3) {
-            a.charge = 0.0;
+            a.charge = Charge::ZERO;
         }
         Ok(Some(target))
     }

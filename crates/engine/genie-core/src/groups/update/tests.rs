@@ -1,3 +1,4 @@
+use crate::combat::Charge;
 use crate::combat::attack::AttackState;
 use crate::groups::FormationKind;
 use crate::groups::SlotState;
@@ -2045,13 +2046,13 @@ fn a_unit_s_speed_is_its_movers_unless_a_charge_runs() {
     assert_eq!(speed(&t, 11).unwrap(), 0.0);
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
     let mut m4 = t.masters[1].get(master_id(4)).unwrap().clone();
-    m4.max_charge = 1.0;
+    m4.max_charge = Charge::new(1.0);
     t.masters[1] = Masters::new([m4.clone()]);
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
     m4.special_attack = 3;
     t.masters[1] = Masters::new([m4.clone()]);
     assert!(speed(&t, 10).is_err());
-    m4.max_charge = 0.0;
+    m4.max_charge = Charge::ZERO;
     t.masters[1] = Masters::new([m4]);
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
 }

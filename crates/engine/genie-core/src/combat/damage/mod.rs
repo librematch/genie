@@ -41,6 +41,7 @@ use self::taking::kill_bonus;
 pub use self::taking::take;
 #[cfg(test)]
 use self::taking::take_static;
+use crate::combat::Charge;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -363,13 +364,13 @@ pub struct Attacker {
     /// charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
     pub charge_type: i16,
     /// Its master's `max_charge`.
-    pub max_charge: f32,
+    pub max_charge: Charge,
     /// Its master's `charge_target`.
     pub charge_target: i16,
     /// Its master's `special_attack_flag`.
     pub special_attack: u8,
     /// Its charge (`+0x9e0`).
-    pub charge: f32,
+    pub charge: Charge,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
     pub charge_hit: bool,
     /// Its attack powerup (`+0xa24`) and the game's setting `+0x680`

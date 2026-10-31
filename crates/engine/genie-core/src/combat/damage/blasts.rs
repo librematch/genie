@@ -1,6 +1,7 @@
 //! The damage beyond what a blast has done (`FUN_141082e80`) and the blast itself (slot
 //! 0x848).
 
+use crate::combat::Charge;
 use crate::combat::damage::{
     Attacker, CONE, ELEPHANT_ARCHER, Kill, MINUS_CONE, RAMS, Victim, WIDE_CONE, armor_damage,
     bonus_damage, charge_hit, elevation_factor, facing_offset, kill_bonus, lose, shield, take,
@@ -42,7 +43,7 @@ pub(super) fn damage(
             let hit = charge_hit(&src.source, t);
             src.source.charge_hit = hit;
             if hit && src.source.area_effect <= Distance::ZERO {
-                src.source.charge = 0.0;
+                src.source.charge = Charge::ZERO;
             }
         }
         lose(t, d - blast_taken);

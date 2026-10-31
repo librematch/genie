@@ -7,6 +7,7 @@ use crate::{
     object_ids, production, saved_actions, saved_sprite, task_at, unit_ai,
 };
 use genie_core::GenieError;
+use genie_core::combat::Charge;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
@@ -181,7 +182,9 @@ pub(super) fn unit(
         armor_removed: object
             .combat()
             .map_or([0; 2], |c| [c.melee_armor_removed, c.pierce_armor_removed]),
-        charge: object.combat().map_or(0.0, |c| c.charge),
+        charge: object
+            .combat()
+            .map_or(Charge::ZERO, |c| Charge::new(c.charge)),
         // the animated layer (types 20 and up); a moving object's mover takes it below
         body: genie_core::objects::layers::Body::new(
             Position::new(s.t_x, s.t_y, s.t_z),

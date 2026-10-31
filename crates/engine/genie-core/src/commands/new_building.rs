@@ -2,6 +2,7 @@
 //! its storage and its annexes.
 
 use crate::GenieError;
+use crate::combat::Charge;
 use crate::construction::build::Construction;
 use crate::map::Distance;
 use crate::map::Position;
@@ -341,7 +342,7 @@ impl World {
             range_powerup: Distance::ZERO,
             armor_powerups: [0; 2],
             armor_removed: [0; 2],
-            charge: 0.0,
+            charge: Charge::ZERO,
             charge_hit: false,
             idle_variant: 0,
             roo_called: false,

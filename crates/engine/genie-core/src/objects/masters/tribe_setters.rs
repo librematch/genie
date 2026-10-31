@@ -1,6 +1,8 @@
 //! The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the
 //! train locations.
 
+use crate::combat::Charge;
+use crate::combat::ChargeRate;
 use crate::objects::HitPoints;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::MasterAttribute;
@@ -126,8 +128,8 @@ impl Master {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::MAXIMUM_CHARGE => self.max_charge = v,
-            a::RECHARGE_RATE => self.recharge_rate = v,
+            a::MAXIMUM_CHARGE => self.max_charge = Charge::new(v),
+            a::RECHARGE_RATE => self.recharge_rate = ChargeRate::new(v),
             a::CHARGE_EVENT => self.charge_event = low16(v),
             a::CHARGE_TYPE => self.charge_type = low16(v),
             a::CHARGE_PROJECTILE_UNIT => self.charge_projectile = id_of(cvttss2si(v)),
@@ -215,8 +217,8 @@ impl Master {
             a::SHOWN_PIERCE_ARMOR => {
                 self.shown.pierce_armor = self.shown.pierce_armor.wrapping_add(low16(v));
             }
-            a::MAXIMUM_CHARGE => self.max_charge += v,
-            a::RECHARGE_RATE => self.recharge_rate += v,
+            a::MAXIMUM_CHARGE => self.max_charge += Charge::new(v),
+            a::RECHARGE_RATE => self.recharge_rate += ChargeRate::new(v),
             a::CHARGE_EVENT => self.charge_event = self.charge_event.wrapping_add(low16(v)),
             a::SPECIAL_GRAPHIC => add_sprite(&mut self.special_sprite, v, world),
             a::SPECIAL_ABILITY => self.special_attack = self.special_attack.wrapping_add(low8(v)),

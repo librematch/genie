@@ -4,6 +4,7 @@
 //! 0x1e8, `FUN_141086330`).
 
 use crate::GenieError;
+use crate::combat::Charge;
 use crate::combat::damage::SPECIAL_CHARGE_GAP;
 use crate::groups::GroupId;
 use crate::groups::WorldObject;
@@ -233,7 +234,8 @@ impl World {
             return Ok(speed.get());
         }
         let master = unit.master(&self.masters, player)?;
-        if master.kind != CHARGER || master.max_charge <= 0.0 || master.special_attack != 3 {
+        if master.kind != CHARGER || master.max_charge <= Charge::ZERO || master.special_attack != 3
+        {
             return Ok(speed.get());
         }
         Err(SPECIAL_CHARGE_GAP)

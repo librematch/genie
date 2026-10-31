@@ -1,6 +1,7 @@
 //! A hit: where it comes from ([`Hit`]), what the swing does after it, the strike
 //! (`FUN_141084230`) and the blast so far.
 
+use crate::combat::Charge;
 use crate::combat::attack::{DRAW_SCALE, QUIET_SWINGS};
 use crate::combat::damage::Victim;
 use crate::map::Distance;
@@ -120,7 +121,7 @@ pub(crate) fn strike(
         targets.push(victim);
         let _ = damage::blast(own, hit.at, None, Some(main), &mut targets, 1.0)?;
         if a.charge_type == 3 {
-            own.source.charge = 0.0;
+            own.source.charge = Charge::ZERO;
         }
         return Ok(struck);
     }

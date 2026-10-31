@@ -153,8 +153,8 @@ fn a_static_object_takes_a_ready_charge_first() {
         kind: master_type::COMBAT,
         charge_type: 1,
         charge_target: -1,
-        charge: 5.0,
-        max_charge: 5.0,
+        charge: Charge::new(5.0),
+        max_charge: Charge::new(5.0),
         ..Attacker::default()
     };
     let mut t = tree();
@@ -456,7 +456,8 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     assert_eq!(shown_attack(&v, &at_sheep), 4 + 3);
     v.bonus_tasks.clear();
     // a ready charge of type 1 for every target, or for its target's class group
-    (v.source.charge_type, v.source.max_charge, v.source.charge) = (1, 5.0, 5.5);
+    (v.source.charge_type, v.source.max_charge, v.source.charge) =
+        (1, Charge::new(5.0), Charge::new(5.5));
     v.source.charge_target = -1;
     assert_eq!(shown_attack(&v, &none), 4 + 5);
     v.source.charge_target = 0;
@@ -479,11 +480,11 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     assert_eq!(shown_attack(&v, &shot), 9);
     v.source.weapon_range = Distance::new(4.0);
     assert_eq!(shown_range(&v, &shot), Distance::new(1.0 + (2.0 + 4.0)));
-    v.source.charge = 0.5;
+    v.source.charge = Charge::new(0.5);
     assert_eq!(shown_attack(&v, &shot), 4);
     assert_eq!(shown_range(&v, &shot), Distance::new(5.0));
     v.kind = master_type::RGE_COMBAT;
-    v.source.charge = 1.0;
+    v.source.charge = Charge::new(1.0);
     assert_eq!(shown_range(&v, &shot), Distance::new(4.0));
     // the melee armor: its best of class 4 plus the powerup; a wall foundation none; type 50
     // without the powerup; else its best of any, else its base armor
@@ -506,12 +507,13 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
 #[test]
 fn a_range_charge_hits_a_target_its_class_group_names() {
     let (sheep, mut v) = (sheep(), hunter());
-    (v.source.charge_type, v.source.max_charge, v.source.charge) = (7, 5.0, 1.0);
+    (v.source.charge_type, v.source.max_charge, v.source.charge) =
+        (7, Charge::new(5.0), Charge::new(1.0));
     v.source.charge_target = 0;
     assert!(range_charge_hit(&v.source, &sheep));
-    v.source.charge = 0.5;
+    v.source.charge = Charge::new(0.5);
     assert!(!range_charge_hit(&v.source, &sheep));
-    (v.source.charge_type, v.source.charge) = (1, 9.0);
+    (v.source.charge_type, v.source.charge) = (1, Charge::new(9.0));
     assert!(!range_charge_hit(&v.source, &sheep));
 }
 
@@ -538,8 +540,8 @@ fn a_ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     hunter.source.charge_type = 1;
     hunter.source.charge_target = -1;
-    hunter.source.max_charge = 5.0;
-    hunter.source.charge = 5.0;
+    hunter.source.max_charge = Charge::new(5.0);
+    hunter.source.charge = Charge::new(5.0);
     assert_eq!(
         armor_damage(
             &sheep,
@@ -561,9 +563,9 @@ fn a_ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(14.0 - 8.0));
     assert!(hunter.source.charge_hit);
-    assert_eq!(hunter.source.charge, 0.0);
+    assert_eq!(hunter.source.charge, Charge::ZERO);
     // not ready: no charge
-    hunter.source.charge = 4.0;
+    hunter.source.charge = Charge::new(4.0);
     assert_eq!(
         armor_damage(&sheep, &[ClassAmount::new(4, 3)], 1.0, &hunter.source, 0.0),
         Ok(HitPoints::new(3.0))
@@ -599,15 +601,15 @@ fn a_charge_target_picks_the_class_groups() {
 fn a_shield_spends_a_charge_per_blocked_hit() {
     let mut sheep = sheep();
     sheep.source.charge_type = 5;
-    sheep.source.charge = 1.5;
+    sheep.source.charge = Charge::new(1.5);
     assert!(!shield(&mut sheep, true));
     assert!(shield(&mut sheep, false));
-    assert_eq!(sheep.source.charge, 0.5);
+    assert_eq!(sheep.source.charge, Charge::new(0.5));
     assert!(!shield(&mut sheep, false));
     // COMISS 1.0, charge; JA past: a NaN charge blocks the hit and stays NaN
-    sheep.source.charge = f32::NAN;
+    sheep.source.charge = Charge::new(f32::NAN);
     assert!(shield(&mut sheep, false));
-    assert!(sheep.source.charge.is_nan());
+    assert!(sheep.source.charge.get().is_nan());
 }
 
 #[test]

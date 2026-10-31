@@ -6,6 +6,8 @@
 //! `.dat`'s values for what the save does not carry.
 
 use crate::GenieError;
+use crate::combat::Charge;
+use crate::combat::ChargeRate;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
@@ -365,7 +367,7 @@ pub struct Master {
     /// `area_damage` (`+0x834`).
     pub area_damage: f32,
     /// `max_charge` (`+0x918`).
-    pub max_charge: f32,
+    pub max_charge: Charge,
     /// `charge_target` (`+0x924`).
     pub charge_target: i16,
     /// `+0x5d4`, `obj_max` (the `.dat`'s `garrison_capacity`): a building that garrisons takes a
@@ -506,7 +508,7 @@ pub struct Master {
     /// `+0x8b4`, `regeneration_rate`.
     pub regeneration: f32,
     /// `+0x91c`, `mRechargeRate`.
-    pub recharge_rate: f32,
+    pub recharge_rate: ChargeRate,
     /// `+0x920`, `mChargeEvent`.
     pub charge_event: i16,
     /// `+0x934`, `+0x938`, `+0x93c`: `mMinConversionTimeAdj`, `mMaxConversionTimeAdj`,

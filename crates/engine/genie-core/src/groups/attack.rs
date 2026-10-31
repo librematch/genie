@@ -3,6 +3,7 @@
 //! (`FUN_14100c6c0`, `FUN_141007ba0`, `FUN_14102bbd0`).
 
 use crate::GenieError;
+use crate::combat::Charge;
 use crate::groups::GroupId;
 use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
@@ -430,7 +431,7 @@ impl World {
             tm.class,
             tm.kind,
         );
-        Ok(works && 1.0 <= u.charge)
+        Ok(works && Charge::new(1.0) <= u.charge)
     }
 }
 
