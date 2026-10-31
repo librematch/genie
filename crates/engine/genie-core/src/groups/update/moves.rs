@@ -12,6 +12,7 @@ use crate::groups::update::{
 use crate::groups::{SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::objects::ActionState;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::world::Millis;
 use crate::world::World;
@@ -423,7 +424,9 @@ impl World {
         let me = Me {
             id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let mover = unit.body.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
         let mut plan = Planning {

@@ -23,6 +23,7 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Planning};
+use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -212,7 +213,9 @@ impl World {
         let me_walk = Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         Ok((seeker, me_walk))
     }

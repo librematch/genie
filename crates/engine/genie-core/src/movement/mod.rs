@@ -24,6 +24,7 @@ use crate::map::Radii;
 use crate::map::spatial::{Placed, Spatial};
 use crate::math::Angle;
 use crate::math::fmath::{self, BVector};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
 use crate::objects::masters::ClassId;
@@ -300,7 +301,7 @@ pub struct Me {
     /// Its top action's state (slot 0x2b0, `RGE_Action_Object::actionState`; 0 without one),
     /// which the short pather's ignore list reads: an action that walks after changing its state
     /// sets its own.
-    pub action_state: u8,
+    pub action_state: ActionState,
     /// Its group (`mGroupID`, `+0x6d0`; -1 for none), whose differentiator units the long pather
     /// lowers (`FUN_140f9eb70`).
     pub group: Option<crate::groups::GroupId>,

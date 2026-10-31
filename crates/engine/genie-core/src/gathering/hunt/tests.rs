@@ -13,6 +13,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, TargetMoved, WalkTo,
 };
+use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
@@ -128,7 +129,7 @@ const fn me(state: HuntState) -> Me {
     Me {
         id: object_id(9177),
         group: None,
-        action_state: state.get(),
+        action_state: ActionState::new(state.get()),
     }
 }
 

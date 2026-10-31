@@ -10,6 +10,7 @@ use crate::math::rng::Stream;
 use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{MoveDefaults, SpriteReads};
 use crate::movement::{Me, footprint_gap, footprint_gap_squared};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
@@ -389,7 +390,7 @@ impl Unit {
                 groups: &c.w.groups,
             };
             // the notify's record holds the drop site's id, 0 for none
-            self.drop_site_from(&mut w, others, state.get(), false)?
+            self.drop_site_from(&mut w, others, ActionState::new(state.get()), false)?
                 .map_or(0, ObjectId::get)
         } else {
             -1

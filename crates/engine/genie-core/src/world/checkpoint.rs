@@ -6,6 +6,7 @@
 
 use crate::map::Position;
 use crate::math::conversions::cvttss2si;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::players::Amount;
@@ -35,7 +36,7 @@ pub struct TopAction {
     /// The type (virtual slot 166).
     pub kind: ActionType,
     /// The state (virtual slot 86).
-    pub state: u8,
+    pub state: ActionState,
 }
 
 /// What word 9 reads of an object's actions: its top action's type (virtual slot 166), none
@@ -46,7 +47,7 @@ pub struct ActionTerm {
     /// The type, none for −1.
     pub kind: Option<ActionType>,
     /// The state.
-    pub state: u8,
+    pub state: ActionState,
 }
 
 impl From<TopAction> for ActionTerm {
@@ -101,7 +102,7 @@ pub fn player_block(player: &PlayerState) -> [u32; 11] {
 fn action_checksum(o: &CheckpointObject) -> u32 {
     let (kind, state) = o
         .top_action
-        .map_or((-1, 0), |t| (ActionType::field(t.kind), t.state));
+        .map_or((-1, 0), |t| (ActionType::field(t.kind), t.state.get()));
     (i32::from(kind) as u32)
         .wrapping_add(u32::from(state))
         .wrapping_add(o.retarget_timer.unwrap_or(0) as u32)
@@ -190,7 +191,7 @@ mod tests {
         let o = CheckpointObject {
             top_action: Some(ActionTerm {
                 kind: Some(crate::gathering::gather::GATHER),
-                state: 3,
+                state: ActionState::new(3),
             }),
             retarget_timer: Some(100),
             ..object()

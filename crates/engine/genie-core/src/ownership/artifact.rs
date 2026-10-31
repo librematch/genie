@@ -576,6 +576,7 @@ mod tests {
     use crate::movement::Speed;
     use crate::movement::move_to::MoveWaitState;
     use crate::movement::move_to::{MoveDefaults, MoveToReads, MoveWait, SpriteReads, WalkTo};
+    use crate::objects::ActionState;
     use crate::objects::ObjectId;
     use crate::objects::masters::class;
     use crate::objects::sprite::Graphic;
@@ -1057,7 +1058,7 @@ mod tests {
         Me {
             id: object_id(9177),
             group: None,
-            action_state: 0,
+            action_state: ActionState::NO_ACTION,
         }
     }
 

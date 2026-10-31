@@ -7,6 +7,7 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Stream;
+use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -109,7 +110,9 @@ impl World {
                 (false, None),
             );
         }
-        let state = unit.top_action().map_or(0, |a| a.state);
+        let state = unit
+            .top_action()
+            .map_or(ActionState::NO_ACTION, |a| a.state);
         let player = &self.players.player(p)?;
         let mut world = crate::unit_ai::world_view::DropWorld {
             masters: self.masters.get(p.index()),

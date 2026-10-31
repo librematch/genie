@@ -7,6 +7,7 @@ use crate::movement::move_to::{
     MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, TargetMoved, WalkTo,
 };
 use crate::movement::{Me, Mover};
+use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
@@ -136,7 +137,7 @@ impl Rig {
                 let me = Me {
                     id: u.id,
                     group: None,
-                    action_state: state.get(),
+                    action_state: ActionState::new(state.get()),
                 };
                 f(c, u, me)
             },

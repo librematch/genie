@@ -8,6 +8,7 @@ use crate::map::Distance;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, SpriteReads, TargetMoved, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
+use crate::objects::ActionState;
 use crate::objects::SpriteId;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -96,7 +97,7 @@ impl HuntAction {
         mut me: Me,
         gives_up: GiveUp,
     ) -> Result<u8, GenieError> {
-        me.action_state = self.state.get();
+        me.action_state = ActionState::new(self.state.get());
         let state = self.move_to.as_ref().map(|m| m.state);
         let how = ListUpdate {
             gives_up,

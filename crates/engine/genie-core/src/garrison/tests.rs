@@ -20,6 +20,7 @@ use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::MoveWaitState;
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -516,7 +517,7 @@ fn enter_update(t: &mut World, dt: u32) -> Result<HeadCode, GenieError> {
         let me = crate::movement::Me {
             id: u.id,
             group: u.group.id,
-            action_state: u.top_action().map_or(0, |a| a.state),
+            action_state: u.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
         };
         u.enter_part(c, me)
     })
@@ -794,14 +795,14 @@ fn a_meeting_point_is_the_shore_on_the_way_else_a_beach_under_the_unit() {
     let ship = MeetingTarget {
         room: true,
         speed: Speed::new(1.1),
-        state: 0,
+        state: ActionState::NO_ACTION,
         class: class::TRANSPORT,
         position: Point::new(79.5, 92.5),
         action_point: Err(UNPLACED),
     };
     assert_eq!(meet_at(&ship), MeetAt::Shore);
     let idle = MeetingTarget {
-        state: 2,
+        state: ActionState::new(2),
         ..ship.clone()
     };
     assert_eq!(meet_at(&idle), MeetAt::Shore);
@@ -827,7 +828,7 @@ fn a_meeting_point_is_the_shore_on_the_way_else_a_beach_under_the_unit() {
     };
     assert_eq!(meet_at(&nan), MeetAt::Shore);
     let moving = MeetingTarget {
-        state: 4,
+        state: ActionState::new(4),
         action_point: Ok(Point::new(60.0, 70.0)),
         ..ship
     };
@@ -838,7 +839,10 @@ fn a_meeting_point_is_the_shore_on_the_way_else_a_beach_under_the_unit() {
     };
     assert_eq!(meet_at(&siege), MeetAt::Place);
     assert_eq!(
-        meet_at(&MeetingTarget { state: 7, ..moving }),
+        meet_at(&MeetingTarget {
+            state: ActionState::new(7),
+            ..moving
+        }),
         MeetAt::Place
     );
     // the shore on the way: from the ship's tile (5, 30) toward the villager's (5, 12) the
@@ -3609,7 +3613,9 @@ fn a_transport_unloads_inside_its_own_update() {
         let me = crate::movement::Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let _ = unit.transport_update(c, me)?;
         let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
@@ -4013,7 +4019,7 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
             let me = crate::movement::Me {
                 id: u.id,
                 group: u.group.id,
-                action_state: 0,
+                action_state: ActionState::NO_ACTION,
             };
             crate::movement::move_to::update_sub_actions(
                 list,

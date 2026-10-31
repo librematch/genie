@@ -5,6 +5,7 @@ use crate::map::GridSize;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
@@ -2110,7 +2111,7 @@ fn hit_villager() -> (UnitAi, Surroundings, Notify) {
         state: ObjectState::Alive,
         map: GridSize::new(100, 100),
         anim_speed: Some(1.0),
-        action_state: Some(5),
+        action_state: Some(ActionState::new(5)),
         units: vec![foe(30, class::CLASS_6)],
         ..Surroundings::default()
     };
@@ -2912,7 +2913,7 @@ fn soldier_at() -> Surroundings {
         speed: Speed::new(1.0),
         los: Distance::new(4.0),
         weapon_range: Distance::ZERO,
-        action_state: Some(0),
+        action_state: Some(ActionState::NO_ACTION),
         position: Position::new(10.0, 10.0, 0.0),
         ..Surroundings::default()
     }
@@ -3459,7 +3460,7 @@ fn a_scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
             master: ids::ID_448,
             class: Some(class::CLASS_47),
             weapon_range: Distance::ZERO,
-            action_state: Some(0),
+            action_state: Some(ActionState::NO_ACTION),
             ..Surroundings::default()
         };
         let mut side = SoldierSide {
@@ -3514,7 +3515,7 @@ fn a_patrol_s_kill_ends_the_patrol_order_with_its_timers() {
     let at = Surroundings {
         player: PlayerId::new(1),
         kind: master_type::COMBAT,
-        action_state: Some(0),
+        action_state: Some(ActionState::NO_ACTION),
         ..Surroundings::default()
     };
     let mut side = SoldierSide {
@@ -3556,7 +3557,7 @@ fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
             sheep,
             Distance::ZERO,
             false,
-            Some(4),
+            Some(ActionState::new(4)),
             Some(true)
         ),
         Ok(None)
@@ -3566,7 +3567,7 @@ fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
             sheep,
             Distance::ZERO,
             false,
-            Some(6),
+            Some(ActionState::new(6)),
             Some(true)
         ),
         Ok(None)
@@ -3576,7 +3577,7 @@ fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
             sheep,
             Distance::ZERO,
             false,
-            Some(4),
+            Some(ActionState::new(4)),
             Some(true)
         ),
         Ok(Some(RetargetSearch {
@@ -3590,7 +3591,7 @@ fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some((PlayerId::new(1), class::BUILDING)),
             Distance::ZERO,
             true,
-            Some(6),
+            Some(ActionState::new(6)),
             Some(true)
         ),
         Ok(Some(RetargetSearch {
@@ -3612,7 +3613,7 @@ fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
             Some((PlayerId::new(8), class::BUILDING)),
             Distance::ZERO,
             false,
-            Some(4),
+            Some(ActionState::new(4)),
             Some(false)
         ),
         Ok(None)
@@ -3660,7 +3661,7 @@ fn a_hunter_hit_by_its_boar_ignores_the_damage() {
     };
     let at = Surroundings {
         id: object_id(10041),
-        action_state: Some(12),
+        action_state: Some(ActionState::new(12)),
         target: Some(Seen {
             class: class::PREDATOR,
             ..Seen::default()
@@ -6340,7 +6341,7 @@ fn a_dead_target_stops_an_action_that_needs_a_live_one() {
         ..builder_done()
     };
     let swinging = Surroundings {
-        action_state: Some(2),
+        action_state: Some(ActionState::new(2)),
         ..dead.clone()
     };
     let mut u = attack();
@@ -6354,7 +6355,7 @@ fn a_dead_target_stops_an_action_that_needs_a_live_one() {
     .unwrap();
     assert_eq!((u.current_target, fx), (Some(object_id(10028)), vec![]));
     let over = Surroundings {
-        action_state: Some(1),
+        action_state: Some(ActionState::new(1)),
         ..dead.clone()
     };
     let mut u = attack();
@@ -9509,7 +9510,7 @@ fn the_rest_after_an_order_that_gave_an_action_reads_it() {
             class: class::CLASS_6,
             ..Seen::default()
         }),
-        action_state: Some(6),
+        action_state: Some(ActionState::new(6)),
         ..Surroundings::default()
     };
     let mut r = rng();
@@ -9722,7 +9723,7 @@ fn a_transport_ship_runs_from_its_attackers_without_an_order() {
     // busy with its top action in state 2 it runs too; in another state it stays
     let (mut u, mut at) = attacked_transport();
     at.busy = true;
-    at.action_state = Some(4);
+    at.action_state = Some(ActionState::new(4));
     let mut fx = Vec::new();
     assert_eq!(
         u.handle(

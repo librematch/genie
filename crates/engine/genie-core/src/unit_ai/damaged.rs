@@ -126,7 +126,7 @@ impl UnitAi {
         fierce: bool,
     ) -> Result<bool, GenieError> {
         let order = self.current_order;
-        let state = held_action_state(at.action_state)?;
+        let state = held_action_state(at.action_state)?.get();
         let gathers = matches!(
             order,
             Some(OrderKind::Hunt | OrderKind::Gather | OrderKind::AutoBoarLuring)
@@ -188,7 +188,7 @@ impl UnitAi {
         if self.ai_type == SIEGE_TOWER_AI && held_by_group {
             return Ok(GO_ON);
         }
-        if !at.busy || held_action_state(at.action_state)? == 2 {
+        if !at.busy || held_action_state(at.action_state)?.get() == 2 {
             let _ = self.run_away(true, at, computer, ai_rng, side)?;
         }
         Ok(BREAK)

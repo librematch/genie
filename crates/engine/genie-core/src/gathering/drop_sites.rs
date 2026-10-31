@@ -261,6 +261,7 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::math::rng::Well512;
     use crate::movement::Speed;
+    use crate::objects::ActionState;
     use crate::objects::WorkRate;
     use crate::objects::actions::ActionList;
     use crate::objects::lifecycle::Lifecycle;
@@ -394,7 +395,7 @@ mod tests {
             unit,
             me: Me {
                 id: unit.id,
-                action_state: 0,
+                action_state: ActionState::NO_ACTION,
                 group: None,
             },
             mover: &mover,

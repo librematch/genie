@@ -169,7 +169,7 @@ impl Watch {
     pub(crate) fn of(u: &Unit) -> Option<Self> {
         tracing::enabled!(target: STATE, tracing::Level::DEBUG).then(|| Self {
             object_state: u.life.state,
-            action: u.top_action().map(|a| (a.kind.get(), a.state)),
+            action: u.top_action().map(|a| (a.kind.get(), a.state.get())),
             order: u.ai.as_ref().map(|ai| {
                 [
                     crate::unit_ai::OrderKind::field(ai.current_order),

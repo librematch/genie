@@ -11,6 +11,7 @@ use crate::map::Distance;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{BVector, below_or_unordered};
 use crate::movement::ASIDE;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::master_type::ACTION;
 use crate::players::PlayerId;
@@ -154,17 +155,17 @@ impl World {
         &self,
         p: PlayerId,
         u: &crate::objects::unit::Unit,
-    ) -> Result<(bool, u8), GenieError> {
+    ) -> Result<(bool, ActionState), GenieError> {
         if u.master(&self.masters, p)?.kind < ACTION {
-            return Ok((false, 0));
+            return Ok((false, ActionState::NO_ACTION));
         }
         if let Some(e) = u.unmodelled_action.clone() {
             return Err(e);
         }
         let top = u.top_action();
-        let state = top.map_or(0, |a| a.state);
+        let state = top.map_or(ActionState::NO_ACTION, |a| a.state);
         let move_to = top.is_some_and(|a| a.kind == MOVE_TO);
-        Ok((move_to || KEEPS_MOVING.contains(&state), state))
+        Ok((move_to || KEEPS_MOVING.contains(&state.get()), state))
     }
 
     /// `FUN_1411570c0` for unit `u` on the line `from` -> `to` (x, height, y; held inside the

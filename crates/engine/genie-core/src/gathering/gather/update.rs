@@ -15,6 +15,7 @@ use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{GiveUp, MoveTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
+use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
@@ -351,7 +352,7 @@ impl GatherAction {
         mut me: Me,
         r: &GatherReads,
     ) -> Result<u8, GenieError> {
-        me.action_state = self.state.get();
+        me.action_state = ActionState::new(self.state.get());
         let state = self.move_to.as_ref().map(|m| m.state);
         // the computer player's test is not held: its villagers would fail at once
         let how = ListUpdate {

@@ -12,6 +12,7 @@ use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Tile;
+use crate::objects::ActionState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
@@ -549,13 +550,14 @@ impl Unit {
     pub(crate) fn free_for_group(&self, master: &Master) -> Result<bool, GenieError> {
         let u = self;
         let state = if master.kind < ACTION {
-            0
+            ActionState::NO_ACTION
         } else {
             if let Some(e) = u.unmodelled_action.clone() {
                 return Err(e);
             }
-            u.top_action().map_or(0, |a| a.state)
-        };
+            u.top_action().map_or(ActionState::NO_ACTION, |a| a.state)
+        }
+        .get();
         if 1 < state {
             if state == 2 {
                 if master.class == class::TRADE_CART || master.class == class::TRADE_BOAT {

@@ -5,6 +5,7 @@ use crate::map::GridSize;
 use crate::map::Tile;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveWaitState;
+use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
@@ -232,7 +233,7 @@ fn update(t: &mut World, dt: u32) -> Result<(HeadCode, Top), GenieError> {
         let me = Me {
             id: u.id,
             group: u.group.id,
-            action_state: u.top_action().map_or(0, |a| a.state),
+            action_state: u.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let code = u.build_part(c, me)?;
         Ok((code, (u.top_action_kind(), u.top_target())))

@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
+use crate::objects::ActionState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
@@ -437,7 +438,9 @@ pub(super) const fn closest_undiscovered_tile() -> Result<(), GenieError> {
 
 /// The state of the unit's top action (slot 0x2b0) as [`Surroundings::action_state`] holds it,
 /// for an action the slice holds.
-pub(super) const fn held_action_state(state: Option<u8>) -> Result<u8, GenieError> {
+pub(super) const fn held_action_state(
+    state: Option<ActionState>,
+) -> Result<ActionState, GenieError> {
     match state {
         Some(s) => Ok(s),
         None => Err(GenieError::unsupported(

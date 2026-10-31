@@ -12,6 +12,7 @@ use crate::movement::Me;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveTo, MoveToReads, MoveWait, SpriteReads};
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -729,7 +730,7 @@ const fn me(id: i32, state: AttackState) -> Me {
     Me {
         id: object_id(id),
         group: None,
-        action_state: state.get(),
+        action_state: ActionState::new(state.get()),
     }
 }
 
@@ -2253,7 +2254,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     let me = |id| Me {
         id,
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut t = forage_world();
     // the town centre's master without a missile cannot attack

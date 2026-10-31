@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::math::fmath::BVector;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action;
@@ -110,7 +111,10 @@ impl Unit {
                 .velocity
                 .as_ref()
                 .is_some_and(|v| 0.0 < crate::math::fmath::length(v.velocity)),
-            waits: m.waiting != 0 && !self.top_action().is_some_and(|a| matches!(a.state, 6 | 7)),
+            waits: m.waiting != 0
+                && !self
+                    .top_action()
+                    .is_some_and(|a| matches!(a.state.get(), 6 | 7)),
             last_move: m.last_move,
             pause: m.paths.first().map(|l| l.pause_time),
             human_order: self.last_human_order,
@@ -190,21 +194,21 @@ impl Unit {
         let walking = |m: Option<MoveTo>| {
             m.map(|m| TopAction {
                 kind: MOVE_TO,
-                state: m.number(),
+                state: ActionState::new(m.number()),
             })
         };
         match self.actions.head()? {
             Action::Artifact(a) => walking(a.move_to.map(|m| m.state)).or_else(|| {
                 a.enter.map(|e| TopAction {
                     kind: crate::garrison::ENTER,
-                    state: e.state.get(),
+                    state: ActionState::new(e.state.get()),
                 })
             }),
             Action::Hunt(h) => h
                 .attack
                 .map(|a| TopAction {
                     kind: crate::combat::attack::ATTACK,
-                    state: a.state.get(),
+                    state: ActionState::new(a.state.get()),
                 })
                 .or_else(|| walking(h.move_to.map(|m| m.state))),
             Action::Build(b) => walking(b.move_to.map(|m| m.state)),
@@ -249,7 +253,7 @@ impl Unit {
         let Some(TopAction { kind, state }) = self.top_action() else {
             return Ok(true);
         };
-        Ok(match (kind, state) {
+        Ok(match (kind, state.get()) {
             (action_type::ACTION_126, _) => false,
             (action_type::TRADE, 4) => {
                 return Err(GenieError::unsupported("slot 0x2d0 of a trade in state 4"));

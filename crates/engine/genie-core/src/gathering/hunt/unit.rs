@@ -10,6 +10,7 @@ use crate::map::spatial::{Placed, SearchQuery, Spatial};
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::{Me, Planning};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -136,7 +137,12 @@ impl Unit {
                 construction_rate: c.w.players.player(c.player)?.construction_rate(),
                 groups: &c.w.groups,
             };
-            let (site, _) = self.drop_site(&mut w, others, None, HuntState::Search.get())?;
+            let (site, _) = self.drop_site(
+                &mut w,
+                others,
+                None,
+                ActionState::new(HuntState::Search.get()),
+            )?;
             match site {
                 None => {
                     self.actions
@@ -365,7 +371,9 @@ impl Unit {
         let me = Me {
             id: self.id,
             group: self.group.id,
-            action_state: self.actions.hunt().expect("the caller's hunt").state.get(),
+            action_state: ActionState::new(
+                self.actions.hunt().expect("the caller's hunt").state.get(),
+            ),
         };
         let mut plan = Planning {
             pathing: &mut c.w.pathing,

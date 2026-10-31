@@ -44,6 +44,7 @@ use crate::movement::fly::Fly;
 use crate::movement::fly::FlyState;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{MoveTo, MoveToAction};
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
@@ -2147,7 +2148,7 @@ fn a_wait_for_a_foundation_switches_the_villager_and_holds_the_task() {
         v.top_action(),
         Some(TopAction {
             kind: crate::construction::wait_solidify::WAIT_SOLIDIFY,
-            state: 10
+            state: ActionState::new(10)
         })
     );
     // the wait names its foundation apart: its action has no target
@@ -2577,7 +2578,9 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let _ = unit.build_part(c, me)?;
             Ok(unit.sprite.map(|s| s.graphic.id))
@@ -4619,7 +4622,9 @@ fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
         let me = crate::movement::Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let mut own = unit.own_victim(c)?;
         let tree_lost = unit.tree_lost(c);
@@ -5008,7 +5013,9 @@ fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(c)?;
             let tree_lost = unit.tree_lost(c);
@@ -5045,7 +5052,9 @@ fn a_gathering_hunt_whose_target_left_searches_without_reading_one() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(c)?;
             let code = unit.hunt_part(c, me, &mut own, false)?;
@@ -5203,7 +5212,9 @@ fn a_hunter_s_sheep_walks_before_the_hunter_s_update_ends() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let mut own = unit.own_victim(c)?;
             let tree_lost = unit.tree_lost(c);
@@ -6339,7 +6350,9 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
                 let me = crate::movement::Me {
                     id: unit.id,
                     group: unit.group.id,
-                    action_state: unit.top_action().map_or(0, |a| a.state),
+                    action_state: unit
+                        .top_action()
+                        .map_or(ActionState::NO_ACTION, |a| a.state),
                 };
                 let code = unit.enter_part(c, me)?;
                 unit.end_head_update(c, code)?;
@@ -6395,7 +6408,9 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let code = unit.enter_part(c, me)?;
             unit.end_head_update(c, code)?;
@@ -7519,7 +7534,7 @@ fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
         f.top_action(),
         Some(TopAction {
             kind: crate::gathering::make::MAKE,
-            state: 6
+            state: ActionState::new(6)
         })
     );
     t.tick(Millis::new(104));
@@ -16480,7 +16495,9 @@ fn gather_step(t: &mut World) -> Result<(), GenieError> {
         let me = crate::movement::Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let code = unit.gather_update(c, me)?;
         unit.end_head_update(c, code)
@@ -16765,7 +16782,12 @@ fn drop_site_sought(
         groups: &t.groups,
     };
     let objects = OthersRef::of(&t.players, PlayerId::new(1)).unwrap();
-    t.players[1].objects[ListIndex::new(0)].drop_site_with(&mut world, objects, 0, args)
+    t.players[1].objects[ListIndex::new(0)].drop_site_with(
+        &mut world,
+        objects,
+        ActionState::NO_ACTION,
+        args,
+    )
 }
 
 /// The drop-site search from a unit (`FUN_1411671e0`): the nearer town centre wins by path (its
@@ -16859,7 +16881,9 @@ fn own_move(t: &mut World) -> OwnMoved {
         let me = crate::movement::Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.actions.move_to().map_or(0, |m| m.state.number()),
+            action_state: unit.actions.move_to().map_or(ActionState::NO_ACTION, |m| {
+                ActionState::new(m.state.number())
+            }),
         };
         let code = unit.move_to_part(c, me)?;
         unit.end_head_update(c, code)
@@ -16978,7 +17002,7 @@ fn flown(move_to: MoveTo, setup: impl FnOnce(&mut Unit)) -> Flown {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: 4,
+                action_state: ActionState::new(4),
             };
             unit.fly_part(c, me)
         },
@@ -17040,7 +17064,7 @@ fn explored(set: impl FnOnce(&mut crate::movement::explore::ExploreAction)) -> E
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: crate::movement::explore::ExploreState::Walk.get(),
+                action_state: ActionState::new(crate::movement::explore::ExploreState::Walk.get()),
             };
             unit.explore_part(c, me)
         },
@@ -17086,7 +17110,7 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: crate::movement::explore::ExploreState::Walk.get(),
+                action_state: ActionState::new(crate::movement::explore::ExploreState::Walk.get()),
             };
             unit.explore_part(c, me)
         },
@@ -17430,7 +17454,9 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let _ = unit.build_part(c, me)?;
             let heard = unit.ai.as_ref().unwrap().notifies.iter();
@@ -17518,7 +17544,9 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
         let me = crate::movement::Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         unit.build_part(c, me).map(drop)
     })
@@ -17971,7 +17999,9 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let code = unit.repair_part(c, me)?;
             unit.end_head_update(c, code)
@@ -18071,7 +18101,9 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
-                action_state: unit.top_action().map_or(0, |a| a.state),
+                action_state: unit
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
             };
             let code = unit.repair_part(c, me)?;
             unit.end_head_update(c, code)
@@ -18339,7 +18371,9 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
                 let me = crate::movement::Me {
                     id: unit.id,
                     group: unit.group.id,
-                    action_state: unit.top_action().map_or(0, |a| a.state),
+                    action_state: unit
+                        .top_action()
+                        .map_or(ActionState::NO_ACTION, |a| a.state),
                 };
                 let code = unit.repair_part(c, me)?;
                 unit.end_head_update(c, code)

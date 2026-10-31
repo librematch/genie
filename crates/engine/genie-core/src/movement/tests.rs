@@ -203,7 +203,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     m.ignore_units = vec![object_id(5), object_id(9177), object_id(6)];
@@ -388,7 +388,7 @@ fn a_drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
             line,
         )
     };
-    let mut ids = list(&m, &world, &mut plan, 8).unwrap();
+    let mut ids = list(&m, &world, &mut plan, ActionState::new(8)).unwrap();
     ids[2..].sort_unstable();
     assert_eq!(
         ids,
@@ -401,18 +401,18 @@ fn a_drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
         ]
     );
     assert_eq!(
-        list(&m, &world, &mut plan, 7).unwrap(),
+        list(&m, &world, &mut plan, ActionState::new(7)).unwrap(),
         [object_id(9177), object_id(10028)]
     );
     m.velocity.as_mut().unwrap().velocity = BVector::new(0.0, 0.0, 0.8);
     assert_eq!(
-        list(&m, &world, &mut plan, 8).unwrap(),
+        list(&m, &world, &mut plan, ActionState::new(8)).unwrap(),
         [object_id(9177), object_id(10028)]
     );
     m.velocity.as_mut().unwrap().velocity = BVector::ZERO;
     let free = drop_off_world(2, &near);
     assert_eq!(
-        list(&m, &free, &mut plan, 8).unwrap(),
+        list(&m, &free, &mut plan, ActionState::new(8)).unwrap(),
         [object_id(9177), object_id(10028)]
     );
 }
@@ -618,7 +618,7 @@ fn a_kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     m.paths[0].target = Some(object_id(9175));
@@ -679,7 +679,7 @@ fn kept_hits_replan_the_parent_or_stop_a_walk_without_one() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     assert_eq!(m.paths.len(), 2);
@@ -709,7 +709,7 @@ fn a_map_edge_s_record_is_a_hit_without_an_object() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     m.paths[0].target = Some(object_id(9175));
@@ -819,7 +819,7 @@ fn a_big_unit_s_path_request_takes_the_old_pather_with_the_walk_s_kept_hits() {
     let me = Me {
         id: object_id(9171),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
@@ -917,7 +917,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut m = builder_9177().placed(Position::new(5.5, 5.5, 0.0));
     m.moved_at = Position::new(5.5, 5.5, 0.0);
@@ -1196,7 +1196,7 @@ fn a_loop_s_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let goal = Goal {
         target: None,
@@ -1252,7 +1252,7 @@ fn a_walk_whose_target_is_gone_walks_as_to_a_point() {
         let me = Me {
             id: object_id(9926),
             group: None,
-            action_state: 0,
+            action_state: ActionState::NO_ACTION,
         };
         let motion = m.motion(
             &me,
@@ -1495,7 +1495,7 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
     let me = Me {
         id: object_id(9517),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     // land of a terrain class the unit's mask (6) has
     let mut w = Spatial::with_tiles(
@@ -1684,7 +1684,7 @@ fn a_unit_closes_in_along_a_clear_straight_line() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let mut open = tiled_world(vec![4; 120 * 120]);
     assert_eq!(
@@ -1733,7 +1733,7 @@ fn a_long_path_ends_before_its_first_walled_stretch() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let path = || Path {
         points: vec![
@@ -1824,7 +1824,7 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
         let me = Me {
             id: object_id(9177),
             group: None,
-            action_state: 0,
+            action_state: ActionState::NO_ACTION,
         };
         let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
         let mut path = Path::default();
@@ -1951,7 +1951,7 @@ impl WalkRig {
             me: Me {
                 id: object_id(9177),
                 group: None,
-                action_state: state,
+                action_state: ActionState::new(state),
             },
             dt: Seconds::new(0.1),
             world: &mut self.world,
@@ -2021,7 +2021,7 @@ fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) 
             &Me {
                 id: object_id(9177),
                 group: None,
-                action_state: 0,
+                action_state: ActionState::NO_ACTION,
             },
             Seconds::new(DT),
             world,
@@ -2040,7 +2040,7 @@ fn a_walk_on_or_past_its_waypoint_counts_it_reached() {
     let me = || Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let levels = |m: &Mover| {
         m.paths
@@ -2217,7 +2217,7 @@ fn a_walk_to_a_point_goes_on_until_its_range() {
     let me = Me {
         id: object_id(9926),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     assert_eq!(
         hawk.motion(
@@ -2310,7 +2310,7 @@ fn a_top_level_short_of_its_moved_target_arrives() {
         let me = Me {
             id: object_id(9177),
             group: None,
-            action_state: 0,
+            action_state: ActionState::NO_ACTION,
         };
         m.place_for_test(Position::new(30.0, 88.0, 0.0));
         m.paths[0].target = ObjectId::of_field(target_id);
@@ -2399,7 +2399,7 @@ fn a_next_waypoint_an_object_stands_on_goes() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let goal = Goal {
         target: None,
@@ -2460,7 +2460,7 @@ fn a_reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
     let me = Me {
         id: object_id(9175),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     assert_eq!(
         m.motion(&me, Seconds::new(DT), &mut world, None),
@@ -2508,7 +2508,7 @@ fn a_path_request_makes_the_top_level_from_the_unit_to_its_goal() {
     let me = Me {
         id: object_id(9175),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     assert_eq!(
         m.motion(
@@ -2530,7 +2530,7 @@ fn a_unit_with_no_speed_or_no_path_is_done() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     assert_eq!(
         m.motion(&me, Seconds::new(DT), &mut world(), None),
@@ -2569,7 +2569,7 @@ fn an_arrived_level_under_one_without_a_path_ends_the_step() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     assert_eq!(
         m.motion(&me, Seconds::new(DT), &mut world(), None),
@@ -2595,7 +2595,7 @@ fn a_human_walker_pauses_a_met_unit_of_an_older_human_order() {
     let me = Me {
         id: object_id(9177),
         group: None,
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let walker = |human_order| Gait {
         human_order,
@@ -2657,7 +2657,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
     let me = Me {
         id: object_id(9177),
         group: Some(group_id(4)),
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let groups = |ids: &[i32]| crate::groups::UnitGroups {
         groups: vec![crate::groups::UnitGroup {
@@ -2724,7 +2724,7 @@ fn a_group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gate
     let me = Me {
         id: object_id(9177),
         group: Some(group_id(4)),
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
     };
     let groups = |member: i32, reason: i32| crate::groups::UnitGroups {
         groups: vec![crate::groups::UnitGroup {

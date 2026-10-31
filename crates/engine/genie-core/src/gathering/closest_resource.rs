@@ -9,6 +9,7 @@ use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Planning};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
@@ -157,7 +158,9 @@ pub(crate) fn closest_resource_of(
     let me_walk = Me {
         id: unit.id,
         group: unit.group.id,
-        action_state: unit.top_action().map_or(0, |a| a.state),
+        action_state: unit
+            .top_action()
+            .map_or(ActionState::NO_ACTION, |a| a.state),
     };
     let master_id = unit.life.master_id;
     let plan = &mut c.plan;

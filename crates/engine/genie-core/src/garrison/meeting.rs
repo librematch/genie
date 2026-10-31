@@ -13,6 +13,7 @@ use crate::math::conversions::cvttss2si;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
 use crate::movement::footprint_gap_squared;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::master_type::BUILDING;
@@ -40,7 +41,7 @@ pub struct MeetingTarget {
     /// Its speed (slot 0x208).
     pub speed: Speed,
     /// Its top action's state (slot 0x2b0, `RGE_Action_Object::actionState`; 0 without one).
-    pub state: u8,
+    pub state: ActionState,
     /// Its class (`+0x410`).
     pub class: ClassId,
     /// Its place, x and y.
@@ -71,10 +72,10 @@ pub fn meet_at(t: &MeetingTarget) -> MeetAt {
     if !t.room || t.speed <= Speed::ZERO {
         return MeetAt::Place;
     }
-    if matches!(t.state, 0 | 2) {
+    if matches!(t.state.get(), 0 | 2) {
         return MeetAt::Shore;
     }
-    if t.class == class::SIEGE || !matches!(t.state, 11 | 4 | 3) {
+    if t.class == class::SIEGE || !matches!(t.state.get(), 11 | 4 | 3) {
         return MeetAt::Place;
     }
     MeetAt::ActionPoint
@@ -227,7 +228,7 @@ pub(crate) fn meeting_target(
     Ok(MeetingTarget {
         room,
         speed: t.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
-        state: t.top_action().map_or(0, |a| a.state),
+        state: t.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
         class: tm.class,
         position: t.position().ground(),
         action_point,
@@ -511,7 +512,9 @@ pub(crate) fn ship_reaches(
     };
     let me = crate::movement::Me {
         id: ship.id,
-        action_state: ship.top_action().map_or(0, |a| a.state),
+        action_state: ship
+            .top_action()
+            .map_or(ActionState::NO_ACTION, |a| a.state),
         group: ship.group.id,
     };
     let goal = Point::new(cvttss2si(to.x()) as f32, cvttss2si(to.y()) as f32);

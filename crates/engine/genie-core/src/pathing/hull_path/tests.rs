@@ -7,6 +7,7 @@ use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::TileRect;
 use crate::map::spatial::{Obstruction, Tiles};
+use crate::objects::ActionState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -328,7 +329,7 @@ fn a_unit_s_short_reach_is_its_old_short_path_s_length() {
     mover.stats.restriction_mask = TerrainMask::of_bits(6);
     let me = crate::movement::Me {
         id: object_id(9171),
-        action_state: 0,
+        action_state: ActionState::NO_ACTION,
         group: None,
     };
     let length = mover

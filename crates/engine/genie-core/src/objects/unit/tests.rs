@@ -4,6 +4,7 @@ use crate::construction::wait_solidify::WaitSolidifyState;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
+use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
@@ -430,7 +431,7 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
         actions: ActionList::default().with_hunt(Some(hunt)),
         ..Unit::default()
     };
-    assert_eq!(hunter.top_sub_action(), Some(walking(1)));
+    assert_eq!(hunter.top_sub_action(), Some(walking(ActionState::new(1))));
     let mut idle = hunt;
     idle.move_to = None;
     let resting = Unit {
@@ -456,7 +457,7 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
         actions: ActionList::default().with_build(Some(build)),
         ..Unit::default()
     };
-    assert_eq!(builder.top_sub_action(), Some(walking(4)));
+    assert_eq!(builder.top_sub_action(), Some(walking(ActionState::new(4))));
     assert_eq!(Unit::default().top_sub_action(), None);
 }
 
@@ -470,7 +471,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
     use crate::world::checkpoint::TopAction;
     let walking = Some(TopAction {
         kind: MOVE_TO,
-        state: MoveTo::Moving.number(),
+        state: ActionState::new(MoveTo::Moving.number()),
     });
     let of = |action: Action| {
         let mut u = Unit::default();
@@ -494,7 +495,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         of(Action::Artifact(artifact)),
         Some(TopAction {
             kind: crate::garrison::ENTER,
-            state: enter.state.get(),
+            state: ActionState::new(enter.state.get()),
         })
     );
     enter = enter.walking(MoveTo::Moving);

@@ -1,6 +1,7 @@
 //! The generation tasks (action type 151): their test, what they make and the player's store.
 
 use crate::combat::abilities::{ONE, Own, WORKING, WORKING_ACTIONS};
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -26,7 +27,7 @@ pub struct TopWork {
     /// The action's type.
     pub kind: ActionType,
     /// The action's state.
-    pub state: u8,
+    pub state: ActionState,
     /// Its target.
     pub target: Option<WorkTarget>,
 }
@@ -65,7 +66,7 @@ pub fn generates(
     if master_kind == COMBAT
         && let Some(top) = top
         && WORKING_ACTIONS.contains(&top.kind)
-        && top.state == WORKING
+        && top.state.get() == WORKING
         && let Some(t) = top.target
         && (HitPoints::ZERO < t.hp || Amount::ZERO < t.storage)
         && task.for_class(t.class)
@@ -137,7 +138,7 @@ impl World {
                 Some(a) => {
                     // FUN_140a78450: an id below 0 names no object; the target only matters
                     // to an action of the test's at work
-                    let works = WORKING_ACTIONS.contains(&a.kind) && a.state == WORKING;
+                    let works = WORKING_ACTIONS.contains(&a.kind) && a.state.get() == WORKING;
                     let target = match unit.top_target().filter(|t| works && !t.is_recyclable()) {
                         Some(t) => self.work_target(t)?,
                         None => None,

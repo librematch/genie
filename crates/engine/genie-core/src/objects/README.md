@@ -35,6 +35,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`action_state.rs`](action_state.rs) | The state of an action of any type (`ActionState`): its number. |
 | [`actions.rs`](actions.rs) | The object's action list (`RGE_Action_List`, FD-045-D12): the actions it holds, its current one (the head) first, each a variant of `Action`. |
 | [`facing.rs`](facing.rs) | Where an object faces: its angle (`+0x7e8`, radians on the map, 0 to 2π) and its facet (`+0xe`), counted in its current sprite's facets (`+0x140` -> `+0xa`). |
 | [`hit_points.rs`](hit_points.rs) | A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and 80): the heal, the gain and the loss, the regeneration and the powerup's clamp (slots 0x110, 0xb8 and 0x260, and the update's checks). |

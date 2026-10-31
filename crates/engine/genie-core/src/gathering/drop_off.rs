@@ -10,6 +10,7 @@ use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::move_to::SpriteReads;
 use crate::movement::{Me, Planning, footprint_gap};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
@@ -335,7 +336,8 @@ impl Unit {
         }
         let gather = self.actions.gather().expect("the caller's gather");
         let (carry_to, state) = (gather.carry_to, gather.state);
-        let (site, gap) = self.drop_site(&mut c, others, carry_to, state.get())?;
+        let (site, gap) =
+            self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;
         let at = c
             .spatial
             .get_known(site)?
@@ -371,7 +373,8 @@ impl Unit {
         }
         let hunt = self.actions.hunt().expect("the caller's hunt");
         let (carry_to, state) = (hunt.carry_to, hunt.state);
-        let (site, gap) = self.drop_site(&mut c, others, carry_to, state.get())?;
+        let (site, gap) =
+            self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;
         if site.is_none() {
             return Err(GenieError::unsupported(
                 "a hunt without a drop site (notify 0x203, set_state 2)",
@@ -406,7 +409,7 @@ impl Unit {
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         carry_to: Option<ObjectId>,
-        state: u8,
+        state: ActionState,
     ) -> Result<(Option<ObjectId>, f32), GenieError> {
         let master = self.master_in(c.masters)?;
         let mover = self
@@ -453,7 +456,7 @@ impl Unit {
         &self,
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
-        state: u8,
+        state: ActionState,
         outside: bool,
     ) -> Result<Option<ObjectId>, GenieError> {
         let by_path = !c.computer;
@@ -471,7 +474,7 @@ impl Unit {
         &self,
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
-        state: u8,
+        state: ActionState,
         (outside, by_path, at_work): (bool, bool, Option<ActionType>),
     ) -> Result<Option<ObjectId>, GenieError> {
         let masters = c.masters.ok_or(GenieError::unsupported(

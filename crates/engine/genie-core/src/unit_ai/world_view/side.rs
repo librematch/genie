@@ -16,6 +16,7 @@ use crate::map::Tile;
 use crate::map::spatial::{Placed, SearchQuery, Spatial};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::{Me, Planning, footprint_gap_squared};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -222,7 +223,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let walker = Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
             "a reach test of a unit that does not move",
@@ -278,7 +281,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let walker = Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let (mover, master_id) = (unit.body.mover(), unit.life.master_id);
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {

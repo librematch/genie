@@ -1,5 +1,6 @@
 use super::*;
 use crate::test_ids::object_id;
+use genie_core::objects::ActionState;
 use genie_core::objects::HitPoints;
 use genie_core::objects::actions::ActionList;
 use genie_core::objects::masters::{MasterId, ids};
@@ -46,7 +47,7 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         checkpoint_action(&both),
         Some(ActionTerm {
             kind: Some(kind),
-            state: 6
+            state: ActionState::new(6)
         })
     );
     let top = Unit {
@@ -57,7 +58,7 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         checkpoint_action(&top),
         Some(ActionTerm {
             kind: Some(kind),
-            state: 10
+            state: ActionState::new(10)
         })
     );
     let training = Unit {
@@ -68,7 +69,7 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         checkpoint_action(&training),
         Some(ActionTerm {
             kind: None,
-            state: 6
+            state: ActionState::new(6)
         })
     );
     assert_eq!(checkpoint_action(&Unit::default()), None);

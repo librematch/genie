@@ -10,6 +10,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -195,7 +196,7 @@ pub struct Surroundings {
     pub anim_speed: Option<f32>,
     /// The unit's slot 0x2b0 (`RGE_Action_Object::actionState`): its top action's state, 0
     /// without one; None for an action the slice does not hold.
-    pub action_state: Option<u8>,
+    pub action_state: Option<ActionState>,
     /// The unit's slot 0x538 with 9 (`FUN_14106d0c0`): its action list holds an Attack (type
     /// 9); read with [`Surroundings::action_state`], which tells whether the slice holds the
     /// list.

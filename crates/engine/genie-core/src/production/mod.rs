@@ -17,6 +17,7 @@
 //! value, and the buffer's regrowth by ten copies them with the rest.
 
 use crate::GenieError;
+use crate::objects::ActionState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, TrainLocation};
@@ -374,11 +375,11 @@ pub enum Making {
 impl Making {
     /// Its state (`+0x18`).
     #[must_use]
-    pub const fn state(&self) -> u8 {
-        match self {
+    pub const fn state(&self) -> ActionState {
+        ActionState::new(match self {
             Self::Unit(m) => m.state.get(),
             Self::Research(r) => r.state.get(),
-        }
+        })
     }
 }
 

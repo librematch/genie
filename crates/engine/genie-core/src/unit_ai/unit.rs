@@ -6,6 +6,7 @@ use crate::map::Footprint;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::movement::{Mover, footprint_gap_squared};
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
@@ -153,7 +154,10 @@ impl Unit {
             action_state: if self.unmodelled_action.is_some() {
                 None
             } else {
-                Some(self.top_action().map_or(0, |a| a.state))
+                Some(
+                    self.top_action()
+                        .map_or(ActionState::NO_ACTION, |a| a.state),
+                )
             },
             attack_listed: self.actions.attack().is_some(),
             units: self.named_units(

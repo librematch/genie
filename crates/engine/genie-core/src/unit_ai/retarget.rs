@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -414,7 +415,7 @@ impl UnitAi {
         target: Option<(PlayerId, ClassId)>,
         weapon_range: Distance,
         computer: bool,
-        action_state: Option<u8>,
+        action_state: Option<ActionState>,
         attack_listed: Option<bool>,
     ) -> Result<Option<RetargetSearch>, GenieError> {
         let attack_order = self.current_order == Some(OrderKind::Attack);
@@ -448,10 +449,10 @@ impl UnitAi {
             return Ok(None);
         }
         // "I have an game attack action without an order ... inAttackWorkState"
-        if matches!(held_action_state(action_state)?, 6 | 7) && !search {
+        if matches!(held_action_state(action_state)?.get(), 6 | 7) && !search {
             return Ok(None);
         }
-        let work_state = matches!(held_action_state(action_state)?, 6 | 7);
+        let work_state = matches!(held_action_state(action_state)?.get(), 6 | 7);
         Ok(Some(RetargetSearch {
             building: search,
             work_state,

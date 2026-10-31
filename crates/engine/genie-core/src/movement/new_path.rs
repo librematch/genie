@@ -175,7 +175,7 @@ impl Mover {
         // target and the unit's action in state 8
         if let Some((target_id, t)) = target
             && !self.is_moving()
-            && me.action_state == 8
+            && me.action_state.get() == 8
         {
             let grow = self.stats.radius.x() + RANGE_FLOOR;
             // the query's point: slot 0x520, +0x824

@@ -22,6 +22,7 @@ use crate::gathering::make::MakeAction;
 use crate::movement::explore::ExploreAction;
 use crate::movement::fly::Fly;
 use crate::movement::move_to::MoveToAction;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
@@ -144,8 +145,8 @@ impl Action {
 
     /// The action's state (`+0x18`); a `MoveTo`'s by its number.
     #[must_use]
-    pub const fn state(&self) -> u8 {
-        match self {
+    pub const fn state(&self) -> ActionState {
+        ActionState::new(match self {
             Self::Artifact(a) => a.state.get(),
             Self::Build(a) => a.state.get(),
             Self::Repair(a) => a.state.get(),
@@ -160,7 +161,7 @@ impl Action {
             Self::Missile(a) => a.state.get(),
             Self::Make(a) => a.state.get(),
             Self::WaitSolidify(a) => a.state.get(),
-        }
+        })
     }
 }
 
@@ -322,7 +323,10 @@ mod tests {
         let a = Action::Artifact(artifact(ArtifactState::Check));
         assert_eq!(
             (a.kind(), a.state()),
-            (crate::ownership::artifact::ARTIFACT_TYPE, 6)
+            (
+                crate::ownership::artifact::ARTIFACT_TYPE,
+                ActionState::new(6)
+            )
         );
         let list = ActionList::default().with_artifact(Some(artifact(ArtifactState::Check)));
         assert_eq!(

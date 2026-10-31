@@ -2,6 +2,7 @@
 //! with its update, its actions' holdings and stops, its life and death, its release, its sprite
 //! and facing, and the masters it is made from.
 
+mod action_state;
 pub mod actions;
 pub mod facing;
 pub(crate) mod hit_points;
@@ -21,6 +22,7 @@ pub(crate) mod teardown;
 pub mod unit;
 mod work_rate;
 
+pub use self::action_state::ActionState;
 pub use self::hit_points::HpPowerup;
 pub use self::hp::HitPoints;
 pub use self::lifecycle::ObjectState;

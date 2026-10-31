@@ -8,6 +8,7 @@ use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
+use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
@@ -113,7 +114,7 @@ fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class()
             &t,
             COMBAT,
             COMBAT,
-            top(kind, 7, Some(target)),
+            top(kind, ActionState::new(7), Some(target)),
             false
         ));
     }
@@ -121,21 +122,29 @@ fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class()
         &t,
         COMBAT,
         COMBAT,
-        top(crate::movement::move_to::MOVE_TO, 7, Some(target)),
+        top(
+            crate::movement::move_to::MOVE_TO,
+            ActionState::new(7),
+            Some(target)
+        ),
         false
     ));
     assert!(!generates(
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, 6, Some(target)),
+        top(
+            crate::combat::attack::ATTACK,
+            ActionState::new(6),
+            Some(target)
+        ),
         false
     ));
     assert!(!generates(
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, 7, None),
+        top(crate::combat::attack::ATTACK, ActionState::new(7), None),
         false
     ));
     assert!(!generates(&t, COMBAT, COMBAT, None, false));
@@ -148,7 +157,11 @@ fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class()
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, 7, Some(other)),
+        top(
+            crate::combat::attack::ATTACK,
+            ActionState::new(7),
+            Some(other)
+        ),
         false
     ));
     // a dead target counts while its master stores some, never with a NaN
@@ -161,7 +174,11 @@ fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class()
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, 7, Some(dead)),
+        top(
+            crate::combat::attack::ATTACK,
+            ActionState::new(7),
+            Some(dead)
+        ),
         false
     ));
     let empty = WorkTarget {
@@ -173,7 +190,11 @@ fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class()
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, 7, Some(empty)),
+        top(
+            crate::combat::attack::ATTACK,
+            ActionState::new(7),
+            Some(empty)
+        ),
         false
     ));
     let nan = WorkTarget {
@@ -185,7 +206,11 @@ fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class()
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, 7, Some(nan)),
+        top(
+            crate::combat::attack::ATTACK,
+            ActionState::new(7),
+            Some(nan)
+        ),
         false
     ));
 }

@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Mover};
+use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action;
 use crate::objects::lifecycle::Class;
@@ -84,7 +85,9 @@ impl Unit {
         let me = Me {
             id: self.id,
             group: self.group.id,
-            action_state: self.top_action().map_or(0, |a| a.state),
+            action_state: self
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         let mut captured = None;
         let code = self.head_part(c, me, &mut captured)?;

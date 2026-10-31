@@ -374,6 +374,7 @@ mod tests {
     use crate::map::Radii;
     use crate::movement::Speed;
     use crate::movement::move_to::MoveTo;
+    use crate::objects::ActionState;
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::layers::Body;
@@ -487,7 +488,7 @@ mod tests {
         let me = Me {
             id: object_id(9925),
             group: None,
-            action_state: 0,
+            action_state: ActionState::NO_ACTION,
         };
         crate::world::tests::in_update(t, (PlayerId::new(0), ListIndex::new(0)), 21, |u, c| {
             u.fly_part(c, me)

@@ -16,6 +16,7 @@ use crate::math::fmath::at_most_or_unordered;
 use crate::math::image::group::EPSILON;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
+use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -82,9 +83,9 @@ impl World {
         )?;
         let state = match self.object(id) {
             Some((p, u)) => self.action_list(p, u)?.1,
-            None => 0,
+            None => ActionState::NO_ACTION,
         };
-        if matches!(state, 6 | 7) {
+        if matches!(state.get(), 6 | 7) {
             self.stand_unit(id)?;
         }
         if !computer {

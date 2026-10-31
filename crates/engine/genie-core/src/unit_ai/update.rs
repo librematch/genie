@@ -324,9 +324,13 @@ impl UnitAi {
                     && t.kind != BUILDING
                 {
                     let attack_over = action == Some(ActionKind::Attack)
-                        && at.action_state.ok_or(GenieError::unsupported(
-                            "an attack whose target died, its top action not held",
-                        ))? != 2;
+                        && at
+                            .action_state
+                            .ok_or(GenieError::unsupported(
+                                "an attack whose target died, its top action not held",
+                            ))?
+                            .get()
+                            != 2;
                     if self.stop_after_kill
                         || action.is_some_and(|a| LIVE_TARGET_ACTIONS.contains(&a))
                         || attack_over

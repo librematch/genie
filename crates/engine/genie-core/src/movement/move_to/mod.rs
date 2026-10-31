@@ -511,6 +511,7 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::math::Angle;
     use crate::movement::Speed;
+    use crate::objects::ActionState;
     use crate::objects::ObjectState;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
@@ -954,7 +955,7 @@ mod tests {
                 me: Me {
                     id: object_id(9177),
                     group: None,
-                    action_state: 4,
+                    action_state: ActionState::new(4),
                 },
                 dt: Seconds::new(0.1),
                 world: &mut world,

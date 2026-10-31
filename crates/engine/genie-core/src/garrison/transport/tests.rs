@@ -4,6 +4,7 @@ use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
+use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::masters::TaskSprites;
 use crate::test_ids::object_id;
@@ -522,7 +523,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     let me = crate::movement::Me {
         id: object_id(9177),
         group: None,
-        action_state: TransportState::Sail.get(),
+        action_state: ActionState::new(TransportState::Sail.get()),
     };
     let rig = || {
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());

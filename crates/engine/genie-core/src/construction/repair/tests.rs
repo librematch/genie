@@ -5,6 +5,7 @@ use crate::movement::Speed;
 use crate::movement::move_to::{
     MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, WalkTo,
 };
+use crate::objects::ActionState;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
 use crate::objects::masters::class;
@@ -330,7 +331,9 @@ fn repaired(t: &mut crate::world::World) -> Result<HeadCode, GenieError> {
         let me = Me {
             id: unit.id,
             group: unit.group.id,
-            action_state: unit.top_action().map_or(0, |a| a.state),
+            action_state: unit
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
         unit.repair_part(c, me)
     })
