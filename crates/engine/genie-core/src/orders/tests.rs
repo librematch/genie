@@ -287,7 +287,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             ..crate::objects::lifecycle::Lifecycle::default()
         },
         construction: Some(crate::construction::build::Construction {
-            progress: 1.0,
+            progress: Seconds::new(1.0),
             desolid: false,
             builders: 1,
             hit_points: 550,
@@ -1454,7 +1454,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         id: object_id(60),
         firepower: 7.0,
         construction: Some(crate::construction::build::Construction {
-            progress: 10.0,
+            progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
             hit_points: 100,
@@ -1480,7 +1480,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
     let unit = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(unit.life.master_id, master_id(1650));
     assert_eq!(unit.life.hp, HitPoints::new(50.0));
-    assert_eq!(unit.construction.unwrap().progress, 30.0);
+    assert_eq!(unit.construction.unwrap().progress, Seconds::new(30.0));
     // FUN_141225b70 in state 2: the volleys are the new master's volley fire
     assert_eq!(unit.firepower, 2.0);
     t.players[1].objects = vec![trophy(ObjectState::Unfinished)].into();
@@ -1491,7 +1491,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
             .construction
             .unwrap()
             .progress,
-        10.0
+        Seconds::new(10.0)
     );
     assert_eq!(t.players[1].objects[ListIndex::new(0)].firepower, 7.0);
 }
@@ -2611,7 +2611,7 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
         ..Master::default()
     }]);
     let construction = crate::construction::build::Construction {
-        progress: 0.0,
+        progress: Seconds::ZERO,
         desolid: true,
         builders: 2,
         hit_points: 100,
@@ -2791,7 +2791,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     let foundation = |id, builders| Unit {
         id,
         construction: Some(crate::construction::build::Construction {
-            progress: 0.0,
+            progress: Seconds::ZERO,
             desolid: true,
             builders,
             hit_points: 100,

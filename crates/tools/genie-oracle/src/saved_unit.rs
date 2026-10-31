@@ -416,7 +416,7 @@ pub(super) fn construction(
         .and_then(|c| c.train_location.first())
         .map_or(0, |t| t.train_time);
     Some(genie_core::construction::build::Construction {
-        progress: b.build_pts,
+        progress: Seconds::new(b.build_pts),
         desolid: b.desolid_flag != 0,
         builders: b.tribe_combat_object.num_builders,
         hit_points: ms.read_temp_6,

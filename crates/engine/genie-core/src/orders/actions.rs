@@ -25,6 +25,7 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::Millis;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -185,7 +186,7 @@ impl World {
         if unit.life.state == ObjectState::Alive
             && let Some(c) = unit.construction.as_mut()
         {
-            c.progress = f32::from(build_time);
+            c.progress = Seconds::of_master(build_time);
         }
         Ok(())
     }

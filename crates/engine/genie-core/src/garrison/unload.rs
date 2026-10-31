@@ -16,6 +16,7 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::orders::object_gone;
+use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
 use crate::players::PlayerId;
@@ -402,7 +403,7 @@ impl World {
                 class: m.class,
                 built: o
                     .construction
-                    .is_some_and(|c| f32::from(m.build_time) <= c.progress),
+                    .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
             }))
         };
         let (found, record) = bell.back_to_work(&lookup)?;

@@ -22,6 +22,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
 
@@ -61,7 +62,7 @@ impl World {
             .is_some_and(|m| m.kind == BUILDING)
             && unit
                 .construction
-                .is_some_and(|c| f32::from(c.build_time) <= c.progress);
+                .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
         self.players[0].objects.push(unit);
         self.track_remove(q, id, master_id)?;
         self.track_add(PlayerId::GAIA, id, master_id)?;
@@ -125,7 +126,7 @@ impl World {
         let (state, held, amount) = (u.life.state, u.life.attribute_type, u.life.amount);
         let built = u
             .construction
-            .is_some_and(|c| f32::from(c.build_time) <= c.progress);
+            .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
         let rice = u.rice;
         let placed = self.spatial.get(id).copied();
         if state < ObjectState::Dying {

@@ -141,6 +141,13 @@ impl Seconds {
         Self(s)
     }
 
+    /// A master's whole seconds (a build, train or research time) as the game converts them
+    /// (`CVTSI2SS`, exact for an `i16`).
+    #[must_use]
+    pub fn of_master(s: i16) -> Self {
+        Self(f32::from(s))
+    }
+
     /// The seconds, as the save and the game's arithmetic hold them.
     #[must_use]
     pub const fn get(self) -> f32 {
@@ -299,6 +306,7 @@ mod tests {
         assert!(Seconds::ZERO < a && a <= a);
         assert_eq!(Seconds::new(f32::NAN).partial_cmp(&Seconds::ZERO), None);
         assert_eq!(Seconds::new(0.5).to_string(), "0.5");
+        assert_eq!(Seconds::of_master(-3).get().to_bits(), (-3.0_f32).to_bits());
     }
 
     #[test]

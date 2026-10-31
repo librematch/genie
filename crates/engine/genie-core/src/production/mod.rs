@@ -23,6 +23,7 @@ use crate::objects::masters::{Master, TrainLocation};
 use crate::players::Amount;
 use crate::players::attribute::{self, AttributeId};
 use crate::technology::TechId;
+use crate::world::Seconds;
 use genie_diff::Diff;
 
 mod costs;
@@ -300,7 +301,7 @@ pub struct MakeObj {
     /// `+0x68`, `obj_id`: the master it makes.
     pub master: Option<MasterId>,
     /// `+0x6c`, `work_done`: the seconds of work done.
-    pub progress: f32,
+    pub progress: Seconds,
     /// `+0x70`, `unique_id` (−1 from the building's update).
     pub unique_id: i32,
     /// `+0x78`, `mButtonLocationId`.
@@ -318,7 +319,7 @@ impl MakeObj {
             state: MakeObjState::New,
             paid: true,
             master: entry.master,
-            progress: 0.0,
+            progress: Seconds::ZERO,
             unique_id: -1,
             button: entry.button,
             train_time: entry.train_time,
@@ -356,8 +357,8 @@ pub struct MakeTech {
     pub tech: TechId,
     /// `+0x6c`, `unique_id`: the entry's master (−1).
     pub master: i32,
-    /// `+0x70`, `m_researchProgress`: the work done.
-    pub progress: f32,
+    /// `+0x70`, `m_researchProgress`: the seconds of work done.
+    pub progress: Seconds,
 }
 
 /// What a building's production list (`+0xbf8`) holds: the building's update makes at most one
@@ -727,7 +728,7 @@ mod tests {
         };
         let state = |state| TechState {
             state,
-            research_done: 7.5,
+            research_done: Seconds::new(7.5),
             cost_adj: [-10, 0, 0],
             ..TechState::default()
         };
@@ -742,7 +743,10 @@ mod tests {
             refunded(&mut s, tech_id(22), Amount::ZERO),
             (Ok(true), Amount::new(90.0), Amount::ZERO)
         );
-        assert_eq!((s.state, s.research_done), (ResearchState::Available, 0.0));
+        assert_eq!(
+            (s.state, s.research_done),
+            (ResearchState::Available, Seconds::ZERO)
+        );
         let mut s = state(ResearchState::Queued);
         assert_eq!(
             refunded(&mut s, tech_id(22), Amount::new(0.75)),
@@ -767,7 +771,10 @@ mod tests {
             refunded(&mut s, tech_id(22), Amount::ZERO),
             (Ok(false), Amount::ZERO, Amount::ZERO)
         );
-        assert_eq!((s.state, s.research_done), (ResearchState::Researched, 7.5));
+        assert_eq!(
+            (s.state, s.research_done),
+            (ResearchState::Researched, Seconds::new(7.5))
+        );
     }
 
     /// `FUN_141630530` gives back what the entry paid of each paid cost (the last pair naming

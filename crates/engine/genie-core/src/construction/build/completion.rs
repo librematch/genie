@@ -14,6 +14,7 @@ use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{BuildingMaster, Master};
 use crate::players::PlayerId;
+use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
 impl crate::world::World {
@@ -100,7 +101,7 @@ impl crate::world::World {
     ) -> Result<(), GenieError> {
         let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
         let c = u.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
-        c.progress = f32::from(c.build_time);
+        c.progress = Seconds::of_master(c.build_time);
         let mut gains = Vec::new();
         hand_storage(master, &mut gains, Some(&mut u.store));
         self.players.player_mut(p)?.add_attributes(gains)

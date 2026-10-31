@@ -240,14 +240,14 @@ impl World {
             }
         }
         let progress = if foundation {
-            0.0
+            Seconds::ZERO
         } else {
-            f32::from(made.build_time)
+            Seconds::of_master(made.build_time)
         };
         // FUN_1411cf770 with no master copy of its own and no annex link yet
         let desolid = 0 < made.build_time
             && !matches!(made.class, class::CLASS_51 | class::CLASS_54)
-            && progress == 0.0;
+            && progress == Seconds::ZERO;
         let owner = self.players.player_mut(player)?;
         owner.objects.push(Unit {
             id,

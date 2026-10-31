@@ -77,7 +77,7 @@ fn an_object_has_actions_while_it_holds_one() {
             paid: false,
             tech: tech_id(22),
             master: -1,
-            progress: 0.0,
+            progress: Seconds::ZERO,
         },
     ));
     assert!(has_actions(&u));
@@ -397,7 +397,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
 /// completes it in its player's tracker ([`World::load_trackers`]).
 fn built() -> crate::construction::build::Construction {
     crate::construction::build::Construction {
-        progress: 1.0,
+        progress: Seconds::new(1.0),
         desolid: false,
         builders: 0,
         hit_points: 1,
@@ -1175,12 +1175,12 @@ fn barracks_tech() -> World {
     use crate::technology::{Location, TechDef, TechState};
     let state = TechState {
         state: ResearchState::Available,
-        research_done: 20.0,
+        research_done: Seconds::new(20.0),
         locations: vec![Location {
             building: Some(master_id(12)),
             time: 30,
             button: 3,
-            adjustment: 0.0,
+            adjustment: Seconds::ZERO,
         }],
         building_master: None,
         ..TechState::default()
@@ -1213,16 +1213,25 @@ fn the_research_time_modifier_changes_the_adjustment_and_may_complete() {
     let mut t = barracks_tech();
     t.do_effect(PlayerId::new(0), &[attribute(b'g', 0, -1, 1, 4.9)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[0].locations[0].adjustment, 4.0);
+    assert_eq!(
+        t.players[0].techs[0].locations[0].adjustment,
+        Seconds::new(4.0)
+    );
     t.do_effect(PlayerId::new(0), &[attribute(b'g', 0, -1, 2, 0.8)], None)
         .unwrap();
     // (0.8 − 1) × 30 − 0.5 = −6.5, truncated −6, plus 4
-    assert_eq!(t.players[0].techs[0].locations[0].adjustment, -2.0);
+    assert_eq!(
+        t.players[0].techs[0].locations[0].adjustment,
+        Seconds::new(-2.0)
+    );
     assert_eq!(t.players[0].techs[0].state, ResearchState::Available);
     // set to 20: the adjustment −10, and 20 seconds are done
     t.do_effect(PlayerId::new(0), &[attribute(b'g', 0, -1, 0, 20.0)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[0].locations[0].adjustment, -10.0);
+    assert_eq!(
+        t.players[0].techs[0].locations[0].adjustment,
+        Seconds::new(-10.0)
+    );
     assert_eq!(t.players[0].techs[0].state, ResearchState::Researched);
 }
 
@@ -1296,7 +1305,7 @@ fn a_technology_change_s_location_stacking_and_effect_override() {
         building: Some(master_id(13)),
         time: 40,
         button: 4,
-        adjustment: 0.0,
+        adjustment: Seconds::ZERO,
     });
     t.do_effect(PlayerId::new(0), &[attribute(8, 5, 9, -1, 1.0)], None)
         .unwrap();
@@ -1310,7 +1319,7 @@ fn a_technology_change_s_location_stacking_and_effect_override() {
         .unwrap();
     let s = &t.players[0].techs[0];
     let at = |i: usize| (s.locations[i].button, s.locations[i].adjustment);
-    assert_eq!([at(0), at(1)], [(3, 0.0), (9, 5.0)]);
+    assert_eq!([at(0), at(1)], [(3, Seconds::ZERO), (9, Seconds::new(5.0))]);
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 12, -1, 1.0)], None)
         .unwrap();
     assert_eq!(t.players[0].techs[0].state, ResearchState::Unavailable);

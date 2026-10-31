@@ -22,6 +22,7 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -306,7 +307,7 @@ impl World {
                 class: m.class,
                 built: o
                     .construction
-                    .is_some_and(|c| f32::from(m.build_time) <= c.progress),
+                    .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
             }))
         };
         let (found, record) = bell.back_to_work(&lookup)?;

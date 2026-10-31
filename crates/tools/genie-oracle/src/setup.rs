@@ -38,7 +38,7 @@ pub(super) fn tech_state(
         })
     };
     Ok(genie_core::technology::TechState {
-        research_done: t.research_done,
+        research_done: Seconds::new(t.research_done),
         state: genie_core::technology::ResearchState::of_int(t.state)?,
         cost_adj: [0, 1, 2].map(|j| t.cost_adj.get(j).copied().unwrap_or(0)),
         times_researched: t.tech_player_tree_times_researched as i16,
@@ -58,7 +58,7 @@ pub(super) fn tech_state(
                 building: MasterId::of_data(l.location_research_location_id as i16),
                 time: l.location_research_time,
                 button: l.location_button_location_id,
-                adjustment: f32::from_bits(l.location_research_adjustment),
+                adjustment: Seconds::new(f32::from_bits(l.location_research_adjustment)),
             })
             .collect(),
     })

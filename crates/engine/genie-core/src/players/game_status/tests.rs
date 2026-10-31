@@ -91,7 +91,7 @@ fn game() -> World {
             queue: queue(&[villager(Some(ids::VILLAGER_MALE), 1, 46.0)]),
             action: Some(Making::Unit(MakeObj {
                 state: MakeObjState::Making,
-                progress: 3.0,
+                progress: Seconds::new(3.0),
                 ..MakeObj::for_entry(&villager(Some(ids::VILLAGER_MALE), 1, 46.0))
             })),
             ..Production::default()
@@ -710,7 +710,7 @@ fn researching(progress: f32) -> World {
         paid: true,
         tech: tech_id(22),
         master: -1,
-        progress,
+        progress: Seconds::new(progress),
     }));
     tc.disabled_techs = vec![tech_id(22), tech_id(5)];
     let mut techs = vec![TechState::default(); 23];
@@ -718,14 +718,14 @@ fn researching(progress: f32) -> World {
         state: ResearchState::Researching,
         allow_multiple: true,
         pending: 3,
-        research_done: progress,
+        research_done: Seconds::new(progress),
         research_cap: -1,
         overrides: [(-1, None, -2); 3],
         locations: vec![Location {
             building: Some(ids::TOWN_CENTRE),
             time: 25,
             button: 1,
-            adjustment: 0.0,
+            adjustment: Seconds::ZERO,
         }],
         ..TechState::default()
     };
@@ -764,7 +764,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     let s = &p.techs[22];
     assert_eq!(
         (s.state, s.pending, s.research_done),
-        (ResearchState::Available, 0, 0.0)
+        (ResearchState::Available, 0, Seconds::ZERO)
     );
     let tc = &p.objects[ListIndex::new(0)];
     assert_eq!(tc.store, crate::test_ids::adds([(attribute::WOOD, 20.0)]));
@@ -801,7 +801,7 @@ fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_o
     let s = &p.techs[22];
     assert_eq!(
         (s.state, s.times_researched, s.pending, s.research_done),
-        (ResearchState::Available, 1, -1, 30.0)
+        (ResearchState::Available, 1, -1, Seconds::new(30.0))
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     assert_eq!((production.queue.count, production.queue.changes), (0, 1));

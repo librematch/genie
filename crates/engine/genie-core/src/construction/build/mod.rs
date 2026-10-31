@@ -147,7 +147,7 @@ impl BuildTask {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Construction {
     /// `+0xc50`, `build_pts`: the seconds of work it has had.
-    pub progress: f32,
+    pub progress: Seconds,
     /// `+0xc60`, `desolid_flag`: no builder has started it; it has no obstruction record.
     pub desolid: bool,
     /// `+0x9e8`, `num_builders`.
@@ -233,7 +233,7 @@ impl Completion<'_> {
             ));
         }
         let mut part = FirstPart::default();
-        if master.class == class::FARM && f32::from(c.build_time) <= c.progress {
+        if master.class == class::FARM && Seconds::of_master(c.build_time) <= c.progress {
             let [amount, resource, near] = self.farm_bonus;
             let (resource, near) = (cvttss2si(resource), cvttss2si(near));
             if 0 <= resource && 0 <= near {
@@ -553,7 +553,7 @@ mod stack_tests {
                 ..Lifecycle::default()
             },
             construction: Some(Construction {
-                progress: 149.99,
+                progress: Seconds::new(149.99),
                 desolid: false,
                 builders: 1,
                 hit_points: 2400,

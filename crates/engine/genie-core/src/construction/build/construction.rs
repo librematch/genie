@@ -25,6 +25,7 @@ use crate::players::attribute::MONASTERIES;
 use crate::players::attribute::WONDERS;
 use crate::players::attribute::WONDERS_BUILT;
 use crate::world::Millis;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 
 /// The completion's storage ([`crate::world::World::complete_building`]): its master's entries of modes 4, 8 and 64 go to its
@@ -166,8 +167,8 @@ impl Construction {
         let mut amount = amount;
         let build_time = f32::from(self.build_time);
         let hit_points = f32::from(self.hit_points);
-        if build_time < self.progress + amount {
-            amount = build_time - self.progress;
+        if build_time < self.progress.get() + amount {
+            amount = build_time - self.progress.get();
         }
         let new = if 1.0 <= build_time {
             (amount * hit_points) / build_time + hp.get()
@@ -175,8 +176,8 @@ impl Construction {
             hit_points
         };
         *hp = HitPoints::new(if hit_points < new { hit_points } else { new });
-        let before = self.progress;
-        self.progress = amount + before;
+        let before = self.progress.get();
+        self.progress = Seconds::new(amount + before);
         crate::math::fmath::at_most_or_unordered(build_time, amount + before)
     }
 
@@ -208,7 +209,7 @@ impl Construction {
         }
         let placed = *world.get(id).ok_or(SITE_GONE)?;
         c.desolid = false;
-        c.progress = f32::from_bits(STARTED);
+        c.progress = Seconds::new(f32::from_bits(STARTED));
         if let Some(v) = world.sight.as_mut() {
             v.construction_started(id, placed.position, placed.radius)?;
         }

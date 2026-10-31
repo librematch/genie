@@ -1981,7 +1981,7 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 0.0,
+            progress: Seconds::ZERO,
             desolid: true,
             builders: 0,
             hit_points: 550,
@@ -2194,7 +2194,7 @@ fn a_wait_reads_its_foundation_s_build_points_wherever_it_is() {
         left: None,
     };
     let own = OthersRef::new(PlayerId::new(1), &t.players[1].objects, own);
-    assert_eq!(wait_progress(object_id(10028), own), Some(0.0));
+    assert_eq!(wait_progress(object_id(10028), own), Some(Seconds::ZERO));
     assert_eq!(wait_progress(object_id(77), own), None);
     // another player's (player 0 updating, player 1 after it)
     let other = Foreign {
@@ -2207,7 +2207,7 @@ fn a_wait_reads_its_foundation_s_build_points_wherever_it_is() {
             object_id(10028),
             OthersRef::new(PlayerId::new(0), &ObjectList::default(), other)
         ),
-        Some(0.0)
+        Some(Seconds::ZERO)
     );
 }
 
@@ -2252,9 +2252,9 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
     let c = |id: ObjectId| t.object(id).unwrap().1.construction.unwrap();
     let started = f32::from_bits(0x2edb_e6ff);
     assert!(!c(object_id(10031)).desolid);
-    assert_eq!(c(object_id(10031)).progress, started);
+    assert_eq!(c(object_id(10031)).progress, Seconds::new(started));
     assert!(!c(object_id(10028)).desolid);
-    assert_eq!(c(object_id(10028)).progress, started + 0.021);
+    assert_eq!(c(object_id(10028)).progress, Seconds::new(started + 0.021));
     assert_eq!(
         t.object(object_id(10031)).unwrap().1.life.hp,
         HitPoints::new(1.0)
@@ -2273,7 +2273,7 @@ fn repair_world() -> World {
     house.life.state = ObjectState::Alive;
     house.life.hp = HitPoints::new(300.0);
     let c = house.construction.as_mut().unwrap();
-    (c.progress, c.desolid) = (1.0, false);
+    (c.progress, c.desolid) = (Seconds::new(1.0), false);
     for masters in &mut t.masters {
         let builder = masters.get_mut(ids::BUILDER).unwrap();
         builder.weapon_range = Distance::new(0.5);
@@ -4229,7 +4229,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
             ..Lifecycle::default()
         },
         construction: desolid.then_some(Construction {
-            progress: 0.0,
+            progress: Seconds::ZERO,
             desolid: true,
             builders: 0,
             hit_points: 550,
@@ -5730,7 +5730,7 @@ fn repairer_world(orders: Vec<crate::unit_ai::QueuedOrder>, repairer: bool) -> W
     house.life.state = ObjectState::Alive;
     house.life.hp = HitPoints::new(300.0);
     let c = house.construction.as_mut().unwrap();
-    (c.progress, c.desolid) = (1.0, false);
+    (c.progress, c.desolid) = (Seconds::new(1.0), false);
     if repairer {
         for masters in &mut t.masters {
             let mut m = masters.get(VILLAGER_MALE).unwrap().clone();
@@ -5902,7 +5902,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
     house.life.state = ObjectState::Alive;
     house.life.hp = HitPoints::new(550.0);
     let c = house.construction.as_mut().unwrap();
-    (c.progress, c.desolid) = (1.0, false);
+    (c.progress, c.desolid) = (Seconds::new(1.0), false);
     for masters in &mut t.masters {
         let house = masters.get_mut(ids::HOUSE).unwrap();
         house.garrison = room;
@@ -6509,7 +6509,7 @@ fn a_villager_sent_off_a_foundation_waits_for_it_as_a_builder() {
         .construction
         .as_mut()
         .unwrap()
-        .progress = 0.5;
+        .progress = Seconds::new(0.5);
     t.tick(Millis::new(50));
     t.tick(Millis::new(50));
     assert_eq!(t.players[1].freezes, vec![]);
@@ -8462,7 +8462,7 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
     assert_eq!(
         (make.progress, make.state, make.master),
         (
-            0.104,
+            Seconds::new(0.104),
             crate::production::MakeObjState::Making,
             production.queue.slots[0].master
         )
@@ -8569,12 +8569,12 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
     assert_eq!(
         t.production_load(PlayerId::new(0), &t.players[0].objects[ListIndex::new(0)])
             .unwrap(),
-        25.0 - make.progress
+        Seconds::new(25.0) - make.progress
     );
     assert_eq!(
         t.production_load(PlayerId::new(0), &t.players[0].objects[ListIndex::new(1)])
             .unwrap(),
-        0.0
+        Seconds::ZERO
     );
     // the empty one takes the first, then the loaded one the second (25 above its load)
     t.tick_with(Millis::new(104), &[several(2)]);
@@ -8850,7 +8850,7 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
                 building: Some(ids::TOWN_CENTRE),
                 time: 160,
                 button: 1,
-                adjustment: 0.0,
+                adjustment: Seconds::ZERO,
             }],
             ..TechState::default()
         };
@@ -8898,7 +8898,7 @@ fn research_world() -> World {
             building: Some(ids::TOWN_CENTRE),
             time: 30,
             button: 1,
-            adjustment: 0.0,
+            adjustment: Seconds::ZERO,
         }],
         ..TechState::default()
     };
@@ -8985,7 +8985,7 @@ fn a_queued_research_starts_at_the_buildings_master() {
     };
     assert_eq!(
         (r.state, r.progress),
-        (crate::production::MakeTechState::Researching, 0.0)
+        (crate::production::MakeTechState::Researching, Seconds::ZERO)
     );
     assert_eq!(t.players[0].techs[5].state, ResearchState::Researching);
     assert_eq!(t.players[0].techs[5].building_master, Some(master));
@@ -9959,7 +9959,7 @@ fn teardown_world() -> World {
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 0.0,
+            progress: Seconds::ZERO,
             desolid: false,
             builders: 1,
             hit_points: 550,
@@ -10297,7 +10297,7 @@ fn deaths_world() -> World {
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 0.0,
+            progress: Seconds::ZERO,
             desolid: false,
             builders: 1,
             hit_points: 550,
@@ -11205,7 +11205,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 10.0,
+            progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
             hit_points: 20000,
@@ -12973,7 +12973,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 100.0,
+            progress: Seconds::new(100.0),
             desolid: false,
             builders: 0,
             hit_points: 1650,
@@ -13090,7 +13090,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 10.0,
+            progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
             hit_points: 10,
@@ -13423,7 +13423,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             ..Lifecycle::default()
         },
         construction: Some(Construction {
-            progress: 10.0,
+            progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
             hit_points: 1200,
@@ -15266,29 +15266,38 @@ fn a_fishing_ship_counts_a_near_drop_site_its_path_does_not_reach() {
 #[test]
 fn a_farm_foundation_lays_its_stage_terrain() {
     use crate::construction::building_update::farm_stage_terrain;
-    assert_eq!(farm_stage_terrain(ids::FARM, (false, 7), 0.0, 15), Some(29));
-    assert_eq!(farm_stage_terrain(ids::FARM, (false, 7), 7.5, 15), Some(30));
     assert_eq!(
-        farm_stage_terrain(ids::FARM, (false, 7), 15.0, 15),
+        farm_stage_terrain(ids::FARM, (false, 7), Seconds::ZERO, 15),
+        Some(29)
+    );
+    assert_eq!(
+        farm_stage_terrain(ids::FARM, (false, 7), Seconds::new(7.5), 15),
+        Some(30)
+    );
+    assert_eq!(
+        farm_stage_terrain(ids::FARM, (false, 7), Seconds::new(15.0), 15),
         Some(31)
     );
     assert_eq!(
-        farm_stage_terrain(ids::ID_1187, (true, 63), 5.0, 15),
+        farm_stage_terrain(ids::ID_1187, (true, 63), Seconds::new(5.0), 15),
         Some(66)
     );
     assert_eq!(
-        farm_stage_terrain(ids::ID_1187, (false, 63), 0.0, 15),
+        farm_stage_terrain(ids::ID_1187, (false, 63), Seconds::ZERO, 15),
         Some(65)
     );
     assert_eq!(
-        farm_stage_terrain(ids::PASTURE_1889, (false, 117), 15.0, 15),
+        farm_stage_terrain(ids::PASTURE_1889, (false, 117), Seconds::new(15.0), 15),
         Some(121)
     );
     assert_eq!(
-        farm_stage_terrain(ids::PASTURE_1889, (false, -1), 0.0, 15),
+        farm_stage_terrain(ids::PASTURE_1889, (false, -1), Seconds::ZERO, 15),
         Some(1)
     );
-    assert_eq!(farm_stage_terrain(ids::HOUSE, (false, -1), 0.0, 15), None);
+    assert_eq!(
+        farm_stage_terrain(ids::HOUSE, (false, -1), Seconds::ZERO, 15),
+        None
+    );
 }
 
 /// `RGE_Moving_Object::update`'s count-down of the last human order time (`+0x650`, at most
@@ -16058,17 +16067,50 @@ fn a_missile_whose_target_died_flies_on_without_it_and_lands() {
 #[test]
 fn a_queued_unit_goes_to_the_least_loaded_building_with_room() {
     use crate::commands::least_loaded;
-    assert_eq!(least_loaded(&[2, 2, 2], &[5.0, 3.0, 4.0], None), Some(1));
-    assert_eq!(least_loaded(&[2, 0, 2], &[5.0, 3.0, 4.0], None), Some(2));
-    assert_eq!(least_loaded(&[2, 2], &[3.0, 3.0], Some(1)), Some(1));
-    assert_eq!(least_loaded(&[2, 2], &[f32::NAN, 3.0], None), Some(0));
     assert_eq!(
-        least_loaded(&[2, 2, 2], &[4.0, f32::NAN, 3.0], None),
+        least_loaded(
+            &[2, 2, 2],
+            &[Seconds::new(5.0), Seconds::new(3.0), Seconds::new(4.0)],
+            None
+        ),
+        Some(1)
+    );
+    assert_eq!(
+        least_loaded(
+            &[2, 0, 2],
+            &[Seconds::new(5.0), Seconds::new(3.0), Seconds::new(4.0)],
+            None
+        ),
         Some(2)
     );
-    assert_eq!(least_loaded(&[2, 2], &[3.0, f32::NAN], None), Some(0));
-    assert_eq!(least_loaded(&[0, 2], &[1.0, 3.0], Some(0)), Some(0));
-    assert_eq!(least_loaded(&[0, 0], &[3.0, 1.0], None), None);
+    assert_eq!(
+        least_loaded(&[2, 2], &[Seconds::new(3.0), Seconds::new(3.0)], Some(1)),
+        Some(1)
+    );
+    assert_eq!(
+        least_loaded(&[2, 2], &[Seconds::new(f32::NAN), Seconds::new(3.0)], None),
+        Some(0)
+    );
+    assert_eq!(
+        least_loaded(
+            &[2, 2, 2],
+            &[Seconds::new(4.0), Seconds::new(f32::NAN), Seconds::new(3.0)],
+            None
+        ),
+        Some(2)
+    );
+    assert_eq!(
+        least_loaded(&[2, 2], &[Seconds::new(3.0), Seconds::new(f32::NAN)], None),
+        Some(0)
+    );
+    assert_eq!(
+        least_loaded(&[0, 2], &[Seconds::new(1.0), Seconds::new(3.0)], Some(0)),
+        Some(0)
+    );
+    assert_eq!(
+        least_loaded(&[0, 0], &[Seconds::new(3.0), Seconds::new(1.0)], None),
+        None
+    );
     assert_eq!(least_loaded(&[], &[], None), None);
 }
 
@@ -17191,7 +17233,7 @@ fn site_of(u: &Unit) -> (ObjectState, f32, Option<f32>) {
     (
         u.life.state,
         u.life.hp.get(),
-        u.construction.map(|c| c.progress),
+        u.construction.map(|c| c.progress.get()),
     )
 }
 
@@ -17233,7 +17275,7 @@ fn a_building_s_own_completion_completes_its_annexes_first() {
     let mut t = annexed_house();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
     let k = h.construction.as_mut().unwrap();
-    k.progress = f32::from(k.build_time);
+    k.progress = Seconds::new(f32::from(k.build_time));
     let i = t.players[1].objects.position_of(object_id(10028)).unwrap();
     let seen = in_update(&mut t, (PlayerId::new(1), i), 50, |unit, c| {
         unit.complete_on_update(c)?;
@@ -17275,7 +17317,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     centre.workers = 1;
     centre.construction = Some(Construction {
-        progress: 25.0,
+        progress: Seconds::new(25.0),
         desolid: false,
         builders: 0,
         hit_points: 2400,
@@ -17438,7 +17480,7 @@ fn a_builder_s_completion_reaches_the_world_within_its_update() {
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
     h.life.hp = HitPoints::new(549.0);
     let k = h.construction.as_mut().unwrap();
-    (k.progress, k.desolid) = (24.99, false);
+    (k.progress, k.desolid) = (Seconds::new(24.99), false);
     assert_eq!(
         worked(&mut t, 10028, 50).map_err(|e| e.reason().to_owned()),
         Ok(())
@@ -17475,7 +17517,7 @@ fn a_builder_s_completion_completes_the_foundation_s_annexes_where_it_runs() {
     let mut t = annexed_house();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
     let k = h.construction.as_mut().unwrap();
-    (k.progress, k.desolid) = (24.99, false);
+    (k.progress, k.desolid) = (Seconds::new(24.99), false);
     assert_eq!(
         worked(&mut t, 10028, 50).map_err(|e| e.reason().to_owned()),
         Ok(())
@@ -17514,7 +17556,7 @@ fn completed_house(setup: fn(&mut Unit)) -> (World, Completed) {
     let mut t = house_builder();
     let h = &mut t.players[1].objects[ListIndex::new(1)];
     let k = h.construction.as_mut().unwrap();
-    k.progress = f32::from(k.build_time);
+    k.progress = Seconds::new(f32::from(k.build_time));
     setup(h);
     let r = in_update(
         &mut t,
@@ -17548,7 +17590,7 @@ fn a_foundation_whose_build_points_reached_its_build_time_completes() {
         t.players[1].tracker.list(ListKey::of_master(key.master)),
         [Some(object_id(10028))]
     );
-    let short: fn(&mut Unit) = |h| h.construction.as_mut().unwrap().progress = 24.0;
+    let short: fn(&mut Unit) = |h| h.construction.as_mut().unwrap().progress = Seconds::new(24.0);
     let annex: fn(&mut Unit) =
         |h| (h.life.master_id, h.annex_of) = (master_id(109), Some(object_id(700)));
     for setup in [short, annex] {
@@ -17570,7 +17612,7 @@ fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_le
     let finish = |t: &mut World| {
         let h = &mut t.players[1].objects[ListIndex::new(1)];
         let k = h.construction.as_mut().unwrap();
-        k.progress = f32::from(k.build_time);
+        k.progress = Seconds::new(f32::from(k.build_time));
         in_update(t, (PlayerId::new(1), ListIndex::new(1)), 50, |unit, c| {
             unit.complete_on_update(c)?;
             let events: Vec<(crate::players::history::EventKind, f32)> = c.w.players[1]
@@ -18327,7 +18369,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
     let house = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
         (house.construction.unwrap().progress, house.workers),
-        (25.0, 0)
+        (Seconds::new(25.0), 0)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(v.actions.build().copied().unwrap().target, None);

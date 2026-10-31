@@ -229,7 +229,7 @@ impl World {
         let share = if state < ObjectState::Alive && HitPoints::new(1.0) <= hp {
             let c = site.ok_or(crate::construction::build::NO_CONSTRUCTION)?;
             let build_time = f32::from(c.build_time);
-            (build_time - c.progress) / build_time
+            (build_time - c.progress.get()) / build_time
         } else {
             0.0
         };
@@ -605,6 +605,7 @@ mod tests {
     use crate::test_ids::player_id;
     use crate::world::Millis;
     use crate::world::Player;
+    use crate::world::Seconds;
     use crate::world::WorldTime;
 
     /// Gaia and two players: player 1's villager 10, house foundation 11 (build time 25, cost 25
@@ -613,7 +614,7 @@ mod tests {
         let house = Unit {
             id: object_id(11),
             construction: Some(Construction {
-                progress,
+                progress: Seconds::new(progress),
                 desolid,
                 builders: 0,
                 hit_points: 550,

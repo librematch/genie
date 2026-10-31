@@ -340,7 +340,7 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
         ..Master::default()
     }]);
     let built = Construction {
-        progress: 15.0,
+        progress: Seconds::new(15.0),
         desolid: false,
         builders: 1,
         hit_points: 480,
@@ -382,7 +382,7 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
     );
     // not built yet: nothing
     let going = Construction {
-        progress: 14.5,
+        progress: Seconds::new(14.5),
         ..built
     };
     assert_eq!(
@@ -603,7 +603,7 @@ fn a_builder_sent_to_another_foundation_starts_over() {
 #[test]
 fn a_builder_told_to_build_its_foundation_again_starts_over() {
     let mut c = Construction {
-        progress: 3.0,
+        progress: Seconds::new(3.0),
         desolid: false,
         builders: 2,
         hit_points: 25,
@@ -786,7 +786,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         ..Lifecycle::default()
     };
     let c = Construction {
-        progress: 24.99,
+        progress: Seconds::new(24.99),
         desolid: false,
         builders: 2,
         hit_points: 550,
@@ -805,7 +805,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let c = h.construction.unwrap();
     assert_eq!(
         (h.life.state, c.progress, c.snow),
-        (ObjectState::Alive, 25.0, true)
+        (ObjectState::Alive, Seconds::new(25.0), true)
     );
     let a = &t.players[1].attributes;
     assert_eq!(
@@ -849,7 +849,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             ..Lifecycle::default()
         };
         let c = Construction {
-            progress: 100.0,
+            progress: Seconds::new(100.0),
             desolid: false,
             builders: 1,
             hit_points: 100,
@@ -938,7 +938,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         ..Lifecycle::default()
     };
     let c = Construction {
-        progress: 0.0,
+        progress: Seconds::ZERO,
         desolid: true,
         builders: 1,
         hit_points: 550,
@@ -962,7 +962,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
     let c = h.construction.unwrap();
     assert_eq!(h.life.hp, HitPoints::new(1.462));
     assert!(!c.desolid);
-    assert_eq!(c.progress, f32::from_bits(STARTED) + rate);
+    assert_eq!(c.progress, Seconds::new(f32::from_bits(STARTED) + rate));
     assert!(
         t.spatial
             .get(object_id(10028))
@@ -994,7 +994,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     world.set_annex(object_id(10029), Some(object_id(10028)));
     world.set_annex(object_id(10030), Some(object_id(10028)));
     let foundation = |desolid| Construction {
-        progress: 0.0,
+        progress: Seconds::ZERO,
         desolid,
         builders: 1,
         hit_points: 550,
@@ -1037,7 +1037,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     let u = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
     let post = u(object_id(10029)).construction.unwrap();
     assert!(!post.desolid);
-    assert_eq!(post.progress, f32::from_bits(STARTED));
+    assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
     assert_eq!(u(object_id(10029)).firepower, 2.0);
     assert!(
         t.spatial
@@ -1082,7 +1082,7 @@ fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
         }),
     );
     let mut c = Construction {
-        progress: 0.0,
+        progress: Seconds::ZERO,
         desolid: true,
         builders: 1,
         hit_points: 550,
@@ -1118,7 +1118,7 @@ fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
 #[test]
 fn an_annex_s_work_goes_to_its_main_building() {
     let foundation = Construction {
-        progress: 0.0,
+        progress: Seconds::ZERO,
         desolid: true,
         builders: 1,
         hit_points: 550,
@@ -1179,7 +1179,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
     };
     assert_eq!(run(foundation, 0.021), (Ok(true), ObjectState::Foundation));
     let nearly = Construction {
-        progress: 24.99,
+        progress: Seconds::new(24.99),
         desolid: false,
         ..foundation
     };

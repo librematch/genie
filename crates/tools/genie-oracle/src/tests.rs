@@ -28,7 +28,7 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
                 state: genie_core::production::MakeObjState::Making,
                 paid: true,
                 master: Some(ids::VILLAGER_MALE),
-                progress: 0.5,
+                progress: Seconds::new(0.5),
                 unique_id: -1,
                 button: 0,
                 train_time: 25,

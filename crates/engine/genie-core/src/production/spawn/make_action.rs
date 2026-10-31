@@ -259,7 +259,7 @@ impl World {
         state.state = ResearchState::Researching;
         state.building_master = Some(master);
         r.state = MakeTechState::Researching;
-        r.progress = 0.0;
+        r.progress = Seconds::ZERO;
         Ok(())
     }
 
@@ -312,7 +312,7 @@ impl World {
         let rate = building.work_rate_powerup + site.work_rate;
         let made = make.master.and_then(|m| player_master(&self.masters, p, m));
         let time = f32::from(make.time(made, building.life.master_id));
-        let progress = rate * dt_seconds + make.progress;
+        let progress = Seconds::new(rate * dt_seconds) + make.progress;
         if let Some(Some(Making::Unit(m))) = self
             .players
             .live_mut(p, i)?
@@ -322,7 +322,7 @@ impl World {
         {
             m.progress = progress;
         }
-        if crate::math::fmath::below_or_unordered(progress, time) {
+        if crate::math::fmath::below_or_unordered(progress.get(), time) {
             return Ok(0);
         }
         let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));

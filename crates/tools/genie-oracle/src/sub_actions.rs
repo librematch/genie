@@ -300,7 +300,7 @@ pub(super) fn production(
                 state: MakeObjState::of_byte(base.state)?,
                 paid: base.sub_action_value != 0,
                 master: MasterId::of_data(make.obj_id),
-                progress: make.work_done,
+                progress: Seconds::new(make.work_done),
                 unique_id: make.unique_id,
                 button: make.button_location_id,
                 train_time: make.train_time,
@@ -321,7 +321,7 @@ pub(super) fn production(
                 paid: base.sub_action_value != 0,
                 tech: genie_core::technology::TechId::try_from(tech.tech_id)?,
                 master: tech.unique_id,
-                progress: tech.m_research_progress,
+                progress: Seconds::new(tech.m_research_progress),
             }))
         }
         Some(_) => {

@@ -23,6 +23,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::QUEUED;
 use crate::production::Production;
 use crate::technology::TechId;
+use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 use crate::world::{
     COMPUTER_QUEUE_LIMIT, ONE_UNIT_GAME, QUEUE_LIMIT, VILLAGER_ANY, World, villager,
@@ -148,7 +149,7 @@ impl World {
             counts[k] += 1;
             let at = self.at(found[k])?.1.life.master_id;
             let time = crate::production::train_time(&unit.train_locations, at, q.button);
-            loads[k] += f32::from(time);
+            loads[k] += Seconds::of_master(time);
             pick = Some(k);
         }
         for (k, &place) in found.iter().enumerate() {
@@ -181,7 +182,7 @@ impl World {
         found: &[Place],
         unit: &Master,
         per: i32,
-    ) -> Result<(Vec<i32>, Vec<f32>, i32), GenieError> {
+    ) -> Result<(Vec<i32>, Vec<Seconds>, i32), GenieError> {
         let mut rooms = Vec::with_capacity(found.len());
         let mut loads = Vec::with_capacity(found.len());
         let mut total_room = 0i32;
@@ -190,7 +191,7 @@ impl World {
             // a building the unit does not train at keeps room −1 and load 0
             if !self.trains_at(unit, building.life.master_id) {
                 rooms.push(-1);
-                loads.push(0.0);
+                loads.push(Seconds::ZERO);
                 continue;
             }
             let total = building.production.as_ref().map_or(0, |p| p.queue.total);
@@ -213,9 +214,9 @@ impl World {
         r: &ResearchCommand,
         buildings: &[Option<ObjectId>],
     ) -> Result<Option<ObjectId>, GenieError> {
-        let load = |id: ObjectId| -> Result<f32, GenieError> {
+        let load = |id: ObjectId| -> Result<Seconds, GenieError> {
             self.object(id)
-                .map_or(Ok(0.0), |(q, u)| self.production_load(q, u))
+                .map_or(Ok(Seconds::ZERO), |(q, u)| self.production_load(q, u))
         };
         let is_building = |id: Option<ObjectId>| -> Result<bool, GenieError> {
             match self.object(id) {
@@ -260,29 +261,29 @@ impl World {
         &self,
         p: PlayerId,
         building: &crate::objects::unit::Unit,
-    ) -> Result<f32, GenieError> {
+    ) -> Result<Seconds, GenieError> {
         let owner = self.players.player(p)?;
         let Some(production) = building.production.as_ref() else {
-            return Ok(0.0);
+            return Ok(Seconds::ZERO);
         };
         let queue = &production.queue;
         let entries = usize::try_from(queue.count)
             .unwrap_or(0)
             .min(queue.slots.len());
-        let mut queued = 0.0f32;
+        let mut queued = Seconds::ZERO;
         for e in &queue.slots[..entries] {
             if let Some(master) = e.master {
                 let time = player_master(&self.masters, p, master)
                     .and_then(|m| m.train_locations.first())
                     .map_or(0, |l| l.time);
-                queued += (i32::from(e.count) * i32::from(time)) as f32;
+                queued += Seconds::new((i32::from(e.count) * i32::from(time)) as f32);
             } else if let Some(tech) = e.tech {
                 // a queued research has its locations (the queue checked them)
                 let (time, adjustment) = Some(tech.index())
                     .and_then(|t| owner.techs.get(t))
                     .and_then(|t| t.location(building.life.master_id))
-                    .map_or((0, 0.0), |l| (l.time as i16, l.adjustment));
-                queued += (f32::from(time) + adjustment) * f32::from(e.count);
+                    .map_or((0, Seconds::ZERO), |l| (l.time as i16, l.adjustment));
+                queued += (Seconds::of_master(time) + adjustment) * f32::from(e.count);
             }
         }
         if queue.slots.is_empty() {
@@ -291,9 +292,9 @@ impl World {
         let done = match production.action {
             Some(crate::production::Making::Unit(m)) => m.progress,
             Some(crate::production::Making::Research(r)) => r.progress,
-            None => 0.0,
+            None => Seconds::ZERO,
         };
-        Ok(queued - (0.0 + done))
+        Ok(queued - (Seconds::ZERO + done))
     }
 
     /// `FUN_1411cbc40`, QUEUE's and RESEARCH's building part, at the building at `i` of
@@ -585,7 +586,7 @@ impl World {
 /// one's `pick` first (none: the first with room), replaced by each with room and a load below
 /// its (`COMISS`, `JBE`: a comparison with a NaN replaces nothing); with none, the one with the
 /// most room, the first of equals; none without room.
-pub(crate) fn least_loaded(rooms: &[i32], loads: &[f32], pick: Option<usize>) -> Option<usize> {
+pub(crate) fn least_loaded(rooms: &[i32], loads: &[Seconds], pick: Option<usize>) -> Option<usize> {
     let mut best = pick;
     for k in 0..rooms.len() {
         if 0 < rooms[k] && best.is_none_or(|b| loads[b] > loads[k]) {

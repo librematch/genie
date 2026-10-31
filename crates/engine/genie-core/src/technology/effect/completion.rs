@@ -15,6 +15,7 @@ use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER, MODE_WITHOUT_0X26D};
 use crate::technology::{EffectCommand, ObjectsKind, Party};
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -293,7 +294,7 @@ impl World {
                 .and_then(|b| state.location(b))
                 .copied()
                 .unwrap_or(*l);
-            f32::from(l.time as i16) + at.adjustment <= state.research_done
+            Seconds::of_master(l.time as i16) + at.adjustment <= state.research_done
         };
         // its research done already: it completes (`FUN_1413cdcd0` with `param_3` 0 and no
         // building), once per location reached without a building of its own (each

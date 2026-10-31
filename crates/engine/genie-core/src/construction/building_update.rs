@@ -194,7 +194,7 @@ impl Unit {
         let due = self.life.state == ObjectState::Foundation
             && self
                 .construction
-                .is_some_and(|cons| f32::from(cons.build_time) <= cons.progress);
+                .is_some_and(|cons| Seconds::of_master(cons.build_time) <= cons.progress);
         if !due {
             return Ok(());
         }
@@ -432,7 +432,7 @@ impl Unit {
 pub(crate) fn farm_stage_terrain(
     master: MasterId,
     (rice, foundation): (bool, i16),
-    progress: f32,
+    progress: Seconds,
     build_time: i16,
 ) -> Option<u8> {
     /// The stages over the build time (`DAT_142eb1c98`).
@@ -441,7 +441,7 @@ pub(crate) fn farm_stage_terrain(
     const FIRST_STAGE: u8 = 29;
     /// A rice farm's first stage terrain on mangrove or rice (`0x41`).
     const RICE_STAGE: u8 = 65;
-    let stage = (((progress * STAGES) / f32::from(build_time)) as i32 as u8).min(2);
+    let stage = (((progress.get() * STAGES) / f32::from(build_time)) as i32 as u8).min(2);
     match master {
         ids::FARM => Some(FIRST_STAGE + stage),
         ids::ID_1187 | ids::PASTURE_1889 if rice => Some(RICE_STAGE + stage),

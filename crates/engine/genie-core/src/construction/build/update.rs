@@ -212,7 +212,7 @@ impl BuildAction {
         let special = master.id == TOWN_CENTRE_621 || master.class == class::GATE;
         let unbuilt = site
             .construction
-            .is_some_and(|k| k.progress < f32::from(k.build_time));
+            .is_some_and(|k| k.progress < Seconds::of_master(k.build_time));
         if (special || state < ObjectState::Dying)
             && !(special && ObjectState::Alive < state && unbuilt)
         {

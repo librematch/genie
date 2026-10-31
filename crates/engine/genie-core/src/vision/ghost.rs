@@ -691,6 +691,7 @@ mod tests {
     use crate::vision::visibility::{Seer, Visibility};
     use crate::world::Millis;
     use crate::world::Player;
+    use crate::world::Seconds;
     use crate::world::WorldTime;
 
     /// A gold mine's master (it leaves ghosts), a house's and the ghosts' own.
@@ -1301,7 +1302,7 @@ mod tests {
         ]);
         let mut foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
         foundation.construction = Some(crate::construction::build::Construction {
-            progress: 0.0,
+            progress: Seconds::ZERO,
             desolid: true,
             builders: 0,
             hit_points: 0,

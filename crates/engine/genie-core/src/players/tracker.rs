@@ -39,6 +39,7 @@ use crate::objects::masters::Masters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{ClassId, class};
 use crate::players::PlayerId;
+use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
 /// A pending key is its done key + this (a master's + 90000, a class's + 90900).
@@ -430,7 +431,7 @@ impl crate::world::World {
                 let building = u.master(&self.masters, p)?.kind == BUILDING;
                 if building
                     && u.construction
-                        .is_some_and(|c| f32::from(c.build_time) <= c.progress)
+                        .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress)
                 {
                     tracker.complete(u.id, k);
                 }
@@ -881,7 +882,7 @@ mod tests {
             let mut u = Unit {
                 id: object_id(id),
                 construction: progress.map(|progress| crate::construction::build::Construction {
-                    progress,
+                    progress: Seconds::new(progress),
                     desolid: false,
                     builders: 0,
                     hit_points: 2400,

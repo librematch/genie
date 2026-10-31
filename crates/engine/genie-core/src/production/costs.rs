@@ -11,6 +11,7 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::world::Seconds;
 
 /// `FUN_141630530`: a queued unit's refund. For a master of type 70 and up each of its cost
 /// entries with an attribute and a paid flag gives back what the queue entry's `costs` paid
@@ -118,7 +119,7 @@ pub fn refund_tech(
         attributes.set(attribute, held + Amount::new(v))?;
     }
     state.state = ResearchState::Available;
-    state.research_done = 0.0;
+    state.research_done = Seconds::ZERO;
     Ok(true)
 }
 

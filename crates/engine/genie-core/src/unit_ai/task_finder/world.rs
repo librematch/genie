@@ -13,6 +13,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskTarget};
 use crate::unit_ai::world_view::Foreign;
+use crate::world::Seconds;
 use crate::world::others::OthersRef;
 use crate::world::player::Player;
 
@@ -77,7 +78,7 @@ impl Diplomacy for SideWorld<'_> {
 /// sent the unit off (the unit AI's notify 0x216), whose build points are its construction's;
 /// the world never gives its id to another object, so an object without a construction is not
 /// met.
-pub(crate) fn wait_progress(id: ObjectId, others: OthersRef<'_>) -> Option<f32> {
+pub(crate) fn wait_progress(id: ObjectId, others: OthersRef<'_>) -> Option<Seconds> {
     others
         .get(id)
         .and_then(|u| u.construction.map(|k| k.progress))

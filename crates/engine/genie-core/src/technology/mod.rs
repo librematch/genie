@@ -12,6 +12,7 @@ use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
 pub mod effect;
@@ -142,14 +143,14 @@ pub struct Location {
     /// Its button.
     pub button: u8,
     /// The seconds added (`+0xc`, `FUN_1413cec90`).
-    pub adjustment: f32,
+    pub adjustment: Seconds,
 }
 
 /// A player's state of one technology (`Tech_Player_Tree`, 0x80 bytes, saved).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TechState {
-    /// `+0x0`: the research's work done.
-    pub research_done: f32,
+    /// `+0x0`: the research's seconds of work done.
+    pub research_done: Seconds,
     /// `+0x4`: its state.
     pub state: ResearchState,
     /// `+0x6`: added to the `.dat`'s amounts.
@@ -504,7 +505,7 @@ mod tests {
                 building: Some(ids::TOWN_CENTRE),
                 time: 25,
                 button: 6,
-                adjustment: 0.0,
+                adjustment: Seconds::ZERO,
             }],
             ..TechState::default()
         };

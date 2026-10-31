@@ -423,8 +423,8 @@ pub fn undead(master: &Master, look: Option<&Look>) -> Option<i16> {
 /// its master's death sprite (`+0x480`, not the look's); a built one its slot 0x7a0's
 /// ([`dying`]).
 #[must_use]
-pub fn building_death(master: &Master, look: Option<&Look>, build_points: f32) -> Option<i16> {
-    let points = crate::math::conversions::cvttss2si(build_points).to_le_bytes();
+pub fn building_death(master: &Master, look: Option<&Look>, build_points: Seconds) -> Option<i16> {
+    let points = crate::math::conversions::cvttss2si(build_points.get()).to_le_bytes();
     if i16::from_le_bytes([points[0], points[1]]) < master.build_time {
         let destruction = master
             .building
@@ -727,19 +727,25 @@ mod tests {
     #[test]
     fn a_building_that_dies_before_it_is_built_shows_its_destruction_sprite() {
         let m = barracks();
-        assert_eq!(building_death(&m, None, 12.5), Some(389));
-        assert_eq!(building_death(&m, None, 49.9), Some(389));
-        assert_eq!(building_death(&m, None, 50.0), Some(2573));
-        assert_eq!(building_death(&m, Some(&look()), 50.0), Some(5));
+        assert_eq!(building_death(&m, None, Seconds::new(12.5)), Some(389));
+        assert_eq!(building_death(&m, None, Seconds::new(49.9)), Some(389));
+        assert_eq!(building_death(&m, None, Seconds::new(50.0)), Some(2573));
+        assert_eq!(
+            building_death(&m, Some(&look()), Seconds::new(50.0)),
+            Some(5)
+        );
         // a NaN is the integer indefinite, whose short is 0
-        assert_eq!(building_death(&m, None, f32::NAN), Some(389));
+        assert_eq!(building_death(&m, None, Seconds::new(f32::NAN)), Some(389));
         // the short wraps: 65586 build points are 50
-        assert_eq!(building_death(&m, None, 65586.0), Some(2573));
+        assert_eq!(building_death(&m, None, Seconds::new(65586.0)), Some(2573));
         // without a destruction sprite its master's death sprite, never the look's
         let plain = Master {
             building: None,
             ..barracks()
         };
-        assert_eq!(building_death(&plain, Some(&look()), 0.0), Some(2573));
+        assert_eq!(
+            building_death(&plain, Some(&look()), Seconds::ZERO),
+            Some(2573)
+        );
     }
 }

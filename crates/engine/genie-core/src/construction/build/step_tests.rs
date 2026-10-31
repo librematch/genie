@@ -102,7 +102,7 @@ const fn placed(at: Position, r: f32, class: ClassId, master: MasterId) -> Place
 /// A foundation's construction: `progress` seconds of 25, `builders`, `desolid`.
 const fn construction(progress: f32, builders: u8, desolid: bool) -> Construction {
     Construction {
-        progress,
+        progress: Seconds::new(progress),
         desolid,
         builders,
         hit_points: 550,
@@ -358,7 +358,9 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     let n = 2.0f32;
     assert_eq!(
         annex_of(&t).map(|k| k.progress),
-        Some(1.0 + rate * (((n - 1.0) * EXTRA_BUILDER + 1.0) / n))
+        Some(Seconds::new(
+            1.0 + rate * (((n - 1.0) * EXTRA_BUILDER + 1.0) / n)
+        ))
     );
     let mut b = build(&t);
     let main = own(&mut t, HOUSE).construction.as_mut().unwrap();

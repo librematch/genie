@@ -21,6 +21,7 @@ use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, Wait};
+use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
 
@@ -63,8 +64,8 @@ impl WaitSolidify {
     /// holds it with build points at most [`SOLID_FROM`]. `COMISD` with `JA`: build points that
     /// are not a number keep it waiting.
     #[must_use]
-    pub fn update(&self, progress: Option<f32>) -> bool {
-        progress.is_none_or(|p| f64::from(p) > SOLID_FROM)
+    pub fn update(&self, progress: Option<Seconds>) -> bool {
+        progress.is_none_or(|p| f64::from(p.get()) > SOLID_FROM)
     }
 
     /// Its `set_state` (slot 0x80, `FUN_140ae8b60`): the state, nothing else.
@@ -173,13 +174,13 @@ mod tests {
     fn the_wait_ends_once_the_foundation_is_past_a_hundredth_or_gone() {
         let w = WaitSolidify::new(task(), object_id(8123));
         assert!(w.update(None), "a foundation the world does not hold");
-        assert!(!w.update(Some(0.0)));
+        assert!(!w.update(Some(Seconds::ZERO)));
         // 0.01f32 widens to 0.009999999776…, at most the double 0.01
-        assert!(!w.update(Some(0.01)));
-        assert!(w.update(Some(0.010_001)));
-        assert!(w.update(Some(1.5)));
+        assert!(!w.update(Some(Seconds::new(0.01))));
+        assert!(w.update(Some(Seconds::new(0.010_001))));
+        assert!(w.update(Some(Seconds::new(1.5))));
         // COMISD with JA: unordered is not above
-        assert!(!w.update(Some(f32::NAN)));
+        assert!(!w.update(Some(Seconds::new(f32::NAN))));
     }
 
     #[test]

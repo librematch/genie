@@ -16,6 +16,7 @@ use crate::players::tracker::Key;
 use crate::production::{Making, refund, refund_research};
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -109,7 +110,7 @@ impl World {
         refund_research(&e.costs, count, owner)?;
         let state = owner.techs.checked_mut(t)?;
         state.state = ResearchState::Available;
-        state.research_done = 0.0;
+        state.research_done = Seconds::ZERO;
         let building = owner.objects.checked_mut(idx)?;
         if let Some(def) = self.techs.get(t) {
             for c in def.costs.iter().filter(|c| c.paid == 2) {
@@ -169,12 +170,12 @@ impl World {
                 let unit = owner.objects.checked_mut(idx)?;
                 if let Some(Some(action)) = unit.production.as_mut().map(|q| q.action.as_mut()) {
                     match action {
-                        Making::Research(r) => r.progress = 0.0,
+                        Making::Research(r) => r.progress = Seconds::ZERO,
                         // the game writes the make action's +0x70, its unique id
                         Making::Unit(m) => m.unique_id = 0,
                     }
                     if let Some(state) = entry.tech.and_then(|t| owner.techs.get_mut(t.index())) {
-                        state.research_done = 0.0;
+                        state.research_done = Seconds::ZERO;
                     }
                 }
             }

@@ -38,7 +38,7 @@ impl World {
             paid: true,
             tech,
             master: i32::from(MasterId::field(first.master)),
-            progress: 0.0,
+            progress: Seconds::ZERO,
         }))
     }
 
@@ -111,9 +111,9 @@ impl World {
         if state.state != ResearchState::Researching && (repeatable || shared) {
             state.state = ResearchState::Researching;
         }
-        let mut progress = r.progress + rate * dt_seconds;
+        let mut progress = r.progress + Seconds::new(rate * dt_seconds);
         if 0xff < times {
-            progress = 32767.0;
+            progress = Seconds::new(32767.0);
         }
         state.research_done = progress;
         if let Some(Some(Making::Research(r))) = owner.objects[i]
@@ -127,7 +127,7 @@ impl World {
         if !crate::technology::is_age(r.tech) && Amount::ZERO < time_modifier {
             time *= time_modifier.get();
         }
-        if location.adjustment + time <= progress {
+        if location.adjustment + Seconds::new(time) <= progress {
             if 0xff < times {
                 return Err(GenieError::unsupported(
                     "a research done 0x100 times (set_state 1)",
@@ -174,8 +174,10 @@ impl World {
             if !crate::technology::is_age(tech) && Amount::ZERO < modifier {
                 time *= modifier.get();
             }
-            let adjustment = state.location(master).map_or(0.0, |l| l.adjustment);
-            if repeat || time + adjustment <= state.research_done {
+            let adjustment = state
+                .location(master)
+                .map_or(Seconds::ZERO, |l| l.adjustment);
+            if repeat || Seconds::new(time) + adjustment <= state.research_done {
                 let _ = self.complete_research(p, tech, Some(master))?;
             }
         }
@@ -295,12 +297,14 @@ impl World {
             .iter()
             .find(|l| l.0 == master.get())
             .map_or(-1.0, |l| f32::from(l.1));
-        let adjustment = state.location(master).map_or(0.0, |l| l.adjustment);
+        let adjustment = state
+            .location(master)
+            .map_or(Seconds::ZERO, |l| l.adjustment);
         let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
         if !crate::technology::is_age(r.tech) && Amount::ZERO < modifier {
             time *= modifier.get();
         }
-        let done = adjustment + time <= r.progress;
+        let done = adjustment + Seconds::new(time) <= r.progress;
         let state = &mut self.players.player_mut(p)?.techs[t];
         state.research_done = r.progress;
         if done {

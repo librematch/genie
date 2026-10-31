@@ -19,6 +19,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::technology::effect::{Change, OBJECT_GONE};
 use crate::vision::SightTiles;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -343,16 +344,16 @@ pub(super) fn charge_after(charge: Charge, max: Charge, change: Change, v: f32) 
 
 /// A building's build points after its master's build time (`time`, the old) changes
 /// (`FUN_1411d4e70`'s `e`).
-pub(super) fn build_points_after(points: f32, time: i16, change: Change, v: f32) -> f32 {
-    let t = f32::from(time);
-    match change {
+pub(super) fn build_points_after(points: Seconds, time: i16, change: Change, v: f32) -> Seconds {
+    let (points, t) = (points.get(), f32::from(time));
+    Seconds::new(match change {
         Change::Set => v / t * points,
         Change::Add => (t + v) / t * points,
         Change::Multiply => {
             let new = f32::from(crate::math::conversions::cvttss2si(t * v + ROUND) as i16);
             if 0.0 < t { points / t * new } else { ONE * new }
         }
-    }
+    })
 }
 
 /// `unit` lies within the player's master table (`0 <= unit < player+0x20`): the slice's

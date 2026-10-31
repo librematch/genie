@@ -10,6 +10,7 @@ use crate::players::attribute::TECHS_RESEARCHED;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ONE, ROUND};
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -300,7 +301,7 @@ impl World {
                     } else {
                         ROUND
                     };
-                    short((v - ONE) * time + half) + entry.adjustment
+                    Seconds::new(short((v - ONE) * time + half)) + entry.adjustment
                 }
                 0 => {
                     let s = if v == NO_TIME {
@@ -308,13 +309,13 @@ impl World {
                     } else {
                         crate::math::conversions::cvttss2si(v) as i16
                     };
-                    f32::from(s) - time
+                    Seconds::new(f32::from(s) - time)
                 }
-                _ => short(v) + entry.adjustment,
+                _ => Seconds::new(short(v)) + entry.adjustment,
             };
             entry.adjustment = adjustment;
             let done = state.state == ResearchState::Available
-                && adjustment + time <= state.research_done
+                && adjustment + Seconds::new(time) <= state.research_done
                 && (mode != 0 || v != NO_TIME);
             if done {
                 let _ = self.complete_research(p, tech_id, None)?;
