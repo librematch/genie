@@ -516,7 +516,8 @@ pub(crate) fn builder_masters() -> Masters {
             clearance: Footprint::new(1.0, 1.0),
             // built by the villagers (the builders' test, FUN_141262270)
             trained_at: vec![ids::BUILDER],
-            // a house's building part: no annexes, no stack unit, not an annex
+            // a house's building part: no annexes, no stack unit, not an annex; its destruction
+            // sprite (392 in build 158041's .dat), which it dies on unbuilt
             building: Some(crate::objects::masters::BuildingMaster {
                 stack_unit: None,
                 foundation_terrain: -1,
@@ -524,8 +525,11 @@ pub(crate) fn builder_masters() -> Masters {
                 annexes: [None; 4],
                 head_unit: None,
                 transform_unit: None,
+                destruction_sprite: Some(SpriteId::named(392)),
                 ..crate::objects::masters::BuildingMaster::default()
             }),
+            // its dying sprite (2196), which it dies on built
+            death_sprite: Some(SpriteId::named(2196)),
             ..Master::default()
         },
     ])
@@ -18537,14 +18541,6 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
     let mut t = house_builder();
     t.spatial.set_annex(object_id(700), Some(object_id(10028)));
     t.players[1].objects[ListIndex::new(2)].annex_of = Some(object_id(10028));
-    let house = &t.players[1].objects[ListIndex::new(1)];
-    let house_master = house.life.master_id;
-    // the unbuilt house dies on its dying sprite, 0 here (it has no destruction sprite)
-    for masters in &mut t.masters {
-        if let Some(m) = masters.get_mut(house_master) {
-            m.death_sprite = Some(SpriteId::named(0));
-        }
-    }
     let house = &t.players[1].objects[ListIndex::new(1)];
     let master = t.masters[1].get(house.life.master_id).unwrap();
     let progress = house.construction.unwrap().progress;
