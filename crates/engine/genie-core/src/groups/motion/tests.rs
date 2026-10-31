@@ -1,4 +1,5 @@
 use super::*;
+use crate::groups::GroupFlags;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::GridSize;
@@ -557,7 +558,7 @@ fn target_at(y: f32) -> Placed {
 fn grouped(flags: u32) -> Lead {
     Lead {
         group: Some(LeadGroup {
-            flags,
+            flags: GroupFlags::from_bits_retain(flags),
             members: vec![object_id(7)],
             ..LeadGroup::default()
         }),

@@ -1,6 +1,7 @@
 //! PATROL, the attack move and their sweep, and the group the splitter keeps.
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -309,7 +310,7 @@ impl World {
                 let _ = split.loose.remove(i);
                 let _ = self.add_to_group(group, id)?;
                 if let Some(g) = self.groups.get_mut(group) {
-                    g.flags |= 0x2_0000;
+                    g.flags |= GroupFlags::JOINED;
                 }
             }
             i += 1;

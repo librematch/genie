@@ -2,6 +2,7 @@
 //! speed, facing, place and own move.
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::SpecificMove;
@@ -219,11 +220,11 @@ impl World {
         id: ObjectId,
         (gap, speed): (f32, f32),
     ) -> Result<(), GenieError> {
-        self.groups.held_mut(group)?.flags |= 0x200;
+        self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
         if at_most_or_unordered(SLOT_REACH, gap) {
             self.set_member_speed(id, Speed::new(speed));
             let _ = self.show_walking(id)?;
-            self.groups.held_mut(group)?.flags |= 0x200;
+            self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
         } else {
             let v = if at_most_or_unordered(CATCH_UP_SPAN, gap) {
                 speed * CATCH_UP

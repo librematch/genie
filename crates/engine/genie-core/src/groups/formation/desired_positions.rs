@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::formation::EPSILON;
 use crate::groups::group_list::NO_FORMATION;
@@ -108,7 +109,7 @@ impl World {
                 kind = FormationKind::COLUMN;
             }
         }
-        if g.flags & 4 != 0 {
+        if g.flags.contains(GroupFlags::LINE) {
             kind = FormationKind::LINE;
         }
         if self.horde_units_only(g)? {

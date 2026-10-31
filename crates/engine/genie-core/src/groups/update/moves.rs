@@ -2,6 +2,7 @@
 //! due orders and the idle timer.
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::command::MOVE_COMMAND;
@@ -82,7 +83,7 @@ impl World {
                                 },
                             )?;
                         }
-                        self.groups.held_mut(group)?.flags |= 0x1000;
+                        self.groups.held_mut(group)?.flags |= GroupFlags::FOLLOWED;
                         return Ok(true);
                     }
                     _ => true,
@@ -143,7 +144,7 @@ impl World {
             .paths
             .first()
             .is_some_and(|l| l.has_path && !l.points.is_empty());
-        let follows = g.flags >> 12 & 1 != 0;
+        let follows = g.flags.contains(GroupFlags::FOLLOWED);
         if g.motion.moving() {
             return self.moving_step(group, follows, relayout);
         }
@@ -157,7 +158,7 @@ impl World {
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
             .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         let mut patrolling = true;
-        if !patrol && g.flags >> 11 & 1 == 0 {
+        if !patrol && !g.flags.contains(GroupFlags::PATROL) {
             patrolling = false;
             let slots = g
                 .current_formation
@@ -250,7 +251,7 @@ impl World {
         patrolling: bool,
     ) -> Result<bool, GenieError> {
         let g = self.groups.held_mut(group)?;
-        g.flags = (g.flags & !4) | 0x20;
+        g.flags = (g.flags & !GroupFlags::LINE) | GroupFlags::MEMBERS_SENT;
         self.move_to_desired_positions(group, MOVE_COMMAND, None)?;
         Ok(!walks && !patrolling)
     }

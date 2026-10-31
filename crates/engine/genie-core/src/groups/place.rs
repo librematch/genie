@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::formation::on_map;
@@ -121,7 +122,7 @@ impl World {
         g.motion.position[0] = at;
         self.set_initial_orientation(group)?;
         let g = self.groups.held_mut(group)?;
-        g.flags |= 0x400;
+        g.flags |= GroupFlags::PLACED;
         Ok(())
     }
 

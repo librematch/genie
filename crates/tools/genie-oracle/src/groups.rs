@@ -6,6 +6,7 @@
 //! with another layout maps into the same state here.
 
 use genie_core::GenieError;
+use genie_core::groups::GroupFlags;
 use genie_core::groups::{
     Formation, FormationKind, FormationLine, GroupCommand, GroupId, GroupOrder, GroupTarget,
     LinePoint, Member, Motion, PointLine, Slot, SlotState, SpecificMove, TargetData, UnitGroup,
@@ -155,7 +156,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
         current_formation: g.current_formation.as_deref().map(formation).transpose()?,
         garbage: g.garbage,
         formation_locked_type: FormationKind::of_field(g.formation_locked_type),
-        flags: g.group_flags_m_bits,
+        flags: GroupFlags::from_bits_retain(g.group_flags_m_bits),
         centroid: vec3(&g.centroid),
         desired_height: g.desired_height,
         largest_unit_radius: g.largest_unit_radius,
@@ -473,6 +474,13 @@ impl Flat for TurnRate {
 impl Flat for BVector {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
+    }
+}
+
+/// A group's flags flatten as their bits, as the save holds them.
+impl Flat for GroupFlags {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.bits().flat(path, out);
     }
 }
 

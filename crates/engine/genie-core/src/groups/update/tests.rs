@@ -1,6 +1,7 @@
 use crate::combat::Charge;
 use crate::combat::attack::AttackState;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::SlotState;
 use crate::groups::{GroupTarget, Member, UnitGroup, UnitGroups};
 use crate::map::Distance;
@@ -187,14 +188,14 @@ fn lost_members_leave_the_group_and_stop() {
             ..Member::default()
         });
     }
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     t.drop_lost_members(group_id(1)).unwrap();
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         g.members.iter().map(|m| m.id).collect::<Vec<_>>(),
         [object_id(10)]
     );
-    assert_eq!(g.flags & 0x1_0000, 0x1_0000);
+    assert_eq!(g.flags & GroupFlags::STATISTICS, GroupFlags::STATISTICS);
     let unit = |t: &World, id: ObjectId| t.object(id).unwrap().1.clone();
     assert_eq!(unit(&t, object_id(10)).group.id, Some(group_id(1)));
     for id in [11, 12, 13] {
@@ -209,7 +210,10 @@ fn lost_members_leave_the_group_and_stop() {
     t.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(f32::NAN);
     t.drop_lost_members(group_id(1)).unwrap();
     assert_eq!(t.groups.get(group_id(1)).unwrap().members.len(), 3);
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags & 0x1_0000, 0);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags & GroupFlags::STATISTICS,
+        GroupFlags::NONE
+    );
 }
 
 /// A hibernating group by its command: without one or on a move it runs its queued commands
@@ -671,7 +675,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
 fn the_formation_turns_past_a_quarter_turn() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.motion.flags = 0;
     g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
     assert!(
@@ -690,13 +694,13 @@ fn the_formation_turns_past_a_quarter_turn() {
         !t.turns_formation(group_id(1), BVector::new(f32::NAN, 0.0, 0.0))
             .unwrap()
     );
-    t.groups.get_mut(group_id(1)).unwrap().flags = 0x4000;
+    t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::RELAYOUT_AT_TURN;
     assert!(
         t.turns_formation(group_id(1), BVector::new(1.0, 0.0, 0.0))
             .unwrap()
     );
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.motion.flags = 2;
     assert!(
         t.turns_formation(group_id(1), BVector::new(1.0, 0.0, 0.0))
@@ -808,28 +812,37 @@ fn the_relayout_follows_the_count_and_the_spacing() {
     let mut t = world();
     let set = |t: &mut World, flags: u32, spacing: f32| {
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.flags = flags;
+        g.flags = GroupFlags::from_bits_retain(flags);
         g.total_spacing = spacing;
     };
     set(&mut t, 0, 6.0);
     assert_eq!(t.relayout_choice(group_id(1), 3).unwrap(), (false, false));
     assert_eq!(t.relayout_choice(group_id(1), 4).unwrap(), (false, false));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0x80);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags,
+        GroupFlags::RELAYOUT_SPREAD
+    );
     set(&mut t, 0, f32::NAN);
     assert_eq!(t.relayout_choice(group_id(1), 4).unwrap(), (false, false));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0x80);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags,
+        GroupFlags::RELAYOUT_SPREAD
+    );
     set(&mut t, 0, 6.5);
     assert_eq!(t.relayout_choice(group_id(1), 4).unwrap(), (true, false));
     set(&mut t, 0x82, 6.5);
     assert_eq!(t.relayout_choice(group_id(1), 3).unwrap(), (true, false));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0);
+    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, GroupFlags::NONE);
     set(&mut t, 0x2, 6.5);
     assert_eq!(t.relayout_choice(group_id(1), 3).unwrap(), (true, false));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0);
+    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, GroupFlags::NONE);
     t.groups.get_mut(group_id(1)).unwrap().motion.velocity = BVector::new(0.0, 0.0, 1.0);
     set(&mut t, 0x2, 6.5);
     assert_eq!(t.relayout_choice(group_id(1), 3).unwrap(), (false, false));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 2);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags,
+        GroupFlags::RELAYOUT
+    );
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = 9;
     g.current_formation = Some(crate::groups::Formation {
@@ -838,7 +851,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
     });
     set(&mut t, 0, 6.0);
     assert_eq!(t.relayout_choice(group_id(1), 4).unwrap(), (false, true));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0);
+    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, GroupFlags::NONE);
 }
 
 /// A follow: its target near where the group's target was keeps the group (flags bit 12);
@@ -852,14 +865,14 @@ fn a_follow_moves_to_its_target_when_it_strays() {
     g.current_command = 2;
     g.current_target.target = GroupTarget::of_saved(20, -1);
     g.current_target.original_position = BVector::new(3.5, 0.0, 4.5);
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     let mut relayout = false;
     // 1 from the target: within half the lead's line of sight (2)
     assert!(t.command_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         (g.flags, g.members[0].seconds_since_attacking),
-        (0x1000, Seconds::ZERO)
+        (GroupFlags::FOLLOWED, Seconds::ZERO)
     );
     t.groups
         .get_mut(group_id(1))
@@ -870,7 +883,7 @@ fn a_follow_moves_to_its_target_when_it_strays() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         (g.flags, g.members[0].seconds_since_attacking),
-        (0x1000, Seconds::MAX)
+        (GroupFlags::FOLLOWED, Seconds::MAX)
     );
     assert_eq!(g.motion.lead, Some(object_id(12)));
     t.groups.get_mut(group_id(1)).unwrap().current_target.target = GroupTarget::of_saved(77, -1);
@@ -892,7 +905,7 @@ fn a_moving_group_s_move_waits_or_follows() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = 1;
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.motion.flags = 2;
     let mut relayout = false;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
@@ -905,7 +918,7 @@ fn a_moving_group_s_move_waits_or_follows() {
     assert!(relayout);
     // a follow's target 20 at (3.5, 3.5) and the top path's end at (3.5, h, 3.5): no change
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.flags = 0x1000;
+    g.flags = GroupFlags::FOLLOWED;
     g.current_target.target = GroupTarget::of_saved(20, -1);
     let mut path = crate::movement::PathData::without_path();
     path.has_path = true;
@@ -932,7 +945,7 @@ fn a_moving_group_s_move_waits_or_follows() {
     assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 2);
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = 1;
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.motion.number_wait_delays = 1;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get_mut(group_id(1)).unwrap();
@@ -951,12 +964,12 @@ fn a_standing_group_s_move_ends_or_goes_on() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = 1;
-    g.flags = 4;
+    g.flags = GroupFlags::LINE;
     g.motion.flags = 0;
     let mut relayout = false;
     assert!(t.move_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!((g.current_command, g.flags), (-1, 0x20));
+    assert_eq!((g.current_command, g.flags), (-1, GroupFlags::MEMBERS_SENT));
     let walked = || {
         let mut path = crate::movement::PathData::without_path();
         path.has_path = true;
@@ -971,7 +984,7 @@ fn a_standing_group_s_move_ends_or_goes_on() {
     // on a patrol (flags bit 11) without a path walked: the command ends, unfinished
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.motion.paths[0].has_path = false;
-    g.flags = 0x800;
+    g.flags = GroupFlags::PATROL;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, -1);
     // every slot in place: its units leave and the command ends
@@ -1274,7 +1287,7 @@ fn an_idle_group_goes() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = -1;
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.current_formation = Some(crate::groups::Formation {
         kind: FormationKind::COLUMN,
         slots: vec![crate::groups::Slot {
@@ -1285,12 +1298,12 @@ fn an_idle_group_goes() {
     });
     assert!(!t.group_update(group_id(1)).unwrap());
     let mut t = world();
-    t.groups.get_mut(group_id(1)).unwrap().flags = 0x40;
+    t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::NO_PATH_UNIT;
     assert!(!t.group_update(group_id(1)).unwrap());
     // every member kept apart: each leaves, then the group has none
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.objects = vec![object_id(10), object_id(11), object_id(12)];
     g.current_command = 1;
     assert!(!t.group_update(group_id(1)).unwrap());
@@ -1443,9 +1456,12 @@ fn the_update_end_stores_a_moved_group_s_new_position() {
     let mut g = UnitGroup::new(group_id(1));
     g.motion.new_position[0] = BVector::new(3.0, 0.0, 4.0);
     g.motion.flags = 3;
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.update_end().unwrap();
-    assert_eq!((g.motion.flags, g.flags & 2), (0, 2));
+    assert_eq!(
+        (g.motion.flags, g.flags & GroupFlags::RELAYOUT),
+        (0, GroupFlags::RELAYOUT)
+    );
     assert_eq!(
         g.stored_positions.points.first().map(|p| p.point),
         Some(BVector::new(3.0, 0.0, 4.0))
@@ -1549,9 +1565,9 @@ fn a_group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     t.groups.groups[0].motion.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(!t.is_idle(group_id(1)));
     t.groups.groups[0].current_command = 1;
-    t.groups.groups[0].flags |= 0x800;
+    t.groups.groups[0].flags |= GroupFlags::PATROL;
     assert!(t.is_idle(group_id(1)));
-    t.groups.groups[0].flags = 0x20;
+    t.groups.groups[0].flags = GroupFlags::MEMBERS_SENT;
     assert!(t.is_idle(group_id(1)));
     assert!(!t.is_idle(group_id(2)));
 }
@@ -1565,11 +1581,14 @@ fn emptying_the_command_queue_wakes_a_hibernating_group() {
     g.hibernating = 1;
     g.clear_command_queue();
     assert_eq!(g.command_queue, Vec::new());
-    assert_eq!((g.hibernating, g.flags), (0, 0x100 | 0x4_c000));
+    assert_eq!(
+        (g.hibernating, g.flags),
+        (0, GroupFlags::from_bits_retain(0x100 | 0x4_c000))
+    );
     let mut g = UnitGroup::new(group_id(1));
     g.hibernating = 2;
     g.clear_command_queue();
-    assert_eq!((g.hibernating, g.flags), (0, 0x100));
+    assert_eq!((g.hibernating, g.flags), (0, GroupFlags::TURN));
 }
 
 /// The long pather's list of a unit in group 1 (whose differentiator groups are 1 and 2) is
@@ -1663,24 +1682,24 @@ fn an_awake_group_without_a_command_places_itself_and_turns_its_formation() {
         assert_eq!((g.motion.lead, g.centroid), (Some(object_id(10)), mean));
         g
     };
-    let g = run(0x100, 3);
-    assert_eq!(g.flags, 0x400);
+    let g = run(GroupFlags::TURN, 3);
+    assert_eq!(g.flags, GroupFlags::PLACED);
     assert_eq!(g.motion.position[1], BVector::new(-1.0, 0.0, 0.0));
     assert_eq!(g.motion.position[0], mean);
-    let g = run(0x100, 1);
-    assert_eq!(g.flags, 0);
+    let g = run(GroupFlags::TURN, 1);
+    assert_eq!(g.flags, GroupFlags::NONE);
     assert_eq!(
         g.motion.position[..2],
         [BVector::ZERO, BVector::new(1.0, 0.0, 0.0)]
     );
-    let g = run(0x4100, 1);
-    assert_eq!(g.flags, 0);
+    let g = run(GroupFlags::TURN | GroupFlags::RELAYOUT_AT_TURN, 1);
+    assert_eq!(g.flags, GroupFlags::NONE);
     assert_eq!(g.motion.position[0], mean);
-    let g = run(0x4_0000, 1);
-    assert_eq!(g.flags, 0);
+    let g = run(GroupFlags::LEAD_TO_TARGET, 1);
+    assert_eq!(g.flags, GroupFlags::NONE);
     assert_eq!(g.motion.position[0], mean);
-    let g = run(0x8000, 1);
-    assert_eq!(g.flags, 0x400);
+    let g = run(GroupFlags::PLACE_AGAIN, 1);
+    assert_eq!(g.flags, GroupFlags::PLACED);
     assert_eq!(g.motion.position[1], BVector::new(-1.0, 0.0, 0.0));
 }
 
@@ -1736,7 +1755,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
         });
         (f, walks)
     };
-    let (f, walks) = run(0, 1);
+    let (f, walks) = run(GroupFlags::NONE, 1);
     let slots: Vec<_> = f
         .slots
         .iter()
@@ -1758,7 +1777,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
             vec![BVector::new(1.0, 0.0, 2.0), BVector::new(5.0, 0.0, 4.0)]
         ]
     );
-    let (f, walks) = run(0x100, 3);
+    let (f, walks) = run(GroupFlags::TURN, 3);
     let ids: Vec<_> = f.slots.iter().map(|s| s.unit_id).collect();
     assert_eq!(
         ids,
@@ -1799,7 +1818,7 @@ fn attacking(t: &mut World) {
         units: vec![object_id(10), object_id(11), object_id(12)],
         ..crate::groups::UnitTypeStatistic::default()
     }];
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.motion.maximum_velocity_forward = Speed::new(1.0);
 }
 
@@ -1915,20 +1934,29 @@ fn an_attack_releases_a_category_in_reach_or_arrived() {
     let mut relayout = false;
     // nothing in reach: not finished, arrived
     assert!(!t.attack_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0x8);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags,
+        GroupFlags::ARRIVED
+    );
     assert!(reasons(&t, 5));
     // arrived: the category is released
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0x8);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags,
+        GroupFlags::ARRIVED
+    );
     assert!(reasons(&t, -1));
     // arrived and on its way: all are sent at the end
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
         m.specific_move.reason = 5;
     }
     t.groups.get_mut(group_id(1)).unwrap().unit_types.clear();
-    t.groups.get_mut(group_id(1)).unwrap().flags = 0x10;
+    t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::ATTACKING;
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags, 0x8);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags,
+        GroupFlags::ARRIVED
+    );
     assert!(reasons(&t, -1));
 }
 
@@ -1974,7 +2002,13 @@ fn an_attack_follows_a_target_that_moved() {
     assert!(!t.attack_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.current_target.target, GroupTarget::Object(object_id(20)));
-    assert_eq!((g.current_command, g.flags & 0x18), (9, 0x10));
+    assert_eq!(
+        (
+            g.current_command,
+            g.flags & (GroupFlags::ARRIVED | GroupFlags::ATTACKING)
+        ),
+        (9, GroupFlags::ATTACKING)
+    );
 }
 
 /// Owner 2's masters: master 4 and a gate (master 5: a building of class 39) and the target 20

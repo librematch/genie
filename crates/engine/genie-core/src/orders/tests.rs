@@ -4,6 +4,7 @@ use crate::construction::build::BuildState;
 use crate::gathering::gather::GatherState;
 use crate::gathering::hunt::HuntState;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -3951,7 +3952,7 @@ fn a_kept_group_takes_the_loose_soldiers_about_it() {
     assert_eq!(split.loose, object_id_list([14, 15]));
     let g = t.groups.get(group_id(5)).unwrap();
     assert!(g.has(object_id(13)));
-    assert_eq!(g.flags & 0x2_0000, 0x2_0000);
+    assert_eq!(g.flags & GroupFlags::JOINED, GroupFlags::JOINED);
     // the unit after one that joins is passed over: 13 joins, 15 slides into its place
     let mut t = soldiers(&units, &[11, 12]);
     t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
@@ -4086,8 +4087,11 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
     let g = &t.groups.groups[0];
     let top = g.motion.paths.last().unwrap();
     assert_eq!(
-        (top.path_flags & PathFlags::LOOPS, g.flags & 0x800),
-        (PathFlags::NONE, 0x800)
+        (
+            top.path_flags & PathFlags::LOOPS,
+            g.flags & GroupFlags::PATROL
+        ),
+        (PathFlags::NONE, GroupFlags::PATROL)
     );
     let mut t = two_patrollers();
     t.patrol(
@@ -4100,8 +4104,11 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
     let g = &t.groups.groups[0];
     let top = g.motion.paths.last().unwrap();
     assert_eq!(
-        (top.path_flags & PathFlags::LOOPS, g.flags & 0x800),
-        (PathFlags::LOOPS, 0)
+        (
+            top.path_flags & PathFlags::LOOPS,
+            g.flags & GroupFlags::PATROL
+        ),
+        (PathFlags::LOOPS, GroupFlags::NONE)
     );
 }
 
@@ -4217,7 +4224,10 @@ fn a_move_of_a_whole_group_keeps_it() {
     let g = t.groups.get(group_id(5)).unwrap();
     assert!(g.has(object_id(13)));
     // the keep sets flags bit 17, which the group's command then clears
-    assert_eq!((g.flags & 0x2_0000, g.differentiator_id), (0, 0));
+    assert_eq!(
+        (g.flags & GroupFlags::JOINED, g.differentiator_id),
+        (GroupFlags::NONE, 0)
+    );
     assert_eq!(t.groups.commands, 1);
     let mut t = kept();
     // with a target the world holds the kept group takes the command on it (a unit of the

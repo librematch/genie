@@ -86,8 +86,8 @@ pub(crate) struct Lead {
 /// What `BMotion` reads of the lead's group.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct LeadGroup {
-    /// `mGroupFlags`: bit 11 marks a patrol.
-    pub(crate) flags: u32,
+    /// `mGroupFlags` ([`GroupFlags::PATROL`] marks a patrol).
+    pub(crate) flags: crate::groups::GroupFlags,
     /// The members (`+0xf0`).
     pub(crate) members: Vec<ObjectId>,
     /// The differentiator groups' members, at most 128 (`FUN_14100bbe0` with `0x80`).
@@ -98,7 +98,7 @@ pub(crate) struct LeadGroup {
 
 impl LeadGroup {
     const fn patrols(&self) -> bool {
-        self.flags & 0x800 != 0
+        self.flags.contains(crate::groups::GroupFlags::PATROL)
     }
 }
 

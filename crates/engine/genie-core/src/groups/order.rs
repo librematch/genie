@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupCommand;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::{ATTACK_COMMANDS, MOVE_COMMAND, MoveTo};
@@ -60,7 +61,7 @@ impl World {
         order: CommandArgs,
     ) -> Result<bool, GenieError> {
         let g = self.groups.held_mut(group)?;
-        g.flags &= !0x20;
+        g.flags &= !GroupFlags::MEMBERS_SENT;
         let target = target.filter(|&t| self.world_object(t).is_some());
         let task = match target {
             Some(t) => self.group_task(group, t, point, order)?,
@@ -105,7 +106,7 @@ impl World {
             self.stop_all_units(group, false)?;
         }
         let g = self.groups.held_mut(group)?;
-        g.flags &= !0x2_0000;
+        g.flags &= !GroupFlags::JOINED;
         Ok(moved)
     }
 

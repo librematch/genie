@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
@@ -121,7 +122,7 @@ impl World {
         let at = self.moved_place_of(main)?;
         let g = self.groups.held(group)?;
         if g.current_target.target == GroupTarget::Object(main)
-            && g.flags & 0x2_0000 == 0
+            && !g.flags.contains(GroupFlags::JOINED)
             && self.members_on_target(g, main)
         {
             self.groups
@@ -171,8 +172,8 @@ impl World {
             return Ok(false);
         }
         g.current_command = 9;
-        g.flags &= !8;
-        g.flags |= 0x10;
+        g.flags &= !GroupFlags::ARRIVED;
+        g.flags |= GroupFlags::ATTACKING;
         Ok(true)
     }
 

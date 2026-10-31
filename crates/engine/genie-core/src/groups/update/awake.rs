@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::UnitGroup;
@@ -48,17 +49,27 @@ impl World {
         } else {
             false
         };
-        if self.groups.held(group)?.flags & 0x4_0000 != 0 {
+        if self
+            .groups
+            .held(group)?
+            .flags
+            .contains(GroupFlags::LEAD_TO_TARGET)
+        {
             self.lead_to_target(group, far)?;
         }
         let g = self.groups.held(group)?;
         if awake_group_ends(g) {
             return Ok(false);
         }
-        if self.any_member_held(group) && g.flags & 0x1_0000 != 0 {
+        if self.any_member_held(group) && g.flags.contains(GroupFlags::STATISTICS) {
             self.group_statistics(group, far)?;
         }
-        if self.groups.held(group)?.flags & 0x40 != 0 {
+        if self
+            .groups
+            .held(group)?
+            .flags
+            .contains(GroupFlags::NO_PATH_UNIT)
+        {
             return Ok(false);
         }
         let lead = self.nearest_to_target(group);
@@ -71,13 +82,15 @@ impl World {
             .current_formation
             .as_ref()
             .is_some_and(|f| f.kind == FormationKind::HORDE);
-        if (g.motion.flags & 2 != 0 && g.flags & 0x400 == 0 && !horde) || g.flags & 0x8000 != 0 {
+        if (g.motion.flags & 2 != 0 && !g.flags.contains(GroupFlags::PLACED) && !horde)
+            || g.flags.contains(GroupFlags::PLACE_AGAIN)
+        {
             self.set_initial_position(group)?;
-            self.groups.held_mut(group)?.flags &= !0x8000;
+            self.groups.held_mut(group)?.flags &= !GroupFlags::PLACE_AGAIN;
         }
         let g = self.groups.held_mut(group)?;
         g.unit_types.retain(|s| !s.units.is_empty());
-        let budget = g.flags & 0x100 == 0;
+        let budget = !g.flags.contains(GroupFlags::TURN);
         let forward = g.motion.position[1];
         self.motion_update(group, budget)?;
         self.after_motion(group, far, forward)
@@ -100,7 +113,7 @@ impl World {
         if g.objects.len() as u32 == g.members.len() as u32
             && !self.target_pending(group)?
             && !patrol
-            && g.flags >> 11 & 1 == 0
+            && !g.flags.contains(GroupFlags::PATROL)
         {
             while let Some(&id) = self.groups.held(group)?.objects.first() {
                 if !self.remove_unit(group, id, None, false)? {
@@ -133,7 +146,7 @@ impl World {
             g.motion.new_position[0] = g.centroid;
             g.motion.position[0] = g.centroid;
         }
-        self.groups.held_mut(group)?.flags &= !0x4_0000;
+        self.groups.held_mut(group)?.flags &= !GroupFlags::LEAD_TO_TARGET;
         Ok(())
     }
 
@@ -165,14 +178,19 @@ impl World {
         far: bool,
         forward: BVector,
     ) -> Result<bool, GenieError> {
-        if self.groups.held(group)?.flags & 0x100 != 0 {
+        if self.groups.held(group)?.flags.contains(GroupFlags::TURN) {
             self.turn_formation(group, forward)?;
         }
         let count = self.groups.held(group)?.members.len();
-        if self.groups.held(group)?.flags & 0x1_0000 == 0 {
+        if !self
+            .groups
+            .held(group)?
+            .flags
+            .contains(GroupFlags::STATISTICS)
+        {
             self.group_statistics(group, far)?;
         }
-        self.groups.held_mut(group)?.flags &= !0x1_0000;
+        self.groups.held_mut(group)?.flags &= !GroupFlags::STATISTICS;
         // DAT_143f15860 (0x14103e3a5..0x14103e442), which only the members' moves read
         let g = self.groups.held(group)?;
         let differentiators = self.groups.differentiator_units(g, DIFFERENTIATORS);
@@ -207,7 +225,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let g = self.groups.held_mut(group)?;
         if g.hibernating == 0 {
-            g.flags &= !0x200;
+            g.flags &= !GroupFlags::CATCHING_UP;
             if g.current_formation
                 .as_ref()
                 .is_some_and(|f| !f.slots.is_empty())
@@ -262,7 +280,7 @@ impl World {
                 self.groups.held_mut(group)?.current_formation = Some(f);
                 placed?;
             }
-            self.groups.held_mut(group)?.flags &= !0x4000;
+            self.groups.held_mut(group)?.flags &= !GroupFlags::RELAYOUT_AT_TURN;
         }
         self.groups.held_mut(group)?.motion.drop_to_high_level()?;
         self.motion_update(group, true)?;
@@ -271,7 +289,7 @@ impl World {
             self.groups.held_mut(group)?.current_formation = Some(f);
             let _ = moved?;
         }
-        self.groups.held_mut(group)?.flags &= !0x100;
+        self.groups.held_mut(group)?.flags &= !GroupFlags::TURN;
         Ok(())
     }
 
@@ -285,7 +303,9 @@ impl World {
     ) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
         let turn = crate::math::fmath::angle_between(g.motion.position[1], forward).abs();
-        Ok(TURN_LIMIT < turn || g.motion.flags & 2 != 0 || g.flags & 0x4000 != 0)
+        Ok(TURN_LIMIT < turn
+            || g.motion.flags & 2 != 0
+            || g.flags.contains(GroupFlags::RELAYOUT_AT_TURN))
     }
 
     /// `movePositionToFrontUsingCentroid` (inline at `0x14103e199`, its log aside): the group's
@@ -396,17 +416,17 @@ impl World {
             {
                 refill = true;
             } else if crate::math::fmath::at_most_or_unordered(g.total_spacing, RELAYOUT_SPACING) {
-                g.flags |= 0x80;
+                g.flags |= GroupFlags::RELAYOUT_SPREAD;
             } else {
                 relayout = true;
             }
         }
-        if g.flags & 0x80 != 0 && RELAYOUT_SPACING < g.total_spacing {
+        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD) && RELAYOUT_SPACING < g.total_spacing {
             relayout = true;
-            g.flags &= !0x82;
+            g.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
         }
-        if g.flags & 2 != 0 && RELAYOUT_SPACING < g.total_spacing && idle {
-            g.flags &= !2;
+        if g.flags.contains(GroupFlags::RELAYOUT) && RELAYOUT_SPACING < g.total_spacing && idle {
+            g.flags &= !GroupFlags::RELAYOUT;
             relayout = true;
         }
         Ok((relayout, refill))

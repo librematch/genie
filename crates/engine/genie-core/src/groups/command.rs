@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::CommandArgs;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::attack::AttackOrder;
 use crate::groups::group_list::member_gone;
@@ -86,7 +87,7 @@ impl UnitGroup {
     /// since attacking are `f32::MAX`; the waypoints (`+0x398`, count `+0x3a0`) take (`x`, the
     /// desired height, `z`). The array's growth (5, then twice) fails only without memory.
     pub fn add_waypoint(&mut self, x: f32, z: f32, forget_target: bool) {
-        self.flags &= !0x20;
+        self.flags &= !GroupFlags::MEMBERS_SENT;
         if forget_target {
             let t = &mut self.current_target;
             t.target = GroupTarget::None;
@@ -233,7 +234,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         let world_time = self.world_time;
         let g = self.groups.held_mut(group)?;
-        g.flags &= !0x1020;
+        g.flags &= !(GroupFlags::MEMBERS_SENT | GroupFlags::FOLLOWED);
         // the game compares the two integers: a target of none changes a group with one
         let changed = target != g.current_target.target.key();
         if let Some(done) = self.queue_move(group, point, &how)? {
@@ -302,7 +303,7 @@ impl World {
             )?;
         }
         let g = self.groups.held_mut(group)?;
-        g.flags |= 0x100;
+        g.flags |= GroupFlags::TURN;
         Ok(true)
     }
 
@@ -321,9 +322,9 @@ impl World {
         // FUN_141046500: the top ancestor's path, else the walked level's
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
             .is_some_and(|l| l.path_flags.contains(PathFlags::LOOPS))
-            || g.flags & 0x800 != 0;
+            || g.flags.contains(GroupFlags::PATROL);
         if (!how.hold && !how.leg && patrol) || changed {
-            g.flags |= 0xc000;
+            g.flags |= GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN;
         }
         // the top speed below the tolerance (`COMISS`/`JA` at 0x141010cc3)
         if g.motion.maximum_velocity_forward < Speed::new(EPSILON) {
@@ -342,16 +343,16 @@ impl World {
         // again
         if how.hold {
             path_flags &= !PathFlags::LOOPS;
-            g.flags |= 0x800;
+            g.flags |= GroupFlags::PATROL;
         } else {
-            g.flags &= !0x800;
+            g.flags &= !GroupFlags::PATROL;
         }
         path.measure();
         let path = (2 <= path.points.len()
             && crate::math::fmath::below_or_unordered(EPSILON, path.length.get()))
         .then_some(path);
         if path.is_none() {
-            g.flags &= !0x800;
+            g.flags &= !GroupFlags::PATROL;
         }
         // FUN_140f98e80: the level and its parents go, its repath time stays
         let repath_time = g.motion.paths.first().map_or(0.0, |l| l.repath_time);
@@ -395,7 +396,9 @@ impl World {
         let g = self.groups.held_mut(group)?;
         if g.hibernating != 0 {
             if g.hibernating == 1 {
-                g.flags |= 0x4_c000;
+                g.flags |= GroupFlags::RELAYOUT_AT_TURN
+                    | GroupFlags::PLACE_AGAIN
+                    | GroupFlags::LEAD_TO_TARGET;
             }
             g.hibernating = 0;
         }
@@ -794,7 +797,9 @@ mod tests {
         t.groups.get_mut(group_id(1)).unwrap().hibernating = 1;
         t.check_queued_orders(group_id(1)).unwrap();
         let g = t.groups.get(group_id(1)).unwrap();
-        assert_eq!((g.hibernating, g.flags & 0x4_c000), (0, 0x4_c000));
+        let marked =
+            GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN | GroupFlags::LEAD_TO_TARGET;
+        assert_eq!((g.hibernating, g.flags.contains(marked)), (0, true));
     }
 
     /// A move without `direct` behind queued commands joins them unapproved; the approved ones
@@ -837,10 +842,10 @@ mod tests {
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(
             (
-                g.flags & 0x800,
+                g.flags & GroupFlags::PATROL,
                 g.motion.paths[0].path_flags & PathFlags::LOOPS
             ),
-            (0x800, PathFlags::NONE)
+            (GroupFlags::PATROL, PathFlags::NONE)
         );
         let mut t = moving_world();
         let mut walked = PathData::without_path();
@@ -859,7 +864,10 @@ mod tests {
                 .unwrap()
         );
         let g = t.groups.get(group_id(1)).unwrap();
-        assert_eq!(g.flags & 0xc000, 0xc000);
+        assert!(
+            g.flags
+                .contains(GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN)
+        );
         let ai = t.players[1].sleeping[ListIndex::new(0)]
             .ai
             .as_ref()
@@ -895,12 +903,12 @@ mod tests {
             (Point::new(f32::NAN, 0.0), 7),
         ] {
             let mut t = moving_world();
-            t.groups.get_mut(group_id(1)).unwrap().flags = 0x800;
+            t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::PATROL;
             assert!(t.command_move_to(group_id(1), None, point, leg).unwrap());
             let g = t.groups.get(group_id(1)).unwrap();
             assert_eq!(
-                (g.motion.paths[0].path_flags, g.flags & 0x800),
-                (PathFlags::from_bits_retain(flags), 0),
+                (g.motion.paths[0].path_flags, g.flags & GroupFlags::PATROL),
+                (PathFlags::from_bits_retain(flags), GroupFlags::NONE),
                 "{point:?}"
             );
         }
@@ -914,6 +922,10 @@ mod tests {
             t.command_move_to(group_id(1), None, Point::new(8.0, 0.0), leg)
                 .unwrap()
         );
-        assert_eq!(t.groups.get(group_id(1)).unwrap().flags & 0xc000, 0);
+        assert_eq!(
+            t.groups.get(group_id(1)).unwrap().flags
+                & (GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN),
+            GroupFlags::NONE
+        );
     }
 }

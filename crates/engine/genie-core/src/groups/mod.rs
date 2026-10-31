@@ -29,12 +29,14 @@ use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
 
 mod formation_kind;
+mod group_flags;
 mod group_id;
 mod group_list;
 mod objects;
 mod slot_state;
 
 pub use self::formation_kind::FormationKind;
+pub use self::group_flags::GroupFlags;
 pub use self::group_id::GroupId;
 pub use self::group_list::{GroupLink, UnitGroups, common_group};
 pub(crate) use self::objects::WorldObject;
@@ -371,7 +373,7 @@ pub struct UnitGroup {
     /// `mFormationLockedType`: none for the constructor's −1; a horde (0) is no lock either.
     pub formation_locked_type: Option<FormationKind>,
     /// `mGroupFlags`.
-    pub flags: u32,
+    pub flags: GroupFlags,
     /// `mCentroid`.
     pub centroid: BVector,
     /// `mDesiredHeight`.
@@ -500,7 +502,7 @@ impl UnitGroup {
             id,
             owner: u32::MAX,
             stance: None,
-            flags: 0x100,
+            flags: GroupFlags::TURN,
             current_command: -1,
             current_target: TargetData::default(),
             differentiator_id: -1,
@@ -516,7 +518,9 @@ impl UnitGroup {
         self.command_queue.clear();
         if self.hibernating != 0 {
             if self.hibernating == 1 {
-                self.flags |= 0x4_c000;
+                self.flags |= GroupFlags::RELAYOUT_AT_TURN
+                    | GroupFlags::PLACE_AGAIN
+                    | GroupFlags::LEAD_TO_TARGET;
             }
             self.hibernating = 0;
         }

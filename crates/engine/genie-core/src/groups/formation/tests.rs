@@ -1,5 +1,6 @@
 use super::*;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -1007,7 +1008,7 @@ fn a_lock_or_a_given_type_overrides_the_groups_own_choice() {
         level(&[BVector::ZERO, BVector::new(30.0, 0.0, 0.0)], 1, 0),
     ];
     let mut t = type_world(far);
-    t.groups.groups[0].flags |= 4;
+    t.groups.groups[0].flags |= GroupFlags::LINE;
     assert_eq!(own(&t), FormationKind::LINE);
     t.masters[1] = crate::objects::masters::Masters::new([crate::objects::masters::Master {
         id: master_id(4),

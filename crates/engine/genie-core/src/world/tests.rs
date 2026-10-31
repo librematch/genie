@@ -22,6 +22,7 @@ use crate::gathering::gather::GatherState;
 use crate::gathering::gather::unit::give_load;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::make::MakeState;
+use crate::groups::GroupFlags;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -14561,7 +14562,7 @@ fn a_helper_in_a_group_answers_only_while_its_group_patrols() {
     let groups = crate::groups::UnitGroups {
         groups: vec![
             crate::groups::UnitGroup {
-                flags: 0x800,
+                flags: GroupFlags::PATROL,
                 ..crate::groups::UnitGroup::new(group_id(7))
             },
             crate::groups::UnitGroup::new(group_id(8)),

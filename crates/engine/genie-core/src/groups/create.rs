@@ -2,6 +2,7 @@
 //! (`FUN_141008d90`, `FUN_1410116c0`) and a unit's radius in a formation (`FUN_141025920`).
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
@@ -234,7 +235,7 @@ impl World {
             let lead = self.nearest_to_target(group);
             self.groups.held_mut(group)?.motion.lead = lead;
         }
-        self.groups.held_mut(group)?.flags |= 0x1_0002;
+        self.groups.held_mut(group)?.flags |= GroupFlags::STATISTICS | GroupFlags::RELAYOUT;
         Ok(true)
     }
 }
@@ -415,9 +416,9 @@ impl World {
         if g.desired_spacing < spacing.get() {
             g.desired_spacing = spacing.get();
         }
-        g.flags |= 2;
+        g.flags |= GroupFlags::RELAYOUT;
         if g.motion.flags & 2 == 0 {
-            g.flags |= 0x1_0002;
+            g.flags |= GroupFlags::STATISTICS | GroupFlags::RELAYOUT;
         }
         self.groups.unit_types_scratch = scratch;
         Ok(true)
@@ -427,6 +428,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use crate::groups::FormationKind;
+    use crate::groups::GroupFlags;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
     use crate::map::Footprint;
     use crate::map::GridSize;
@@ -663,8 +665,12 @@ mod tests {
         );
         assert_eq!(g.unit_types[1].units, [object_id(12)]);
         assert_eq!(
-            (g.motion.lead, g.flags & 0x1_0002),
-            (Some(object_id(10)), 0x1_0002)
+            (
+                g.motion.lead,
+                g.flags
+                    .contains(GroupFlags::RELAYOUT | GroupFlags::STATISTICS)
+            ),
+            (Some(object_id(10)), true)
         );
         let u = &t.players[1].objects[ListIndex::new(1)];
         assert_eq!(u.group.id, None);
@@ -708,11 +714,11 @@ mod tests {
         t.spatial.unit_diplomacy =
             crate::players::ByPlayer::new(vec![relations([1, 2]), relations([0, 1])]);
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.flags |= 2;
+        g.flags |= GroupFlags::RELAYOUT;
         g.motion.flags &= !2;
         assert!(!t.statistics_only(group_id(1), false).unwrap());
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.flags &= !2;
+        g.flags &= !GroupFlags::RELAYOUT;
         g.motion.flags |= 2;
         assert!(t.statistics_only(group_id(1), false).unwrap());
     }

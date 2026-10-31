@@ -3,6 +3,7 @@
 //! returns 0 (the world list's unlink, then `BUnitGroup`'s destructor, `FUN_140fe1920`).
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::UnitGroup;
 use crate::movement::PathFlags;
 use crate::objects::masters::ActionType;
@@ -79,7 +80,7 @@ impl UnitGroup {
     /// waits to move; else idle.
     #[must_use]
     pub fn is_idle(&self) -> bool {
-        if self.flags >> 5 & 1 != 0 {
+        if self.flags.contains(GroupFlags::MEMBERS_SENT) {
             return true;
         }
         if self.current_command == 1 && self.patrols() {
@@ -94,7 +95,7 @@ impl UnitGroup {
     pub fn patrols(&self) -> bool {
         crate::groups::formation::top_path(&self.motion.paths)
             .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS))
-            || self.flags >> 11 & 1 != 0
+            || self.flags.contains(GroupFlags::PATROL)
     }
 
     /// The group's vtable slot 8 after its update (`BUnitGroup::updateEnd`, `FUN_141040b50`): a
@@ -116,7 +117,7 @@ impl UnitGroup {
         g.motion.flags &= !1;
         if flags & 2 != 0 {
             g.motion.flags &= !3;
-            g.flags |= 2;
+            g.flags |= GroupFlags::RELAYOUT;
         }
         Ok(())
     }

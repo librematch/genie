@@ -2,6 +2,7 @@
 //! the group's current command is an attack (9).
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::MoveTo;
@@ -21,9 +22,6 @@ use crate::world::World;
 
 /// The formation categories a group keeps its units by, which the update walks in order.
 const CATEGORIES: std::ops::RangeInclusive<i32> = 0..=5;
-/// The group's flags: bit 3 (the group has arrived) and bit 4 (it is on its way to attack).
-const ARRIVED: u32 = 8;
-const ATTACKING: u32 = 0x10;
 
 impl World {
     /// `FUN_14103f4e0` of group `group`: the attack command's update. True when the command is
@@ -204,7 +202,7 @@ impl World {
             else {
                 continue;
             };
-            let releases = if self.groups.held(group)?.flags & ARRIVED != 0 {
+            let releases = if self.groups.held(group)?.flags.contains(GroupFlags::ARRIVED) {
                 true
             } else {
                 let in_reach = self.category_in_reach(&units, range, target)?;
@@ -214,7 +212,7 @@ impl World {
             if releases {
                 let g = self.groups.held_mut(group)?;
                 g.motion.stop_walk()?;
-                g.flags &= !ATTACKING;
+                g.flags &= !GroupFlags::ATTACKING;
                 self.release_units(group, &units, target)?;
             }
         }
@@ -341,8 +339,8 @@ impl World {
         )?;
         let g = self.groups.held_mut(group)?;
         g.current_command = ATTACK;
-        g.flags &= !ARRIVED;
-        g.flags |= ATTACKING;
+        g.flags &= !GroupFlags::ARRIVED;
+        g.flags |= GroupFlags::ATTACKING;
         Ok(Some(false))
     }
 
@@ -373,21 +371,21 @@ impl World {
         if g.motion.moving() {
             *relayout = true;
         } else if !g.motion.waits_to_move() {
-            g.flags |= ARRIVED;
+            g.flags |= GroupFlags::ARRIVED;
         }
         if point_gap(at, radius, g.motion.position[0].ground()) <= g.current_target.range.get() {
             g.motion.stop_walk()?;
-            g.flags |= ARRIVED;
+            g.flags |= GroupFlags::ARRIVED;
         }
         let flags = g.flags;
-        if flags & ARRIVED == 0 || flags & ATTACKING == 0 {
+        if !flags.contains(GroupFlags::ARRIVED) || !flags.contains(GroupFlags::ATTACKING) {
             return Ok(if self.any_member_held(group) {
                 finished
             } else {
                 true
             });
         }
-        g.flags &= !ATTACKING;
+        g.flags &= !GroupFlags::ATTACKING;
         let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
         self.release_units(group, &members, target)?;
         Ok(true)

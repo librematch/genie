@@ -1,6 +1,7 @@
 //! The members' moves to their slots, a free member's stop, the line test and a member's
 //! steering toward its slot (`FUN_141025fb0`).
 
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::SpecificMove;
@@ -309,7 +310,7 @@ impl World {
             // A member's own move for being moved aside (`mReason`).
             let _ = self.set_specific_move(group, id, (-1, ASIDE), (at, ASIDE_TIMER, 0.0))?;
             self.stop_member(id)?;
-            self.groups.held_mut(group)?.flags |= 0x200;
+            self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
             return Ok(());
         }
         if !self.member_idle(id)? {

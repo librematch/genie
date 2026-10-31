@@ -1,4 +1,5 @@
 use super::*;
+use crate::groups::GroupFlags;
 use crate::groups::SlotState;
 use crate::groups::{Formation, Member, Slot, UnitGroup, UnitGroups};
 use crate::map::Footprint;
@@ -135,7 +136,7 @@ fn world() -> World {
     );
     let mut g = UnitGroup::new(group_id(1));
     g.owner = 1;
-    g.flags = 0;
+    g.flags = GroupFlags::NONE;
     g.motion.maximum_velocity_forward = Speed::new(0.9);
     g.members = [10, 11]
         .map(|id| Member {
@@ -317,7 +318,7 @@ fn a_member_in_place_or_failing_too_often() {
         )
     );
     assert_eq!(own.consecutive_move_failures, 11);
-    assert_eq!(g.flags & 0x200, 0x200);
+    assert_eq!(g.flags & GroupFlags::CATCHING_UP, GroupFlags::CATCHING_UP);
     assert_eq!(mover(&t, 10).animated.speed, 0.0);
     assert_eq!(
         unit(&t, 10).ai.as_ref().unwrap().state_position,
@@ -385,7 +386,10 @@ fn a_far_member_turns_and_walks_to_its_slot() {
     assert!(0.99 < m.forward.x());
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.8);
     assert_eq!(m.stats.speed, Speed::new(WALKING));
-    assert_eq!(t.groups.get(group_id(1)).unwrap().flags & 0x200, 0x200);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().flags & GroupFlags::CATCHING_UP,
+        GroupFlags::CATCHING_UP
+    );
     assert_eq!(state(&t, 0), SlotState::Steering);
     assert_eq!(
         unit(&t, 10).ai.as_ref().unwrap().state_position,
@@ -425,8 +429,8 @@ fn a_near_member_catches_up_or_takes_the_group_s_speed() {
         assert_eq!(m.velocity.unwrap().velocity.y(), v, "{gap}");
         assert_eq!(m.stats.speed, Speed::new(shown), "{gap}");
         assert_eq!(
-            t.groups.get(group_id(1)).unwrap().flags & 0x200,
-            flags,
+            t.groups.get(group_id(1)).unwrap().flags & GroupFlags::CATCHING_UP,
+            GroupFlags::from_bits_retain(flags),
             "{gap}"
         );
     }

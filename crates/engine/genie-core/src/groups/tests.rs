@@ -226,7 +226,7 @@ fn a_new_group_holds_the_constructor_s_values() {
     assert_eq!((g.id, g.owner, g.stance), (group_id(7), u32::MAX, None));
     assert_eq!(
         (g.flags, g.current_command, g.differentiator_id),
-        (0x100, -1, -1)
+        (GroupFlags::TURN, -1, -1)
     );
     assert_eq!(g.current_target.target, GroupTarget::None);
     assert_eq!(
@@ -681,7 +681,13 @@ fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
         }
     );
     assert_eq!(g.current_command, 9);
-    assert_eq!((g.flags & 8, g.flags & 0x10), (0, 0x10));
+    assert_eq!(
+        (
+            g.flags & GroupFlags::ARRIVED,
+            g.flags & GroupFlags::ATTACKING
+        ),
+        (GroupFlags::NONE, GroupFlags::ATTACKING)
+    );
     assert!(
         g.members
             .iter()
@@ -712,7 +718,7 @@ fn a_group_already_on_its_target_only_notes_the_place() {
             .original_position,
         BVector::new(41.0, 0.0, 45.0)
     );
-    t.groups.get_mut(group_id(1)).unwrap().flags |= 0x2_0000;
+    t.groups.get_mut(group_id(1)).unwrap().flags |= GroupFlags::JOINED;
     assert!(
         t.command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap()
@@ -1073,7 +1079,7 @@ fn a_group_ordered_on_an_enemy_building_runs_the_attack_path() {
         (g.current_command, g.current_target.target),
         (9, GroupTarget::Object(object_id(60)))
     );
-    assert_eq!(g.flags & 0x2_0000, 0);
+    assert_eq!(g.flags & GroupFlags::JOINED, GroupFlags::NONE);
 }
 
 /// `FUN_14100efd0`: a member whose task on the building is action 5 gives the general command: the

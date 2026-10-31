@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationKind;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::attack::moved_place;
 use crate::groups::create::FormationUnit;
@@ -126,7 +127,7 @@ impl World {
         g.total_spacing = largest + g.total_spacing + largest + g.total_spacing;
         g.stored_positions.desired_length =
             Distance::new(g.members.len() as f32 * (largest + largest));
-        if g.flags >> 9 & 1 != 0 {
+        if g.flags.contains(GroupFlags::CATCHING_UP) {
             slowest /= SLOW_GROUP_FACTOR;
         }
         g.motion.maximum_velocity_forward = Speed::new(slowest);
@@ -424,7 +425,7 @@ impl World {
         let g = self.groups.held(group)?;
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
             .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
-        if patrol || g.flags >> 11 & 1 != 0 {
+        if patrol || g.flags.contains(GroupFlags::PATROL) {
             return Ok(false);
         }
         let (p, u) = self.object(view.id).ok_or_else(|| member_gone(view.id))?;
@@ -907,7 +908,7 @@ mod tests {
             t.players[1].objects[ListIndex::new(0)].group.id = Some(group_id(1));
             t.players[1].objects.push(stray);
             let g = t.groups.get_mut(group_id(1)).unwrap();
-            g.flags = 0;
+            g.flags = GroupFlags::NONE;
             g.members = order
                 .map(|id| Member {
                     id: object_id(id),
@@ -972,7 +973,7 @@ mod tests {
         let _ = t.statistics_only(group_id(1), false).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
         let mut t = world(1.0, [11, 10]);
-        t.groups.get_mut(group_id(1)).unwrap().flags = 0x800;
+        t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::PATROL;
         let _ = t.statistics_only(group_id(1), true).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
         let mut t = world(1.0, [11, 10]);

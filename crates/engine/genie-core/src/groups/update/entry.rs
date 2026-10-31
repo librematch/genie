@@ -2,6 +2,7 @@
 //! check and a hibernating group.
 
 use crate::GenieError;
+use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::WorldObject;
 use crate::groups::command::MOVE_COMMAND;
@@ -124,7 +125,7 @@ impl World {
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
     pub fn group_update(&mut self, group: GroupId) -> Result<bool, GenieError> {
-        self.groups.held_mut(group)?.flags &= !0x2000;
+        self.groups.held_mut(group)?.flags &= !GroupFlags::UPDATE_CLEARED;
         self.keep_apart(group)?;
         self.drop_lost_members(group)?;
         if self.groups.held(group)?.hibernating != 0 {
@@ -168,7 +169,7 @@ impl World {
             i += 1;
         }
         if removed {
-            self.groups.held_mut(group)?.flags |= 0x1_0000;
+            self.groups.held_mut(group)?.flags |= GroupFlags::STATISTICS;
         }
         Ok(())
     }
