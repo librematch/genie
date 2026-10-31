@@ -13,7 +13,7 @@ use crate::map::Point;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
 use crate::movement::CONTINUE;
-use crate::movement::NEW_PATH_FLAGS;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
 use crate::movement::{
@@ -148,7 +148,7 @@ fn take_turn(
         .paths
         .last()
         .filter(|t| t.has_path)
-        .map(|t| t.path_flags & 1 != 0);
+        .map(|t| t.path_flags.contains(PathFlags::LOOPS));
     let lead_group = lead.group.as_ref();
     let spends = top_loops.is_none_or(|loops| !loops && lead_group.is_some_and(|g| !g.patrols()));
     if spends {
@@ -396,7 +396,7 @@ pub(super) fn link(
             if level.continue_counter < LAST_TRIES {
                 if level.points.len() as i32 - 1 <= level.waypoint {
                     let patrols = lead.group.as_ref().is_some_and(LeadGroup::patrols);
-                    if level.path_flags & 1 != 0 || patrols {
+                    if level.path_flags.contains(PathFlags::LOOPS) || patrols {
                         motion.paths.checked_mut(0)?.pause_time = PATROL_PAUSE;
                         return Ok(Some(Pass::Done(false)));
                     }
@@ -417,7 +417,7 @@ pub(super) fn link(
             motion.stand();
             return Ok(Some(Pass::Done(false)));
         }
-        if level.path_flags & 1 == 0 {
+        if !level.path_flags.contains(PathFlags::LOOPS) {
             motion.stand();
             reset_level(&mut motion.paths)?;
             return Ok(Some(Pass::Done(true)));
@@ -433,7 +433,7 @@ pub(super) fn link(
     let new = PathData {
         points: path.points,
         has_path: true,
-        path_flags: NEW_PATH_FLAGS,
+        path_flags: PathFlags::NEW,
         length: path.length,
         created: now,
         range,

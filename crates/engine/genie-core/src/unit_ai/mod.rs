@@ -423,7 +423,7 @@ pub struct PatrolPath {
     /// The points (x, height, y) and the length.
     pub path: crate::pathing::tile_path::Path,
     /// The path's flags.
-    pub flags: u32,
+    pub flags: crate::movement::PathFlags,
 }
 
 /// The unit-AI fields the idle update reads and writes, with their offsets in 158041.

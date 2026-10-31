@@ -46,8 +46,10 @@ mod long_walk;
 pub mod move_to;
 mod new_path;
 mod path_end;
+mod path_flags;
 mod path_points;
 mod path_state;
+pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;
 mod request;
 mod request_plans;
@@ -140,7 +142,7 @@ pub struct PathData {
     /// it.
     pub has_path: bool,
     /// The path's own flags (`+0xc`).
-    pub path_flags: u32,
+    pub path_flags: PathFlags,
     /// `+0x24`: the index of the waypoint the unit walks to.
     pub waypoint: i32,
     /// `+0x28`: its state.
@@ -151,9 +153,8 @@ pub struct PathData {
     pub target: Option<ObjectId>,
     /// `+0x34`, in seconds.
     pub pause_time: Seconds,
-    /// `+0x3c`: bit 0 a waypoint was reached, bit 1 it was the waypoint itself, bit 3 the tile
-    /// pathfinder found only the nearest point.
-    pub flags: u32,
+    /// `+0x3c`: what the walk met on this level ([`LevelFlags`]).
+    pub flags: LevelFlags,
     /// The path's length (its `+4`, `mPathLengthValue`).
     pub length: Distance,
     /// The path's creation time (its `+8`, `mCreationTimeValue`): the world's time when it was
@@ -399,8 +400,6 @@ const ANNEX_GAP: f32 = crate::math::image::movement::RANGE_FLOOR;
 /// A path level's plans before it gives up and the plans it may still try (`FUN_140f8f670`,
 /// `FUN_140f9b800`, `FUN_140f98e80`).
 pub(crate) const CONTINUE: i32 = 10;
-/// A new path's flags (`FUN_14152eea0`'s construction).
-pub(crate) const NEW_PATH_FLAGS: u32 = 6;
 /// A group member's own move's reason (`mReason`, slot 0x5e0, `FUN_141017590`): moved aside
 /// (`NO_OWN_MOVE` is none).
 pub(crate) const ASIDE: i32 = 2;
@@ -412,6 +411,36 @@ const NEW_PATHER_RADIUS: f32 = crate::math::image::movement::NEW_PATHER_RADIUS;
 const INCLUDED: usize = 0x100;
 
 impl PathData {
+    /// `FUN_140f98bc0` with 1 on the level's path: the waypoint after `index`. A path that does
+    /// not loop ([`PathFlags::LOOPS`]) has none (−1); a loop goes on to its next point, or 0 past
+    /// its last; a path that goes back and forth ([`PathFlags::BACK_AND_FORTH`]) turns at its
+    /// ends: at its first point it goes forward again ([`PathFlags::FORWARD`] set), at its last
+    /// back (cleared). The units' and the groups' walks both take it.
+    pub(crate) fn looping_next(&mut self, index: i32) -> i32 {
+        let n = self.points.len() as i32;
+        if !self.path_flags.contains(PathFlags::LOOPS) {
+            return -1;
+        }
+        if !self.path_flags.contains(PathFlags::BACK_AND_FORTH) {
+            return if index + 1 < n { index + 1 } else { 0 };
+        }
+        if self.path_flags.contains(PathFlags::FORWARD) {
+            let next = index + 1;
+            if n <= next {
+                self.path_flags.remove(PathFlags::FORWARD);
+                return n - 2;
+            }
+            next
+        } else {
+            let next = index - 1;
+            if next < 0 {
+                self.path_flags.insert(PathFlags::FORWARD);
+                return 1;
+            }
+            next
+        }
+    }
+
     /// Whether the level's target is object `id`, as the walk tests a hit (`0 <= target &&
     /// id == target`): a recyclable object's id is no level's target there.
     pub(crate) fn targets(&self, id: ObjectId) -> bool {
@@ -425,13 +454,13 @@ impl PathData {
             linked_type: 0,
             points: Vec::new(),
             has_path: true,
-            path_flags: 6,
+            path_flags: PathFlags::NEW,
             waypoint: 0,
             state: PathState::Idle,
             range: Distance::ZERO,
             target: None,
             pause_time: Seconds::ZERO,
-            flags: 0,
+            flags: LevelFlags::NONE,
             length: Distance::ZERO,
             created: now,
             continue_counter: CONTINUE,
@@ -450,13 +479,13 @@ impl PathData {
             linked_type: 0,
             points: Vec::new(),
             has_path: false,
-            path_flags: 0,
+            path_flags: PathFlags::NONE,
             waypoint: 0,
             state: PathState::Idle,
             range: Distance::ZERO,
             target: None,
             pause_time: Seconds::ZERO,
-            flags: 0,
+            flags: LevelFlags::NONE,
             length: Distance::ZERO,
             created: WorldTime::ZERO,
             continue_counter: CONTINUE,
@@ -534,35 +563,6 @@ pub(crate) fn gate_gap(
         }
     }
     gap.get()
-}
-
-/// `FUN_140f98bc0` with 1 on a level's path: the waypoint after `index`. A path that does not
-/// loop (flags bit 0) has none (-1); a loop goes on to its next point, or 0 past its last; a path
-/// that goes back and forth (bit 1) turns at its ends, bit 2 the way back, which the turn sets
-/// or clears.
-const fn looping_next(level: &mut PathData, index: i32) -> i32 {
-    let n = level.points.len() as i32;
-    if level.path_flags & 1 == 0 {
-        return -1;
-    }
-    if level.path_flags & 2 == 0 {
-        return if index + 1 < n { index + 1 } else { 0 };
-    }
-    if level.path_flags & 4 == 0 {
-        let next = index - 1;
-        if next < 0 {
-            level.path_flags |= 4;
-            return 1;
-        }
-        next
-    } else {
-        let next = index + 1;
-        if n <= next {
-            level.path_flags &= !4;
-            return n - 2;
-        }
-        next
-    }
 }
 
 /// [`Mover::avoid`]'s rank for the pause of a walker (`me` of `player`, a `computer`'s or not)

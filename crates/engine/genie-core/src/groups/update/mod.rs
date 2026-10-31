@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::groups::UnitGroup;
+use crate::movement::PathFlags;
 use crate::objects::masters::ActionType;
 use crate::world::Millis;
 
@@ -92,7 +93,7 @@ impl UnitGroup {
     #[must_use]
     pub fn patrols(&self) -> bool {
         crate::groups::formation::top_path(&self.motion.paths)
-            .is_some_and(|p| p.path_flags & 1 != 0)
+            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS))
             || self.flags >> 11 & 1 != 0
     }
 

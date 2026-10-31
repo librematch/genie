@@ -338,7 +338,9 @@ impl UnitAi {
             ask.patrol = true;
             if let Some(saved) = ai.patrol_path.as_ref() {
                 ask.resume = ai.patrol_waypoint;
-                ask.back_and_forth = saved.flags & 2 != 0;
+                ask.back_and_forth = saved
+                    .flags
+                    .contains(crate::movement::PathFlags::BACK_AND_FORTH);
                 ai.zero_patrol();
             } else {
                 let (dx, dy) = (point.x() - at.x(), point.y() - at.y());

@@ -37,6 +37,7 @@ use crate::map::terrain::TileTerrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::{Stream, Streams, Well512};
+use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::ai_moves::PointMove;
@@ -12720,7 +12721,7 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
     top.has_path = true;
     top.points = vec![BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)];
     top.length = Distance::new(10.0);
-    top.path_flags = 7;
+    top.path_flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD;
     top.waypoint = 1;
     m.paths = vec![walked, top];
     let (saved, waypoint) = patrol_information(Some(&m)).unwrap();
@@ -12730,7 +12731,11 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
     );
     assert_eq!(
         (saved.path.length, saved.flags, waypoint),
-        (Distance::new(10.0), 7, 1)
+        (
+            Distance::new(10.0),
+            PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
+            1
+        )
     );
     m.paths[1].has_path = false;
     assert_eq!(patrol_information(Some(&m)), None);
@@ -12751,7 +12756,7 @@ fn a_restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
             ],
             length: Distance::new(10.0),
         },
-        flags: 7,
+        flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
     };
     let mut u = Unit {
         body: crate::objects::layers::Body::new(

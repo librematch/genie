@@ -9,6 +9,8 @@ use genie_core::map::Distance;
 use genie_core::map::{Position, Radii};
 use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
+use genie_core::movement::LevelFlags;
+use genie_core::movement::PathFlags;
 use genie_core::movement::Speed;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
@@ -125,13 +127,13 @@ pub(super) fn path_level(
         linked_type: d.linked_path_type,
         points: path.map_or_else(Vec::new, |p| p.m_waypoints.iter().map(vec3).collect()),
         has_path: path.is_some(),
-        path_flags: path.map_or(0, |p| p.flags_m_bits),
+        path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_m_bits)),
         waypoint: d.waypoint,
         state: genie_core::movement::PathState::of_int(d.state)?,
         range: Distance::new(d.range),
         target: ObjectId::of_field(d.target_id),
         pause_time: Seconds::new(f32::from_bits(d.pause_time)),
-        flags: d.flags_m_bits,
+        flags: LevelFlags::from_bits_retain(d.flags_m_bits),
         length: path.map_or(Distance::ZERO, |p| Distance::new(p.path_length_value)),
         created: path.map_or(WorldTime::ZERO, |p| {
             WorldTime::from_millis(p.creation_time_value)

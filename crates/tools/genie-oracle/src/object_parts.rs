@@ -6,6 +6,7 @@ use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::Position;
+use genie_core::movement::PathFlags;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
@@ -191,7 +192,7 @@ fn patrol_path(ai: &UnitAiModule) -> Option<genie_core::unit_ai::PatrolPath> {
                 points: p.m_waypoints.iter().map(vec3).collect(),
                 length: Distance::new(p.path_length_value),
             },
-            flags: p.flags_m_bits,
+            flags: PathFlags::from_bits_retain(p.flags_m_bits),
         })
 }
 

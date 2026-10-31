@@ -4,6 +4,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
+use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
@@ -8994,7 +8995,7 @@ fn a_saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Patrol),
         patrol_path: Some(PatrolPath {
-            flags: 3,
+            flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
             ..PatrolPath::default()
         }),
         patrol_waypoint: 2,
@@ -9071,7 +9072,7 @@ fn a_patrol_saves_itself_and_attacks_what_it_finds() {
     let (mut u, at) = patroller(0);
     u.last_order = Some(OrderKind::Wait);
     let saved = PatrolPath {
-        flags: 3,
+        flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
         ..PatrolPath::default()
     };
     let mut side = SoldierSide {
@@ -11417,7 +11418,7 @@ fn a_unit_with_patrol_information_leashes_to_its_patrol_s_path() {
             points: vec![BVector::new(0.0, 0.0, 10.0), BVector::new(20.0, 0.0, 10.0)],
             length: Distance::new(20.0),
         },
-        flags: 3,
+        flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
     };
     // where the unit last moved to: on the path's line, 1 or 6 off it
     let at = |y: f32| Surroundings {

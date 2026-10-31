@@ -2,6 +2,7 @@
 //! the short pather's tail, the long pather for a far waypoint and the tile pathfinder again.
 
 use crate::map::Distance;
+use crate::movement::LevelFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::world::WorldTime;
@@ -191,7 +192,9 @@ impl Mover {
             return Ok(());
         }
         let level = &mut self.paths[0];
-        if r == 2 && (level.level != WaypointLevel::TOP || level.flags & 8 != 0) {
+        if r == 2
+            && (level.level != WaypointLevel::TOP || level.flags.contains(LevelFlags::NEAREST))
+        {
             return Ok(());
         }
         np.planned = true;
@@ -202,7 +205,7 @@ impl Mover {
         }
         np.found = !farther;
         if !target_moves && !farther && level.level == WaypointLevel::TOP && r == 2 {
-            level.flags |= 8;
+            level.flags |= LevelFlags::NEAREST;
         }
         Ok(())
     }
@@ -334,7 +337,7 @@ impl Mover {
                 self.paths[0].state = PathState::GaveUp;
                 return Ok(AfterRequest::GaveUp);
             }
-            level.flags |= 1;
+            level.flags |= LevelFlags::REACHED;
         } else {
             level.state = PathState::Arrived;
         }

@@ -2,6 +2,8 @@
 
 use crate::map::Distance;
 use crate::map::Tile;
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointLevel;
@@ -230,7 +232,7 @@ impl Mover {
             {
                 *w = point;
             }
-            level.flags &= !3;
+            level.flags &= !(LevelFlags::REACHED | LevelFlags::AT_WAYPOINT);
         }
         if let Some(last) = self.paths.last_mut().and_then(|l| l.points.last_mut()) {
             *last = point;
@@ -281,7 +283,7 @@ impl Mover {
             },
             points,
             has_path: true,
-            path_flags: 6,
+            path_flags: PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
             length,
             created: now,
             waypoint: 1,
@@ -341,19 +343,23 @@ impl Mover {
         // a new path's flags are 6 (FUN_14152eea0); bit 0 by the patrol, cleared again by an
         // attack move, then bit 1 by the back and forth. The walked level, if any, is reset for
         // it (FUN_140f98e80: its repath time stays)
-        let mut path_flags = if ask.patrol { 6 | 1 } else { 6 & !1 };
+        let mut path_flags = if ask.patrol {
+            PathFlags::NEW | PathFlags::LOOPS
+        } else {
+            PathFlags::NEW & !PathFlags::LOOPS
+        };
         match ask.attack_move {
             Some(true) => {
-                path_flags &= !1;
+                path_flags &= !PathFlags::LOOPS;
                 self.attack_moving = true;
             }
             Some(false) => self.attack_moving = false,
             None => {}
         }
         path_flags = if ask.back_and_forth {
-            path_flags | 2
+            path_flags | PathFlags::BACK_AND_FORTH
         } else {
-            path_flags & !2
+            path_flags & !PathFlags::BACK_AND_FORTH
         };
         let repath_time = self.paths.first().map_or(0.0, |l| l.repath_time);
         self.paths = vec![PathData {

@@ -6,6 +6,8 @@ use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::spatial::{Placed, Spatial, WalkQuery};
 use crate::math::fmath::BVector;
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointLevel;
@@ -129,9 +131,9 @@ impl Mover {
             EPSILON < footprint_gap(here, ground_radius, t.position, t.radius).get()
         });
         if away {
-            level.flags |= 2;
+            level.flags |= LevelFlags::AT_WAYPOINT;
         }
-        level.flags |= 1;
+        level.flags |= LevelFlags::REACHED;
         Some(AfterRequest::Again)
     }
 
@@ -171,7 +173,7 @@ impl Mover {
         let top_loops = self
             .paths
             .last()
-            .is_some_and(|t| !t.points.is_empty() && t.path_flags & 1 != 0);
+            .is_some_and(|t| !t.points.is_empty() && t.path_flags.contains(PathFlags::LOOPS));
         if top_loops || self.attack_moving {
             return Ok(None);
         }
@@ -183,7 +185,7 @@ impl Mover {
         }
         if WaypointLevel::PLANNED < level.level || !top_has_more {
             if level.level == WaypointLevel::TOP && level.waypoint < level.points.len() as i32 - 1 {
-                level.flags |= 1;
+                level.flags |= LevelFlags::REACHED;
                 level.continue_counter = CONTINUE;
                 return Ok(Some(AfterRequest::Again));
             }

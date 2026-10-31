@@ -11,6 +11,7 @@ use crate::map::RestrictionId;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
+use crate::movement::PathFlags;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
@@ -4084,7 +4085,10 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
     .unwrap();
     let g = &t.groups.groups[0];
     let top = g.motion.paths.last().unwrap();
-    assert_eq!((top.path_flags & 1, g.flags & 0x800), (0, 0x800));
+    assert_eq!(
+        (top.path_flags & PathFlags::LOOPS, g.flags & 0x800),
+        (PathFlags::NONE, 0x800)
+    );
     let mut t = two_patrollers();
     t.patrol(
         player_id(1),
@@ -4095,7 +4099,10 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
     .unwrap();
     let g = &t.groups.groups[0];
     let top = g.motion.paths.last().unwrap();
-    assert_eq!((top.path_flags & 1, g.flags & 0x800), (1, 0));
+    assert_eq!(
+        (top.path_flags & PathFlags::LOOPS, g.flags & 0x800),
+        (PathFlags::LOOPS, 0)
+    );
 }
 
 /// A PATROL of two soldiers near each other: the splitter's group becomes a new group of
@@ -4116,7 +4123,10 @@ fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
     );
     assert_eq!((g.differentiator_id, g.current_command), (0, 1));
     let top = g.motion.paths.last().unwrap();
-    assert_eq!(top.path_flags & 3, 3);
+    assert_eq!(
+        top.path_flags & (PathFlags::LOOPS | PathFlags::BACK_AND_FORTH),
+        PathFlags::LOOPS | PathFlags::BACK_AND_FORTH
+    );
     assert_eq!(top.points.len(), 3);
     assert_eq!(
         top.points[1..],

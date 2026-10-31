@@ -7,11 +7,13 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
 use crate::movement::{
     CLOSE, EPSILON, Goal, LOOK_AHEAD, Me, Motion, Mover, Next, PathData, RANGE_FLOOR,
-    STRAIGHT_GROW, TARGET_SHORT_REACH, drop_edge_waypoints, footprint_gap, gate_gap, looping_next,
+    STRAIGHT_GROW, TARGET_SHORT_REACH, drop_edge_waypoints, footprint_gap, gate_gap,
     point_or_zero_of, remove_point,
 };
 use crate::objects::ObjectId;
@@ -28,7 +30,7 @@ impl Mover {
     /// steps back to the waypoint it left and asks again, else the level arrived (state 4). Level
     /// 0 on a level 1 parent looks ahead first ([`Mover::look_ahead`]). A loop (the path's flags
     /// bit 0) moves on from the waypoint reached instead (`FUN_140f98bc0` with 1,
-    /// [`looping_next`]) and waits for a path to it (state 2): back at its first waypoint the step
+    /// [`PathData::looping_next`]) and waits for a path to it (state 2): back at its first waypoint the step
     /// ends ([`Mover::loop_end`]), else on to the level's state. A waypoint some object stands on
     /// is not modelled.
     pub(super) fn reached(
@@ -40,16 +42,16 @@ impl Mover {
         now: WorldTime,
     ) -> Result<Next, GenieError> {
         let ground_radius = self.stats.radius.ground();
-        if self.paths[0].flags & 2 != 0 {
+        if self.paths[0].flags.contains(LevelFlags::AT_WAYPOINT) {
             self.take_waypoint_place(me, world, pathing, now)?;
         }
         let level = &mut self.paths[0];
-        level.flags &= !1;
+        level.flags &= !LevelFlags::REACHED;
         level.waypoint += 1;
         drop_edge_waypoints(level, self.stats.radius, world.map);
-        if level.path_flags & 1 != 0 {
+        if level.path_flags.contains(PathFlags::LOOPS) {
             let reached = level.waypoint - 1;
-            level.waypoint = looping_next(level, reached);
+            level.waypoint = level.looping_next(reached);
             level.state = PathState::WantsPath;
             return Ok(if level.waypoint == 0 {
                 Next::LoopEnd
@@ -89,7 +91,7 @@ impl Mover {
                         (g - range.get()) - RANGE_FLOOR
                     }))
                 });
-        if goal.target.is_some() && level.flags & 4 != 0 {
+        if goal.target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
             self.clear_bit_2();
             beyond = Distance::ZERO;
         }
@@ -134,7 +136,7 @@ impl Mover {
             let at = self.grounded(at, world.terrain.as_ref());
             self.moved_to(me, at, world, pathing, now)?;
         }
-        self.paths[0].flags &= !2;
+        self.paths[0].flags &= !LevelFlags::AT_WAYPOINT;
         Ok(())
     }
 
@@ -343,15 +345,15 @@ impl Mover {
         match level.linked_type {
             1 => {
                 let _ = self.paths.remove(0);
-                self.paths[0].flags |= 1;
+                self.paths[0].flags |= LevelFlags::REACHED;
             }
             2 => {
                 let _ = self.paths.remove(0);
                 let parent = &mut self.paths[0];
                 parent.state = PathState::WantsPath;
                 // a looping parent path moves on (FUN_140f98bc0 with 1)
-                if parent.has_path && parent.path_flags & 1 != 0 {
-                    parent.waypoint = looping_next(parent, parent.waypoint);
+                if parent.has_path && parent.path_flags.contains(PathFlags::LOOPS) {
+                    parent.waypoint = parent.looping_next(parent.waypoint);
                 }
             }
             3 => {
@@ -374,7 +376,7 @@ impl Mover {
             repath_time: level.repath_time,
             created: WorldTime::ZERO,
             has_path: false,
-            path_flags: 0,
+            path_flags: PathFlags::NONE,
             ..PathData::new(WorldTime::ZERO)
         };
     }
@@ -388,9 +390,9 @@ impl Mover {
 
     /// `FUN_140f9b4d0(level, 2, 0)`: bit 2 goes off the walked level and on for its parents.
     pub(super) fn clear_bit_2(&mut self) {
-        self.paths[0].flags &= !4;
+        self.paths[0].flags &= !LevelFlags::MET_TARGET;
         for parent in &mut self.paths[1..] {
-            parent.flags |= 4;
+            parent.flags |= LevelFlags::MET_TARGET;
         }
     }
 

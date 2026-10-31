@@ -11,6 +11,7 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::math::fmath::{BVector, Rotation, add, sub};
 use crate::movement::PathData;
+use crate::movement::PathFlags;
 use crate::objects::ObjectKey;
 use crate::world::World;
 use crate::world::WorldTime;
@@ -93,7 +94,8 @@ impl World {
             }
             let remaining =
                 crate::math::fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
-            let patrol = top_path(&g.motion.paths).is_some_and(|p| p.path_flags & 1 != 0);
+            let patrol =
+                top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
             if on_last_high_level_waypoint(&g.motion.paths) && !patrol {
                 if (current != FormationKind::COLUMN || column_to_line <= remaining)
                     && (current == FormationKind::COLUMN || min_column <= remaining)

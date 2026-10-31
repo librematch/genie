@@ -10,6 +10,7 @@ use crate::groups::create::FormationUnit;
 use crate::groups::group_list::member_gone;
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterKind;
@@ -422,7 +423,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags & 1 != 0);
+            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         if patrol || g.flags >> 11 & 1 != 0 {
             return Ok(false);
         }
@@ -977,7 +978,7 @@ mod tests {
         let mut t = world(1.0, [11, 10]);
         let paths = &mut t.groups.get_mut(group_id(1)).unwrap().motion.paths;
         paths[0].has_path = true;
-        paths[0].path_flags = 1;
+        paths[0].path_flags = PathFlags::LOOPS;
         let _ = t.statistics_only(group_id(1), true).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
     }

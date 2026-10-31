@@ -12,8 +12,8 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::BVector;
 use crate::movement::CONTINUE;
-use crate::movement::NEW_PATH_FLAGS;
 use crate::movement::PathData;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointLevel;
@@ -200,7 +200,7 @@ impl World {
     /// (`commandHorde`, not modelled). A changed target, or a patrol's path (the top path's flags
     /// bit 0, [`crate::groups::formation::top_path`], or flags bit 11) when neither `leg` nor
     /// `hold`, sets flags `0xc000`. Below [`EPSILON`] of top speed nothing moves (false). The
-    /// path (a new one, flags [`NEW_PATH_FLAGS`], made now) runs from the group's place through
+    /// path (a new one, flags [`PathFlags::NEW`], made now) runs from the group's place through
     /// its waypoints (which it empties) to the point at the group's desired height, its flags
     /// bit 0 off and bit 1 on; a patrol's leg (`leg`) loops instead (bit 0 on) and goes back and
     /// forth (bit 1) when the point is at least [`PATROL_LEG_REACH`] from the group on the ground
@@ -320,7 +320,7 @@ impl World {
         let g = self.groups.held_mut(group)?;
         // FUN_141046500: the top ancestor's path, else the walked level's
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|l| l.path_flags & 1 != 0)
+            .is_some_and(|l| l.path_flags.contains(PathFlags::LOOPS))
             || g.flags & 0x800 != 0;
         if (!how.hold && !how.leg && patrol) || changed {
             g.flags |= 0xc000;
@@ -341,7 +341,7 @@ impl World {
         // `keep_flag` sets bit 11 (0x141010dc1) off a leg, which the hold's test then decides
         // again
         if how.hold {
-            path_flags &= !1;
+            path_flags &= !PathFlags::LOOPS;
             g.flags |= 0x800;
         } else {
             g.flags &= !0x800;
@@ -584,7 +584,7 @@ impl World {
 /// [`World::command_move_to`]'s path flags: a patrol leg sets bit 0 and, when the group's place
 /// `from` lies at least [`PATROL_LEG_REACH`] from `to` on the ground (`COMISS`/`JBE`: a NaN
 /// too), bit 1; any other move clears bit 0 and sets bit 1.
-fn move_path_flags(from: BVector, to: BVector, leg: bool) -> u32 {
+fn move_path_flags(from: BVector, to: BVector, leg: bool) -> PathFlags {
     if leg {
         let mut d = crate::math::fmath::sub(from, to);
         d = d.with_height(0.0);
@@ -592,12 +592,12 @@ fn move_path_flags(from: BVector, to: BVector, leg: bool) -> u32 {
         if crate::math::fmath::at_most_or_unordered(PATROL_LEG_REACH, length) {
             // A new path's flags (`FUN_14152eea0`'s construction).
             // The plans a path level may still try (`FUN_140f9b800`, `FUN_140f98e80`).
-            NEW_PATH_FLAGS | 1 | 2
+            PathFlags::NEW | PathFlags::LOOPS | PathFlags::BACK_AND_FORTH
         } else {
-            (NEW_PATH_FLAGS | 1) & !2
+            (PathFlags::NEW | PathFlags::LOOPS) & !PathFlags::BACK_AND_FORTH
         }
     } else {
-        NEW_PATH_FLAGS & !1 | 2
+        (PathFlags::NEW & !PathFlags::LOOPS) | PathFlags::BACK_AND_FORTH
     }
 }
 
@@ -606,7 +606,7 @@ fn move_path_flags(from: BVector, to: BVector, leg: bool) -> u32 {
 /// waypoint 1 and state 2; waypoint level 2 either way.
 fn move_level(
     path: Option<Path>,
-    path_flags: u32,
+    path_flags: PathFlags,
     repath_time: f32,
     world_time: WorldTime,
     range: Distance,
@@ -836,15 +836,18 @@ mod tests {
         );
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(
-            (g.flags & 0x800, g.motion.paths[0].path_flags & 1),
-            (0x800, 0)
+            (
+                g.flags & 0x800,
+                g.motion.paths[0].path_flags & PathFlags::LOOPS
+            ),
+            (0x800, PathFlags::NONE)
         );
         let mut t = moving_world();
         let mut walked = PathData::without_path();
         walked.has_path = true;
         let mut top = PathData::without_path();
         top.has_path = true;
-        top.path_flags = 1;
+        top.path_flags = PathFlags::LOOPS;
         t.groups.get_mut(group_id(1)).unwrap().motion.paths = vec![walked, top];
         let asleep = t.players[1].objects.remove(ListIndex::new(0)).unwrap();
         t.players[1].sleeping.push(Unit {
@@ -897,7 +900,7 @@ mod tests {
             let g = t.groups.get(group_id(1)).unwrap();
             assert_eq!(
                 (g.motion.paths[0].path_flags, g.flags & 0x800),
-                (flags, 0),
+                (PathFlags::from_bits_retain(flags), 0),
                 "{point:?}"
             );
         }
@@ -905,7 +908,7 @@ mod tests {
         let mut t = moving_world();
         let mut top = PathData::without_path();
         top.has_path = true;
-        top.path_flags = 1;
+        top.path_flags = PathFlags::LOOPS;
         t.groups.get_mut(group_id(1)).unwrap().motion.paths = vec![top];
         assert!(
             t.command_move_to(group_id(1), None, Point::new(8.0, 0.0), leg)

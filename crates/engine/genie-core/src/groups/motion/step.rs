@@ -2,13 +2,15 @@
 
 use crate::groups::Motion;
 use crate::groups::motion::{
-    CLOSE, EPSILON, GroupView, Lead, LeadGroup, NEAR, PASSES, looping_next, point, request,
-    reset_level, set_flag, steer,
+    CLOSE, EPSILON, GroupView, Lead, LeadGroup, NEAR, PASSES, point, request, reset_level,
+    set_flag, steer,
 };
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
 use crate::movement::{Planning, footprint_gap, footprint_gap_squared};
@@ -82,7 +84,7 @@ pub(crate) fn path_step(
     loop {
         match pass(motion, group, lead, world, budget)? {
             Pass::Done(r) => return Ok(r),
-            Pass::Reached => set_flag(&mut motion.paths, 0, true),
+            Pass::Reached => set_flag(&mut motion.paths, LevelFlags::REACHED, true),
             Pass::Next => {}
         }
         passes += 1;
@@ -122,7 +124,7 @@ pub(super) fn pass(
         )
     });
     let flags = level.flags;
-    if flags & 1 != 0 {
+    if flags.contains(LevelFlags::REACHED) {
         reached(motion, target.as_ref())?;
     }
     let state = motion.paths.checked(0)?.state;
@@ -133,7 +135,7 @@ pub(super) fn pass(
             return Ok(Pass::Done(true));
         }
         let linked = motion.paths.checked(0)?.linked_type;
-        if linked == 1 || flags & 4 != 0 {
+        if linked == 1 || flags.contains(LevelFlags::MET_TARGET) {
             let _ = motion.paths.remove(0);
             return Ok(Pass::Reached);
         }
@@ -143,9 +145,9 @@ pub(super) fn pass(
             let parent = motion.paths.checked_mut(0)?;
             parent.state = PathState::WantsPath;
             if linked == 2 && parent.has_path {
-                if parent.path_flags & 1 != 0 {
+                if parent.path_flags.contains(PathFlags::LOOPS) {
                     let w = parent.waypoint;
-                    parent.waypoint = looping_next(parent, w);
+                    parent.waypoint = parent.looping_next(w);
                 }
                 if patrols {
                     parent.waypoint += 1;
@@ -175,21 +177,21 @@ pub(super) fn pass(
 /// its parents). A looping path takes its next waypoint (`FUN_140f98bc0`) and asks again.
 pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<(), GenieError> {
     let level = motion.paths.checked(0)?;
-    if level.flags & 2 != 0 {
+    if level.flags.contains(LevelFlags::AT_WAYPOINT) {
         if level.waypoint < level.points.len() as i32 {
             let p = *level.points.checked(level.waypoint as usize)?;
             motion.new_position[0] = p;
             motion.position[0] = p;
         }
-        set_flag(&mut motion.paths, 1, false);
+        set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, false);
     }
-    set_flag(&mut motion.paths, 0, false);
+    set_flag(&mut motion.paths, LevelFlags::REACHED, false);
     let at = motion.position[0];
     let level = motion.paths.checked_mut(0)?;
     level.waypoint += 1;
     let left = level.waypoint - 1;
-    if level.path_flags & 1 != 0 {
-        level.waypoint = looping_next(level, left);
+    if level.path_flags.contains(PathFlags::LOOPS) {
+        level.waypoint = level.looping_next(left);
         level.state = PathState::WantsPath;
         return Ok(());
     }
@@ -208,9 +210,9 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
                 - NEAR
         }
     };
-    if target.is_some() && level.flags & 4 != 0 {
+    if target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
         beyond = 0.0;
-        set_flag(&mut motion.paths, 2, false);
+        set_flag(&mut motion.paths, LevelFlags::MET_TARGET, false);
     }
     let level = motion.paths.checked_mut(0)?;
     if level.waypoint < level.points.len() as i32 {

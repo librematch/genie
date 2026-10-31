@@ -6,6 +6,7 @@ use crate::map::Point;
 use crate::map::spatial::{RecordId, Spatial};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::movement::LevelFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::{
@@ -124,7 +125,7 @@ impl Mover {
         flat = flat.with_height(0.0);
         let flat = fmath::normalize(flat);
         let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt));
-        if self.paths[0].flags & 1 != 0 && turn == Angle::ZERO {
+        if self.paths[0].flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
             return Ok(clipped);
         }
         self.yaw(turn, self.facets())?;

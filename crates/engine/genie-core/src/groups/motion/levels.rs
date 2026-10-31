@@ -7,23 +7,20 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
+use crate::movement::LevelFlags;
 use crate::movement::PathData;
 use crate::world::slots::CheckedIndex;
 
-/// `FUN_140f9b4d0(level, bit, on)` on the walked level: its flag `bit` set or cleared; bit 2 is
-/// then set on every parent too.
-pub(super) fn set_flag(paths: &mut [PathData], bit: u32, on: bool) {
+/// `FUN_140f9b4d0(level, bit, on)` on the walked level: its flag `flag` set or cleared;
+/// [`LevelFlags::MET_TARGET`] (bit 2) is then set on every parent too.
+pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, on: bool) {
     let Some((level, parents)) = paths.split_first_mut() else {
         return;
     };
-    if on {
-        level.flags |= 1 << bit;
-    } else {
-        level.flags &= !(1 << bit);
-    }
-    if bit == 2 {
+    level.flags.set(flag, on);
+    if flag == LevelFlags::MET_TARGET {
         for p in parents {
-            p.flags |= 4;
+            p.flags |= LevelFlags::MET_TARGET;
         }
     }
 }
@@ -43,33 +40,6 @@ pub(super) fn reset_level(paths: &mut Vec<PathData>) -> Result<(), GenieError> {
         *paths.checked_mut(0)? = level;
     }
     Ok(())
-}
-
-/// `FUN_140f98bc0` with 1 on a looping path's level: the waypoint after `index`; on a path that
-/// goes back and forth (flags bit 1) the walk turns at its ends (bit 2 the way back).
-pub(super) const fn looping_next(level: &mut PathData, index: i32) -> i32 {
-    let n = level.points.len() as i32;
-    if level.path_flags & 1 == 0 {
-        return -1;
-    }
-    if level.path_flags & 2 == 0 {
-        return if index + 1 < n { index + 1 } else { 0 };
-    }
-    if level.path_flags & 4 == 0 {
-        let next = index - 1;
-        if next < 0 {
-            level.path_flags |= 4;
-            return 1;
-        }
-        next
-    } else {
-        let next = index + 1;
-        if n <= next {
-            level.path_flags &= !4;
-            return n - 2;
-        }
-        next
-    }
 }
 
 /// The waypoint at `index` (`FUN_140f9bcd0`), the game's static zero point outside the path.

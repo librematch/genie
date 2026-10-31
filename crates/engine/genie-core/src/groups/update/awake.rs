@@ -12,6 +12,7 @@ use crate::groups::update::{
 };
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::movement::PathFlags;
 use crate::objects::ObjectId;
 use crate::world::Millis;
 use crate::world::World;
@@ -94,7 +95,7 @@ impl World {
     pub(super) fn kept_apart_leave(&mut self, group: GroupId) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags & 1 != 0);
+            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         // the dword compare at 0x14103dd78: the list's size (64 bits) against the count
         if g.objects.len() as u32 == g.members.len() as u32
             && !self.target_pending(group)?

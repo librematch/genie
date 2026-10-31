@@ -6,6 +6,7 @@ use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::RecordId;
 use crate::map::spatial::{Gait, Obstruction, Placed};
+use crate::movement::LevelFlags;
 use crate::movement::WaypointLevel;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Walk;
@@ -107,13 +108,17 @@ fn level(level: u8, points: &[Point], state: PathState) -> PathData {
             .map(|p| BVector::new(p.x(), 0.0, p.y()))
             .collect(),
         has_path: true,
-        path_flags: if level == 0 { 6 } else { 4 },
+        path_flags: if level == 0 {
+            PathFlags::BACK_AND_FORTH | PathFlags::FORWARD
+        } else {
+            PathFlags::FORWARD
+        },
         waypoint: 1,
         state,
         range: Distance::new(0.1),
         target: Some(object_id(10028)),
         pause_time: Seconds::ZERO,
-        flags: 0,
+        flags: LevelFlags::NONE,
         length: Distance::ZERO,
         created: WorldTime::from_millis(16360),
         continue_counter: 10,
@@ -129,7 +134,7 @@ fn level(level: u8, points: &[Point], state: PathState) -> PathData {
 #[test]
 fn a_path_s_end_follows_a_moved_target_in_the_paths_layout() {
     let mut m = builder_9177();
-    m.paths[0].flags = 3;
+    m.paths[0].flags = LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
     assert!(m.walks_to_path_end().unwrap());
     m.follow_path_end(Position::new(99.515_114, 41.147_972, 0.0));
     assert_eq!(
@@ -140,7 +145,7 @@ fn a_path_s_end_follows_a_moved_target_in_the_paths_layout() {
         m.paths[1].points[1],
         BVector::new(99.515_114, 0.0, 41.147_972)
     );
-    assert_eq!(m.paths[0].flags, 0);
+    assert_eq!(m.paths[0].flags, LevelFlags::NONE);
     assert!(m.walks_to_path_end().unwrap());
 }
 
@@ -1135,15 +1140,24 @@ fn a_looping_path_s_next_waypoint_goes_round_or_back_and_forth() {
         ],
         PathState::WantsPath,
     );
-    l.path_flags = 0;
-    assert_eq!(looping_next(&mut l, 1), -1);
-    l.path_flags = 1;
-    assert_eq!((looping_next(&mut l, 1), looping_next(&mut l, 2)), (2, 0));
-    l.path_flags = 3;
-    assert_eq!(looping_next(&mut l, 1), 0);
-    assert_eq!((looping_next(&mut l, 0), l.path_flags), (1, 7));
-    assert_eq!(looping_next(&mut l, 1), 2);
-    assert_eq!((looping_next(&mut l, 2), l.path_flags), (1, 3));
+    l.path_flags = PathFlags::NONE;
+    assert_eq!(l.looping_next(1), -1);
+    l.path_flags = PathFlags::LOOPS;
+    assert_eq!((l.looping_next(1), l.looping_next(2)), (2, 0));
+    l.path_flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH;
+    assert_eq!(l.looping_next(1), 0);
+    assert_eq!(
+        (l.looping_next(0), l.path_flags),
+        (
+            1,
+            PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD
+        )
+    );
+    assert_eq!(l.looping_next(1), 2);
+    assert_eq!(
+        (l.looping_next(2), l.path_flags),
+        (1, PathFlags::LOOPS | PathFlags::BACK_AND_FORTH)
+    );
 }
 
 /// `LAB_141151b6d`: an arrived level of link 2 hands its looping parent its next waypoint;
@@ -1157,7 +1171,7 @@ fn an_arrived_level_hands_a_looping_parent_its_next_waypoint() {
     };
     let mut m = builder_9177();
     m.paths[0].linked_type = 2;
-    m.paths[1].path_flags = 1;
+    m.paths[1].path_flags = PathFlags::LOOPS;
     m.paths[1].waypoint = 1;
     assert!(matches!(m.arrived(goal), Ok(Next::Again)));
     assert_eq!(
@@ -1189,9 +1203,9 @@ fn a_loop_s_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         )];
         let l = &mut m.paths[0];
         l.target = None;
-        l.path_flags = 1;
+        l.path_flags = PathFlags::LOOPS;
         l.waypoint = waypoint;
-        l.flags = 1;
+        l.flags = LevelFlags::REACHED;
         m
     };
     let mut world = Spatial::new(GridSize::new(120, 120));
@@ -1881,13 +1895,16 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
 fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
     let target = *world().get(object_id(10028)).unwrap();
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
-    m.paths[0].flags = 4;
+    m.paths[0].flags = LevelFlags::MET_TARGET;
     assert!(matches!(
         m.no_path(false, Some(&target), 0.5),
         Ok(AfterRequest::Paused)
     ));
     assert_eq!(m.paths[0].pause_time, STUCK_PAUSE);
-    assert_eq!((m.paths[0].flags, m.paths[1].flags), (0, 4));
+    assert_eq!(
+        (m.paths[0].flags, m.paths[1].flags),
+        (LevelFlags::NONE, LevelFlags::MET_TARGET)
+    );
     let out = |edit: &dyn Fn(&mut Mover)| {
         let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
         m.paths[0].continue_counter = 0;
@@ -1899,20 +1916,24 @@ fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
     assert!(matches!(r, Ok(AfterRequest::Again)));
     assert_eq!(m.paths[0].state, PathState::Unplanned);
     assert!(out(&|_| {}).0.is_err());
-    assert!(out(&|m| m.paths[0].path_flags |= 1).0.is_err());
+    assert!(
+        out(&|m| m.paths[0].path_flags |= PathFlags::LOOPS)
+            .0
+            .is_err()
+    );
     assert!(out(&|m| m.attack_moving = true).0.is_err());
     assert!(out(&|m| m.paths[0].level = WaypointLevel::TOP).0.is_err());
     let (r, m) = out(&|m| m.paths[0].waypoint = 0);
     assert!(matches!(r, Ok(AfterRequest::Again)));
-    assert_eq!(m.paths[0].flags, 1);
+    assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     assert!(m.no_path(true, None, 0.05).is_err());
-    m.paths[0].path_flags |= 1;
+    m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
         m.no_path(true, None, 0.05),
         Ok(AfterRequest::Again)
     ));
-    assert_eq!(m.paths[0].flags, 1);
+    assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
 }
 
 /// A unit's walk for the actions' tests: MarvinBlue/426048731's builder 9177 on its first
@@ -2060,7 +2081,7 @@ fn a_walk_on_or_past_its_waypoint_counts_it_reached() {
         m.place_for_test(at);
         let motion = m.motion(&me(), Seconds::new(DT), &mut w, None).unwrap();
         assert_eq!(motion, Motion::Arrived);
-        assert_eq!(levels(&m), [(0, 0, PathState::Idle)]);
+        assert_eq!(levels(&m), [(0, LevelFlags::NONE, PathState::Idle)]);
     }
     let mut w = world();
     let mut m = builder_9177();
@@ -2069,7 +2090,14 @@ fn a_walk_on_or_past_its_waypoint_counts_it_reached() {
     assert_eq!(motion, Motion::Moving);
     assert_eq!(
         levels(&m),
-        [(1, 3, PathState::Walking), (1, 0, PathState::Idle)]
+        [
+            (
+                1,
+                LevelFlags::REACHED | LevelFlags::AT_WAYPOINT,
+                PathState::Walking
+            ),
+            (1, LevelFlags::NONE, PathState::Idle)
+        ]
     );
 }
 
@@ -2280,7 +2308,7 @@ fn a_top_level_short_of_its_moved_target_arrives() {
             PathState::Walking,
         )];
         let l = &mut m.paths[0];
-        l.flags = 1;
+        l.flags = LevelFlags::REACHED;
         l.target = Some(object_id(500));
         l.created = WorldTime::from_millis(100);
         m.stats.weapon_range = weapon_range;
@@ -2375,7 +2403,7 @@ fn a_next_waypoint_an_object_stands_on_goes() {
         )];
         let l = &mut m.paths[0];
         l.target = None;
-        l.flags = 1;
+        l.flags = LevelFlags::REACHED;
         m
     };
     let mut world = Spatial::new(GridSize::new(120, 120));
@@ -2468,7 +2496,10 @@ fn a_reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
         m.motion(&me, Seconds::new(DT), &mut world, None),
         Ok(Motion::Moving)
     );
-    assert_eq!(m.paths[0].flags, 3);
+    assert_eq!(
+        m.paths[0].flags,
+        LevelFlags::REACHED | LevelFlags::AT_WAYPOINT
+    );
     assert_eq!(
         m.motion(&me, Seconds::new(DT), &mut world, None),
         Ok(Motion::Arrived)
@@ -2500,7 +2531,7 @@ fn a_path_request_makes_the_top_level_from_the_unit_to_its_goal() {
             top.state,
             top.target
         ),
-        (2, 4, 1, PathState::WantsPath, None)
+        (2, PathFlags::FORWARD, 1, PathState::WantsPath, None)
     );
     assert_eq!(
         top.points,
@@ -2560,7 +2591,7 @@ fn an_arrived_level_under_one_without_a_path_ends_the_step() {
         ),
         PathData {
             has_path: false,
-            path_flags: 0,
+            path_flags: PathFlags::NONE,
             created: WorldTime::ZERO,
             ..level(2, &[], PathState::Idle)
         },
@@ -2578,7 +2609,10 @@ fn an_arrived_level_under_one_without_a_path_ends_the_step() {
         Ok(Motion::Done)
     );
     assert_eq!(m.paths.len(), 1);
-    assert_eq!((m.paths[0].flags, m.paths[0].state), (1, PathState::Idle));
+    assert_eq!(
+        (m.paths[0].flags, m.paths[0].state),
+        (LevelFlags::REACHED, PathState::Idle)
+    );
     assert_eq!(
         m.velocity.as_ref().unwrap().velocity,
         BVector::new(0.0, 0.0, 1.32)
@@ -2832,7 +2866,11 @@ fn a_patrol_s_path_request_walks_the_own_waypoints_and_takes_the_patrol_flags() 
     );
     assert_eq!(
         (top.path_flags, top.waypoint, top.state),
-        (7, 1, PathState::WantsPath)
+        (
+            PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
+            1,
+            PathState::WantsPath
+        )
     );
     assert_eq!(m.user_waypoints, Vec::<BVector>::new());
     assert!(!m.attack_moving);
@@ -2855,7 +2893,7 @@ fn a_patrol_s_path_request_walks_the_own_waypoints_and_takes_the_patrol_flags() 
         m.paths[0].points,
         vec![BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)]
     );
-    assert_eq!(m.paths[0].path_flags, 4);
+    assert_eq!(m.paths[0].path_flags, PathFlags::FORWARD);
     assert!(m.attack_moving);
     // none leaves the attack move as it was
     m.request_path(
@@ -2894,7 +2932,13 @@ fn a_resumed_patrol_s_path_is_its_waypoints_from_the_saved_one() {
         ask,
     );
     assert_eq!(m.paths[0].points.len(), 3);
-    assert_eq!((m.paths[0].waypoint, m.paths[0].path_flags), (2, 7));
+    assert_eq!(
+        (m.paths[0].waypoint, m.paths[0].path_flags),
+        (
+            2,
+            PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD
+        )
+    );
     m.request_path_asked(
         Position::new(22.0, 21.0, 0.0),
         Position::new(30.0, 20.0, 1.0),
@@ -2942,18 +2986,21 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     assert_eq!(m.in_reach(far, start), None);
     assert_eq!(
         (m.paths[0].state, m.paths[0].flags),
-        (PathState::Walking, 0)
+        (PathState::Walking, LevelFlags::NONE)
     );
     let waypoint = BVector::new(30.0, 0.0, 88.0);
     assert_eq!(m.in_reach(far, waypoint), Some(AfterRequest::Again));
-    assert_eq!(m.paths[0].flags, 3);
+    assert_eq!(
+        m.paths[0].flags,
+        LevelFlags::REACHED | LevelFlags::AT_WAYPOINT
+    );
     let mut m = builder_9177().placed(house.position);
     let on_house = Goal {
         gap: Distance::new(FAR),
         ..near
     };
     assert_eq!(m.in_reach(on_house, waypoint), Some(AfterRequest::Again));
-    assert_eq!(m.paths[0].flags, 1);
+    assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
 }
 
 /// The request's try ([`Mover::spend_try`]): a try left goes on, one fewer; a looping top
@@ -2967,7 +3014,7 @@ fn a_request_spends_a_try_and_gives_up_or_goes_on_without_more() {
     assert_eq!(m.spend_try(), Ok(None));
     assert_eq!(m.paths[0].continue_counter, 9);
     let mut looping = builder_9177();
-    looping.paths[1].path_flags |= 1;
+    looping.paths[1].path_flags |= PathFlags::LOOPS;
     let mut attacking = builder_9177();
     attacking.attack_moving = true;
     for mut m in [looping, attacking] {
@@ -2996,7 +3043,7 @@ fn a_request_spends_a_try_and_gives_up_or_goes_on_without_more() {
     assert_eq!(m.spend_try(), Ok(Some(AfterRequest::Again)));
     assert_eq!(
         (m.paths[0].flags, m.paths[0].continue_counter),
-        (1, CONTINUE)
+        (LevelFlags::REACHED, CONTINUE)
     );
 }
 
@@ -3050,7 +3097,7 @@ fn a_waypoint_in_range_ends_the_level_or_gives_up_on_a_fresh_path() {
     );
     assert_eq!(
         (m.paths[0].state, m.paths[0].flags),
-        (PathState::Walking, 1)
+        (PathState::Walking, LevelFlags::REACHED)
     );
     let mut m = builder_9177();
     assert_eq!(

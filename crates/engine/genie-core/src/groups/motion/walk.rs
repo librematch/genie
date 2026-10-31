@@ -12,6 +12,8 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::{Planning, footprint_gap};
 use crate::objects::ObjectKey;
@@ -39,7 +41,7 @@ pub(super) fn steer(
     let waypoint = point(level, level.waypoint);
     let at = motion.position[0];
     if ground(at, waypoint) < EPSILON {
-        set_flag(&mut motion.paths, 1, true);
+        set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
         return Ok(Pass::Reached);
     }
     // FUN_141046080: the direction on the ground
@@ -51,12 +53,12 @@ pub(super) fn steer(
     let next = fmath::add(at, fmath::scale(step, direction));
     match passes_waypoint(waypoint, at, next) {
         Passing::Passes => {
-            set_flag(&mut motion.paths, 1, true);
+            set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
             return Ok(Pass::Reached);
         }
         Passing::Reaches => {
-            set_flag(&mut motion.paths, 1, true);
-            set_flag(&mut motion.paths, 0, true);
+            set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
+            set_flag(&mut motion.paths, LevelFlags::REACHED, true);
         }
         Passing::Short => {}
     }
@@ -106,8 +108,8 @@ fn way_blocked(
     }
     let (on_target, newer) = weigh_hits(motion, spatial, &hits)?;
     if hits.len() == 1 && on_target {
-        set_flag(&mut motion.paths, 0, true);
-        set_flag(&mut motion.paths, 2, true);
+        set_flag(&mut motion.paths, LevelFlags::REACHED, true);
+        set_flag(&mut motion.paths, LevelFlags::MET_TARGET, true);
         return Ok(Some(Pass::Next));
     }
     if 0 < newer {
@@ -188,7 +190,7 @@ fn walk_ends(
     match target {
         None => {
             let top = motion.paths.last().filter(|t| t.has_path);
-            if level.path_flags & 1 == 0
+            if !level.path_flags.contains(PathFlags::LOOPS)
                 && NEAR < level.range.get()
                 && let Some(top) = top
             {

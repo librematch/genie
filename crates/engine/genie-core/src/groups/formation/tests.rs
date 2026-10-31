@@ -9,6 +9,8 @@ use crate::map::Rect;
 use crate::map::RestrictionId;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointLevel;
@@ -868,13 +870,13 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
         linked_type: 0,
         points: points.to_vec(),
         has_path: !points.is_empty(),
-        path_flags: flags,
+        path_flags: PathFlags::from_bits_retain(flags),
         waypoint,
         state: PathState::Idle,
         range: Distance::ZERO,
         target: None,
         pause_time: Seconds::ZERO,
-        flags: 0,
+        flags: LevelFlags::NONE,
         length: Distance::ZERO,
         created: WorldTime::ZERO,
         continue_counter: 10,

@@ -56,6 +56,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`mod.rs`](mod.rs) | A unit's movement (`RGE_Moving_Object`, MovingObject.cpp in 158041): the velocity step that moves it along its forward vector, and the motion step that steers it along its path. |
 | [`new_path.rs`](new_path.rs) | A new level's path: no path, its link under the walked level, the short pather's ignore list and a blocked start. |
 | [`path_end.rs`](path_end.rs) | The reach test, a `MoveTo`'s path end that follows its target, the top path and the pauses. |
+| [`path_flags.rs`](path_flags.rs) | A path's flags (`PathFlags`, `+0xc`) and a path level's (`LevelFlags`, `+0x3c`). |
 | [`path_points.rs`](path_points.rs) | Path points, the gaps between footprints and the position setter's tests. |
 | [`path_state.rs`](path_state.rs) | A path level's state: whether it asks for a path, walks it or is done with it. |
 | [`request.rs`](request.rs) | The motion step's path request: the long pather's plan, the walled-off stretches and the goal's reach. |

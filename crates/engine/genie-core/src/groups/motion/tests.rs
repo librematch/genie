@@ -5,7 +5,8 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
-use crate::movement::NEW_PATH_FLAGS;
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::TurnRate;
 use crate::movement::WaypointLevel;
@@ -77,7 +78,7 @@ fn level(level: u8, points: &[Point], waypoint: i32, state: PathState) -> PathDa
             .map(|p| BVector::new(p.x(), 0.0, p.y()))
             .collect(),
         has_path: true,
-        path_flags: NEW_PATH_FLAGS,
+        path_flags: PathFlags::NEW,
         waypoint,
         state,
         ..PathData::without_path()
@@ -172,13 +173,20 @@ fn a_levels_flag_and_its_parents_bit_2() {
         level(1, &[], 0, PathState::Idle),
         level(2, &[], 0, PathState::Idle),
     ];
-    set_flag(&mut paths, 0, true);
-    assert_eq!(paths[0].flags, 1);
-    set_flag(&mut paths, 2, false);
-    assert_eq!((paths[0].flags, paths[1].flags, paths[2].flags), (1, 4, 4));
-    set_flag(&mut paths, 0, false);
-    assert_eq!(paths[0].flags, 0);
-    assert_eq!(paths[1].flags, 4);
+    set_flag(&mut paths, LevelFlags::REACHED, true);
+    assert_eq!(paths[0].flags, LevelFlags::REACHED);
+    set_flag(&mut paths, LevelFlags::MET_TARGET, false);
+    assert_eq!(
+        (paths[0].flags, paths[1].flags, paths[2].flags),
+        (
+            LevelFlags::REACHED,
+            LevelFlags::MET_TARGET,
+            LevelFlags::MET_TARGET
+        )
+    );
+    set_flag(&mut paths, LevelFlags::REACHED, false);
+    assert_eq!(paths[0].flags, LevelFlags::NONE);
+    assert_eq!(paths[1].flags, LevelFlags::MET_TARGET);
 }
 
 /// `FUN_140f98e80`: the walked level and its parents go; the level keeps its repath time.
@@ -213,17 +221,17 @@ fn a_looping_path_goes_round_or_back_and_forth() {
         0,
         PathState::WantsPath,
     );
-    assert_eq!(looping_next(&mut l, 0), -1);
-    l.path_flags = 1;
-    assert_eq!(looping_next(&mut l, 1), 2);
-    assert_eq!(looping_next(&mut l, 2), 0);
-    l.path_flags = 1 | 2;
-    assert_eq!(looping_next(&mut l, 1), 0);
-    assert_eq!(looping_next(&mut l, 0), 1);
-    assert_eq!(l.path_flags & 4, 4);
-    assert_eq!(looping_next(&mut l, 1), 2);
-    assert_eq!(looping_next(&mut l, 2), 1);
-    assert_eq!(l.path_flags & 4, 0);
+    assert_eq!(l.looping_next(0), -1);
+    l.path_flags = PathFlags::LOOPS;
+    assert_eq!(l.looping_next(1), 2);
+    assert_eq!(l.looping_next(2), 0);
+    l.path_flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH;
+    assert_eq!(l.looping_next(1), 0);
+    assert_eq!(l.looping_next(0), 1);
+    assert_eq!(l.path_flags & PathFlags::FORWARD, PathFlags::FORWARD);
+    assert_eq!(l.looping_next(1), 2);
+    assert_eq!(l.looping_next(2), 1);
+    assert_eq!(l.path_flags & PathFlags::FORWARD, PathFlags::NONE);
 }
 
 /// `FUN_141046130`: short of the waypoint, on it, or past it (or a step under 0.1).
@@ -441,7 +449,7 @@ fn the_last_waypoint_of_the_top_level_ends_the_walk() {
         1,
         PathState::Walking,
     );
-    top.flags = 1;
+    top.flags = LevelFlags::REACHED;
     m.paths = vec![top];
     assert!(fx.step(&mut m, &GroupView::default(), &lead()));
     assert_eq!(m.paths, vec![PathData::without_path()]);
@@ -811,7 +819,7 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
     ));
     assert_eq!(m.paths[0].pause_time, PATROL_PAUSE);
     let mut m = at(2, &last, 2);
-    m.paths[0].path_flags |= 1;
+    m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
@@ -852,7 +860,7 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
     assert!(matches!(end(&mut m, &lead(), true), Some(Pass::Done(true))));
     assert_eq!(m.paths, vec![PathData::without_path()]);
     let mut m = at(0, &last, 5);
-    m.paths[0].path_flags |= 1;
+    m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(end(&mut m, &lead(), true), Some(Pass::Reached)));
 }
 
@@ -869,7 +877,7 @@ fn a_reached_waypoint_moves_the_level_on() {
     ];
     let mut m = Motion::new();
     m.paths = vec![level(1, &three, 1, PathState::Walking)];
-    m.paths[0].flags = 3;
+    m.paths[0].flags = LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
     reached(&mut m, None).unwrap();
     assert_eq!(
         (m.position[0], m.new_position[0]),
@@ -877,8 +885,12 @@ fn a_reached_waypoint_moves_the_level_on() {
     );
     let l = &m.paths[0];
     assert_eq!(
-        (l.flags & 3, l.waypoint, l.state),
-        (0, 2, PathState::WantsPath)
+        (
+            l.flags & (LevelFlags::REACHED | LevelFlags::AT_WAYPOINT),
+            l.waypoint,
+            l.state
+        ),
+        (LevelFlags::NONE, 2, PathState::WantsPath)
     );
     m.paths = vec![level(0, &three, 1, PathState::Walking)];
     reached(&mut m, None).unwrap();
@@ -887,7 +899,7 @@ fn a_reached_waypoint_moves_the_level_on() {
         (2, PathState::Walking)
     );
     m.paths = vec![level(1, &three, 2, PathState::Walking)];
-    m.paths[0].path_flags = 1;
+    m.paths[0].path_flags = PathFlags::LOOPS;
     reached(&mut m, None).unwrap();
     assert_eq!(
         (m.paths[0].waypoint, m.paths[0].state),
@@ -907,40 +919,44 @@ fn past_its_last_waypoint_a_level_steps_back_or_arrived() {
         let mut m = Motion::new();
         m.position[0] = BVector::new(at.x(), 0.0, at.y());
         m.paths = vec![level(n, &two, 1, PathState::Walking)];
-        m.paths[0].flags = flags;
+        m.paths[0].flags = LevelFlags::from_bits_retain(flags);
         reached(&mut m, target).unwrap();
-        (m.paths[0].waypoint, m.paths[0].state, m.paths[0].flags & 4)
+        (
+            m.paths[0].waypoint,
+            m.paths[0].state,
+            m.paths[0].flags & LevelFlags::MET_TARGET,
+        )
     };
     assert_eq!(
         state(0, Point::new(5.0, 5.0), None, 0),
-        (1, PathState::WantsPath, 0)
+        (1, PathState::WantsPath, LevelFlags::NONE)
     );
     assert_eq!(
         state(0, Point::new(5.0, 9.0), None, 0),
-        (2, PathState::Arrived, 0)
+        (2, PathState::Arrived, LevelFlags::NONE)
     );
     // 0.6 short: beyond 0.5, below CLOSE: level 0 steps back, level 1 arrived
     assert_eq!(
         state(0, Point::new(5.0, 8.4), None, 0),
-        (1, PathState::WantsPath, 0)
+        (1, PathState::WantsPath, LevelFlags::NONE)
     );
     assert_eq!(
         state(1, Point::new(5.0, 8.4), None, 0),
-        (2, PathState::Arrived, 0)
+        (2, PathState::Arrived, LevelFlags::NONE)
     );
     let target = target_at(12.0);
     assert_eq!(
         state(1, Point::new(5.0, 8.0), Some(&target), 0),
-        (1, PathState::WantsPath, 0)
+        (1, PathState::WantsPath, LevelFlags::NONE)
     );
     assert_eq!(
         state(1, Point::new(5.0, 8.0), Some(&target), 4),
-        (2, PathState::Arrived, 0)
+        (2, PathState::Arrived, LevelFlags::NONE)
     );
     // on the waypoint it left the group arrived, its target however far
     assert_eq!(
         state(1, Point::new(5.0, 9.0), Some(&target), 0),
-        (2, PathState::Arrived, 0)
+        (2, PathState::Arrived, LevelFlags::NONE)
     );
 }
 
@@ -993,17 +1009,20 @@ fn an_arrived_level_hands_over_by_its_link() {
         assert_eq!(m.paths.len(), 1);
         (m.paths[0].waypoint, m.paths[0].state)
     };
-    assert_eq!(handed(&mut fx, 2, 1, &lead(), 1), (2, PathState::WantsPath));
     assert_eq!(
-        handed(&mut fx, 2, 0, &grouped(0x800), 1),
+        handed(&mut fx, 2, PathFlags::LOOPS, &lead(), 1),
         (2, PathState::WantsPath)
     );
     assert_eq!(
-        handed(&mut fx, 2, 0, &grouped(0x800), 2),
+        handed(&mut fx, 2, PathFlags::NONE, &grouped(0x800), 1),
+        (2, PathState::WantsPath)
+    );
+    assert_eq!(
+        handed(&mut fx, 2, PathFlags::NONE, &grouped(0x800), 2),
         (3, PathState::Arrived)
     );
     assert_eq!(
-        handed(&mut fx, 3, 1, &grouped(0x800), 1),
+        handed(&mut fx, 3, PathFlags::LOOPS, &grouped(0x800), 1),
         (1, PathState::WantsPath)
     );
     // bit 0: the waypoint counts reached (past the last, 0.5 from the target: back to it, state
@@ -1014,7 +1033,7 @@ fn an_arrived_level_hands_over_by_its_link() {
         ..lead()
     };
     let mut m = requesting(0, 6.0);
-    m.paths[0].flags = 1;
+    m.paths[0].flags = LevelFlags::REACHED;
     m.paths[0].target = Some(object_id(7));
     fx.spatial.insert(object_id(7), target_at(6.0));
     assert!(matches!(fx.pass(&mut m, &lead), Pass::Reached));
@@ -1054,7 +1073,10 @@ fn what_stands_in_the_way_stops_the_walk() {
     fx.spatial.insert(object_id(9), placed_at(5.0, 5.3));
     let mut m = walking(Some(object_id(9)));
     assert!(matches!(fx.pass(&mut m, &lead()), Pass::Next));
-    assert_eq!(m.paths[0].flags & 5, 5);
+    assert_eq!(
+        m.paths[0].flags & (LevelFlags::REACHED | LevelFlags::MET_TARGET),
+        LevelFlags::REACHED | LevelFlags::MET_TARGET
+    );
     // 8 in the way moved at 60
     fx.spatial.set_gait(
         object_id(8),

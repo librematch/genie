@@ -7,6 +7,8 @@ use crate::map::Point;
 use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
+use crate::movement::LevelFlags;
+use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
 use crate::movement::{
@@ -36,11 +38,11 @@ impl Mover {
         to_end: f32,
     ) -> Result<AfterRequest, GenieError> {
         let top_has_more = self.top_has_more();
-        if target.is_some() && self.paths[0].flags & 4 != 0 {
+        if target.is_some() && self.paths[0].flags.contains(LevelFlags::MET_TARGET) {
             // FUN_140f9b4d0(level, 2, 0): bit 2 goes off the level and on for its parents
-            self.paths[0].flags &= !4;
+            self.paths[0].flags &= !LevelFlags::MET_TARGET;
             for parent in &mut self.paths[1..] {
-                parent.flags |= 4;
+                parent.flags |= LevelFlags::MET_TARGET;
             }
         }
         let level = &mut self.paths[0];
@@ -53,7 +55,7 @@ impl Mover {
                     self.stop()?;
                     return Ok(AfterRequest::Paused);
                 }
-                if level.path_flags & 1 != 0 || self.attack_moving {
+                if level.path_flags.contains(PathFlags::LOOPS) || self.attack_moving {
                     return Err(GenieError::unsupported(
                         "a looping level without a path pauses the unit",
                     ));
@@ -66,12 +68,12 @@ impl Mover {
                 level.state = PathState::Unplanned;
                 return Ok(AfterRequest::Again);
             }
-        } else if level.path_flags & 1 == 0 {
+        } else if !level.path_flags.contains(PathFlags::LOOPS) {
             return Err(GenieError::unsupported(
                 "a found path without length stops the unit",
             ));
         }
-        level.flags |= 1;
+        level.flags |= LevelFlags::REACHED;
         Ok(AfterRequest::Again)
     }
 
@@ -129,7 +131,7 @@ impl Mover {
             let level = &mut self.paths[0];
             level.has_path = false;
             level.points.clear();
-            level.path_flags = 0;
+            level.path_flags = PathFlags::NONE;
             level.length = Distance::ZERO;
             level.created = WorldTime::ZERO;
         }

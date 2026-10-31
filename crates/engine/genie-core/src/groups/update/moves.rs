@@ -12,6 +12,7 @@ use crate::groups::update::{
 use crate::groups::{SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::movement::PathFlags;
 use crate::objects::ActionState;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::world::Millis;
@@ -154,7 +155,7 @@ impl World {
             return Ok(false);
         }
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags & 1 != 0);
+            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         let mut patrolling = true;
         if !patrol && g.flags >> 11 & 1 == 0 {
             patrolling = false;

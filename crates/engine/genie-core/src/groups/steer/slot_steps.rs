@@ -10,6 +10,7 @@ use crate::groups::motion::passes_waypoint;
 use crate::groups::steer::{CATCH_UP, CATCH_UP_SPAN, LINKED_RADIUS, SLOT_REACH};
 use crate::map::Distance;
 use crate::math::fmath::{BVector, at_most_or_unordered, below_or_unordered};
+use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::master_type::BUILDING;
@@ -198,7 +199,7 @@ impl World {
         let paused = u.body.mover().is_some_and(crate::movement::Mover::paused);
         let g = self.groups.held(group)?;
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags & 1 != 0);
+            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         let walks = g
             .motion
             .paths
