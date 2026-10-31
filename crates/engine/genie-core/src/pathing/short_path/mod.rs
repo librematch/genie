@@ -8,7 +8,7 @@
 use crate::GenieError;
 use crate::math::fmath;
 use crate::pathing::mesh::{Mesh, ONE, Rect};
-use crate::pathing::{ShapeId, ShapeSide};
+use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
 
 mod axis_dir;
 mod call;
@@ -26,9 +26,6 @@ use self::geometry::segment_hit;
 use self::geometry::{contact_point, ray_rect, shrunk_corner, snap_to_side};
 use self::nodes::{Corner, Foot, cheb, clamp_to_box, clip, corner_emits, in_box};
 use self::token::Token;
-
-/// A point in fixed point.
-pub type FixedPoint = [i32; 2];
 
 /// `DAT_142f43b10`, `DAT_142f43a10`: fixed point to float and back.
 const TO_FLOAT: f32 = crate::math::image::short_path::TO_FLOAT;
@@ -76,18 +73,20 @@ fn through_float(v: i32) -> i32 {
 
 /// The Euclidean distance in fixed point through float (`sqrtf` of the float differences).
 fn float_distance(a: FixedPoint, b: FixedPoint) -> i32 {
-    let dy = (a[1].wrapping_sub(b[1])) as f32 * TO_FLOAT;
-    let dx = (a[0].wrapping_sub(b[0])) as f32 * TO_FLOAT;
+    let dy = (a.y().wrapping_sub(b.y())) as f32 * TO_FLOAT;
+    let dx = (a.x().wrapping_sub(b.x())) as f32 * TO_FLOAT;
     (fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32
 }
 
 /// `FUN_14087c610`: `p` strictly inside `r` shrunk by `k`.
-const fn strictly_inside(r: Rect, [x, y]: FixedPoint, k: i32) -> bool {
+const fn strictly_inside(r: Rect, p: FixedPoint, k: i32) -> bool {
+    let [x, y] = p.get();
     r[0] + k < x && r[1] + k < y && x < r[2] - k && y < r[3] - k
 }
 
 /// `FUN_14087c650`: `p` inside `r` shrunk by `k`, edges included.
-const fn inside(r: Rect, [x, y]: FixedPoint, k: i32) -> bool {
+const fn inside(r: Rect, p: FixedPoint, k: i32) -> bool {
+    let [x, y] = p.get();
     r[0] + k <= x && r[1] + k <= y && x <= r[2] - k && y <= r[3] - k
 }
 
@@ -160,7 +159,12 @@ const UNSET: i32 = -0x40_0000;
 /// `DAT_143cc1f54`: the outline tracer's step limit.
 const TRACE_STEPS: i32 = 2000;
 /// `DAT_143cc1f60`: the four unit directions (x, y) of a type-3 node's nudges.
-const NUDGES: [FixedPoint; 4] = [[0, ONE], [ONE, 0], [0, -ONE], [-ONE, 0]];
+const NUDGES: [FixedPoint; 4] = [
+    FixedPoint::new(0, ONE),
+    FixedPoint::new(ONE, 0),
+    FixedPoint::new(0, -ONE),
+    FixedPoint::new(-ONE, 0),
+];
 /// No node or polygon.
 const NONE: u32 = u32::MAX;
 /// An open corner node without its emission: only the goal candidates, which never open, lack
@@ -185,8 +189,8 @@ struct Goal {
 impl Goal {
     /// The squared distance from `p` to the target's box grown by the radius (`>> 22` each).
     fn rect_distance2(&self, p: FixedPoint) -> i64 {
-        let lx = i64::from((p[0].wrapping_sub(self.at[0])).wrapping_abs()) - self.rrx;
-        let ly = i64::from((p[1].wrapping_sub(self.at[1])).wrapping_abs()) - self.rry;
+        let lx = i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - self.rrx;
+        let ly = i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - self.rry;
         let a = if lx < 0 { 0 } else { lx * lx };
         let b = if ly < 0 { 0 } else { ly * ly };
         (b >> 22) + (a >> 22)
@@ -195,12 +199,12 @@ impl Goal {
     /// `FUN_140fa3f10`: the estimate from `p` to the goal.
     fn heuristic(&self, p: FixedPoint) -> i32 {
         if !RECT_HEURISTIC {
-            let fy = (self.at[1].wrapping_sub(p[1])) as f32 * TO_FLOAT;
-            let fx = (self.at[0].wrapping_sub(p[0])) as f32 * TO_FLOAT;
+            let fy = (self.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
+            let fx = (self.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
             return (fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
         }
-        let lx = i64::from((p[0].wrapping_sub(self.at[0])).wrapping_abs()) - self.rrx;
-        let ly = i64::from((p[1].wrapping_sub(self.at[1])).wrapping_abs()) - self.rry;
+        let lx = i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - self.rrx;
+        let ly = i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - self.rry;
         let a = if lx < 0 { 0 } else { (lx * lx) as u64 };
         let b = if ly < 0 { 0 } else { (ly * ly) as u64 };
         isqrt((b & !0x3f_ffff).wrapping_add(a & !0x3f_ffff)) as i32

@@ -60,7 +60,7 @@ pub(super) fn corner_emits(
     g: FixedPoint,
 ) -> Option<Token> {
     use ShapeSide::{HighX, HighY, LowX, LowY};
-    let ([vx, vy], [gx, gy]) = (v, g);
+    let ([vx, vy], [gx, gy]) = (v.get(), g.get());
     match prev {
         LowY if next == LowX => (gx <= vx && gy <= vy).then_some(Token::NONE),
         LowY => {
@@ -98,7 +98,8 @@ pub(super) fn clip(
     } else {
         (bx[1], bx[3])
     };
-    let code = |[x, y]: FixedPoint| {
+    let code = |p: FixedPoint| {
+        let [x, y] = p.get();
         let mut c = if x < xmin {
             1
         } else if xmax < x {
@@ -127,25 +128,25 @@ pub(super) fn clip(
         }
         let c = if ca != 0 { ca } else { cb };
         // the differences in 32 bits, the products and the division in 64
-        let (dx, dy) = (b[0].wrapping_sub(a[0]), b[1].wrapping_sub(a[1]));
+        let (dx, dy) = (b.x().wrapping_sub(a.x()), b.y().wrapping_sub(a.y()));
         if c & 1 != 0 {
-            y = a[1].wrapping_add(part(dy, xmin.wrapping_sub(a[0]), dx));
+            y = a.y().wrapping_add(part(dy, xmin.wrapping_sub(a.x()), dx));
             x = xmin;
         } else if c & 2 != 0 {
-            y = a[1].wrapping_add(part(xmax.wrapping_sub(a[0]), dy, dx));
+            y = a.y().wrapping_add(part(xmax.wrapping_sub(a.x()), dy, dx));
             x = xmax;
         } else if c & 4 != 0 {
-            x = a[0].wrapping_add(part(ymin.wrapping_sub(a[1]), dx, dy));
+            x = a.x().wrapping_add(part(ymin.wrapping_sub(a.y()), dx, dy));
             y = ymin;
         } else if c & 8 != 0 {
-            x = a[0].wrapping_add(part(ymax.wrapping_sub(a[1]), dx, dy));
+            x = a.x().wrapping_add(part(ymax.wrapping_sub(a.y()), dx, dy));
             y = ymax;
         }
         if c == ca {
-            a = [x, y];
+            a = FixedPoint::new(x, y);
             ca = code(a);
         } else {
-            b = [x, y];
+            b = FixedPoint::new(x, y);
             cb = code(b);
         }
     }
@@ -153,29 +154,29 @@ pub(super) fn clip(
 }
 
 pub(super) const fn in_box(p: FixedPoint, b: [i32; 4]) -> bool {
-    b[0] <= p[0] && b[1] <= p[1] && p[0] <= b[2] && p[1] <= b[3]
+    b[0] <= p.x() && b[1] <= p.y() && p.x() <= b[2] && p.y() <= b[3]
 }
 
 /// `p` held in the box `b` on each axis (`[x0, y0, x1, y1]`).
 pub(super) const fn clamp_to_box(p: FixedPoint, b: [i32; 4]) -> FixedPoint {
-    [
-        if b[0] <= p[0] {
-            if b[2] < p[0] { b[2] } else { p[0] }
+    FixedPoint::new(
+        if b[0] <= p.x() {
+            if b[2] < p.x() { b[2] } else { p.x() }
         } else {
             b[0]
         },
-        if b[1] <= p[1] {
-            if b[3] < p[1] { b[3] } else { p[1] }
+        if b[1] <= p.y() {
+            if b[3] < p.y() { b[3] } else { p.y() }
         } else {
             b[1]
         },
-    ]
+    )
 }
 
 /// Chebyshev distance (`max(|dx|, |dy|)`), the polygon walks' cost.
 pub(super) const fn cheb(a: FixedPoint, b: FixedPoint) -> i32 {
-    let dy = (a[1].wrapping_sub(b[1])).wrapping_abs();
-    let dx = (a[0].wrapping_sub(b[0])).wrapping_abs();
+    let dy = (a.y().wrapping_sub(b.y())).wrapping_abs();
+    let dx = (a.x().wrapping_sub(b.x())).wrapping_abs();
     if dy < dx { dx } else { dy }
 }
 
@@ -233,8 +234,8 @@ impl Search<'_> {
         let d2: i64 = if RECT_HEURISTIC {
             self.goal.rect_distance2(pt)
         } else {
-            let dx = i64::from(self.goal.at[0].wrapping_sub(pt[0]));
-            let dy = i64::from(self.goal.at[1].wrapping_sub(pt[1]));
+            let dx = i64::from(self.goal.at.x().wrapping_sub(pt.x()));
+            let dy = i64::from(self.goal.at.y().wrapping_sub(pt.y()));
             i64::from((((dy * dy) >> 22) as i32).wrapping_add(((dx * dx) >> 22) as i32))
         };
         let kind = Kind::Corner {
@@ -274,14 +275,18 @@ impl Search<'_> {
             parent,
         } = edge;
         let (s, e, gv) = if dx != 0 {
-            (a[0], b[0], self.goal.at[0])
+            (a.x(), b.x(), self.goal.at.x())
         } else {
-            (a[1], b[1], self.goal.at[1])
+            (a.y(), b.y(), self.goal.at.y())
         };
         let low = if e < s { e } else { s };
         let high = if s < e { e } else { s };
         if low <= gv && gv <= high {
-            let foot = if dx != 0 { [gv, a[1]] } else { [a[0], gv] };
+            let foot = if dx != 0 {
+                FixedPoint::new(gv, a.y())
+            } else {
+                FixedPoint::new(a.x(), gv)
+            };
             let g = g0.wrapping_add((gv.wrapping_sub(s)).wrapping_abs());
             let _ = self.goal_test(Corner {
                 cost: g,

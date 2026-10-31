@@ -26,9 +26,11 @@ use crate::pathing::tile_path::Planner;
 use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
+pub use self::fixed_point::FixedPoint;
 pub use self::shape_id::ShapeId;
 pub use self::shape_side::ShapeSide;
 
+mod fixed_point;
 pub mod hull_path;
 pub mod long_path;
 pub mod mesh;

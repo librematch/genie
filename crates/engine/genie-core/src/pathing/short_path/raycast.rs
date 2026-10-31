@@ -43,7 +43,7 @@ impl Ctx<'_> {
 
     /// `FUN_140fa3dc0`: the first shape of `p`'s tile, not ignored, strictly holding `p` (shrunk).
     pub(super) fn holder(&self, p: FixedPoint) -> Result<Option<ShapeId>, GenieError> {
-        for &id in self.tile(Tile::new(tile_of(p[0]), tile_of(p[1])))? {
+        for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
             if !self.ignored(id)
                 && strictly_inside(*self.mesh.shapes.checked(id.index())?, p, self.d)
             {
@@ -61,7 +61,7 @@ impl Ctx<'_> {
         excl: ShapeId,
         d: i32,
     ) -> Result<Option<ShapeId>, GenieError> {
-        for &id in self.tile(Tile::new(tile_of(p[0]), tile_of(p[1])))? {
+        for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
             if id != excl
                 && !self.ignored(id)
                 && inside(*self.mesh.shapes.checked(id.index())?, p, d)
@@ -86,17 +86,17 @@ impl Ctx<'_> {
         let mut result = None;
         // B and C first test the shape against the ray's box
         let mut bx = [
-            if a[0] < b[0] { a[0] } else { b[0] },
-            if a[1] < b[1] { a[1] } else { b[1] },
-            if b[0] < a[0] { a[0] } else { b[0] },
-            if b[1] < a[1] { a[1] } else { b[1] },
+            if a.x() < b.x() { a.x() } else { b.x() },
+            if a.y() < b.y() { a.y() } else { b.y() },
+            if b.x() < a.x() { a.x() } else { b.x() },
+            if b.y() < a.y() { a.y() } else { b.y() },
         ];
         if matches!(cb, Callback::Box) {
-            if a[0] == b[0] {
+            if a.x() == b.x() {
                 bx[0] -= 1;
                 bx[2] += 1;
             }
-            if a[1] == b[1] {
+            if a.y() == b.y() {
                 bx[1] -= 1;
                 bx[3] += 1;
             }
@@ -159,7 +159,7 @@ impl Ctx<'_> {
         t: &mut i32,
         mut cb: Callback,
     ) -> Result<Option<(i32, Hit)>, GenieError> {
-        let (x0, y0, x1, y1) = (a[0], a[1], b[0], b[1]);
+        let (x0, y0, x1, y1) = (a.x(), a.y(), b.x(), b.y());
         let dx = x1.wrapping_sub(x0);
         let adx = dx.wrapping_abs();
         let ady = y1.wrapping_sub(y0).wrapping_abs();
@@ -244,23 +244,27 @@ impl Ctx<'_> {
         d: i32,
         dir: AxisDir,
     ) -> Option<(FixedPoint, ShapeSide)> {
-        let [x, y] = from;
+        let [x, y] = from.get();
         let met = match dir {
             AxisDir::PlusX => {
                 let h = d + r[0];
-                (r[1] + d < y && y < r[3] - d && h < end[0] && x <= h).then_some([h, y])
+                (r[1] + d < y && y < r[3] - d && h < end.x() && x <= h)
+                    .then_some(FixedPoint::new(h, y))
             }
             AxisDir::PlusY => {
                 let h = d + r[1];
-                (r[0] + d < x && x < r[2] - d && h < end[1] && y <= h).then_some([x, h])
+                (r[0] + d < x && x < r[2] - d && h < end.y() && y <= h)
+                    .then_some(FixedPoint::new(x, h))
             }
             AxisDir::MinusX => {
                 let h = r[2] - d;
-                (r[1] + d < y && y < r[3] - d && end[0] < h && h <= x).then_some([h, y])
+                (r[1] + d < y && y < r[3] - d && end.x() < h && h <= x)
+                    .then_some(FixedPoint::new(h, y))
             }
             AxisDir::MinusY => {
                 let h = r[3] - d;
-                (r[0] + d < x && x < r[2] - d && end[1] < h && h <= y).then_some([x, h])
+                (r[0] + d < x && x < r[2] - d && end.y() < h && h <= y)
+                    .then_some(FixedPoint::new(x, h))
             }
         };
         met.map(|p| (p, dir.facing()))
@@ -306,33 +310,33 @@ impl Ctx<'_> {
             };
         match dir {
             AxisDir::PlusX => {
-                let row = tile_of(from[1]);
-                let mut x = tile_of(from[0]) as u32;
-                while x <= tile_of(to[0]) as u32 {
+                let row = tile_of(from.y());
+                let mut x = tile_of(from.x()) as u32;
+                while x <= tile_of(to.x()) as u32 {
                     visit(self.tile(Tile::new(x as i32, row))?, &mut end, &mut out)?;
                     x = x.wrapping_add(1);
                 }
             }
             AxisDir::PlusY => {
-                let col = tile_of(from[0]);
-                let mut y = tile_of(from[1]) as u32;
-                while y <= tile_of(to[1]) as u32 {
+                let col = tile_of(from.x());
+                let mut y = tile_of(from.y()) as u32;
+                while y <= tile_of(to.y()) as u32 {
                     visit(self.tile(Tile::new(col, y as i32))?, &mut end, &mut out)?;
                     y = y.wrapping_add(1);
                 }
             }
             AxisDir::MinusX => {
-                let row = tile_of(from[1]);
-                let mut x = tile_of(from[0]);
-                while tile_of(to[0]) <= x {
+                let row = tile_of(from.y());
+                let mut x = tile_of(from.x());
+                while tile_of(to.x()) <= x {
                     visit(self.tile(Tile::new(x, row))?, &mut end, &mut out)?;
                     x -= 1;
                 }
             }
             AxisDir::MinusY => {
-                let col = tile_of(from[0]);
-                let mut y = tile_of(from[1]);
-                while tile_of(to[1]) <= y {
+                let col = tile_of(from.x());
+                let mut y = tile_of(from.y());
+                while tile_of(to.y()) <= y {
                     visit(self.tile(Tile::new(col, y))?, &mut end, &mut out)?;
                     y -= 1;
                 }
@@ -344,11 +348,11 @@ impl Ctx<'_> {
     /// `FUN_140fa8e60`: whether the straight walk from `a` to `b` is blocked (the smoothing's line of
     /// sight): an axis sweep along an axis, else the raycast with callback C.
     pub(super) fn sight_blocked(&self, a: FixedPoint, b: FixedPoint) -> Result<bool, GenieError> {
-        if a[0] == b[0] {
-            return Ok(self.sweep(a, b, AxisDir::of_dy(b[1] - a[1]))?.found);
+        if a.x() == b.x() {
+            return Ok(self.sweep(a, b, AxisDir::of_dy(b.y() - a.y()))?.found);
         }
-        if a[1] == b[1] {
-            return Ok(self.sweep(a, b, AxisDir::of_dx(b[0] - a[0]))?.found);
+        if a.y() == b.y() {
+            return Ok(self.sweep(a, b, AxisDir::of_dx(b.x() - a.x()))?.found);
         }
         let mut t = T_START;
         Ok(self.raycast(a, b, &mut t, Callback::Sight)?.is_some())

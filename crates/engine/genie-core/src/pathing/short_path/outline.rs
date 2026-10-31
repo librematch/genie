@@ -53,20 +53,20 @@ impl Search<'_> {
         } = vertex;
         if let (Some(&last), 4) = (poly.vertices.last(), winding.wrapping_abs()) {
             let closes = if vertical {
-                last[0] == first[0]
-                    && pos[0] == first[0]
+                last.x() == first.x()
+                    && pos.x() == first.x()
                     && if s0 == ShapeSide::HighX {
-                        last[1] <= first[1] && first[1] <= pos[1]
+                        last.y() <= first.y() && first.y() <= pos.y()
                     } else {
-                        first[1] <= last[1] && pos[1] <= first[1]
+                        first.y() <= last.y() && pos.y() <= first.y()
                     }
             } else {
-                last[1] == first[1]
-                    && pos[1] == first[1]
+                last.y() == first.y()
+                    && pos.y() == first.y()
                     && if s0 == ShapeSide::LowY {
-                        last[0] <= first[0] && first[0] <= pos[0]
+                        last.x() <= first.x() && first.x() <= pos.x()
                     } else {
-                        first[0] <= last[0] && pos[0] <= first[0]
+                        first.x() <= last.x() && pos.x() <= first.x()
                     }
             };
             if closes {
@@ -86,7 +86,7 @@ impl Search<'_> {
 
     /// The coordinate of `p` along a side's axis (x for sides 0 and 2, y for 1 and 3).
     pub(super) const fn along(p: FixedPoint, side: ShapeSide) -> i32 {
-        if side.along_y() { p[1] } else { p[0] }
+        if side.along_y() { p.y() } else { p.x() }
     }
 
     /// `FUN_140fa9630`: the trace left the bounds: walk the bounds' border from `pos` in the turn
@@ -103,10 +103,10 @@ impl Search<'_> {
         let b = self.bounds;
         let w = side.prev();
         let (target, dir) = match w {
-            ShapeSide::LowY => ([b[0], b[3]], AxisDir::PlusY),
-            ShapeSide::HighX => ([b[0], b[1]], AxisDir::MinusX),
-            ShapeSide::HighY => ([b[2], b[1]], AxisDir::MinusY),
-            ShapeSide::LowX => ([b[2], b[3]], AxisDir::PlusX),
+            ShapeSide::LowY => (FixedPoint::new(b[0], b[3]), AxisDir::PlusY),
+            ShapeSide::HighX => (FixedPoint::new(b[0], b[1]), AxisDir::MinusX),
+            ShapeSide::HighY => (FixedPoint::new(b[2], b[1]), AxisDir::MinusY),
+            ShapeSide::LowX => (FixedPoint::new(b[2], b[3]), AxisDir::PlusX),
         };
         let sw = self.ctx.sweep(*pos, target, dir)?;
         let u_new = Self::along(*pos, w);
@@ -389,60 +389,60 @@ impl Search<'_> {
         // the game's unsigned compares of the side numbers: `prev < 2`, `prev - 1 < 2` and the
         // like name two neighbouring sides
         match s_cur {
-            LowY if vc[1] == p[1] => {
-                let (a, b) = (vc[0], vn[0]);
+            LowY if vc.y() == p.y() => {
+                let (a, b) = (vc.x(), vn.x());
                 let start = if matches!(prev, LowY | HighX) {
-                    a <= p[0]
+                    a <= p.x()
                 } else {
-                    a < p[0]
+                    a < p.x()
                 };
                 start
                     && if matches!(next, LowX | LowY) {
-                        p[0] <= b
+                        p.x() <= b
                     } else {
-                        p[0] < b
+                        p.x() < b
                     }
             }
-            HighX if vc[0] == p[0] => {
-                let (a, b) = (vc[1], vn[1]);
+            HighX if vc.x() == p.x() => {
+                let (a, b) = (vc.y(), vn.y());
                 let start = if matches!(prev, HighX | HighY) {
-                    a <= p[1]
+                    a <= p.y()
                 } else {
-                    a < p[1]
+                    a < p.y()
                 };
                 start
                     && if matches!(next, LowY | HighX) {
-                        p[1] <= b
+                        p.y() <= b
                     } else {
-                        p[1] < b
+                        p.y() < b
                     }
             }
-            HighY if vc[1] == p[1] => {
-                let (a, b) = (vc[0], vn[0]);
+            HighY if vc.y() == p.y() => {
+                let (a, b) = (vc.x(), vn.x());
                 let start = if matches!(next, HighX | HighY) {
-                    b <= p[0]
+                    b <= p.x()
                 } else {
-                    b < p[0]
+                    b < p.x()
                 };
                 start
                     && if matches!(prev, HighY | LowX) {
-                        p[0] <= a
+                        p.x() <= a
                     } else {
-                        p[0] < a
+                        p.x() < a
                     }
             }
-            LowX if vc[0] == p[0] => {
-                let (a, b) = (vc[1], vn[1]);
+            LowX if vc.x() == p.x() => {
+                let (a, b) = (vc.y(), vn.y());
                 let start = if matches!(next, HighY | LowX) {
-                    b <= p[1]
+                    b <= p.y()
                 } else {
-                    b < p[1]
+                    b < p.y()
                 };
                 start
                     && if matches!(prev, LowY | LowX) {
-                        p[1] <= a
+                        p.y() <= a
                     } else {
-                        p[1] < a
+                        p.y() < a
                     }
             }
             _ => false,
@@ -475,7 +475,7 @@ impl Search<'_> {
                 let vv = *v.checked(bi as usize)?;
                 self.walk_new_corner(&walk, &poly, (bi, bi - 1), cb, (WalkDir::Backward, bi, 0))?;
                 let w = *v.checked((bi - 1) as usize)?;
-                let dx = vv[0] - w[0];
+                let dx = vv.x() - w.x();
                 self.foot_test(Foot {
                     poly: pi,
                     start: vv,
@@ -500,7 +500,7 @@ impl Search<'_> {
                 )?;
                 fi += 1;
                 let w = *v.checked(fi as usize)?;
-                let dx = vv[0] - w[0];
+                let dx = vv.x() - w.x();
                 self.foot_test(Foot {
                     poly: pi,
                     start: vv,
@@ -533,8 +533,8 @@ impl Search<'_> {
         let v = &poly.vertices;
         let last = v.len() - 1;
         let (vb, vf) = (*v.checked(last)?, *v.checked(0)?);
-        let (dxb, dyb) = (vb[0] - p[0], vb[1] - p[1]);
-        let (dxf, dyf) = (vf[0] - p[0], vf[1] - p[1]);
+        let (dxb, dyb) = (vb.x() - p.x(), vb.y() - p.y());
+        let (dxf, dyf) = (vf.x() - p.x(), vf.y() - p.y());
         self.foot_test(Foot {
             poly: walk.poly,
             start: p,

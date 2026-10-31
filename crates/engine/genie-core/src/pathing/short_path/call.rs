@@ -46,10 +46,10 @@ impl Query {
             from: self.from,
             to: self.to,
             radius: fixed(self.radius),
-            target_size: [
+            target_size: FixedPoint::new(
                 fixed(Distance::new(self.target_size.x())),
                 fixed(Distance::new(self.target_size.y())),
-            ],
+            ),
             range: fixed(self.range),
             blocked: self.blocked,
         }
@@ -62,7 +62,8 @@ pub(super) struct Fixed {
     pub(super) from: FixedPoint,
     pub(super) to: FixedPoint,
     pub(super) radius: i32,
-    pub(super) target_size: [i32; 2],
+    /// The target's half sizes, x and y.
+    pub(super) target_size: FixedPoint,
     pub(super) range: i32,
     pub(super) blocked: u64,
 }
@@ -173,10 +174,10 @@ impl Call {
         }
         // CVTTSS2SI into a 64-bit register, its low 32 bits kept
         let fixed = |f: f32| crate::math::conversions::cvttss2si_64(f * TO_FIXED) as i32;
-        let to = [fixed(self.to.x()), fixed(self.to.y())];
+        let to = FixedPoint::new(fixed(self.to.x()), fixed(self.to.y()));
         let at_target = self
             .target
-            .filter(|t| to == [fixed(t.position.x()), fixed(t.position.y())]);
+            .filter(|t| to == FixedPoint::new(fixed(t.position.x()), fixed(t.position.y())));
         let ignore = self
             .listed
             .iter()
@@ -186,7 +187,7 @@ impl Call {
         let size = at_target.map_or(Footprint::ZERO, |t| t.half_size);
         Entry::Search {
             query: Query {
-                from: [fixed(self.from.x()), fixed(self.from.y())],
+                from: FixedPoint::new(fixed(self.from.x()), fixed(self.from.y())),
                 to,
                 radius: self.radius,
                 target_size: size,
@@ -203,7 +204,8 @@ impl Call {
 #[must_use]
 pub fn to_path(points: &[FixedPoint]) -> crate::pathing::tile_path::Path {
     let mut path = crate::pathing::tile_path::Path::default();
-    for &[x, y] in points {
+    for p in points {
+        let [x, y] = p.get();
         let _ = path.push(BVector::new(x as f32 * TO_FLOAT, 0.0, y as f32 * TO_FLOAT));
     }
     path
@@ -317,8 +319,8 @@ impl Pather {
         let d = 0x20_0000 - r;
         let w = mesh.width as i32;
         let cap = w.wrapping_mul(ONE) - 1 - r;
-        let [sx, sy] = q.from;
-        let [gx, gy] = q.to;
+        let [sx, sy] = q.from.get();
+        let [gx, gy] = q.to.get();
         let hold_high = |v: i32| {
             if v.wrapping_add(0x100_0000) < cap {
                 v.wrapping_add(0x100_0000)
@@ -342,12 +344,12 @@ impl Pather {
         self.remove_terrain(mesh);
         self.add_terrain(mesh, words, q.blocked, bounds);
         let goal = Goal {
-            at: [gx, gy],
+            at: FixedPoint::new(gx, gy),
             r,
-            rx: q.target_size[0],
-            ry: q.target_size[1],
-            rrx: i64::from(r.wrapping_add(q.target_size[0])),
-            rry: i64::from(r.wrapping_add(q.target_size[1])),
+            rx: q.target_size.x(),
+            ry: q.target_size.y(),
+            rrx: i64::from(r.wrapping_add(q.target_size.x())),
+            rry: i64::from(r.wrapping_add(q.target_size.y())),
             range: q.range,
             range2: (i64::from(q.range) * i64::from(q.range)) >> 22,
         };
@@ -383,8 +385,8 @@ impl Pather {
         let d = 0x20_0000 - r;
         let w = mesh.width as i32;
         let cap = w.wrapping_mul(ONE) - 1 - r;
-        let [sx, sy] = q.from;
-        let [mut gx, mut gy] = q.to;
+        let [sx, sy] = q.from.get();
+        let [mut gx, mut gy] = q.to.get();
         let hold_high = |v: i32| {
             if v.wrapping_add(0x100_0000) < cap {
                 v.wrapping_add(0x100_0000)
@@ -413,20 +415,20 @@ impl Pather {
             return Ok(invalid);
         }
         if gx < bounds[0] || gy < bounds[1] || bounds[2] < gx || bounds[3] < gy {
-            match clip(q.from, [gx, gy], bounds) {
-                Some((_, end)) => [gx, gy] = end,
+            match clip(q.from, FixedPoint::new(gx, gy), bounds) {
+                Some((_, end)) => [gx, gy] = end.get(),
                 None => return Ok(invalid),
             }
         }
         self.remove_terrain(mesh);
         self.add_terrain(mesh, words, q.blocked, bounds);
         let goal = Goal {
-            at: [gx, gy],
+            at: FixedPoint::new(gx, gy),
             r,
-            rx: q.target_size[0],
-            ry: q.target_size[1],
-            rrx: i64::from(r.wrapping_add(q.target_size[0])),
-            rry: i64::from(r.wrapping_add(q.target_size[1])),
+            rx: q.target_size.x(),
+            ry: q.target_size.y(),
+            rrx: i64::from(r.wrapping_add(q.target_size.x())),
+            rry: i64::from(r.wrapping_add(q.target_size.y())),
             range: q.range,
             range2: (i64::from(q.range) * i64::from(q.range)) >> 22,
         };

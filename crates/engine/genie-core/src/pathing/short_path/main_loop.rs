@@ -212,10 +212,10 @@ impl Search<'_> {
         if touches(found) {
             let b = self.bounds;
             for dir in NUDGES {
-                let tj = [
-                    ((i64::from(dir[0]) * i64::from(self.goal.rx)) >> 22) as i32 + t[0],
-                    ((i64::from(dir[1]) * i64::from(self.goal.ry)) >> 22) as i32 + t[1],
-                ];
+                let tj = FixedPoint::new(
+                    ((i64::from(dir.x()) * i64::from(self.goal.rx)) >> 22) as i32 + t.x(),
+                    ((i64::from(dir.y()) * i64::from(self.goal.ry)) >> 22) as i32 + t.y(),
+                );
                 if !in_box(tj, b) {
                     continue;
                 }
@@ -264,9 +264,9 @@ impl Search<'_> {
     /// be the best (by cost, not estimate).
     pub(super) fn corner_axis(&mut self, n: Node, t: FixedPoint) -> Result<(), GenieError> {
         let p = n.at;
-        let dx = t[0].wrapping_sub(p[0]);
-        let dy = t[1].wrapping_sub(p[1]);
-        let m = [t[0], p[1]];
+        let dx = t.x().wrapping_sub(p.x());
+        let dy = t.y().wrapping_sub(p.y());
+        let m = FixedPoint::new(t.x(), p.y());
         let sw = self.ctx.sweep(p, m, AxisDir::of_dx(dx))?;
         if let Some((shape, side, at)) = sw.counted()? {
             let g = n.g.wrapping_add(float_distance(p, at));
@@ -283,7 +283,7 @@ impl Search<'_> {
             let w = self.add(
                 n.g.wrapping_add(dx.wrapping_abs()),
                 n.idx,
-                [step.wrapping_add(p[0]), p[1]],
+                FixedPoint::new(step.wrapping_add(p.x()), p.y()),
                 Kind::Waypoint,
             );
             if self.best == NONE || w.g < self.arena.checked(self.best as usize)?.g {
@@ -297,7 +297,7 @@ impl Search<'_> {
             m,
             Kind::Waypoint,
         );
-        let g = through_float((at[1].wrapping_sub(p[1])).wrapping_abs()).wrapping_add(mid.g);
+        let g = through_float((at.y().wrapping_sub(p.y())).wrapping_abs()).wrapping_add(mid.g);
         self.side_node(g, mid.idx, shape, side, at);
         Ok(())
     }
@@ -467,8 +467,8 @@ impl Search<'_> {
         while 1 <= frac {
             let qp = Self::at_fraction(p, t, frac);
             if self.ctx.holder(qp)?.is_none() {
-                let dx = ((i64::from(t[0].wrapping_sub(p[0])) * i64::from(frac)) >> 22) as i32;
-                let dy = ((i64::from(t[1].wrapping_sub(p[1])) * i64::from(frac)) >> 22) as i32;
+                let dx = ((i64::from(t.x().wrapping_sub(p.x())) * i64::from(frac)) >> 22) as i32;
+                let dy = ((i64::from(t.y().wrapping_sub(p.y())) * i64::from(frac)) >> 22) as i32;
                 let fy = dy as f32 * TO_FLOAT;
                 let fx = dx as f32 * TO_FLOAT;
                 let g = (fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
@@ -478,7 +478,7 @@ impl Search<'_> {
             frac -= 0x6_6666;
         }
         let r = *self.ctx.mesh.shapes.checked(hit.shape.index())?;
-        let centre = [
+        let centre = FixedPoint::new(
             r[0].wrapping_add(
                 (((i64::from(r[2] - r[0]) * 0x40_0000)
                     + ((i64::from(r[2] - r[0]) >> 63) & 0x7f_ffff))
@@ -489,23 +489,23 @@ impl Search<'_> {
                     + ((i64::from(r[3] - r[1]) >> 63) & 0x7f_ffff))
                     >> 23) as i32,
             ),
-        ];
+        );
         let b = self.bounds;
-        let c = [
-            if b[0] <= centre[0] {
-                if b[2] < centre[0] { b[2] } else { centre[0] }
+        let c = FixedPoint::new(
+            if b[0] <= centre.x() {
+                if b[2] < centre.x() { b[2] } else { centre.x() }
             } else {
                 b[0]
             },
-            if b[1] <= centre[1] {
-                if b[3] < centre[1] { b[3] } else { centre[1] }
+            if b[1] <= centre.y() {
+                if b[3] < centre.y() { b[3] } else { centre.y() }
             } else {
                 b[1]
             },
-        ];
-        let delta = [c[0].wrapping_sub(p[0]), c[1].wrapping_sub(p[1])];
-        let dir_x = AxisDir::of_dx(delta[0]);
-        let dir_y = AxisDir::of_dy(delta[1]);
+        );
+        let delta = FixedPoint::new(c.x().wrapping_sub(p.x()), c.y().wrapping_sub(p.y()));
+        let dir_x = AxisDir::of_dx(delta.x());
+        let dir_y = AxisDir::of_dy(delta.y());
         self.legs(base, c, dir_x, dir_y, delta)?;
         self.legs(base, c, dir_y, dir_x, delta)
     }
@@ -525,8 +525,8 @@ pub(super) fn range_point(
 ) -> Result<FixedPoint, GenieError> {
     let mut out = goal;
     if range != 0 {
-        let dx = i64::from(p[0].wrapping_sub(goal[0]));
-        let dy = i64::from(p[1].wrapping_sub(goal[1]));
+        let dx = i64::from(p.x().wrapping_sub(goal.x()));
+        let dy = i64::from(p.y().wrapping_sub(goal.y()));
         let len = isqrt(((dy * dy) as u64 & !0x3f_ffff).wrapping_add((dx * dx) as u64 & !0x3f_ffff))
             as i32;
         if len == 0 {
@@ -536,8 +536,12 @@ pub(super) fn range_point(
         }
         let ux = ((dx << 22) / i64::from(len)) as i32;
         let uy = ((dy << 22) / i64::from(len)) as i32;
-        out[0] = out[0].wrapping_add(((i64::from(ux) * i64::from(range)) >> 22) as i32);
-        out[1] = out[1].wrapping_add(((i64::from(uy) * i64::from(range)) >> 22) as i32);
+        out = FixedPoint::new(
+            out.x()
+                .wrapping_add(((i64::from(ux) * i64::from(range)) >> 22) as i32),
+            out.y()
+                .wrapping_add(((i64::from(uy) * i64::from(range)) >> 22) as i32),
+        );
     }
     Ok(out)
 }

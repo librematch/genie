@@ -1,56 +1,52 @@
 //! The fixed-point geometry: a shrunk rectangle's corners and sides, a contact's point, the
 //! segment and ray hits.
 
+use crate::pathing::FixedPoint;
 use crate::pathing::ShapeSide;
 use crate::pathing::mesh::Rect;
-use crate::pathing::short_path::FixedPoint;
 
 /// `FUN_140fa8460`: corner `k` of `r` shrunk by `d`.
 pub(super) const fn shrunk_corner(r: Rect, k: u32, d: i32) -> FixedPoint {
     match k {
-        0 => [r[0] + d, r[1] + d],
-        1 => [r[2] - d, r[1] + d],
-        2 => [r[2] - d, r[3] - d],
-        3 => [r[0] + d, r[3] - d],
-        _ => [r[0], r[1]],
+        0 => FixedPoint::new(r[0] + d, r[1] + d),
+        1 => FixedPoint::new(r[2] - d, r[1] + d),
+        2 => FixedPoint::new(r[2] - d, r[3] - d),
+        3 => FixedPoint::new(r[0] + d, r[3] - d),
+        _ => FixedPoint::new(r[0], r[1]),
     }
 }
 
 /// `FUN_140fa8350`: a contact's junction moved by `d` into the free space beside its side.
-pub(super) const fn contact_point(
-    [x, y]: FixedPoint,
-    side: ShapeSide,
-    d: i32,
-    flag: u8,
-) -> FixedPoint {
+pub(super) const fn contact_point(p: FixedPoint, side: ShapeSide, d: i32, flag: u8) -> FixedPoint {
+    let [x, y] = p.get();
     let f = flag == 1;
     match side {
         ShapeSide::HighX => {
             if f {
-                [x - d, y + d]
+                FixedPoint::new(x - d, y + d)
             } else {
-                [x - d, y - d]
+                FixedPoint::new(x - d, y - d)
             }
         }
         ShapeSide::HighY => {
             if f {
-                [x - d, y - d]
+                FixedPoint::new(x - d, y - d)
             } else {
-                [x + d, y - d]
+                FixedPoint::new(x + d, y - d)
             }
         }
         ShapeSide::LowX => {
             if f {
-                [x + d, y - d]
+                FixedPoint::new(x + d, y - d)
             } else {
-                [x + d, y + d]
+                FixedPoint::new(x + d, y + d)
             }
         }
         ShapeSide::LowY => {
             if f {
-                [x + d, y + d]
+                FixedPoint::new(x + d, y + d)
             } else {
-                [x - d, y + d]
+                FixedPoint::new(x - d, y + d)
             }
         }
     }
@@ -69,20 +65,16 @@ pub(super) fn snap_to_side(p: &mut FixedPoint, r: Rect, side: ShapeSide, d: i32)
     };
     match side {
         ShapeSide::LowY => {
-            p[0] = hold(p[0], r[0] + d, r[2] - d);
-            p[1] = r[1] + d;
+            *p = FixedPoint::new(hold(p.x(), r[0] + d, r[2] - d), r[1] + d);
         }
         ShapeSide::HighX => {
-            p[0] = r[2] - d;
-            p[1] = hold(p[1], r[1] + d, r[3] - d);
+            *p = FixedPoint::new(r[2] - d, hold(p.y(), r[1] + d, r[3] - d));
         }
         ShapeSide::HighY => {
-            p[0] = hold(p[0], r[0] + d, r[2] - d);
-            p[1] = r[3] - d;
+            *p = FixedPoint::new(hold(p.x(), r[0] + d, r[2] - d), r[3] - d);
         }
         ShapeSide::LowX => {
-            p[0] = r[0] + d;
-            p[1] = hold(p[1], r[1] + d, r[3] - d);
+            *p = FixedPoint::new(r[0] + d, hold(p.y(), r[1] + d, r[3] - d));
         }
     }
 }
@@ -98,8 +90,8 @@ pub(super) fn segment_hit(
     t: &mut i32,
 ) -> i32 {
     let w = |v: i32| i64::from(v);
-    let (x1, y1, x2, y2) = (w(a[0]), w(a[1]), w(b[0]), w(b[1]));
-    let (x3, y3, x4, y4) = (w(c[0]), w(c[1]), w(e[0]), w(e[1]));
+    let (x1, y1, x2, y2) = (w(a.x()), w(a.y()), w(b.x()), w(b.y()));
+    let (x3, y3, x4, y4) = (w(c.x()), w(c.y()), w(e.x()), w(e.y()));
     let den = (((y4 - y3) * (x2 - x1)) >> 22) - (((y2 - y1) * (x4 - x3)) >> 22);
     if den == 0 {
         return 0;
@@ -153,7 +145,7 @@ pub(super) fn ray_rect(
     r: Rect,
     t: &mut i32,
 ) -> Option<(i32, ShapeSide)> {
-    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
     let mut found = None;
     // the side across x it faces: the right (1) for a ray going left, the left (3) for one going
     // right
@@ -191,16 +183,22 @@ pub(super) fn ray_right_side(
     [_, ry0, rx1, ry1]: Rect,
     t: &mut i32,
 ) -> i32 {
-    if b[1] - a[1] != 0 {
-        return segment_hit(a, b, [rx1, ry0], [rx1, ry1], t);
+    if b.y() - a.y() != 0 {
+        return segment_hit(
+            a,
+            b,
+            FixedPoint::new(rx1, ry0),
+            FixedPoint::new(rx1, ry1),
+            t,
+        );
     }
-    if a[1] <= ry0 || ry1 <= a[1] {
+    if a.y() <= ry0 || ry1 <= a.y() {
         return 0;
     }
-    if rx1 <= b[0] || a[0] < rx1 {
+    if rx1 <= b.x() || a.x() < rx1 {
         return 0;
     }
-    let u = ray_ratio(rx1 - a[0], b[0] - a[0]);
+    let u = ray_ratio(rx1 - a.x(), b.x() - a.x());
     if *t <= u {
         return 0;
     }
@@ -216,16 +214,22 @@ pub(super) fn ray_left_side(
     [rx0, ry0, _, ry1]: Rect,
     t: &mut i32,
 ) -> i32 {
-    if b[1] - a[1] != 0 {
-        return segment_hit(a, b, [rx0, ry0], [rx0, ry1], t);
+    if b.y() - a.y() != 0 {
+        return segment_hit(
+            a,
+            b,
+            FixedPoint::new(rx0, ry0),
+            FixedPoint::new(rx0, ry1),
+            t,
+        );
     }
-    if a[1] <= ry0 || ry1 <= a[1] {
+    if a.y() <= ry0 || ry1 <= a.y() {
         return 0;
     }
-    if b[0] <= rx0 || rx0 < a[0] {
+    if b.x() <= rx0 || rx0 < a.x() {
         return 0;
     }
-    let u = ray_ratio(rx0 - a[0], b[0] - a[0]);
+    let u = ray_ratio(rx0 - a.x(), b.x() - a.x());
     if *t <= u {
         return 0;
     }
@@ -242,16 +246,22 @@ pub(super) fn ray_bottom_side(
     [rx0, ry0, rx1, _]: Rect,
     t: &mut i32,
 ) -> i32 {
-    if b[0] - a[0] != 0 {
-        return segment_hit(a, b, [rx0, ry0], [rx1, ry0], t);
+    if b.x() - a.x() != 0 {
+        return segment_hit(
+            a,
+            b,
+            FixedPoint::new(rx0, ry0),
+            FixedPoint::new(rx1, ry0),
+            t,
+        );
     }
-    if !(rx0 < a[0] && a[0] < rx1) {
+    if !(rx0 < a.x() && a.x() < rx1) {
         return 0;
     }
-    if b[1] <= ry0 || ry0 < a[1] {
+    if b.y() <= ry0 || ry0 < a.y() {
         return 0;
     }
-    let u = ray_ratio(ry0 - a[1], b[1] - a[1]);
+    let u = ray_ratio(ry0 - a.y(), b.y() - a.y());
     if *t <= u {
         return 0;
     }
@@ -267,16 +277,22 @@ pub(super) fn ray_top_side(
     [rx0, _, rx1, ry1]: Rect,
     t: &mut i32,
 ) -> i32 {
-    if b[0] - a[0] != 0 {
-        return segment_hit(a, b, [rx0, ry1], [rx1, ry1], t);
+    if b.x() - a.x() != 0 {
+        return segment_hit(
+            a,
+            b,
+            FixedPoint::new(rx0, ry1),
+            FixedPoint::new(rx1, ry1),
+            t,
+        );
     }
-    if !(rx0 < a[0] && a[0] < rx1) {
+    if !(rx0 < a.x() && a.x() < rx1) {
         return 0;
     }
-    if ry1 <= b[1] || a[1] < ry1 {
+    if ry1 <= b.y() || a.y() < ry1 {
         return 0;
     }
-    let u = ray_ratio(ry1 - a[1], b[1] - a[1]);
+    let u = ray_ratio(ry1 - a.y(), b.y() - a.y());
     if *t <= u {
         return 0;
     }

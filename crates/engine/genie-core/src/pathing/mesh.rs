@@ -11,7 +11,7 @@
 //! exactly: a freed slot links the next free one through its first word, last in first out; the
 //! tile lists and contact lists keep their order of insertion.
 
-use crate::pathing::{ShapeId, ShapeSide};
+use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
 use std::collections::HashSet;
 
 /// One tile in fixed point.
@@ -29,7 +29,7 @@ pub struct Contact {
     /// w1: the side of the other shape the outline goes on along.
     pub side: ShapeSide,
     /// w2, w3: the junction.
-    pub at: [i32; 2],
+    pub at: FixedPoint,
     /// w4: the junction along the owner side's axis (x for sides 0 and 2, y for 1 and 3).
     pub along: i32,
     /// w5: a collinear contact at the start of its side in one of the two shapes.
@@ -57,12 +57,12 @@ pub struct Mesh {
 /// Corner `k` of a rectangle (`FUN_14087c6b0`): 0 = (x0, y0), 1 = (x1, y0), 2 = (x1, y1),
 /// 3 = (x0, y1).
 #[must_use]
-pub const fn corner(r: Rect, k: u32) -> [i32; 2] {
+pub const fn corner(r: Rect, k: u32) -> FixedPoint {
     match k {
-        0 => [r[0], r[1]],
-        1 => [r[2], r[1]],
-        2 => [r[2], r[3]],
-        _ => [r[0], r[3]],
+        0 => FixedPoint::new(r[0], r[1]),
+        1 => FixedPoint::new(r[2], r[1]),
+        2 => FixedPoint::new(r[2], r[3]),
+        _ => FixedPoint::new(r[0], r[3]),
     }
 }
 
@@ -70,7 +70,8 @@ pub const fn corner(r: Rect, k: u32) -> [i32; 2] {
 /// overlap lies on, and whether it lies on both along one line (`FUN_140fdb8d0`,
 /// 0x140fdbcb0..0x140fdbddc, transliterated from the disassembly: each test overwrites what an
 /// earlier one set); None when the corner yields no contact.
-fn classify([cx, cy]: [i32; 2], o: Rect, n: Rect) -> Option<(ShapeSide, ShapeSide, bool)> {
+fn classify(c: FixedPoint, o: Rect, n: Rect) -> Option<(ShapeSide, ShapeSide, bool)> {
+    let [cx, cy] = c.get();
     let (mut lo, mut hi) = (ShapeSide::LowY, ShapeSide::LowY);
     let (mut collinear, mut found) = (false, false);
     let mut by_n_y = false;
@@ -273,7 +274,7 @@ impl Mesh {
             let Some((lo, hi, collinear)) = classify(c, or, nr) else {
                 continue;
             };
-            let along = |side: ShapeSide| if side.along_y() { c[1] } else { c[0] };
+            let along = |side: ShapeSide| if side.along_y() { c.y() } else { c.x() };
             if collinear {
                 // the owner: the shape with the junction as a corner, o before n at each corner
                 let owner = (0..4).find_map(|j| {
@@ -296,10 +297,10 @@ impl Mesh {
                     continue;
                 };
                 let flag = match lo {
-                    ShapeSide::LowY => c[0] == a[0] || c[0] == b[0],
-                    ShapeSide::HighX => c[1] == a[1] || c[1] == b[1],
-                    ShapeSide::HighY => c[0] == a[2] || c[0] == b[2],
-                    ShapeSide::LowX => c[1] == a[3] || c[1] == b[3],
+                    ShapeSide::LowY => c.x() == a[0] || c.x() == b[0],
+                    ShapeSide::HighX => c.y() == a[1] || c.y() == b[1],
+                    ShapeSide::HighY => c.x() == a[2] || c.x() == b[2],
+                    ShapeSide::LowX => c.y() == a[3] || c.y() == b[3],
                 };
                 self.contact(
                     (owner, lo),
@@ -440,7 +441,7 @@ mod tests {
             [Contact {
                 other: b,
                 side: ShapeSide::LowX,
-                at: [0x17a0_0000, 0x0b20_0000],
+                at: FixedPoint::new(0x17a0_0000, 0x0b20_0000),
                 along: 0x17a0_0000,
                 flag: 0,
                 half: 0x20_0000,

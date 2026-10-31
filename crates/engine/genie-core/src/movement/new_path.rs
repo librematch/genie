@@ -17,6 +17,7 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
+use crate::pathing::FixedPoint;
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Path, Request};
 use crate::world::WorldTime;
@@ -246,8 +247,8 @@ impl Mover {
         let fixed =
             |f: f32| crate::math::conversions::cvttss2si_64(f * short_path::TO_FIXED) as i32;
         let query = short_path::Query {
-            from: [fixed(from.x()), fixed(from.y())],
-            to: [fixed(to.x()), fixed(to.y())],
+            from: FixedPoint::new(fixed(from.x()), fixed(from.y())),
+            to: FixedPoint::new(fixed(to.x()), fixed(to.y())),
             radius: Distance::new(self.stats.radius.x()),
             target_size: target.radius,
             range: self.stats.weapon_range,

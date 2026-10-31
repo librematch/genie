@@ -25,13 +25,18 @@ const fn side_corners(side: ShapeSide) -> (u32, u32) {
 /// A side's direction from its first corner to its second ([`side_corners`]): one tile along x
 /// or y.
 const fn side_dir(side: ShapeSide) -> FixedPoint {
-    if side.along_y() { [0, ONE] } else { [ONE, 0] }
+    if side.along_y() {
+        FixedPoint::new(0, ONE)
+    } else {
+        FixedPoint::new(ONE, 0)
+    }
 }
 
 /// The distance from `p` to `a` in fixed point, through floats as the game takes it.
-fn float_distance([px, py]: FixedPoint, a: FixedPoint) -> i32 {
-    let dy = (py.wrapping_sub(a[1])) as f32 * TO_FLOAT;
-    let dx = (px.wrapping_sub(a[0])) as f32 * TO_FLOAT;
+fn float_distance(p: FixedPoint, a: FixedPoint) -> i32 {
+    let [px, py] = p.get();
+    let dy = (py.wrapping_sub(a.y())) as f32 * TO_FLOAT;
+    let dx = (px.wrapping_sub(a.x())) as f32 * TO_FLOAT;
     (fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32
 }
 
@@ -45,8 +50,8 @@ impl Search<'_> {
         if g.range2 >= g.rect_distance2(p) {
             return Ok(3);
         }
-        let fx = (g.at[0].wrapping_sub(p[0])) as f32 * TO_FLOAT;
-        let fy = (g.at[1].wrapping_sub(p[1])) as f32 * TO_FLOAT;
+        let fx = (g.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
+        let fy = (g.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
         // CVTTSS2SI RAX at 0x140fa4558, EAX stored: a start 512 tiles or more away wraps
         let f = crate::math::conversions::cvttss2si_64(fmath::sqrt(fx * fx + fy * fy) * TO_FIXED)
             as i32;
@@ -86,7 +91,7 @@ impl Search<'_> {
         let total = mesh.width * mesh.width;
         let rr = ((i64::from(self.goal.r) << 23) >> 22) as i32;
         let rr2 = i64::from(((i64::from(rr) * i64::from(rr)) >> 22) as i32);
-        let [px, py] = p;
+        let [px, py] = p.get();
         let tile = |x: i32, y: i32| (tile_of(y).wrapping_mul(w)).wrapping_add(tile_of(x)) as u32;
         let tiles = [
             tile(px - rr, py - rr),
@@ -126,23 +131,23 @@ impl Search<'_> {
     ) -> Result<(), GenieError> {
         let d = self.ctx.d;
         let r = *self.ctx.mesh.shapes.checked(id.index())?;
-        let [px, py] = p;
+        let [px, py] = p.get();
         let (first, second) = side_corners(side);
         let a = shrunk_corner(r, first, d);
         let e = shrunk_corner(r, second, d);
         let dir = side_dir(side);
         let (t, dist2, span) = if side.along_y() {
-            let u = i64::from(dir[1]);
-            let t = ((i64::from(py - a[1]) * u) >> 22) as i32;
-            let perp = i64::from((py - a[1]) - (((i64::from(t) * u) >> 22) as i32));
-            let dx = i64::from(px - a[0]);
-            (t, ((perp * perp) >> 22) + ((dx * dx) >> 22), e[1] - a[1])
+            let u = i64::from(dir.y());
+            let t = ((i64::from(py - a.y()) * u) >> 22) as i32;
+            let perp = i64::from((py - a.y()) - (((i64::from(t) * u) >> 22) as i32));
+            let dx = i64::from(px - a.x());
+            (t, ((perp * perp) >> 22) + ((dx * dx) >> 22), e.y() - a.y())
         } else {
-            let u = i64::from(dir[0]);
-            let t = ((i64::from(px - a[0]) * u) >> 22) as i32;
-            let perp = i64::from((px - a[0]) - (((i64::from(t) * u) >> 22) as i32));
-            let dy = i64::from(py - a[1]);
-            (t, ((dy * dy) >> 22) + ((perp * perp) >> 22), e[0] - a[0])
+            let u = i64::from(dir.x());
+            let t = ((i64::from(px - a.x()) * u) >> 22) as i32;
+            let perp = i64::from((px - a.x()) - (((i64::from(t) * u) >> 22) as i32));
+            let dy = i64::from(py - a.y());
+            (t, ((dy * dy) >> 22) + ((perp * perp) >> 22), e.x() - a.x())
         };
         if dist2 > rr2 {
             return Ok(());
@@ -151,10 +156,10 @@ impl Search<'_> {
         let h = (fmath::sqrt((rr2 - dist2) as f32 * TO_FLOAT) * TO_FIXED) as i32;
         for c in [t - h, h + t] {
             if 0 < c && c < span {
-                let q = [
-                    ((i64::from(dir[0]) * i64::from(c)) >> 22) as i32 + a[0],
-                    ((i64::from(dir[1]) * i64::from(c)) >> 22) as i32 + a[1],
-                ];
+                let q = FixedPoint::new(
+                    ((i64::from(dir.x()) * i64::from(c)) >> 22) as i32 + a.x(),
+                    ((i64::from(dir.y()) * i64::from(c)) >> 22) as i32 + a.y(),
+                );
                 if in_box(q, b) && self.ctx.holder_but(q, id, d)?.is_none() {
                     self.side_node(float_distance(p, q), root, id, side, q);
                 }
@@ -163,8 +168,8 @@ impl Search<'_> {
         self.escape_foot(p, root, (id, side), (a, e))?;
         // the side's first corner
         if in_box(a, b) && self.ctx.holder_but(a, id, d)?.is_none() {
-            let dx = i64::from(px - a[0]);
-            let dy = i64::from(py - a[1]);
+            let dx = i64::from(px - a.x());
+            let dy = i64::from(py - a.y());
             let d2 = ((dx * dx) >> 22) + ((dy * dy) >> 22);
             if d2 < rr2 {
                 let g = (fmath::sqrt(d2 as f32 * TO_FLOAT) * TO_FIXED) as i32;
@@ -180,23 +185,24 @@ impl Search<'_> {
     /// perpendicular distance.
     pub(super) fn escape_foot(
         &mut self,
-        [px, py]: FixedPoint,
+        p: FixedPoint,
         root: u32,
         (id, side): (ShapeId, ShapeSide),
         (a, e): (FixedPoint, FixedPoint),
     ) -> Result<(), GenieError> {
+        let [px, py] = p.get();
         let b = self.bounds;
         if !side.along_y() {
-            if a[0] < px && px < e[0] {
-                let q = [px, a[1]];
+            if a.x() < px && px < e.x() {
+                let q = p.with_y(a.y());
                 if in_box(q, b) && self.ctx.holder(q)?.is_none() {
-                    self.side_node((py - a[1]).wrapping_abs(), root, id, side, q);
+                    self.side_node((py - a.y()).wrapping_abs(), root, id, side, q);
                 }
             }
-        } else if a[1] < py && py < e[1] {
-            let q = [a[0], py];
+        } else if a.y() < py && py < e.y() {
+            let q = p.with_x(a.x());
             if in_box(q, b) && self.ctx.holder(q)?.is_none() {
-                self.side_node((a[0] - px).wrapping_abs(), root, id, side, q);
+                self.side_node((a.x() - px).wrapping_abs(), root, id, side, q);
             }
         }
         Ok(())
@@ -208,11 +214,12 @@ impl Search<'_> {
     /// `rr2` of the start `p`: an escape candidate, 0x32 dearer on a side of its own number.
     pub(super) fn escape_contacts(
         &mut self,
-        [px, py]: FixedPoint,
+        p: FixedPoint,
         root: u32,
         (id, side): (ShapeId, ShapeSide),
         rr2: i64,
     ) -> Result<(), GenieError> {
+        let [px, py] = p.get();
         let mesh = self.ctx.mesh;
         let d = self.ctx.d;
         let b = self.bounds;
@@ -225,13 +232,12 @@ impl Search<'_> {
                 continue;
             }
             if c.side == side {
-                let mut nudged = q;
-                match side {
-                    ShapeSide::LowY => nudged[1] += 1,
-                    ShapeSide::HighX => nudged[0] += 1,
-                    ShapeSide::HighY => nudged[1] -= 1,
-                    ShapeSide::LowX => nudged[0] -= 1,
-                }
+                let nudged = match side {
+                    ShapeSide::LowY => q.with_y(q.y() + 1),
+                    ShapeSide::HighX => q.with_x(q.x() + 1),
+                    ShapeSide::HighY => q.with_y(q.y() - 1),
+                    ShapeSide::LowX => q.with_x(q.x() - 1),
+                };
                 if !strictly_inside(*mesh.shapes.checked(c.other.index())?, nudged, d) {
                     continue;
                 }
@@ -239,8 +245,8 @@ impl Search<'_> {
             if self.ctx.holder(q)?.is_some() {
                 continue;
             }
-            let dx = i64::from(px - q[0]);
-            let dy = i64::from(py - q[1]);
+            let dx = i64::from(px - q.x());
+            let dy = i64::from(py - q.y());
             let d2 = ((dy * dy) >> 22) + ((dx * dx) >> 22);
             if d2 < rr2 {
                 let g0 = (fmath::sqrt(d2 as f32 * TO_FLOAT) * TO_FIXED) as i32;
@@ -253,10 +259,10 @@ impl Search<'_> {
 
     /// The point where the walk from `p` toward `t` meets the hit at fraction `frac` (`>> 22`).
     pub(super) fn at_fraction(p: FixedPoint, t: FixedPoint, frac: i32) -> FixedPoint {
-        [
-            ((i64::from(t[0].wrapping_sub(p[0])) * i64::from(frac)) >> 22) as i32 + p[0],
-            ((i64::from(t[1].wrapping_sub(p[1])) * i64::from(frac)) >> 22) as i32 + p[1],
-        ]
+        FixedPoint::new(
+            ((i64::from(t.x().wrapping_sub(p.x())) * i64::from(frac)) >> 22) as i32 + p.x(),
+            ((i64::from(t.y().wrapping_sub(p.y())) * i64::from(frac)) >> 22) as i32 + p.y(),
+        )
     }
 
     /// A hit point snapped onto the hit shape's side, then onto that side of every shape of its
@@ -293,27 +299,27 @@ impl Search<'_> {
     ) -> Result<(), GenieError> {
         let p = b.at;
         let m = if a.along_x() {
-            [c[0], p[1]]
+            FixedPoint::new(c.x(), p.y())
         } else {
-            [p[0], c[1]]
+            FixedPoint::new(p.x(), c.y())
         };
         let sw = self.ctx.sweep(p, m, a)?;
         let (g, parent, sw) = if sw.found {
             (
-                through_float(delta[0].wrapping_abs()).wrapping_add(b.g),
+                through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
                 b.idx,
                 sw,
             )
         } else {
             let mid = self.add(
-                through_float(delta[0].wrapping_abs()).wrapping_add(b.g),
+                through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
                 b.idx,
                 m,
                 Kind::Waypoint,
             );
             let sw2 = self.ctx.sweep(m, c, second)?;
             (
-                through_float(delta[1].wrapping_abs()).wrapping_add(mid.g),
+                through_float(delta.y().wrapping_abs()).wrapping_add(mid.g),
                 mid.idx,
                 sw2,
             )
