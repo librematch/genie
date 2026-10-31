@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::combat::damage::ArmorPair;
 use crate::construction::build::Construction;
 use crate::map::Distance;
 use crate::map::Position;
@@ -14,6 +15,7 @@ use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::Relics;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
@@ -314,7 +316,7 @@ impl World {
             reload_worldtime: WorldTime::ZERO,
             garrison: Vec::new(),
             garrison_time: WorldTime::ZERO,
-            relics: [0; 2],
+            relics: Relics::NONE,
             damaged_lately: 0,
             livestock_summation: 0.0,
             livestock: Vec::new(),
@@ -340,8 +342,8 @@ impl World {
             reload_powerup: Seconds::ZERO,
             attack_powerup: 0.0,
             range_powerup: Distance::ZERO,
-            armor_powerups: [0; 2],
-            armor_removed: [0; 2],
+            armor_powerups: ArmorPair::ZERO,
+            armor_removed: ArmorPair::ZERO,
             charge: Charge::ZERO,
             charge_hit: false,
             idle_variant: 0,

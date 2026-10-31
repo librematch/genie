@@ -6,6 +6,7 @@ use crate::combat::damage::{
     Attacker, ElevationBonus, Facing, HIGHER, LOWER, RELIC_BOOST, SPECIFIC_RELIC_BOOST, Victim,
 };
 use crate::map::Position;
+use crate::objects::Relics;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -28,27 +29,27 @@ pub fn elevation_factor(z: f32, own: ElevationBonus, to: &Victim) -> f32 {
 
 /// Slot 0x1f0 of a building (`FUN_1411cc890`): the combat object's `factor`
 /// ([`elevation_factor`]), times [`SPECIFIC_RELIC_BOOST`] while its `specific_relic_count`
-/// (`+0xc24`, `relics[1]`) is above 0, else [`RELIC_BOOST`] while its `relic_count` (`+0xc20`,
-/// `relics[0]`) is; a building victim (type 80, `kind`) divides it by the same of its own counts
+/// (`+0xc24`, [`Relics::specific`]) is above 0, else [`RELIC_BOOST`] while its `relic_count`
+/// (`+0xc20`, [`Relics::count`]) is; a building victim (type 80, `kind`) divides it by the same of its own counts
 /// (`victim_relics`). Each count compares signed.
 #[must_use]
 pub fn building_elevation_factor(
     factor: f32,
-    relics: [i32; 2],
+    relics: Relics,
     kind: MasterKind,
-    victim_relics: [i32; 2],
+    victim_relics: Relics,
 ) -> f32 {
     let mut f = factor;
-    if 0 < relics[1] {
+    if 0 < relics.specific {
         f *= SPECIFIC_RELIC_BOOST;
-    } else if 0 < relics[0] {
+    } else if 0 < relics.count {
         f *= RELIC_BOOST;
     }
     if kind == BUILDING {
-        if 0 < victim_relics[1] {
+        if 0 < victim_relics.specific {
             return f / SPECIFIC_RELIC_BOOST;
         }
-        if 0 < victim_relics[0] {
+        if 0 < victim_relics.count {
             f /= RELIC_BOOST;
         }
     }

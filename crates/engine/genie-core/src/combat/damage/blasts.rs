@@ -224,7 +224,7 @@ pub(super) fn blast_one(
         )
         .with("blasted", t.id));
     }
-    if (b.spares_friends && t.allied[0])
+    if (b.spares_friends && t.allied.by_attacker)
         || Some(t.id) == b.exclude
         || t.id == attacker.id
         || t.class == class::ARTIFACT
@@ -353,7 +353,7 @@ pub(super) fn blast_falloff(
     is_main: bool,
 ) -> f32 {
     let mut f = elevation_factor(attacker.position.z(), attacker.attack_elevation, t);
-    if COMBAT <= t.kind && (t.player == attacker.player || t.allied[1]) {
+    if COMBAT <= t.kind && (t.player == attacker.player || t.allied.by_target) {
         f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire);
     }
     if a.missile.is_none() {

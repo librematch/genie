@@ -212,7 +212,7 @@ impl Unit {
             state: v.state,
             player: v.player,
             amount: v.amount,
-            allied: v.allied[0],
+            allied: v.allied.by_attacker,
             top_action: None,
             drop_site: false,
         };

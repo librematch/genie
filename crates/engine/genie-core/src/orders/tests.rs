@@ -2304,7 +2304,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
             taken: HitPoints::new(10.0),
             max: HitPoints::new(20.0),
         },
-        armor_powerups: [1, 2],
+        armor_powerups: ArmorPair::new(1, 2),
         ..Unit::default()
     };
     clear_powerups(&mut unit);
@@ -2323,7 +2323,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
                 taken: HitPoints::new(10.0),
                 max: HitPoints::ZERO
             },
-            [0, 0]
+            ArmorPair::ZERO
         )
     );
     assert_eq!(unit.reload_stinger, Seconds::new(0.25));

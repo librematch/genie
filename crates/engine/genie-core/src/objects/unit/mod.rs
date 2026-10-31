@@ -1,11 +1,13 @@
 //! What the slice tracks of one object ([`Unit`]) and its update, action by action.
 
 use crate::combat::Charge;
+use crate::combat::damage::ArmorPair;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::Relics;
 use crate::objects::WorkRate;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -141,7 +143,7 @@ pub struct Unit {
     /// on which its garrison heals ([`Unit::building_seconds`]).
     pub garrison_time: WorldTime,
     /// A building's `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`).
-    pub relics: [i32; 2],
+    pub relics: Relics,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after a hit on a building (`FUN_1411cea90`),
     /// one off in each of its updates that passes whole seconds; the computer AI reads it.
     pub damaged_lately: u8,
@@ -188,10 +190,10 @@ pub struct Unit {
     /// `mMaxRangePowerup` (`+0xa40`, slot 0x700): what its shown range adds
     /// ([`crate::combat::damage::shown_range`]).
     pub range_powerup: Distance,
-    /// Its melee and pierce armor powerups (`+0x9e4`, `+0x9e6`).
-    pub armor_powerups: [i16; 2],
-    /// The melee and pierce armor taken off it (its charge's hits).
-    pub armor_removed: [i16; 2],
+    /// Its melee and pierce armor powerups (`+0xa48`, `+0xa4c`, read as 16 bits).
+    pub armor_powerups: ArmorPair,
+    /// The melee and pierce armor taken off it by charge hits (`+0x9e4`, `+0x9e6`).
+    pub armor_removed: ArmorPair,
     /// Its charge (`+0x9e0`).
     pub charge: Charge,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`): its last hit was its charge's.

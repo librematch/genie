@@ -457,7 +457,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
                 |best, a| if best < a.amount { a.amount } else { best },
             )
         });
-        Ok(100 <= armor.wrapping_add(t.armor_powerups[1]))
+        Ok(100 <= armor.wrapping_add(t.armor_powerups.pierce))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).

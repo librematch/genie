@@ -13,6 +13,7 @@ use genie_core::movement::Speed;
 use genie_core::objects::HitPoints;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
+use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
@@ -157,10 +158,10 @@ pub(super) fn core_task(
         work_flag: t.work_flag,
         enablement,
         sprites: [t.short_val, t.short_val_2, t.short_val_3, t.short_val_4],
-        sound_events: [
+        sound_events: SoundEvents::new(
             t.gather_sound_event_event_id.cast_signed(),
             t.deposit_sound_event_event_id.cast_signed(),
-        ],
+        ),
     })
 }
 

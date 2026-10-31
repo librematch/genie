@@ -12,15 +12,19 @@
 //! sheep (update 1170). The charges, shields, blasts, terrain bonuses, special attacks,
 //! retaliations and reflections are ports of the code, checked by the unit tests alone.
 
+mod allied;
 mod armor;
+mod armor_pair;
 mod blasts;
 mod hit_factors;
 mod hit_points;
 mod shown_values;
 mod taking;
 
+pub use self::allied::Allied;
 pub use self::armor::armor_damage;
 use self::armor::{master_melee_armor, melee_armor};
+pub use self::armor_pair::ArmorPair;
 pub use self::blasts::blast;
 #[cfg(test)]
 use self::blasts::blast_tiles;
@@ -52,6 +56,7 @@ use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::Relics;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -186,7 +191,7 @@ pub struct Victim {
     /// The attacker's player counts its player as its own or allied (`FUN_141663d90` with the
     /// ally flag), and the other way round: a blast spares the first and scales its damage on
     /// the second by `friendly_fire_damage`.
-    pub allied: [bool; 2],
+    pub allied: Allied,
     /// Its place is a guess: its player's update is not modelled.
     pub uncertain: bool,
     /// It is inside another object (`+0x2f0`): an Attack on it ends.
@@ -237,7 +242,7 @@ pub struct Building {
     pub struck: bool,
     /// `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`), which its elevation factor
     /// reads as the shooter and as the target ([`building_elevation_factor`]).
-    pub relics: [i32; 2],
+    pub relics: Relics,
     /// What each hit that left it below 1 hit point counted, in order, for the write-back.
     pub razed: Vec<Razed>,
 }
@@ -313,9 +318,9 @@ pub struct Armored {
     /// slice lacks the map or the restriction.
     pub terrain: Option<f32>,
     /// The object's armor powerups (melee, pierce).
-    pub armor_powerups: [i16; 2],
+    pub armor_powerups: ArmorPair,
     /// The melee and pierce armor taken off it.
-    pub armor_removed: [i16; 2],
+    pub armor_removed: ArmorPair,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`), which absorbs damage first.
     pub hp_powerup: HpPowerup,
     /// Its master has a task of action type 0xa1 with a work value (a kill reward,

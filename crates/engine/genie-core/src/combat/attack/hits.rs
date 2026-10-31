@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::Relics;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MISSILE;
@@ -138,7 +139,7 @@ pub(crate) fn strike(
     let factor = hit.from_z.map_or(1.0, |z| {
         let f = damage::elevation_factor(z, own.attack_elevation, victim);
         own.building.as_ref().map_or(f, |b| {
-            let theirs = victim.building.as_ref().map_or([0; 2], |t| t.relics);
+            let theirs = victim.building.as_ref().map_or(Relics::NONE, |t| t.relics);
             damage::building_elevation_factor(f, b.relics, victim.kind, theirs)
         })
     });

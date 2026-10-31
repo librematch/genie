@@ -46,6 +46,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`object_id.rs`](object_id.rs) | An object's id as one type: the id that names an object across ticks, as the commands, their unit lists and their targets hold it. |
 | [`object_list.rs`](object_list.rs) | One of a player's object lists (FD-045-D11, D20): its objects in update order and the place of each by id, which the game's table by id (`FUN_1415417a0`, `world+0x168` and `+0x178`) answers. |
 | [`release.rs`](release.rs) | An object's leave of the world and its release by the action that held it (slot 0x180); the update's regeneration and hit point check, and a walk's pause. |
+| [`relics.rs`](relics.rs) | A building's relic counts (`Relics`). |
 | [`sprite.rs`](sprite.rs) | An object's active sprite: the frame of its sprite (a `.dat` graphic) and, for a graphic that animates, the clock that advances it. |
 | [`teardown.rs`](teardown.rs) | The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor (its slot 0): what they leave the unit's world to apply. |
 | [`work_rate.rs`](work_rate.rs) | A worker's work rate (`WorkRate`), with the game's `f32` operations. |

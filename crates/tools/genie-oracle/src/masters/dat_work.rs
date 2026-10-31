@@ -12,6 +12,7 @@ use genie_core::objects::masters::GatherGroup;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
+use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
 use genie_core::world::Seconds;
@@ -83,7 +84,7 @@ fn dat_task(
             t.working_graphic_id,
             t.carrying_graphic_id,
         ],
-        sound_events: [
+        sound_events: SoundEvents::new(
             sound_event(
                 t.wwise_resource_gathering_sound_id,
                 t.resource_gathering_sound_id,
@@ -94,7 +95,7 @@ fn dat_task(
                 t.resource_deposit_sound_id,
                 sounds,
             ),
-        ],
+        ),
     })
 }
 

@@ -10,6 +10,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::SoundEvents;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -450,7 +451,7 @@ fn longboat_look() -> Task {
         work_val1: 0.35,
         work_val2: 1.0,
         sprites: [19601, -1, 19599, 19599],
-        sound_events: [19598, 19600],
+        sound_events: SoundEvents::new(19598, 19600),
         ..task(TERRAIN_LOOK)
     }
 }
@@ -477,7 +478,7 @@ fn a_terrain_look_gives_the_task_s_sprites_on_its_terrains() {
     assert_eq!((l.standing, l.undead, l.walking), (None, None, Some(19601)));
     // an event id past the table's ids is none
     let t = Task {
-        sound_events: [0x62d4_b3ec, -5],
+        sound_events: SoundEvents::new(0x62d4_b3ec, -5),
         ..longboat_look()
     };
     let l = look(&t, 32, 32, all).unwrap();

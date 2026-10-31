@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::damage::ArmorPair;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::{
@@ -650,13 +651,13 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         )
     );
     let h = &mut t.players[1].objects[ListIndex::new(1)];
-    (h.life.hp, h.armor_removed) = (HitPoints::new(549.99), [3, 4]);
+    (h.life.hp, h.armor_removed) = (HitPoints::new(549.99), ArmorPair::new(3, 4));
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     assert_eq!(repair_of(&t).state, RepairState::Done);
     assert_eq!(the_house(&t), (550.0, 0, 0));
     assert_eq!(
         t.players[1].objects[ListIndex::new(1)].armor_removed,
-        [0, 0]
+        ArmorPair::ZERO
     );
     assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);
     // the player without the wood the building repair cost asks

@@ -4,6 +4,7 @@
 //! that heals around it) calls the healed object's heal here.
 
 use crate::GenieError;
+use crate::combat::damage::ArmorPair;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -203,7 +204,7 @@ impl Unit {
         // at its most hit points (slot 0xc0 at least slot 200, `COMISS`: a NaN is not) the
         // armor its charge's hits took (`+0x9e4`, `+0x9e6`) comes back
         if most <= (self.hp_powerup.room() + self.life.hp).get() {
-            self.armor_removed = [0; 2];
+            self.armor_removed = ArmorPair::ZERO;
         }
     }
 

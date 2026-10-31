@@ -2,6 +2,7 @@
 //! wait, the work, a new target, a move and the halt.
 
 use crate::GenieError;
+use crate::combat::damage::ArmorPair;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{
     EXTRA_REPAIRER, LEAST_HP, MOVING_REACH, ONE, REACH, RepairAction, RepairReads, RepairTask,
@@ -389,7 +390,7 @@ impl RepairAction {
                 if COMBAT <= kind
                     && let Some((_, u)) = c.w.object_mut(self.target)
                 {
-                    u.armor_removed = [0; 2];
+                    u.armor_removed = ArmorPair::ZERO;
                 }
                 self.set_state(c, repairer, RepairState::Done, reads)
             }

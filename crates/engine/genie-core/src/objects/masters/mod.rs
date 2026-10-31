@@ -99,7 +99,7 @@ pub struct Task {
     /// `+0x60` and `+0x78`: the event ids (`mEventId`) of the gathering and the deposit sound,
     /// as the task's load (`FUN_141062470`) leaves them; a terrain look task (159) names its
     /// dying and its undead sprite with them ([`crate::combat::abilities`]).
-    pub sound_events: [i32; 2],
+    pub sound_events: SoundEvents,
 }
 
 impl Task {
@@ -135,7 +135,7 @@ impl Default for Task {
             work_flag: 0,
             enablement: None,
             sprites: [-1; 4],
-            sound_events: [0; 2],
+            sound_events: SoundEvents::new(0, 0),
         }
     }
 }
@@ -604,6 +604,7 @@ mod master_kind;
 pub mod master_type;
 mod obstruction_class;
 mod obstruction_type;
+mod sound_events;
 
 pub use self::action_type::ActionType;
 pub use self::attack_priority::AttackPriority;
@@ -616,6 +617,7 @@ pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
+pub use self::sound_events::SoundEvents;
 
 #[cfg(test)]
 mod tests;

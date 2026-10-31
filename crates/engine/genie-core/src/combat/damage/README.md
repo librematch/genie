@@ -25,7 +25,9 @@ When a melee hit lands is decided in `combat/attack/`. A missile's hit is decide
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`allied.rs`](allied.rs) | How a hit's two players stand to each other (`Allied`). |
 | [`armor.rs`](armor.rs) | The armor against melee and against each weapon class, and the damage per weapon (`FUN_141082530`). |
+| [`armor_pair.rs`](armor_pair.rs) | An object's two armor values (`ArmorPair`): melee and pierce. |
 | [`blasts.rs`](blasts.rs) | The damage beyond what a blast has done (`FUN_141082e80`) and the blast itself (slot 0x848). |
 | [`hit_factors.rs`](hit_factors.rs) | A hit's factors: the elevation, the facing offset and the charges (`FUN_1412623d0`). |
 | [`hit_points.rs`](hit_points.rs) | The shield, the invulnerability floor, and the hit points' loss (slot 0xb0) and gain (slot 0xb8). |

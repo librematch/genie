@@ -1,6 +1,7 @@
 use super::*;
 use crate::GenieError;
 use crate::combat::attack::AttackState;
+use crate::combat::damage::ArmorPair;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::game::GameCommand;
@@ -13208,20 +13209,20 @@ fn a_unit_regenerated_to_its_most_has_its_armor_back() {
             hp,
             ..Lifecycle::default()
         },
-        armor_removed: [2, 1],
+        armor_removed: ArmorPair::new(2, 1),
         ..Unit::default()
     };
     let mut healed = unit(HitPoints::new(53.0));
     healed.regenerate(&berserk, Seconds::new(3.0));
     assert_eq!(
         (healed.life.hp, healed.armor_removed),
-        (HitPoints::new(54.0), [0, 0])
+        (HitPoints::new(54.0), ArmorPair::ZERO)
     );
     let mut hurt = unit(HitPoints::new(40.0));
     hurt.regenerate(&berserk, Seconds::new(3.0));
     assert_eq!(
         (hurt.life.hp, hurt.armor_removed),
-        (HitPoints::new(41.0), [2, 1])
+        (HitPoints::new(41.0), ArmorPair::new(2, 1))
     );
 }
 
@@ -18063,7 +18064,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     );
     let mut t = repairing(near);
     let house = &mut t.players[1].objects[ListIndex::new(1)];
-    (house.life.hp, house.armor_removed) = (HitPoints::new(549.0), [3, 4]);
+    (house.life.hp, house.armor_removed) = (HitPoints::new(549.0), ArmorPair::new(3, 4));
     let states = repair_for(&mut t, 100);
     assert_eq!(
         states,
@@ -18083,7 +18084,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
             house.repairers(),
             house.workers
         ),
-        (HitPoints::new(550.0), [0, 0], 0, 0)
+        (HitPoints::new(550.0), ArmorPair::ZERO, 0, 0)
     );
     let heard = &t.players[1].objects[ListIndex::new(0)]
         .ai
@@ -18101,7 +18102,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     let allied = |hp: HitPoints| {
         let mut t = repairing(near);
         let mut house = t.players[1].objects.remove(ListIndex::new(1)).unwrap();
-        (house.life.hp, house.armor_removed, house.workers) = (hp, [3, 4], 0);
+        (house.life.hp, house.armor_removed, house.workers) = (hp, ArmorPair::new(3, 4), 0);
         t.players[0].objects.push(house);
         t.players[0].attributes = vec![Amount::ZERO; 300];
         t.spatial.relations = vec![relation_row([0, 0]), relation_row([0, 0])];
@@ -18135,7 +18136,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
                 Some(RepairState::Work)
             ],
             302.449_4,
-            [3, 4],
+            ArmorPair::new(3, 4),
             1,
             1
         )
@@ -18151,7 +18152,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
                 None
             ],
             550.0,
-            [0, 0],
+            ArmorPair::ZERO,
             0,
             0
         )

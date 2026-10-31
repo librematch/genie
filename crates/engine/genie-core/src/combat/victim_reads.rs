@@ -1,5 +1,6 @@
 //! What a hit reads of its victim: the object's values and its relations to the attacker.
 
+use crate::combat::damage::Allied;
 use crate::combat::damage::{ElevationBonus, Victim};
 use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
@@ -27,7 +28,7 @@ pub(crate) fn victim_in(
     mode_680: i32,
 ) -> Victim {
     let mut v = victim_of(u, master, attributes, p, spatial.terrain.as_ref(), mode_680);
-    v.allied = [dip.allied(attacker, p, true), dip.allied(p, attacker, true)];
+    v.allied = Allied::new(dip.allied(attacker, p, true), dip.allied(p, attacker, true));
     v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
     v.tile_place = spatial.tile_place(u.id);
     if let Some(b) = v.building.as_mut() {
@@ -96,7 +97,7 @@ pub(crate) fn victim_of(
             lower: at(273).get(),
         },
         attack_elevation,
-        allied: [false; 2],
+        allied: Allied::NONE,
         uncertain: false,
         inside: u.life.inside.is_some(),
         source: crate::combat::damage::Attacker {

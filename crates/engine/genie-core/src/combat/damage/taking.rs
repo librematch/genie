@@ -228,7 +228,7 @@ pub(super) fn kill_bonus(src: &Attacker) -> Result<(), GenieError> {
 /// both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does anything (its
 /// master's effects on the target, not modelled).
 pub(super) const fn attack_effects(src: &Attacker, t: &Victim) -> Result<(), GenieError> {
-    if src.ability & 0x80 != 0 && !(t.allied[0] && t.allied[1]) {
+    if src.ability & 0x80 != 0 && !t.allied.both() {
         return Err(GenieError::unsupported(
             "an attacker whose hits apply effects (FUN_14107bdf0)",
         ));

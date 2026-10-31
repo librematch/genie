@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::damage::Allied;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Radii;
@@ -15,6 +16,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::Relics;
 use crate::objects::layers::Animated;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
@@ -815,7 +817,7 @@ fn a_strike_on_an_annex_hits_its_main_building() {
 /// (`+0xc24`), so its hit on a lower target does more than a tower's without one.
 #[test]
 fn a_building_s_relic_raises_its_missile_s_hit() {
-    let hit_by = |relics: [i32; 2]| {
+    let hit_by = |relics: Relics| {
         let mut target = struck_building(
             21,
             Position::new(10.5, 10.0, 0.0),
@@ -858,9 +860,9 @@ fn a_building_s_relic_raises_its_missile_s_hit() {
         .unwrap();
         target.hp
     };
-    assert!(hit_by([0, 1]) < hit_by([0, 0]));
-    assert!(hit_by([1, 0]) < hit_by([0, 0]));
-    assert!(hit_by([0, 1]) < hit_by([1, 0]));
+    assert!(hit_by(Relics::new(0, 1)) < hit_by(Relics::new(0, 0)));
+    assert!(hit_by(Relics::new(1, 0)) < hit_by(Relics::new(0, 0)));
+    assert!(hit_by(Relics::new(0, 1)) < hit_by(Relics::new(1, 0)));
 }
 
 /// `FUN_1412115e0`'s trample: its blast about the unit passes its target but reaches the
@@ -1447,7 +1449,7 @@ fn an_attack_on_a_target_its_player_counts_as_its_own_ends() {
                 class,
                 player: PlayerId::new(1),
                 position: at,
-                allied: [allied, allied],
+                allied: Allied::new(allied, allied),
                 ..Victim::default()
             };
             let mut rig = Rig::on(world_with(7, PlayerId::new(1), class, at), 0.8, victim);
@@ -2921,7 +2923,7 @@ fn an_attack_ends_early_on_an_ally_a_hidden_target_or_disarmed() {
             .unwrap();
         ((code, rig.posted()), a)
     };
-    let ((code, posted), a) = run(|rig| rig.f.victim.allied[0] = true);
+    let ((code, posted), a) = run(|rig| rig.f.victim.allied.by_attacker = true);
     assert_eq!(
         (code, a.state, posted),
         (

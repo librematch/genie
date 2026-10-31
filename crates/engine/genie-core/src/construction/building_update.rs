@@ -9,6 +9,7 @@ use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::Relics;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
@@ -264,7 +265,7 @@ impl Unit {
         if self.damaged_lately != 0 {
             self.damaged_lately -= 1;
         }
-        if master.id == MONASTERY && self.relics != [0; 2] {
+        if master.id == MONASTERY && self.relics != Relics::NONE {
             return Err(GenieError::unsupported(
                 "a monastery's relics' goods (its seconds)",
             ));

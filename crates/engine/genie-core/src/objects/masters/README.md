@@ -48,6 +48,7 @@ file for what the save does not hold.
 | [`mod.rs`](mod.rs) | What the engine reads of a player's masters: the tasks a unit can do and the masters a unit changes into to do them, and how an effect changes a master: the attribute setters (slots 0x18, 0x20 and 0x28 of every master type, `Master::set_attribute`), the master copy of an upgrade (slot 8, `Master::copy_from`) and the values the slice derives from a master (`Master::follow`). |
 | [`obstruction_class.rs`](obstruction_class.rs) | A master's obstruction class as one type: what its obstruction record blocks, the value the `.dat` names `obstruction_class`. |
 | [`obstruction_type.rs`](obstruction_type.rs) | A master's obstruction type as one type: the shape of the record its objects file in the obstruction manager, the value the `.dat` names `obstruction_type`. |
+| [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`). |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
 | [`task_id.rs`](task_id.rs) | A task's id as one type: the place of a task in its master's task list, which an action keeps to name the task it works on. |
 | [`tests.rs`](tests.rs) | Tests. |

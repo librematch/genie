@@ -8,12 +8,14 @@ use crate::{
 };
 use genie_core::GenieError;
 use genie_core::combat::Charge;
+use genie_core::combat::damage::ArmorPair;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
 use genie_core::objects::HitPoints;
 use genie_core::objects::HpPowerup;
 use genie_core::objects::ObjectId;
+use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
 use genie_core::objects::lifecycle::Lifecycle;
 use genie_core::objects::masters::ClassId;
@@ -128,7 +130,9 @@ pub(super) fn unit(
         relics: object
             .tribe_building_object
             .as_deref()
-            .map_or([0; 2], |b| [b.relic_count, b.specific_relic_count]),
+            .map_or(Relics::NONE, |b| {
+                Relics::new(b.relic_count, b.specific_relic_count)
+            }),
         damaged_lately: s.damaged_lately_timer as u8,
         livestock_summation: object
             .tribe_building_object
@@ -176,12 +180,12 @@ pub(super) fn unit(
         range_powerup: object
             .combat()
             .map_or(Distance::ZERO, |c| Distance::new(c.max_range_powerup)),
-        armor_powerups: object.combat().map_or([0; 2], |c| {
-            [c.melee_armor_powerup as i16, c.pierce_armor_powerup as i16]
+        armor_powerups: object.combat().map_or(ArmorPair::ZERO, |c| {
+            ArmorPair::new(c.melee_armor_powerup as i16, c.pierce_armor_powerup as i16)
         }),
-        armor_removed: object
-            .combat()
-            .map_or([0; 2], |c| [c.melee_armor_removed, c.pierce_armor_removed]),
+        armor_removed: object.combat().map_or(ArmorPair::ZERO, |c| {
+            ArmorPair::new(c.melee_armor_removed, c.pierce_armor_removed)
+        }),
         charge: object
             .combat()
             .map_or(Charge::ZERO, |c| Charge::new(c.charge)),

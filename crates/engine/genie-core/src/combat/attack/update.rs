@@ -279,7 +279,7 @@ impl Attack {
         // the Attack took it (+0x9f)
         let spared = matches!(f.victim.class, class::LIVESTOCK | class::FARM) && self.same_owner;
         let rng = c.w.streams.get(Stream::Sprite);
-        if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied[0] {
+        if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied.by_attacker {
             self.finish(unit, rng)?;
             if !self.sub_action {
                 unit.post_own(

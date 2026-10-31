@@ -14,6 +14,7 @@ use genie_core::movement::move_to::MoveWaitState;
 use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
@@ -52,7 +53,7 @@ fn task(id: i16, range: f32) -> Task {
         work_flag: 0,
         enablement: Some(attribute::FOOD),
         sprites: [-1; 4],
-        sound_events: [-1; 2],
+        sound_events: SoundEvents::new(-1, -1),
     }
 }
 

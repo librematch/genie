@@ -40,8 +40,8 @@ pub fn look(task: &Task, mask: u8, flags: u8, exists: impl Fn(i32) -> bool) -> O
         walking: task_sprite(moving),
         attacking: task_sprite(working),
         running: task_sprite(proceeding),
-        dying: sprite(task.sound_events[0]),
-        undead: sprite(task.sound_events[1]),
+        dying: sprite(task.sound_events.gathering),
+        undead: sprite(task.sound_events.deposit),
     })
 }
 

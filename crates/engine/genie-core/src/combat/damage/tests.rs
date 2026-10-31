@@ -4,28 +4,46 @@
 fn a_building_s_relics_scale_its_elevation_factor() {
     let up = 1.25_f32;
     assert_eq!(
-        building_elevation_factor(up, [0, 0], master_type::COMBAT, [5, 5]).to_bits(),
+        building_elevation_factor(
+            up,
+            Relics::new(0, 0),
+            master_type::COMBAT,
+            Relics::new(5, 5)
+        )
+        .to_bits(),
         up.to_bits()
     );
     assert_eq!(
-        building_elevation_factor(up, [3, 1], master_type::COMBAT, [0, 0]).to_bits(),
+        building_elevation_factor(
+            up,
+            Relics::new(3, 1),
+            master_type::COMBAT,
+            Relics::new(0, 0)
+        )
+        .to_bits(),
         (up * SPECIFIC_RELIC_BOOST).to_bits()
     );
     assert_eq!(
-        building_elevation_factor(up, [3, 0], master_type::COMBAT, [0, 0]).to_bits(),
+        building_elevation_factor(
+            up,
+            Relics::new(3, 0),
+            master_type::COMBAT,
+            Relics::new(0, 0)
+        )
+        .to_bits(),
         (up * RELIC_BOOST).to_bits()
     );
     assert_eq!(
-        building_elevation_factor(up, [3, 0], BUILDING, [0, 2]).to_bits(),
+        building_elevation_factor(up, Relics::new(3, 0), BUILDING, Relics::new(0, 2)).to_bits(),
         (up * RELIC_BOOST / SPECIFIC_RELIC_BOOST).to_bits()
     );
     assert_eq!(
-        building_elevation_factor(up, [0, 0], BUILDING, [1, -1]).to_bits(),
+        building_elevation_factor(up, Relics::new(0, 0), BUILDING, Relics::new(1, -1)).to_bits(),
         (up / RELIC_BOOST).to_bits()
     );
     // the counts compare signed
     assert_eq!(
-        building_elevation_factor(up, [-1, -1], BUILDING, [-1, -1]).to_bits(),
+        building_elevation_factor(up, Relics::new(-1, -1), BUILDING, Relics::new(-1, -1)).to_bits(),
         up.to_bits()
     );
 }
@@ -489,7 +507,7 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     // the melee armor: its best of class 4 plus the powerup; a wall foundation none; type 50
     // without the powerup; else its best of any, else its base armor
     let mut a = hunter();
-    a.armored.as_mut().unwrap().armor_powerups = [2, 0];
+    a.armored.as_mut().unwrap().armor_powerups = ArmorPair::new(2, 0);
     assert_eq!(shown_melee_armor(&a), Ok(2));
     (a.class, a.state) = (class::WALL, ObjectState::Foundation);
     assert_eq!(shown_melee_armor(&a), Ok(0));
@@ -884,7 +902,7 @@ fn a_blast_reaches_the_objects_about_its_attacker() {
     let mut near = enemy(2, 10.8);
     let mut far = enemy(3, 12.0);
     let mut friend = Victim {
-        allied: [true, true],
+        allied: Allied::new(true, true),
         ..enemy(4, 10.7)
     };
     let center = elephant.position;
@@ -1308,7 +1326,7 @@ fn a_building_s_attacker_effects_and_kill_bonus_are_the_game_s() {
         .is_err()
     );
     let mut h = Victim {
-        allied: [true, true],
+        allied: Allied::new(true, true),
         ..house()
     };
     take(
@@ -1848,7 +1866,7 @@ fn a_blast_passes_over_what_it_spares_and_hits_the_rest() {
             ..enemy.clone()
         },
         Victim {
-            allied: [true, true],
+            allied: Allied::new(true, true),
             ..enemy.clone()
         },
         Victim {

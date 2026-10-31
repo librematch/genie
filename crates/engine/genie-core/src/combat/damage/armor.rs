@@ -35,7 +35,7 @@ pub(super) fn master_melee_armor(a: &Armored) -> i16 {
 /// melee armor powerup (`+0xa48`, slot 0x708) and stinger (`+0xb4c`, slot 0x770, 0 as
 /// [`Victim::most_hp`] says), each as 16 bits; a wall foundation (class 27 in state 0) has none.
 pub(super) fn melee_armor(a: &Armored, own_class: ClassId, state: ObjectState) -> i16 {
-    let armor = master_melee_armor(a).wrapping_add(a.armor_powerups[0]);
+    let armor = master_melee_armor(a).wrapping_add(a.armor_powerups.melee);
     if own_class == class::WALL && state == ObjectState::Foundation {
         return 0;
     }
@@ -64,15 +64,15 @@ pub(super) fn class_armor(
             .fold(from, |m, e| if m < e.amount { e.amount } else { m })
     };
     match class {
-        OwnSlot::Melee => melee_armor(a, own_class, state).wrapping_sub(a.armor_removed[0]),
+        OwnSlot::Melee => melee_armor(a, own_class, state).wrapping_sub(a.armor_removed.melee),
         OwnSlot::Pierce => {
             let mut armor = best(DamageClass::PIERCE, -1);
             if armor == -1 {
                 armor = any(a.base_armor);
             }
             armor
-                .wrapping_add(a.armor_powerups[1])
-                .wrapping_sub(a.armor_removed[1])
+                .wrapping_add(a.armor_powerups.pierce)
+                .wrapping_sub(a.armor_removed.pierce)
         }
     }
 }

@@ -9,6 +9,7 @@
 //! the target ([`crate::unit_ai::task_finder`]), and the task's action replaces its action list.
 
 use crate::GenieError;
+use crate::combat::damage::ArmorPair;
 use crate::groups::GroupId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -470,7 +471,7 @@ const fn clear_powerups(unit: &mut Unit) {
     unit.reload_powerup = Seconds::ZERO;
     unit.work_rate_powerup = WorkRate::ZERO;
     unit.hp_powerup.max = HitPoints::ZERO;
-    unit.armor_powerups = [0; 2];
+    unit.armor_powerups = ArmorPair::ZERO;
 }
 
 /// `FUN_140c4da50`: the target of the first order in unit AI `ai`'s queue (`+0x20`, count
