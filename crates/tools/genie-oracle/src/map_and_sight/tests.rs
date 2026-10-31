@@ -215,11 +215,15 @@ mod spatial {
         );
         assert!(seer.explored && seer.building.is_none());
         assert_eq!(
-            out.unit_diplomacy[1],
-            [
-                Some(genie_core::players::UnitRelation::GAIA),
-                Some(genie_core::players::UnitRelation::OWN)
-            ]
+            out.unit_diplomacy
+                .get(PlayerId::new(1))
+                .map(genie_core::players::ByPlayer::values),
+            Some(
+                &[
+                    Some(genie_core::players::UnitRelation::GAIA),
+                    Some(genie_core::players::UnitRelation::OWN)
+                ][..]
+            )
         );
     }
 

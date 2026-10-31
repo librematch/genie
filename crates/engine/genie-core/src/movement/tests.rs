@@ -18,6 +18,7 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::ID_45;
+use crate::players::ByPlayer;
 use crate::players::relation_row;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
@@ -278,9 +279,10 @@ fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> S
     for &(id, at, r, class, player) in near {
         w.insert(object_id(id), placed(at, r, class, player));
     }
-    w.relations = vec![vec![]; 5];
+    w.relations = ByPlayer::new(vec![ByPlayer::default(); 5]);
     // player 4 is player 2's ally; player 3 is not
-    w.relations[4] = relation_row([1, 1, 0, 1, 1]);
+    w.relations
+        .set(PlayerId::new(4), relation_row([1, 1, 0, 1, 1]));
     w
 }
 

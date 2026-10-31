@@ -30,7 +30,7 @@ use crate::world::{Player, World};
 /// with the unit's state, when its side's call returns: [`crate::objects::unit::Unit::with_side`]).
 pub(crate) struct Lets<'l> {
     pub(crate) player: PlayerId,
-    pub(crate) relations: &'l [crate::players::Relation],
+    pub(crate) relations: &'l crate::players::Relations,
     pub(crate) masters: &'l [Masters],
     pub(crate) lines: &'l UnitLines,
     pub(crate) tracker: &'l mut Tracker,
@@ -363,7 +363,7 @@ impl Lets<'_> {
             self.relations
         } else {
             let other = view.players().player(from);
-            other.map_or(&[][..], |p| &p.relations[..])
+            other.map_or(&crate::players::NO_RELATIONS, |p| &p.relations)
         };
         crate::unit_ai::task_finder::allied(relations, from, to, true)
     }

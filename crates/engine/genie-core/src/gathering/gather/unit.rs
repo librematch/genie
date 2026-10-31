@@ -413,13 +413,15 @@ impl Unit {
 /// the resources would go to the allies too when the player shares (`sharing`, `+0x1426`,
 /// `FUN_14165d040`): a sharing player with allies is not modelled.
 pub(crate) fn give_load(
-    (relations, sharing): (&[Vec<crate::players::Relation>], bool),
+    (relations, sharing): (&crate::players::ByPlayer<crate::players::Relations>, bool),
     player: PlayerId,
     adds: &mut Vec<(AttributeId, Amount)>,
     kind: AttributeId,
     amount: Amount,
 ) -> Result<(), GenieError> {
-    let own = relations.get(player.index()).map_or(&[][..], |r| &r[..]);
+    let own = relations
+        .get(player)
+        .unwrap_or(&crate::players::NO_RELATIONS);
     let allied = PlayerId::each(own.len())
         .skip(1)
         .any(|q| q != player && crate::unit_ai::task_finder::allied(own, player, q, true));

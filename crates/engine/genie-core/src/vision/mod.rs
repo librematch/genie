@@ -82,17 +82,17 @@ impl World {
             .skip(1)
         {
             let attribute = |i: usize| me.attributes.get(i).copied().unwrap_or(Amount::ZERO);
-            let allies = |q: usize| {
+            let allies = |q: PlayerId| {
                 me.relations.get(q) == Some(&crate::players::Relation::ALLY)
-                    && self.players.get(q).and_then(|o| o.relations.get(p.index()))
+                    && self.players.player(q).ok().and_then(|o| o.relations.get(p))
                         == Some(&crate::players::Relation::ALLY)
             };
             let mine = masks.checked_mut(p.index())?;
             if me.allied_vision {
-                for q in 1..n {
-                    if q != p.index() && allies(q) {
-                        mine[0] |= 1 << q;
-                        mine[1] |= 1 << (32 + q);
+                for q in PlayerId::each(n).skip(1) {
+                    if q != p && allies(q) {
+                        mine[0] |= 1 << q.index();
+                        mine[1] |= 1 << (32 + q.index());
                     }
                 }
             }
@@ -108,7 +108,7 @@ impl World {
             // playback has no such screen, the probe reads 0)
             if REVEAL_CENTRES < me.attributes.len() && Amount::ZERO < attribute(REVEAL_CENTRES) {
                 for q in PlayerId::each(n).skip(1) {
-                    if allies(q.index()) || me.tc_flared.get(q.index()).copied().unwrap_or(false) {
+                    if allies(q) || me.tc_flared.get(q.index()).copied().unwrap_or(false) {
                         continue;
                     }
                     flares.extend(
@@ -194,7 +194,9 @@ mod tests {
     #[test]
     fn an_ally_one_way_or_the_vision_off_shares_nothing() {
         let mut t = teams();
-        t.players[3].relations[1] = Relation::ENEMY;
+        t.players[3]
+            .relations
+            .set(PlayerId::new(1), Relation::ENEMY);
         t.players[2].allied_vision = false;
         t.rebuild_vision().unwrap();
         assert_eq!(t.spatial.vision[1], own_masks(PlayerId::new(1), false));

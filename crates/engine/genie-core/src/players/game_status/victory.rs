@@ -13,10 +13,11 @@ use crate::world::slots::PlayerSlots;
 
 impl World {
     /// The relations of players `a` and `b` each way (`player+0x260`).
-    pub(super) fn relations(&self, a: usize, b: usize) -> (Relation, Relation) {
-        let r = |x: usize, y: usize| {
+    pub(super) fn relations(&self, a: PlayerId, b: PlayerId) -> (Relation, Relation) {
+        let r = |x: PlayerId, y: PlayerId| {
             self.players
-                .get(x)
+                .player(x)
+                .ok()
                 .and_then(|p| p.relations.get(y))
                 .copied()
                 .unwrap_or(Relation::ALLY)
@@ -32,7 +33,10 @@ impl World {
             return true;
         }
         let mut count = Count::default();
-        for (i, p) in self.players.iter().enumerate().skip(1) {
+        for (i, p) in PlayerId::each(self.players.len())
+            .zip(&self.players)
+            .skip(1)
+        {
             let rel = self.relations(count.first, i);
             count.add(i, p.game_status, p.allied_victory, rel);
         }
@@ -175,9 +179,9 @@ impl World {
                     return Ok(());
                 }
             };
-            let rel = self.relations(count.first, i.index());
+            let rel = self.relations(count.first, i);
             let allied_victory = self.players.player(i)?.allied_victory;
-            count.add(i.index(), status, allied_victory, rel);
+            count.add(i, status, allied_victory, rel);
         }
         let outcome = if 0 < count.won {
             LOST

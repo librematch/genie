@@ -39,6 +39,7 @@ use crate::objects::masters::{MasterId, ids};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
+use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
@@ -3182,7 +3183,7 @@ fn a_unit_inside_an_ally_s_transport_unloaded_goes_ashore() {
         let ship = t.players[1].objects.remove(i).unwrap();
         t.players[2].objects.push(ship);
         t.players[1].relations = relation_row([3, 0, 0, 3]);
-        t.players[2].relations = vec![
+        t.players[2].relations = ByPlayer::new(vec![
             Relation::ENEMY,
             if both_ways {
                 Relation::RELATION_4
@@ -3191,7 +3192,7 @@ fn a_unit_inside_an_ally_s_transport_unloaded_goes_ashore() {
             },
             Relation::ALLY,
             Relation::ENEMY,
-        ];
+        ]);
         t
     };
     let mut t = ally(true);

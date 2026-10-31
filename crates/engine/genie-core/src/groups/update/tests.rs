@@ -27,6 +27,7 @@ use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::objects::unit::Unit;
+use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::relation_row;
 use crate::players::relations;
@@ -107,18 +108,18 @@ fn world() -> World {
     };
     t.masters = vec![Masters::new([master]); 4];
     let mut s = crate::map::spatial::Spatial::new(GridSize::new(8, 8));
-    s.relations = vec![
+    s.relations = ByPlayer::new(vec![
         relation_row([0, 3, 3, 3]),
         relation_row([0, 0, 3, 0]),
         relation_row([0, 3, 0, 3]),
         relation_row([0, 0, 3, 0]),
-    ];
-    s.unit_diplomacy = vec![
+    ]);
+    s.unit_diplomacy = ByPlayer::new(vec![
         relations([1, 4, 4, 4]),
         relations([0, 1, 4, 2]),
         relations([0, 4, 1, 4]),
         relations([0, 2, 4, 1]),
-    ];
+    ]);
     s.sight = Some(crate::vision::visibility::Visibility::new(
         GridSize::new(8, 8),
         Vec::new(),

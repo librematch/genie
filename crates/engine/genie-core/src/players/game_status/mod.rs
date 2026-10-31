@@ -14,6 +14,7 @@ mod victory;
 
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
+use crate::players::PlayerId;
 #[cfg(test)]
 use crate::world::World;
 use crate::world::WorldTime;
@@ -57,7 +58,7 @@ const ONE_UNIT_AGE: f32 = crate::math::image::game_status::ONE_UNIT_AGE;
 #[derive(Clone, Copy, Debug, Default)]
 struct Count {
     playing: u32,
-    first: usize,
+    first: PlayerId,
     side: i32,
     won: u32,
     lost: u32,
@@ -67,9 +68,9 @@ impl Count {
     /// Player `i` of `status`, with the allied victory flag (`+0x2d0`, tested for 0) and the
     /// relations both ways to the first player still playing (`relation` 0: allied;
     /// `FUN_141667f70`).
-    const fn add(
+    fn add(
         &mut self,
-        i: usize,
+        i: PlayerId,
         status: u8,
         allied_victory: u8,
         relations: (crate::players::Relation, crate::players::Relation),
@@ -77,7 +78,7 @@ impl Count {
         match status {
             PLAYING => {
                 self.playing += 1;
-                if self.first != 0 && self.side != 0 {
+                if self.first != PlayerId::GAIA && self.side != 0 {
                     // another side unless the two count each other's victory as their own
                     if allied_victory == 0
                         || !matches!(relations.0, crate::players::Relation::ALLY)

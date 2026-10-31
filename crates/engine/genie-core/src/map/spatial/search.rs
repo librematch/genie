@@ -205,14 +205,14 @@ impl Spatial {
         &self,
         player: PlayerId,
         players: usize,
-    ) -> Result<Vec<Option<UnitRelation>>, GenieError> {
+    ) -> Result<crate::players::UnitRelations, GenieError> {
         let kinds = self
             .unit_diplomacy
-            .get(player.index())
+            .get(player)
             .ok_or(GenieError::unsupported(
                 "a search of a player without its unit diplomacy",
             ))?;
-        Ok(kinds.iter().take(players).copied().collect())
+        Ok(kinds.values().iter().take(players).copied().collect())
     }
 
     /// The query of a unit AI's search (`FUN_140c63e20`'s first part): over the player's

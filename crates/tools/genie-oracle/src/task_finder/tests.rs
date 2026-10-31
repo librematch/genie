@@ -9,6 +9,7 @@ use genie_core::objects::masters::{Master, Masters};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute;
+use genie_core::players::{ByPlayer, Relations};
 use genie_core::unit_ai::task_finder::Diplomacy;
 
 /// An object of player 1, master 83, at the main building `annex_of` if it is an annex.
@@ -46,7 +47,11 @@ fn world(relation: u8) -> FinderWorld {
         ]
         .into_iter()
         .collect(),
-        relations: vec![vec![], vec![0, 0, relation], vec![]],
+        relations: ByPlayer::new(vec![
+            Relations::default(),
+            Relations::of_bytes([0, 0, relation]),
+            Relations::default(),
+        ]),
         attribute_95: vec![Amount::ZERO, Amount::new(1.5)],
         civs: vec![0, 4],
         drop_sites: vec![],

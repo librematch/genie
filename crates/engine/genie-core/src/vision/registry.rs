@@ -13,8 +13,10 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::players::ByRelation;
 use crate::players::PlayerId;
-use crate::players::{ByRelation, UnitRelation};
+#[cfg(test)]
+use crate::players::UnitRelation;
 use crate::world::slots::CheckedIndex;
 use std::collections::BTreeMap;
 
@@ -103,7 +105,7 @@ pub struct VisibleQuery<'a> {
     /// The classes it reads.
     pub classes: &'a [ClassId],
     /// What the owners are to the player (none for a saved value past the relations).
-    pub relations: &'a [Option<UnitRelation>],
+    pub relations: &'a crate::players::UnitRelations,
     /// The searcher's radii (x, y).
     pub size: Footprint,
     /// The relations kept, one bit each.
@@ -309,7 +311,7 @@ impl Registry {
             for r in list {
                 let relation =
                     *relations
-                        .get(usize::from(r.owner))
+                        .get(PlayerId::new(r.owner))
                         .ok_or(GenieError::unsupported(
                             "a record of an owner without a relation",
                         ))?;
@@ -531,11 +533,11 @@ mod tests {
                 radius: Distance::new(100.0),
                 mode: 1,
                 classes: &[class_id(4)],
-                relations: &[
+                relations: &crate::players::ByPlayer::new(vec![
                     Some(UnitRelation::OWN),
                     Some(UnitRelation::ENEMY),
                     Some(UnitRelation::ENEMY),
-                ],
+                ]),
                 size: Footprint::new(0.2, 0.2),
                 wanted: 0xff,
             })
@@ -571,11 +573,11 @@ mod tests {
                 radius: Distance::new(3.0),
                 mode: 0,
                 classes: &[class_id(4)],
-                relations: &[
+                relations: &crate::players::ByPlayer::new(vec![
                     Some(UnitRelation::OWN),
                     Some(UnitRelation::ENEMY),
                     Some(UnitRelation::ENEMY),
-                ],
+                ]),
                 size: Footprint::new(0.2, 0.2),
                 wanted: 0xff,
             })

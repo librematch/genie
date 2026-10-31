@@ -688,18 +688,18 @@ mod tests {
             4
         ];
         let mut s = crate::map::spatial::Spatial::new(GridSize::new(20, 20));
-        s.relations = vec![
+        s.relations = crate::players::ByPlayer::new(vec![
             relation_row([0, 3, 3, 3]),
             relation_row([0, 0, 3, 1]),
             relation_row([0, 3, 0, 3]),
             relation_row([0, 1, 3, 0]),
-        ];
-        s.unit_diplomacy = vec![
+        ]);
+        s.unit_diplomacy = crate::players::ByPlayer::new(vec![
             relations([1, 4, 4, 4]),
             relations([0, 1, 4, 3]),
             relations([0, 4, 1, 4]),
             relations([0, 3, 4, 1]),
-        ];
+        ]);
         let mut r = crate::vision::registry::Registry::new(4, 65);
         for (id, owner, at, class) in [
             (20, 2, Point::new(6.0, 5.0), class::CLASS_6),

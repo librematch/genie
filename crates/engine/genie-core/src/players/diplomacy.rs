@@ -58,16 +58,6 @@ pub fn unit_kind(p: PlayerId, q: PlayerId, relation: Relation) -> UnitRelation {
     }
 }
 
-/// Lane `q` of a per-player row takes `value`; a row shorter than `q` grows (with 0) first.
-fn set_lane<T: Copy + Default>(row: &mut Vec<T>, q: PlayerId, value: T) {
-    if let Some(lane) = row.get_mut(q.index()) {
-        *lane = value;
-    } else {
-        row.resize(q.index(), T::default());
-        row.push(value);
-    }
-}
-
 impl World {
     /// Slot 0x30 (`FUN_141639690`) of player `p` toward player `other` with the command's
     /// relation `relation`: 0 makes the stance an ally's (4), 1 a neutral's (3), 3 and 4 an
@@ -101,7 +91,7 @@ impl World {
             .players
             .player(p)?
             .diplomacy
-            .get(q.index())
+            .get(q)
             .copied()
             .unwrap_or(Stance::NONE)
             != stance
@@ -127,7 +117,7 @@ impl World {
         q: PlayerId,
         stance: Stance,
     ) -> Result<(), GenieError> {
-        set_lane(&mut self.players.player_mut(p)?.diplomacy, q, stance);
+        self.players.player_mut(p)?.diplomacy.set(q, stance);
         stance
             .relation()
             .map_or(Ok(()), |relation| self.set_relation(p, q, relation))
@@ -143,12 +133,12 @@ impl World {
         q: PlayerId,
         relation: Relation,
     ) -> Result<(), GenieError> {
-        set_lane(&mut self.players.player_mut(p)?.relations, q, relation);
-        if let Some(row) = self.spatial.relations.get_mut(p.index()) {
-            set_lane(row, q, relation);
+        self.players.player_mut(p)?.relations.set(q, relation);
+        if let Some(row) = self.spatial.relations.get_mut(p) {
+            row.set(q, relation);
         }
-        if let Some(row) = self.spatial.unit_diplomacy.get_mut(p.index()) {
-            set_lane(row, q, Some(unit_kind(p, q, relation)));
+        if let Some(row) = self.spatial.unit_diplomacy.get_mut(p) {
+            row.set(q, Some(unit_kind(p, q, relation)));
         }
         let mut i = ListIndex::FIRST;
         while self.players.player(p)?.objects.holds(i) {
@@ -336,17 +326,17 @@ impl World {
         if self.settings.teams_locked {
             return;
         }
-        let n = self.players.len();
+        let players = PlayerId::each(self.players.len()).skip(1);
         self.teams = [1; 8];
         let mut team = 2;
-        for i in 1..n {
+        for i in players.clone() {
             if 2 <= self.team(i) || team == 1 {
                 continue;
             }
             let mut joined = 0;
-            for j in 1..n {
-                let both = |a: usize, b: usize| {
-                    self.players.get(a).is_some_and(|pl| {
+            for j in players.clone() {
+                let both = |a: PlayerId, b: PlayerId| {
+                    self.players.player(a).is_ok_and(|pl| {
                         pl.relations.get(b) == Some(&Relation::ALLY) && pl.allied_victory == 1
                     })
                 };
@@ -366,12 +356,12 @@ impl World {
     }
 
     /// Player `i`'s team (`+0x984` at `i − 1`), 1 for a player past the eight.
-    fn team(&self, i: usize) -> i32 {
-        self.teams.get(i - 1).copied().unwrap_or(1)
+    fn team(&self, i: PlayerId) -> i32 {
+        self.teams.get(i.index() - 1).copied().unwrap_or(1)
     }
 
-    fn set_team(&mut self, i: usize, team: i32) {
-        if let Some(t) = self.teams.get_mut(i - 1) {
+    fn set_team(&mut self, i: PlayerId, team: i32) {
+        if let Some(t) = self.teams.get_mut(i.index() - 1) {
             *t = team;
         }
     }
@@ -408,7 +398,7 @@ mod tests {
         let player = |p: usize| Player {
             attributes: vec![Amount::ZERO; 300],
             relations: crate::players::relation_row((0..4).map(|q| if q == p { 0 } else { 3 })),
-            diplomacy: vec![Stance::NONE; 9],
+            diplomacy: crate::players::ByPlayer::new(vec![Stance::NONE; 9]),
             ..Player::default()
         };
         let mut t = World::new(
@@ -476,18 +466,60 @@ mod tests {
     fn a_diplomacy_change_sets_the_stance_and_the_relation() {
         let mut t = world();
         t.set_diplomacy(PlayerId::new(1), 2, 0).unwrap();
-        assert_eq!(t.players[1].diplomacy[2], Stance::ALLY);
-        assert_eq!(t.players[1].relations[2], Relation::ALLY);
-        assert_eq!(t.players[2].relations[1], Relation::ENEMY);
-        assert_eq!(t.spatial.relations[1][2], Relation::ALLY);
-        assert_eq!(t.spatial.unit_diplomacy[1][2], Some(UnitRelation::ALLY));
+        assert_eq!(
+            t.players[1].diplomacy.get(PlayerId::new(2)),
+            Some(&Stance::ALLY)
+        );
+        assert_eq!(
+            t.players[1].relations.get(PlayerId::new(2)),
+            Some(&Relation::ALLY)
+        );
+        assert_eq!(
+            t.players[2].relations.get(PlayerId::new(1)),
+            Some(&Relation::ENEMY)
+        );
+        assert_eq!(
+            t.spatial
+                .relations
+                .get(PlayerId::new(1))
+                .and_then(|r| r.get(PlayerId::new(2))),
+            Some(&Relation::ALLY)
+        );
+        assert_eq!(
+            t.spatial
+                .unit_diplomacy
+                .get(PlayerId::new(1))
+                .and_then(|r| r.get(PlayerId::new(2))),
+            Some(&Some(UnitRelation::ALLY))
+        );
         t.set_diplomacy(PlayerId::new(1), 2, 1).unwrap();
-        assert_eq!(t.players[1].diplomacy[2], Stance::NEUTRAL);
-        assert_eq!(t.spatial.unit_diplomacy[1][2], Some(UnitRelation::NEUTRAL));
+        assert_eq!(
+            t.players[1].diplomacy.get(PlayerId::new(2)),
+            Some(&Stance::NEUTRAL)
+        );
+        assert_eq!(
+            t.spatial
+                .unit_diplomacy
+                .get(PlayerId::new(1))
+                .and_then(|r| r.get(PlayerId::new(2))),
+            Some(&Some(UnitRelation::NEUTRAL))
+        );
         t.set_diplomacy(PlayerId::new(1), 2, 4).unwrap();
-        assert_eq!(t.players[1].diplomacy[2], Stance::ENEMY);
-        assert_eq!(t.players[1].relations[2], Relation::ENEMY);
-        assert_eq!(t.spatial.unit_diplomacy[1][2], Some(UnitRelation::ENEMY));
+        assert_eq!(
+            t.players[1].diplomacy.get(PlayerId::new(2)),
+            Some(&Stance::ENEMY)
+        );
+        assert_eq!(
+            t.players[1].relations.get(PlayerId::new(2)),
+            Some(&Relation::ENEMY)
+        );
+        assert_eq!(
+            t.spatial
+                .unit_diplomacy
+                .get(PlayerId::new(1))
+                .and_then(|r| r.get(PlayerId::new(2))),
+            Some(&Some(UnitRelation::ENEMY))
+        );
         let before = t.players.clone();
         t.set_diplomacy(PlayerId::new(1), 2, 2).unwrap();
         t.set_diplomacy(PlayerId::new(1), 9, 0).unwrap();
@@ -536,9 +568,10 @@ mod tests {
         // pairs (1, 2), (3, 4), (5, 6), (7, 8), each allied both ways
         for (a, b) in [(1, 2), (3, 4), (5, 6), (7, 8)] {
             for (x, y) in [(a, b), (b, a)] {
-                t.players[x].relations = vec![Relation::ENEMY; 9];
-                t.players[x].relations[x] = Relation::ALLY;
-                t.players[x].relations[y] = Relation::ALLY;
+                let row = &mut t.players[usize::from(x)].relations;
+                *row = crate::players::ByPlayer::new(vec![Relation::ENEMY; 9]);
+                row.set(PlayerId::new(x), Relation::ALLY);
+                row.set(PlayerId::new(y), Relation::ALLY);
             }
         }
         t.resolve_teams();

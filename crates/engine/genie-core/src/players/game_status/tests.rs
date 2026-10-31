@@ -938,17 +938,42 @@ fn early_in_the_game_a_resignation_leaves_the_objects_alone() {
 #[test]
 fn one_side_left_after_a_resignation_ends_a_conquest_game() {
     let mut c = Count::default();
-    c.add(1, LOST, 0, (Relation::ALLY, Relation::ALLY));
-    c.add(2, PLAYING, 0, (Relation::ALLY, Relation::ALLY));
+    c.add(PlayerId::new(1), LOST, 0, (Relation::ALLY, Relation::ALLY));
+    c.add(
+        PlayerId::new(2),
+        PLAYING,
+        0,
+        (Relation::ALLY, Relation::ALLY),
+    );
     assert_eq!((c.playing, c.side, c.lost, c.won), (1, 1, 1, 0));
     // two players still playing, enemies: two sides
     let mut c = Count::default();
-    c.add(1, PLAYING, 0, (Relation::ALLY, Relation::ALLY));
-    c.add(2, PLAYING, 0, (Relation::ENEMY, Relation::ENEMY));
+    c.add(
+        PlayerId::new(1),
+        PLAYING,
+        0,
+        (Relation::ALLY, Relation::ALLY),
+    );
+    c.add(
+        PlayerId::new(2),
+        PLAYING,
+        0,
+        (Relation::ENEMY, Relation::ENEMY),
+    );
     assert_eq!((c.playing, c.side), (2, -1));
     // allies with the allied victory are one side
     let mut c = Count::default();
-    c.add(1, PLAYING, 1, (Relation::ALLY, Relation::ALLY));
-    c.add(2, PLAYING, 1, (Relation::ALLY, Relation::ALLY));
+    c.add(
+        PlayerId::new(1),
+        PLAYING,
+        1,
+        (Relation::ALLY, Relation::ALLY),
+    );
+    c.add(
+        PlayerId::new(2),
+        PLAYING,
+        1,
+        (Relation::ALLY, Relation::ALLY),
+    );
     assert_eq!((c.playing, c.side), (2, 1));
 }

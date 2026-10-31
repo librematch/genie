@@ -9,19 +9,15 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::FARM_FOOD_AMOUNT;
 use crate::technology::{EffectCommand, Party};
 use crate::world::World;
+use crate::world::slots::PlayerSlots;
 
 impl World {
     /// The players party `party` reaches from player `p`: for a relation, each player past Gaia
     /// (`FUN_14152fdd0`, from 1, the player itself when it counts itself so) whose and to whom
     /// the relations (`+0x260`, `FUN_141667f50`) are the party's, in order.
     pub(super) fn party(&self, p: PlayerId, party: Party) -> Vec<PlayerId> {
-        let relation = |a: PlayerId, b: PlayerId| {
-            self.players
-                .get(a.index())?
-                .relations
-                .get(b.index())
-                .copied()
-        };
+        let relation =
+            |a: PlayerId, b: PlayerId| self.players.player(a).ok()?.relations.get(b).copied();
         let mutual = |q: PlayerId, wanted: &[crate::players::Relation]| {
             wanted
                 .iter()

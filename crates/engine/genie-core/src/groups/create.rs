@@ -703,8 +703,10 @@ mod tests {
         );
         v.registry = Some(crate::vision::registry::Registry::new(2, 65));
         t.spatial.sight = Some(v);
-        t.spatial.relations = vec![relation_row([0, 0]), relation_row([0, 0])];
-        t.spatial.unit_diplomacy = vec![relations([1, 2]), relations([0, 1])];
+        t.spatial.relations =
+            crate::players::ByPlayer::new(vec![relation_row([0, 0]), relation_row([0, 0])]);
+        t.spatial.unit_diplomacy =
+            crate::players::ByPlayer::new(vec![relations([1, 2]), relations([0, 1])]);
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags |= 2;
         g.motion.flags &= !2;

@@ -458,8 +458,8 @@ impl Unit {
         let relations =
             c.w.spatial
                 .relations
-                .get(c.player.index())
-                .map_or(&[][..], |r| &r[..]);
+                .get(c.player)
+                .unwrap_or(&crate::players::NO_RELATIONS);
         if matches!(
             t.life.master_id,
             crate::objects::masters::ids::PASTURE_MANGROVE | crate::objects::masters::ids::PASTURE

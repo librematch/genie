@@ -26,6 +26,7 @@ A player has more than its objects. This folder holds the rest:
 | [`amount.rs`](amount.rs) | An amount of a player attribute (`Amount`), with the game's `f32` operations. |
 | [`amount_rate.rs`](amount_rate.rs) | How fast an amount changes (`AmountRate`, an attribute's amount per second), with the game's `f32` operations. |
 | [`attribute.rs`](attribute.rs) | The indices of the player's attributes (`player+0x8`'s array of `f32`): the one definition of the attributes the engine reads and writes by number. |
+| [`by_player.rs`](by_player.rs) | One value per player, looked up by the player (`ByPlayer`). |
 | [`civ_id.rs`](civ_id.rs) | A civilisation's number. |
 | [`diplomacy.rs`](diplomacy.rs) | A player's diplomacy change (the world player's slot 0x30, `FUN_141639690`, which GAME's sub-command 0 runs): its stance toward another player (`diplomacy[i]`, `+0xe12`), the relation it makes (`relation[i]`, `+0x260`) and what its queries make of that player's objects (`unit_diplomacy[i]`, `+0x278`); its objects hear of it (slot 0x120: units inside a building or siege tower of a player no longer allied leave it); the players' sight masks and tile lists are made again; then the world's teams (`FUN_1415e23f0`) and the units the players reveal (`FUN_14152bcb0`). |
 | [`history.rs`](history.rs) | The player's history (`TRIBE_History_Info`, TribeHistoryInfo.cpp; player `+0xdb8`, saved with the player): a population entry each history period and a list of events, newest first. |
@@ -34,7 +35,7 @@ A player has more than its objects. This folder holds the rest:
 | [`player_id.rs`](player_id.rs) | A player's number as one type: the player a command comes from or names, and the index of the world's players. |
 | [`player_type.rs`](player_type.rs) | A player's type as one type: `player+0x10`, the save's class byte. |
 | [`query_relation.rs`](query_relation.rs) | A search's relation number: which players' objects `ClosestObject` asks for or passes over. |
-| [`relation.rs`](relation.rs) | How a player stands to another as one type: `relation[i]` (`player+0x260`). |
+| [`relation.rs`](relation.rs) | How a player stands to another as one type (`Relation`), and a player's row of them (`Relations`, `relation[i]`, `player+0x260`). |
 | [`stance.rs`](stance.rs) | A player's stance toward another as one type: `diplomacy[i]` (`+0xe12`). |
 | [`tracker.rs`](tracker.rs) | The player's object tracker (`player+0x18`, the "Object Tracker"): lists of the player's object ids by key, in the order the ids came in. |
 | [`treason.rs`](treason.rs) | Treason (GAME's sub-command 0xa, the old Spies): a player with a castle pays gold to have its allies see the kings of the players it is not allied with, a flare at each king for each of them. |

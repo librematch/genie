@@ -303,16 +303,11 @@ impl Spatial {
     /// `FUN_141663dc0` with the ally flag: `to` counts for `from` when it is `from`, or `from`
     /// stands to it in relation 0 or 4; Gaia counts for no one else.
     pub(super) fn allied(&self, from: PlayerId, to: PlayerId) -> bool {
-        if from == to {
-            return true;
-        }
-        if to == PlayerId::new(0) {
-            return false;
-        }
-        self.relations
-            .get(from.index())
-            .and_then(|r| r.get(to.index()))
-            .is_some_and(|r| r.allied(true))
+        let relations = self
+            .relations
+            .get(from)
+            .unwrap_or(&crate::players::NO_RELATIONS);
+        crate::unit_ai::task_finder::allied(relations, from, to, true)
     }
 
     /// `FUN_1410562e0` on the obstruction manager: its ignore list becomes `ids` (none for an

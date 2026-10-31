@@ -55,10 +55,14 @@ impl UnitRelation {
     }
 }
 
+/// What a player's queries make of each player's objects (`unit_diplomacy[i]`, `player+0x278`),
+/// by the other player: none for a saved value past the five relations.
+pub type UnitRelations = crate::players::ByPlayer<Option<UnitRelation>>;
+
 /// A test's row of saved relations (`unit_diplomacy`): each value as [`UnitRelation::of_field`]
 /// reads it.
 #[cfg(test)]
-pub(crate) fn relations<const N: usize>(values: [i32; N]) -> Vec<Option<UnitRelation>> {
+pub(crate) fn relations<const N: usize>(values: [i32; N]) -> UnitRelations {
     values.into_iter().map(UnitRelation::of_field).collect()
 }
 

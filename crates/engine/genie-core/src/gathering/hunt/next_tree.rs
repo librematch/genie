@@ -68,7 +68,7 @@ impl Unit {
         let own =
             c.w.spatial
                 .relations
-                .get(c.player.index())
+                .get(c.player)
                 .ok_or(GenieError::unsupported(
                     "a hunter's player without relations",
                 ))?;

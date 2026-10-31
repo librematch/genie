@@ -78,6 +78,7 @@ use crate::ownership::artifact::ArtifactState;
 use crate::ownership::change::change_hands;
 use crate::players::Amount;
 use crate::players::AmountRate;
+use crate::players::ByPlayer;
 use crate::players::CivId;
 use crate::players::PlayerType;
 use crate::players::Relation;
@@ -2188,19 +2189,23 @@ fn a_unit_s_side_reads_the_other_players_relations_around_its_own() {
         left: None,
     };
     assert_eq!(
-        foreign.player(PlayerId::new(0)).map(|p| p.relations[0]),
+        foreign
+            .player(PlayerId::new(0))
+            .and_then(|p| p.relations.get(PlayerId::GAIA).copied()),
         Some(Relation::ALLY)
     );
     assert!(foreign.player(PlayerId::new(1)).is_none());
     assert_eq!(
-        foreign.player(PlayerId::new(2)).map(|p| p.relations[0]),
+        foreign
+            .player(PlayerId::new(2))
+            .and_then(|p| p.relations.get(PlayerId::GAIA).copied()),
         Some(Relation::from(2))
     );
     assert!(foreign.player(PlayerId::new(3)).is_none());
     // the owner (1) counts player 2 as an ally (0), player 2 counts the owner an enemy (2)
     let world = SideWorld {
         player: PlayerId::new(1),
-        relations: &[Relation::NEUTRAL, Relation::NEUTRAL, Relation::ALLY],
+        relations: &ByPlayer::new(vec![Relation::NEUTRAL, Relation::NEUTRAL, Relation::ALLY]),
         foreign,
         drop_sites: &[],
     };
@@ -2514,7 +2519,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
     use crate::objects::sprite::Graphic;
     let mut t = sent_off_world(vec![]);
     open_map(&mut t);
-    t.spatial.relations = vec![relation_row([0, 3]), relation_row([3, 0])];
+    t.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
     let placed = |position, class, master, radius| Placed {
         position,
         radius,
@@ -5290,7 +5295,7 @@ fn lumber_world(near: f32) -> World {
             },
         );
     }
-    t.spatial.relations = vec![relation_row([0, 3]), relation_row([3, 0])];
+    t.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
@@ -6328,11 +6333,11 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
             t.spatial.insert(object_id(10028), placed);
             t.players[1].relations = relation_row([3, 0, 0]);
             t.players[2].relations = relation_row([3, 0, 0]);
-            t.spatial.relations = vec![
+            t.spatial.relations = ByPlayer::new(vec![
                 relation_row([0, 3, 3]),
                 relation_row([3, 0, 0]),
                 relation_row([3, 0, 0]),
-            ];
+            ]);
         }
         let mut e = crate::garrison::EnterAction::new(
             object_id(10028),
@@ -7731,11 +7736,11 @@ fn an_order_resets_its_units_sleeping_ones_too() {
 #[test]
 fn a_load_goes_to_its_player_alone_unless_the_player_shares() {
     // records/425906646's update 818: player 6, with allies, does not share (+0x1426 0)
-    let relations = vec![
+    let relations = ByPlayer::new(vec![
         relation_row([0, 3, 3]),
         relation_row([3, 0, 0]),
         relation_row([3, 0, 0]),
-    ];
+    ]);
     let mut adds = Vec::new();
     give_load(
         (&relations, false),
@@ -7947,11 +7952,11 @@ fn a_gate_counts_the_moving_units_between_its_posts() {
         GridSize::new(40, 40),
         crate::map::spatial::Tiles::new(GridSize::new(40, 40), vec![1; 1600]),
     );
-    s.relations = vec![
+    s.relations = ByPlayer::new(vec![
         relation_row([0, 3, 3]),
         relation_row([3, 0, 3]),
         relation_row([3, 3, 0]),
-    ];
+    ]);
     let placed = |x: f32, class, player, speed, kind| Placed {
         position: Position::new(x, 20.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
@@ -8145,7 +8150,7 @@ fn gate_world() -> World {
         GridSize::new(40, 40),
         crate::map::spatial::Tiles::new(GridSize::new(40, 40), vec![1; 1600]),
     );
-    t.spatial.relations = vec![relation_row([0, 3]), relation_row([3, 0])];
+    t.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
     let placed = |x: f32, class, speed, kind| Placed {
         position: Position::new(x, 20.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
@@ -10033,12 +10038,20 @@ fn teardown_world() -> World {
                     tc(object_id(9150)),
                 ]
                 .into(),
-                relations: vec![Relation::ALLY, Relation::NEUTRAL, Relation::from(2)],
+                relations: ByPlayer::new(vec![
+                    Relation::ALLY,
+                    Relation::NEUTRAL,
+                    Relation::from(2),
+                ]),
                 ..Player::default()
             },
             Player {
                 objects: vec![foundation].into(),
-                relations: vec![Relation::ALLY, Relation::from(2), Relation::NEUTRAL],
+                relations: ByPlayer::new(vec![
+                    Relation::ALLY,
+                    Relation::from(2),
+                    Relation::NEUTRAL,
+                ]),
                 ..Player::default()
             },
         ],
@@ -10989,12 +11002,12 @@ fn a_foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
                     foundation(object_id(10029), ids::HOUSE),
                 ]
                 .into(),
-                relations: vec![
+                relations: ByPlayer::new(vec![
                     Relation::ALLY,
                     Relation::ALLY,
                     Relation::from(2),
                     Relation::RELATION_4,
-                ],
+                ]),
                 ..Player::default()
             },
             Player {
@@ -11003,22 +11016,22 @@ fn a_foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
                     unit(object_id(41), VILLAGER_MALE),
                 ]
                 .into(),
-                relations: vec![
+                relations: ByPlayer::new(vec![
                     Relation::ALLY,
                     Relation::from(2),
                     Relation::ALLY,
                     Relation::from(2),
-                ],
+                ]),
                 ..Player::default()
             },
             Player {
                 objects: vec![unit(object_id(50), VILLAGER_MALE)].into(),
-                relations: vec![
+                relations: ByPlayer::new(vec![
                     Relation::ALLY,
                     Relation::RELATION_4,
                     Relation::from(2),
                     Relation::ALLY,
-                ],
+                ]),
                 ..Player::default()
             },
         ],
@@ -11310,11 +11323,11 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         cell: crate::vision::ghost::Cell::Tile(10 * 40 + 10),
         bits: 0,
     });
-    t.spatial.unit_diplomacy = vec![
+    t.spatial.unit_diplomacy = ByPlayer::new(vec![
         relations([1, 4, 4]),
         relations([4, 1, 4]),
         relations([4, 4, 1]),
-    ];
+    ]);
     t.spatial.insert(
         object_id(500),
         Placed {
@@ -11460,11 +11473,11 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
         ids::ID_854,
         Distance::new(4.0),
     );
-    t.spatial.unit_diplomacy = vec![
+    t.spatial.unit_diplomacy = ByPlayer::new(vec![
         relations([1, 4, 4]),
         relations([4, 1, 4]),
         relations([4, 4, 1]),
-    ];
+    ]);
     t.spatial.insert(
         object_id(500),
         Placed {
@@ -11594,11 +11607,11 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
         master_id(705),
         Distance::new(2.0),
     );
-    t.spatial.relations = vec![
+    t.spatial.relations = ByPlayer::new(vec![
         relation_row([1, 4, 4]),
         relation_row([4, 1, 4]),
         relation_row([4, 4, 1]),
-    ];
+    ]);
     t.spatial.insert(
         object_id(500),
         Placed {
@@ -17188,8 +17201,8 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
 /// the hunter before [`Unit::hunt_after_drop`] runs.
 fn hunted_without_a_deer(setup: impl FnOnce(&mut Unit)) -> World {
     let mut t = hunt_world();
-    t.spatial.relations = vec![relation_row([0, 3]), relation_row([3, 0])];
-    t.spatial.unit_diplomacy = vec![relations([1, 4]), relations([4, 1])];
+    t.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
+    t.spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([4, 1])]);
     for masters in &mut t.masters {
         let m = masters.get_mut(master_id(122)).unwrap();
         (m.line_of_sight, m.search_radius) = (Distance::new(4.0), Distance::new(4.0));
@@ -17928,7 +17941,7 @@ fn a_wall_or_a_house_counts_no_whole_seconds() {
 pub(crate) fn repairing(at: Position) -> World {
     let mut t = repair_world();
     open_map(&mut t);
-    t.spatial.relations = vec![relation_row([0, 3]), relation_row([3, 0])];
+    t.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
     let placed = |position, class, master, radius| Placed {
         position,
         radius,
@@ -18226,7 +18239,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         (house.life.hp, house.armor_removed, house.workers) = (hp, ArmorPair::new(3, 4), 0);
         t.players[0].objects.push(house);
         t.players[0].attributes = vec![Amount::ZERO; 300];
-        t.spatial.relations = vec![relation_row([0, 0]), relation_row([0, 0])];
+        t.spatial.relations = ByPlayer::new(vec![relation_row([0, 0]), relation_row([0, 0])]);
         for p in &mut t.players {
             p.relations = relation_row([0, 0]);
         }

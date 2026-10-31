@@ -10,6 +10,7 @@ use genie_core::objects::masters::PlayersMasters;
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
+use genie_core::players::{ByPlayer, Relations};
 use genie_rec::de;
 
 /// What the task finder (`genie_core::unit_ai::task_finder`) reads of a save: every player's masters as the work
@@ -22,7 +23,7 @@ pub struct FinderWorld {
     /// The objects by id.
     pub objects: std::collections::HashMap<ObjectId, FinderObject>,
     /// `relation[i]` of each player (`player+0x260`).
-    pub relations: Vec<Vec<u8>>,
+    pub relations: ByPlayer<Relations>,
     /// Every player's attribute 95.
     pub attribute_95: Vec<Amount>,
     /// Every player's civ.
@@ -59,25 +60,12 @@ pub struct FinderObject {
 }
 
 impl genie_core::unit_ai::task_finder::Diplomacy for FinderWorld {
-    /// `FUN_141663dc0`: one's own player counts; Gaia never does; else the relation 0 does, and
-    /// 4 with the ally flag. Relation 1 counts only under allied victory (`FUN_1415e8e10`), which
-    /// the slice does not model.
+    /// [`genie_core::unit_ai::task_finder::allied`] with `from`'s relations: a player without
+    /// them counts only itself.
     fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
-        if from == to {
-            return true;
-        }
-        if to == PlayerId::GAIA {
-            return false;
-        }
-        match self
-            .relations
-            .get(from.index())
-            .and_then(|r| r.get(to.index()))
-        {
-            Some(0) => true,
-            Some(4) => with_ally,
-            _ => false,
-        }
+        self.relations.get(from).map_or(from == to, |r| {
+            genie_core::unit_ai::task_finder::allied(r, from, to, with_ally)
+        })
     }
 
     fn drops_at(
@@ -165,7 +153,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
         objects,
         relations: sections
             .iter()
-            .map(|p| p.world_player().base.relation.clone())
+            .map(|p| Relations::of_bytes(p.world_player().base.relation.iter().copied()))
             .collect(),
         attribute_95: sections
             .iter()

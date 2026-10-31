@@ -219,8 +219,8 @@ impl Mover {
                 let allied = owner.is_some_and(|o| {
                     let relations = world
                         .relations
-                        .get(p.player.index())
-                        .map_or(&[][..], |r| &r[..]);
+                        .get(p.player)
+                        .unwrap_or(&crate::players::NO_RELATIONS);
                     crate::unit_ai::task_finder::allied(relations, p.player, o, true)
                 });
                 let gap = footprint_gap_squared(p.position, p.radius, t.position, t.radius);

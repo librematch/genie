@@ -169,8 +169,9 @@ impl World {
         }
         let mine = self
             .players
-            .get(p.index())
-            .and_then(|pl| pl.relations.get(q.index()).copied());
+            .player(p)
+            .ok()
+            .and_then(|pl| pl.relations.get(q).copied());
         if !mine.is_some_and(|r| r.allied(true)) {
             return false;
         }
@@ -178,8 +179,9 @@ impl World {
             && p.index() < n
             && self
                 .players
-                .get(q.index())
-                .and_then(|pl| pl.relations.get(p.index()))
+                .player(q)
+                .ok()
+                .and_then(|pl| pl.relations.get(p))
                 .is_some_and(|r| r.allied(true))
     }
 

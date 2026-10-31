@@ -6,6 +6,7 @@ pub mod ai_module;
 mod amount;
 mod amount_rate;
 pub mod attribute;
+mod by_player;
 mod civ_id;
 pub mod diplomacy;
 pub mod game_status;
@@ -24,14 +25,16 @@ pub mod world_player;
 
 pub use self::amount::Amount;
 pub use self::amount_rate::AmountRate;
+pub use self::by_player::ByPlayer;
 pub use self::civ_id::CivId;
 pub use self::player_id::PlayerId;
 pub use self::player_type::PlayerType;
 pub use self::query_relation::QueryRelation;
-pub use self::relation::Relation;
+pub(crate) use self::relation::NO_RELATIONS;
 #[cfg(test)]
 pub(crate) use self::relation::relation_row;
+pub use self::relation::{Relation, Relations};
 pub use self::stance::Stance;
 #[cfg(test)]
 pub(crate) use self::unit_relation::relations;
-pub use self::unit_relation::{ByRelation, UnitRelation};
+pub use self::unit_relation::{ByRelation, UnitRelation, UnitRelations};

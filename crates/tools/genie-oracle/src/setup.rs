@@ -142,13 +142,9 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     .map(|&b| Amount::new(f32::from_bits(b)))
                     .collect(),
                 civ: genie_core::players::CivId::new(civ),
-                relations: p
-                    .world_player()
-                    .base
-                    .relation
-                    .iter()
-                    .map(|&r| genie_core::players::Relation::from(r))
-                    .collect(),
+                relations: genie_core::players::Relations::of_bytes(
+                    p.world_player().base.relation.iter().copied(),
+                ),
                 auto_farm_queue: p.world_player().auto_farm_queue != 0,
                 auto_fishtrap_queue: p.world_player().auto_fish_trap_queue != 0,
                 farm_queue: p.world_player().farm_queue_count,

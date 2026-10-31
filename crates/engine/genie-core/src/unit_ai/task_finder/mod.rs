@@ -104,7 +104,7 @@ pub struct TaskOn<'t, 'a> {
 /// under allied victory (`FUN_1415e8e10`), which the slice does not model.
 #[must_use]
 pub fn allied(
-    relations: &[crate::players::Relation],
+    relations: &crate::players::Relations,
     from: PlayerId,
     to: PlayerId,
     with_ally: bool,
@@ -112,12 +112,10 @@ pub fn allied(
     if from == to {
         return true;
     }
-    if to == PlayerId::new(0) {
+    if to == PlayerId::GAIA {
         return false;
     }
-    relations
-        .get(to.index())
-        .is_some_and(|r| r.allied(with_ally))
+    relations.get(to).is_some_and(|r| r.allied(with_ally))
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.

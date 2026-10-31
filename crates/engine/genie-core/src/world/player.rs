@@ -90,7 +90,7 @@ pub struct Player {
     /// The civ (`player+0x738`), which drop sites read.
     pub civ: crate::players::CivId,
     /// `relation[i]` (`player+0x260`): how the player stands to player i.
-    pub relations: Vec<crate::players::Relation>,
+    pub relations: crate::players::Relations,
     /// The sleeping objects, in their list's order: they are not updated; a unit's work on one
     /// wakes it.
     pub sleeping: ObjectList,
@@ -109,7 +109,7 @@ pub struct Player {
     pub production_queue_on: u8,
     /// `diplomacy[i]` (`+0xe12`, saved, 9 entries): the stance toward player i a diplomacy change
     /// set (1 or 2 enemy, 3 neutral, 4 or 5 ally; [`crate::players::diplomacy`]).
-    pub diplomacy: Vec<crate::players::Stance>,
+    pub diplomacy: crate::players::ByPlayer<crate::players::Stance>,
     /// The settings a computer player's GAME 0xb sets (`+0x608`..`+0x670`, saved).
     pub ai_settings: AiSettings,
     /// The order splitter's settings (`+0x6c0` `mAutoFormations`, `+0x6c4`

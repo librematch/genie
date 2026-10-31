@@ -27,6 +27,7 @@ use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::Amount;
+use crate::players::ByPlayer;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
@@ -4041,8 +4042,8 @@ fn searchable(mut t: World) -> World {
         vec![kind],
         vec![vec![1.0]],
     ));
-    s.relations = vec![relation_row([0, 3]), relation_row([0, 0])];
-    s.unit_diplomacy = vec![relations([1, 4]), relations([0, 1])];
+    s.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([0, 0])]);
+    s.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([0, 1])]);
     let mut v = crate::vision::visibility::Visibility::new(
         GridSize::new(60, 60),
         vec![],

@@ -17,6 +17,7 @@ use crate::unit_ai::world_view::Foreign;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
 use crate::world::player::Player;
+use crate::world::slots::PlayerSlots;
 
 /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
 /// [`Terrain::at_task_point`]); none on a world without its map's terrain.
@@ -35,8 +36,8 @@ impl Diplomacy for TaskWorld<'_> {
     fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
         let relations = self
             .players
-            .get(from.index())
-            .map_or(&[][..], |p| &p.relations[..]);
+            .player(from)
+            .map_or(&crate::players::NO_RELATIONS, |p| &p.relations);
         crate::unit_ai::task_finder::allied(relations, from, to, with_ally)
     }
 
@@ -49,7 +50,7 @@ impl Diplomacy for TaskWorld<'_> {
 /// owner's list is out for its update ([`UnitView`]): the owner's relations, the others'.
 pub(crate) struct SideWorld<'a> {
     pub(crate) player: PlayerId,
-    pub(crate) relations: &'a [crate::players::Relation],
+    pub(crate) relations: &'a crate::players::Relations,
     pub(crate) foreign: Foreign<'a>,
     pub(crate) drop_sites: &'a [DropSite],
 }
@@ -62,7 +63,7 @@ impl Diplomacy for SideWorld<'_> {
         } else {
             self.foreign
                 .player(from)
-                .map_or(&[][..], |p| &p.relations[..])
+                .map_or(&crate::players::NO_RELATIONS, |p| &p.relations)
         };
         crate::unit_ai::task_finder::allied(relations, from, to, with_ally)
     }

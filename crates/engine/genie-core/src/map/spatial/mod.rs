@@ -28,7 +28,7 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::pathing::tile_path::PlanRect;
 use crate::players::PlayerId;
-use crate::players::{ByRelation, QueryRelation, UnitRelation};
+use crate::players::{ByRelation, QueryRelation};
 use crate::vision::registry::Record;
 use crate::vision::visibility::Visibility;
 use crate::world::Seconds;
@@ -596,12 +596,12 @@ pub struct Spatial {
     /// Each annex's main building (`+0xbb8`), which the walk's avoidance takes for the annex.
     annexes: BTreeMap<ObjectId, ObjectId>,
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.
-    pub relations: Vec<Vec<crate::players::Relation>>,
+    pub relations: crate::players::ByPlayer<crate::players::Relations>,
     /// What each player's queries make of the other players' objects (`player+0x278`, the
     /// save's `unit_diplomacy`): none for a saved value past the five relations.
     /// Loaded, not derived: the slice runs no diplomacy change (command 0x76), whose handler
     /// would write it with `relation`.
-    pub unit_diplomacy: Vec<Vec<Option<UnitRelation>>>,
+    pub unit_diplomacy: crate::players::ByPlayer<crate::players::UnitRelations>,
     /// Each player's masters with a task of action type 0x99, which a building's slot 0x4f0
     /// reads (`FUN_1411d4980` -> `FUN_1415c60b0`): a drop-off walker counts such a building
     /// among the workers near it.

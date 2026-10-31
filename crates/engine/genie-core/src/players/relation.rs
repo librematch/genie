@@ -1,4 +1,7 @@
-//! How a player stands to another as one type: `relation[i]` (`player+0x260`).
+//! How a player stands to another as one type ([`Relation`]), and a player's row of them
+//! ([`Relations`], `relation[i]`, `player+0x260`).
+
+use crate::players::ByPlayer;
 
 /// How a player stands to player i (`relation[i]`, `player+0x260`, which `FUN_141676b80`
 /// writes from a stance, `FUN_1416397d0`): an ally, a neutral or an enemy. Every byte is a
@@ -32,10 +35,25 @@ impl Relation {
     }
 }
 
+/// A player's relations toward every player (`relation[i]`, `player+0x260`), by the other
+/// player: the diplomacy row the stances write and the queries read.
+pub type Relations = ByPlayer<Relation>;
+
+impl ByPlayer<Relation> {
+    /// The row of the save's bytes, toward players 0, 1, … in their order: every byte is a
+    /// relation.
+    pub fn of_bytes(values: impl IntoIterator<Item = u8>) -> Self {
+        values.into_iter().map(Relation::from).collect()
+    }
+}
+
+/// The relations of a player the world does not hold: toward no player.
+pub(crate) static NO_RELATIONS: Relations = ByPlayer::new(Vec::new());
+
 /// A test's relation row (`player+0x260`) of saved bytes.
 #[cfg(test)]
-pub(crate) fn relation_row(values: impl IntoIterator<Item = u8>) -> Vec<Relation> {
-    values.into_iter().map(Relation::from).collect()
+pub(crate) fn relation_row(values: impl IntoIterator<Item = u8>) -> Relations {
+    Relations::of_bytes(values)
 }
 
 impl From<u8> for Relation {
@@ -65,5 +83,15 @@ mod tests {
         assert!(!Relation::ENEMY.allied(true));
         assert_eq!(Relation::from(3), Relation::ENEMY);
         assert_eq!(Relation::default().get(), 0);
+    }
+
+    /// A saved row's bytes are the relations toward the players in their order.
+    #[test]
+    fn a_saved_row_is_the_relations_toward_each_player() {
+        use crate::players::{PlayerId, Relations};
+        let row = Relations::of_bytes([0, 3, 4]);
+        assert_eq!(row.get(PlayerId::new(1)), Some(&Relation::ENEMY));
+        assert_eq!(row.get(PlayerId::new(2)), Some(&Relation::RELATION_4));
+        assert_eq!(row.get(PlayerId::new(3)), None);
     }
 }

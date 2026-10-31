@@ -10,6 +10,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::spawn::{Near, PlaceMap};
 use crate::world::World;
+use crate::world::slots::PlayerSlots;
 
 /// The map as the spawn's placement test reads it: the terrain, the players' sight and the
 /// objects with what their units and masters say.
@@ -82,8 +83,8 @@ impl PlaceMap for WorldMap<'_> {
         let relations = self
             .turns
             .players
-            .get(a.index())
-            .map_or(&[][..], |p| &p.relations[..]);
+            .player(a)
+            .map_or(&crate::players::NO_RELATIONS, |p| &p.relations);
         crate::unit_ai::task_finder::allied(relations, a, b, with_4)
     }
 
