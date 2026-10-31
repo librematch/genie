@@ -17,6 +17,7 @@ use crate::objects::SpriteId;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
@@ -1851,7 +1852,7 @@ fn an_auto_scout_reaches_any_player_s_scout_of_its_first_60_ids() {
         id: ids::ID_448,
         kind: master_type::COMBAT,
         class: class::CLASS_12,
-        object_flags: 0x10,
+        object_flags: ObjectFlags::SCOUT,
         // no sprites: the Explore's MoveTo takes none (the world's sprites' table holds none)
         move_sprite: None,
         standing_sprite: None,

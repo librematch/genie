@@ -15,6 +15,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
+use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::VolleySpread;
@@ -191,7 +192,7 @@ pub(super) fn work_masters(
         work.obstruction_type = ObstructionType::from(s.obstruction_type);
         work.buildable_on = s.can_be_built_on;
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
-        work.object_flags = s.object_flags;
+        work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
         work.hit_points = s.read_temp_6;
         work.available = s.available != 0;
         work.disabled = s.disabled != 0;
@@ -419,7 +420,7 @@ pub(super) fn moving_stats(
         turn_time: Seconds::new(moving.turn_speed),
         move_algorithm: turning.move_algorithm,
         min_collision: turning.min_collision_size_multiplier,
-        fast_turn: s.object_flags & 2 != 0,
+        fast_turn: ObjectFlags::from_bits_retain(s.object_flags).contains(ObjectFlags::SHIP),
         facets: master_facets(m, s, table),
         weapon_range: combat_master(m).map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
     })

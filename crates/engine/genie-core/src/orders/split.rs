@@ -5,6 +5,7 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::master_type::MOVING;
 use crate::orders::{Interact, MAX_UNGROUPED, Split, Splittable, centroid, splits_together};
 use crate::players::PlayerId;
@@ -164,7 +165,7 @@ impl World {
                 group: u.group.id,
                 kind: master.kind,
                 grouped: master.formation_category != 0,
-                flag_1: master.object_flags & 2 != 0,
+                flag_1: master.object_flags.contains(ObjectFlags::SHIP),
                 speed: u.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
                 position: u.position(),
                 moved_at: u

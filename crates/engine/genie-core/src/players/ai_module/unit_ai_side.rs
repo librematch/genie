@@ -10,6 +10,7 @@ use crate::GenieError;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::math::rng::Stream;
+use crate::objects::masters::ObjectFlags;
 use crate::unit_ai::NotifyKind;
 use crate::world::WorldTime;
 
@@ -131,7 +132,7 @@ impl UnitView<'_, '_> {
             }
             Some(_) => {}
         }
-        if flags & 2 != 0 {
+        if flags.contains(ObjectFlags::SHIP) {
             return Ok(Heard::Detask);
         }
         let Some((at, centre_sight)) = centre else {

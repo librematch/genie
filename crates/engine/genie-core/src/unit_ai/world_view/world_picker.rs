@@ -9,6 +9,7 @@ use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::objects::masters::{Masters, player_master};
@@ -200,7 +201,7 @@ impl WorldPicker<'_> {
     /// counts when the world holds it.
     pub(crate) fn harmless(&self, spatial: &Spatial, other: ObjectId) -> Result<bool, GenieError> {
         let (q, o, attributes, om) = self.held(other)?.ok_or(NOT_HELD)?;
-        if om.object_flags & 0x10 == 0 || om.copy_id != Some(om.id) {
+        if !om.object_flags.contains(ObjectFlags::SCOUT) || om.copy_id != Some(om.id) {
             return Ok(false);
         }
         let terrain = spatial.terrain.as_ref();

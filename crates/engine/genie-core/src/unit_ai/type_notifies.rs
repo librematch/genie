@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::ObjectFlags;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::NotifyKind;
@@ -121,11 +122,11 @@ impl UnitAi {
         // a target within its sight whose master has no flag 0x10 (`+0x654`) it
         // attacks again (slot 0xb8: the target, forced, not any, its group) and the
         // processing breaks
-        let flags = at.target.map_or(0, |t| t.flags);
+        let flags = at.target.map_or(ObjectFlags::NONE, |t| t.flags);
         if let Some(gap) = gap
             && let Some(target) = self.current_target
             && !crate::math::fmath::below_or_unordered(at.los.squared().get(), gap.get())
-            && flags & 0x10 == 0
+            && !flags.contains(ObjectFlags::SCOUT)
         {
             let _ = self.attack_object(target, true, false, at, side)?;
             return Ok(BREAK);

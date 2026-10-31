@@ -21,6 +21,7 @@ use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -448,14 +449,14 @@ fn finder_head<'m>(
         if let Some(task) = garrison_task(list, actor, target, dip)? {
             return Ok(Finding::Answer(Some(task)));
         }
-        if target.is_none_or(|t| t.master.object_flags & 1 == 0) {
+        if target.is_none_or(|t| !t.master.object_flags.contains(ObjectFlags::GARRISON)) {
             return Ok(Finding::Answer(None));
         }
     }
     // a master with object flag 0x10 has no task on prey whose master stores something
     // (`+0x610`, its first storage amount, above 0)
     if let Some(t) = target
-        && own.object_flags & 0x10 != 0
+        && own.object_flags.contains(ObjectFlags::SCOUT)
         && t.master.class == class::PREY
         && Amount::ZERO
             < t.master
@@ -885,7 +886,7 @@ mod tests {
     fn a_flag_0x10_master_has_no_task_on_prey_that_stores_food() {
         let hunt = task(crate::gathering::hunt::HUNT, class::PREY.get(), -1, 1.0);
         let hunter = Master {
-            object_flags: 0x10,
+            object_flags: ObjectFlags::SCOUT,
             ..master(master_id(122), COMBAT, class::VILLAGER, vec![hunt])
         };
         let deer = Master {
@@ -906,7 +907,7 @@ mod tests {
             Ok(Some(&hunt))
         );
         let plain = Master {
-            object_flags: 0,
+            object_flags: ObjectFlags::NONE,
             ..hunter
         };
         assert_eq!(
@@ -1080,7 +1081,7 @@ mod tests {
         // FUN_1412784d0 with filter 3 on a transport ship (545, class 20, object flag 0): no
         // building's task, so LAB_1412796b4's first task of action 3 on class 20
         let ship = Master {
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             garrison: 5,
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
@@ -1130,7 +1131,7 @@ mod tests {
         );
         // a target without object flag 0 has no task with the garrison filter
         let galley = Master {
-            object_flags: 0,
+            object_flags: ObjectFlags::NONE,
             ..ship
         };
         assert_eq!(
@@ -1148,7 +1149,7 @@ mod tests {
         // LAB_1412796b4: a villager takes a target with object flag 0 not of class 20 (a ram,
         // class 13) only under the garrison filter (or mode 1, not modelled)
         let ram = Master {
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             garrison: 4,
             ..master(ids::ID_35, COMBAT, class::SIEGE, vec![])
         };
@@ -1242,7 +1243,7 @@ mod tests {
             Ok(Finding::Answer(None))
         );
         let ship = Master {
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
         assert_eq!(
@@ -1260,7 +1261,7 @@ mod tests {
             ..master(master_id(65), COMBAT, class::PREY, vec![])
         };
         let wolf = Master {
-            object_flags: 0x10,
+            object_flags: ObjectFlags::SCOUT,
             ..master(master_id(126), COMBAT, class::PREDATOR, vec![])
         };
         let prey = building(&deer, PlayerId::new(0), ObjectState::Alive);
@@ -1447,7 +1448,7 @@ mod tests {
         );
         let soldier = master(master_id(4), COMBAT, class::CLASS_6, vec![]);
         let ship = Master {
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
         let sailor = actor(&soldier, carrying(None, 0.0));
@@ -1511,7 +1512,7 @@ mod tests {
             garrison_into(list, &actor(list, carrying(None, 0.0)), t, filter, &Alone)
         }
         let ship = Master {
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
         let boarding = task(crate::orders::GARRISON, class::TRANSPORT.get(), -1, 0.0);
@@ -1528,7 +1529,7 @@ mod tests {
         );
         assert_eq!(into(&bare, &t, None), (Finding::Next, true));
         let barge = Master {
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             ..master(ids::ID_546, COMBAT, class::CLASS_6, vec![])
         };
         let villager = master(ids::VILLAGER_MALE, COMBAT, class::VILLAGER, vec![]);

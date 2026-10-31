@@ -8,6 +8,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassAmount;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -263,7 +264,7 @@ fn a_villager_fights_back_a_weak_attacker_of_its_own_master() {
         copy_id: Some(ids::VILLAGER_MALE),
         kind: master_type::COMBAT,
         class: class::VILLAGER,
-        object_flags: 0x10,
+        object_flags: ObjectFlags::SCOUT,
         hit_points: 25,
         weapons: vec![ClassAmount::new(4, 3), ClassAmount::new(21, 6)],
         armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
@@ -276,7 +277,7 @@ fn a_villager_fights_back_a_weak_attacker_of_its_own_master() {
         f(&mut m);
         harmless(m)
     };
-    assert!(!with(&|m| m.object_flags = 0));
+    assert!(!with(&|m| m.object_flags = ObjectFlags::NONE));
     assert!(!with(&|m| m.copy_id = Some(ids::VILLAGER_FEMALE)));
     assert!(!with(&|m| m.weapons = vec![ClassAmount::new(4, 5)]));
     // an attack of 4 below 60 hit points

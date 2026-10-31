@@ -9,6 +9,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
@@ -58,7 +59,9 @@ impl crate::world::World {
         {
             self.construction_starts(p, id)?;
         }
-        if building.foundation_terrain.is_some() && master.object_flags & 0x40 != 0 {
+        if building.foundation_terrain.is_some()
+            && master.object_flags.contains(ObjectFlags::TILE_CLASSES)
+        {
             return Err(GenieError::unsupported(
                 "a completion of a master of object flag 0x40 (its tiles' classes, FUN_141055790)",
             ));

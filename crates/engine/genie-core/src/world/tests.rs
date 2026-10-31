@@ -58,6 +58,7 @@ use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
@@ -453,7 +454,7 @@ pub(crate) fn builder_masters() -> Masters {
         tasks,
         cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
-        object_flags: 0,
+        object_flags: ObjectFlags::NONE,
         combat_level: 0,
         work_rate: WorkRate::new(1.0),
         hit_points: 25,
@@ -512,7 +513,7 @@ pub(crate) fn builder_masters() -> Masters {
             tasks: vec![],
             cost: costs(&[(attribute::WOOD, 25, true)]),
             obstruction_class: ObstructionClass::UNIT,
-            object_flags: 0,
+            object_flags: ObjectFlags::NONE,
             combat_level: 0,
             work_rate: WorkRate::ZERO,
             hit_points: 550,

@@ -12,6 +12,7 @@ use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::GatherGroup;
 use genie_core::objects::masters::MasterId;
+use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::masters::PlacementTerrains;
@@ -138,7 +139,7 @@ pub(super) fn dat_work(
         obstruction_type: ObstructionType::from(unit.obstruction_type),
         buildable_on: unit.can_be_built_on,
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
-        object_flags: 0,
+        object_flags: ObjectFlags::NONE,
         combat_level: unit.combat_level,
         tasks: dat_tasks(unit, sounds)?,
         default_task: unit

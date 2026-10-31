@@ -5,6 +5,7 @@ use crate::movement::Speed;
 use crate::objects::WorkRate;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::{
@@ -45,9 +46,13 @@ impl Master {
                 self.terrain_restriction = crate::map::RestrictionId::of_data(low16(v));
             }
             // `CVTTSS2SI RAX`, the low 32 bits
-            a::UNIT_TRAIT => self.object_flags = cvttss2si_64(v) as u32,
+            a::UNIT_TRAIT => {
+                self.object_flags = ObjectFlags::from_bits_retain(cvttss2si_64(v) as u32);
+            }
             a::TRAIT_PIECE => {
-                self.object_flags = ((cvttss2si_64(v) as u32) << 16) | (self.object_flags & 0xffff);
+                self.object_flags = ObjectFlags::from_bits_retain(
+                    ((cvttss2si_64(v) as u32) << 16) | (self.object_flags.bits() & 0xffff),
+                );
             }
             a::DEAD_UNIT_ID => self.death_spawns[0] = MasterId::of_data(low16(v)),
             a::BLOOD_UNIT => self.death_spawns[1] = MasterId::of_data(low16(v)),
@@ -180,7 +185,11 @@ impl Master {
                 self.blast_defense = self.blast_defense.wrapping_add(low8(v));
             }
             a::UNIT_TRAIT => {
-                self.object_flags = self.object_flags.wrapping_add(cvttss2si_64(v) as u32);
+                self.object_flags = ObjectFlags::from_bits_retain(
+                    self.object_flags
+                        .bits()
+                        .wrapping_add(cvttss2si_64(v) as u32),
+                );
             }
             a::STANDING_GRAPHIC | a::STANDING_GRAPHIC_2 | a::DYING_GRAPHIC | a::UNDEAD_GRAPHIC => {
                 self.add_static_sprite(attribute, v, world);

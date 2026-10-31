@@ -14,6 +14,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::WONDER;
@@ -4887,38 +4888,41 @@ fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(stance(&|_| {}), UnitStance::AGGRESSIVE);
     assert_eq!(stance(&|n| n.posture = 0x101), UnitStance::DEFENSIVE);
     // the scout of the Dark Age stands its ground: flag 0x10, its own copy, age 0 (or -0)
-    assert_eq!(stance(&|n| n.object_flags = 0x10), UnitStance::STAND_GROUND);
+    assert_eq!(
+        stance(&|n| n.object_flags = ObjectFlags::SCOUT),
+        UnitStance::STAND_GROUND
+    );
     assert_eq!(
         stance(&|n| {
-            n.object_flags = 0x10;
+            n.object_flags = ObjectFlags::SCOUT;
             n.age = -0.0;
         }),
         UnitStance::STAND_GROUND
     );
     assert_eq!(
         stance(&|n| {
-            n.object_flags = 0x10;
+            n.object_flags = ObjectFlags::SCOUT;
             n.age = 1.0;
         }),
         UnitStance::AGGRESSIVE
     );
     assert_eq!(
         stance(&|n| {
-            n.object_flags = 0x10;
+            n.object_flags = ObjectFlags::SCOUT;
             n.age = f32::NAN;
         }),
         UnitStance::AGGRESSIVE
     );
     assert_eq!(
         stance(&|n| {
-            n.object_flags = 0x10;
+            n.object_flags = ObjectFlags::SCOUT;
             n.copy_id = Some(ids::ID_448);
         }),
         UnitStance::AGGRESSIVE
     );
     assert_eq!(
         stance(&|n| {
-            n.object_flags = 0x10;
+            n.object_flags = ObjectFlags::SCOUT;
             n.computer = true;
         }),
         UnitStance::AGGRESSIVE
@@ -5017,7 +5021,7 @@ fn a_new_object_takes_its_hunt_range_from_its_master_s_last_task_of_type_6() {
     let made = crate::objects::masters::Master {
         copy_id: Some(master_id(1240)),
         class: class::PREY,
-        object_flags: 0x30,
+        object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
         hero_flag: 4,
         tasks: vec![
             task(ActionType::named(6), Distance::new(2.0)),
@@ -5038,7 +5042,7 @@ fn a_new_object_takes_its_hunt_range_from_its_master_s_last_task_of_type_6() {
             master: master_id(1239),
             copy_id: Some(master_id(1240)),
             class: class::PREY,
-            object_flags: 0x30,
+            object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
             hero_flag: 4,
             hunt_range: Distance::new(3.5),
             ..NewObject::default()
@@ -7494,7 +7498,7 @@ fn a_grouped_unit_s_full_update_reads_its_group() {
         position: Position::new(5.0, 5.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
         visible: true,
-        flags: 0,
+        flags: ObjectFlags::NONE,
         sight: 0xf,
     };
     let target_at = Surroundings {
@@ -8098,7 +8102,10 @@ fn a_lion_drops_a_moved_target_out_of_its_sight() {
     // a master with flag 0x10 is dropped at its sight too
     let mut u = lion();
     let mut flagged = at(15.0);
-    flagged.target = flagged.target.map(|t| Seen { flags: 0x10, ..t });
+    flagged.target = flagged.target.map(|t| Seen {
+        flags: ObjectFlags::SCOUT,
+        ..t
+    });
     let (r, fx, side) = handled(&mut u, n, &flagged, false);
     assert_eq!(
         (r, fx, side.attacks),

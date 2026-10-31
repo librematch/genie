@@ -7,6 +7,7 @@ use crate::gathering::hunt::HUNT;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -148,7 +149,7 @@ pub(super) fn garrison_into<'m>(
     // no task, and any filter ends the finder after the repair and task 0x6f below
     if own_or_allied
         && t.state < ObjectState::Dying
-        && t.master.object_flags & 1 != 0
+        && t.master.object_flags.contains(ObjectFlags::GARRISON)
         && (t.master.class == class::TRANSPORT
             || own.class != class::VILLAGER
             || filter == Some(crate::garrison::ENTER))

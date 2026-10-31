@@ -11,13 +11,13 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::release::Releaser;
-use crate::orders::GATHERED_BUILDING;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
@@ -485,7 +485,7 @@ impl World {
                     "a gather retargeted to a building with an action (packing)",
                 ));
             }
-            if tm.object_flags & GATHERED_BUILDING == 0 {
+            if !tm.object_flags.contains(ObjectFlags::GATHERED_BUILDING) {
                 let (mp, main) = match t.annex_of {
                     Some(m) => self.object(m).ok_or(GenieError::unsupported(
                         "an annex whose main building is gone",

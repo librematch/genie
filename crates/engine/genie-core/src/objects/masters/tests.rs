@@ -42,7 +42,7 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         tasks,
         cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
-        object_flags: 0,
+        object_flags: ObjectFlags::NONE,
         combat_level: 0,
         work_rate: WorkRate::new(1.0),
         hit_points: 25,
@@ -64,7 +64,7 @@ fn house() -> Master {
         tasks: vec![],
         cost: costs(&[(player_attribute::WOOD, 25, true)]),
         obstruction_class: ObstructionClass::UNIT,
-        object_flags: 0,
+        object_flags: ObjectFlags::NONE,
         combat_level: 0,
         work_rate: WorkRate::ZERO,
         hit_points: 550,
@@ -224,10 +224,14 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
             |m| f32::from(RestrictionId::field(m.terrain_restriction)),
             [3.0, 3.0, 3.0],
         ),
-        (a::UNIT_TRAIT, |m| m.object_flags as f32, [3.0, 5.0, 5.0]),
+        (
+            a::UNIT_TRAIT,
+            |m| m.object_flags.bits() as f32,
+            [3.0, 5.0, 5.0],
+        ),
         (
             a::TRAIT_PIECE,
-            |m| (m.object_flags >> 16) as f32,
+            |m| (m.object_flags.bits() >> 16) as f32,
             [3.0, 3.0, 3.0],
         ),
         (
@@ -338,13 +342,16 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
     // an obstruction type the table does not hold is 0; the trait piece keeps the low half;
     // a flag of 0 is off
     let mut m = stocked(master_type::STATIC);
-    m.object_flags = 0x1234;
+    m.object_flags = ObjectFlags::from_bits_retain(0x1234);
     m.set_attribute(a::TRAIT_PIECE, 2.0, &world(false));
     m.set_attribute(a::OBSTRUCTION_TYPE, 4.0, &world(false));
     m.set_attribute(a::AVAILABLE_UNIT_FLAG, 0.0, &world(false));
     assert_eq!(
         (m.object_flags, m.obstruction_type),
-        (0x2_1234, ObstructionType::NONE)
+        (
+            ObjectFlags::from_bits_retain(0x2_1234),
+            ObstructionType::NONE
+        )
     );
     assert!(!m.available);
 }
@@ -665,10 +672,13 @@ fn the_static_setters_truncate_as_the_game_does() {
     // 2234.5 + 0.5 = 2235
     assert_eq!(m.storage[0].1, Amount::new(2235.0));
     m.set_attribute(attribute::UNIT_TRAIT, 5_000_000_000.0, &world(false));
-    assert_eq!(m.object_flags, 5_000_000_000_i64 as u32);
-    m.object_flags = 0x1234_5678;
+    assert_eq!(
+        m.object_flags,
+        ObjectFlags::from_bits_retain(5_000_000_000_i64 as u32)
+    );
+    m.object_flags = ObjectFlags::from_bits_retain(0x1234_5678);
     m.set_attribute(attribute::TRAIT_PIECE, 3.0, &world(false));
-    assert_eq!(m.object_flags, 0x0003_5678);
+    assert_eq!(m.object_flags, ObjectFlags::from_bits_retain(0x0003_5678));
     m.set_attribute(attribute::OBSTRUCTION_TYPE, 5.0, &world(false));
     assert_eq!(m.obstruction_type, ObstructionType::CIRCLE);
     m.set_attribute(attribute::OBSTRUCTION_TYPE, 4.0, &world(false));

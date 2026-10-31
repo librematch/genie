@@ -260,8 +260,8 @@ pub struct Master {
     pub buildable_on: u8,
     /// `obstruction_class` (`+0x652`).
     pub obstruction_class: ObstructionClass,
-    /// `object_flags` (`+0x654`): bit 0 takes garrisons, bit 4 marks a hunter master.
-    pub object_flags: u32,
+    /// `object_flags` (`+0x654`): its traits and the trait piece ([`ObjectFlags`]).
+    pub object_flags: ObjectFlags,
     /// The `.dat`'s `combat_level` (`+0x62c`).
     pub combat_level: u8,
     /// Its task list.
@@ -602,6 +602,7 @@ pub mod ids;
 mod master_id;
 mod master_kind;
 pub mod master_type;
+mod object_flags;
 mod obstruction_class;
 mod obstruction_type;
 mod placement_terrains;
@@ -619,6 +620,7 @@ pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::gather_group::GatherGroup;
 pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
+pub use self::object_flags::ObjectFlags;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
 pub use self::placement_terrains::PlacementTerrains;

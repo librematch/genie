@@ -5,6 +5,7 @@ use crate::movement::MoveStats;
 use crate::movement::Speed;
 use crate::objects::SpriteId;
 use crate::objects::masters::MasterAttribute;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{Master, master_type};
 
 /// A sprite's speed factor (the `.dat` graphic's `speed_multiplier`): the master's speed times
@@ -81,7 +82,9 @@ impl Master {
                     }
                 }
             }
-            a::UNIT_TRAIT | a::TRAIT_PIECE => stats.fast_turn = self.object_flags & 2 != 0,
+            a::UNIT_TRAIT | a::TRAIT_PIECE => {
+                stats.fast_turn = self.object_flags.contains(ObjectFlags::SHIP);
+            }
             a::MAXIMUM_RANGE => stats.weapon_range = self.weapon_range,
             _ => {}
         }

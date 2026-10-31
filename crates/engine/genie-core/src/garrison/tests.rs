@@ -30,6 +30,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
@@ -128,7 +129,7 @@ fn garrison_masters() -> Masters {
             id: SHIP,
             kind: master_type::COMBAT,
             class: class::TRANSPORT,
-            object_flags: 1,
+            object_flags: ObjectFlags::GARRISON,
             garrison: 1,
             // no sprites (the world's sprites' table is empty)
             standing_sprite: None,
@@ -1278,7 +1279,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 2)],
         garrison_firepower: 1.0,
-        object_flags: 8 | (1122 << 16),
+        object_flags: ObjectFlags::from_bits_retain(8 | (1122 << 16)),
         ..Master::default()
     };
     let mounted = Master {
@@ -1296,7 +1297,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
     // the other form's lower share leaves its own
     assert_eq!(share(&mounted, &masters, Seconds::ZERO, 2.0), Ok(1.5));
     let reversed = Master {
-        object_flags: 8 | (1120 << 16),
+        object_flags: ObjectFlags::from_bits_retain(8 | (1120 << 16)),
         ..mounted.clone()
     };
     assert_eq!(share(&reversed, &masters, Seconds::ZERO, 2.0), Ok(1.5));
@@ -1308,7 +1309,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
     let masters_80 = Masters::new([foot.clone(), building]);
     assert_eq!(share(&foot, &masters_80, Seconds::ZERO, 2.0), Ok(0.5));
     let unflagged = Master {
-        object_flags: 1122 << 16,
+        object_flags: ObjectFlags::from_bits_retain(1122 << 16),
         ..foot.clone()
     };
     assert_eq!(share(&unflagged, &masters, Seconds::ZERO, 2.0), Ok(0.5));

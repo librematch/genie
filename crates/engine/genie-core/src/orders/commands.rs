@@ -7,6 +7,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
@@ -143,7 +144,7 @@ impl World {
                 continue;
             }
             let master = unit.master(&self.masters, p)?;
-            if master.object_flags & 0x10 == 0 {
+            if !master.object_flags.contains(ObjectFlags::SCOUT) {
                 if master.class == class::LIVESTOCK {
                     return Err(GenieError::unsupported(
                         "AUTO_SCOUT's class 58 rule (FUN_140eca780)",

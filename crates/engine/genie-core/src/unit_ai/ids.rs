@@ -7,6 +7,7 @@ use crate::math::rng::Well512;
 use crate::objects::ActionState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::unit_ai::UnitAiType;
@@ -281,7 +282,7 @@ pub struct NewObject {
     /// Its master's class (`+0x410`).
     pub class: ClassId,
     /// Its master's `object_flags` (`+0x654`).
-    pub object_flags: u32,
+    pub object_flags: ObjectFlags,
     /// Its master's `hero_flag` (`+0x8d9`).
     pub hero_flag: u8,
     /// The object's slot 0x7b0 (`+0xb74`, which the action object's constructor set before
@@ -348,10 +349,6 @@ pub(super) const DEFENSIVE_MASTERS: [MasterId; 3] = [
 pub(super) const NO_ATTACK_CLASSES: [ClassId; 2] = [class::CLASS_35, class::CLASS_64];
 /// The class whose soldier is in `NoAttack` unless a hero (`FUN_140c12300`: `-0xe6f` raw).
 pub(super) const NO_ATTACK_CLASS: ClassId = class::CLASS_61;
-/// The master object flag of the soldier that stands its ground in the Dark Age
-/// (`FUN_140c12300`: `+0x654` bit 4).
-pub(super) const STAND_GROUND_FLAG: u32 = 0x10;
-
 /// The soldier's stance (`+0x1a9`) its constructor (`FUN_140c12300`) gives a new object: 2
 /// (stand ground) to a human player's object of a master with object flag 0x10 that is its own
 /// copy (`copy_id`, `+0x158`, its id) while the player's current age (attribute 6) is 0; 1
@@ -361,7 +358,7 @@ pub(super) const STAND_GROUND_FLAG: u32 = 0x10;
 pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
     // UCOMISS with JP, JNZ: the age equals 0 (a NaN does not)
     if !new.computer
-        && new.object_flags & STAND_GROUND_FLAG != 0
+        && new.object_flags.contains(ObjectFlags::SCOUT)
         && new.copy_id == Some(new.master)
         && new.age == 0.0
     {

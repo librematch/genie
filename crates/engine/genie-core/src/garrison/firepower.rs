@@ -6,6 +6,7 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{ClassAmount, DamageClass};
@@ -146,13 +147,12 @@ pub fn share(
         return Ok(1.0);
     }
     let mut floor = 0.0;
-    if master.object_flags & 8 != 0 {
+    if master.object_flags.contains(ObjectFlags::TRANSFORMS) {
         // MOVZX of the ushort at +0x656; the game reads the slot without a test, so a null one
         // would crash it: a master the player has is the only case it runs
-        let other = u16::try_from(master.object_flags >> 16).unwrap_or(u16::MAX);
-        if let Some(m) = i16::try_from(other)
-            .ok()
-            .and_then(MasterId::of_data)
+        if let Some(m) = master
+            .object_flags
+            .piece()
             .and_then(|id| masters.get(id))
             // `SEEK_SHELTER`'s villagers: class 4 of type 70.
             // The type of a combat unit: the master a transforming master names (`+0x656`), and a unit a

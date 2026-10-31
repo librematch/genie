@@ -16,6 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::unit_ai::Search;
@@ -371,7 +372,7 @@ pub struct Seen {
     /// Its tile is visible to the viewer.
     pub visible: bool,
     /// Its master's `object_flags` (`+0x654`).
-    pub flags: u32,
+    pub flags: ObjectFlags,
     /// The viewer's test of its tile (`FUN_1416635e0`, [`crate::map::spatial::Spatial::tile_sight`]):
     /// 0xf seen, 0x80 explored, else 0.
     pub sight: u8,

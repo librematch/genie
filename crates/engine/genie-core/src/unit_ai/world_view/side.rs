@@ -22,6 +22,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::player_master;
 use crate::orders::object_gone;
@@ -298,7 +299,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             let m = player_master(every, p.player, p.master).ok_or(GenieError::unsupported(
                 "a found object of a master the slice does not have",
             ))?;
-            Ok(p.master == PETARD || m.object_flags & 0x10 != 0)
+            Ok(p.master == PETARD || m.object_flags.contains(ObjectFlags::SCOUT))
         };
         // a farm's workers (`+0x644`) and its pasture (`+0x790`)
         let farm = |id: ObjectId| others.get(id).map(|u| (u.workers, u.pasture));

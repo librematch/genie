@@ -7,6 +7,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
@@ -166,7 +167,7 @@ impl World {
             return Ok(false);
         }
         let own = b.master(&self.masters, bp)?;
-        if own.object_flags & 1 != 0
+        if own.object_flags.contains(ObjectFlags::GARRISON)
             && (unit.kind == COMBAT || class_has_flags(unit.class, TRANSPORTED))
         {
             if !has_garrison_task(&unit.tasks, GARRISON, own.class) {

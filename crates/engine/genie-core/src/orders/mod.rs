@@ -139,8 +139,6 @@ const LISTED: usize = 60;
 const GUARD_RANGE: f32 = crate::math::image::order::GUARD_RANGE;
 /// The task filter of garrisoning (3).
 pub(crate) const GARRISON: ActionType = ActionType::named(3);
-/// A master's object flag 0x20: a building a gather takes as its target as any other.
-const GATHERED_BUILDING: u32 = 0x20;
 /// A task's action type of attacking (7), whose factory makes an Attack (type 9).
 const ATTACK_TASK: ActionType = ActionType::named(7);
 

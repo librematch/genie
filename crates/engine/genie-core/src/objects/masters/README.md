@@ -47,6 +47,7 @@ file for what the save does not hold.
 | [`master_kind.rs`](master_kind.rs) | A master's type as one type: the byte at `+0x8` that tells a static object from a combat unit or a building, which the `.dat` names `unit_type`. |
 | [`master_type.rs`](master_type.rs) | The master types (`+0x8`, the object's kind at `+0xf`): the one definition of the type bytes. |
 | [`mod.rs`](mod.rs) | What the engine reads of a player's masters: the tasks a unit can do and the masters a unit changes into to do them, and how an effect changes a master: the attribute setters (slots 0x18, 0x20 and 0x28 of every master type, `Master::set_attribute`), the master copy of an upgrade (slot 8, `Master::copy_from`) and the values the slice derives from a master (`Master::follow`). |
+| [`object_flags.rs`](object_flags.rs) | A master's object flags (`ObjectFlags`): its traits and the master its upper half names. |
 | [`obstruction_class.rs`](obstruction_class.rs) | A master's obstruction class as one type: what its obstruction record blocks, the value the `.dat` names `obstruction_class`. |
 | [`obstruction_type.rs`](obstruction_type.rs) | A master's obstruction type as one type: the shape of the record its objects file in the obstruction manager, the value the `.dat` names `obstruction_type`. |
 | [`placement_terrains.rs`](placement_terrains.rs) | A master's placement terrains (`PlacementTerrains`). |
