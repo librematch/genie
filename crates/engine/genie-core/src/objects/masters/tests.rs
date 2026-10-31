@@ -136,9 +136,9 @@ fn stocked(kind: MasterKind) -> Master {
         kind,
         hit_points: 10,
         storage: vec![
-            (Some(player_attribute::FOOD), 1.0, 1),
-            (Some(player_attribute::WOOD), 1.0, 1),
-            (Some(player_attribute::STONE), 1.0, 1),
+            (Some(player_attribute::FOOD), Amount::new(1.0), 1),
+            (Some(player_attribute::WOOD), Amount::new(1.0), 1),
+            (Some(player_attribute::STONE), Amount::new(1.0), 1),
         ],
         cost: costs(&[(player_attribute::FOOD, 1, true)]),
         damage_graphics: vec![DamageGraphic::default(); 2],
@@ -189,9 +189,9 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
             |m| f32::from(m.capacity),
             [3.0, 5.0, 10.0],
         ),
-        (a::STORAGE_1, |m| m.storage[0].1, [3.0, 5.0, 10.0]),
-        (a::STORAGE_2, |m| m.storage[1].1, [3.0, 5.0, 10.0]),
-        (a::STORAGE_3, |m| m.storage[2].1, [3.0, 5.0, 10.0]),
+        (a::STORAGE_1, |m| m.storage[0].1.get(), [3.0, 5.0, 10.0]),
+        (a::STORAGE_2, |m| m.storage[1].1.get(), [3.0, 5.0, 10.0]),
+        (a::STORAGE_3, |m| m.storage[2].1.get(), [3.0, 5.0, 10.0]),
         (
             a::FOG_VISIBILITY,
             |m| f32::from(m.fog_visibility),
@@ -643,17 +643,17 @@ fn the_hit_points_add_and_multiply_up_to_their_cap_when_capped() {
 fn the_static_setters_truncate_as_the_game_does() {
     let mut m = of_type(master_type::TREE);
     m.storage = vec![
-        (Some(player_attribute::MEAT), 100.0, 1),
-        (None, 0.0, 0),
-        (None, 0.0, 0),
+        (Some(player_attribute::MEAT), Amount::new(100.0), 1),
+        (None, Amount::ZERO, 0),
+        (None, Amount::ZERO, 0),
     ];
     m.set_attribute(attribute::STORAGE_1, 70000.5, &world(false));
-    assert_eq!(m.storage[0].1, 4464.0);
+    assert_eq!(m.storage[0].1, Amount::new(4464.0));
     m.add_attribute(attribute::STORAGE_1, 5.9, &world(false));
-    assert_eq!(m.storage[0].1, 4469.0);
+    assert_eq!(m.storage[0].1, Amount::new(4469.0));
     m.multiply_attribute(attribute::STORAGE_1, 0.5, &world(false));
     // 2234.5 + 0.5 = 2235
-    assert_eq!(m.storage[0].1, 2235.0);
+    assert_eq!(m.storage[0].1, Amount::new(2235.0));
     m.set_attribute(attribute::UNIT_TRAIT, 5_000_000_000.0, &world(false));
     assert_eq!(m.object_flags, 5_000_000_000_i64 as u32);
     m.object_flags = 0x1234_5678;
@@ -816,9 +816,9 @@ fn the_cost_attributes_change_their_resource_s_entries() {
         (player_attribute::HEADROOM, 1, false),
     ]);
     m.storage = vec![
-        (Some(player_attribute::HEADROOM), 5.0, 4),
-        (Some(player_attribute::POPULATION), -1.0, 4),
-        (None, 0.0, 0),
+        (Some(player_attribute::HEADROOM), Amount::new(5.0), 4),
+        (Some(player_attribute::POPULATION), Amount::new(-1.0), 4),
+        (None, Amount::ZERO, 0),
     ];
     m.add_attribute(attribute::WOOD_COSTS, -5.0, &world(false));
     assert_eq!(
@@ -850,8 +850,8 @@ fn the_cost_attributes_change_their_resource_s_entries() {
     assert_eq!(
         m.storage[..2],
         [
-            (Some(player_attribute::HEADROOM), 2.0, 4),
-            (Some(player_attribute::POPULATION), -2.0, 4)
+            (Some(player_attribute::HEADROOM), Amount::new(2.0), 4),
+            (Some(player_attribute::POPULATION), Amount::new(-2.0), 4)
         ]
     );
 }
@@ -1219,7 +1219,7 @@ fn a_villager_on_a_farm_takes_its_group_s_farmer_for_the_farm_s_class() {
             master: own,
             player: PlayerId::new(2),
             held: carrying(None, 0.0),
-            attribute_95: 0.0,
+            attribute_95: Amount::ZERO,
             civ: CivId::new(1),
         };
         let on = crate::unit_ai::task_finder::TaskOn {
@@ -1285,7 +1285,7 @@ fn a_villager_takes_the_first_master_of_its_swap_group_with_a_task_for_its_found
             master: m.get(own).unwrap(),
             player: PlayerId::new(2),
             held: carrying(None, 0.0),
-            attribute_95: 0.0,
+            attribute_95: Amount::ZERO,
             civ: CivId::new(1),
         };
         let on = crate::unit_ai::task_finder::TaskOn {

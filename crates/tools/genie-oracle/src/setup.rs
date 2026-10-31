@@ -5,6 +5,7 @@ use genie_core::map::Distance;
 use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::objects::ListIndex;
+use genie_core::players::Amount;
 use genie_core::world::Millis;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
@@ -131,14 +132,14 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     .collect(),
                 computer: false,
                 kind: genie_core::players::PlayerType::from(p.player.type_),
-                attributes: attributes.clone(),
+                attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
                 // the second attribute array (+0x658), floats as their bits
                 generated: p
                     .world_player()
                     .base
                     .attributes_2
                     .iter()
-                    .map(|&b| f32::from_bits(b))
+                    .map(|&b| Amount::new(f32::from_bits(b)))
                     .collect(),
                 civ: genie_core::players::CivId::new(civ),
                 relations: p
@@ -203,7 +204,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 gaia_update_time: p.player.gaia_player.as_deref().map_or(Seconds::ZERO, |g| {
                     Seconds::new(g.world_player_gaia.update_time)
                 }),
-                escrow: p.world_player().base.escrow,
+                escrow: p.world_player().base.escrow.map(Amount::new),
                 escrow_percentage: p.world_player().base.escrow_percentage,
                 sudden_death_eliminable: p.world_player().sudden_death_can_be_eliminated != 0,
                 victory_times: genie_core::players::world_player::VictoryTimes {

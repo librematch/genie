@@ -14,6 +14,7 @@ use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
+use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 
@@ -271,7 +272,7 @@ pub(super) fn work_masters(
             .map(|e| {
                 (
                     AttributeId::of_data(e.attribute_type_held),
-                    e.attribute_amount_held,
+                    Amount::new(e.attribute_amount_held),
                     e.attribute_flag,
                 )
             })

@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{RESEARCH_TIME_MODIFIER, WORLD_EFFECT};
 use crate::production::{MakeTech, MakeTechState, Making};
@@ -123,8 +124,8 @@ impl World {
             r.progress = progress;
         }
         let mut time = f32::from(location.time as i16);
-        if !crate::technology::is_age(r.tech) && 0.0 < time_modifier {
-            time *= time_modifier;
+        if !crate::technology::is_age(r.tech) && Amount::ZERO < time_modifier {
+            time *= time_modifier.get();
         }
         if location.adjustment + time <= progress {
             if 0xff < times {
@@ -170,8 +171,8 @@ impl World {
                 .find(|l| l.0 == master.get())
                 .map_or(-1.0, |l| f32::from(l.1));
             let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
-            if !crate::technology::is_age(tech) && 0.0 < modifier {
-                time *= modifier;
+            if !crate::technology::is_age(tech) && Amount::ZERO < modifier {
+                time *= modifier.get();
             }
             let adjustment = state.location(master).map_or(0.0, |l| l.adjustment);
             if repeat || time + adjustment <= state.research_done {
@@ -199,7 +200,8 @@ impl World {
         // world's table the player gets with the building as its object (its slot 0x10,
         // `TRIBE_Effects::do_effect`, which skips an id the table does not hold)
         let reward =
-            crate::math::conversions::cvttss2si(self.players.player(p)?.get(WORLD_EFFECT)?) as i16;
+            crate::math::conversions::cvttss2si((self.players.player(p)?.get(WORLD_EFFECT)?).get())
+                as i16;
         if 0 < reward
             && let Some(effect) = usize::try_from(reward)
                 .ok()
@@ -295,8 +297,8 @@ impl World {
             .map_or(-1.0, |l| f32::from(l.1));
         let adjustment = state.location(master).map_or(0.0, |l| l.adjustment);
         let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
-        if !crate::technology::is_age(r.tech) && 0.0 < modifier {
-            time *= modifier;
+        if !crate::technology::is_age(r.tech) && Amount::ZERO < modifier {
+            time *= modifier.get();
         }
         let done = adjustment + time <= r.progress;
         let state = &mut self.players.player_mut(p)?.techs[t];

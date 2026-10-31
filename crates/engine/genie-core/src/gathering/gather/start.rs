@@ -108,11 +108,15 @@ pub struct MoveTarget {
 /// The productivity the time per stop reads (the constructor's and the update's): the player's
 /// attribute the task's `attribute_type2` names, as it is, or 1.0 for none (`DAT_14330eb8c`).
 #[must_use]
-pub fn productivity_of(attribute_type2: Option<AttributeId>, attributes: &[f32]) -> f32 {
+pub fn productivity_of(attribute_type2: Option<AttributeId>, attributes: &[Amount]) -> f32 {
     let Some(attribute) = attribute_type2 else {
         return DEFAULT_PRODUCTIVITY;
     };
-    attributes.get(attribute.index()).copied().unwrap_or(0.0)
+    (attributes
+        .get(attribute.index())
+        .copied()
+        .unwrap_or(Amount::ZERO))
+    .get()
 }
 
 /// `set_state(4)`'s point of a farm's next stop (`0x140a8cd40` case 4): a tile of the farm's

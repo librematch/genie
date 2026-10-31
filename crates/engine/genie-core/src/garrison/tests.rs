@@ -1737,7 +1737,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
         ..crate::unit_ai::UnitAi::default()
     });
     t.players[1].objects.push(v);
-    t.players[1].attributes = vec![0.0; 250];
+    t.players[1].attributes = vec![Amount::ZERO; 250];
     let placed = crate::map::spatial::Placed {
         position: Position::new(12.5, 10.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
@@ -1803,7 +1803,10 @@ fn an_enter_gives_its_load_to_a_drop_site_and_needs_room() {
     assert_eq!(v.life.inside, Some(object_id(100)));
     assert_eq!(v.life.held(), carrying(None, 0.0));
     let p = &t.players[1];
-    assert_eq!((p.attributes[0], p.attributes[166]), (6.0, 6.0));
+    assert_eq!(
+        (p.attributes[0], p.attributes[166]),
+        (Amount::new(6.0), Amount::new(6.0))
+    );
     let (r, t) = enters_the_centre(with_food);
     assert_eq!(r, Ok(()));
     let v = t.object(object_id(400)).unwrap().1;

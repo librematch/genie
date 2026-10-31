@@ -11,6 +11,7 @@ use crate::movement::{Me, Mover, Planning};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
@@ -85,7 +86,7 @@ impl UnitView<'_, '_> {
                 .attributes
                 .get(95)
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO),
             civ: self.civ,
         };
         let dip = SideWorld {
@@ -173,7 +174,7 @@ impl UnitView<'_, '_> {
                 .attributes
                 .get(95)
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO),
             civ: self.civ,
         };
         let dip = SideWorld {

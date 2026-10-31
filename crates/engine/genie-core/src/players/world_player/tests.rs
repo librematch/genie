@@ -29,8 +29,8 @@ use crate::world::Player;
 use crate::world::Seconds;
 
 /// Attributes 0 to 299, all 0.
-fn attributes() -> Vec<f32> {
-    vec![0.0; 300]
+fn attributes() -> Vec<Amount> {
+    vec![Amount::ZERO; 300]
 }
 
 /// A human player (type 1) still playing, with 300 attributes, whose ruins timer keeps it in
@@ -125,9 +125,9 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
 #[test]
 fn attribute_22_is_the_explored_share_in_percent() {
     let mut t = world();
-    t.players[1].attributes[22] = 7.0;
+    t.players[1].attributes[22] = Amount::new(7.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[22], 7.0);
+    assert_eq!(t.players[1].attributes[22], Amount::new(7.0));
     let map = |explored| VisibleMap {
         counts: vec![-1; 100],
         explored,
@@ -141,10 +141,13 @@ fn attribute_22_is_the_explored_share_in_percent() {
         vec![false; 4],
     ));
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[22], 37.0 / 100.0 * 100.0);
+    assert_eq!(
+        t.players[1].attributes[22],
+        Amount::new(37.0 / 100.0 * 100.0)
+    );
     t.settings.visibility_type = 2;
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[22], 100.0);
+    assert_eq!(t.players[1].attributes[22], Amount::new(100.0));
 }
 
 /// Attribute 44: kills (20) less the units owned (19) less the population (11); below 0 it
@@ -153,15 +156,15 @@ fn attribute_22_is_the_explored_share_in_percent() {
 fn attribute_44_is_the_kills_less_the_losses() {
     let mut t = world();
     let a = &mut t.players[1].attributes;
-    (a[20], a[19], a[11]) = (5.0, 12.0, 10.0);
+    (a[20], a[19], a[11]) = (Amount::new(5.0), Amount::new(12.0), Amount::new(10.0));
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[44], 3.0);
-    t.players[1].attributes[19] = 20.0;
+    assert_eq!(t.players[1].attributes[44], Amount::new(3.0));
+    t.players[1].attributes[19] = Amount::new(20.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[44], 0.0);
-    t.players[1].attributes[20] = f32::NAN;
+    assert_eq!(t.players[1].attributes[44], Amount::ZERO);
+    t.players[1].attributes[20] = Amount::new(f32::NAN);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert!(t.players[1].attributes[44].is_nan());
+    assert!(t.players[1].attributes[44].get().is_nan());
 }
 
 /// The trickles: each of attributes 230 to 233 above 0 gives its sixtieth of the resource
@@ -171,17 +174,25 @@ fn attribute_44_is_the_kills_less_the_losses() {
 fn the_trickles_give_a_sixtieth_of_their_rate_each_second() {
     let mut t = world();
     let a = &mut t.players[1].attributes;
-    (a[230], a[231], a[232], a[233]) = (6.0, -1.0, f32::NAN, 60.0);
+    (a[230], a[231], a[232], a[233]) = (
+        Amount::new(6.0),
+        Amount::new(-1.0),
+        Amount::new(f32::NAN),
+        Amount::new(60.0),
+    );
     t.update_world_player(PlayerId::new(1)).unwrap();
     let p = &t.players[1];
-    assert_eq!(p.resources(), [6.0 / 60.0, 0.0, 0.0, 1.0]);
+    assert_eq!(
+        p.resources(),
+        crate::test_ids::amounts([6.0 / 60.0, 0.0, 0.0, 1.0])
+    );
     assert_eq!(
         [166, 167, 168, 169, 49].map(|k| p.attributes[k]),
-        [6.0 / 60.0, 0.0, 0.0, 1.0, 1.0]
+        crate::test_ids::amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
     );
     t.players[1].game_status = LOST;
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[3], 1.0);
+    assert_eq!(t.players[1].attributes[3], Amount::new(1.0));
 }
 
 /// The mills' food: the livestock of the objects filed under the mill (68) that are
@@ -212,13 +223,13 @@ fn a_mill_s_livestock_makes_food() {
     for id in [10, 11, 12] {
         p.tracker.add(object_id(id), key);
     }
-    p.attributes[254] = 15.0;
+    p.attributes[254] = Amount::new(15.0);
     p.update_time = Seconds::new(0.5);
     t.update_world_player(PlayerId::new(1)).unwrap();
     let grows = crate::math::fmath::log(400.0 / 200.0 + 1.0);
     let food = 15.0 / 60.0 * (1.5 * grows);
-    assert_eq!(t.players[1].attributes[0], food);
-    assert_eq!(t.players[1].attributes[166], food);
+    assert_eq!(t.players[1].attributes[0], Amount::new(food));
+    assert_eq!(t.players[1].attributes[166], Amount::new(food));
 }
 
 /// A computer player's income fills its escrow by the share, held to the resource; with
@@ -229,28 +240,43 @@ fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
     let mut t = world();
     t.players[1].kind = PlayerType::COMPUTER;
     t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0];
-    t.add_resource(PlayerId::new(1), attribute::FOOD, 10.0, 1, true)
-        .unwrap();
+    t.add_resource(
+        PlayerId::new(1),
+        attribute::FOOD,
+        Amount::new(10.0),
+        1,
+        true,
+    )
+    .unwrap();
     assert_eq!(
         (t.players[1].attributes[0], t.players[1].escrow[0]),
-        (10.0, 5.0)
+        (Amount::new(10.0), Amount::new(5.0))
     );
-    t.add_resource(PlayerId::new(1), attribute::FOOD, -20.0, 1, true)
-        .unwrap();
-    assert_eq!(t.players[1].escrow[0], 0.0);
+    t.add_resource(
+        PlayerId::new(1),
+        attribute::FOOD,
+        Amount::new(-20.0),
+        1,
+        true,
+    )
+    .unwrap();
+    assert_eq!(t.players[1].escrow[0], Amount::ZERO);
     // sharing: 1 and 2 count each other, 3 counts 1 but not the other way round
     let mut t = world();
     t.players[1].sharing = true;
     t.players[1].relations = relation_row([1, 0, 0, 3]);
     t.players[2].relations = relation_row([1, 0, 0, 3]);
     t.players[3].relations = relation_row([1, 0, 3, 0]);
-    t.add_resource(PlayerId::new(1), attribute::WOOD, 4.0, 1, true)
+    t.add_resource(PlayerId::new(1), attribute::WOOD, Amount::new(4.0), 1, true)
         .unwrap();
     assert_eq!(
-        [1, 2, 3].map(|p| (t.players[p].attributes[1], t.players[p].attributes[167])),
+        [1, 2, 3].map(|p| (
+            t.players[p].attributes[1].get(),
+            t.players[p].attributes[167].get()
+        )),
         [(4.0, 4.0), (4.0, 4.0), (0.0, 0.0)]
     );
-    assert_eq!(t.players[0].attributes[1], 0.0);
+    assert_eq!(t.players[0].attributes[1], Amount::ZERO);
     assert!(
         t.shares_with(PlayerId::new(1), PlayerId::new(2))
             && !t.shares_with(PlayerId::new(1), PlayerId::new(3))
@@ -274,9 +300,9 @@ fn a_player_without_an_object_that_keeps_it_loses() {
         master(ids::WONDER, master_type::BUILDING, class::BUILDING),
         Master {
             storage: vec![
-                (Some(attribute::POPULATION), 1.0, 0x20),
-                (None, 0.0, 0),
-                (None, 0.0, 0),
+                (Some(attribute::POPULATION), Amount::new(1.0), 0x20),
+                (None, Amount::ZERO, 0),
+                (None, Amount::ZERO, 0),
             ],
             ..master(master_id(900), master_type::COMBAT, class::CLASS_11)
         },
@@ -332,10 +358,10 @@ fn a_player_without_an_object_that_keeps_it_loses() {
     t.masters = vec![masters.clone(); 4];
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![object(3, master_id(117), ObjectState::Alive)].into();
-    t.players[1].attributes[45] = 1.0;
+    t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, LOST);
-    assert_eq!(t.players[1].attributes[45], 0.0);
+    assert_eq!(t.players[1].attributes[45], Amount::ZERO);
     // one that a villager keeps plays on
     let mut t = world();
     t.masters = vec![masters; 4];
@@ -345,10 +371,10 @@ fn a_player_without_an_object_that_keeps_it_loses() {
         object(1, ids::VILLAGER_MALE, ObjectState::Alive),
     ]
     .into();
-    t.players[1].attributes[45] = 1.0;
+    t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, PLAYING);
-    assert_eq!(t.players[1].attributes[45], 1.0);
+    assert_eq!(t.players[1].attributes[45], Amount::new(1.0));
 }
 
 /// Each victory timer at 0 or more keeps the player; −1 and NaN do not.
@@ -522,9 +548,9 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
     let mut builder = masters;
     builder.get_mut(ids::TOWN_CENTRE_621).unwrap().available = false;
     t.masters[1] = builder;
-    t.players[1].attributes[218] = 1.0;
+    t.players[1].attributes[218] = Amount::new(1.0);
     assert_eq!(t.trainable_count(PlayerId::new(1), BUILDER), 1);
-    t.players[1].attributes[48] = 1.0;
+    t.players[1].attributes[48] = Amount::new(1.0);
     assert_eq!(t.trainable_count(PlayerId::new(1), BUILDER), 0);
 }
 

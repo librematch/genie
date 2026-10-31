@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::objects::masters::MasterId;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
@@ -232,8 +233,8 @@ impl World {
         let listed = owner.techs.checked(t)?.listed_costs(&def, factors)?;
         let spent = listed.iter().map(|&(_, a)| i32::from(a)).sum::<i32>() as f32;
         let owner = self.players.player_mut(p)?;
-        owner.add_attribute(TECHS_RESEARCHED, 1.0)?;
-        owner.add_attribute(RESEARCH_SPENT, spent)?;
+        owner.add_attribute(TECHS_RESEARCHED, Amount::new(1.0))?;
+        owner.add_attribute(RESEARCH_SPENT, Amount::new(spent))?;
         Ok(true)
     }
 

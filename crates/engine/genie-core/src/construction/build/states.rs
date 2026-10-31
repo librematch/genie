@@ -112,7 +112,7 @@ impl BuildAction {
         kind: AttributeId,
         amount: Amount,
     ) -> Result<(), GenieError> {
-        c.give_load(kind, amount.get())?;
+        c.give_load(kind, amount)?;
         builder.life.attribute_type = None;
         builder.life.amount = Amount::ZERO;
         Ok(())

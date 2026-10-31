@@ -330,7 +330,14 @@ impl Unit {
             master: &me,
             player: c.player,
             held: self.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: Amount::new(
+                owner
+                    .attributes
+                    .get(95)
+                    .copied()
+                    .unwrap_or(Amount::ZERO)
+                    .get(),
+            ),
             civ: owner.civ,
         };
         if crate::unit_ai::task_finder::drops_at(&c.w.drop_sites, bm.id, &actor)
@@ -354,7 +361,7 @@ impl Unit {
                     c.player,
                     &mut adds,
                     resource,
-                    self.life.amount.get(),
+                    self.life.amount,
                 )?;
                 c.w.players.player_mut(c.player)?.add_attributes(adds)?;
                 self.life.attribute_type = None;

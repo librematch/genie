@@ -6,6 +6,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{master_type, player_master};
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
@@ -65,8 +66,8 @@ impl World {
             let listed = state.listed_costs(&def, factors)?;
             let spent = listed.iter().map(|&(_, a)| i32::from(a)).sum::<i32>() as f32;
             let owner = self.players.player_mut(p)?;
-            owner.add_attribute(TECHS_RESEARCHED, 1.0)?;
-            owner.add_attribute(RESEARCH_SPENT, spent)?;
+            owner.add_attribute(TECHS_RESEARCHED, Amount::new(1.0))?;
+            owner.add_attribute(RESEARCH_SPENT, Amount::new(spent))?;
         }
         let age = match t {
             101 => Some(crate::players::history::EventKind::FEUDAL_AGE),
@@ -202,9 +203,9 @@ impl World {
             if let Some(v) = owner
                 .attributes
                 .get_mut(ATTRIBUTE_39)
-                .filter(|v| **v == 0.0)
+                .filter(|v| **v == Amount::ZERO)
             {
-                *v = 1.0;
+                *v = Amount::new(1.0);
             }
         }
         Ok(())

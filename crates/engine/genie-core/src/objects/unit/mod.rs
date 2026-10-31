@@ -10,6 +10,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::MISSILE;
 use crate::objects::masters::master_type::TREE;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
@@ -244,7 +245,7 @@ pub struct Unit {
     /// A building's own store (`+0xae0`, `FUN_1411abad0`'s map by attribute): what its storage
     /// entries of mode 16 put in at its completion and take out at its death
     /// (`FUN_1411e6580`).
-    pub store: Vec<(AttributeId, f32)>,
+    pub store: Vec<(AttributeId, Amount)>,
     /// `+0x6c0` (`FUN_141185010`): the master of its own its master pointer (`+0xa0`) reads, a
     /// copy (`FUN_141186d10`, the master's slot 0x48) of the one it read when it took it; None
     /// while it reads its player's. An ownership change gives it one ([`change_hands`]).

@@ -16,6 +16,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::vision::visibility::Visibility;
 impl Spatial {
@@ -128,7 +129,7 @@ impl Spatial {
                     "an owner search's unit of a player beyond the list",
                 ));
             };
-            let strong = livestock && attribute_97(o.index()).is_some_and(|a| 0.0 < a);
+            let strong = livestock && attribute_97(o.index()).is_some_and(|a| Amount::ZERO < a);
             if o == p.player {
                 if strong {
                     return Ok(None);

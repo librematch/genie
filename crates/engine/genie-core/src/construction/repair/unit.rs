@@ -20,6 +20,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::sprite_id;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitAiType;
@@ -317,7 +318,7 @@ fn repaired(
     id: ObjectId,
 ) -> Result<crate::construction::repair::Repaired, GenieError> {
     let om = repair_master(&c.w.masters, oq, o)?;
-    let attributes: &[f32] = if oq == c.player {
+    let attributes: &[Amount] = if oq == c.player {
         &c.w.players.player(c.player)?.attributes
     } else {
         others
@@ -325,7 +326,7 @@ fn repaired(
             .player(oq)
             .map_or(&[][..], |p| &p.attributes[..])
     };
-    let rate = |k: usize| attributes.get(k).copied().unwrap_or(0.0);
+    let rate = |k: usize| attributes.get(k).copied().map_or(0.0, Amount::get);
     let annexes = if om.kind == BUILDING && o.annex_of.is_none() {
         let mut a = c.w.spatial.annexes_of(id);
         a.sort_unstable();

@@ -205,24 +205,25 @@ fn the_amount_is_dt_times_the_rate_times_the_attribute_in_that_order() {
 
 #[test]
 fn the_store_gives_what_reached_1_and_starts_again() {
-    let mut stores = vec![0.0_f32; 4];
-    assert_eq!(store(0.6, attribute::FOOD, &mut stores), None);
-    assert_eq!(stores[0], 0.6);
+    let a = Amount::new;
+    let mut stores = vec![Amount::ZERO; 4];
+    assert_eq!(store(a(0.6), attribute::FOOD, &mut stores), None);
+    assert_eq!(stores[0], a(0.6));
     // ADDSS: the amount plus the store
     let sum = 0.5_f32 + 0.6;
-    assert_eq!(store(0.5, attribute::FOOD, &mut stores), Some(sum));
-    assert_eq!(stores[0], 0.0);
+    assert_eq!(store(a(0.5), attribute::FOOD, &mut stores), Some(a(sum)));
+    assert_eq!(stores[0], Amount::ZERO);
     // nothing above 0 joins: the store stays, and nothing is given
-    stores[1] = 0.9;
-    assert_eq!(store(0.0, attribute::WOOD, &mut stores), None);
-    assert_eq!(store(f32::NAN, attribute::WOOD, &mut stores), None);
-    assert_eq!(store(-2.0, attribute::WOOD, &mut stores), None);
-    assert_eq!(stores[1], 0.9);
+    stores[1] = a(0.9);
+    assert_eq!(store(Amount::ZERO, attribute::WOOD, &mut stores), None);
+    assert_eq!(store(a(f32::NAN), attribute::WOOD, &mut stores), None);
+    assert_eq!(store(a(-2.0), attribute::WOOD, &mut stores), None);
+    assert_eq!(stores[1], a(0.9));
     // a NaN store gives nothing (JC)
-    stores[2] = f32::NAN;
-    assert_eq!(store(0.5, attribute::STONE, &mut stores), None);
+    stores[2] = a(f32::NAN);
+    assert_eq!(store(a(0.5), attribute::STONE, &mut stores), None);
     // a store the player does not have: no store and no give, however large
-    assert_eq!(store(5.0, AttributeId::numbered(9), &mut stores), None);
+    assert_eq!(store(a(5.0), AttributeId::numbered(9), &mut stores), None);
 }
 
 #[test]
@@ -550,8 +551,8 @@ use crate::world::Player;
 /// Gaia and two enemies, the world's dt half a second, a 20 by 20 map.
 fn world() -> World {
     let player = |relations: Vec<u8>| Player {
-        attributes: vec![0.0; 600],
-        generated: vec![0.0; 600],
+        attributes: vec![Amount::ZERO; 600],
+        generated: vec![Amount::ZERO; 600],
         relations: crate::players::relation_row(relations),
         ..Player::default()
     };
@@ -693,25 +694,25 @@ fn a_built_feitoria_trickles_food_through_its_player_s_store() {
         Point::new(5.5, 5.5),
     );
     building_sight(&mut t, PlayerId::new(1), 50, true);
-    t.players[1].attributes[205] = 1.0;
+    t.players[1].attributes[205] = Amount::new(1.0);
     run(&mut t, PlayerId::new(1), 50);
     let made = 0.5_f32 * 1.6 * 1.0;
-    assert_eq!(t.players[1].generated[0], made);
-    assert_eq!(t.players[1].attributes[0], 0.0);
+    assert_eq!(t.players[1].generated[0], Amount::new(made));
+    assert_eq!(t.players[1].attributes[0], Amount::ZERO);
     run(&mut t, PlayerId::new(1), 50);
     let given = made + made;
-    assert_eq!(t.players[1].attributes[0], given);
-    assert_eq!(t.players[1].attributes[166], given);
-    assert_eq!(t.players[1].generated[0], 0.0);
+    assert_eq!(t.players[1].attributes[0], Amount::new(given));
+    assert_eq!(t.players[1].attributes[166], Amount::new(given));
+    assert_eq!(t.players[1].generated[0], Amount::ZERO);
     // unbuilt, nothing
     building_sight(&mut t, PlayerId::new(1), 50, false);
     run(&mut t, PlayerId::new(1), 50);
-    assert_eq!(t.players[1].generated[0], 0.0);
+    assert_eq!(t.players[1].generated[0], Amount::ZERO);
     // the player's attribute 205 at 0: nothing joins the store
     building_sight(&mut t, PlayerId::new(1), 50, true);
-    t.players[1].attributes[205] = 0.0;
+    t.players[1].attributes[205] = Amount::ZERO;
     run(&mut t, PlayerId::new(1), 50);
-    assert_eq!(t.players[1].generated[0], 0.0);
+    assert_eq!(t.players[1].generated[0], Amount::ZERO);
 }
 
 /// A Keshik of player 1 attacking object 77 in state 7.
@@ -761,8 +762,8 @@ fn keshik(t: &mut World) {
     t.players[1].objects[ListIndex::new(0)]
         .actions
         .set_attack(Some(attack));
-    t.players[1].attributes[213] = 0.5;
-    t.players[1].generated[3] = 0.999;
+    t.players[1].attributes[213] = Amount::new(0.5);
+    t.players[1].generated[3] = Amount::new(0.999);
 }
 
 #[test]
@@ -780,10 +781,10 @@ fn a_keshik_makes_gold_while_it_fights_a_target_of_its_task_s_class() {
     );
     run(&mut t, PlayerId::new(1), 60);
     let given = 0.5_f32 * 0.01 * 0.5 + 0.999;
-    assert_eq!(t.players[1].attributes[3], given);
-    assert_eq!(t.players[1].attributes[49], given);
-    assert_eq!(t.players[1].attributes[169], given);
-    assert_eq!(t.players[1].generated[3], 0.0);
+    assert_eq!(t.players[1].attributes[3], Amount::new(given));
+    assert_eq!(t.players[1].attributes[49], Amount::new(given));
+    assert_eq!(t.players[1].attributes[169], Amount::new(given));
+    assert_eq!(t.players[1].generated[3], Amount::ZERO);
     // in another state, nothing
     t.players[1].objects[ListIndex::new(0)]
         .actions
@@ -791,7 +792,7 @@ fn a_keshik_makes_gold_while_it_fights_a_target_of_its_task_s_class() {
         .unwrap()
         .state = AttackState::Ready;
     run(&mut t, PlayerId::new(1), 60);
-    assert_eq!(t.players[1].generated[3], 0.0);
+    assert_eq!(t.players[1].generated[3], Amount::ZERO);
 }
 
 /// A combat unit of master 9 at (5.5, 5.5) moving east, with a movement damage of range 2,
@@ -912,10 +913,10 @@ fn a_movement_damage_kill_leaves_0_hit_points_and_counts_the_kill() {
     let (_, u) = t.object(object_id(20)).unwrap();
     assert_eq!((u.life.hp, u.life.amount), (HitPoints::ZERO, Amount::ZERO));
     // FUN_1412005b0: player 1 a kill (20) of player 2 (302), player 2 a loss (154)
-    assert_eq!(t.players[1].attributes[20], 1.0);
-    assert_eq!(t.players[1].attributes[302], 1.0);
-    assert_eq!(t.players[2].attributes[154], 1.0);
-    assert_eq!(t.players[2].attributes[326], 1.0);
+    assert_eq!(t.players[1].attributes[20], Amount::new(1.0));
+    assert_eq!(t.players[1].attributes[302], Amount::new(1.0));
+    assert_eq!(t.players[2].attributes[154], Amount::new(1.0));
+    assert_eq!(t.players[2].attributes[326], Amount::new(1.0));
 }
 
 /// The map's terrain: every tile of terrain 1 but (5, 6) of terrain 2, whose flag byte has
@@ -1021,7 +1022,7 @@ fn a_dead_object_that_leaves_issues_its_removal_rewards() {
         HitPoints::ZERO,
         Point::new(5.5, 5.5),
     );
-    t.players[1].attributes[7] = 2.0;
+    t.players[1].attributes[7] = Amount::new(2.0);
     assert_eq!(rewards(&mut t, PlayerId::new(1), 80, false), Vec::new());
     let r = Reward {
         player: PlayerId::new(1),
@@ -1063,14 +1064,23 @@ fn a_player_s_attribute_reads_its_place_and_none_past_the_count() {
         attributes: crate::test_ids::attributes(6, [1.0, 2.0, 3.0, 4.0]),
         ..Player::default()
     };
-    p.attributes[5] = 9.0;
-    assert_eq!(p.attribute(attribute::STONE), Some(3.0));
-    assert_eq!(p.attribute(AttributeId::numbered(5)), Some(9.0));
+    p.attributes[5] = Amount::new(9.0);
+    assert_eq!(p.attribute(attribute::STONE), Some(Amount::new(3.0)));
+    assert_eq!(
+        p.attribute(AttributeId::numbered(5)),
+        Some(Amount::new(9.0))
+    );
     assert_eq!(p.attribute(attribute::CURRENT_AGE), None);
-    assert_eq!(p.resources(), [1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(
+        p.resources(),
+        crate::test_ids::amounts([1.0, 2.0, 3.0, 4.0])
+    );
     assert_eq!(p.construction_rate(), 0.0);
-    p.attributes.resize(196, 0.0);
-    p.attributes[attribute::CONSTRUCTION_RATE.index()] = 1.5;
+    p.attributes.resize(196, Amount::ZERO);
+    p.attributes[attribute::CONSTRUCTION_RATE.index()] = Amount::new(1.5);
     assert_eq!(p.construction_rate(), 1.5);
-    assert_eq!(Player::default().resources(), [0.0; 4]);
+    assert_eq!(
+        Player::default().resources(),
+        crate::test_ids::amounts([0.0; 4])
+    );
 }

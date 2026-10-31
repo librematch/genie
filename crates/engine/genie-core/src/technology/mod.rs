@@ -9,6 +9,7 @@
 
 use crate::GenieError;
 use crate::objects::masters::MasterId;
+use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::world::slots::CheckedIndex;
@@ -181,7 +182,7 @@ pub struct TechState {
 /// adjustments (1; attribute 38 for 0x2f3). Spies is not modelled.
 pub fn factors(
     tech: TechId,
-    attribute: &dyn Fn(AttributeId) -> Result<f32, GenieError>,
+    attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
 ) -> Result<(f32, i16), GenieError> {
     if tech == SPIES {
         return Err(GenieError::unsupported("the cost of Spies (FUN_1413cbd80)"));
@@ -190,10 +191,10 @@ pub fn factors(
         0.0
     } else {
         // The attribute that scales research costs above 0 (`+0x2a8`: 85).
-        attribute(attribute::RESEARCH_COST_MODIFIER)?
+        attribute(attribute::RESEARCH_COST_MODIFIER)?.get()
     };
     let scale = if tech == SCALED_BY_38 {
-        attribute(ATTRIBUTE_38)? as i32 as i16
+        attribute(ATTRIBUTE_38)?.get() as i32 as i16
     } else {
         1
     };
@@ -257,7 +258,7 @@ impl TechState {
         def: &TechDef,
         factors: (f32, i16),
         paid: &[(Option<AttributeId>, f32); 3],
-        attribute: &dyn Fn(AttributeId) -> Result<f32, GenieError>,
+        attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
     ) -> Result<bool, GenieError> {
         let (modifier, scale) = factors;
         for j in 0..3 {
@@ -286,7 +287,7 @@ impl TechState {
                     "a research cost the building holds (FUN_141204310)",
                 ));
             }
-            if attribute(attr)? + before < v {
+            if attribute(attr)?.get() + before < v {
                 return Ok(false);
             }
             if 0.0 < v - before {
@@ -375,7 +376,7 @@ impl TechState {
         def: &TechDef,
         factors: (f32, i16),
         repeat: bool,
-        attribute: &dyn Fn(AttributeId) -> Result<f32, GenieError>,
+        attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
     ) -> Result<bool, GenieError> {
         let shared = def.kind == TechType::SHARED;
         if self.state != ResearchState::Available
@@ -396,7 +397,7 @@ impl TechState {
                     "a research cost the building holds (FUN_141204310)",
                 ));
             }
-            if attribute(attr)? < amount {
+            if attribute(attr)?.get() < amount {
                 return Ok(false);
             }
         }
@@ -430,12 +431,12 @@ impl TechState {
                 ));
             }
             let have = attributes.get(attr)?;
-            if amount <= have {
-                attributes.set(attr, have - amount)?;
+            if amount <= have.get() {
+                attributes.set(attr, have - Amount::new(amount))?;
             } else {
                 let gold = attributes.get(GOLD)?;
-                attributes.set(GOLD, gold - (amount - have))?;
-                attributes.set(attr, 0.0)?;
+                attributes.set(GOLD, gold - Amount::new(amount - have.get()))?;
+                attributes.set(attr, Amount::ZERO)?;
             }
         }
         if def.kind == TechType::SHARED {
@@ -469,16 +470,16 @@ impl TechState {
 /// The player's attributes as a technology's costs read and write them.
 pub trait Attributes {
     /// Attribute `i`.
-    fn get(&self, i: AttributeId) -> Result<f32, GenieError>;
+    fn get(&self, i: AttributeId) -> Result<Amount, GenieError>;
     /// Attribute `i` set to `v`.
-    fn set(&mut self, i: AttributeId, v: f32) -> Result<(), GenieError>;
+    fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError>;
     /// Attribute `i` less `amount` (a payment's `SUBSS`), by default through [`Attributes::get`]
     /// and [`Attributes::set`].
     ///
     /// # Errors
     ///
     /// An attribute the player does not have.
-    fn subtract(&mut self, i: AttributeId, amount: f32) -> Result<(), GenieError> {
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
         let v = self.get(i)?;
         self.set(i, v - amount)
     }
@@ -524,13 +525,13 @@ mod tests {
         (state, def)
     }
 
-    struct Held([f32; 4]);
+    struct Held([Amount; 4]);
 
     impl Attributes for Held {
-        fn get(&self, i: AttributeId) -> Result<f32, GenieError> {
+        fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
             Ok(self.0[i.index()])
         }
-        fn set(&mut self, i: AttributeId, v: f32) -> Result<(), GenieError> {
+        fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError> {
             self.0[i.index()] = v;
             Ok(())
         }
@@ -545,12 +546,20 @@ mod tests {
         );
         assert!(!s.repeatable(&d, false));
         // the game's attributes in 3842 (80 food, 157 wood, 200 stone, 100 gold) and after it
-        let mut held = Held([79.956_116, 157.05705, 200.0, 100.0]);
+        let mut held = Held([
+            Amount::new(79.956_116),
+            Amount::new(157.05705),
+            Amount::new(200.0),
+            Amount::new(100.0),
+        ]);
         assert_eq!(
             s.pay(&d, (0.0, 1), false, ids::TOWN_CENTRE, &mut held),
             Ok(true)
         );
-        assert_eq!(held.0, [79.956_116, 157.05705, 200.0, 50.0]);
+        assert_eq!(
+            held.0,
+            crate::test_ids::amounts([79.956_116, 157.05705, 200.0, 50.0])
+        );
         assert_eq!(
             (s.state, s.building_master),
             (ResearchState::Queued, Some(master_id(109)))
@@ -578,7 +587,12 @@ mod tests {
     fn a_cost_beyond_the_attribute_takes_the_rest_from_gold() {
         let (mut s, mut d) = loom();
         d.costs[0].attribute = Some(attribute::WOOD);
-        let mut held = Held([0.0, 30.0, 0.0, 100.0]);
+        let mut held = Held([
+            Amount::ZERO,
+            Amount::new(30.0),
+            Amount::ZERO,
+            Amount::new(100.0),
+        ]);
         // the test asks for 50 wood: 30 is too little
         assert_eq!(
             s.pay(&d, (0.0, 1), false, ids::TOWN_CENTRE, &mut held),
@@ -589,7 +603,7 @@ mod tests {
             s.pay(&d, (0.5, 1), false, ids::TOWN_CENTRE, &mut held),
             Ok(true)
         );
-        assert_eq!(held.0, [0.0, 5.0, 0.0, 100.0]);
+        assert_eq!(held.0, crate::test_ids::amounts([0.0, 5.0, 0.0, 100.0]));
         assert_eq!(
             s.listed_costs(&d, (0.5, 1)).unwrap(),
             [(Some(attribute::WOOD), 25), (None, 0), (None, 0)]

@@ -302,7 +302,7 @@ impl World {
                     .ok_or(GenieError::unreachable(
                         "a player's attribute table without the conversion range",
                     ))?;
-                return Ok(bonus + task.work_range.get());
+                return Ok(bonus.get() + task.work_range.get());
             }
             if task.action_type == filter {
                 return Ok(task.work_range.get());

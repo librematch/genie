@@ -7,6 +7,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::player_master;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::QUEUED;
@@ -79,7 +80,9 @@ impl World {
             owner.tracker.count_queued(-1);
             owner.tracker.unplace(e.master, class);
         }
-        let pop = master.as_ref().map_or(0.0, |m| population(&m.storage));
+        let pop = master
+            .as_ref()
+            .map_or(Amount::ZERO, |m| population(&m.storage));
         owner.add_attribute(QUEUED, -pop * f32::from(count))
     }
 
@@ -113,8 +116,10 @@ impl World {
                 // a cost entry of the building's own store names an attribute
                 let attribute = c.attribute.ok_or(crate::world::NO_ATTRIBUTE)?;
                 match building.store.iter_mut().find(|s| s.0 == attribute) {
-                    Some(s) => s.1 += f32::from(c.amount),
-                    None => building.store.push((attribute, f32::from(c.amount) + 0.0)),
+                    Some(s) => s.1 += Amount::new(f32::from(c.amount)),
+                    None => building
+                        .store
+                        .push((attribute, Amount::new(f32::from(c.amount) + 0.0))),
                 }
             }
         }
@@ -220,7 +225,7 @@ impl World {
         owner.tracker.unplace(entry.master, class);
         let pop = master
             .as_ref()
-            .map_or(0.0, |m| crate::production::population(&m.storage));
+            .map_or(Amount::ZERO, |m| crate::production::population(&m.storage));
         owner.add_attribute(QUEUED, -pop)
     }
 
@@ -403,7 +408,7 @@ impl World {
         let attribute =
             // The player's attribute that mode reads (6, `+0x30`).
             crate::technology::Attributes::get(self.players.player(p)?, attribute::CURRENT_AGE)?;
-        if crate::math::fmath::below_or_unordered(ONE_UNIT_AGE, attribute) {
+        if crate::math::fmath::below_or_unordered(ONE_UNIT_AGE, attribute.get()) {
             return Ok(());
         }
         let master = self

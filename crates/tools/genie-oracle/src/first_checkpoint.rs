@@ -87,7 +87,7 @@ pub fn player_state(section: &PlayerSection<'_>, id: u32) -> Result<PlayerState,
 /// A player section's resources and sleeping count, without its live objects.
 pub(super) fn player_totals(section: &PlayerSection<'_>, id: u32) -> PlayerState {
     let attributes = &section.world_player().base.attributes;
-    let resource = |i: usize| attributes.get(i).copied().unwrap_or_default();
+    let resource = |i: usize| Amount::new(attributes.get(i).copied().unwrap_or_default());
     PlayerState {
         id,
         resources: [resource(0), resource(1), resource(2), resource(3)],

@@ -49,7 +49,7 @@ impl World {
         &mut self,
         p: PlayerId,
         attribute: AttributeId,
-        amount: f32,
+        amount: Amount,
         change: ResourceChange,
     ) -> Result<(), GenieError> {
         self.all_garrison_volleys(p, false)?;
@@ -108,7 +108,7 @@ impl World {
         &mut self,
         p: PlayerId,
         attribute: AttributeId,
-        v: f32,
+        v: Amount,
     ) -> Result<(), GenieError> {
         let player = self.players.player_mut(p)?;
         let i = attribute.index();
@@ -128,22 +128,22 @@ impl World {
         &mut self,
         p: PlayerId,
         attribute: AttributeId,
-        v: f32,
+        v: Amount,
     ) -> Result<(), GenieError> {
         match attribute {
             ALLIED_VISION => self.allied_vision_on(p)?,
             SPREAD_ATTRIBUTE => {
-                if 0.0 < self.attribute_of(p, SPREAD_ATTRIBUTE) {
+                if Amount::ZERO < self.attribute_of(p, SPREAD_ATTRIBUTE) {
                     return Ok(());
                 }
                 // the message to the players is the interface's
                 for q in PlayerId::each(self.players.len()).skip(1) {
-                    if q != p && self.attribute_of(q, SPREAD_ATTRIBUTE) <= 0.0 {
+                    if q != p && self.attribute_of(q, SPREAD_ATTRIBUTE) <= Amount::ZERO {
                         self.store_attribute(q, SPREAD_ATTRIBUTE, v)?;
                     }
                 }
             }
-            EFFECT_FUNCTION if 0.0 < v => {
+            EFFECT_FUNCTION if Amount::ZERO < v => {
                 return Err(GenieError::unsupported(
                     "an effect's script function (attribute 0x21, EffectFunction in Effects.xs)",
                 ));
@@ -166,18 +166,18 @@ impl World {
         &mut self,
         p: PlayerId,
         attribute: AttributeId,
-        v: f32,
+        v: Amount,
     ) -> Result<(), GenieError> {
         match attribute {
             ALLIED_VISION => self.allied_vision_on(p)?,
             SHARED_VISION => self.rebuild_vision()?,
             SPREAD_ATTRIBUTE => {
-                if 0.0 < self.attribute_of(p, SPREAD_ATTRIBUTE) {
+                if Amount::ZERO < self.attribute_of(p, SPREAD_ATTRIBUTE) {
                     return Ok(());
                 }
                 for q in PlayerId::each(self.players.len()).skip(1) {
                     let theirs = self.attribute_of(q, SPREAD_ATTRIBUTE);
-                    if q != p && theirs <= 0.0 {
+                    if q != p && theirs <= Amount::ZERO {
                         self.store_attribute(q, SPREAD_ATTRIBUTE, v + theirs)?;
                     }
                 }
@@ -214,7 +214,7 @@ impl World {
         before: f32,
         amount: f32,
     ) -> Result<(), GenieError> {
-        let exponent = self.attribute_of(p, FARM_EXPONENT);
+        let exponent = self.attribute_of(p, FARM_EXPONENT).get();
         if crate::math::fmath::below_or_unordered(exponent, 0.0) {
             return Ok(());
         }

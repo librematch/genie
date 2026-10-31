@@ -89,17 +89,17 @@ pub fn generated(dt: Seconds, task: &Task, multiplier: f32) -> f32 {
 /// the player (returned, the caller's slot 0xf8) and the store starts again at 0. A store the
 /// player does not have (an attribute past its count, which no `.dat` task names) takes nothing;
 /// a task without an attribute (−1) has no store, which the caller passes over.
-pub fn store(amount: f32, out: AttributeId, stores: &mut [f32]) -> Option<f32> {
+pub fn store(amount: Amount, out: AttributeId, stores: &mut [Amount]) -> Option<Amount> {
     let s = stores.get_mut(out.index())?;
     let mut amount = amount;
-    if 0.0 < amount {
+    if Amount::ZERO < amount {
         *s += amount;
         amount = *s;
     }
-    if fmath::below_or_unordered(amount, ONE) {
+    if fmath::below_or_unordered(amount.get(), ONE) {
         return None;
     }
-    *s = 0.0;
+    *s = Amount::ZERO;
     Some(amount)
 }
 
@@ -165,8 +165,8 @@ impl World {
         let player = self.players.player_mut(owner)?;
         let multiplier = (task.attribute_type2)
             .and_then(|a| player.attribute(a))
-            .unwrap_or(0.0);
-        let amount = generated(self.dt_seconds, task, multiplier);
+            .unwrap_or(Amount::ZERO);
+        let amount = Amount::new(generated(self.dt_seconds, task, multiplier.get()));
         // no store without the task's attribute: nothing reaches the player
         let Some(out) = task.attribute_type3 else {
             return Ok(());
@@ -200,7 +200,7 @@ impl World {
         let m = u.master(&self.masters, q)?;
         Ok(Some(WorkTarget {
             hp: u.life.hp,
-            storage: m.storage.first().map_or(Amount::ZERO, |s| Amount::new(s.1)),
+            storage: m.storage.first().map_or(Amount::ZERO, |s| s.1),
             class: m.class,
         }))
     }

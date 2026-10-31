@@ -17,6 +17,7 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, Masters, player_master};
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -517,7 +518,7 @@ pub(crate) fn lose_built_storage(
     }
     // The population headroom attribute, which a building's held amount gives (`+0x308` 4).
     if held == Some(attribute::HEADROOM) {
-        p.add_attribute(attribute::HEADROOM, -amount)?;
+        p.add_attribute(attribute::HEADROOM, Amount::new(-amount))?;
     }
     Ok(())
 }
@@ -542,7 +543,7 @@ pub(crate) fn gain_built_storage(
         }
     }
     if held == Some(attribute::HEADROOM) {
-        p.add_attribute(attribute::HEADROOM, amount)?;
+        p.add_attribute(attribute::HEADROOM, Amount::new(amount))?;
     }
     Ok(())
 }

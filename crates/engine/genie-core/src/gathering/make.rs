@@ -62,7 +62,7 @@ impl MakeAction {
     /// resource other than the farm's own holding (`life`'s `+0x308`) replaces it, with nothing
     /// held (`FUN_14119d310` with 0).
     #[must_use]
-    pub fn start(task: Task, attributes: &[f32], life: &mut Lifecycle) -> Self {
+    pub fn start(task: Task, attributes: &[Amount], life: &mut Lifecycle) -> Self {
         // the factory's constructor (FUN_140a99430) sets +0x68 to 120.0, which set_state(6)
         // replaces at once
         let mut make = Self {
@@ -82,7 +82,7 @@ impl MakeAction {
     /// `set_state` (`FUN_140a99d60`): state 6 takes the player's food to make (attribute 36 for
     /// a task of the farm food kind, `task+0x20 == 0x10`, else 88) as both what is left and what
     /// is made in all.
-    pub fn set_state(&mut self, state: MakeState, attributes: &[f32]) {
+    pub fn set_state(&mut self, state: MakeState, attributes: &[Amount]) {
         self.state = state;
         if state == MakeState::Making {
             let kind = if self.task.attribute_type == Some(attribute::FARM_FOOD) {
@@ -90,7 +90,10 @@ impl MakeAction {
             } else {
                 attribute::FISH_TRAP_FOOD
             };
-            self.remaining = Amount::new(attributes.get(kind.index()).copied().unwrap_or(0.0));
+            self.remaining = attributes
+                .get(kind.index())
+                .copied()
+                .unwrap_or(Amount::ZERO);
             self.total = self.remaining;
         }
     }
@@ -141,7 +144,7 @@ impl MakeAction {
                     let attribute = self.task.attribute_type.ok_or(crate::world::NO_ATTRIBUTE)?;
                     c.w.players
                         .player_mut(c.player)?
-                        .add_attribute(attribute, rate)?;
+                        .add_attribute(attribute, Amount::new(rate))?;
                 }
                 self.remaining -= farm.life.amount - before;
             }
@@ -214,12 +217,12 @@ mod tests {
         }
     }
 
-    fn attributes() -> Vec<f32> {
-        let mut a = vec![0.0; 100];
+    fn attributes() -> Vec<Amount> {
+        let mut a = vec![Amount::ZERO; 100];
         (
             a[attribute::FARM_FOOD_AMOUNT.index()],
             a[attribute::FISH_TRAP_FOOD.index()],
-        ) = (175.0, 225.0);
+        ) = (Amount::new(175.0), Amount::new(225.0));
         a
     }
 
@@ -381,7 +384,7 @@ mod tests {
         let mut t = farm_world(making(5.0, 5.0, task), ids::FARM, 0.0);
         let (_, make, amount, _) = made(&mut t);
         let food = t.players[1].attributes[attribute::FARM_FOOD.index()];
-        assert_eq!(food, 0.4 * 0.104);
+        assert_eq!(food, Amount::new(0.4 * 0.104));
         assert_eq!((amount, make.remaining), (0.0, Amount::new(5.0)));
     }
 

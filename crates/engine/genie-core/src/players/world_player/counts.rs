@@ -8,6 +8,7 @@ use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::player_master;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::tracker::ListKey;
@@ -97,9 +98,9 @@ impl World {
             };
             let a = &player.attributes;
             let centre = masters.get(TOWN_CENTRE_621);
-            if get(a, attribute::NO_TOWN_CENTRE) == 0.0
+            if get(a, attribute::NO_TOWN_CENTRE) == Amount::ZERO
                 && centre.is_some_and(|c| !c.disabled && !c.available)
-                && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT)
+                && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT).get()
             {
                 count = count.wrapping_add(1);
             }
@@ -189,9 +190,9 @@ impl World {
         if building == BUILDER {
             let a = &player.attributes;
             let centre = masters.get(TOWN_CENTRE_621);
-            if get(a, attribute::NO_TOWN_CENTRE) == 0.0
+            if get(a, attribute::NO_TOWN_CENTRE) == Amount::ZERO
                 && centre.is_some_and(|c| !c.disabled && c.available)
-                && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT)
+                && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT).get()
             {
                 count = count.wrapping_add(1);
             }

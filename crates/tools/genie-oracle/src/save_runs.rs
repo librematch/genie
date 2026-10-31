@@ -12,6 +12,7 @@ use crate::{
 use genie_core::commands::Command;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::action_type;
+use genie_core::players::Amount;
 use genie_core::world::Millis;
 use genie_core::world::{Player, World};
 use genie_rec::de;
@@ -128,10 +129,11 @@ fn stock_differences(
     report: &mut TickReport,
 ) {
     let id = p as u32;
+    let resources = player.resources().map(Amount::get);
     if let Some(r) = game.resources.get(p)
-        && *r != player.resources()
+        && *r != resources
     {
-        let d = format!("resources slice {:?} game {:?}", player.resources(), r);
+        let d = format!("resources slice {resources:?} game {r:?}");
         report.differences.push((id, d));
     }
     if let Some(saved) = game.attributes.get(p) {
@@ -142,8 +144,8 @@ fn stock_differences(
                 .zip(saved)
                 .enumerate()
                 .skip(4)
-                .filter(|(_, (a, b))| a.to_bits() != b.to_bits())
-                .map(|(i, (a, b))| (id, i, a.to_bits(), b.to_bits())),
+                .filter(|(_, (a, b))| a.get().to_bits() != b.to_bits())
+                .map(|(i, (a, b))| (id, i, a.get().to_bits(), b.to_bits())),
         );
     }
 }

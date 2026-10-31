@@ -5,6 +5,7 @@ use crate::objects::ListIndex;
 use crate::objects::masters::action_type;
 use crate::objects::masters::player_master;
 use crate::orders::NO_QUEUE;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::IN_PRODUCTION;
@@ -126,7 +127,7 @@ impl World {
             let pop = first
                 .master
                 .and_then(|m| player_master(&self.masters, p, m))
-                .map_or(0.0, |m| population(&m.storage));
+                .map_or(Amount::ZERO, |m| population(&m.storage));
             self.players.player_mut(p)?.add_attribute(QUEUED, -pop)?;
         }
         if let Some(production) = self.players.live_mut(p, i)?.production.as_mut() {
@@ -151,7 +152,7 @@ impl World {
                 let pop = first
                     .master
                     .and_then(|m| player_master(&self.masters, p, m))
-                    .map_or(0.0, |m| population(&m.storage));
+                    .map_or(Amount::ZERO, |m| population(&m.storage));
                 if housed(&self.players.player(p)?.attributes, pop)? {
                     if self.players.player(p)?.computer {
                         self.cancel_queue(p, i)?;
@@ -324,7 +325,7 @@ impl World {
         if crate::math::fmath::below_or_unordered(progress, time) {
             return Ok(0);
         }
-        let pop = made.map_or(0.0, |m| population(&m.storage));
+        let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
         self.spawn(
             p,
             i,
@@ -384,7 +385,7 @@ impl World {
         if matches!(make.state, MakeObjState::Making | MakeObjState::NoSpot) && self.game_state == 0
         {
             let made = make.master.and_then(|m| player_master(&self.masters, p, m));
-            let pop = made.map_or(0.0, |m| population(&m.storage));
+            let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
             let refund = (!make.paid).then(|| made.cloned()).flatten();
             let owner = self.players.player_mut(p)?;
             owner.add_attribute(IN_PRODUCTION, -pop)?;

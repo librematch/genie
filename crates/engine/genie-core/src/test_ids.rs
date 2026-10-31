@@ -106,10 +106,22 @@ pub(crate) const fn carrying(kind: Option<AttributeId>, amount: f32) -> Held {
 
 /// A player's `n` attributes (at least the four resources): food, wood, stone and gold from
 /// `resources`, the rest 0.
-pub(crate) fn attributes(n: usize, resources: [f32; 4]) -> Vec<f32> {
-    let mut a = vec![0.0; n.max(4)];
-    a[..4].copy_from_slice(&resources);
+pub(crate) fn attributes(n: usize, resources: [f32; 4]) -> Vec<Amount> {
+    let mut a = vec![Amount::ZERO; n.max(4)];
+    for (v, r) in a.iter_mut().zip(resources) {
+        *v = Amount::new(r);
+    }
     a
+}
+
+/// `values` as attribute amounts, a test's expected attributes.
+pub(crate) fn amounts<const N: usize>(values: [f32; N]) -> [Amount; N] {
+    values.map(Amount::new)
+}
+
+/// Attribute adds of `adds`' amounts, a test's expected adds.
+pub(crate) fn adds<const N: usize>(adds: [(AttributeId, f32); N]) -> [(AttributeId, Amount); N] {
+    adds.map(|(kind, amount)| (kind, Amount::new(amount)))
 }
 
 /// A master's cost slots of `entries` in their order, the slots after them empty.

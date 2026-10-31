@@ -2,6 +2,7 @@
 //! and the world's victory check.
 
 use crate::GenieError;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::game_status::{
@@ -119,9 +120,13 @@ impl World {
             if i == 0 || i == p.index() || DEFEAT_IDS <= i {
                 continue;
             }
-            let v = other.attributes.get(KILLS_OF + i).copied().unwrap_or(0.0);
-            if v > most as f32 {
-                most = crate::math::conversions::cvttss2si(v);
+            let v = other
+                .attributes
+                .get(KILLS_OF + i)
+                .copied()
+                .unwrap_or(Amount::ZERO);
+            if v > Amount::new(most as f32) {
+                most = crate::math::conversions::cvttss2si(v.get());
                 killer = i as u8;
             }
         }

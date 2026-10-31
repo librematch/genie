@@ -15,6 +15,7 @@
 use crate::GenieError;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::TOWN_CENTRE;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -77,7 +78,7 @@ impl World {
             .zip(&self.players)
             .skip(1)
         {
-            let attribute = |i: usize| me.attributes.get(i).copied().unwrap_or(0.0);
+            let attribute = |i: usize| me.attributes.get(i).copied().unwrap_or(Amount::ZERO);
             let allies = |q: usize| {
                 me.relations.get(q) == Some(&crate::players::Relation::ALLY)
                     && self.players.get(q).and_then(|o| o.relations.get(p.index()))
@@ -92,7 +93,7 @@ impl World {
                     }
                 }
             }
-            if attribute(REVEAL_ALL) != 0.0 {
+            if attribute(REVEAL_ALL) != Amount::ZERO {
                 for q in 1..n {
                     mine[0] |= 1 << q;
                     mine[1] |= 1 << (32 + q);
@@ -102,7 +103,7 @@ impl World {
             // past Gaia it and who do not both count each other as allies, each player's once
             // (`mTCFlared`), unless the screen's mode is 4 (`FUN_140c87f20`, the editor's: a
             // playback has no such screen, the probe reads 0)
-            if REVEAL_CENTRES < me.attributes.len() && 0.0 < attribute(REVEAL_CENTRES) {
+            if REVEAL_CENTRES < me.attributes.len() && Amount::ZERO < attribute(REVEAL_CENTRES) {
                 for q in PlayerId::each(n).skip(1) {
                     if allies(q.index()) || me.tc_flared.get(q.index()).copied().unwrap_or(false) {
                         continue;
@@ -119,7 +120,7 @@ impl World {
                 }
             }
             if SHARED_MASKS[1] < me.attributes.len()
-                && SHARED_MASKS.iter().any(|&i| attribute(i) != 0.0)
+                && SHARED_MASKS.iter().any(|&i| attribute(i) != Amount::ZERO)
             {
                 return Err(GenieError::unsupported(
                     "a scenario's shared vision masks (attributes 285, 286)",
@@ -160,7 +161,7 @@ mod tests {
         let player = |relations: Vec<u8>| Player {
             relations: crate::players::relation_row(relations),
             allied_vision: true,
-            attributes: vec![0.0; 250],
+            attributes: vec![Amount::ZERO; 250],
             ..Player::default()
         };
         World::new(
@@ -201,7 +202,7 @@ mod tests {
     #[test]
     fn attribute_183_shares_every_players_sight() {
         let mut t = teams();
-        t.players[2].attributes[REVEAL_ALL] = 1.0;
+        t.players[2].attributes[REVEAL_ALL] = Amount::new(1.0);
         t.rebuild_vision().unwrap();
         assert_eq!(t.spatial.vision[2], [0x2000_001e, 0x2000_001e_0000_0000]);
     }
@@ -223,7 +224,7 @@ mod tests {
     #[test]
     fn attribute_209_leaves_the_masks_and_flares_only_town_centres() {
         let mut t = teams();
-        t.players[2].attributes[REVEAL_CENTRES] = 5.0;
+        t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
         t.rebuild_vision().unwrap();
         assert_eq!(t.spatial.vision[2], [0x2000_0014, 0x2000_0014_0000_0000]);
         assert!(!t.players[2].tc_flared.iter().any(|&f| f));
@@ -235,7 +236,7 @@ mod tests {
     #[test]
     fn every_update_ends_with_the_masks_rebuilt_and_new_town_centres_flared() {
         let mut t = teams();
-        t.players[2].attributes[REVEAL_CENTRES] = 5.0;
+        t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
         let flare = crate::objects::masters::Master {
             id: FLARE4,
             kind: crate::objects::masters::master_type::ANIMATED,

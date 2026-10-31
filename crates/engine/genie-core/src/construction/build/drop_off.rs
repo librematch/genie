@@ -120,7 +120,7 @@ impl BuildAction {
                         .attributes
                         .get(95)
                         .copied()
-                        .unwrap_or(0.0),
+                        .unwrap_or(Amount::ZERO),
                     civ: c.w.players.player(c.player)?.civ,
                 };
                 let dip = SideWorld {

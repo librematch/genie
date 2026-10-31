@@ -12,6 +12,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::{self, RELIC, VILLAGER_FEMALE, VILLAGER_MALE};
 use crate::objects::masters::{CostSlot, Master, master_type, player_master};
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::{CostEdit, CostUnits, ObjectsKind};
 use crate::world::World;
@@ -248,9 +249,10 @@ impl World {
         } else {
             PlayerId::GAIA
         };
-        let attribute =
-            |q: &crate::world::Player, i: usize| q.attributes.get(i).copied().unwrap_or(0.0);
-        let limit = attribute(self.players.player(p)?, 234) as i32;
+        let attribute = |q: &crate::world::Player, i: usize| {
+            q.attributes.get(i).copied().unwrap_or(Amount::ZERO)
+        };
+        let limit = attribute(self.players.player(p)?, 234).get() as i32;
         let buildings: Vec<ObjectId> = self
             .players
             .player(p)?
@@ -292,7 +294,7 @@ impl World {
                     };
                     self.enter_forced(np, ni, b)?;
                 }
-                if attribute(self.players.player(p)?, 283) <= 0.0 {
+                if attribute(self.players.player(p)?, 283) <= Amount::ZERO {
                     let Some(crate::orders::Place::Live(bp, bi)) = self.place(b) else {
                         break;
                     };

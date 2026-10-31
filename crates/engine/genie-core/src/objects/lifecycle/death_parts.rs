@@ -27,9 +27,9 @@ use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`Completion::farm_bonus`]);
 /// −1 for those the player has not got.
-pub(crate) fn farm_bonus(attributes: &[f32]) -> [f32; 3] {
-    let at = |i: usize| attributes.get(i).copied().unwrap_or(-1.0);
-    [at(237), at(238), at(239)]
+pub(crate) fn farm_bonus(attributes: &[Amount]) -> [f32; 3] {
+    let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::new(-1.0));
+    [at(237).get(), at(238).get(), at(239).get()]
 }
 
 /// `FUN_1411980b0`'s visible resources, from `set_state` leaving a state below 4 for one above 6
@@ -117,7 +117,7 @@ pub(crate) fn combat_dies(
 /// for the castle, 82, and the wonder, 276), nothing for an annex (`+0xbb8`). Each attribute is
 /// held at 0 or more after (slot 0xf0 with 0), the caller's.
 #[must_use]
-pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(AttributeId, f32)> {
+pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(AttributeId, Amount)> {
     let mut cost = 0.0f32;
     for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
         if paid {
@@ -126,8 +126,8 @@ pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(Attribu
     }
     if master.kind != BUILDING {
         return vec![
-            (attribute::TOTAL_VALUE, cost),
-            (attribute::UNITS_VALUE, cost),
+            (attribute::TOTAL_VALUE, Amount::new(cost)),
+            (attribute::UNITS_VALUE, Amount::new(cost)),
         ];
     }
     if main.is_some() {
@@ -137,11 +137,11 @@ pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(Attribu
     // `0x61b0`, `0x60ee`): the monastery's ([`MONASTERY`]) in attribute 52, the wonder's in 42,
     // the castle's in 134.
     if matches!(master.id, CASTLE | WONDER) {
-        return vec![(attribute::TOTAL_VALUE, cost)];
+        return vec![(attribute::TOTAL_VALUE, Amount::new(cost))];
     }
     vec![
-        (attribute::TOTAL_VALUE, cost),
-        (attribute::BUILDINGS_VALUE, cost),
+        (attribute::TOTAL_VALUE, Amount::new(cost)),
+        (attribute::BUILDINGS_VALUE, Amount::new(cost)),
     ]
 }
 
@@ -152,7 +152,7 @@ pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(Attribu
 /// owner's watched list lets it go (`FUN_141091310`, the caller's).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct BuiltDeath {
-    pub(crate) adds: Vec<(AttributeId, f32)>,
+    pub(crate) adds: Vec<(AttributeId, Amount)>,
     pub(crate) unlink: Option<Position>,
     pub(crate) building: BuildingDeath,
 }
@@ -210,25 +210,25 @@ pub(crate) fn built_death(
 /// negated), then the population it holds itself (`+0x308` 4: the amount leaves, and it holds
 /// nothing after, `FUN_14119d310` with −1 and 0); then each entry of mode 16 leaves its own store
 /// ([`Unit::store`]) when the store holds its attribute.
-pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId, f32)> {
+pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId, Amount)> {
     let mut adds = Vec::new();
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
-            && 0.0 < amount
+            && Amount::ZERO < amount
             && flag == 4
         {
             adds.push((kind, -amount));
         }
     }
     if u.life.attribute_type == Some(attribute::HEADROOM) {
-        adds.push((attribute::HEADROOM, (-u.life.amount).get()));
+        adds.push((attribute::HEADROOM, -u.life.amount));
         u.life.attribute_type = None;
         u.life.amount = Amount::ZERO;
     }
     // FUN_1411e6580: each entry of mode 16 leaves its own store, when the store holds it
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
-            && 0.0 < amount
+            && Amount::ZERO < amount
             && flag & 0x10 != 0
             && let Some(e) = u.store.iter_mut().find(|e| e.0 == kind)
         {
@@ -305,10 +305,10 @@ pub(crate) const CIVILIAN_CLASSES: [ClassId; 4] = [
 /// Its callers: the combat setup (`FUN_14121df60`, 1), the destructors (`FUN_141200450`,
 /// `FUN_1411ec020`, -1), the ownership change (`FUN_14120f800`, -1 then 1 for the new owner) and
 /// the master change (`FUN_141186580` through `FUN_141209d90`, -1 then 1 with the new master).
-pub(crate) fn count_class(attributes: &mut [f32], master: &Master, by: f32) {
+pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32) {
     let mut add = |i: usize| {
         if let Some(v) = attributes.get_mut(i) {
-            *v += by;
+            *v += Amount::new(by);
         }
     };
     if MILITARY_CLASSES.contains(&master.class) {

@@ -327,6 +327,7 @@ mod tests {
     use crate::objects::masters::class;
     use crate::objects::masters::ids::CASTLE;
     use crate::objects::masters::ids::FISH_TRAP;
+    use crate::players::Amount;
     use crate::players::attribute;
     use crate::test_ids::costs;
     use crate::test_ids::object_id;
@@ -338,7 +339,7 @@ mod tests {
     /// Gaia and three players with 300 attributes each.
     fn world() -> World {
         let player = || Player {
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             diplomacy: vec![crate::players::Stance::NONE; 9],
             ..Player::default()
         };
@@ -417,7 +418,12 @@ mod tests {
             ..Master::default()
         };
         let mut t = world();
-        t.players[1].attributes[..4].copy_from_slice(&[0.0, 1000.0, 0.0, 0.0]);
+        t.players[1].attributes[..4].copy_from_slice(&[
+            Amount::ZERO,
+            Amount::new(1000.0),
+            Amount::ZERO,
+            Amount::ZERO,
+        ]);
         let masters = Masters::new([
             costing(FARM, 60),
             costing(PASTURE, 100),
@@ -426,21 +432,27 @@ mod tests {
         t.masters = vec![Masters::new([]), masters];
         let wood = |t: &World| t.players[1].attributes[1];
         t.game(&game(1, sub::FARM_QUEUE, 1, 2, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (2, 880.0));
+        assert_eq!((t.players[1].farm_queue, wood(&t)), (2, Amount::new(880.0)));
         t.game(&game(1, sub::PASTURE_QUEUE, 1, 1, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (3, 780.0));
+        assert_eq!((t.players[1].farm_queue, wood(&t)), (3, Amount::new(780.0)));
         t.game(&game(1, sub::PASTURE_UNQUEUE, 1, 1, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (2, 880.0));
+        assert_eq!((t.players[1].farm_queue, wood(&t)), (2, Amount::new(880.0)));
         t.game(&game(1, sub::FARM_UNQUEUE, 1, 1, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (1, 940.0));
+        assert_eq!((t.players[1].farm_queue, wood(&t)), (1, Amount::new(940.0)));
         t.game(&game(1, sub::FISH_TRAP_QUEUE, 1, 3, 0)).unwrap();
-        assert_eq!((t.players[1].fish_trap_queue, wood(&t)), (3, 640.0));
+        assert_eq!(
+            (t.players[1].fish_trap_queue, wood(&t)),
+            (3, Amount::new(640.0))
+        );
         t.game(&game(1, sub::FISH_TRAP_UNQUEUE, 1, 2, 0)).unwrap();
-        assert_eq!((t.players[1].fish_trap_queue, wood(&t)), (1, 840.0));
+        assert_eq!(
+            (t.players[1].fish_trap_queue, wood(&t)),
+            (1, Amount::new(840.0))
+        );
         // player 9 is outside the world: nothing
         t.settings.cheats_enabled = true;
         t.game(&game(1, sub::FARM_QUEUE, 9, 2, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (1, 840.0));
+        assert_eq!((t.players[1].farm_queue, wood(&t)), (1, Amount::new(840.0)));
     }
 
     /// `do_command`'s gate: a sub-command for another player runs only with the game's cheats,

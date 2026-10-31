@@ -5,6 +5,7 @@
 use crate::GenieError;
 use crate::math::fmath::maxss;
 use crate::objects::masters::MasterId;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::tracker::ListKey;
@@ -22,7 +23,7 @@ pub struct Gift {
     /// The attribute given: food, wood, stone or gold (0 to 3); any other entry gives nothing.
     pub attribute: u16,
     /// The amount the receiver gets.
-    pub amount: f32,
+    pub amount: Amount,
     /// The fee, the share of the amount the giver pays on top.
     pub fee: f32,
 }
@@ -33,10 +34,14 @@ pub struct Gift {
 /// two (`COMISS`, `JBE`: an unordered sum passes) pays all it has, the fee its share,
 /// `have - have / (fee + 1)`, and the receiver gets the rest.
 #[must_use]
-pub fn settle(have: f32, gift: Gift) -> (f32, f32) {
-    let amount = maxss(gift.amount, 0.0);
+pub fn settle(have: Amount, gift: Gift) -> (Amount, Amount) {
+    let amount = Amount::new(maxss(gift.amount.get(), 0.0));
     let fee = maxss(gift.fee, 0.0);
-    let mut extra = if 0.0 < amount { amount * fee } else { 0.0 };
+    let mut extra = if Amount::ZERO < amount {
+        amount * fee
+    } else {
+        Amount::ZERO
+    };
     let mut given = amount;
     if have < given + extra {
         extra = have - have / (fee + 1.0);
@@ -133,7 +138,7 @@ mod tests {
     fn gift(attribute: u16, amount: f32, fee: f32) -> Gift {
         Gift {
             attribute,
-            amount,
+            amount: Amount::new(amount),
             fee,
         }
     }
@@ -144,19 +149,34 @@ mod tests {
     #[test]
     fn a_tribute_pays_its_fee_on_top_and_what_the_giver_lacks_lowers_both() {
         assert_eq!(
-            settle(1000.0, gift(1, 100.0, 0.3)),
-            (100.0, 100.0 + 100.0 * 0.3)
+            settle(Amount::new(1000.0), gift(1, 100.0, 0.3)),
+            (Amount::new(100.0), Amount::new(100.0 + 100.0 * 0.3))
         );
         let extra = 100.0 - 100.0 / 1.3f32;
         assert_eq!(
-            settle(100.0, gift(1, 100.0, 0.3)),
-            (100.0 - extra, 100.0 - extra + extra)
+            settle(Amount::new(100.0), gift(1, 100.0, 0.3)),
+            (
+                Amount::new(100.0 - extra),
+                Amount::new(100.0 - extra + extra)
+            )
         );
-        assert_eq!(settle(100.0, gift(0, -5.0, 0.3)), (0.0, 0.0));
-        assert_eq!(settle(100.0, gift(0, f32::NAN, 0.3)), (0.0, 0.0));
-        assert_eq!(settle(100.0, gift(0, 50.0, f32::NAN)), (50.0, 50.0));
+        assert_eq!(
+            settle(Amount::new(100.0), gift(0, -5.0, 0.3)),
+            (Amount::ZERO, Amount::ZERO)
+        );
+        assert_eq!(
+            settle(Amount::new(100.0), gift(0, f32::NAN, 0.3)),
+            (Amount::ZERO, Amount::ZERO)
+        );
+        assert_eq!(
+            settle(Amount::new(100.0), gift(0, 50.0, f32::NAN)),
+            (Amount::new(50.0), Amount::new(50.0))
+        );
         // no fee: exactly what it has
-        assert_eq!(settle(40.0, gift(3, 50.0, 0.0)), (40.0, 40.0));
+        assert_eq!(
+            settle(Amount::new(40.0), gift(3, 50.0, 0.0)),
+            (Amount::new(40.0), Amount::new(40.0))
+        );
     }
 
     /// Players 1 and 2, each with 600 attributes and 500 of each resource, player 1 a market
@@ -210,22 +230,25 @@ mod tests {
         let (giver, receiver) = (&t.players[1], &t.players[2]);
         assert_eq!(
             giver.resources(),
-            [500.0, 500.0 - 130.0, 500.0, 500.0 - 260.0]
+            crate::test_ids::amounts([500.0, 500.0 - 130.0, 500.0, 500.0 - 260.0])
         );
-        assert_eq!(receiver.resources(), [500.0, 600.0, 500.0, 700.0]);
+        assert_eq!(
+            receiver.resources(),
+            crate::test_ids::amounts([500.0, 600.0, 500.0, 700.0])
+        );
         assert_eq!(
             (
                 giver.attributes[53],
                 giver.attributes[175],
                 giver.attributes[452]
             ),
-            (300.0, 390.0, 300.0)
+            (Amount::new(300.0), Amount::new(390.0), Amount::new(300.0))
         );
         assert_eq!(
             (receiver.attributes[171], receiver.attributes[476]),
-            (300.0, 300.0)
+            (Amount::new(300.0), Amount::new(300.0))
         );
-        assert_eq!(receiver.attributes[4], 0.0);
+        assert_eq!(receiver.attributes[4], Amount::ZERO);
         for (from, to, market) in [(1, 2, false), (1, 1, true)] {
             let mut t = world(market);
             let before = t.players.clone();

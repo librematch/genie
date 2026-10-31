@@ -11,6 +11,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
+use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 
 /// The classes whose repair pays its unit share (`FUN_1412143b0`: the ships 20, 21, 22, 2 and
@@ -179,12 +180,12 @@ pub fn repair_unit(
 /// payment kept as an add the caller makes the owner's right after the repair's step (a
 /// subtraction, so the player's value comes out as the repair saw it).
 pub(crate) struct PaidAttributes {
-    pub(super) values: Vec<f32>,
-    pub(crate) adds: Vec<(AttributeId, f32)>,
+    pub(super) values: Vec<Amount>,
+    pub(crate) adds: Vec<(AttributeId, Amount)>,
 }
 
 impl PaidAttributes {
-    pub(crate) fn new(attributes: &[f32]) -> Self {
+    pub(crate) fn new(attributes: &[Amount]) -> Self {
         Self {
             values: attributes.to_vec(),
             adds: Vec::new(),
@@ -193,20 +194,20 @@ impl PaidAttributes {
 }
 
 impl crate::technology::Attributes for PaidAttributes {
-    fn get(&self, i: AttributeId) -> Result<f32, GenieError> {
+    fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
         self.values
             .get(i.index())
             .copied()
             .ok_or(crate::world::NO_ATTRIBUTE)
     }
 
-    fn set(&mut self, _: AttributeId, _: f32) -> Result<(), GenieError> {
+    fn set(&mut self, _: AttributeId, _: Amount) -> Result<(), GenieError> {
         Err(GenieError::unreachable(
             "a repair's payment that sets an attribute",
         ))
     }
 
-    fn subtract(&mut self, i: AttributeId, amount: f32) -> Result<(), GenieError> {
+    fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
         let v = self
             .values
             .get_mut(i.index())

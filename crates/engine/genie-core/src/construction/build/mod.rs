@@ -22,6 +22,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
 use crate::objects::masters::{MasterId, ids};
+use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use std::collections::BTreeMap;
@@ -189,7 +190,7 @@ pub struct Completion<'a> {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FirstPart {
     /// The attributes its owner gains, in order.
-    pub attributes: Vec<(AttributeId, f32)>,
+    pub attributes: Vec<(AttributeId, Amount)>,
     /// The building's master has a task of action type 0x99 and the building a unit AI: its
     /// search for resources follows ([`crate::world::World::cart_search`]).
     pub cart: bool,
@@ -249,7 +250,7 @@ impl Completion<'_> {
                     .ok()
                     .and_then(AttributeId::of_data)
                     .ok_or(crate::world::NO_ATTRIBUTE)?;
-                part.attributes.push((attribute, amount));
+                part.attributes.push((attribute, Amount::new(amount)));
             }
             // the game mode is not the editor's (4) in a game
             part.pasture = matches!(master.id, ids::PASTURE_MANGROVE | ids::PASTURE);
@@ -490,9 +491,9 @@ mod stack_tests {
             ],
         );
         tc.storage = vec![
-            (Some(attribute::HEADROOM), 5.0, 4),
-            (Some(AttributeId::numbered(506)), 1.0, 16),
-            (None, 0.0, 0),
+            (Some(attribute::HEADROOM), Amount::new(5.0), 4),
+            (Some(AttributeId::numbered(506)), Amount::new(1.0), 16),
+            (None, Amount::ZERO, 0),
         ];
         tc.volley_missile = Some(master_id(54));
         let mut empty = building(
@@ -575,7 +576,7 @@ mod stack_tests {
                 Player::default(),
                 Player {
                     objects: vec![foundation].into(),
-                    attributes: vec![0.0; 600],
+                    attributes: vec![Amount::ZERO; 600],
                     ..Player::default()
                 },
             ],
@@ -652,7 +653,7 @@ mod stack_tests {
                 data3: 0.0,
             }]
         );
-        assert_eq!(t.players[1].attributes[134], 1.0);
+        assert_eq!(t.players[1].attributes[134], Amount::new(1.0));
     }
 
     /// census v5's 273 stops "a completion of a stack unit or a vanishing building" (records/
@@ -730,13 +731,13 @@ mod stack_tests {
             ),
             (
                 HitPoints::new(2400.0 - lacked),
-                vec![(AttributeId::numbered(506), 1.0)]
+                vec![(AttributeId::numbered(506), Amount::new(1.0))]
             )
         );
         let attributes = &t.players[1].attributes;
         assert_eq!(
             (attributes[4], attributes[98], attributes[165]),
-            (5.0, 0.0, 0.0)
+            (Amount::new(5.0), Amount::ZERO, Amount::ZERO)
         );
         let gone = unit(object_id(8759));
         assert_eq!((gone.life.hp, gone.roo_called), (HitPoints::ZERO, true));

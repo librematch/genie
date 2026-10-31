@@ -6,6 +6,7 @@ use crate::map::Tile;
 use crate::math::fmath::at_most_or_unordered;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute::{self, AttributeId, RESOURCES};
@@ -25,7 +26,7 @@ impl World {
                 &self.players.player(p)?.attributes,
                 attribute::TRICKLES.offset(kind.index())?,
             );
-            if at_most_or_unordered(rate, 0.0) {
+            if at_most_or_unordered(rate.get(), 0.0) {
                 continue;
             }
             self.add_resource(p, kind, rate / MINUTE, 1, true)?;
@@ -59,8 +60,14 @@ impl World {
             }
         }
         let grows = crate::math::fmath::log(sum / LIVESTOCK_SCALE + SECOND);
-        let rate = get(&self.players.player(p)?.attributes, attribute::MILL_FOOD) / MINUTE;
-        self.add_resource(p, attribute::FOOD, rate * (time * grows), 1, true)?;
+        let rate = get(&self.players.player(p)?.attributes, attribute::MILL_FOOD).get() / MINUTE;
+        self.add_resource(
+            p,
+            attribute::FOOD,
+            Amount::new(rate * (time * grows)),
+            1,
+            true,
+        )?;
         Ok(())
     }
 
@@ -75,7 +82,7 @@ impl World {
         &mut self,
         p: PlayerId,
         kind: AttributeId,
-        amount: f32,
+        amount: Amount,
         stat: u8,
         share: bool,
     ) -> Result<(), GenieError> {
@@ -115,7 +122,7 @@ impl World {
         &mut self,
         p: PlayerId,
         kind: AttributeId,
-        amount: f32,
+        amount: Amount,
         stat: u8,
         share: bool,
     ) -> Result<(), GenieError> {
@@ -127,15 +134,15 @@ impl World {
         *player.attributes.checked_mut(k)? += amount;
         if player.kind == PlayerType::COMPUTER && kind.is_resource() {
             let pct = *player.escrow_percentage.checked(k)?;
-            if !at_most_or_unordered(amount, 0.0) && !at_most_or_unordered(pct, 0.0) {
+            if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(pct, 0.0) {
                 *player.escrow.checked_mut(k)? += pct * amount;
             }
             let held = *player.attributes.checked(k)?;
-            if !at_most_or_unordered(*player.escrow.checked(k)?, held) {
-                *player.escrow.checked_mut(k)? = if at_most_or_unordered(0.0, held) {
+            if !at_most_or_unordered(player.escrow.checked(k)?.get(), held.get()) {
+                *player.escrow.checked_mut(k)? = if at_most_or_unordered(0.0, held.get()) {
                     held
                 } else {
-                    0.0
+                    Amount::ZERO
                 };
             }
         }

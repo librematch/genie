@@ -20,6 +20,7 @@ use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::unit::Unit;
 use genie_core::orders::town_bell::TownBell;
+use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::{ActionKind, UnitAi};
 use genie_core::world::Seconds;
@@ -217,7 +218,7 @@ pub(super) fn unit(
                     .filter_map(|e| {
                         Some((
                             AttributeId::of_index(usize::from(e.attribute_idx))?,
-                            e.value,
+                            Amount::new(e.value),
                         ))
                     })
                     .collect()

@@ -601,7 +601,7 @@ fn an_order_on_a_target_joins_the_unit_ai_s_history() {
     };
     let player = |objects| Player {
         objects,
-        attributes: vec![0.0; 300],
+        attributes: vec![Amount::ZERO; 300],
         ..Player::default()
     };
     let mut t = World::new(
@@ -676,7 +676,7 @@ fn an_order_on_a_target_joins_the_unit_ai_s_history() {
 #[test]
 fn a_flare_at_a_point_stands_on_the_ground() {
     let player = || Player {
-        attributes: vec![0.0; 300],
+        attributes: vec![Amount::ZERO; 300],
         ..Player::default()
     };
     let mut t = World::new(
@@ -710,7 +710,7 @@ fn a_flare_at_a_point_stands_on_the_ground() {
 #[test]
 fn a_hit_s_flare_lasts_twice_as_long_from_a_trebuchet() {
     let player = || Player {
-        attributes: vec![0.0; 300],
+        attributes: vec![Amount::ZERO; 300],
         ..Player::default()
     };
     let mut t = World::new(
@@ -725,7 +725,7 @@ fn a_hit_s_flare_lasts_twice_as_long_from_a_trebuchet() {
         id: master_id(112),
         kind: master_type::ANIMATED,
         standing_sprite: -1,
-        storage: vec![(Some(AttributeId::numbered(12)), 1.0, 0)],
+        storage: vec![(Some(AttributeId::numbered(12)), Amount::new(1.0), 0)],
         ..Master::default()
     };
     t.masters = (0..3).map(|_| Masters::new([flare.clone()])).collect();
@@ -750,7 +750,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
     use crate::objects::masters::master_type::{BUILDING, MOVING};
     use crate::objects::sprite::Graphic;
     let player = || Player {
-        attributes: vec![0.0; 300],
+        attributes: vec![Amount::ZERO; 300],
         ..Player::default()
     };
     let mut t = World::new(
@@ -762,8 +762,8 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
     );
     t.spatial = Spatial::new(GridSize::new(120, 120));
     placeable(&mut t);
-    t.players[1].attributes[289] = livestock;
-    t.players[1].attributes[288] = 300.0;
+    t.players[1].attributes[289] = Amount::new(livestock);
+    t.players[1].attributes[288] = Amount::new(300.0);
     let idle = |id| Graphic {
         id,
         frames: 60,
@@ -788,7 +788,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         hit_points: 1,
         radius: Footprint::new(0.2, 0.2),
         standing_sprite,
-        storage: vec![(Some(attribute::FOOD), 100.0, 0)],
+        storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 0)],
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         ..Master::default()
     };
@@ -1039,7 +1039,7 @@ fn tended_pasture(at: Position, room: f32) -> World {
         &[master_id(1899), master_id(1900)],
     );
     t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
-    t.players[1].attributes[290] = room;
+    t.players[1].attributes[290] = Amount::new(room);
     let villager = Master {
         id: VILLAGER_MALE,
         kind: master_type::COMBAT,
@@ -1127,7 +1127,7 @@ fn a_villager_tends_the_nearest_livestock_with_room() {
     let mut other = tended_pasture(near, 2.0);
     let v = other.players[1].objects.pop().unwrap();
     other.players.push(Player {
-        attributes: vec![0.0; 300],
+        attributes: vec![Amount::ZERO; 300],
         objects: vec![v].into(),
         ..Player::default()
     });
@@ -1511,7 +1511,7 @@ fn a_new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
 fn a_combat_object_counts_in_its_player_s_class_attributes() {
     use crate::objects::masters::Master;
     let counted = |class, id, task_by_group| {
-        let mut a = vec![0.0f32; 240];
+        let mut a = vec![Amount::ZERO; 240];
         let m = Master {
             id,
             class,
@@ -1520,7 +1520,7 @@ fn a_combat_object_counts_in_its_player_s_class_attributes() {
         };
         count_class(&mut a, &m, 1.0);
         count_class(&mut a, &m, 1.0);
-        [a[37], a[38], a[40], a[235]]
+        [a[37], a[38], a[40], a[235]].map(Amount::get)
     };
     assert_eq!(
         counted(class::CLASS_6, master_id(4), 0),
@@ -1549,7 +1549,7 @@ fn a_combat_object_counts_in_its_player_s_class_attributes() {
     );
     assert_eq!(counted(class::LIVESTOCK, ids::ID_1663, 1), [0.0; 4]);
     assert_eq!(counted(class::BUILDING, ids::TOWN_CENTRE, 0), [0.0; 4]);
-    let mut a = vec![5.0f32; 41];
+    let mut a = vec![Amount::new(5.0); 41];
     count_class(
         &mut a,
         &Master {
@@ -1558,7 +1558,7 @@ fn a_combat_object_counts_in_its_player_s_class_attributes() {
         },
         -1.0,
     );
-    assert_eq!(a[40], 4.0);
+    assert_eq!(a[40], Amount::new(4.0));
 }
 
 /// `0x141071880`'s idle swap: a standing sprite that looped draws on the Sprite stream and,
@@ -1749,9 +1749,12 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
         })],
     );
     let p = &t.players[1];
-    assert_eq!(p.resources(), [200.0, 75.0, 200.0, 100.0]);
+    assert_eq!(
+        p.resources(),
+        crate::test_ids::amounts([200.0, 75.0, 200.0, 100.0])
+    );
     // the house's paid cost, as a building with a train location, in attribute 247
-    assert_eq!(p.attributes[247], 25.0);
+    assert_eq!(p.attributes[247], Amount::new(25.0));
     let foundation = p.objects.last().unwrap();
     assert_eq!(
         (
@@ -1883,7 +1886,7 @@ fn a_queued_build_queues_its_order_for_another_player_s_villager() {
             },
             Player {
                 objects: vec![villager(object_id(9618), VILLAGER_FEMALE, 29.0, 99.0)].into(),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
         ],
@@ -1999,7 +2002,7 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
             Player::default(),
             Player {
                 objects: vec![villager, foundation].into(),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 relations: relation_row([1, 0]),
                 ..Player::default()
             },
@@ -2038,7 +2041,7 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
             master: own,
             player: PlayerId::new(1),
             held: carrying(None, 0.0),
-            attribute_95: 0.0,
+            attribute_95: Amount::ZERO,
             civ: CivId::new(0),
         };
         task_search(masters, &actor, &site, &site, None, None, &world)
@@ -4133,7 +4136,7 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
         class: class::BUILDING,
         radius: Footprint::new(2.0, 2.0),
         hit_points: 4800,
-        storage: vec![(Some(attribute::HEADROOM), 20.0, 4)],
+        storage: vec![(Some(attribute::HEADROOM), Amount::new(20.0), 4)],
         building: Some(crate::objects::masters::BuildingMaster {
             tech: None,
             foundation_terrain: -1,
@@ -4146,9 +4149,9 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
         ..Master::default()
     };
     let world = |count: f32| {
-        let mut attributes = vec![0.0; 250];
-        attributes[4] = 25.0;
-        attributes[134] = count;
+        let mut attributes = vec![Amount::ZERO; 250];
+        attributes[4] = Amount::new(25.0);
+        attributes[134] = Amount::new(count);
         let mut t = World::new(
             WorldTime::ZERO,
             1,
@@ -4183,12 +4186,15 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
     t.set_state(PlayerId::new(1), object_id(900), ObjectState::Dying)
         .unwrap();
     let p = &t.players[1];
-    assert_eq!((p.attributes[4], p.attributes[134]), (5.0, 0.0));
+    assert_eq!(
+        (p.attributes[4], p.attributes[134]),
+        (Amount::new(5.0), Amount::ZERO)
+    );
     assert_eq!(p.objects[ListIndex::new(0)].life.state, ObjectState::Dying);
     let mut t = world(0.0);
     t.set_state(PlayerId::new(1), object_id(900), ObjectState::Dying)
         .unwrap();
-    assert_eq!(t.players[1].attributes[134], 0.0);
+    assert_eq!(t.players[1].attributes[134], Amount::ZERO);
     let mut t = world(1.0);
     t.players[1].computer = true;
     assert!(
@@ -4678,7 +4684,7 @@ fn a_hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(v.life.amount, Amount::ZERO);
-    assert_eq!(t.players[1].attributes[0], 5.0);
+    assert_eq!(t.players[1].attributes[0], Amount::new(5.0));
     let h = v.actions.hunt().copied().unwrap();
     assert_eq!(
         (h.state, h.target, h.carry_to),
@@ -6267,7 +6273,7 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
         if ally {
             let house = t.players[1].objects.remove(ListIndex::new(1)).unwrap();
             let mut ally = Player {
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             };
             ally.objects.push(house);
@@ -7206,7 +7212,7 @@ fn livestock_without_actions_starts_its_artifact_again() {
             Player::default(),
             Player {
                 objects: vec![sheep].into(),
-                attributes: vec![0.0; 100],
+                attributes: vec![Amount::ZERO; 100],
                 ..Player::default()
             },
         ],
@@ -7286,6 +7292,7 @@ fn attribute_values(t: &World, p: usize) -> Vec<f32> {
         .iter()
         .chain(owner.attributes.iter().skip(4))
         .copied()
+        .map(Amount::get)
         .collect()
 }
 
@@ -7314,10 +7321,10 @@ fn a_dying_object_gives_back_its_storage_of_kinds_2_and_16() {
         life_part(
             |m, v| {
                 m.storage = vec![
-                    (Some(attribute::HEADROOM), 1.0, 2),
-                    (Some(attribute::POPULATION), 5.0, 16),
-                    (Some(AttributeId::numbered(9)), 1.0, 1),
-                    (None, 1.0, 2),
+                    (Some(attribute::HEADROOM), Amount::new(1.0), 2),
+                    (Some(attribute::POPULATION), Amount::new(5.0), 16),
+                    (Some(AttributeId::numbered(9)), Amount::new(1.0), 1),
+                    (None, Amount::new(1.0), 2),
                 ];
                 (v.life.state, v.life.hp) = (ObjectState::Alive, hp);
             },
@@ -7396,7 +7403,7 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
     };
     let player = |objects| Player {
         objects,
-        attributes: vec![0.0; 250],
+        attributes: vec![Amount::ZERO; 250],
         ..Player::default()
     };
     let mut t = World::new(
@@ -7454,8 +7461,8 @@ fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
         default_make: true,
         ..Unit::default()
     };
-    let mut attributes = vec![0.0; 100];
-    attributes[attribute::FARM_FOOD_AMOUNT.index()] = 175.0;
+    let mut attributes = vec![Amount::ZERO; 100];
+    attributes[attribute::FARM_FOOD_AMOUNT.index()] = Amount::new(175.0);
     let mut t = World::new(
         WorldTime::ZERO,
         1,
@@ -7529,7 +7536,7 @@ fn a_building_s_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
         vec![Millis::ZERO],
         vec![Player {
             objects: vec![barracks].into(),
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             ..Player::default()
         }],
     );
@@ -7687,17 +7694,20 @@ fn a_load_goes_to_its_player_alone_unless_the_player_shares() {
         PlayerId::new(1),
         &mut adds,
         attribute::FOOD,
-        10.0,
+        Amount::new(10.0),
     )
     .unwrap();
-    assert_eq!(adds, [(attribute::FOOD, 10.0), (attribute::GATHERED, 10.0)]);
+    assert_eq!(
+        adds,
+        crate::test_ids::adds([(attribute::FOOD, 10.0), (attribute::GATHERED, 10.0)])
+    );
     assert!(
         give_load(
             (&relations, true),
             PlayerId::new(1),
             &mut adds,
             attribute::GOLD,
-            10.0
+            Amount::new(10.0)
         )
         .is_err()
     );
@@ -7723,7 +7733,7 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
     let player = |objects: Vec<Unit>| Player {
         objects: objects.into(),
         relations: relation_row([0, 0]),
-        attributes: vec![0.0; 250],
+        attributes: vec![Amount::ZERO; 250],
         ..Player::default()
     };
     let mut t = World::new(
@@ -7784,7 +7794,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
     let player = |objects: Vec<Unit>, relations: Vec<u8>| Player {
         objects: objects.into(),
         relations: relation_row(relations),
-        attributes: vec![0.0; 250],
+        attributes: vec![Amount::ZERO; 250],
         ..Player::default()
     };
     let mut t = World::new(
@@ -8297,7 +8307,10 @@ fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
     };
     let _ = t.force(&game);
     assert_eq!(
-        (t.players[0].stopped, t.players[0].resources()),
+        (
+            t.players[0].stopped,
+            t.players[0].resources().map(Amount::get)
+        ),
         (false, [1.0, 2.0, 3.0, 4.0])
     );
     assert_eq!(retarget(&t), vec![900, 901]);
@@ -8366,7 +8379,8 @@ fn the_forced_replay_s_removal_leaves_as_an_update_s_leave_does() {
 /// A player with the villagers' masters (a population of one each) and room for more.
 fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
     let mut attributes = crate::test_ids::attributes(250, resources);
-    (attributes[4], attributes[11], attributes[32]) = (5.0, 4.0, 10.0);
+    (attributes[4], attributes[11], attributes[32]) =
+        (Amount::new(5.0), Amount::new(4.0), Amount::new(10.0));
     let mut t = World::new(
         WorldTime::ZERO,
         29910,
@@ -8398,8 +8412,8 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
         class: class::VILLAGER,
         cost: costs(&[(attribute::FOOD, 46, true), (attribute::HEADROOM, 1, false)]),
         storage: vec![
-            (Some(attribute::HEADROOM), -1.0, 2),
-            (Some(attribute::POPULATION), 1.0, 2),
+            (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
+            (Some(attribute::POPULATION), Amount::new(1.0), 2),
         ],
         ..trained(id, 25)
     };
@@ -8411,8 +8425,8 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
     };
     let quick = Master {
         storage: vec![
-            (Some(attribute::HEADROOM), -1.0, 2),
-            (Some(attribute::POPULATION), 1.0, 2),
+            (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
+            (Some(attribute::POPULATION), Amount::new(1.0), 2),
         ],
         ..trained(master_id(97), 2)
     };
@@ -8432,7 +8446,10 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
     let mut t = one_player(vec![centre(9)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
-    assert_eq!(p.resources(), [154.0, 200.0, 200.0, 200.0]);
+    assert_eq!(
+        p.resources(),
+        crate::test_ids::amounts([154.0, 200.0, 200.0, 200.0])
+    );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     // the make action works in the tick it is created in
     let Some(crate::production::Making::Unit(make)) = production.action else {
@@ -8485,7 +8502,7 @@ fn a_queue_the_player_cannot_pay_or_at_a_missing_building_queues_nothing() {
     let mut poor = one_player(vec![centre(9)], [40.0, 0.0, 0.0, 0.0]);
     poor.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     assert!(poor.players[0].unsupported.is_none());
-    assert_eq!(poor.players[0].attributes[0], 40.0);
+    assert_eq!(poor.players[0].attributes[0], Amount::new(40.0));
     let tc = &poor.players[0].objects[ListIndex::new(0)];
     assert!(
         tc.production
@@ -8502,7 +8519,10 @@ fn a_queue_the_player_cannot_pay_or_at_a_missing_building_queues_nothing() {
     let mut missing = one_player(vec![centre(9)], [200.0; 4]);
     missing.tick_with(Millis::new(104), &[queue(9 - 1, 83, 1)]);
     assert!(missing.players[0].unsupported.is_none());
-    assert_eq!(missing.players[0].resources(), [200.0; 4]);
+    assert_eq!(
+        missing.players[0].resources(),
+        crate::test_ids::amounts([200.0; 4])
+    );
 }
 
 /// `FUN_141614450` over two town centres: unit by unit the one with room and the least load
@@ -8607,7 +8627,10 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
     let mut alone = with_trophy(vec![trophy(9)]);
     alone.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     assert!(alone.players[0].unsupported.is_none());
-    assert_eq!(alone.players[0].resources(), [200.0; 4]);
+    assert_eq!(
+        alone.players[0].resources(),
+        crate::test_ids::amounts([200.0; 4])
+    );
     assert!(
         alone.players[0].objects[ListIndex::new(0)]
             .production
@@ -8625,7 +8648,12 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
         let mut t = one_player(vec![], [200.0; 4]);
         let mut other = t.players[0].clone();
         other.objects = vec![centre(10)].into();
-        other.attributes[..4].copy_from_slice(&[100.0, 0.0, 0.0, 0.0]);
+        other.attributes[..4].copy_from_slice(&[
+            Amount::new(100.0),
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+        ]);
         t.players.push(other);
         t.player_time.push(Millis::ZERO);
         t.masters.push(t.masters[0].clone());
@@ -8635,8 +8663,11 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
     let mut t = two(true);
     t.tick_with(Millis::new(104), &[queue(10, 83, 1)]);
     assert!(t.players.iter().all(|p| p.unsupported.is_none()));
-    assert_eq!(t.players[0].resources(), [200.0; 4]);
-    assert_eq!(t.players[1].attributes[0], 54.0);
+    assert_eq!(
+        t.players[0].resources(),
+        crate::test_ids::amounts([200.0; 4])
+    );
+    assert_eq!(t.players[1].attributes[0], Amount::new(54.0));
     let production = t.players[1].objects[ListIndex::new(0)]
         .production
         .as_ref()
@@ -8644,7 +8675,7 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
     assert_eq!(production.queue.total, 1);
     let mut t = two(false);
     t.tick_with(Millis::new(104), &[queue(10, 83, 1)]);
-    assert_eq!(t.players[1].attributes[0], 100.0);
+    assert_eq!(t.players[1].attributes[0], Amount::new(100.0));
     assert!(t.players[1].objects[ListIndex::new(0)].production.is_none());
 }
 
@@ -9014,11 +9045,11 @@ fn a_queue_counts_its_units_population_as_queued() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 83, 3)]);
     let a = &t.players[0].attributes;
-    assert_eq!((a[80], a[81]), (3.0, 1.0));
+    assert_eq!((a[80], a[81]), (Amount::new(3.0), Amount::new(1.0)));
     // a unit without population (master 99, no storage of kind 4) adds none
     let mut other = one_player(vec![centre(9)], [1000.0; 4]);
     other.tick_with(Millis::new(104), &[queue(9, 99, 2)]);
-    assert_eq!(other.players[0].attributes[80], 0.0);
+    assert_eq!(other.players[0].attributes[80], Amount::ZERO);
 }
 
 #[test]
@@ -9037,7 +9068,10 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
             .total
     };
     assert_eq!(queued(&two), 2);
-    assert_eq!(two.players[0].attributes[0], 100.0 - 2.0 * 46.0);
+    assert_eq!(
+        two.players[0].attributes[0],
+        Amount::new(100.0 - 2.0 * 46.0)
+    );
     assert_eq!(
         two.streams.get(Stream::Action).draws,
         one.streams.get(Stream::Action).draws + 1
@@ -9102,12 +9136,12 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
 fn a_computer_player_s_housed_building_cancels_its_queue() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     t.players[0].computer = true;
-    t.players[0].attributes[4] = 0.5;
+    t.players[0].attributes[4] = Amount::new(0.5);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
     assert_eq!(
         (p.attributes[0], p.attributes[80], p.attributes[81]),
-        (1000.0, 0.0, 0.0)
+        (Amount::new(1000.0), Amount::ZERO, Amount::ZERO)
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     assert_eq!((production.queue.count, production.queue.total), (0, 0));
@@ -9122,7 +9156,10 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
     });
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
-    assert_eq!((p.attributes[80], p.attributes[81]), (1.0, 0.0));
+    assert_eq!(
+        (p.attributes[80], p.attributes[81]),
+        (Amount::new(1.0), Amount::ZERO)
+    );
     assert!(
         p.objects[ListIndex::new(0)]
             .production
@@ -9181,9 +9218,9 @@ fn hands_masters() -> Vec<Masters> {
             hit_points: 30 + 5 * i16::from(p),
             death_spawns: [Some(master_id(3)), None],
             storage: vec![
-                (Some(attribute::HEADROOM), 1.0, 2),
-                (Some(attribute::POPULATION), 0.0, 0),
-                (None, 0.0, 0),
+                (Some(attribute::HEADROOM), Amount::new(1.0), 2),
+                (Some(attribute::POPULATION), Amount::ZERO, 0),
+                (None, Amount::ZERO, 0),
             ],
             ..Master::default()
         };
@@ -9204,7 +9241,7 @@ fn hands_masters() -> Vec<Masters> {
             class: class::LIVESTOCK,
             line_of_sight: Distance::new(2.0 + f32::from(p)),
             fog_visibility: p,
-            storage: vec![(Some(attribute::FARM_FOOD), 100.0, 1)],
+            storage: vec![(Some(attribute::FARM_FOOD), Amount::new(100.0), 1)],
             ..Master::default()
         };
         if p == 2 {
@@ -9497,8 +9534,8 @@ fn artifact_players(attribute_97: &[f32], status: &[u8]) -> Vec<Player> {
         .iter()
         .enumerate()
         .map(|(q, &game_status)| {
-            let mut attributes = vec![0.0; 98];
-            attributes[97] = attribute_97.get(q).copied().unwrap_or(0.0);
+            let mut attributes = vec![Amount::ZERO; 98];
+            attributes[97] = Amount::new(attribute_97.get(q).copied().unwrap_or(0.0));
             Player {
                 attributes,
                 game_status,
@@ -9797,12 +9834,12 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
                         ..hands_unit(21712, master_id(4))
                     }]
                     .into(),
-                    attributes: vec![0.0; 300],
+                    attributes: vec![Amount::ZERO; 300],
                     ..Player::default()
                 },
                 Player {
                     objects: vec![live(500)].into(),
-                    attributes: vec![0.0; 300],
+                    attributes: vec![Amount::ZERO; 300],
                     computer,
                     kind: if computer {
                         PlayerType::COMPUTER
@@ -9812,13 +9849,13 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
                     ..Player::default()
                 },
                 Player {
-                    attributes: vec![0.0; 300],
+                    attributes: vec![Amount::ZERO; 300],
                     ..Player::default()
                 },
             ],
         );
         t.settings.game_mode = mode;
-        t.players[0].attributes[40] = 1.0;
+        t.players[0].attributes[40] = Amount::new(1.0);
         t.masters = masters;
         t.spatial = hands_world(
             21712,
@@ -9849,7 +9886,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     );
     assert_eq!(
         [t.players[0].attributes[40], t.players[1].attributes[40]],
-        [0.0, 1.0]
+        crate::test_ids::amounts([0.0, 1.0])
     );
     // player 1 lacks the master: the loop ends with it, and Gaia keeps the archer
     let mut masters = hands_masters();
@@ -10105,20 +10142,20 @@ fn a_built_building_s_storage_leaves_its_owner_and_its_store() {
         id: ids::TOWN_CENTRE,
         kind: BUILDING,
         storage: vec![
-            (Some(attribute::HEADROOM), 5.0, 4),
-            (None, 5.0, 4),
-            (Some(attribute::RELICS_HELD), 0.0, 4),
-            (Some(attribute::POPULATION), 2.0, 16),
-            (Some(AttributeId::numbered(12)), 3.0, 0x30),
-            (Some(AttributeId::numbered(13)), 1.0, 16),
+            (Some(attribute::HEADROOM), Amount::new(5.0), 4),
+            (None, Amount::new(5.0), 4),
+            (Some(attribute::RELICS_HELD), Amount::ZERO, 4),
+            (Some(attribute::POPULATION), Amount::new(2.0), 16),
+            (Some(AttributeId::numbered(12)), Amount::new(3.0), 0x30),
+            (Some(AttributeId::numbered(13)), Amount::new(1.0), 16),
         ],
         ..Master::default()
     };
     let mut u = Unit {
         id: object_id(1),
         store: vec![
-            (attribute::POPULATION, 6.0),
-            (AttributeId::numbered(12), 4.0),
+            (attribute::POPULATION, Amount::new(6.0)),
+            (AttributeId::numbered(12), Amount::new(4.0)),
         ],
         ..Unit::default()
     };
@@ -10127,25 +10164,25 @@ fn a_built_building_s_storage_leaves_its_owner_and_its_store() {
     let adds = storage_leaves(&mut u, &master);
     assert_eq!(
         adds,
-        [(attribute::HEADROOM, -5.0), (attribute::HEADROOM, -3.0)]
+        crate::test_ids::adds([(attribute::HEADROOM, -5.0), (attribute::HEADROOM, -3.0)])
     );
     assert_eq!(u.life.held(), carrying(None, 0.0));
     assert_eq!(
         u.store,
-        [
+        crate::test_ids::adds([
             (attribute::POPULATION, 4.0),
             (AttributeId::numbered(12), 1.0)
-        ]
+        ])
     );
     // holding no population: the master's entries alone
     let adds = storage_leaves(&mut u, &master);
-    assert_eq!(adds, [(attribute::HEADROOM, -5.0)]);
+    assert_eq!(adds, crate::test_ids::adds([(attribute::HEADROOM, -5.0)]));
     assert_eq!(
         u.store,
-        [
+        crate::test_ids::adds([
             (attribute::POPULATION, 2.0),
             (AttributeId::numbered(12), -2.0)
-        ]
+        ])
     );
 }
 
@@ -10284,7 +10321,7 @@ fn deaths_world() -> World {
             Player {
                 objects: villagers.into_iter().chain([foundation]).collect(),
                 relations: relation_row([0, 1]),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
         ],
@@ -11126,9 +11163,9 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         kind: BUILDING,
         build_time: 10,
         storage: vec![
-            (Some(attribute::HEADROOM), 5.0, 4),
-            (None, 0.0, 0),
-            (None, 0.0, 0),
+            (Some(attribute::HEADROOM), Amount::new(5.0), 4),
+            (None, Amount::ZERO, 0),
+            (None, Amount::ZERO, 0),
         ],
         obstruction_type: ObstructionType::TYPE_2,
         obstruction_class: ObstructionClass::UNIT,
@@ -11197,16 +11234,16 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         vec![
             Player {
                 objects: vec![torch].into(),
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
                 objects: vec![villager].into(),
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
         ],
@@ -11219,7 +11256,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         master_id(1378),
         Distance::new(4.0),
     );
-    t.players[0].attributes[4] = 5.0;
+    t.players[0].attributes[4] = Amount::new(5.0);
     t.players[0].watched.push(crate::vision::ghost::Watched {
         id: object_id(7),
         cell: crate::vision::ghost::Cell::Tile(10 * 40 + 10),
@@ -11284,7 +11321,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
     );
     assert_eq!(
         [t.players[0].attributes[4], t.players[1].attributes[4]],
-        [0.0, 5.0]
+        crate::test_ids::amounts([0.0, 5.0])
     );
     let watched = |p: PlayerId| {
         t.players[p.index()]
@@ -11353,16 +11390,16 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
         vec![
             Player {
                 objects: vec![torch].into(),
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
                 objects: vec![villager].into(),
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
         ],
@@ -11477,16 +11514,16 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
         vec![
             Player {
                 objects: vec![sheep].into(),
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
                 objects: vec![villager].into(),
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
         ],
@@ -11561,7 +11598,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
         Some(Speed::new(0.8))
     );
     assert_eq!(sheep.actions.artifact().map(|a| a.gaia), Some(false));
-    assert_eq!(t.players[1].attributes[16], 100.0);
+    assert_eq!(t.players[1].attributes[16], Amount::new(100.0));
     assert_eq!(
         t.spatial.get(object_id(9520)).map(|p| p.player),
         Some(PlayerId::new(1))
@@ -11589,31 +11626,31 @@ fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
         vec![Millis::ZERO, Millis::ZERO],
         vec![
             Player {
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
             Player {
-                attributes: vec![0.0; 300],
+                attributes: vec![Amount::ZERO; 300],
                 ..Player::default()
             },
         ],
     );
-    t.players[0].attributes[4] = 5.0;
-    t.players[0].attributes[40] = 2.0;
+    t.players[0].attributes[4] = Amount::new(5.0);
+    t.players[0].attributes[40] = Amount::new(2.0);
     let mut u = hands_unit(1, master_id(4));
     t.hand_over_attributes(0, 1, &u).unwrap();
-    assert_eq!(t.players[0].attributes[4], 5.0);
+    assert_eq!(t.players[0].attributes[4], Amount::new(5.0));
     u.own_master = hands_masters()[0].get(master_id(4)).cloned().map(Box::new);
     t.hand_over_attributes(0, 1, &u).unwrap();
     assert_eq!(
         [t.players[0].attributes[4], t.players[0].attributes[40]],
-        [4.0, 1.0]
+        crate::test_ids::amounts([4.0, 1.0])
     );
     assert_eq!(
         [t.players[1].attributes[4], t.players[1].attributes[40]],
-        [1.0, 1.0]
+        crate::test_ids::amounts([1.0, 1.0])
     );
-    assert_eq!(t.players[1].attributes[11], 0.0);
+    assert_eq!(t.players[1].attributes[11], Amount::ZERO);
 }
 
 /// `FUN_141082e80` before the kill's counts: a killed villager (class 4) counts for its owner an
@@ -11634,7 +11671,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
     let player = |kind, objects| Player {
         objects,
         kind,
-        attributes: vec![0.0; 500],
+        attributes: vec![Amount::ZERO; 500],
         ..Player::default()
     };
     let world = |attacker_kind| {
@@ -11697,7 +11734,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
         by(object_id(50), 0, class::PREY),
     )
     .unwrap();
-    assert_eq!(counts(&t), [1.0, 1.0, 0.0, 0.0]);
+    assert_eq!(counts(&t), crate::test_ids::amounts([1.0, 1.0, 0.0, 0.0]));
     // the archers of a human, a computer and the editor's phantom
     for (kind, seen) in [
         (PlayerType::HUMAN, [0.0, 0.0, 0.0, 1.0]),
@@ -11711,7 +11748,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
             by(object_id(60), 2, class::CLASS_0),
         )
         .unwrap();
-        assert_eq!(counts(&t), seen);
+        assert_eq!(counts(&t), crate::test_ids::amounts(seen));
     }
     let mut t = world(PlayerType::HUMAN);
     t.killed(
@@ -11720,7 +11757,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
         by(object_id(99), 2, class::PREDATOR),
     )
     .unwrap();
-    assert_eq!(counts(&t), [0.0, 1.0, 0.0, 1.0]);
+    assert_eq!(counts(&t), crate::test_ids::amounts([0.0, 1.0, 0.0, 1.0]));
     t.players[1].computer = true;
     assert!(
         t.killed(
@@ -11758,12 +11795,12 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
         vec![Millis::ZERO, Millis::ZERO],
         vec![
             Player {
-                attributes: vec![0.0; 500],
+                attributes: vec![Amount::ZERO; 500],
                 ..Player::default()
             },
             Player {
                 objects,
-                attributes: vec![0.0; 500],
+                attributes: vec![Amount::ZERO; 500],
                 ..Player::default()
             },
         ],
@@ -11771,7 +11808,7 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
     let master = Master {
         id: master_id(705),
         class: class::LIVESTOCK,
-        storage: vec![(Some(attribute::FARM_FOOD), 100.0, 1)],
+        storage: vec![(Some(attribute::FARM_FOOD), Amount::new(100.0), 1)],
         ..Master::default()
     };
     t.masters = vec![Masters::new([master.clone()]), Masters::new([master])];
@@ -11821,9 +11858,9 @@ fn a_killed_sheep_goes_to_gaia() {
         t.spatial.get(object_id(9520)).map(|p| p.player),
         Some(PlayerId::new(0))
     );
-    assert_eq!(t.players[1].attributes[301], 1.0);
-    assert_eq!(t.players[1].attributes[326], 1.0);
-    assert_eq!(t.players[0].attributes[16], 100.0);
+    assert_eq!(t.players[1].attributes[301], Amount::new(1.0));
+    assert_eq!(t.players[1].attributes[326], Amount::new(1.0));
+    assert_eq!(t.players[0].attributes[16], Amount::new(100.0));
 }
 
 /// The update lends its object back to its slot for a world call that may reach it
@@ -11926,7 +11963,7 @@ fn a_hit_s_kill_reaches_the_world_where_the_hit_runs() {
         file_kill(c, u, KillLeft::own(c.me, kill))?;
         Ok((gaia_s, counted, c.w.players[1].attributes[325] - before))
     });
-    assert_eq!(seen.unwrap(), (true, 1.0, 1.0));
+    assert_eq!(seen.unwrap(), (true, Amount::new(1.0), Amount::new(1.0)));
 }
 
 /// The updating unit's own kill that gives it to Gaia (a player's livestock): its slot 0x70 at
@@ -12048,7 +12085,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     };
     let player = |objects| Player {
         objects,
-        attributes: vec![0.0; 500],
+        attributes: vec![Amount::ZERO; 500],
         ..Player::default()
     };
     let mut t = World::new(
@@ -12125,13 +12162,22 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     assert_eq!(hp, [0.0, 0.0, 0.0]);
     assert_eq!(t.players[2].objects[ListIndex::new(0)].damaged_lately, 60);
     let (attacker, owner) = (&t.players[1].attributes, &t.players[2].attributes);
-    assert_eq!([attacker[20], owner[154]], [0.0, 0.0]);
+    assert_eq!(
+        [attacker[20], owner[154]],
+        crate::test_ids::amounts([0.0, 0.0])
+    );
     assert_eq!(
         [attacker[302], owner[326], attacker[402]],
-        [1.0, 1.0, 650.0]
+        crate::test_ids::amounts([1.0, 1.0, 650.0])
     );
-    assert_eq!([attacker[43], owner[155]], [1.0, 1.0]);
-    assert_eq!([attacker[170], owner[152]], [1300.0, 650.0]);
+    assert_eq!(
+        [attacker[43], owner[155]],
+        crate::test_ids::amounts([1.0, 1.0])
+    );
+    assert_eq!(
+        [attacker[170], owner[152]],
+        crate::test_ids::amounts([1300.0, 650.0])
+    );
     let event = t.players[1]
         .history
         .event_of_kind(crate::players::history::EventKind::CASTLE_DESTROYED)
@@ -12180,12 +12226,12 @@ fn a_hit_wakes_a_sleeping_object_only_below_1_hit_point() {
                 Player {
                     objects: vec![tree(object_id(51))].into(),
                     sleeping: vec![tree(object_id(50))].into(),
-                    attributes: vec![0.0; 500],
+                    attributes: vec![Amount::ZERO; 500],
                     ..Player::default()
                 },
                 Player {
                     objects: vec![tree(object_id(9))].into(),
-                    attributes: vec![0.0; 500],
+                    attributes: vec![Amount::ZERO; 500],
                     ..Player::default()
                 },
             ],
@@ -12589,7 +12635,7 @@ fn a_unit_due_to_spawn_stops_the_player() {
     t.tick_with(Millis::new(1000), &[quick]);
     // the building makes the make action in its update: one unit in production
     assert_eq!(t.players[0].unsupported, None);
-    assert_eq!(t.players[0].attributes[81], 1.0);
+    assert_eq!(t.players[0].attributes[81], Amount::new(1.0));
     t.tick(Millis::new(1000));
     assert_eq!(
         t.players[0].freezes.first().map(|f| f.2.clone()),
@@ -12748,7 +12794,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
                     Position::new(101.5, 158.5, 0.0),
                 )]
                 .into(),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
             Player {
@@ -12759,7 +12805,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
                     Position::new(102.5, 158.5, 0.0),
                 )]
                 .into(),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
         ],
@@ -12941,7 +12987,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         vec![Millis::ZERO, Millis::ZERO],
         vec![
             Player {
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
             Player {
@@ -12953,7 +12999,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                     },
                 ]
                 .into(),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
         ],
@@ -13058,7 +13104,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         vec![Millis::ZERO, Millis::ZERO],
         vec![
             Player {
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
             Player {
@@ -13078,7 +13124,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
                     foundation(object_id(34600), master_id(800), HitPoints::ZERO, None),
                 ]
                 .into(),
-                attributes: vec![0.0; 250],
+                attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             },
         ],
@@ -13394,7 +13440,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         vec![Millis::ZERO],
         vec![Player {
             objects: vec![foundation].into(),
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             ..Player::default()
         }],
     );
@@ -13865,8 +13911,8 @@ fn on_side<R>(
     groups: crate::groups::UnitGroups,
     f: impl FnOnce(&mut crate::unit_ai::world_view::UnitView<'_, '_>) -> R,
 ) -> (R, World) {
-    let mut attributes = vec![0.0; 8];
-    attributes[4] = 10.0;
+    let mut attributes = vec![Amount::ZERO; 8];
+    attributes[4] = Amount::new(10.0);
     let scout = Player {
         objects: own.into(),
         relations: relation_row([0, 0]),
@@ -14175,7 +14221,7 @@ fn attack_by(
         crate::groups::UnitGroups::default(),
         |side| {
             let attacked = side.attack(object_id(50), force, &ai).unwrap();
-            (attacked, side.c.w.players[1].attributes[4])
+            (attacked, side.c.w.players[1].attributes[4].get())
         },
     );
     let unit = t.players[1].objects[ListIndex::new(0)].clone();
@@ -14202,10 +14248,13 @@ fn a_villager_s_attack_command_switches_it_to_the_villager_first() {
         ..Master::default()
     };
     let (unit, attacked, housed, tracker) = attack_by(
-        villager(ids::BUILDER, vec![(Some(attribute::HEADROOM), 1.0, 2)]),
+        villager(
+            ids::BUILDER,
+            vec![(Some(attribute::HEADROOM), Amount::new(1.0), 2)],
+        ),
         vec![villager(
             VILLAGER_MALE,
-            vec![(Some(attribute::HEADROOM), 3.0, 2)],
+            vec![(Some(attribute::HEADROOM), Amount::new(3.0), 2)],
         )],
     );
     assert_eq!(unit.life.master_id, VILLAGER_MALE);
@@ -14839,7 +14888,7 @@ fn a_farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
         .unwrap();
     let p = &t.players[1];
-    assert_eq!(p.attributes[1], 40.0);
+    assert_eq!(p.attributes[1], Amount::new(40.0));
     assert_eq!(p.farm_queue, 0);
     let foundation = p.objects.last().unwrap();
     assert_eq!(
@@ -14866,12 +14915,12 @@ fn a_reseed_takes_a_queued_farm() {
     for (auto, wood) in [(false, 100.0), (true, 59.0)] {
         let mut t = reseed_world();
         t.players[1].auto_farm_queue = auto;
-        t.players[1].attributes[1] = wood;
+        t.players[1].attributes[1] = Amount::new(wood);
         t.players[1].farm_queue = 2;
         t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
             .unwrap();
         let p = &t.players[1];
-        assert_eq!((p.attributes[1], p.farm_queue), (wood, 1));
+        assert_eq!((p.attributes[1], p.farm_queue), (Amount::new(wood), 1));
         assert_eq!(p.objects.last().unwrap().life.master_id, ids::FARM);
     }
 }
@@ -14894,12 +14943,12 @@ fn without_a_farm_to_make_the_farmer_idles() {
     );
     let mut t = reseed_world();
     t.players[1].auto_farm_queue = true;
-    t.players[1].attributes[1] = 59.0;
+    t.players[1].attributes[1] = Amount::new(59.0);
     t.players[1].computer = true;
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
         .unwrap();
     let p = &t.players[1];
-    assert_eq!((p.objects.len(), p.attributes[1]), (1, 59.0));
+    assert_eq!((p.objects.len(), p.attributes[1]), (1, Amount::new(59.0)));
     assert_eq!(
         p.objects[ListIndex::new(0)]
             .actions
@@ -14969,7 +15018,10 @@ fn a_fishing_ship_reseeds_a_fish_trap() {
     t.players[1].fish_trap_queue = 2;
     assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
     let p = &t.players[1];
-    assert_eq!((p.attributes[1], p.fish_trap_queue), (100.0, 1));
+    assert_eq!(
+        (p.attributes[1], p.fish_trap_queue),
+        (Amount::new(100.0), 1)
+    );
     let trap = p.objects.last().unwrap();
     assert_eq!(
         (trap.life.master_id, trap.position()),
@@ -14980,7 +15032,7 @@ fn a_fishing_ship_reseeds_a_fish_trap() {
     t.players[1].auto_fishtrap_queue = true;
     assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
     let p = &t.players[1];
-    assert_eq!((p.attributes[1], p.fish_trap_queue), (40.0, 0));
+    assert_eq!((p.attributes[1], p.fish_trap_queue), (Amount::new(40.0), 0));
 }
 
 /// The farm's placement test passes over the gather's old target (the spent farm 12557 on the
@@ -15390,14 +15442,17 @@ fn a_build_of_another_player_s_builders_is_refused_and_theirs_are_left_out() {
     t.tick_with(Millis::new(50), &[build(vec![9181])]);
     let p = &t.players[1];
     assert_eq!(
-        (p.resources(), p.objects.len()),
+        (p.resources().map(Amount::get), p.objects.len()),
         ([200.0, 100.0, 200.0, 100.0], 1)
     );
     assert_eq!(t.next_object_id, object_id(10028));
     assert_eq!(p.freezes, vec![]);
     t.tick_with(Millis::new(50), &[build(vec![9181, 9175])]);
     let p = &t.players[1];
-    assert_eq!(p.resources(), [200.0, 75.0, 200.0, 100.0]);
+    assert_eq!(
+        p.resources(),
+        crate::test_ids::amounts([200.0, 75.0, 200.0, 100.0])
+    );
     assert_eq!(p.objects.last().map(|f| f.id.get()), Some(10028));
     assert_eq!(
         p.objects[ListIndex::new(0)]
@@ -15571,11 +15626,11 @@ fn a_hit_s_flare_is_made_where_the_volley_runs() {
         id: master_id(112),
         kind: master_type::ANIMATED,
         standing_sprite: -1,
-        storage: vec![(Some(AttributeId::numbered(12)), 1.0, 0)],
+        storage: vec![(Some(AttributeId::numbered(12)), Amount::new(1.0), 0)],
         ..Master::default()
     };
     t.masters[1] = Masters::new(t.masters[1].iter().cloned().chain([flare]));
-    t.players[1].attributes = vec![0.0; 300];
+    t.players[1].attributes = vec![Amount::ZERO; 300];
     let aimed = crate::combat::volley::Aimed {
         target: Some(object_id(50)),
         position: Position::new(13.0, 10.0, 0.0),
@@ -16073,7 +16128,7 @@ fn a_forager_fills_up_carries_its_berries_home_and_comes_back() {
             GatherState::Work
         ]
     );
-    assert_eq!(t.players[1].attributes[0], 10.0);
+    assert_eq!(t.players[1].attributes[0], Amount::new(10.0));
     let g = t.players[1].objects[ListIndex::new(0)]
         .actions
         .gather()
@@ -16165,7 +16220,7 @@ fn a_forager_without_its_bush_after_the_drop_takes_the_next_one() {
                 != Some(GatherState::Drop)
         };
         forage_until(&mut t, 400, dropped);
-        assert_eq!(t.players[1].attributes[0], 10.0);
+        assert_eq!(t.players[1].attributes[0], Amount::new(10.0));
         t.players[1].objects[ListIndex::new(0)]
             .actions
             .gather()
@@ -16201,7 +16256,7 @@ fn dropped_without_a_bush(setup: impl FnOnce(&mut World)) -> World {
             != Some(GatherState::Drop)
     };
     forage_until(&mut t, 400, dropped);
-    assert_eq!(t.players[1].attributes[0], 10.0);
+    assert_eq!(t.players[1].attributes[0], Amount::new(10.0));
     t
 }
 
@@ -17394,7 +17449,10 @@ fn a_builder_s_completion_reaches_the_world_within_its_update() {
             .contains(&Some(object_id(10028)))
     );
     let attributes = &t.players[1].attributes;
-    assert_eq!((attributes[98], attributes[165]), (25.0, 25.0));
+    assert_eq!(
+        (attributes[98], attributes[165]),
+        (Amount::new(25.0), Amount::new(25.0))
+    );
     let b = t.players[1].objects[ListIndex::new(0)]
         .actions
         .build()
@@ -17531,7 +17589,7 @@ fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_le
     assert_eq!(finish(&mut t), Ok((ObjectState::Removed, vec![])));
     let mut t = house_builder();
     t.players[1].history.entries.push([0, 0]);
-    t.players[1].attributes.resize(250, 0.0);
+    t.players[1].attributes.resize(250, Amount::ZERO);
     for masters in &mut t.masters {
         let castle = Master {
             id: ids::CASTLE,
@@ -17646,8 +17704,8 @@ fn a_building_heals_its_garrison_each_whole_second() {
     );
     assert_eq!(
         reason(centre_seconds(|t| {
-            t.players[1].attributes.resize(256, 0.0);
-            t.players[1].attributes[255] = 109.0;
+            t.players[1].attributes.resize(256, Amount::ZERO);
+            t.players[1].attributes[255] = Amount::new(109.0);
         })),
         "a building whose master attribute 255 names (FUN_1411c39b0)"
     );
@@ -17744,7 +17802,7 @@ pub(crate) fn repairing(at: Position) -> World {
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.moved_at = at;
     v.body.put_mover(Some(mover));
-    t.players[1].attributes[..4].copy_from_slice(&[100.0; 4]);
+    t.players[1].attributes[..4].copy_from_slice(&[Amount::new(100.0); 4]);
     t.build_mesh().unwrap();
     t
 }
@@ -17840,7 +17898,10 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
         (house.life.hp, house.repairers(), house.workers),
         (HitPoints::new(309.947_57), 1, 1)
     );
-    assert_eq!(t.players[1].resources(), [100.0; 4]);
+    assert_eq!(
+        t.players[1].resources(),
+        crate::test_ids::amounts([100.0; 4])
+    );
 }
 
 /// A repair pays from what its owner holds when it pays, within the update (`FUN_141618db0` on
@@ -17849,8 +17910,8 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
 #[test]
 fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
     let mut t = repairing(Position::new(30.0, 89.2, 0.0));
-    t.players[1].attributes.resize(300, 0.0);
-    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = 1.0;
+    t.players[1].attributes.resize(300, Amount::ZERO);
+    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = Amount::new(1.0);
     assert_eq!(
         repair_for(&mut t, 100),
         [
@@ -17865,7 +17926,7 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, c| {
-            c.w.players[1].attributes[1] = 0.0;
+            c.w.players[1].attributes[1] = Amount::ZERO;
             let me = crate::movement::Me {
                 id: unit.id,
                 group: unit.group.id,
@@ -17877,7 +17938,10 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
     )
     .unwrap();
     let house = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!((house.life.hp, t.players[1].attributes[1]), (hp, 0.0));
+    assert_eq!(
+        (house.life.hp, t.players[1].attributes[1]),
+        (hp, Amount::ZERO)
+    );
 }
 
 /// The Repair's payment, its end and another player's target ([`Unit::repair_part`]): with a
@@ -17890,8 +17954,8 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
 fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     let near = Position::new(30.0, 89.2, 0.0);
     let mut t = repairing(near);
-    t.players[1].attributes.resize(300, 0.0);
-    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = 1.0;
+    t.players[1].attributes.resize(300, Amount::ZERO);
+    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = Amount::new(1.0);
     assert_eq!(
         repair_for(&mut t, 100),
         [
@@ -17904,7 +17968,10 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         t.players[1].objects[ListIndex::new(1)].life.hp,
         HitPoints::new(302.449_4)
     );
-    assert_eq!(t.players[1].resources(), [100.0, 99.888_596, 100.0, 100.0]);
+    assert_eq!(
+        t.players[1].resources(),
+        crate::test_ids::amounts([100.0, 99.888_596, 100.0, 100.0])
+    );
     // a castle (650 stone, 4800 hit points) pays its share in stone
     let mut t = repairing(near);
     for masters in &mut t.masters {
@@ -17927,8 +17994,8 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
             ..p
         },
     );
-    t.players[1].attributes.resize(300, 0.0);
-    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = 1.0;
+    t.players[1].attributes.resize(300, Amount::ZERO);
+    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = Amount::new(1.0);
     assert_eq!(
         repair_for(&mut t, 100),
         [
@@ -17941,7 +18008,10 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         t.players[1].objects[ListIndex::new(1)].life.hp,
         HitPoints::new(3_002.440_4)
     );
-    assert_eq!(t.players[1].resources(), [100.0, 100.0, 99.668_03, 100.0]);
+    assert_eq!(
+        t.players[1].resources(),
+        crate::test_ids::amounts([100.0, 100.0, 99.668_03, 100.0])
+    );
     let mut t = repairing(near);
     let house = &mut t.players[1].objects[ListIndex::new(1)];
     (house.life.hp, house.armor_removed) = (HitPoints::new(549.0), [3, 4]);
@@ -17984,7 +18054,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         let mut house = t.players[1].objects.remove(ListIndex::new(1)).unwrap();
         (house.life.hp, house.armor_removed, house.workers) = (hp, [3, 4], 0);
         t.players[0].objects.push(house);
-        t.players[0].attributes = vec![0.0; 300];
+        t.players[0].attributes = vec![Amount::ZERO; 300];
         t.spatial.relations = vec![relation_row([0, 0]), relation_row([0, 0])];
         for p in &mut t.players {
             p.relations = relation_row([0, 0]);
@@ -18090,8 +18160,8 @@ fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
 /// 100 more.
 fn repaired_by(n: usize) -> [(f32, f32); 2] {
     let mut t = repairing(Position::new(30.0, 89.2, 0.0));
-    t.players[1].attributes.resize(300, 0.0);
-    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = 1.0;
+    t.players[1].attributes.resize(300, Amount::ZERO);
+    t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = Amount::new(1.0);
     for (k, at) in [
         Position::new(31.2, 88.0, 0.0),
         Position::new(28.8, 88.0, 0.0),
@@ -18139,7 +18209,7 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
     let seen = |t: &World| {
         (
             t.players[1].objects[ListIndex::new(1)].life.hp.get(),
-            t.players[1].attributes[1],
+            t.players[1].attributes[1].get(),
         )
     };
     (0..10).for_each(|_| update(&mut t));
@@ -18334,7 +18404,7 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
             (344, (BuildState::Place, None, None, 0.0)),
         ]
     );
-    assert_eq!(t.players[1].attributes[0], 6.0);
+    assert_eq!(t.players[1].attributes[0], Amount::new(6.0));
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].life.attribute_type,
         None
@@ -18566,14 +18636,14 @@ fn the_own_razings_count_where_the_hit_runs() {
     use crate::combat::victims::file_kill;
     let razed = |adds: &[(AttributeId, f32)]| {
         let mut t = house_builder();
-        t.players[1].attributes[98] = 10.0;
+        t.players[1].attributes[98] = Amount::new(10.0);
         let r = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 0, |u, c| {
             file_kill(c, u, own_razing(adds))?;
-            Ok(c.w.players[1].attributes[98])
+            Ok(c.w.players[1].attributes[98].get())
         });
         (
             r.map_err(|e| e.reason().to_owned()),
-            t.players[1].attributes[98],
+            t.players[1].attributes[98].get(),
         )
     };
     assert_eq!(razed(&[(attribute::TOTAL_VALUE, -5.0)]), (Ok(5.0), 5.0));
@@ -18737,12 +18807,12 @@ fn a_built_building_s_death_reaches_its_owner_within_its_update() {
             ..TechState::default()
         }];
         let owner = &mut t.players[1];
-        owner.attributes.resize(250, 0.0);
+        owner.attributes.resize(250, Amount::ZERO);
         (
             owner.attributes[134],
             owner.attributes[98],
             owner.attributes[165],
-        ) = (0.5, 1000.0, 1000.0);
+        ) = (Amount::new(0.5), Amount::new(1000.0), Amount::new(1000.0));
         t.players[1].watched.push(crate::vision::ghost::Watched {
             id: object_id(10028),
             cell: crate::vision::ghost::Cell::Tile(0),
@@ -18757,7 +18827,11 @@ fn a_built_building_s_death_reaches_its_owner_within_its_update() {
                 unit.died(c, ObjectState::Alive)?;
                 let a = &c.w.players[1].attributes;
                 let withdrawn = c.w.players[1].techs[0].state != ResearchState::Researched;
-                Ok((watches(c.w, 1, 10028), [a[134], a[98], a[165]], withdrawn))
+                Ok((
+                    watches(c.w, 1, 10028),
+                    [a[134], a[98], a[165]].map(Amount::get),
+                    withdrawn,
+                ))
             },
         )
         .map_err(|e| e.reason().to_owned())
@@ -19016,7 +19090,7 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
     let t = forage_world();
     let gifts = [Gift {
         attribute: 0,
-        amount: 10.0,
+        amount: Amount::new(10.0),
         fee: 0.0,
     }; 4];
     let game = |sub| GameCommand {

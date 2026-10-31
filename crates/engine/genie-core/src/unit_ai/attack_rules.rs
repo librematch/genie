@@ -38,7 +38,7 @@ pub struct Converter<'a> {
     /// Its faith (`+0x310`, what it holds).
     pub faith: Amount,
     /// Its owner's attributes (`player+0x100`, count `+0x90`).
-    pub attributes: &'a [f32],
+    pub attributes: &'a [Amount],
     /// Its master's tasks (`+0x788`).
     pub tasks: &'a [crate::objects::masters::Task],
 }
@@ -98,7 +98,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
         return false;
     };
     if t.owner == PlayerId::GAIA
-        || p.attributes.get(67).is_some_and(|&a| a <= 0.0)
+        || p.attributes.get(67).is_some_and(|&a| a <= Amount::ZERO)
         || t.class == class::LIVESTOCK
     {
         return false;
@@ -140,7 +140,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
     if let Some(k) = task
         && let Some(i) = k.attribute_type4
         && let Some(&a) = p.attributes.get(i.index())
-        && crate::math::fmath::at_most_or_unordered(a, 0.0)
+        && crate::math::fmath::at_most_or_unordered(a.get(), 0.0)
     {
         return false;
     }

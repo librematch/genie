@@ -21,7 +21,7 @@ fn load() -> (PlayerState, [Option<u32>; 11]) {
         match tag {
             "player" => {
                 player.id = v[0].parse().unwrap();
-                player.resources = [num(1), num(2), num(3), num(4)];
+                player.resources = [num(1), num(2), num(3), num(4)].map(Amount::new);
                 player.sleeping_count = v[5].parse().unwrap();
             }
             "object" => player.live.push(CheckpointObject {

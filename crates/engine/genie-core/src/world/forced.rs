@@ -9,6 +9,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::forget_resource;
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -172,7 +173,7 @@ impl World {
         if stopped {
             if let Some(r) = game.resources.get(p.index()) {
                 for (v, r) in player.attributes.iter_mut().zip(r) {
-                    *v = *r;
+                    *v = Amount::new(*r);
                 }
             }
             if let Some(d) = game.pending_debit.get(p.index()) {
@@ -359,7 +360,11 @@ mod tests {
         assert!(t.force_player_values(PlayerId::new(1), &game).unwrap());
         let player = &t.players[1];
         assert_eq!(
-            (player.resources(), player.pending_debit, player.techs.len()),
+            (
+                player.resources().map(Amount::get),
+                player.pending_debit,
+                player.techs.len()
+            ),
             ([1.0, 2.0, 3.0, 4.0], [5.0; 4], 2)
         );
         assert!(!player.stopped);

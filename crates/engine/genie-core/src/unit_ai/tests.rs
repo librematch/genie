@@ -348,9 +348,9 @@ impl UnitSide for HelpSide {
 #[test]
 fn a_priest_converts_by_its_faith_its_task_and_the_object() {
     let attributes = {
-        let mut a = vec![0.0f32; 100];
-        a[67] = 1.0;
-        a[28] = 0.0;
+        let mut a = vec![Amount::ZERO; 100];
+        a[67] = Amount::new(1.0);
+        a[28] = Amount::ZERO;
         a
     };
     let tasks = [

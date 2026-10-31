@@ -17,6 +17,7 @@ use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
 use crate::orders::{MoveOrder, Place, Work, ignore_unit, packs, readiness, work_reach};
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::PASTURE_WORKERS;
 use crate::unit_ai::ActionKind;
@@ -426,7 +427,7 @@ impl World {
         let room = Attributes::get(self.players.player(player)?, PASTURE_WORKERS)?;
         let workers = self.livestock_workers(on) as f32;
         // COMISS room with the workers, JBE: a NaN is full
-        if room > workers {
+        if room > Amount::new(workers) {
             let Some(pick) = self.pasture_pick(on, player, idx)? else {
                 return Ok(PastureAfter::Ends);
             };

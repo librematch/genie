@@ -19,7 +19,7 @@ use crate::unit_ai::task_finder::Diplomacy;
 /// annexes (the world's links).
 pub(crate) fn victim_in(
     u: &Unit,
-    (p, master, attributes): (PlayerId, &Master, &[f32]),
+    (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: i32,
@@ -42,17 +42,17 @@ pub(crate) fn victim_in(
 pub(crate) fn victim_of(
     u: &Unit,
     master: &Master,
-    attributes: &[f32],
+    attributes: &[Amount],
     p: PlayerId,
     terrain: Option<&crate::map::terrain::Terrain>,
     mode_680: i32,
 ) -> Victim {
-    let at = |i: usize| attributes.get(i).copied().unwrap_or(0.0);
+    let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
     let kind = master.kind;
     let attack_elevation = if 212 < attributes.len() {
         ElevationBonus {
-            higher: at(211),
-            lower: at(212),
+            higher: at(211).get(),
+            lower: at(212).get(),
         }
     } else {
         ElevationBonus::default()
@@ -81,10 +81,7 @@ pub(crate) fn victim_of(
         master_id: master.id,
         radius: master.radius,
         height: master.height,
-        storage: master
-            .storage
-            .first()
-            .map_or(Amount::ZERO, |s| Amount::new(s.1)),
+        storage: master.storage.first().map_or(Amount::ZERO, |s| s.1),
         capacity: master.capacity,
         workers: u.workers,
         blast_defense: master.blast_defense,
@@ -93,8 +90,8 @@ pub(crate) fn victim_of(
         decay: u.life.master.map_or(0.0, |m| m.decay),
         player: p,
         elevation: ElevationBonus {
-            higher: at(272),
-            lower: at(273),
+            higher: at(272).get(),
+            lower: at(273).get(),
         },
         attack_elevation,
         allied: [false; 2],

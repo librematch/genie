@@ -12,6 +12,7 @@ use crate::map::GroundOffset;
 use crate::map::Offset;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::technology::TechId;
 use crate::unit_ai::UnitAiType;
@@ -314,7 +315,7 @@ pub struct Master {
     /// The resource storage (`attribute_type_held`, `attribute_amount_held`, `attribute_flag`:
     /// `+0x60a`, `+0x610`, `+0x628`): what an object of this master adds to its player's
     /// attributes, by its flag.
-    pub storage: Vec<(Option<AttributeId>, f32, u8)>,
+    pub storage: Vec<(Option<AttributeId>, Amount, u8)>,
     /// The master has damage sprites (`+0x638`..`+0x640`): a master change checks them
     /// (`FUN_1411859a0`).
     pub damage_sprites: bool,

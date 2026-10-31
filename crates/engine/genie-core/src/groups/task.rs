@@ -14,6 +14,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
+use crate::players::Amount;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::{Actor, find_task};
 use crate::world::World;
@@ -132,7 +133,7 @@ impl World {
             master: own,
             player,
             held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         };
         let world = TaskWorld {
@@ -197,7 +198,8 @@ impl World {
                         GenieError::unreachable("a player without the attribute of a task's range")
                             .with("player", target.player)
                             .with("attribute", OWNER_RANGE_ATTRIBUTE)
-                    })?,
+                    })?
+                    .get(),
             )),
             _ => Some(task.work_range),
         };

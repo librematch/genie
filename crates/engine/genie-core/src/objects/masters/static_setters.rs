@@ -11,6 +11,7 @@ use crate::objects::masters::{
     insert_damage_graphic, low8, low16, master_type, multiply_short, resize_damage_graphics,
     select_entry, set_sprite,
 };
+use crate::players::Amount;
 
 impl Master {
     /// `FUN_141126400`, the static master's slot 0x18.
@@ -31,7 +32,7 @@ impl Master {
             a::CARRY_CAPACITY => self.capacity = low16(v),
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
-                    *amount = f32::from(low16(v));
+                    *amount = Amount::new(f32::from(low16(v)));
                 }
             }
             a::FOG_VISIBILITY => self.fog_visibility = low8(v),
@@ -172,7 +173,7 @@ impl Master {
             a::CARRY_CAPACITY => self.capacity = add_short(self.capacity, v, world.capped),
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
-                    *amount += f32::from(low16(v));
+                    *amount += Amount::new(f32::from(low16(v)));
                 }
             }
             a::OCCLUSION_MODE => self.occlusion = self.occlusion.wrapping_add(low8(v)),
@@ -290,7 +291,7 @@ impl Master {
             a::CARRY_CAPACITY => self.capacity = multiply_short(self.capacity, v, world.capped),
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
-                    *amount = f32::from(low16(v * *amount + ROUND));
+                    *amount = Amount::new(f32::from(low16(v * amount.get() + ROUND)));
                 }
             }
             a::SIZE_Z => self.height *= v,

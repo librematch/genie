@@ -16,6 +16,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Masters, player_master};
 use crate::orders::NO_QUEUE;
 use crate::orders::Place;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -109,7 +110,7 @@ impl World {
                         continue;
                     }
                     let held = crate::technology::Attributes::get(owner, attribute)?;
-                    if held < f32::from(each) * count as f32 {
+                    if held < Amount::new(f32::from(each) * count as f32) {
                         return Ok(true);
                     }
                 }
@@ -127,7 +128,7 @@ impl World {
         if self.settings.game_mode == ONE_UNIT_GAME
             // The player's attribute game mode 16's QUEUE reads (6, `+0x30`), and its bound
             // (`DAT_14330eb8c`).
-            && crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)? <= ONE_UNIT_AGE
+            && crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)? <= Amount::new(ONE_UNIT_AGE)
             && self.tracker_key(player, unit_id).military
         {
             if owner.one_military_queued {
@@ -388,7 +389,7 @@ impl World {
         let class = self.tracker_key(player, master).class;
         let masters = self.masters.get(player.index()).unwrap_or(&empty);
         let made = masters.get(master);
-        let pop = made.map_or(0.0, |m| population(&m.storage));
+        let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
         let owner = self.players.player_mut(player)?;
         owner.add_attribute(QUEUED, pop * f32::from(n))?;
         let costs = as_entry_costs(master_costs(masters, master, &*owner)?);

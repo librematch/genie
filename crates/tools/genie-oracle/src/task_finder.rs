@@ -23,7 +23,7 @@ pub struct FinderWorld {
     /// `relation[i]` of each player (`player+0x260`).
     pub relations: Vec<Vec<u8>>,
     /// Every player's attribute 95.
-    pub attribute_95: Vec<f32>,
+    pub attribute_95: Vec<Amount>,
     /// Every player's civ.
     pub civs: Vec<u8>,
     /// The drop-site table.
@@ -138,7 +138,7 @@ impl FinderWorld {
                 .attribute_95
                 .get(o.player.index())
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO),
             civ: genie_core::players::CivId::new(
                 self.civs.get(o.player.index()).copied().unwrap_or(0),
             ),
@@ -174,7 +174,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
                     .attributes
                     .get(95)
                     .copied()
-                    .unwrap_or(0.0)
+                    .map_or(Amount::ZERO, Amount::new)
             })
             .collect(),
         civs: sections

@@ -20,6 +20,7 @@ use crate::GenieError;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, TrainLocation};
+use crate::players::Amount;
 use crate::players::attribute::{self, AttributeId};
 use crate::technology::TechId;
 use genie_diff::Diff;
@@ -423,20 +424,20 @@ impl Production {
 /// The population a master's unit takes (`FUN_14163b0b0`): minus its storage of attribute 4,
 /// the population headroom, over the master's three storage entries.
 #[must_use]
-pub fn population(storage: &[(Option<AttributeId>, f32, u8)]) -> f32 {
+pub fn population(storage: &[(Option<AttributeId>, Amount, u8)]) -> Amount {
     storage
         .iter()
         // The population headroom (attribute 4), the population (11), the population cap (32), the
         // units queued (80) and the units in production (81).
         // The population (attribute 11).
         .filter(|&&(kind, _, _)| kind == Some(attribute::HEADROOM))
-        .fold(0.0, |pop, &(_, amount, _)| pop - amount)
+        .fold(Amount::ZERO, |pop, &(_, amount, _)| pop - amount)
 }
 
 /// `FUN_1411e7dc0`'s test before it makes a unit's make action: the population with the units in
 /// production and this one stays within the cap (`COMISS`, `JBE`: a NaN passes), and the
 /// headroom covers them. A building that fails it waits (housed).
-pub fn housed(attributes: &[f32], pop: f32) -> Result<bool, GenieError> {
+pub fn housed(attributes: &[Amount], pop: Amount) -> Result<bool, GenieError> {
     let a = |i: AttributeId| {
         attributes
             .get(i.index())
@@ -446,7 +447,7 @@ pub fn housed(attributes: &[f32], pop: f32) -> Result<bool, GenieError> {
     let in_production = a(attribute::IN_PRODUCTION)?;
     Ok(
         a(attribute::POPULATION_CAP)? < a(attribute::POPULATION)? + in_production + pop
-            || (a(attribute::HEADROOM)? - in_production) - pop < 0.0,
+            || (a(attribute::HEADROOM)? - in_production) - pop < Amount::ZERO,
     )
 }
 
@@ -664,29 +665,34 @@ mod tests {
     fn a_villager_takes_one_population() {
         assert_eq!(
             population(&[
-                (Some(attribute::HEADROOM), -1.0, 2),
-                (Some(attribute::POPULATION), 1.0, 2),
-                (Some(attribute::UNITS_OWNED), 1.0, 1)
+                (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
+                (Some(attribute::POPULATION), Amount::new(1.0), 2),
+                (Some(attribute::UNITS_OWNED), Amount::new(1.0), 1)
             ]),
-            1.0
+            Amount::new(1.0)
         );
-        let mut a = vec![0.0; 82];
-        (a[4], a[11], a[32], a[81]) = (6.0, 4.0, 5.0, 0.0);
-        assert!(!housed(&a, 1.0).unwrap());
-        a[81] = 1.0;
-        assert!(housed(&a, 1.0).unwrap());
-        a[32] = f32::NAN;
-        a[4] = 10.0;
-        assert!(!housed(&a, 1.0).unwrap());
+        let mut a = vec![Amount::ZERO; 82];
+        (a[4], a[11], a[32], a[81]) = (
+            Amount::new(6.0),
+            Amount::new(4.0),
+            Amount::new(5.0),
+            Amount::ZERO,
+        );
+        assert!(!housed(&a, Amount::new(1.0)).unwrap());
+        a[81] = Amount::new(1.0);
+        assert!(housed(&a, Amount::new(1.0)).unwrap());
+        a[32] = Amount::new(f32::NAN);
+        a[4] = Amount::new(10.0);
+        assert!(!housed(&a, Amount::new(1.0)).unwrap());
     }
 
-    struct Held(Vec<f32>);
+    struct Held(Vec<Amount>);
 
     impl crate::technology::Attributes for Held {
-        fn get(&self, i: AttributeId) -> Result<f32, GenieError> {
+        fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
             Ok(self.0[i.index()])
         }
-        fn set(&mut self, i: AttributeId, v: f32) -> Result<(), GenieError> {
+        fn set(&mut self, i: AttributeId, v: Amount) -> Result<(), GenieError> {
             self.0[i.index()] = v;
             Ok(())
         }
@@ -726,29 +732,41 @@ mod tests {
             ..TechState::default()
         };
         let refunded = |state: &mut TechState, tech, modifier| {
-            let mut held = Held(vec![0.0; 90]);
+            let mut held = Held(vec![Amount::ZERO; 90]);
             held.0[attribute::RESEARCH_COST_MODIFIER.index()] = modifier;
             let r = refund_tech(state, &def, tech, &mut held);
             (r, held.0[0], held.0[1])
         };
         let mut s = state(ResearchState::Researching);
-        assert_eq!(refunded(&mut s, tech_id(22), 0.0), (Ok(true), 90.0, 0.0));
+        assert_eq!(
+            refunded(&mut s, tech_id(22), Amount::ZERO),
+            (Ok(true), Amount::new(90.0), Amount::ZERO)
+        );
         assert_eq!((s.state, s.research_done), (ResearchState::Available, 0.0));
         let mut s = state(ResearchState::Queued);
-        assert_eq!(refunded(&mut s, tech_id(22), 0.75), (Ok(true), 67.0, 0.0));
+        assert_eq!(
+            refunded(&mut s, tech_id(22), Amount::new(0.75)),
+            (Ok(true), Amount::new(67.0), Amount::ZERO)
+        );
         let mut s = state(ResearchState::Queued);
-        assert_eq!(refunded(&mut s, tech_id(101), 0.75), (Ok(true), 90.0, 0.0));
+        assert_eq!(
+            refunded(&mut s, tech_id(101), Amount::new(0.75)),
+            (Ok(true), Amount::new(90.0), Amount::ZERO)
+        );
         // the scaled amount wraps at 16 bits: 40000 is -25536
         let mut s = TechState {
             cost_adj: [19_900, 0, 0],
             ..state(ResearchState::Researching)
         };
         assert_eq!(
-            refunded(&mut s, tech_id(22), 2.0),
-            (Ok(true), -25_536.0, 0.0)
+            refunded(&mut s, tech_id(22), Amount::new(2.0)),
+            (Ok(true), Amount::new(-25_536.0), Amount::ZERO)
         );
         let mut s = state(ResearchState::Researched);
-        assert_eq!(refunded(&mut s, tech_id(22), 0.0), (Ok(false), 0.0, 0.0));
+        assert_eq!(
+            refunded(&mut s, tech_id(22), Amount::ZERO),
+            (Ok(false), Amount::ZERO, Amount::ZERO)
+        );
         assert_eq!((s.state, s.research_done), (ResearchState::Researched, 7.5));
     }
 
@@ -766,7 +784,7 @@ mod tests {
             ]),
             ..Master::default()
         };
-        let mut held = Held(vec![1.0; 5]);
+        let mut held = Held(vec![Amount::new(1.0); 5]);
         refund(
             &m,
             &[
@@ -777,7 +795,7 @@ mod tests {
             &mut held,
         )
         .unwrap();
-        assert_eq!(held.0, [46.0, 1.0, 1.0, 1.0, 1.0]);
+        assert_eq!(held.0, crate::test_ids::amounts([46.0, 1.0, 1.0, 1.0, 1.0]));
         let low = Master {
             kind: master_type::MISSILE,
             ..m.clone()
@@ -788,7 +806,7 @@ mod tests {
             &mut held,
         )
         .unwrap();
-        assert_eq!(held.0[0], 46.0);
+        assert_eq!(held.0[0], Amount::new(46.0));
         refund_research(
             &[
                 (Some(attribute::GOLD), 50.0),
@@ -799,9 +817,15 @@ mod tests {
             &mut held,
         )
         .unwrap();
-        assert_eq!((held.0[3], held.0[0]), (151.0, 47.5));
+        assert_eq!(
+            (held.0[3], held.0[0]),
+            (Amount::new(151.0), Amount::new(47.5))
+        );
         refund_master(&m, 1, &mut held).unwrap();
-        assert_eq!((held.0[0], held.0[3], held.0[4]), (107.5, 171.0, 1.0));
+        assert_eq!(
+            (held.0[0], held.0[3], held.0[4]),
+            (Amount::new(107.5), Amount::new(171.0), Amount::new(1.0))
+        );
     }
 
     fn villager(cost: &[(AttributeId, i16, bool)]) -> Master {
@@ -815,8 +839,13 @@ mod tests {
 
     /// 100 food, headroom 5, population 4, cap 10, nothing queued.
     fn held() -> Held {
-        let mut a = vec![0.0; 82];
-        (a[0], a[4], a[11], a[32]) = (100.0, 5.0, 4.0, 10.0);
+        let mut a = vec![Amount::ZERO; 82];
+        (a[0], a[4], a[11], a[32]) = (
+            Amount::new(100.0),
+            Amount::new(5.0),
+            Amount::new(4.0),
+            Amount::new(10.0),
+        );
         Held(a)
     }
 
@@ -855,14 +884,14 @@ mod tests {
         assert!(cost_test(&ms, ids::VILLAGER_MALE, 2.0, true, &h).unwrap());
         assert!(!cost_test(&ms, ids::VILLAGER_MALE, 3.0, true, &h).unwrap());
         // 4 queued: 4 + 4 + 1 is the headroom's 9; one more queued is not
-        h.0[80] = 4.0;
+        h.0[80] = Amount::new(4.0);
         assert!(cost_test(&ms, ids::VILLAGER_MALE, 1.0, true, &h).unwrap());
-        h.0[80] = 5.0;
+        h.0[80] = Amount::new(5.0);
         assert!(!cost_test(&ms, ids::VILLAGER_MALE, 1.0, true, &h).unwrap());
         assert!(cost_test(&ms, ids::VILLAGER_MALE, 1.0, false, &h).unwrap());
         // a population at the cap
         let mut h = held();
-        h.0[32] = 4.0;
+        h.0[32] = Amount::new(4.0);
         assert!(!cost_test(&ms, ids::VILLAGER_MALE, 1.0, true, &h).unwrap());
         // a NaN need passes, a master the player lacks or below type 70 fails
         assert!(cost_test(&ms, ids::VILLAGER_MALE, f32::NAN, false, &h).unwrap());
@@ -883,11 +912,14 @@ mod tests {
             (attribute::WOOD, 7, true),
         ])]);
         let mut h = held();
-        h.0[1] = 30.0;
+        h.0[1] = Amount::new(30.0);
         assert!(pay(&ms, ids::VILLAGER_MALE, 2.0, &mut h).unwrap());
-        assert_eq!((h.0[0], h.0[1], h.0[4]), (0.0, 16.0, 5.0));
+        assert_eq!(
+            (h.0[0], h.0[1], h.0[4]),
+            (Amount::ZERO, Amount::new(16.0), Amount::new(5.0))
+        );
         assert!(!pay(&ms, ids::VILLAGER_MALE, 1.0, &mut h).unwrap());
-        assert_eq!(h.0[0], 0.0);
+        assert_eq!(h.0[0], Amount::ZERO);
     }
 
     /// An annex (master 2, head 3 whose stack unit is 4) is tested by its stack unit's paid
@@ -924,7 +956,7 @@ mod tests {
             ),
         ]);
         let mut h = held();
-        (h.0[0], h.0[1], h.0[2]) = (20.0, 100.0, 5.5);
+        (h.0[0], h.0[1], h.0[2]) = (Amount::new(20.0), Amount::new(100.0), Amount::new(5.5));
         assert_eq!(
             costed(&ms, ms.get(master_id(2)).unwrap()).0.id,
             master_id(4)
@@ -952,7 +984,7 @@ mod tests {
             building(3, -1, 4, &[]),
             building(4, -1, -1, &[(attribute::WOOD, 10, true)]),
         ]);
-        (h.0[3], h.0[0]) = (20.0, 10.0);
+        (h.0[3], h.0[0]) = (Amount::new(20.0), Amount::new(10.0));
         assert_eq!(
             master_costs(&ms, master_id(2), &h).unwrap(),
             [

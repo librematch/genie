@@ -9,6 +9,7 @@ use crate::GenieError;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::KING;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
 use crate::players::tracker::ListKey;
@@ -56,8 +57,12 @@ impl World {
     /// slot 0x1c0 with master 697, [`World::remains`]); the sound and the minimap's mark
     /// (`FUN_140c7d6c0`, the game's `+0xa78`) are the interface's, as the local player's message.
     pub(crate) fn treason(&mut self, p: PlayerId) -> Result<(), GenieError> {
-        let discount = self.players.player(p)?.attribute(DISCOUNT).unwrap_or(0.0);
-        let cost = if 0.0 < discount {
+        let discount = self
+            .players
+            .player(p)?
+            .attribute(DISCOUNT)
+            .unwrap_or(Amount::ZERO);
+        let cost = if Amount::ZERO < discount {
             TREASON_DISCOUNT_COST
         } else {
             TREASON_COST
@@ -67,14 +72,14 @@ impl World {
             .player(p)?
             .attributes
             .checked(attribute::GOLD.index())?;
-        if cost > gold || !self.settings.regicide() {
+        if cost > gold.get() || !self.settings.regicide() {
             return Ok(());
         }
         *self
             .players
             .player_mut(p)?
             .attributes
-            .checked_mut(attribute::GOLD.index())? = gold - cost;
+            .checked_mut(attribute::GOLD.index())? = gold - Amount::new(cost);
         let n = self.players.len();
         for i in PlayerId::each(n).skip(1) {
             if crate::unit_ai::task_finder::allied(&self.players.player(p)?.relations, p, i, false)
@@ -126,7 +131,7 @@ mod tests {
     /// Gaia and three players; player 1 holds 500 gold and is allied with 3.
     fn world() -> World {
         let player = |p: usize| Player {
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             relations: crate::players::relation_row(
                 (0..4).map(|q| u8::from(!(q == p || (p, q) == (1, 3) || (p, q) == (3, 1))) * 3),
             ),
@@ -139,7 +144,7 @@ mod tests {
             vec![Millis::ZERO; 4],
             (0..4).map(player).collect(),
         );
-        t.players[1].attributes[attribute::GOLD.index()] = 500.0;
+        t.players[1].attributes[attribute::GOLD.index()] = Amount::new(500.0);
         t
     }
 
@@ -148,14 +153,23 @@ mod tests {
     fn treason_needs_the_regicide_rule_and_the_gold() {
         let mut t = world();
         t.treason(PlayerId::new(1)).unwrap();
-        assert_eq!(t.players[1].attributes[attribute::GOLD.index()], 500.0);
+        assert_eq!(
+            t.players[1].attributes[attribute::GOLD.index()],
+            Amount::new(500.0)
+        );
         t.settings.game_mode = 1;
-        t.players[1].attributes[attribute::GOLD.index()] = 399.0;
+        t.players[1].attributes[attribute::GOLD.index()] = Amount::new(399.0);
         t.treason(PlayerId::new(1)).unwrap();
-        assert_eq!(t.players[1].attributes[attribute::GOLD.index()], 399.0);
-        t.players[1].attributes[DISCOUNT.index()] = 1.0;
+        assert_eq!(
+            t.players[1].attributes[attribute::GOLD.index()],
+            Amount::new(399.0)
+        );
+        t.players[1].attributes[DISCOUNT.index()] = Amount::new(1.0);
         t.treason(PlayerId::new(1)).unwrap();
-        assert_eq!(t.players[1].attributes[attribute::GOLD.index()], 199.0);
+        assert_eq!(
+            t.players[1].attributes[attribute::GOLD.index()],
+            Amount::new(199.0)
+        );
     }
 
     /// The treason pays 400 gold; without a king anywhere it flares nothing.
@@ -165,7 +179,10 @@ mod tests {
         t.settings.game_mode = 1;
         let before = t.players[3].objects.len();
         t.treason(PlayerId::new(1)).unwrap();
-        assert_eq!(t.players[1].attributes[attribute::GOLD.index()], 100.0);
+        assert_eq!(
+            t.players[1].attributes[attribute::GOLD.index()],
+            Amount::new(100.0)
+        );
         assert_eq!(t.players[3].objects.len(), before);
     }
 

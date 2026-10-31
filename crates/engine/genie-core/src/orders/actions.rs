@@ -344,9 +344,9 @@ pub(crate) struct SwitchWorld<'a> {
 /// storage coming in.
 #[derive(Debug, Default)]
 pub(crate) struct Switched {
-    pub(crate) leaving: Vec<(AttributeId, f32)>,
+    pub(crate) leaving: Vec<(AttributeId, Amount)>,
     pub(crate) promoted: bool,
-    pub(crate) coming: Vec<(AttributeId, f32)>,
+    pub(crate) coming: Vec<(AttributeId, Amount)>,
 }
 
 /// Slot 0x90's unit part (`FUN_141225b70` with 0) of a master change from `old` to `next`, its

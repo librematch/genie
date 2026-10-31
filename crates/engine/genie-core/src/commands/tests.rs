@@ -11,6 +11,7 @@ use crate::commands::{
     UnitOrderAction, UnitOrderCommand, UnloadCommand, UnmodelledCommand, Waypoints,
 };
 use crate::map::Point;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -38,7 +39,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
     let ids = vec![7];
     let gift = crate::players::tribute::Gift {
         attribute: 0,
-        amount: 0.0,
+        amount: Amount::ZERO,
         fee: 0.0,
     };
     vec![

@@ -6,6 +6,7 @@ use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::{
     AttributeWorld, DamageGraphic, Master, TrainLocation, attribute, master_type,
 };
+use crate::players::Amount;
 
 impl Master {
     /// Slot 0x18 (`set`): attribute `attribute` of this master takes `v`, by its type's setter
@@ -145,7 +146,7 @@ impl Master {
     }
 
     /// The resource storage `attribute` (21, 26, 27) names: the first, second or third entry.
-    pub(super) fn storage_mut(&mut self, attribute: MasterAttribute) -> Option<&mut f32> {
+    pub(super) fn storage_mut(&mut self, attribute: MasterAttribute) -> Option<&mut Amount> {
         let i = match attribute {
             attribute::STORAGE_1 => 0,
             attribute::STORAGE_2 => 1,

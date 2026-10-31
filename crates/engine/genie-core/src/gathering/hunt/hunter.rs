@@ -14,6 +14,7 @@ use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, second_target_checked};
+use crate::players::Amount;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
@@ -188,7 +189,7 @@ impl Unit {
                         .attributes
                         .get(95)
                         .copied()
-                        .unwrap_or(0.0),
+                        .unwrap_or(Amount::ZERO),
                     civ: c.w.players.player(c.player)?.civ,
                 };
                 Some(crate::gathering::hunt::DropOff {
@@ -223,7 +224,7 @@ impl Unit {
                 // gathered total (166 to 168; gold's 49 and 169); the statistics (slot 0xb8) and
                 // the local player's tracker (FUN_14097daf0) are not held; a sharing player's
                 // allies' share (+0x1426) is not modelled
-                c.give_load(kind, amount.get())?;
+                c.give_load(kind, amount)?;
                 return self.hunt_after_drop(c);
             }
             crate::gathering::hunt::Dropped::Again => {

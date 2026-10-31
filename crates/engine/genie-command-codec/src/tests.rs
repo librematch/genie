@@ -16,6 +16,7 @@ use genie_core::map::Point;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
 use genie_core::orders::{Interact, MoveOrder};
+use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::tribute::Gift;
 use genie_core::unit_ai::UnitStance;
@@ -931,10 +932,10 @@ fn a_tribute_keeps_its_four_gifts() {
             player: player_id(1),
             to: player_id(2),
             gifts: [
-                gift(3, 100.0, 30.0),
-                gift(0, 0.0, 0.0),
-                gift(0, 0.0, 0.0),
-                gift(1, 50.0, 15.0),
+                gift(3, Amount::new(100.0), 30.0),
+                gift(0, Amount::ZERO, 0.0),
+                gift(0, Amount::ZERO, 0.0),
+                gift(1, Amount::new(50.0), 15.0),
             ],
         })
     );

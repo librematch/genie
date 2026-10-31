@@ -8,6 +8,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::players::Amount;
 use std::collections::BTreeMap;
 
 use crate::GenieError;
@@ -159,7 +160,7 @@ impl Unit {
                 .attributes
                 .get(95)
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO),
             civ: c.w.players.player(c.player)?.civ,
         };
         Ok(state_of(site, others).map(|state| {

@@ -243,7 +243,7 @@ impl World {
                 if paid {
                     self.players
                         .player_mut(owner)?
-                        .add_attribute(resource, f32::from(amount) * share)?;
+                        .add_attribute(resource, Amount::new(f32::from(amount) * share))?;
                 }
             }
         }
@@ -551,7 +551,7 @@ impl World {
         if let Some(kind) = death.building.count {
             self.players
                 .player_mut(owner)?
-                .take_at_least_zero(kind, 1.0)?;
+                .take_at_least_zero(kind, Amount::new(1.0))?;
         }
         if let Some((m, tech)) = death.building.tech {
             self.withdraw_tech(owner, m, tech)?;
@@ -647,7 +647,7 @@ mod tests {
                         },
                     ]
                     .into(),
-                    attributes: vec![0.0; 10],
+                    attributes: vec![Amount::ZERO; 10],
                     ..Player::default()
                 },
                 Player {
@@ -733,7 +733,7 @@ mod tests {
         let house = &t.players[1].objects[ListIndex::new(1)].life;
         assert_eq!(
             (t.players[1].attributes[1], house.hp, house.state),
-            (25.0, HitPoints::ZERO, ObjectState::Removed)
+            (Amount::new(25.0), HitPoints::ZERO, ObjectState::Removed)
         );
         // 10 of its 25 seconds of work done: 15/25 of the wood (in f32: 15.000001); it dies in
         // its own update
@@ -743,7 +743,11 @@ mod tests {
         let share = (25.0_f32 - 10.0) / 25.0;
         assert_eq!(
             (t.players[1].attributes[1], house.hp, house.state),
-            (25.0 * share, HitPoints::ZERO, ObjectState::Foundation)
+            (
+                Amount::new(25.0 * share),
+                HitPoints::ZERO,
+                ObjectState::Foundation
+            )
         );
     }
 
@@ -767,7 +771,7 @@ mod tests {
         let tc = &t.players[1].objects[ListIndex::new(1)].life;
         assert_eq!(
             (t.players[1].attributes[1], tc.hp, tc.state),
-            (25.0, HitPoints::ZERO, ObjectState::Removed)
+            (Amount::new(25.0), HitPoints::ZERO, ObjectState::Removed)
         );
         let mut t = game(0.0, true);
         town_centre(&mut t);
@@ -867,7 +871,7 @@ mod clearing_tests {
                 class: class::CLASS_11,
                 radius: Footprint::new(0.2, 0.2),
                 buildable_on: 1,
-                storage: vec![(Some(attribute::RELICS_HELD), 1.0, 32)],
+                storage: vec![(Some(attribute::RELICS_HELD), Amount::new(1.0), 32)],
                 ..Master::default()
             },
             Master {
@@ -913,12 +917,12 @@ mod clearing_tests {
                 Player {
                     objects: gaia.into(),
                     sleeping: asleep.into(),
-                    attributes: vec![0.0; 200],
+                    attributes: vec![Amount::ZERO; 200],
                     ..Player::default()
                 },
                 Player {
                     objects: own.into(),
-                    attributes: vec![0.0; 200],
+                    attributes: vec![Amount::ZERO; 200],
                     ..Player::default()
                 },
             ],
@@ -994,7 +998,7 @@ mod clearing_tests {
         corpse.life.state = ObjectState::Dead;
         corpse.life.class = Class::Animated;
         let mut t = world(vec![], vec![], vec![corpse]);
-        t.players[1].attributes[7] = 3.0;
+        t.players[1].attributes[7] = Amount::new(3.0);
         t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), false)
             .unwrap();
         let u = &t.players[1].objects[ListIndex::new(0)];
@@ -1002,7 +1006,7 @@ mod clearing_tests {
             (u.life.state, u.life.hp),
             (ObjectState::Removed, HitPoints::ZERO)
         );
-        assert_eq!(t.players[1].attributes[7], 2.0);
+        assert_eq!(t.players[1].attributes[7], Amount::new(2.0));
     }
 
     /// A pile (type 70) a new object's clearing (`param_6`) destroys: its action list goes
@@ -1011,7 +1015,7 @@ mod clearing_tests {
     #[test]
     fn a_cleared_pile_loses_its_record_in_its_destroy() {
         let mut t = world(vec![object(40, master_id(254), 10.5, 10.5)], vec![], vec![]);
-        t.players[0].attributes[98] = 5.0;
+        t.players[0].attributes[98] = Amount::new(5.0);
         assert!(t.spatial.get(object_id(40)).unwrap().obstruction.is_some());
         t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), true)
             .unwrap();
@@ -1022,7 +1026,7 @@ mod clearing_tests {
         );
         let p = t.spatial.get(object_id(40)).unwrap();
         assert_eq!((p.obstruction, p.tall), (None, false));
-        assert_eq!(t.players[0].attributes[98], 5.0);
+        assert_eq!(t.players[0].attributes[98], Amount::new(5.0));
     }
 
     /// A dead farm (`FARM_D`, a building of type 80) a new farm's constructor clears: the
@@ -1057,14 +1061,19 @@ mod clearing_tests {
         );
         for m in [1351, 1358] {
             t.masters[0].get_mut(master_id(m)).unwrap().storage = vec![
-                (Some(attribute::HEADROOM), 2.0, 2),
-                (Some(AttributeId::numbered(5)), 3.0, 16),
-                (Some(attribute::RELICS_HELD), 1.0, 32),
-                (None, 9.0, 2),
+                (Some(attribute::HEADROOM), Amount::new(2.0), 2),
+                (Some(AttributeId::numbered(5)), Amount::new(3.0), 16),
+                (Some(attribute::RELICS_HELD), Amount::new(1.0), 32),
+                (None, Amount::new(9.0), 2),
             ];
         }
         let at = |t: &World| [4, 5, 7].map(|i| t.players[0].attributes[i]);
-        t.players[0].attributes[4..8].copy_from_slice(&[10.0, 10.0, 10.0, 10.0]);
+        t.players[0].attributes[4..8].copy_from_slice(&[
+            Amount::new(10.0),
+            Amount::new(10.0),
+            Amount::new(10.0),
+            Amount::new(10.0),
+        ]);
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
         // the same state, then a lower one: nothing
         t.set_state(PlayerId::new(0), object_id(1), ObjectState::Alive)
@@ -1076,15 +1085,15 @@ mod clearing_tests {
             t.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Dead
         );
-        assert_eq!(at(&t), [10.0; 3]);
+        assert_eq!(at(&t), crate::test_ids::amounts([10.0; 3]));
         // from 2 to 5: flags 2 and 16 leave, flag 32 stays; then to 7, flag 32 leaves
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
         t.set_state(PlayerId::new(0), object_id(1), ObjectState::Dead)
             .unwrap();
-        assert_eq!(at(&t), [8.0, 7.0, 10.0]);
+        assert_eq!(at(&t), crate::test_ids::amounts([8.0, 7.0, 10.0]));
         t.set_state(PlayerId::new(0), object_id(1), ObjectState::Removed)
             .unwrap();
-        assert_eq!(at(&t), [8.0, 7.0, 9.0]);
+        assert_eq!(at(&t), crate::test_ids::amounts([8.0, 7.0, 9.0]));
         assert_eq!(
             t.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Removed
@@ -1122,10 +1131,10 @@ mod clearing_tests {
         };
         assert_eq!(
             crate::objects::lifecycle::death_parts::refund_of(&unit, None),
-            [
+            crate::test_ids::adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::UNITS_VALUE, 70.0)
-            ]
+            ])
         );
         let house = Master {
             id: ids::HOUSE,
@@ -1134,10 +1143,10 @@ mod clearing_tests {
         };
         assert_eq!(
             crate::objects::lifecycle::death_parts::refund_of(&house, None),
-            [
+            crate::test_ids::adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::BUILDINGS_VALUE, 70.0)
-            ]
+            ])
         );
         assert_eq!(
             crate::objects::lifecycle::death_parts::refund_of(&house, Some(object_id(9))),
@@ -1149,7 +1158,7 @@ mod clearing_tests {
         };
         assert_eq!(
             crate::objects::lifecycle::death_parts::refund_of(&castle, None),
-            [(attribute::TOTAL_VALUE, 70.0)]
+            crate::test_ids::adds([(attribute::TOTAL_VALUE, 70.0)])
         );
     }
 }

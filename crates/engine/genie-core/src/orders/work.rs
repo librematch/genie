@@ -131,7 +131,7 @@ impl World {
             master: unit.master(&self.masters, player)?,
             player,
             held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         })
     }
@@ -291,7 +291,7 @@ impl World {
             master: unit.master(&self.masters, player)?,
             player,
             held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         };
         let world = TaskWorld {
@@ -623,7 +623,7 @@ impl World {
             master: own,
             player,
             held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         };
         let world = TaskWorld {

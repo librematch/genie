@@ -149,8 +149,9 @@ impl Unit {
             productivity: (task.productivity)
                 .and_then(|i| attributes.get(i.index()))
                 .copied()
-                .filter(|&v| 0.0 < v)
-                .unwrap_or(1.0),
+                .filter(|&v| Amount::ZERO < v)
+                .unwrap_or(Amount::new(1.0))
+                .get(),
             sprites: HuntSprites {
                 moving: g(task.sprites[0]),
                 working: g(task.sprites[2]),
@@ -173,7 +174,8 @@ impl Unit {
             food_sold: attributes
                 .get(crate::gathering::gather::FARM_FOOD_SOLD)
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO)
+                .get(),
         })
     }
 
@@ -239,7 +241,7 @@ impl Unit {
                 .attributes
                 .get(95)
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO),
             civ: c.w.players.player(c.player)?.civ,
         };
         Ok(Some(crate::gathering::hunt::DropOff {
@@ -260,7 +262,7 @@ impl Unit {
         (kind, amount): (AttributeId, Amount),
         radius: Footprint,
     ) -> Result<HeadCode, GenieError> {
-        c.give_load(kind, amount.get())?;
+        c.give_load(kind, amount)?;
         let gather = self.actions.gather().ok_or(NO_GATHER)?;
         if gather.target.is_none() {
             return self.gather_after_drop(c);
@@ -410,9 +412,9 @@ impl Unit {
 pub(crate) fn give_load(
     (relations, sharing): (&[Vec<crate::players::Relation>], bool),
     player: PlayerId,
-    adds: &mut Vec<(AttributeId, f32)>,
+    adds: &mut Vec<(AttributeId, Amount)>,
     kind: AttributeId,
-    amount: f32,
+    amount: Amount,
 ) -> Result<(), GenieError> {
     let own = relations.get(player.index()).map_or(&[][..], |r| &r[..]);
     let allied = PlayerId::each(own.len())

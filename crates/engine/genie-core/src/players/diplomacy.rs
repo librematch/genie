@@ -383,7 +383,7 @@ impl World {
         let reveals = self.players.iter().any(|q| {
             q.attributes
                 .get(REVEAL_UNIT)
-                .is_some_and(|&v| cvttss2si(v) != 0)
+                .is_some_and(|&v| cvttss2si(v.get()) != 0)
         });
         if reveals {
             return Err(REVEAL_UNITS);
@@ -398,6 +398,7 @@ const NO_POINT: f32 = crate::math::image::diplomacy::NO_POINT;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::players::Amount;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -405,7 +406,7 @@ mod tests {
     /// Gaia and three players, all enemies, with the walk's and the queries' copies.
     fn world() -> World {
         let player = |p: usize| Player {
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             relations: crate::players::relation_row((0..4).map(|q| if q == p { 0 } else { 3 })),
             diplomacy: vec![Stance::NONE; 9],
             ..Player::default()
@@ -549,9 +550,9 @@ mod tests {
     fn a_player_s_attribute_204_reveals_its_units() {
         let mut t = world();
         assert_eq!(t.reveal_units(), Ok(()));
-        t.players[2].attributes[REVEAL_UNIT] = 0.5;
+        t.players[2].attributes[REVEAL_UNIT] = Amount::new(0.5);
         assert_eq!(t.reveal_units(), Ok(()));
-        t.players[2].attributes[REVEAL_UNIT] = -1.0;
+        t.players[2].attributes[REVEAL_UNIT] = Amount::new(-1.0);
         assert_eq!(t.reveal_units(), Err(REVEAL_UNITS));
         assert_eq!(t.set_diplomacy(PlayerId::new(1), 2, 0), Err(REVEAL_UNITS));
     }

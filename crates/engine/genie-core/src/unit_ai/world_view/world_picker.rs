@@ -12,6 +12,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::objects::masters::{Masters, player_master};
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::world_view::Foreign;
@@ -60,7 +61,7 @@ pub(crate) struct WorldPicker<'a> {
     /// The unit itself.
     pub(crate) unit: &'a Unit,
     /// Its owner's attributes, diplomacy and AI settings.
-    pub(crate) attributes: &'a [f32],
+    pub(crate) attributes: &'a [Amount],
     /// Its owner's diplomacy (`player+0x260`).
     pub(crate) relations: &'a [crate::players::Relation],
     /// Its owner's AI settings.
@@ -75,7 +76,7 @@ pub(crate) struct WorldPicker<'a> {
 type Held<'a> = (
     PlayerId,
     &'a Unit,
-    &'a [f32],
+    &'a [Amount],
     &'a crate::objects::masters::Master,
 );
 

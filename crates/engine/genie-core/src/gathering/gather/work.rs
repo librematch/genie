@@ -144,7 +144,7 @@ impl GatherAction {
             && unit.life.attribute_type == Some(attribute::FARM_FOOD)
         {
             let sold = std::mem::take(&mut unit.life.amount);
-            c.give_load(attribute::FOOD, sold.get())?;
+            c.give_load(attribute::FOOD, sold)?;
             return Ok(Next::Stay);
         }
         let empty = target.amount <= Amount::ZERO && !REGATHERED.contains(&target.master_id);

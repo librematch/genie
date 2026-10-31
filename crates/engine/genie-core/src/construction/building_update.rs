@@ -21,6 +21,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, annexes_of};
+use crate::players::Amount;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
@@ -249,7 +250,7 @@ impl Unit {
             .player(c.player)?
             .attributes
             .get(BUILDING_TERRAIN)
-            == Some(&f32::from(master.id.get()))
+            == Some(&Amount::new(f32::from(master.id.get())))
         {
             return Err(GenieError::unsupported(
                 "a building whose master attribute 255 names (FUN_1411c39b0)",

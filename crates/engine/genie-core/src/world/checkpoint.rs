@@ -64,7 +64,7 @@ pub struct PlayerState {
     /// The player's id.
     pub id: u32,
     /// Food, wood, stone and gold.
-    pub resources: [f32; 4],
+    pub resources: [Amount; 4],
     /// How many objects sleep.
     pub sleeping_count: u32,
     /// The live objects, in their list's order.
@@ -79,7 +79,7 @@ pub fn player_block(player: &PlayerState) -> [u32; 11] {
     w[1] = player
         .resources
         .iter()
-        .fold(0u32, |acc, r| acc.wrapping_add(cvttss2si(*r) as u32));
+        .fold(0u32, |acc, r| acc.wrapping_add(cvttss2si(r.get()) as u32));
     for o in &player.live {
         w[2] = w[2].wrapping_add(i32::from(o.main_id) as u32);
         w[3] = w[3].wrapping_add(u32::from(o.state.get()));
@@ -133,7 +133,12 @@ mod tests {
     fn empty_player_carries_sleeping_count_resources_and_id() {
         let p = PlayerState {
             id: 7,
-            resources: [200.0, 200.0, 200.0, 100.0],
+            resources: [
+                Amount::new(200.0),
+                Amount::new(200.0),
+                Amount::new(200.0),
+                Amount::new(100.0),
+            ],
             sleeping_count: 5,
             live: vec![],
         };
@@ -143,7 +148,7 @@ mod tests {
     #[test]
     fn resources_are_truncated_one_by_one() {
         let p = PlayerState {
-            resources: [1.9; 4],
+            resources: [Amount::new(1.9); 4],
             ..PlayerState::default()
         };
         assert_eq!(player_block(&p)[1], 4);

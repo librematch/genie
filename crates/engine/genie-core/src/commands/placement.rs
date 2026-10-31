@@ -10,6 +10,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::player_master;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
 use crate::world::{RICE_FARM, World};
@@ -211,8 +212,8 @@ impl World {
                     "a BUILD whose cost lists the population",
                 ));
             }
-            let held = owner.attributes.get(r).copied().unwrap_or(0.0);
-            if held < f32::from(amount) {
+            let held = owner.attributes.get(r).copied().unwrap_or(Amount::ZERO);
+            if held < Amount::new(f32::from(amount)) {
                 return Ok(false);
             }
         }

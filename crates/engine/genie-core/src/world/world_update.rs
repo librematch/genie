@@ -7,6 +7,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::capture::Captured;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::Millis;
 use crate::world::World;
@@ -108,7 +109,7 @@ impl World {
     pub(crate) fn attribute_204(&self) -> bool {
         self.players
             .iter()
-            .any(|q| q.attributes.get(204).is_some_and(|&v| v != 0.0))
+            .any(|q| q.attributes.get(204).is_some_and(|&v| v != Amount::ZERO))
     }
 }
 

@@ -16,6 +16,7 @@ use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Task;
+use crate::players::Amount;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::owner_view;
@@ -116,7 +117,7 @@ impl UnitView<'_, '_> {
                 .attributes
                 .get(95)
                 .copied()
-                .unwrap_or(0.0),
+                .unwrap_or(Amount::ZERO),
             civ: self.civ,
         };
         let dip = SideWorld {

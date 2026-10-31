@@ -56,7 +56,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         master: MasterId,
-        pop: f32,
+        pop: Amount,
     ) -> Result<(), GenieError> {
         if self.players.player(p)?.computer {
             return Err(GenieError::unsupported(
@@ -217,7 +217,7 @@ impl World {
             posture: owner.posture,
             // The player's attribute a new soldier's unit AI reads: the current age (`player+0x100` at
             // `+0x30`, `FUN_140c12300`).
-            age: crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)?,
+            age: (crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)?).get(),
             ..NewObject::of(position, master, made)
         })
     }
@@ -372,11 +372,11 @@ impl World {
             .filter(|&(_, _, paid)| paid)
             .map(|(_, amount, _)| i32::from(amount))
             .sum();
-        owner.add_attribute(attribute::TOTAL_VALUE, cost as f32)?;
-        owner.add_attribute(attribute::UNITS_VALUE, cost as f32)?;
-        owner.add_attribute(AttributeId::numbered(246), cost as f32)?;
+        owner.add_attribute(attribute::TOTAL_VALUE, Amount::new(cost as f32))?;
+        owner.add_attribute(attribute::UNITS_VALUE, Amount::new(cost as f32))?;
+        owner.add_attribute(AttributeId::numbered(246), Amount::new(cost as f32))?;
         if made.class == class::VILLAGER {
-            owner.add_attribute(AttributeId::numbered(248), 1.0)?;
+            owner.add_attribute(AttributeId::numbered(248), Amount::new(1.0))?;
         }
         // the combat setup's class counters (FUN_141226060)
         crate::objects::lifecycle::death_parts::count_class(&mut owner.attributes, made, 1.0);

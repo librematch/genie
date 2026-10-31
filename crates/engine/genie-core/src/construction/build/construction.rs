@@ -15,6 +15,7 @@ use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::ids::WONDER;
 use crate::pathing::Pathing;
+use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::CASTLE_WONDER_COST;
@@ -31,11 +32,11 @@ use crate::world::WorldTime;
 /// entry from 0); an entry of no resource or no amount gives nothing.
 pub(super) fn hand_storage(
     master: &Master,
-    attributes: &mut Vec<(AttributeId, f32)>,
-    mut store: Option<&mut Vec<(AttributeId, f32)>>,
+    attributes: &mut Vec<(AttributeId, Amount)>,
+    mut store: Option<&mut Vec<(AttributeId, Amount)>>,
 ) {
     for &(kind, amount, flag) in &master.storage {
-        let Some(kind) = kind.filter(|_| 0.0 < amount) else {
+        let Some(kind) = kind.filter(|_| Amount::ZERO < amount) else {
             continue;
         };
         if matches!(flag, 4 | 8 | 64) {
@@ -44,7 +45,7 @@ pub(super) fn hand_storage(
     }
     // the entries of mode 16 go to its own store (FUN_1411abad0: an entry from 0)
     for &(kind, amount, flag) in &master.storage {
-        let Some(kind) = kind.filter(|_| 0.0 < amount && flag & 0x10 != 0) else {
+        let Some(kind) = kind.filter(|_| Amount::ZERO < amount && flag & 0x10 != 0) else {
             continue;
         };
         if let Some(store) = store.as_deref_mut() {
@@ -115,7 +116,7 @@ pub(super) fn completion_counts(
     master: &Master,
     building: &crate::objects::masters::BuildingMaster,
     main: bool,
-    attributes: &mut Vec<(AttributeId, f32)>,
+    attributes: &mut Vec<(AttributeId, Amount)>,
 ) -> Option<crate::players::history::EventKind> {
     // the castle's and the wonder's history event (0x1411dd094), the counts (slot 0xf8 with
     // 1.0, 0x14330eb8c)
@@ -128,9 +129,15 @@ pub(super) fn completion_counts(
     };
     match master.id {
         // The monastery (master 104, `0x6104` raw), whose relics give goods every second.
-        MONASTERY => attributes.push((MONASTERIES, 1.0)),
-        WONDER => attributes.extend([(WONDERS, 1.0), (WONDERS_BUILT, 1.0)]),
-        CASTLE => attributes.extend([(CASTLES, 1.0), (CASTLES_BUILT, 1.0)]),
+        MONASTERY => attributes.push((MONASTERIES, Amount::new(1.0))),
+        WONDER => attributes.extend([
+            (WONDERS, Amount::new(1.0)),
+            (WONDERS_BUILT, Amount::new(1.0)),
+        ]),
+        CASTLE => attributes.extend([
+            (CASTLES, Amount::new(1.0)),
+            (CASTLES_BUILT, Amount::new(1.0)),
+        ]),
         _ => {}
     }
     // its paid cost: the cost entries of a resource flagged paid (`+0x880`), summed as shorts
@@ -142,10 +149,10 @@ pub(super) fn completion_counts(
         .map(|(_, amount, _)| i32::from(amount))
         .sum();
     if matches!(master.id, CASTLE | WONDER) {
-        attributes.push((CASTLE_WONDER_COST, paid as f32));
+        attributes.push((CASTLE_WONDER_COST, Amount::new(paid as f32)));
     } else if !main && building.stack_unit.is_none() {
-        attributes.push((attribute::TOTAL_VALUE, paid as f32));
-        attributes.push((attribute::BUILDINGS_VALUE, paid as f32));
+        attributes.push((attribute::TOTAL_VALUE, Amount::new(paid as f32)));
+        attributes.push((attribute::BUILDINGS_VALUE, Amount::new(paid as f32)));
     }
     history
 }

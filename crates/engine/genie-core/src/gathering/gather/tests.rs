@@ -103,7 +103,7 @@ impl Rig {
     /// The rig with `n` attributes for the player.
     fn with_attributes(n: usize) -> Self {
         let owner = Player {
-            attributes: vec![0.0; n],
+            attributes: vec![Amount::ZERO; n],
             ..Player::default()
         };
         let mut rig = Self {
@@ -443,7 +443,12 @@ fn a_farm_s_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
             rig.load().amount,
             field.amount
         ),
-        (0.25, 0.25, Amount::ZERO, Amount::new(14.75))
+        (
+            Amount::new(0.25),
+            Amount::new(0.25),
+            Amount::ZERO,
+            Amount::new(14.75)
+        )
     );
 }
 

@@ -372,7 +372,7 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
     );
     assert_eq!(
         part([45.0, 0.0, 2.0], &built).unwrap().attributes,
-        [(attribute::FOOD, 45.0)]
+        crate::test_ids::adds([(attribute::FOOD, 45.0)])
     );
     assert_eq!(
         part([45.0, 0.0, 68.0], &built),
@@ -656,7 +656,7 @@ fn site_world(spatial: Spatial, masters: Vec<Master>, units: Vec<Unit>) -> World
             Player::default(),
             Player {
                 objects: units.into(),
-                attributes: vec![0.0; 600],
+                attributes: vec![Amount::ZERO; 600],
                 ..Player::default()
             },
         ],
@@ -772,9 +772,9 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     master.clearance = Footprint::new(1.0, 1.0);
     master.terrain_bonus = 4;
     master.storage = vec![
-        (Some(attribute::HEADROOM), 5.0, 4),
-        (None, 0.0, 0),
-        (None, 0.0, 0),
+        (Some(attribute::HEADROOM), Amount::new(5.0), 4),
+        (None, Amount::ZERO, 0),
+        (None, Amount::ZERO, 0),
     ];
     if let Some(b) = master.building.as_mut() {
         b.foundation_terrain = 27;
@@ -808,7 +808,10 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         (ObjectState::Alive, 25.0, true)
     );
     let a = &t.players[1].attributes;
-    assert_eq!((a[4], a[98], a[165]), (5.0, 25.0, 25.0));
+    assert_eq!(
+        (a[4], a[98], a[165]),
+        (Amount::new(5.0), Amount::new(25.0), Amount::new(25.0))
+    );
     let terrain = t.spatial.terrain.as_ref().unwrap();
     assert_eq!(
         (terrain.kinds[5], terrain.layers[5], terrain.kinds[0]),
@@ -877,8 +880,8 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             .attributes
             .iter()
             .enumerate()
-            .filter(|&(_, &v)| v != 0.0)
-            .map(|(k, &v)| (k, v))
+            .filter(|&(_, &v)| v != Amount::ZERO)
+            .map(|(k, &v)| (k, v.get()))
             .collect();
         let events = t.players[1].history.events.iter().map(|e| e.kind).collect();
         (gained, events)

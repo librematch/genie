@@ -39,6 +39,7 @@ use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids;
+use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::WorldTime;
 
@@ -123,12 +124,12 @@ impl VictoryTimes {
 }
 
 /// Attribute `k` of `attributes`, 0 past them (the game's array holds them all).
-fn get(attributes: &[f32], k: AttributeId) -> f32 {
-    attributes.get(k.index()).copied().unwrap_or(0.0)
+fn get(attributes: &[Amount], k: AttributeId) -> Amount {
+    attributes.get(k.index()).copied().unwrap_or(Amount::ZERO)
 }
 
 /// Attribute `k` of `attributes` takes `v`; none past them (the game's array holds them all).
-fn set(attributes: &mut [f32], k: AttributeId, v: f32) {
+fn set(attributes: &mut [Amount], k: AttributeId, v: Amount) {
     if let Some(a) = attributes.get_mut(k.index()) {
         *a = v;
     }

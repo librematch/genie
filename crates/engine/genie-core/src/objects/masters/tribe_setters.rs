@@ -8,6 +8,7 @@ use crate::objects::masters::{
     AttributeWorld, Master, ROUND, add_sprite, attribute, cost_resource, id_of,
     insert_train_location, low8, low16, resize_train_locations, select_entry, set_sprite,
 };
+use crate::players::Amount;
 use crate::players::attribute as players_attribute;
 
 impl Master {
@@ -78,9 +79,9 @@ impl Master {
                 }
                 for s in &mut self.storage {
                     match s.0 {
-                        Some(players_attribute::HEADROOM) => s.1 = v,
+                        Some(players_attribute::HEADROOM) => s.1 = Amount::new(v),
                         Some(players_attribute::POPULATION | players_attribute::UNITS_OWNED) => {
-                            s.1 = negated;
+                            s.1 = Amount::new(negated);
                         }
                         _ => {}
                     }

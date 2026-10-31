@@ -94,8 +94,8 @@ impl Unit {
         let productivity = (hunt.task.productivity)
             .and_then(|i| owner.attributes.get(i.index()))
             .copied()
-            .filter(|&v| 0.0 < v)
-            .unwrap_or(1.0);
+            .filter(|&v| Amount::ZERO < v)
+            .unwrap_or(Amount::new(1.0));
         let g = |id: i16| (0 <= id).then(|| c.w.graphics.get(&id).copied()).flatten();
         Ok(HuntReads {
             defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
@@ -108,8 +108,8 @@ impl Unit {
             ),
             work_rate: self.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
-            productivity,
-            stops_decay: owner.attributes.get(292) == Some(&1.0),
+            productivity: productivity.get(),
+            stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),
             has_ai: self.ai.is_some(),
             ai_class: self.ai.as_ref().and_then(|ai| ai.target_class),
             tree_searched: tree_lost,

@@ -11,6 +11,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::{NO_DYING_SPRITE, Unit};
+use crate::players::Amount;
 use crate::technology::TechId;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -42,7 +43,7 @@ impl Unit {
         if let Some(kind) = death.building.count {
             c.w.players
                 .player_mut(c.player)?
-                .take_at_least_zero(kind, 1.0)?;
+                .take_at_least_zero(kind, Amount::new(1.0))?;
         }
         Ok(death.building.tech)
     }

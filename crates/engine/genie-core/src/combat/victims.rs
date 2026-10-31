@@ -13,6 +13,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute;
@@ -415,7 +416,7 @@ impl World {
             for &(p, attribute, amount) in &r.adds {
                 self.players
                     .player_mut(p)?
-                    .add_attribute(attribute, amount)?;
+                    .add_attribute(attribute, Amount::new(amount))?;
             }
         }
         Ok(())
@@ -473,7 +474,7 @@ impl World {
             if matches!(kill.attacker_class, class::PREY | class::PREDATOR) {
                 self.players
                     .player_mut(q)?
-                    .add_attribute(attribute::VILLAGER_KILLED_BY_ANIMAL, 1.0)?;
+                    .add_attribute(attribute::VILLAGER_KILLED_BY_ANIMAL, Amount::new(1.0))?;
             }
             let by_kind = match self.players[ap].kind {
                 PlayerType::HUMAN => Some(attribute::VILLAGER_KILLED_BY_TYPE_1),
@@ -482,7 +483,9 @@ impl World {
                 _ => None,
             };
             if let Some(kind) = by_kind {
-                self.players.player_mut(q)?.add_attribute(kind, 1.0)?;
+                self.players
+                    .player_mut(q)?
+                    .add_attribute(kind, Amount::new(1.0))?;
             }
         }
         self.count_kill_of(q, master, ap)
@@ -543,21 +546,24 @@ impl World {
             class::CLASS_63,
         ];
         if !PEACEFUL.contains(&master.class) {
-            self.players[ap].add_attribute(attribute::KILLS, 1.0)?;
+            self.players[ap].add_attribute(attribute::KILLS, Amount::new(1.0))?;
             self.players
                 .player_mut(q)?
-                .add_attribute(attribute::KILLS_OTHER, 1.0)?;
+                .add_attribute(attribute::KILLS_OTHER, Amount::new(1.0))?;
         }
-        self.players[ap].add_attribute(attribute::KILLS_OF.offset(q.index())?, 1.0)?;
+        self.players[ap].add_attribute(attribute::KILLS_OF.offset(q.index())?, Amount::new(1.0))?;
         self.players
             .player_mut(q)?
-            .add_attribute(attribute::KILLED_BY.offset(ap)?, 1.0)?;
+            .add_attribute(attribute::KILLED_BY.offset(ap)?, Amount::new(1.0))?;
         let cost = paid_cost(master);
-        self.players[ap].add_attribute(attribute::KILLS_VALUE, cost)?;
+        self.players[ap].add_attribute(attribute::KILLS_VALUE, Amount::new(cost))?;
         self.players
             .player_mut(q)?
-            .add_attribute(attribute::KILLS_VALUE_OTHER, cost)?;
-        self.players[ap].add_attribute(attribute::KILLS_VALUE_OF.offset(q.index())?, cost)?;
+            .add_attribute(attribute::KILLS_VALUE_OTHER, Amount::new(cost))?;
+        self.players[ap].add_attribute(
+            attribute::KILLS_VALUE_OF.offset(q.index())?,
+            Amount::new(cost),
+        )?;
         Ok(())
     }
 }

@@ -13,6 +13,7 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::{ClassId, class};
 use crate::objects::masters::{MasterId, ids};
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::test_ids::class_id;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
@@ -276,8 +277,8 @@ fn tasked_world(masters: Vec<crate::objects::masters::Master>, owner_range: f32)
         },
         ..Unit::default()
     };
-    let mut attributes = vec![0.0; 100];
-    attributes[90] = owner_range;
+    let mut attributes = vec![Amount::ZERO; 100];
+    attributes[90] = Amount::new(owner_range);
     let mut t = World::new(
         WorldTime::ZERO,
         1,
@@ -783,8 +784,8 @@ fn a_filter_takes_the_range_of_the_members_task_of_that_type() {
             ),
         ];
     }
-    t.players[1].attributes = vec![0.0; 300];
-    t.players[1].attributes[280] = 2.0;
+    t.players[1].attributes = vec![Amount::ZERO; 300];
+    t.players[1].attributes[280] = Amount::new(2.0);
     assert_eq!(
         t.task_reach(PlayerId::new(1), master_id(4), None).unwrap(),
         -1.0

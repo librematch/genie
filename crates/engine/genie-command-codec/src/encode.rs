@@ -451,10 +451,10 @@ fn tribute(c: &TributeCommand) -> Packet {
     let [first, second, third, fourth] = &c.gifts;
     Packet::TribeGiveAttributes(packets::TribeGiveAttributes {
         commp_id: c.player.get(),
-        amt: first.amount,
-        field_0x08: second.amount,
-        field_0x0c: third.amount,
-        field_0x10: fourth.amount,
+        amt: first.amount.get(),
+        field_0x08: second.amount.get(),
+        field_0x0c: third.amount.get(),
+        field_0x10: fourth.amount.get(),
         cost: first.fee,
         field_0x18: second.fee,
         field_0x1c: third.fee,

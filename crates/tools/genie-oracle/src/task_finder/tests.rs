@@ -47,7 +47,7 @@ fn world(relation: u8) -> FinderWorld {
         .into_iter()
         .collect(),
         relations: vec![vec![], vec![0, 0, relation], vec![]],
-        attribute_95: vec![0.0, 1.5],
+        attribute_95: vec![Amount::ZERO, Amount::new(1.5)],
         civs: vec![0, 4],
         drop_sites: vec![],
     }
@@ -108,7 +108,7 @@ fn the_actor_reads_its_player_s_attribute_95_and_civ() {
             genie_core::players::CivId::new(4)
         )
     );
-    assert_eq!(actor.attribute_95.to_bits(), 1.5_f32.to_bits());
+    assert_eq!(actor.attribute_95.get().to_bits(), 1.5_f32.to_bits());
     assert!(w.actor(object_id(99)).is_none());
 }
 

@@ -7,6 +7,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::WONDER;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute;
@@ -77,14 +78,14 @@ impl World {
         };
         let player = self.players.player_mut(p)?;
         if let Some(e) = explored {
-            set(&mut player.attributes, attribute::EXPLORED, e);
+            set(&mut player.attributes, attribute::EXPLORED, Amount::new(e));
         }
         let a = &player.attributes;
         let ratio = get(a, attribute::KILLS)
             - (get(a, attribute::UNITS_OWNED) - get(a, attribute::POPULATION));
         set(&mut player.attributes, attribute::KILL_RATIO, ratio);
-        if !at_most_or_unordered(0.0, get(&player.attributes, attribute::KILL_RATIO)) {
-            set(&mut player.attributes, attribute::KILL_RATIO, 0.0);
+        if !at_most_or_unordered(0.0, get(&player.attributes, attribute::KILL_RATIO).get()) {
+            set(&mut player.attributes, attribute::KILL_RATIO, Amount::ZERO);
         }
         if !matches!(player.kind, PlayerType::HUMAN | PlayerType::COMPUTER) {
             return Ok(());
@@ -158,7 +159,7 @@ impl World {
             set(
                 &mut self.players.player_mut(p)?.attributes,
                 attribute::SURVIVAL,
-                0.0,
+                Amount::ZERO,
             );
         }
         Ok(())

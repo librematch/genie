@@ -14,7 +14,6 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
-use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::Attributes;
 use crate::world::World;
@@ -98,10 +97,8 @@ impl World {
         let radius_x = self.master(p, master)?.radius.x();
         let mut points = edge_points(at, Distance::new(radius_x));
         let owner = self.players.player(p)?;
-        let count = cvttss2si(Attributes::get(
-            owner,
-            crate::players::attribute::PASTURE_LIVESTOCK,
-        )?);
+        let count =
+            cvttss2si(Attributes::get(owner, crate::players::attribute::PASTURE_LIVESTOCK)?.get());
         let food = Attributes::get(owner, crate::players::attribute::PASTURE_FOOD)? / count as f32;
         let map = self.spatial.map;
         let mut made = 0;
@@ -138,7 +135,7 @@ impl World {
                     .ok_or(GenieError::unreachable("the livestock just made"))?;
                 u.untargetable = true;
                 u.pasture = Some(id);
-                u.life.amount = Amount::new(food);
+                u.life.amount = food;
                 let graphic = u.sprite.map(|s| s.graphic);
                 if let Some(g) = graphic.filter(|g| g.flags & 4 != 0) {
                     let d = self.streams.get(Stream::Object).rand15() as i32;
@@ -214,7 +211,7 @@ impl World {
             if workers == 0 {
                 return Ok(Some(id));
             }
-            if pick.is_none() && (workers as f32) < room {
+            if pick.is_none() && (workers as f32) < room.get() {
                 pick = Some(id);
             }
         }

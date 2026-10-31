@@ -10,6 +10,7 @@ use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{Master, Masters, master_type, player_master};
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -193,7 +194,7 @@ impl World {
                 {
                     let owner = self.players.player_mut(p)?;
                     owner.add_attribute(kind, -amount)?;
-                    owner.add_attribute(kind, v)?;
+                    owner.add_attribute(kind, Amount::new(v))?;
                 }
             }
             _ => {}
@@ -275,11 +276,11 @@ impl World {
                 // headroom (4), and current population (11) and 19, which hold its magnitude.
                 Some(attribute::HEADROOM) => {
                     owner.add_attribute(attribute::HEADROOM, amount.abs())?;
-                    owner.add_attribute(attribute::HEADROOM, v)?;
+                    owner.add_attribute(attribute::HEADROOM, Amount::new(v))?;
                 }
                 Some(kind @ (POPULATION | RESOURCE_19)) => {
                     owner.add_attribute(kind, -amount)?;
-                    owner.add_attribute(kind, v.abs())?;
+                    owner.add_attribute(kind, Amount::new(v.abs()))?;
                 }
                 _ => {}
             }

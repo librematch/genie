@@ -20,6 +20,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::action_type;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::player_master;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
@@ -208,7 +209,7 @@ impl World {
             master: unit.master_in(Some(masters))?,
             player: q,
             held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         };
         // the work command's point: BUILD's x and y on the ground
@@ -408,7 +409,7 @@ impl World {
             master: unit.master_in(Some(masters))?,
             player,
             held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(0.0),
+            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         };
         // slot 0x820 with any action type (0xffff): whatever task it finds, the Build takes

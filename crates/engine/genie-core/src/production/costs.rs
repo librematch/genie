@@ -6,6 +6,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, Masters};
+use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::technology::ResearchState;
@@ -33,7 +34,7 @@ pub fn refund(
             .find(|c| c.0 == Some(attribute))
             .map_or(0.0, |c| c.1);
         let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + back)?;
+        attributes.set(attribute, held + Amount::new(back))?;
     }
     Ok(())
 }
@@ -51,7 +52,7 @@ pub fn refund_research(
             continue;
         };
         let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + f32::from(count) * amount)?;
+        attributes.set(attribute, held + Amount::new(f32::from(count) * amount))?;
     }
     Ok(())
 }
@@ -72,7 +73,10 @@ pub fn refund_master(
             continue;
         }
         let held = attributes.get(attribute)?;
-        attributes.set(attribute, (i32::from(amount) * n) as f32 + held)?;
+        attributes.set(
+            attribute,
+            Amount::new((i32::from(amount) * n) as f32 + held.get()),
+        )?;
     }
     Ok(())
 }
@@ -100,7 +104,7 @@ pub fn refund_tech(
     } else {
         // The research cost modifier (attribute 85, `+0x2a8`), which scales a refunded technology's
         // costs above 0.
-        attributes.get(attribute::RESEARCH_COST_MODIFIER)?
+        attributes.get(attribute::RESEARCH_COST_MODIFIER)?.get()
     };
     for (j, c) in def.costs.iter().enumerate() {
         let Some(attribute) = c.attribute.filter(|_| c.paid != 0) else {
@@ -111,7 +115,7 @@ pub fn refund_tech(
             v = f32::from(cvttss2si(v * modifier) as i16);
         }
         let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + v)?;
+        attributes.set(attribute, held + Amount::new(v))?;
     }
     state.state = ResearchState::Available;
     state.research_done = 0.0;
@@ -189,15 +193,15 @@ pub fn cost_test(
             }
             let room = attributes.get(attribute::HEADROOM)? + pop;
             // CMOVBE: the cap unless it is above the headroom's sum (a NaN takes the cap)
-            let limit = if crate::math::fmath::at_most_or_unordered(cap, room) {
+            let limit = if crate::math::fmath::at_most_or_unordered(cap.get(), room.get()) {
                 cap
             } else {
                 room
             };
-            if limit < attributes.get(attribute::QUEUED)? + pop + need {
+            if limit < attributes.get(attribute::QUEUED)? + pop + Amount::new(need) {
                 return Ok(false);
             }
-        } else if attributes.get(attribute)? < need {
+        } else if attributes.get(attribute)? < Amount::new(need) {
             return Ok(false);
         }
     }
@@ -225,7 +229,7 @@ pub fn pay(
         let Some((attribute, amount, true)) = cost_entry(m, j) else {
             continue;
         };
-        attributes.subtract(attribute, f32::from(amount) * count)?;
+        attributes.subtract(attribute, Amount::new(f32::from(amount) * count))?;
     }
     Ok(true)
 }
@@ -256,8 +260,8 @@ pub fn master_costs(
         slot.0 = Some(attribute);
         slot.1 = cvttss2si(f32::from(amount) * ONE) as i16;
         let held = attributes.get(attribute)?;
-        if held < f32::from(slot.1) && can {
-            let have = cvttss2si(held) as i16;
+        if held < Amount::new(f32::from(slot.1)) && can {
+            let have = cvttss2si(held.get()) as i16;
             extra = extra.wrapping_add(slot.1.wrapping_sub(have));
             slot.1 = have;
         }

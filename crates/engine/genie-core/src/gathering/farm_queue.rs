@@ -16,6 +16,7 @@ use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::player_master;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::production::{cost_test, pay, refund_master};
@@ -188,8 +189,8 @@ impl World {
                 .players
                 .player(p)?
                 .attribute(attribute::TOWN_CENTRE_LIMIT)
-                .unwrap_or(0.0);
-            if (self.town_centre_count(p) as f32) < limit {
+                .unwrap_or(Amount::ZERO);
+            if (self.town_centre_count(p) as f32) < limit.get() {
                 return Ok(true);
             }
         }
@@ -459,7 +460,7 @@ mod tests {
         let mut t = world(250.0);
         assert!(t.queue_farms(PlayerId::new(1), 5, FARM).unwrap());
         assert_eq!(t.players[1].farm_queue, 4);
-        assert_eq!(t.players[1].attributes[1], 10.0);
+        assert_eq!(t.players[1].attributes[1], Amount::new(10.0));
         assert!(!t.queue_farms(PlayerId::new(1), 1, FARM).unwrap());
         assert!(!t.queue_farms(PlayerId::new(1), 0, FARM).unwrap());
         assert_eq!(t.players[1].farm_queue, 4);
@@ -470,18 +471,24 @@ mod tests {
     #[test]
     fn pastures_and_fish_traps_pay_their_paid_entries() {
         let mut t = world(1000.0);
-        t.players[1].attributes[0] = 99.0;
+        t.players[1].attributes[0] = Amount::new(99.0);
         assert!(t.queue_farms(PlayerId::new(1), 2, PASTURE).unwrap());
         assert_eq!(t.players[1].farm_queue, 1);
-        assert_eq!(t.players[1].resources(), [99.0, 900.0, 0.0, 0.0]);
-        t.players[1].attributes[0] = 100.0;
+        assert_eq!(
+            t.players[1].resources(),
+            crate::test_ids::amounts([99.0, 900.0, 0.0, 0.0])
+        );
+        t.players[1].attributes[0] = Amount::new(100.0);
         assert!(t.queue_farms(PlayerId::new(1), 2, PASTURE).unwrap());
-        assert_eq!(t.players[1].resources(), [100.0, 700.0, 0.0, 0.0]);
+        assert_eq!(
+            t.players[1].resources(),
+            crate::test_ids::amounts([100.0, 700.0, 0.0, 0.0])
+        );
         t.players[1].farm_queue = 2;
         assert!(t.queue_fish_traps(PlayerId::new(1), 3).unwrap());
         assert_eq!(t.players[1].fish_trap_queue, 3);
         assert_eq!(t.players[1].farm_queue, 2);
-        assert_eq!(t.players[1].attributes[1], 400.0);
+        assert_eq!(t.players[1].attributes[1], Amount::new(400.0));
     }
 
     /// A queue at 40 takes no purchase; one below may pass 40.
@@ -500,7 +507,7 @@ mod tests {
     fn a_master_the_player_lacks_buys_nothing() {
         let mut t = world(1000.0);
         assert!(!t.queue_farms(PlayerId::new(1), 2, ids::ID_1187).unwrap());
-        assert_eq!(t.players[1].attributes[1], 1000.0);
+        assert_eq!(t.players[1].attributes[1], Amount::new(1000.0));
     }
 
     /// A building master `id` of class `class` and base id `base`, available or not, heading
@@ -563,7 +570,7 @@ mod tests {
             -1,
         )]);
         assert!(!t.can_make(PlayerId::new(1), TOWN_CENTRE_621).unwrap());
-        t.players[1].attributes[attribute::TOWN_CENTRE_LIMIT.index()] = 1.0;
+        t.players[1].attributes[attribute::TOWN_CENTRE_LIMIT.index()] = Amount::new(1.0);
         assert!(t.can_make(PlayerId::new(1), TOWN_CENTRE_621).unwrap());
     }
 
@@ -595,15 +602,18 @@ mod tests {
         t.players[1].farm_queue = 3;
         assert!(t.unqueue_farms(PlayerId::new(1), 5, FARM).unwrap());
         assert_eq!(t.players[1].farm_queue, 0);
-        assert_eq!(t.players[1].attributes[1], 180.0);
+        assert_eq!(t.players[1].attributes[1], Amount::new(180.0));
         assert!(!t.unqueue_farms(PlayerId::new(1), 1, FARM).unwrap());
         t.players[1].farm_queue = 2;
         assert!(t.unqueue_farms(PlayerId::new(1), 1, PASTURE).unwrap());
-        assert_eq!(t.players[1].resources(), [0.0, 280.0, 0.0, 0.0]);
+        assert_eq!(
+            t.players[1].resources(),
+            crate::test_ids::amounts([0.0, 280.0, 0.0, 0.0])
+        );
         t.players[1].fish_trap_queue = 1;
         assert!(!t.unqueue_fish_traps(PlayerId::new(1), 0).unwrap());
         assert!(t.unqueue_fish_traps(PlayerId::new(1), 2).unwrap());
         assert_eq!(t.players[1].fish_trap_queue, 0);
-        assert_eq!(t.players[1].attributes[1], 380.0);
+        assert_eq!(t.players[1].attributes[1], Amount::new(380.0));
     }
 }

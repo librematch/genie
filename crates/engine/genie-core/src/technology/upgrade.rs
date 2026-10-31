@@ -190,7 +190,8 @@ fn share_of(u: &Unit, master: &Master) -> Option<(u8, f32)> {
             .take(3)
             .find(|&&(kind, _, _)| kind == u.life.attribute_type);
         let share = held.map_or(0, |&(_, amount, _)| {
-            crate::math::conversions::cvttss2si(WHOLE - u.life.amount.get() * WHOLE / amount) as u8
+            crate::math::conversions::cvttss2si(WHOLE - u.life.amount.get() * WHOLE / amount.get())
+                as u8
         });
         return Some((share, hp));
     }
@@ -398,7 +399,7 @@ impl World {
                 p,
                 &mut adds,
                 kind,
-                amount.get(),
+                amount,
             )?;
             for (k, v) in adds {
                 self.players.player_mut(p)?.add_attribute(k, v)?;
@@ -850,7 +851,7 @@ mod tests {
         let tree = Master {
             class: class::TREE,
             hit_points: 20,
-            storage: vec![(Some(attribute::WOOD), 100.0, 0)],
+            storage: vec![(Some(attribute::WOOD), Amount::new(100.0), 0)],
             damage_graphics: vec![DamageGraphic {
                 sprite: -1,
                 percent: 50,
@@ -1020,7 +1021,7 @@ mod tests {
         v.firepower = 1.0;
         let player = crate::world::Player {
             objects: vec![v].into(),
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             ..crate::world::Player::default()
         };
         let mut t = World::new(
@@ -1031,7 +1032,7 @@ mod tests {
             vec![player],
         );
         t.masters = vec![Masters::new([old, new])];
-        t.players[0].attributes[37] = 1.0;
+        t.players[0].attributes[37] = Amount::new(1.0);
         t.upgrade_objects(PlayerId::new(0), master_id(83), master_id(6), 0, None)
             .unwrap();
         let v = &t.players[0].objects[ListIndex::new(0)];
@@ -1041,8 +1042,8 @@ mod tests {
         );
         assert_eq!(v.life.held(), carrying(None, 0.0));
         let a = &t.players[0].attributes;
-        assert_eq!((a[37], a[40]), (0.0, 1.0));
-        assert_eq!(t.players[0].attributes[0], 10.0);
+        assert_eq!((a[37], a[40]), (Amount::ZERO, Amount::new(1.0)));
+        assert_eq!(t.players[0].attributes[0], Amount::new(10.0));
         assert_eq!(
             t.masters[0].get(ids::VILLAGER_MALE).map(|m| m.class),
             Some(class::VILLAGER)
@@ -1217,7 +1218,7 @@ mod tests {
                 HitPoints::new(20.0),
             )]
             .into(),
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             ..crate::world::Player::default()
         };
         let mut t = World::new(
@@ -1319,7 +1320,7 @@ mod tests {
     fn one_player(objects: Vec<Unit>, masters: Vec<Master>, graphics: &[i16]) -> World {
         let player = crate::world::Player {
             objects: objects.into(),
-            attributes: vec![0.0; 300],
+            attributes: vec![Amount::ZERO; 300],
             ..crate::world::Player::default()
         };
         let mut t = World::new(
@@ -1437,7 +1438,7 @@ mod tests {
             let mut v = object(10, master.id, ObjectState::Alive, HitPoints::new(25.0));
             (v.life.attribute_type, v.life.amount) = (kind, amount);
             let mut t = one_player(vec![v], vec![master.clone()], &[]);
-            t.players[0].attributes[37] = 1.0;
+            t.players[0].attributes[37] = Amount::new(1.0);
             t.hand_in_load(
                 PlayerId::new(0),
                 Place::Live(PlayerId::new(0), ListIndex::new(0)),
@@ -1447,7 +1448,10 @@ mod tests {
             let v = &t.players[0].objects[ListIndex::new(0)];
             (
                 v.life.held(),
-                [t.players[0].attributes[0], t.players[0].attributes[1]],
+                [
+                    t.players[0].attributes[0].get(),
+                    t.players[0].attributes[1].get(),
+                ],
                 t.players[0].attributes[37],
             )
         };
@@ -1457,19 +1461,23 @@ mod tests {
                 Some(AttributeId::numbered(17)),
                 Amount::new(10.0)
             ),
-            (Held::default(), [10.0, 0.0], 0.0)
+            (Held::default(), [10.0, 0.0], Amount::ZERO)
         );
         assert_eq!(
             load(&villager, Some(attribute::WOOD), Amount::new(6.0)),
-            (Held::default(), [0.0, 6.0], 0.0)
+            (Held::default(), [0.0, 6.0], Amount::ZERO)
         );
         assert_eq!(
             load(&villager, Some(attribute::WOOD), Amount::ZERO),
-            (carrying(Some(attribute::WOOD), 0.0), [0.0, 0.0], 0.0)
+            (
+                carrying(Some(attribute::WOOD), 0.0),
+                [0.0, 0.0],
+                Amount::ZERO
+            )
         );
         assert_eq!(
             load(&villager, None, Amount::new(6.0)),
-            (carrying(None, 6.0), [0.0, 0.0], 0.0)
+            (carrying(None, 6.0), [0.0, 0.0], Amount::ZERO)
         );
         assert_eq!(
             load(&soldier, Some(attribute::WOOD), Amount::new(6.0)).0,

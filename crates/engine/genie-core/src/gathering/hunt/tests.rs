@@ -1575,7 +1575,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
     );
     let at = Position::new(26.820_372, 94.718_056, 0.0);
     rig.unit_mut().body = crate::objects::layers::Body::new(at, None, Some(walker()));
-    rig.t.players[1].attributes = vec![0.0; 230];
+    rig.t.players[1].attributes = vec![Amount::ZERO; 230];
     let site = DropOff {
         takes: true,
         gap_squared: DistanceSquared::new(0.5),

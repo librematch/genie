@@ -63,7 +63,7 @@ pub struct Held {
 /// An attribute the owner does not have.
 pub(crate) fn static_storage(
     owner: &mut crate::world::player::Player,
-    storage: &[(Option<AttributeId>, f32, u8)],
+    storage: &[(Option<AttributeId>, Amount, u8)],
 ) -> Result<Held, GenieError> {
     let mut held = Held::default();
     for &(kind, amount, flag) in storage {
@@ -76,7 +76,7 @@ pub(crate) fn static_storage(
         if flag == 0 {
             held = Held {
                 kind: Some(kind),
-                amount: Amount::new(amount),
+                amount,
             };
         }
     }
@@ -509,7 +509,7 @@ mod tests {
     #[test]
     fn a_new_object_s_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {
         let mut owner = crate::world::player::Player {
-            attributes: vec![0.0; 20],
+            attributes: vec![Amount::ZERO; 20],
             ..crate::world::player::Player::default()
         };
         let storage = [
@@ -520,7 +520,8 @@ mod tests {
             (Some(AttributeId::numbered(12)), 3.0, 32),
             (Some(attribute::RELICS_HELD), 1.5, 0),
             (Some(AttributeId::numbered(13)), 4.0, 4),
-        ];
+        ]
+        .map(|(kind, amount, flag)| (kind, Amount::new(amount), flag));
         assert_eq!(
             static_storage(&mut owner, &storage),
             Ok(Held {
@@ -528,13 +529,17 @@ mod tests {
                 amount: Amount::new(1.5)
             })
         );
-        assert_eq!(owner.resources(), [0.0, 2.0, 0.0, 0.0]);
+        assert_eq!(
+            owner.resources(),
+            crate::test_ids::amounts([0.0, 2.0, 0.0, 0.0])
+        );
         let gained: Vec<(usize, f32)> = owner
             .attributes
             .iter()
             .copied()
             .enumerate()
-            .filter(|&(_, v)| v != 0.0)
+            .filter(|&(_, v)| v != Amount::ZERO)
+            .map(|(k, v)| (k, v.get()))
             .collect();
         assert_eq!(gained, [(1, 2.0), (11, 5.0), (12, 3.0)]);
         assert_eq!(static_storage(&mut owner, &[]), Ok(Held::default()));

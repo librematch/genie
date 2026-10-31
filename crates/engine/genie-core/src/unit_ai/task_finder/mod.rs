@@ -53,7 +53,7 @@ pub struct Actor<'a> {
     /// What it carries (`+0x308`, `+0x310`).
     pub held: Held,
     /// The owner's attribute 95 (`+0x2f8`), which some monk tasks read.
-    pub attribute_95: f32,
+    pub attribute_95: Amount,
     /// The owner's civ (`FUN_140e879e0` of `player+0x738`), which drop sites read.
     pub civ: crate::players::CivId,
 }
@@ -250,8 +250,8 @@ pub fn table_drop_buildings(
 /// A task's requirement (`FUN_1410622c0`): no enabling resource (−1), or the player's attribute of
 /// that index above 0.
 #[must_use]
-pub fn enabled(attributes: &[f32], resource: Option<AttributeId>) -> bool {
-    resource.is_none_or(|r| attributes.get(r.index()).is_some_and(|&v| 0.0 < v))
+pub fn enabled(attributes: &[Amount], resource: Option<AttributeId>) -> bool {
+    resource.is_none_or(|r| attributes.get(r.index()).is_some_and(|&v| Amount::ZERO < v))
 }
 
 /// One search over the list: the first task the predicate takes, in list order.
@@ -457,11 +457,11 @@ fn finder_head<'m>(
     if let Some(t) = target
         && own.object_flags & 0x10 != 0
         && t.master.class == class::PREY
-        && 0.0
+        && Amount::ZERO
             < t.master
                 .storage
                 .first()
-                .map_or(0.0, |&(_, amount, _)| amount)
+                .map_or(Amount::ZERO, |&(_, amount, _)| amount)
     {
         return Ok(Finding::Answer(None));
     }
@@ -477,7 +477,7 @@ fn finder_head<'m>(
         return Ok(Finding::Answer(Some(task)));
     }
     let monk_master = own.id == ids::ID_448 || own.id == ids::ID_546;
-    if actor.attribute_95 == 2.0
+    if actor.attribute_95 == Amount::new(2.0)
         && monk_master
         && target.is_some_and(|t| t.master.class == class::VILLAGER)
     {
@@ -485,7 +485,7 @@ fn finder_head<'m>(
             "the task finder's monk conversion of villagers (attribute 95)",
         ));
     }
-    if actor.attribute_95 == 3.0
+    if actor.attribute_95 == Amount::new(3.0)
         && monk_master
         && target.is_some_and(|t| t.master.class == class::BUILDING)
     {
@@ -630,7 +630,7 @@ mod tests {
             master: own,
             player: PlayerId::new(2),
             held,
-            attribute_95: 0.0,
+            attribute_95: Amount::ZERO,
             civ: CivId::new(1),
         }
     }
@@ -889,7 +889,7 @@ mod tests {
             ..master(master_id(122), COMBAT, class::VILLAGER, vec![hunt])
         };
         let deer = Master {
-            storage: vec![(Some(attribute::FOOD), 100.0, 1)],
+            storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 1)],
             ..master(master_id(65), COMBAT, class::PREY, vec![])
         };
         let target = |m| TaskTarget {
@@ -898,7 +898,7 @@ mod tests {
         };
         assert_eq!(find(&hunter, carrying(None, 0.0), &target(&deer)), Ok(None));
         let eaten = Master {
-            storage: vec![(Some(attribute::FOOD), 0.0, 1)],
+            storage: vec![(Some(attribute::FOOD), Amount::ZERO, 1)],
             ..deer.clone()
         };
         assert_eq!(
@@ -1256,7 +1256,7 @@ mod tests {
             Ok(Finding::Next)
         );
         let deer = Master {
-            storage: vec![(Some(attribute::FOOD), 100.0, 0)],
+            storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 0)],
             ..master(master_id(65), COMBAT, class::PREY, vec![])
         };
         let wolf = Master {
@@ -1288,7 +1288,7 @@ mod tests {
         );
         let monk = master(ids::ID_448, COMBAT, class::MONK, vec![]);
         let converting = Actor {
-            attribute_95: 2.0,
+            attribute_95: Amount::new(2.0),
             ..actor(&monk, carrying(None, 0.0))
         };
         let peasant = building(&villager, PlayerId::new(3), ObjectState::Alive);

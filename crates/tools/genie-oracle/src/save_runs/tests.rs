@@ -11,6 +11,7 @@ use crate::{Decoder, Dumps, Error, TickReport, listed};
 use genie_core::GenieError;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ListIndex;
+use genie_core::players::Amount;
 use genie_core::world::WorldTime;
 use genie_core::world::{GameState, World};
 use genie_save::Header;
@@ -199,7 +200,7 @@ fn a_stopped_player_s_stock_is_not_compared() {
 fn resources_and_attributes_differ_apart() {
     let mut turns = slice(&save(), None);
     let player = &mut turns.players[1];
-    player.attributes = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    player.attributes = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].map(Amount::new).to_vec();
     let game = GameState {
         resources: vec![[0.0; 4], [1.0, 2.0, 3.0, 5.0]],
         attributes: vec![Vec::new(), vec![0.0, 0.0, 0.0, 0.0, 5.0, 7.0]],

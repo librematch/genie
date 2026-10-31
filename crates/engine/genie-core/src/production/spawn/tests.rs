@@ -469,7 +469,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
             },
         );
         let p = &mut t.players[1];
-        p.attributes[attribute::IN_PRODUCTION.index()] = 3.0;
+        p.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
         p.objects[ListIndex::new(2)].ai = Some(UnitAi {
             ai_type: UnitAiType::PREDATOR,
             current_order: None,
@@ -481,13 +481,21 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     };
     let mut t = world();
     let before = t.players[1].objects.len();
-    t.spawn(PlayerId::new(1), ListIndex::new(2), ids::VILLAGER_MALE, 1.0)
-        .unwrap();
+    t.spawn(
+        PlayerId::new(1),
+        ListIndex::new(2),
+        ids::VILLAGER_MALE,
+        Amount::new(1.0),
+    )
+    .unwrap();
     let p = &t.players[1];
     assert_eq!(p.objects.len(), before + 1);
     let made = p.objects.last().unwrap();
     assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
-    assert_eq!(p.attributes[attribute::IN_PRODUCTION.index()], 2.0);
+    assert_eq!(
+        p.attributes[attribute::IN_PRODUCTION.index()],
+        Amount::new(2.0)
+    );
     let completed = p.objects[ListIndex::new(2)]
         .ai
         .as_ref()
@@ -516,8 +524,13 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         .unwrap()
         .building_orders
         .push(order);
-    t.spawn(PlayerId::new(1), ListIndex::new(2), ids::VILLAGER_MALE, 1.0)
-        .unwrap();
+    t.spawn(
+        PlayerId::new(1),
+        ListIndex::new(2),
+        ids::VILLAGER_MALE,
+        Amount::new(1.0),
+    )
+    .unwrap();
     let made = t.players[1].objects.last().unwrap();
     let queued = made
         .ai
@@ -540,19 +553,34 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     let mut t = world();
     t.players[1].computer = true;
     assert!(
-        t.spawn(PlayerId::new(1), ListIndex::new(2), ids::VILLAGER_MALE, 1.0)
-            .is_err()
+        t.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0)
+        )
+        .is_err()
     );
     let mut t = world();
     t.spatial.sight = None;
     assert!(
-        t.spawn(PlayerId::new(1), ListIndex::new(2), ids::VILLAGER_MALE, 1.0)
-            .is_err()
+        t.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0)
+        )
+        .is_err()
     );
     let mut t = world();
     assert!(
-        t.spawn(PlayerId::new(1), ListIndex::new(2), master_id(59), 1.0)
-            .is_err()
+        t.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            master_id(59),
+            Amount::new(1.0)
+        )
+        .is_err()
     );
 }
 
@@ -579,7 +607,7 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
             },
         );
         let p = &mut t.players[1];
-        p.attributes[attribute::IN_PRODUCTION.index()] = 3.0;
+        p.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
         p.objects[ListIndex::new(2)].ai = Some(UnitAi {
             ai_type: UnitAiType::PREDATOR,
             current_order: None,
@@ -593,8 +621,13 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
             target: None,
             target_master: None,
         });
-        t.spawn(PlayerId::new(1), ListIndex::new(2), ids::VILLAGER_MALE, 1.0)
-            .unwrap();
+        t.spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0),
+        )
+        .unwrap();
         t.players[1]
             .objects
             .last()
@@ -859,8 +892,8 @@ fn remains_world() -> World {
         death_sprite: 20,
         standing_sprite: -1,
         storage: vec![
-            (Some(attribute::HEADROOM), 1.0, 2),
-            (Some(attribute::POPULATION), 5.0, 0),
+            (Some(attribute::HEADROOM), Amount::new(1.0), 2),
+            (Some(attribute::POPULATION), Amount::new(5.0), 0),
         ],
         ..Master::default()
     };
@@ -908,7 +941,7 @@ fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
         (Class::Static, Some(attribute::POPULATION), Amount::new(5.0))
     );
     assert_eq!((u.life.death_facets, u.sprite), (Some(8), None));
-    assert_eq!(t.players[1].attributes[4], food + 1.0);
+    assert_eq!(t.players[1].attributes[4], food + Amount::new(1.0));
     let i = t
         .plain_object(
             PlayerId::new(1),

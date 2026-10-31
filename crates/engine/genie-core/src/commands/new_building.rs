@@ -25,6 +25,7 @@ use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::BUILDING_COST;
 use crate::unit_ai::UnitAi;
@@ -55,7 +56,7 @@ impl World {
                 .get_mut(resource.index())
                 .ok_or(crate::world::NO_ATTRIBUTE)?;
             if paid {
-                *slot -= f32::from(amount);
+                *slot -= Amount::new(f32::from(amount));
             }
         }
         Ok(made)
@@ -83,7 +84,7 @@ impl World {
                 .sum();
             self.players
                 .player_mut(player)?
-                .add_attribute(BUILDING_COST, paid as f32)?;
+                .add_attribute(BUILDING_COST, Amount::new(paid as f32))?;
         }
         Ok(())
     }

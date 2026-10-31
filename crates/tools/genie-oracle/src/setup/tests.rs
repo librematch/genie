@@ -101,7 +101,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         )
     );
     assert_eq!(
-        p.resources().map(f32::to_bits),
+        p.resources().map(|r| r.get().to_bits()),
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)
     );
     assert!(p.dropped && !p.resigned);

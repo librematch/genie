@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::objects::ObjectId;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::FARM_FOOD_AMOUNT;
@@ -179,13 +180,13 @@ impl World {
                 amount,
             } => {
                 // the effect's player's attribute `scale` scales the amount
-                let amount = self.scaled_amount(p, scale, amount);
+                let amount = Amount::new(self.scaled_amount(p, scale, amount));
                 // a negative attribute is none: nothing changes
                 let Some(attribute) = attribute else {
                     return Ok(());
                 };
                 if party == Party::Own && attribute == FARM_FOOD_AMOUNT {
-                    *farms = Some((self.attribute_of(p, FARM_FOOD_AMOUNT), amount));
+                    *farms = Some((self.attribute_of(p, FARM_FOOD_AMOUNT).get(), amount.get()));
                 }
                 for q in self.party(p, party) {
                     self.modify_resource(q, attribute, amount, change)?;
@@ -265,14 +266,14 @@ impl World {
     ) -> f32 {
         scale
             .and_then(|a| self.players.get(p.index())?.attribute(a))
-            .map_or(amount, |scale| amount * scale)
+            .map_or(amount, |scale| (amount * scale).get())
     }
 
     /// Player `p`'s attribute `attribute`, 0 past its count (`+0x90`, the saved attributes').
-    pub(super) fn attribute_of(&self, p: PlayerId, attribute: AttributeId) -> f32 {
+    pub(super) fn attribute_of(&self, p: PlayerId, attribute: AttributeId) -> Amount {
         self.players
             .get(p.index())
             .and_then(|player| player.attribute(attribute))
-            .unwrap_or(0.0)
+            .unwrap_or(Amount::ZERO)
     }
 }

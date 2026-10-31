@@ -16,6 +16,7 @@ use genie_core::map::Point;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::orders::{Interact, MoveOrder};
+use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::tribute::Gift;
 use genie_rec::de::command::{self as packets, Command as Packet};
@@ -435,10 +436,10 @@ fn tribute(c: &packets::TribeGiveAttributes) -> Command {
         player: PlayerId::from(c.commp_id),
         to: PlayerId::from(c.to),
         gifts: [
-            gift(c.attr, c.amt, c.cost),
-            gift(c.field_0x26, c.field_0x08, c.field_0x18),
-            gift(c.field_0x28, c.field_0x0c, c.field_0x1c),
-            gift(c.field_0x2a, c.field_0x10, c.field_0x20),
+            gift(c.attr, Amount::new(c.amt), c.cost),
+            gift(c.field_0x26, Amount::new(c.field_0x08), c.field_0x18),
+            gift(c.field_0x28, Amount::new(c.field_0x0c), c.field_0x1c),
+            gift(c.field_0x2a, Amount::new(c.field_0x10), c.field_0x20),
         ],
     })
 }

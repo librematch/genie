@@ -2131,11 +2131,11 @@ fn switch_masters() -> (Master, Master) {
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: 10,
         storage: vec![
-            (Some(attribute::HEADROOM), 1.0, 2),
-            (Some(attribute::POPULATION), 1.0, 16),
-            (Some(AttributeId::numbered(12)), 2.0, 32),
-            (Some(AttributeId::numbered(13)), 3.0, 1),
-            (None, 1.0, 2),
+            (Some(attribute::HEADROOM), Amount::new(1.0), 2),
+            (Some(attribute::POPULATION), Amount::new(1.0), 16),
+            (Some(AttributeId::numbered(12)), Amount::new(2.0), 32),
+            (Some(AttributeId::numbered(13)), Amount::new(3.0), 1),
+            (None, Amount::new(1.0), 2),
         ],
         ..Master::default()
     };
@@ -2147,8 +2147,8 @@ fn switch_masters() -> (Master, Master) {
         radius: Footprint::new(0.3, 0.3),
         standing_sprite: 11,
         storage: vec![
-            (Some(attribute::HEADROOM), 1.0, 2),
-            (Some(AttributeId::numbered(14)), 1.0, 16),
+            (Some(attribute::HEADROOM), Amount::new(1.0), 2),
+            (Some(AttributeId::numbered(14)), Amount::new(1.0), 16),
         ],
         volley_fire: 3.0,
         obstruction_type: ObstructionType::TYPE_3,
@@ -2196,13 +2196,16 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
     let (switched, u, record) = switched_in_the_open(showing, &old, &next, &[10, 11]).unwrap();
     assert_eq!(
         switched.leaving,
-        [
+        crate::test_ids::adds([
             (attribute::HEADROOM, -1.0),
             (attribute::POPULATION, -1.0),
             (AttributeId::numbered(12), -2.0)
-        ]
+        ])
     );
-    assert_eq!(switched.coming, [(attribute::HEADROOM, 1.0)]);
+    assert_eq!(
+        switched.coming,
+        crate::test_ids::adds([(attribute::HEADROOM, 1.0)])
+    );
     assert!(switched.promoted);
     assert_eq!(
         (u.life.master_id, u.life.hp, u.firepower),
@@ -4313,7 +4316,7 @@ fn foraging() -> World {
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
-    t.players[1].attributes = vec![0.0; 10];
+    t.players[1].attributes = vec![Amount::ZERO; 10];
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(6.0));
     t
