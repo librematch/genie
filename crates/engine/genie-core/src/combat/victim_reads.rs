@@ -4,6 +4,7 @@ use crate::combat::damage::{ElevationBonus, Victim};
 use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
+use crate::objects::HitPoints;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::master_type::{BUILDING, RGE_COMBAT};
@@ -165,7 +166,7 @@ pub(crate) fn victim_of(
             // the main building of an annex it reaches, which lies within the annex offset of
             // that annex, inside the six tiles the pass reaches past the radius; a trample reads
             // its target's or its main building's after its own blast
-            blast_taken: 0.0,
+            blast_taken: HitPoints::ZERO,
             trebuchet: is_trebuchet(master),
             cost: paid_cost(master),
             damaged_lately: u.damaged_lately,

@@ -254,7 +254,7 @@ impl UnitAi {
         }
         let t = side.duel(target.id)?;
         // "my current target cannot damage me": UCOMISS, JP, JNZ (exactly 0)
-        if (t.attacks == 0.0 || t.harms == 0.0) && !t.converts {
+        if (t.attacks == 0.0 || t.harms == HitPoints::ZERO) && !t.converts {
             if matches!(
                 self.current_order,
                 Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -267,16 +267,16 @@ impl UnitAi {
                 self.current_order = None;
             }
         }
-        let target_time = if 0.0 < t.harmed {
+        let target_time = if HitPoints::ZERO < t.harmed {
             t.hp / t.harmed
         } else {
-            HitPoints::new(NEVER_KILLED)
+            NEVER_KILLED
         };
         let a = side.duel(attacker_id)?;
-        let attacker_time = if 0.0 < a.harmed {
+        let attacker_time = if HitPoints::ZERO < a.harmed {
             a.hp / a.harmed
         } else {
-            HitPoints::new(NEVER_KILLED)
+            NEVER_KILLED
         };
         // "my current target will take longer to kill"
         if !t.converts && (attacker_time < target_time || a.converts) {

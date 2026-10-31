@@ -208,7 +208,7 @@ impl World {
                     }
                     self.players[p].objects[i].abilities.movement_damage_timer =
                         Seconds::new(task.work_val2);
-                    self.movement_hit(b, owner, task.work_val1)?;
+                    self.movement_hit(b, owner, HitPoints::new(task.work_val1))?;
                 }
             }
         }
@@ -268,7 +268,7 @@ impl World {
         &mut self,
         b: Bystander,
         owner: PlayerId,
-        damage: f32,
+        damage: HitPoints,
     ) -> Result<(), GenieError> {
         if b.kind == DOPPELGANGER {
             return Ok(());
@@ -285,7 +285,7 @@ impl World {
             self.spatial.terrain.as_ref(),
             self.mode_680,
         );
-        crate::combat::damage::lose(&mut v, HitPoints::new(damage));
+        crate::combat::damage::lose(&mut v, damage);
         let killed = finish(&mut v);
         let (_, u) = self
             .object_mut(b.id)

@@ -910,7 +910,7 @@ fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
     );
     assert_eq!(
         blasted[0].building.as_ref().map(|b| b.blast_taken),
-        Some(5.0)
+        Some(HitPoints::new(5.0))
     );
 }
 
@@ -929,25 +929,28 @@ fn a_trample_reads_a_building_s_blast_so_far_or_its_main_building_s() {
             },
         )
     };
-    assert_eq!(blast_so_far(&building(None, 3.0), &[]), Ok(3.0));
-    let main = building(None, 5.0);
+    assert_eq!(
+        blast_so_far(&building(None, HitPoints::new(3.0)), &[]),
+        Ok(HitPoints::new(3.0))
+    );
+    let main = building(None, HitPoints::new(5.0));
     let main = Victim {
         id: object_id(20),
         ..main
     };
     assert_eq!(
-        blast_so_far(&building(Some(object_id(20)), 3.0), &[main]),
-        Ok(5.0)
+        blast_so_far(&building(Some(object_id(20)), HitPoints::new(3.0)), &[main]),
+        Ok(HitPoints::new(5.0))
     );
     assert_eq!(
-        blast_so_far(&building(Some(object_id(20)), 3.0), &[]),
+        blast_so_far(&building(Some(object_id(20)), HitPoints::new(3.0)), &[]),
         Err(crate::construction::build::NOT_HELD)
     );
     let unit = Victim {
         kind: master_type::COMBAT,
         ..Victim::default()
     };
-    assert_eq!(blast_so_far(&unit, &[]), Ok(0.0));
+    assert_eq!(blast_so_far(&unit, &[]), Ok(HitPoints::ZERO));
 }
 
 /// A world holding the target `id` of `player` and class `class` at `at`, radius 0.2.

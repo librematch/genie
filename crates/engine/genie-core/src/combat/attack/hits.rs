@@ -6,6 +6,7 @@ use crate::combat::damage::Victim;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
+use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -142,19 +143,19 @@ pub(crate) fn strike(
     });
     let weapons = own.weapons.clone();
     let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
-    damage::take(victim, own, &mut others, &weapons, factor, 0.0)?;
+    damage::take(victim, own, &mut others, &weapons, factor, HitPoints::ZERO)?;
     Ok(struck)
 }
 
 /// The blast's damage so far that a trample's hit on `victim` leaves out (`0x141211933`): a
 /// building's `+0xb90`, its main building's (`+0xbb8`, among `blasted`) for an annex; 0 for
 /// another object.
-pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<f32, GenieError> {
+pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<HitPoints, GenieError> {
     // The livestock (58, `0x3a`) and farm (49, `0x31`) classes: the ally test spares an Attack on
     // one that was its unit's player's when the Attack took it ([`Attack::same_owner`]).
     // A building's master type (`'P'`), whose main building (`+0xbb8`) an area effect attacks.
     let Some(b) = victim.building.as_ref().filter(|_| victim.kind == BUILDING) else {
-        return Ok(0.0);
+        return Ok(HitPoints::ZERO);
     };
     let Some(main) = b.main else {
         return Ok(b.blast_taken);
@@ -162,6 +163,10 @@ pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<f32, G
     blasted
         .iter()
         .find(|v| v.id == main)
-        .map(|m| m.building.as_ref().map_or(0.0, |mb| mb.blast_taken))
+        .map(|m| {
+            m.building
+                .as_ref()
+                .map_or(HitPoints::ZERO, |mb| mb.blast_taken)
+        })
         .ok_or(crate::construction::build::NOT_HELD)
 }

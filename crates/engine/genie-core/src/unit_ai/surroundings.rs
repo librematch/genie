@@ -342,9 +342,9 @@ pub struct Duel {
     /// Its attacks' sum (slot 0x228, `FUN_141084070`: its master's attacks above 0).
     pub attacks: f32,
     /// What it deals the unit per hit (the unit's slot 0x220 with it, `FUN_141083f20`).
-    pub harms: f32,
+    pub harms: HitPoints,
     /// What the unit deals it per hit (its slot 0x220 with the unit).
-    pub harmed: f32,
+    pub harmed: HitPoints,
     /// Its hit points (`+0x278`).
     pub hp: HitPoints,
 }

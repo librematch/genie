@@ -6,6 +6,7 @@ use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::master_type::BUILDING;
@@ -153,7 +154,7 @@ impl WorldPicker<'_> {
         spatial: &Spatial,
         from: ObjectId,
         to: ObjectId,
-    ) -> Result<f32, GenieError> {
+    ) -> Result<HitPoints, GenieError> {
         let (fq, f, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
         let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
         let terrain = spatial.terrain.as_ref();

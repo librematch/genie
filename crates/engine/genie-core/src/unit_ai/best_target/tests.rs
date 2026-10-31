@@ -29,7 +29,7 @@ fn candidate(id: i32, distance: Distance, speed: f32) -> Candidate {
         speed: Speed::new(speed),
         armed: true,
         reach: Distance::new(1.0),
-        damage: 4.0,
+        damage: HitPoints::new(4.0),
         hp: HitPoints::new(40.0),
         reload: Seconds::new(2.0),
         workable: false,
@@ -47,12 +47,12 @@ fn the_statistics_count_bound_and_time_each_object() {
     st.add(&Candidate {
         current: true,
         class: class::BUILDING,
-        damage: 0.0,
+        damage: HitPoints::ZERO,
         workable: true,
         ..candidate(2, Distance::new(0.5), 0.0)
     });
     st.add(&Candidate {
-        damage: 0.0,
+        damage: HitPoints::ZERO,
         category: None,
         armed: false,
         ..candidate(3, Distance::new(7.0), 2.0)

@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::damage::{Armored, Attacker, Victim, charge_damage, charge_works};
+use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
@@ -166,7 +167,7 @@ pub fn armor_damage(
     factor: f32,
     attacker: &Attacker,
     bonus: f32,
-) -> Result<f32, GenieError> {
+) -> Result<HitPoints, GenieError> {
     let a = v.armored.as_ref().ok_or(GenieError::unsupported(
         "the armor of an object without combat values",
     ))?;
@@ -224,11 +225,11 @@ pub fn armor_damage(
         }
     }
     let least = if attacker.mode_680 == 1 { 0.0 } else { 1.0 };
-    Ok(if weapons.is_empty() {
+    Ok(HitPoints::new(if weapons.is_empty() {
         sum
     } else if least > sum {
         least
     } else {
         sum
-    })
+    }))
 }

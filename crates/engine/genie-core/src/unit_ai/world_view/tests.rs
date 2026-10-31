@@ -413,7 +413,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         (
             true,
             Distance::new(0.5),
-            6.0,
+            HitPoints::new(6.0),
             HitPoints::new(40.0),
             Seconds::new(2.0)
         )

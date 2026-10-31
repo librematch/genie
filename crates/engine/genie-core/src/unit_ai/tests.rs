@@ -3303,8 +3303,8 @@ fn a_computer_s_unit_weighs_its_target_against_its_attacker() {
     let duel = |converts: bool, attacks: f32, harmed: f32, hp: HitPoints| Duel {
         converts,
         attacks,
-        harms: 2.0,
-        harmed,
+        harms: HitPoints::new(2.0),
+        harmed: HitPoints::new(harmed),
         hp,
     };
     let run = |at: &Surroundings, attacker: UnitSeen, target: UnitSeen, duels| {

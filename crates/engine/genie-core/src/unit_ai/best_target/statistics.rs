@@ -88,7 +88,7 @@ pub struct Candidate {
     pub reach: Distance,
     /// The unit's damage per hit to it (its slot 0x220, `FUN_141083f20`: the unit's elevation
     /// factor and its armor against the unit's attacks).
-    pub damage: f32,
+    pub damage: HitPoints,
     /// Its hit points (`+0x278`).
     pub hp: HitPoints,
     /// The unit's reload time (slot 0x218).
@@ -225,8 +225,8 @@ impl Statistics {
             self.in_reach += 1;
         }
         self.distance.take(c.distance);
-        e.kill_time = if crate::math::fmath::below_or_unordered(EPSILON, c.damage) {
-            (c.hp.get() / c.damage) / c.reload.get()
+        e.kill_time = if crate::math::fmath::below_or_unordered(EPSILON, c.damage.get()) {
+            (c.hp / c.damage) / c.reload.get()
         } else if c.workable {
             NO_DAMAGE_KILL
         } else {

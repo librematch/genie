@@ -34,7 +34,7 @@ pub(super) fn damage(
     src: &mut Victim,
     weapons: &[crate::objects::masters::ClassAmount],
     factor: f32,
-    blast_taken: f32,
+    blast_taken: HitPoints,
 ) -> Result<(), GenieError> {
     let d = armor_damage(t, weapons, factor, &src.source, bonus_damage(src, t))?;
     if blast_taken < d {
@@ -45,7 +45,7 @@ pub(super) fn damage(
                 src.source.charge = 0.0;
             }
         }
-        lose(t, HitPoints::new(d - blast_taken));
+        lose(t, d - blast_taken);
     }
     let marks = t.kind == COMBAT
         || (t.kind == BUILDING && matches!(t.class, class::CLASS_51 | class::CLASS_54));
@@ -165,7 +165,7 @@ pub fn blast(
         .filter(|t| t.kind == BUILDING && blast.on_tiles(t))
     {
         if let Some(b) = t.building.as_mut() {
-            b.blast_taken = 0.0;
+            b.blast_taken = HitPoints::ZERO;
         }
     }
     attacker.source.charge_hit = false;
@@ -296,15 +296,19 @@ pub(super) fn ledger_values(
     i: usize,
     ledger: Option<usize>,
     a: &Attacker,
-) -> (f32, u8, f32) {
-    let taken = |v: &Victim| v.building.as_ref().map_or(0.0, |b| b.blast_taken);
+) -> (f32, u8, HitPoints) {
+    let taken = |v: &Victim| {
+        v.building
+            .as_ref()
+            .map_or(HitPoints::ZERO, |b| b.blast_taken)
+    };
     match ledger {
         Some(k) if k != i => {
             let m = &*targets[k];
             (m.source.area_damage, m.blast_defense, taken(m))
         }
         Some(_) => (a.area_damage, targets[i].blast_defense, taken(&*targets[i])),
-        None => (a.area_damage, targets[i].blast_defense, 0.0),
+        None => (a.area_damage, targets[i].blast_defense, HitPoints::ZERO),
     }
 }
 
@@ -436,7 +440,7 @@ pub(super) fn blast_hit(
     targets: &mut [&mut Victim],
     i: usize,
     (weapons, factor): (&[crate::objects::masters::ClassAmount], f32),
-    (ledger, blast_taken): (Option<usize>, f32),
+    (ledger, blast_taken): (Option<usize>, HitPoints),
 ) -> Result<(), GenieError> {
     let before = targets[i].hp;
     let mut t = std::mem::replace(&mut *targets[i], Victim::placeholder());
@@ -452,7 +456,7 @@ pub(super) fn blast_hit(
             None => None,
         };
         if let Some(b) = ledger {
-            b.blast_taken += lost.get();
+            b.blast_taken += lost;
         }
     }
     *targets[i] = t;

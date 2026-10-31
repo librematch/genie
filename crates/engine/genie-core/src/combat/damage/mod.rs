@@ -222,7 +222,7 @@ pub struct Building {
     /// `+0xbc0`..`+0xbd8`: its annexes, which take its hit points after each hit.
     pub annexes: Vec<ObjectId>,
     /// `+0xb90` (not saved): the damage the blast under way has done to it ([`blast`]).
-    pub blast_taken: f32,
+    pub blast_taken: HitPoints,
     /// `FUN_140fde380` on its master: of type 70 and up, of class 51 or 54, with a weapon
     /// (`+0x810` above 0): a trebuchet, whose kill counts as a unit's.
     pub trebuchet: bool,

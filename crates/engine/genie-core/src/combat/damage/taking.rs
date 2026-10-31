@@ -41,7 +41,7 @@ pub fn take(
     others: &mut [&mut Victim],
     weapons: &[crate::objects::masters::ClassAmount],
     factor: f32,
-    blast_taken: f32,
+    blast_taken: HitPoints,
 ) -> Result<(), GenieError> {
     match t.kind {
         COMBAT => take_unit(t, src, others, weapons, factor, blast_taken),
@@ -129,7 +129,7 @@ pub(super) fn take_building(
     weapons: &[crate::objects::masters::ClassAmount],
     factor: f32,
     forward: bool,
-    blast_taken: f32,
+    blast_taken: HitPoints,
 ) -> Result<bool, GenieError> {
     let before = t.hp;
     let main = t.building.as_ref().and_then(|b| b.main);
@@ -156,7 +156,7 @@ pub(super) fn take_building(
     damage(t, src, weapons, factor, blast_taken)?;
     // the kill of its damage ran slot 0x8b0, which counts it (+0x954)
     let counted = t.killed.is_some();
-    if blast_taken == 0.0 {
+    if blast_taken == HitPoints::ZERO {
         let least = if src.source.mode_680 == 1 && LEAST_HIT_CLASSES.contains(&src.source.class) {
             LEAST_CLASS_HIT
         } else {
@@ -301,7 +301,7 @@ pub(super) fn take_unit(
     others: &mut [&mut Victim],
     weapons: &[crate::objects::masters::ClassAmount],
     factor: f32,
-    blast_taken: f32,
+    blast_taken: HitPoints,
 ) -> Result<(), GenieError> {
     let before = effective(t);
     if t.hp < HitPoints::new(1.0) {
@@ -377,7 +377,7 @@ pub(super) fn retaliates(
         f *= RETALIATION_SCALE;
     }
     let w = t.weapons.clone();
-    take(src, t, others, &w, f, 0.0)?;
+    take(src, t, others, &w, f, HitPoints::ZERO)?;
     Ok(src.hp <= HitPoints::new(1.0))
 }
 
