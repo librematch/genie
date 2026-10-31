@@ -92,16 +92,16 @@ fn started() -> RepairAction {
 fn the_work_counts_half_for_each_repairer_past_the_first() {
     assert_eq!(
         work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), None),
-        1.0 * 0.5 * 0.05
+        HitPoints::new(1.0 * 0.5 * 0.05)
     );
     assert_eq!(
         work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(1)),
-        1.0 * 0.5 * 0.05
+        HitPoints::new(1.0 * 0.5 * 0.05)
     );
     let alone = 1.0f32 * 0.5 * 0.05;
     assert_eq!(
         work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(3)),
-        alone * (((3.0 - 1.0) * 0.5 + 1.0) / 3.0)
+        HitPoints::new(alone * (((3.0 - 1.0) * 0.5 + 1.0) / 3.0))
     );
 }
 
@@ -176,7 +176,10 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
         masters: &masters,
         attributes: &mut wood,
     };
-    assert_eq!(repair_building(&mut set, 0, 10.0, true, &mut payer), Ok(0));
+    assert_eq!(
+        repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
+        Ok(0)
+    );
     assert_eq!(set[0].hp, HitPoints::new(510.0));
     let share = 0.15f32 * 10.0 / 550.0;
     assert_eq!(wood.0[1], Amount::new(100.0 - 25.0 * share));
@@ -184,7 +187,10 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
         masters: &masters,
         attributes: &mut wood,
     };
-    assert_eq!(repair_building(&mut set, 0, 50.0, true, &mut payer), Ok(1));
+    assert_eq!(
+        repair_building(&mut set, 0, HitPoints::new(50.0), true, &mut payer),
+        Ok(1)
+    );
     assert_eq!(set[0].hp, HitPoints::new(550.0));
     let mut broke = Held(vec![Amount::ZERO; 4]);
     let mut set = vec![house(1, HitPoints::new(500.0))];
@@ -192,10 +198,16 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
         masters: &masters,
         attributes: &mut broke,
     };
-    assert_eq!(repair_building(&mut set, 0, 10.0, true, &mut payer), Ok(2));
+    assert_eq!(
+        repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
+        Ok(2)
+    );
     assert_eq!(set[0].hp, HitPoints::new(500.0));
     let mut set = vec![house(1, HitPoints::new(0.5))];
-    assert_eq!(repair_building(&mut set, 0, 10.0, true, &mut payer), Ok(2));
+    assert_eq!(
+        repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
+        Ok(2)
+    );
 }
 
 /// From its repairer an annex's repair is its main building's, which repairs its annexes
@@ -223,7 +235,10 @@ fn an_annex_s_repair_goes_to_its_main_building_and_its_annexes() {
         masters: &masters,
         attributes: &mut wood,
     };
-    assert_eq!(repair_building(&mut set, 0, 20.0, true, &mut payer), Ok(1));
+    assert_eq!(
+        repair_building(&mut set, 0, HitPoints::new(20.0), true, &mut payer),
+        Ok(1)
+    );
     assert_eq!(
         (set[0].hp, set[1].hp),
         (HitPoints::new(520.0), HitPoints::new(550.0))
@@ -252,7 +267,10 @@ fn a_siege_unit_s_repair_pays_its_unit_share() {
         masters: &masters,
         attributes: &mut held,
     };
-    assert_eq!(repair_unit(&mut set, 0, 10.0, &mut payer), Ok(0));
+    assert_eq!(
+        repair_unit(&mut set, 0, HitPoints::new(10.0), &mut payer),
+        Ok(0)
+    );
     let share = 0.5f32 * 10.0 / 175.0;
     assert_eq!(set[0].hp, HitPoints::new(110.0));
     assert_eq!(
@@ -626,7 +644,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     assert_eq!(
         the_house(&t),
         (
-            300.0 + work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(1)),
+            300.0 + work_amount(WorkRate::new(1.0), 0.5, Seconds::new(0.05), Some(1)).get(),
             1,
             1
         )

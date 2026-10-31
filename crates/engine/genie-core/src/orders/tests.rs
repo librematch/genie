@@ -922,7 +922,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
                 objects,
                 formations: crate::world::Formations {
                     auto: true,
-                    influence: 3.0,
+                    influence: Distance::new(3.0),
                     by_speed: false,
                     ..crate::world::Formations::default()
                 },
@@ -3389,7 +3389,7 @@ fn the_box_of_an_order_moves_only_its_least_value_for_a_lower_one() {
 fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     let f = crate::world::Formations {
         auto: true,
-        influence: 3.0,
+        influence: Distance::new(3.0),
         by_speed: false,
         ..crate::world::Formations::default()
     };
@@ -3434,7 +3434,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     let far = unit(9187, true, Position::new(80.0, 94.0, 0.0));
     assert!(!splits_together(&scout, &far, f, false, &mut none, &mut away).unwrap());
     let wide = crate::world::Formations {
-        influence: 40.0,
+        influence: Distance::new(40.0),
         ..f
     };
     assert!(splits_together(&scout, &far, wide, false, &mut none, &mut away).unwrap());

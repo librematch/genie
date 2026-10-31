@@ -10,6 +10,7 @@ use crate::map::spatial::Spatial;
 use crate::math::fmath::BVector;
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -241,7 +242,7 @@ fn repairee_of(
 pub(crate) fn repair_target(
     c: &mut Step<'_>,
     target: Option<ObjectId>,
-    amount: f32,
+    amount: HitPoints,
 ) -> Result<(u8, MasterKind), GenieError> {
     let player = c.player;
     let mut set = Vec::new();

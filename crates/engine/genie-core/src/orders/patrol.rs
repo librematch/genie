@@ -304,7 +304,7 @@ impl World {
             }
             // slot 0x520: +0x824 as the game holds it (x, height, y)
             let d = crate::math::fmath::sub(BVector::new(moved.x(), moved.z(), moved.y()), at);
-            let influence = self.players.player(p)?.formations.influence;
+            let influence = self.players.player(p)?.formations.influence.get();
             if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() <= influence * influence {
                 let _ = split.loose.remove(i);
                 let _ = self.add_to_group(group, id)?;

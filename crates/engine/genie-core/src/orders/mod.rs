@@ -286,13 +286,16 @@ fn splits_together(
         && let Some((code, length)) = path(a, b)?
     {
         let joins =
-            code == 1 && crate::math::fmath::at_most_or_unordered(length.get(), f.influence);
+            code == 1 && crate::math::fmath::at_most_or_unordered(length.get(), f.influence.get());
         if !joins {
             let _ = far.insert(b.id);
         }
         return Ok(joins);
     }
-    Ok(crate::math::fmath::at_most_or_unordered(d, f.influence))
+    Ok(crate::math::fmath::at_most_or_unordered(
+        d,
+        f.influence.get(),
+    ))
 }
 
 /// The trophy master `TRANSFORM_OBJECT` changes ("Trophy None") and the trophies it may take.

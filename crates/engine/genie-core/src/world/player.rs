@@ -1,6 +1,7 @@
 //! A player ([`Player`]): its objects, attributes and formations, and the stop of its update.
 
 use crate::GenieError;
+use crate::map::Distance;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::object_list::ObjectList;
@@ -18,7 +19,7 @@ pub struct Formations {
     /// The splitter groups units at all (`+0x6c0` not 0).
     pub auto: bool,
     /// How near two units join (`+0x6c4`).
-    pub influence: f32,
+    pub influence: Distance,
     /// Units whose speeds differ by more than [`crate::orders`]'s gap do not join (`+0x6c8` 1).
     pub by_speed: bool,
     /// `mMinColumnDistance` (`+0x6b8`): a group's move along a longer path forms a column

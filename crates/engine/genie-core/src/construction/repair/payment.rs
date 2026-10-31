@@ -99,7 +99,7 @@ pub(super) fn find(set: &[Repaired], id: ObjectId) -> Result<usize, GenieError> 
 pub fn repair_building(
     set: &mut [Repaired],
     idx: usize,
-    amount: f32,
+    amount: HitPoints,
     top: bool,
     payer: &mut Payer<'_>,
 ) -> Result<u8, GenieError> {
@@ -126,12 +126,12 @@ pub fn repair_building(
         }
     }
     let o = &set[idx];
-    let most = f32::from(o.master_hp);
+    let most = HitPoints::of_master(o.master_hp);
     let mut amount = amount;
-    if most < o.hp.get() + amount {
-        amount = most - o.hp.get();
+    if most < o.hp + amount {
+        amount = most - o.hp;
     }
-    let share = o.building_repair_cost * amount / most;
+    let share = (o.building_repair_cost * amount) / most;
     if crate::production::pay(payer.masters, o.master, share, &mut *payer.attributes)? {
         return repair_unit(set, idx, amount, payer);
     }
@@ -150,28 +150,23 @@ pub fn repair_building(
 pub fn repair_unit(
     set: &mut [Repaired],
     idx: usize,
-    amount: f32,
+    amount: HitPoints,
     payer: &mut Payer<'_>,
 ) -> Result<u8, GenieError> {
     let o = &mut set[idx];
     let mut amount = amount;
     if COSTED.contains(&o.class) {
-        let most = f32::from(o.master_hp) + o.hp_powerup.max.get();
-        let now = (o.hp_powerup.room() + o.hp).get();
+        let most = HitPoints::of_master(o.master_hp) + o.hp_powerup.max;
+        let now = o.hp_powerup.room() + o.hp;
         if most < now + amount {
             amount = most - now;
         }
-        let share = o.unit_repair_cost * amount / most;
+        let share = (o.unit_repair_cost * amount) / most;
         if !crate::production::pay(payer.masters, o.master, share, &mut *payer.attributes)? {
             return Ok(2);
         }
     }
-    let full = crate::combat::damage::heal_hp(
-        &mut o.hp,
-        &mut o.hp_powerup,
-        o.master_hp,
-        HitPoints::new(amount),
-    );
+    let full = crate::combat::damage::heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount);
     Ok(u8::from(full))
 }
 

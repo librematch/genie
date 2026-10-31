@@ -13,6 +13,7 @@ use crate::math::rng::Stream;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, Sprites, TargetMoved, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, footprint_gap};
+use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkRate;
@@ -29,7 +30,12 @@ use crate::world::step::Step;
 /// `work_value` times the world's `dt`; with more than one repairer (`repairers`, `COMISS` with
 /// `JBE`) it is scaled by `((n − 1) × 0.5 + 1) / n`.
 #[must_use]
-pub fn work_amount(rate: WorkRate, work_value: f32, dt: Seconds, repairers: Option<u8>) -> f32 {
+pub fn work_amount(
+    rate: WorkRate,
+    work_value: f32,
+    dt: Seconds,
+    repairers: Option<u8>,
+) -> HitPoints {
     let mut amount = rate * work_value * dt;
     if let Some(n) = repairers {
         let n = f32::from(n);
@@ -37,7 +43,7 @@ pub fn work_amount(rate: WorkRate, work_value: f32, dt: Seconds, repairers: Opti
             amount *= ((n - ONE) * EXTRA_REPAIRER + ONE) / n;
         }
     }
-    amount
+    HitPoints::new(amount)
 }
 
 /// The repairer's slot 0x328: notify `kind` with the repair's action value to its unit AI.

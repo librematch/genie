@@ -163,7 +163,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 ai_settings: ai_settings(&p.world_player().base),
                 formations: genie_core::world::Formations {
                     auto: p.world_player().base.auto_formations != 0,
-                    influence: p.world_player().base.formation_influence_distance,
+                    influence: Distance::new(p.world_player().base.formation_influence_distance),
                     by_speed: p.world_player().base.break_auto_formations_by_speed == 1,
                     min_column_distance: p.world_player().base.min_column_distance,
                     column_to_line_distance: p.world_player().base.column_to_line_distance,
