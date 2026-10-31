@@ -283,8 +283,7 @@ impl World {
             return Ok(());
         };
         // the active slot nearest the group's place, and the box around the tester and them
-        let (bounds, nearest) =
-            passability_box(&formation.slots, tester.moved_vector().xhy(), position);
+        let (bounds, nearest) = passability_box(&formation.slots, tester.moved_vector(), position);
         let k = nearest.ok_or(NO_NEAREST_SLOT)?;
         if !stands(formation.slots.checked(k)?.transform_position) {
             if !stands(position) {

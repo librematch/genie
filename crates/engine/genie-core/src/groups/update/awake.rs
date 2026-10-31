@@ -303,8 +303,7 @@ impl World {
             let v = self
                 .world_object(m.id)
                 .ok_or_else(|| member_gone(m.id))?
-                .moved_vector()
-                .xhy();
+                .moved_vector();
             sum = BVector::new(sum.x() + v.x(), sum.height() + v.height(), sum.y() + v.y());
         }
         let n = g.members.len() as i32 as f32;

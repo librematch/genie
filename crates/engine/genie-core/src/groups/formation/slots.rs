@@ -89,7 +89,7 @@ impl World {
             if used.contains(&Some(m.id)) {
                 continue;
             }
-            let at = object.moved_vector().xhy();
+            let at = object.moved_vector();
             let d = (point.height() - at.height()) * (point.height() - at.height())
                 + (point.x() - at.x()) * (point.x() - at.x())
                 + (point.y() - at.y()) * (point.y() - at.y());
@@ -105,7 +105,7 @@ impl World {
     /// zeroed, `sqrt(x² + 0 + y²)`), None for a unit the world does not hold.
     pub(super) fn slot_distance(&self, at: BVector, id: ObjectId) -> Option<Distance> {
         let object = self.world_object(id)?;
-        let mut d = sub(at, object.moved_vector().xhy());
+        let mut d = sub(at, object.moved_vector());
         d = d.with_height(0.0);
         Some(Distance::new(crate::math::fmath::sqrt(
             d.x() * d.x() + 0.0 + d.y() * d.y(),
@@ -255,7 +255,7 @@ impl World {
             }
             let category = self.unit_category(Some(object))?;
             let master = i32::from(object.master_id().get());
-            let at = object.moved_vector().xhy();
+            let at = object.moved_vector();
             for (j, slot) in formation.slots.iter().enumerate() {
                 let mut skip = slot.transformed == 0 || slot.active == 0;
                 if slot.desired_category != -1 && category != slot.desired_category {

@@ -556,13 +556,13 @@ pub struct OrderRecord {
     /// The world time it was given (`mTime`).
     pub time: WorldTime,
     /// The unit's slot 0x520 then (`mPosition`: where it last moved to).
-    pub position: crate::math::game_vector::GameVector,
+    pub position: crate::math::fmath::BVector,
     /// The target (`mTargetID`).
     pub target: Option<ObjectId>,
     /// The target's attack category ([`crate::unit_ai::best_target::category`], `mTargetAttackCategory`).
     pub category: Option<best_target::AttackCategory>,
     /// The target's slot 0x520 then (`mTargetPosition`).
-    pub target_position: crate::math::game_vector::GameVector,
+    pub target_position: crate::math::fmath::BVector,
 }
 
 /// The order history's length (`FUN_140c42080`: a ninth order recycles the oldest).

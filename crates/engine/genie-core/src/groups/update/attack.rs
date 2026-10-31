@@ -294,7 +294,7 @@ impl World {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let at = t.moved_vector().xhy();
+        let at = t.moved_vector();
         let from = g.current_target.original_position;
         let d = fmath::sub(at, from);
         if at_most_or_unordered(fmath::sqrt(d.y() * d.y() + d.x() * d.x()), CLOSE) {
@@ -328,8 +328,7 @@ impl World {
         let at = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?
-            .moved_vector()
-            .xhy();
+            .moved_vector();
         let _ = self.command_move_to(
             group,
             Some(target),

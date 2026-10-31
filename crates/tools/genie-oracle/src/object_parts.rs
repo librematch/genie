@@ -6,7 +6,6 @@ use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::Position;
-use genie_core::math::game_vector::GameVector;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::lifecycle::{Class, Lifecycle, MasterData};
@@ -225,10 +224,10 @@ fn order_history(ai: &UnitAiModule) -> Result<Vec<genie_core::unit_ai::OrderReco
                 action: ActionKind::of_field(e.new_oh_action)?,
                 time: WorldTime::from_millis(e.new_oh_time),
                 // the save's 12 bytes are the game's vector, x, height, y
-                position: GameVector::from_xhy(vec3(&e.new_oh_position)),
+                position: vec3(&e.new_oh_position),
                 target: ObjectId::of_field(e.new_oh_target_id),
                 category: AttackCategory::of_field(e.new_oh_target_attack_category)?,
-                target_position: GameVector::from_xhy(vec3(&e.new_oh_target_position)),
+                target_position: vec3(&e.new_oh_target_position),
             })
         })
         .collect()

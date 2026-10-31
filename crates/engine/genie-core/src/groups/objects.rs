@@ -92,10 +92,10 @@ impl WorldObject<'_> {
 
     /// Slot 0x520, where it last moved to as the game's vector (x, height, y): a unit's
     /// ([`crate::objects::unit::Unit::moved_vector`]), a ghost's place (`FUN_141196c10`).
-    pub(crate) fn moved_vector(&self) -> crate::math::game_vector::GameVector {
+    pub(crate) fn moved_vector(&self) -> BVector {
         match *self {
             Self::Unit(_, u) => u.moved_vector(),
-            Self::Ghost(_, g) => crate::math::game_vector::GameVector::of_place(g.position),
+            Self::Ghost(_, g) => g.position.vector(),
         }
     }
 }

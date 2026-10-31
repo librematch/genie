@@ -1,7 +1,7 @@
 //! What a unit's actions hold: their taker, its top action, target and gait.
 
 use crate::GenieError;
-use crate::math::game_vector::GameVector;
+use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::actions::Action;
@@ -18,12 +18,11 @@ impl Unit {
     /// (`FUN_14106d530`, [`crate::movement::Mover::moved_at`]), any other's place
     /// (`FUN_141196c10`).
     #[must_use]
-    pub(crate) fn moved_vector(&self) -> GameVector {
-        GameVector::of_place(
-            self.body
-                .mover()
-                .map_or_else(|| self.position(), |m| m.moved_at),
-        )
+    pub(crate) fn moved_vector(&self) -> BVector {
+        self.body
+            .mover()
+            .map_or_else(|| self.position(), |m| m.moved_at)
+            .vector()
     }
 
     /// The stand-in left in a list for a unit taken out of it ([`TAKEN_OUT`]).

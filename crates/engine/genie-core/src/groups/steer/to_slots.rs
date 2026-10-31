@@ -83,7 +83,7 @@ impl World {
                     .checked(slot)?
                     .transform_position;
                 let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
-                let from = u.moved_vector().xhy();
+                let from = u.moved_vector();
                 let clear = self.line_clear(m.id, from, to, CLEARANCE, &members)?;
                 let dt = self.dt_seconds;
                 let g = self.groups.held_mut(group)?;
@@ -285,7 +285,7 @@ impl World {
             .checked(slot)?;
         let to = s.transform_position;
         let late = s.time < self.world_time;
-        let at = u.moved_vector().xhy();
+        let at = u.moved_vector();
         let mut d = fmath::sub(to, at);
         d = d.with_height(0.0);
         let gap = fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
@@ -333,7 +333,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
-        let from = u.moved_vector().xhy();
+        let from = u.moved_vector();
         if !self.line_clear(id, from, to, CLEARANCE, differentiators)? {
             return self.way_round(group, index, slot, Distance::new(gap), differentiators);
         }

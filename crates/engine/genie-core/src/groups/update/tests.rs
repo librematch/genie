@@ -1170,7 +1170,7 @@ fn a_member_s_own_move_walks_its_path() {
     };
     t.specific_moves_step(group_id(1)).unwrap();
     let (_, u) = t.object(object_id(10)).unwrap();
-    let at = u.moved_vector().xhy();
+    let at = u.moved_vector();
     let own = t.groups.get(group_id(1)).unwrap().members[0].specific_move;
     assert_eq!(own.active, 1);
     assert_eq!(

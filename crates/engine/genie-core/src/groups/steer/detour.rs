@@ -169,7 +169,7 @@ impl World {
                 ..mover.walker(id)
             },
             computer: self.players.get(p.index()).is_some_and(|q| q.computer),
-            at: u.moved_vector().xhy(),
+            at: u.moved_vector(),
             here: u.position(),
             mask: mover.stats.restriction_mask,
             restriction: mover.stats.restriction,

@@ -575,13 +575,13 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
 
 /// `FUN_140c42080` after a notify of a new action: a unit AI with a target the world holds
 /// remembers the order with the world's time, both places as slot 0x520 gives them (a
-/// [`GameVector`]; these hold no movement state) and the target's attack category by its master
+/// [`BVector`]; these hold no movement state) and the target's attack category by its master
 /// (an archer, class 0: 3); one whose target is gone, or on a point, remembers none.
 ///
-/// [`GameVector`]: crate::math::game_vector::GameVector
+/// [`BVector`]: crate::math::fmath::BVector
 #[test]
 fn an_order_on_a_target_joins_the_unit_ai_s_history() {
-    use crate::math::game_vector::GameVector;
+    use crate::math::fmath::BVector;
     let master = |id, class| Master {
         id,
         kind: master_type::COMBAT,
@@ -667,10 +667,10 @@ fn an_order_on_a_target_joins_the_unit_ai_s_history() {
             order: Some(OrderKind::Attack),
             action: Some(ActionKind::Attack),
             time: WorldTime::from_millis(4321),
-            position: GameVector::new(10.0, 0.0, 11.0),
+            position: BVector::new(10.0, 0.0, 11.0),
             target: Some(object_id(2)),
             category: attack_category(3),
-            target_position: GameVector::new(20.0, 1.0, 21.0),
+            target_position: BVector::new(20.0, 1.0, 21.0),
         }]
     );
     assert_eq!(history(ListIndex::new(1)), []);
