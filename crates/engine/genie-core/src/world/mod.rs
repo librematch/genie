@@ -35,6 +35,7 @@ use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -249,7 +250,7 @@ pub struct World {
     /// The planners and the mesh.
     pub pathing: Pathing,
     /// What the sprite clock reads of each graphic (the `.dat`'s).
-    pub graphics: std::collections::BTreeMap<i16, Graphic>,
+    pub graphics: std::collections::BTreeMap<SpriteId, Graphic>,
     /// The game's drop-site table (`dropsites.json`).
     pub drop_sites: Vec<DropSite>,
     /// The game's unit lines (`unitlines.json`, [`crate::objects::lines`]); empty when not loaded.

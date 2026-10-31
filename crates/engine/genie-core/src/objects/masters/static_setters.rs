@@ -104,11 +104,7 @@ impl Master {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::STANDING_GRAPHIC => set_sprite(&mut self.standing_sprite, cvttss2si(v), world),
-            a::STANDING_GRAPHIC_2 => {
-                let mut s = self.standing_sprite_2.unwrap_or(-1);
-                set_sprite(&mut s, cvttss2si(v), world);
-                self.standing_sprite_2 = (0 <= s).then_some(s);
-            }
+            a::STANDING_GRAPHIC_2 => set_sprite(&mut self.standing_sprite_2, cvttss2si(v), world),
             a::DYING_GRAPHIC => set_sprite(&mut self.death_sprite, cvttss2si(v), world),
             a::UNDEAD_GRAPHIC => set_sprite(&mut self.undead_sprite, cvttss2si(v), world),
             _ => {}
@@ -220,11 +216,7 @@ impl Master {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::STANDING_GRAPHIC => add_sprite(&mut self.standing_sprite, v, world),
-            a::STANDING_GRAPHIC_2 => {
-                let mut s = self.standing_sprite_2.unwrap_or(-1);
-                add_sprite(&mut s, v, world);
-                self.standing_sprite_2 = (0 <= s).then_some(s);
-            }
+            a::STANDING_GRAPHIC_2 => add_sprite(&mut self.standing_sprite_2, v, world),
             a::DYING_GRAPHIC => add_sprite(&mut self.death_sprite, v, world),
             a::UNDEAD_GRAPHIC => add_sprite(&mut self.undead_sprite, v, world),
             _ => {}

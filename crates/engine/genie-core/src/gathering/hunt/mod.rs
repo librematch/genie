@@ -20,6 +20,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::Graphic;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -178,7 +179,7 @@ pub struct HuntTask {
     /// The resource it gathers (`attribute_type`, `+0x20`), none for −1.
     pub resource: Option<AttributeId>,
     /// Its moving, proceeding, working and carrying sprites (`+0x40`..`+0x58`).
-    pub sprites: [i16; 4],
+    pub sprites: TaskSprites,
     /// `+0x28`, `work_val1`: what one work gathers per second and work rate.
     pub work_value: f32,
     /// `+0x22`, `attribute_type2`: the player's attribute that scales the gathering, -1 none.

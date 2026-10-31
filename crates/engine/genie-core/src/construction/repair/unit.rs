@@ -18,7 +18,6 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::{Master, Masters};
-use crate::objects::sprite::sprite_id;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -73,7 +72,7 @@ impl Unit {
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
-            standing: sprite_id(own.standing_sprite),
+            standing: own.standing_sprite,
             restriction: own.terrain_restriction,
         })
     }

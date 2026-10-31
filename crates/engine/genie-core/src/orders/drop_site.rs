@@ -188,8 +188,7 @@ impl World {
                 Some(id) => {
                     let found = self.find_work_task(p, idx, id, None, false)?;
                     let range = found.map_or(task_range, |t| t.work_range);
-                    let sprite =
-                        found.and_then(|t| crate::objects::sprite::sprite_id(t.sprites[3]));
+                    let sprite = found.and_then(|t| t.sprites.carrying);
                     DropSearch::Site { id, range, sprite }
                 }
             }

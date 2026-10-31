@@ -11,9 +11,11 @@ use genie_core::map::Offset;
 use genie_core::map::Radii;
 use genie_core::movement::Speed;
 use genie_core::objects::HitPoints;
+use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
@@ -48,7 +50,7 @@ pub(super) fn master_facets(
     }
     let mut seen = sprites
         .into_iter()
-        .filter(|&id| 0 <= id)
+        .filter_map(SpriteId::of_data)
         .filter_map(|id| table.graphics.get(&id))
         .map(|g| genie_core::objects::facing::SpriteFacets {
             count: g.facets,
@@ -158,7 +160,7 @@ pub(super) fn core_task(
         work_range: Distance::new(t.work_range),
         work_flag: t.work_flag,
         enablement,
-        sprites: [t.short_val, t.short_val_2, t.short_val_3, t.short_val_4],
+        sprites: TaskSprites::of_data([t.short_val, t.short_val_2, t.short_val_3, t.short_val_4]),
         sound_events: SoundEvents::new(
             t.gather_sound_event_event_id.cast_signed(),
             t.deposit_sound_event_event_id.cast_signed(),
@@ -247,7 +249,7 @@ pub(super) fn work_masters(
             work.weapon_offset =
                 Offset::new(rc.weapon_offset_x, rc.weapon_offset_y, rc.weapon_offset_z);
             work.missed_spread = rc.missed_missile_spread;
-            work.attack_sprite = rc.fight_sprite_id;
+            work.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
             work.fire_frame = rc.fire_missile_at_frame;
             work.interrupt_frame = rc.interrupt_frame;
             work.hit_chance = rc.base_hit_chance;
@@ -298,9 +300,9 @@ pub(super) fn work_masters(
             b.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
             b.foundation_terrain = saved.on_build_make_tile;
             // `+0x960`, the third of its sprites (`tempId`)
-            b.destruction_sprite = saved.temp_id_3.cast_signed();
+            b.destruction_sprite = SpriteId::of_data(saved.temp_id_3.cast_signed());
             // `+0x950`, the first (`tempId`)
-            b.construction_sprite = saved.temp_id.cast_signed();
+            b.construction_sprite = SpriteId::of_data(saved.temp_id.cast_signed());
         }
         // a missile master's flight: the save's three bytes and arc, the data file's projectile
         // type
@@ -329,7 +331,7 @@ pub(super) fn work_masters(
             .damage_sprite
             .iter()
             .map(|d| genie_core::objects::masters::DamageGraphic {
-                sprite: d.temp_id,
+                sprite: SpriteId::of_data(d.temp_id),
                 percent: d.sprite_info_damage_percent,
                 apply_mode: d.sprite_info_flag,
             })
@@ -352,11 +354,15 @@ pub(super) fn work_masters(
             .filter_map(|t| t.location)
             .collect();
         work.fly_mode = table.fly_mode(civ, s.copy_id()).unwrap_or(0);
-        work.standing_sprite = s.idle_sprite_id;
-        work.standing_sprite_2 = (0 <= s.idle2_sprite_id).then_some(s.idle2_sprite_id);
-        (work.move_sprite, work.run_sprite) =
-            moving_master(m).map_or((-1, -1), |mv| (mv.move_sprite_id, mv.run_sprite_id));
-        work.death_sprite = s.death_sprite_id;
+        work.standing_sprite = SpriteId::of_data(s.idle_sprite_id);
+        work.standing_sprite_2 = SpriteId::of_data(s.idle2_sprite_id);
+        (work.move_sprite, work.run_sprite) = moving_master(m).map_or((None, None), |mv| {
+            (
+                SpriteId::of_data(mv.move_sprite_id),
+                SpriteId::of_data(mv.run_sprite_id),
+            )
+        });
+        work.death_sprite = SpriteId::of_data(s.death_sprite_id);
         work.garrison = s.obj_max;
         work.death_spawns = [
             MasterId::of_data(s.death_spawn_obj_id),
@@ -384,16 +390,17 @@ pub(super) fn moving_stats(
     table: &MasterTable,
 ) -> Option<genie_core::movement::MoveStats> {
     let moving = moving_master(m)?;
-    let sprite = if moving.run_sprite_id >= 0 {
-        moving.run_sprite_id
-    } else {
-        moving.move_sprite_id
-    };
+    let sprite = SpriteId::of_data(moving.run_sprite_id)
+        .or_else(|| SpriteId::of_data(moving.move_sprite_id));
     let base = moving.rge_master_animated_object.max_speed;
-    let factor = table.sprite_speed(sprite).unwrap_or(0.0);
+    let factor = sprite
+        .and_then(|sprite| table.sprite_speed(sprite))
+        .unwrap_or(0.0);
     let turning = table.turning(civ, s.copy_id())?;
     let restriction = genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id)?;
-    let facets = table.graphics.get(&moving.move_sprite_id).map(|g| g.facets);
+    let facets = SpriteId::of_data(moving.move_sprite_id)
+        .and_then(|w| table.graphics.get(&w))
+        .map(|g| g.facets);
     Some(genie_core::movement::MoveStats {
         fly_mode: table.fly_mode(civ, s.copy_id()).unwrap_or(0),
         speed: if 0.0 < factor {

@@ -107,7 +107,7 @@ impl World {
             .master(&self.masters, player)?;
         // the task factory (`FUN_140a97e00` case 7) gives the Attack the task's moving sprite
         let arms =
-            crate::combat::attack::arms(master, &self.graphics, task.sprites, task.sprites[0]);
+            crate::combat::attack::arms(master, &self.graphics, task.sprites, task.sprites.moving);
         let standing = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
         let me_at = *self
             .spatial

@@ -11,6 +11,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Walk;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -3119,7 +3120,7 @@ fn a_new_move_to_s_wait_lasts_a_second() {
 fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
     use crate::objects::sprite::Graphic;
     let with = |factor: f32| Graphic {
-        id: 1,
+        id: SpriteId::named(1),
         frames: 1,
         facets: 8,
         speed_multiplier: factor,

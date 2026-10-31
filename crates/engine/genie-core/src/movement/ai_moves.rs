@@ -6,6 +6,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::action_type;
 use crate::players::PlayerId;
@@ -87,7 +88,7 @@ impl Unit {
         ),
         (masters, graphics, sprite_rng): (
             Option<&Masters>,
-            &std::collections::BTreeMap<i16, Graphic>,
+            &std::collections::BTreeMap<SpriteId, Graphic>,
             &mut Well512,
         ),
     ) -> Result<bool, GenieError> {
@@ -156,7 +157,7 @@ impl Unit {
         point: Position,
         player: PlayerId,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<i16, Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
     ) -> Result<PointMove, GenieError> {
         if self.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
@@ -206,7 +207,7 @@ impl Unit {
     fn point_sprites<'g>(
         &self,
         masters: Option<&Masters>,
-        graphics: &'g std::collections::BTreeMap<i16, Graphic>,
+        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
     ) -> Result<SpriteReads<'g>, GenieError> {
         Ok(SpriteReads::of(
             self.master_in(masters)?,
@@ -389,7 +390,7 @@ impl Unit {
         stance: crate::unit_ai::UnitStance,
         (masters, graphics, sprite_rng): (
             Option<&Masters>,
-            &std::collections::BTreeMap<i16, Graphic>,
+            &std::collections::BTreeMap<SpriteId, Graphic>,
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
@@ -409,11 +410,13 @@ impl Unit {
     pub(crate) fn shows_standing_sprite(
         &mut self,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<i16, Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        let standing = graphics
-            .get(&self.master_in(masters)?.standing_sprite)
+        let standing = self
+            .master_in(masters)?
+            .standing_sprite
+            .and_then(|s| graphics.get(&s))
             .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());

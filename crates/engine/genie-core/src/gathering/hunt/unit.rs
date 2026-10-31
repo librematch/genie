@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -487,7 +488,7 @@ impl Unit {
             them,
             c.w.world_time,
         )?;
-        let (sprites, moving) = self.actions.hunt().map_or(([-1; 4], -1), |h| {
+        let (sprites, moving) = self.actions.hunt().map_or((TaskSprites::NONE, None), |h| {
             let moving = h.task.walk_sprite_id(self.life.held());
             (h.task.sprites, moving)
         });
@@ -534,10 +535,11 @@ impl Unit {
         if !failed {
             return Ok(());
         }
-        let standing =
-            c.w.graphics
-                .get(&self.master(&c.w.masters, c.player)?.standing_sprite)
-                .copied();
+        let standing = self
+            .master(&c.w.masters, c.player)?
+            .standing_sprite
+            .and_then(|s| c.w.graphics.get(&s))
+            .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());
         }

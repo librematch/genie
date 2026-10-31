@@ -11,6 +11,7 @@ use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::AmountRate;
@@ -100,7 +101,7 @@ pub struct Lifecycle {
     /// The master's death sprite (`+0x480`, the slot 0x7a0's): an animated object with one plays
     /// it in state 4.
     #[diff(gap = "stays the import's master's after a master change (a villager's new task)")]
-    pub dying_sprite: Option<i16>,
+    pub dying_sprite: Option<SpriteId>,
     /// The master spawns an object when this one is gone (its death spawn `+0x5e4`, state 7).
     pub death_spawn: bool,
     /// The master's `death_spawn_obj_id2` (`+0x5e6`, the `.dat`'s `blood_unit_id`, −1 for none):
@@ -377,7 +378,7 @@ mod tests {
             l.state
         };
         assert_eq!(
-            step(held(Class::Animated, Some(8220))),
+            step(held(Class::Animated, Some(SpriteId::named(8220)))),
             ObjectState::DyingSprite
         );
         assert_eq!(step(held(Class::Animated, None)), ObjectState::Dead);
@@ -389,7 +390,7 @@ mod tests {
     #[test]
     fn a_dying_sprite_holds_state_4_while_it_animates() {
         let mut sheep = Lifecycle {
-            dying_sprite: Some(8220),
+            dying_sprite: Some(SpriteId::named(8220)),
             ..dead(Class::Animated)
         };
         let mut rng = Well512::default();

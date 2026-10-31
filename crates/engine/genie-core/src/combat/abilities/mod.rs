@@ -39,6 +39,7 @@ use crate::math::fmath;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -127,19 +128,19 @@ impl Default for Abilities {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
 pub struct Look {
     /// `+0x960`, the task's carrying sprite (`+0x58`): slot 0x798's standing sprite.
-    pub standing: Option<i16>,
+    pub standing: Option<SpriteId>,
     /// `+0x968`, the task's moving sprite (`+0x40`): slot 0x7c8's walking sprite.
-    pub walking: Option<i16>,
+    pub walking: Option<SpriteId>,
     /// `+0x970`, the task's working sprite (`+0x50`): slot 0x898's attack sprite.
-    pub attacking: Option<i16>,
+    pub attacking: Option<SpriteId>,
     /// `+0x978`, the task's proceeding sprite (`+0x48`): slot 0x7d0's running sprite.
-    pub running: Option<i16>,
+    pub running: Option<SpriteId>,
     /// `+0x980`, the sprite the task's gathering sound event id names (`+0x60`): slot 0x7a0's
     /// dying sprite.
-    pub dying: Option<i16>,
+    pub dying: Option<SpriteId>,
     /// `+0x988`, the sprite its deposit sound event id names (`+0x78`): slot 0x7a8's undead
     /// sprite.
-    pub undead: Option<i16>,
+    pub undead: Option<SpriteId>,
 }
 
 /// The `ADD_ATTRIBUTE` command a removal reward task issues (`FUN_14120b5f0`: the player's slot

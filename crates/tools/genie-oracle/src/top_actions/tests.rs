@@ -12,10 +12,12 @@ use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::MoveWaitState;
 use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
+use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TaskId;
+use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
@@ -52,7 +54,7 @@ fn task(id: i16, range: f32) -> Task {
         work_range: Distance::new(range),
         work_flag: 0,
         enablement: Some(attribute::FOOD),
-        sprites: [-1; 4],
+        sprites: TaskSprites::NONE,
         sound_events: SoundEvents::new(-1, -1),
     }
 }
@@ -134,7 +136,7 @@ fn import_drawn(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     mut unit: Unit,
-    graphics: Option<&std::collections::BTreeMap<i16, Graphic>>,
+    graphics: Option<&std::collections::BTreeMap<SpriteId, Graphic>>,
 ) -> Result<Unit, GenieError> {
     let s = object.static_part().expect("a test object's static part");
     saved_actions(
@@ -148,7 +150,7 @@ fn import_drawn(
                 work_rate: WorkRate::new(2.0),
                 resource: None,
                 id: TaskId::of_task(7),
-                moving: Some(9),
+                moving: Some(SpriteId::named(9)),
             })
         },
         |_| Ok(task(8, 3.0)),
@@ -295,7 +297,7 @@ fn a_move_to_s_wait_state_of_none_fails() {
 #[test]
 fn a_move_to_takes_its_sprite_from_the_sprites_table() {
     let walking = Graphic {
-        id: 5,
+        id: SpriteId::named(5),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.5,
@@ -303,7 +305,7 @@ fn a_move_to_takes_its_sprite_from_the_sprites_table() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let graphics = std::collections::BTreeMap::from([(5, walking)]);
+    let graphics = std::collections::BTreeMap::from([(walking.id, walking)]);
     let mut action = move_to(4, 0.5);
     let mut shown = |sprite: i16, graphics| {
         let parts = action.rge_action_by_type.as_deref_mut().unwrap();
@@ -688,7 +690,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         .short_val_2 = 12;
     let dropping = with_sub(dropping, MOVE_TO, carrying);
     let carried = Graphic {
-        id: 12,
+        id: SpriteId::named(12),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -696,7 +698,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let graphics = std::collections::BTreeMap::from([(12, carried)]);
+    let graphics = std::collections::BTreeMap::from([(carried.id, carried)]);
     let a = import_drawn(
         &acting(BUILD, build(dropping)),
         &objects,
@@ -719,7 +721,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         .unwrap();
     assert_eq!(a.move_to, None);
     // without a MoveTo, the task's moving sprite for the next
-    assert_eq!(a.task.moving, Some(9));
+    assert_eq!(a.task.moving, Some(SpriteId::named(9)));
     assert_eq!(
         imported(
             BUILD,
@@ -1173,9 +1175,9 @@ fn a_wait_solidify_waits_for_its_foundation() {
 }
 
 /// The sprites' table of the Attack tests: an attack sprite 21 of ten frames of 0.1 s.
-fn swing_sprites() -> std::collections::BTreeMap<i16, Graphic> {
+fn swing_sprites() -> std::collections::BTreeMap<SpriteId, Graphic> {
     let swing = Graphic {
-        id: 21,
+        id: SpriteId::named(21),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -1183,7 +1185,7 @@ fn swing_sprites() -> std::collections::BTreeMap<i16, Graphic> {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    std::collections::BTreeMap::from([(21, swing)])
+    std::collections::BTreeMap::from([(swing.id, swing)])
 }
 
 /// An Attack in state `state` that walks with sprite `walk` (`short_val`) and swings sprite 21

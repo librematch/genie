@@ -12,6 +12,7 @@ use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Tile;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -455,7 +456,7 @@ impl World {
     /// # Errors
     ///
     /// A trade cart, or an action the slice does not model ([`World::show_sprite`]).
-    fn sprite_to_show(&self, id: ObjectId, shown: Shown) -> Result<Option<i16>, GenieError> {
+    fn sprite_to_show(&self, id: ObjectId, shown: Shown) -> Result<Option<SpriteId>, GenieError> {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };

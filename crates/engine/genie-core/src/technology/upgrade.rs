@@ -9,6 +9,7 @@ use crate::combat::Charge;
 use crate::math::rng::{Stream, Well512};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
@@ -106,7 +107,7 @@ pub(crate) fn damage_sprites(
     master: &Master,
     before: u8,
     (graphics, object, sprite): (
-        &std::collections::BTreeMap<i16, Graphic>,
+        &std::collections::BTreeMap<SpriteId, Graphic>,
         &mut Well512,
         &mut Well512,
     ),
@@ -133,9 +134,13 @@ pub(crate) fn damage_sprites(
     }
     let shown = |i: Option<usize>| {
         i.and_then(|i| entries.get(i).copied())
-            .filter(|e| 0 <= e.sprite)
+            .filter(|e| e.sprite.is_some())
     };
-    let graphic = |id: i16| graphics.get(&id).copied().ok_or(NO_SPRITE);
+    let graphic = |id: Option<SpriteId>| {
+        id.and_then(|id| graphics.get(&id))
+            .copied()
+            .ok_or(NO_SPRITE)
+    };
     if let Some(e) = shown(now) {
         match e.apply_mode {
             SPRITE_SCATTERED => {
@@ -279,8 +284,8 @@ impl World {
         let kind = old.kind;
         if master_type::BUILDING <= kind {
             let (from, to) = (
-                old.building.as_ref().map_or(-1, |b| b.construction_sprite),
-                new.building.as_ref().map_or(-1, |b| b.construction_sprite),
+                old.building.as_ref().and_then(|b| b.construction_sprite),
+                new.building.as_ref().and_then(|b| b.construction_sprite),
             );
             self.show_if(place, from, to)?;
         }
@@ -293,7 +298,7 @@ impl World {
             let u = self.object_at_mut(place)?;
             u.firepower += new.volley_fire - old.volley_fire;
         }
-        if master_type::RGE_COMBAT <= kind && 0 <= new.attack_sprite {
+        if master_type::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
             self.show_if(place, old.attack_sprite, new.attack_sprite)?;
         }
         if master_type::ACTION <= kind {
@@ -352,18 +357,20 @@ impl World {
         place: Place,
         (old, new): (&Master, &Master),
     ) -> Result<(), GenieError> {
-        let shows = |s: i16| {
+        let shows = |s: Option<SpriteId>| {
             self.object_at(place)
                 .ok()
                 .and_then(|u| u.sprite)
-                .is_some_and(|a| 0 <= s && a.graphic.id == s)
+                .is_some_and(|a| Some(a.graphic.id) == s)
         };
         if shows(old.move_sprite) {
-            if 0 <= new.move_sprite {
-                self.show(place, new.move_sprite)?;
+            if let Some(s) = new.move_sprite {
+                self.show(place, s)?;
             }
-        } else if shows(old.run_sprite) && 0 <= new.run_sprite {
-            self.show(place, new.run_sprite)?;
+        } else if shows(old.run_sprite)
+            && let Some(s) = new.run_sprite
+        {
+            self.show(place, s)?;
         }
         Ok(())
     }
@@ -478,8 +485,8 @@ impl World {
         let sprites = [
             (old.standing_sprite, new.standing_sprite),
             (
-                old.standing_sprite_2.unwrap_or(-1),
-                new.standing_sprite_2.unwrap_or(new.standing_sprite),
+                old.standing_sprite_2,
+                new.standing_sprite_2.or(new.standing_sprite),
             ),
             (old.death_sprite, new.death_sprite),
             (old.undead_sprite, new.undead_sprite),
@@ -487,7 +494,7 @@ impl World {
         let shown = self.object_at(place)?.sprite.map(|s| s.graphic.id);
         let next = sprites
             .iter()
-            .find(|&&(from, _)| 0 <= from && shown == Some(from))
+            .find(|&&(from, _)| from.is_some() && shown == from)
             .map(|&(_, to)| to);
         if master_type::COMBAT <= kind
             && master_type::COMBAT <= new.kind
@@ -500,7 +507,7 @@ impl World {
             }
         }
         self.object_at_mut(place)?.life.hp = HitPoints::new(f32::from(new.hit_points) * share);
-        if let Some(s) = next.filter(|&s| 0 <= s) {
+        if let Some(s) = next.flatten() {
             self.show(place, s)?;
         }
         if state == ObjectState::Alive {
@@ -528,12 +535,17 @@ impl World {
     }
 
     /// Slot 0x68 on the object at `place` with sprite `to` when it shows `from` (both sprites).
-    fn show_if(&mut self, place: Place, from: i16, to: i16) -> Result<(), GenieError> {
+    fn show_if(
+        &mut self,
+        place: Place,
+        from: Option<SpriteId>,
+        to: Option<SpriteId>,
+    ) -> Result<(), GenieError> {
         let shows = self
             .object_at(place)?
             .sprite
-            .is_some_and(|s| 0 <= from && s.graphic.id == from);
-        if shows && 0 <= to {
+            .is_some_and(|s| Some(s.graphic.id) == from);
+        if shows && let Some(to) = to {
             self.show(place, to)?;
         }
         Ok(())
@@ -542,7 +554,7 @@ impl World {
     /// Slot 0x68 on the object at `place` with sprite `id`: a new instance unless it shows it
     /// already ([`crate::objects::sprite::new_sprite`] on the Sprite stream). Without the graphics (no
     /// data file) the Sprite stream is not modelled.
-    fn show(&mut self, place: Place, id: i16) -> Result<(), GenieError> {
+    fn show(&mut self, place: Place, id: SpriteId) -> Result<(), GenieError> {
         if self.graphics.is_empty() {
             return Ok(());
         }
@@ -593,7 +605,7 @@ impl World {
         };
         let old_task = |id: TaskId| old.tasks.iter().find(|t| t.id == id).copied();
         let graphics = &self.graphics;
-        let g = |id: i16| (0 <= id).then(|| graphics.get(&id).copied()).flatten();
+        let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
         let sprites = crate::technology::effect::MasterSprites {
             moving: g(new.move_sprite),
             attack: g(new.attack_sprite),
@@ -691,6 +703,7 @@ mod tests {
     use crate::objects::WorkRate;
     use crate::objects::lifecycle::Held;
     use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::TaskSprites;
     use crate::objects::masters::action_type;
     use crate::objects::masters::{BuildingMaster, DamageGraphic, Masters};
     use crate::objects::masters::{MasterId, ids};
@@ -709,7 +722,7 @@ mod tests {
     /// An animated graphic of `frames` frames with a random first frame (flags 5).
     const fn graphic(id: i16) -> Graphic {
         Graphic {
-            id,
+            id: SpriteId::named(id),
             frames: 10,
             facets: 1,
             speed_multiplier: 1.0,
@@ -727,18 +740,18 @@ mod tests {
             kind: master_type::BUILDING,
             class: class::BUILDING,
             hit_points: hp,
-            standing_sprite: id + 1000,
+            standing_sprite: Some(SpriteId::named(id + 1000)),
             death_spawns: [opt_master(dead), None],
             damage_graphics: [25, 50, 75]
                 .map(|percent| DamageGraphic {
-                    sprite: id + 2000 + i16::from(percent),
+                    sprite: Some(SpriteId::named(id + 2000 + i16::from(percent))),
                     percent,
                     apply_mode: mode,
                 })
                 .to_vec(),
             damage_sprites: true,
             building: Some(BuildingMaster {
-                construction_sprite: id + 3000,
+                construction_sprite: Some(SpriteId::named(id + 3000)),
                 ..BuildingMaster::default()
             }),
             ..Master::default()
@@ -766,8 +779,8 @@ mod tests {
     /// does nothing to the simulation for mode 0.
     #[test]
     fn the_damage_sprites_follow_the_share_of_the_hit_points() {
-        let graphics: std::collections::BTreeMap<i16, Graphic> = [70, 1070, 2095, 2120, 2145]
-            .map(|id| (id, graphic(id)))
+        let graphics: std::collections::BTreeMap<SpriteId, Graphic> = [70, 1070, 2095, 2120, 2145]
+            .map(|id| (SpriteId::named(id), graphic(id)))
             .into_iter()
             .collect();
         let (mut object, mut sprite) = (Well512::default(), Well512::default());
@@ -835,13 +848,13 @@ mod tests {
             damage_sprites(&mut u, &shown, 0, (&graphics, &mut object, &mut sprite)),
             Ok(60)
         );
-        assert_eq!(u.sprite.map(|s| s.graphic.id), Some(2120));
+        assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(2120)));
         u.life.hp = HitPoints::new(100.0);
         assert_eq!(
             damage_sprites(&mut u, &shown, 60, (&graphics, &mut object, &mut sprite)),
             Ok(0)
         );
-        assert_eq!(u.sprite.map(|s| s.graphic.id), Some(1070));
+        assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(1070)));
     }
 
     fn object_of(hp: HitPoints) -> Unit {
@@ -857,7 +870,7 @@ mod tests {
             hit_points: 20,
             storage: vec![(Some(attribute::WOOD), Amount::new(100.0), 0)],
             damage_graphics: vec![DamageGraphic {
-                sprite: -1,
+                sprite: None,
                 percent: 50,
                 apply_mode: 0,
             }],
@@ -963,7 +976,7 @@ mod tests {
             rubble(1435, 1435),
         ])];
         t.graphics = [1070, 1464, 3070, 3464]
-            .map(|id| (id, graphic(id)))
+            .map(|id| (SpriteId::named(id), graphic(id)))
             .into_iter()
             .collect();
         t.upgrade_objects(PlayerId::new(0), master_id(70), master_id(464), -1, None)
@@ -975,7 +988,10 @@ mod tests {
             (house.life.master_id, house.life.hp),
             (master_id(70), HitPoints::new(450.0))
         );
-        assert_eq!(house.sprite.map(|s| s.graphic.id), Some(1464));
+        assert_eq!(
+            house.sprite.map(|s| s.graphic.id),
+            Some(SpriteId::named(1464))
+        );
         assert!(house.own_master.is_none());
         assert_eq!(dead.own_master.as_deref().map(|m| m.hit_points), Some(550));
         assert_eq!(
@@ -1110,7 +1126,7 @@ mod tests {
                     Distance::new(0.75),
                 ),
                 Task {
-                    sprites: [12, -1, -1, -1],
+                    sprites: TaskSprites::of_data([12, -1, -1, -1]),
                     ..task(
                         TaskId::test(7),
                         action_type::BUILD,
@@ -1170,7 +1186,7 @@ mod tests {
                 work_rate: WorkRate::new(1.0),
                 resource: Some(AttributeId::numbered(17)),
                 id: TaskId::test(7),
-                moving: Some(12),
+                moving: Some(SpriteId::named(12)),
             }
         );
         assert_eq!(u.actions.make().copied().unwrap().task, new.tasks[3]);
@@ -1335,7 +1351,10 @@ mod tests {
             vec![player],
         );
         t.masters = vec![Masters::new(masters)];
-        t.graphics = graphics.iter().map(|&id| (id, graphic(id))).collect();
+        t.graphics = graphics
+            .iter()
+            .map(|&id| (SpriteId::named(id), graphic(id)))
+            .collect();
         t
     }
 
@@ -1385,14 +1404,14 @@ mod tests {
     fn an_upgrade_s_moving_object_shows_the_new_walking_or_running_sprite() {
         let old = Master {
             id: master_id(4),
-            move_sprite: 100,
-            run_sprite: 101,
+            move_sprite: Some(SpriteId::named(100)),
+            run_sprite: Some(SpriteId::named(101)),
             ..Master::default()
         };
         let new = Master {
             id: master_id(5),
-            move_sprite: 200,
-            run_sprite: 201,
+            move_sprite: Some(SpriteId::named(200)),
+            run_sprite: Some(SpriteId::named(201)),
             ..Master::default()
         };
         let shown = |at: i16, new: &Master| {
@@ -1411,14 +1430,14 @@ mod tests {
                 .sprite
                 .map(|s| s.graphic.id)
         };
-        assert_eq!(shown(100, &new), Some(200));
-        assert_eq!(shown(101, &new), Some(201));
-        assert_eq!(shown(102, &new), Some(102));
+        assert_eq!(shown(100, &new), Some(SpriteId::named(200)));
+        assert_eq!(shown(101, &new), Some(SpriteId::named(201)));
+        assert_eq!(shown(102, &new), Some(SpriteId::named(102)));
         let walkless = Master {
-            move_sprite: -1,
+            move_sprite: None,
             ..new
         };
-        assert_eq!(shown(100, &walkless), Some(100));
+        assert_eq!(shown(100, &walkless), Some(SpriteId::named(100)));
     }
 
     /// `FUN_141186580` without the master kept: a combat object leaves its class's counter; a
@@ -1595,10 +1614,10 @@ mod tests {
             id: master_id(4),
             kind: master_type::COMBAT,
             hit_points: 40,
-            standing_sprite: 300,
-            standing_sprite_2: Some(301),
-            death_sprite: 302,
-            undead_sprite: 303,
+            standing_sprite: Some(SpriteId::named(300)),
+            standing_sprite_2: Some(SpriteId::named(301)),
+            death_sprite: Some(SpriteId::named(302)),
+            undead_sprite: Some(SpriteId::named(303)),
             charge_type: 1,
             max_charge: Charge::new(2.0),
             ..Master::default()
@@ -1606,10 +1625,10 @@ mod tests {
         let new = Master {
             id: master_id(5),
             hit_points: 60,
-            standing_sprite: 400,
+            standing_sprite: Some(SpriteId::named(400)),
             standing_sprite_2: None,
-            death_sprite: 402,
-            undead_sprite: 403,
+            death_sprite: Some(SpriteId::named(402)),
+            undead_sprite: Some(SpriteId::named(403)),
             max_charge: Charge::new(5.0),
             ..old.clone()
         };
@@ -1633,13 +1652,17 @@ mod tests {
         };
         assert_eq!(
             upgraded(&old, &new, 300),
-            (HitPoints::new(30.0), Some(400), Charge::new(3.0))
+            (
+                HitPoints::new(30.0),
+                Some(SpriteId::named(400)),
+                Charge::new(3.0)
+            )
         );
         // the second standing sprite becomes the new standing one when the new has none
-        assert_eq!(upgraded(&old, &new, 301).1, Some(400));
-        assert_eq!(upgraded(&old, &new, 302).1, Some(402));
-        assert_eq!(upgraded(&old, &new, 303).1, Some(403));
-        assert_eq!(upgraded(&old, &new, 304).1, Some(304));
+        assert_eq!(upgraded(&old, &new, 301).1, Some(SpriteId::named(400)));
+        assert_eq!(upgraded(&old, &new, 302).1, Some(SpriteId::named(402)));
+        assert_eq!(upgraded(&old, &new, 303).1, Some(SpriteId::named(403)));
+        assert_eq!(upgraded(&old, &new, 304).1, Some(SpriteId::named(304)));
         let none = Master {
             hit_points: 0,
             ..old.clone()

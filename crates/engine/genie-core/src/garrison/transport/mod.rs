@@ -21,6 +21,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, MoveToReads};
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::sprite::Graphic;
 use genie_diff::Diff;
@@ -117,7 +118,7 @@ pub struct Ship<'a> {
     pub walk: MoveToReads<'a>,
     /// The sprite its maker gives a `MoveTo` (`+0x58`): the task's moving one, without a task
     /// the master's walking sprite ([`TransportAction::given_sprite`]).
-    pub given: Option<i16>,
+    pub given: Option<SpriteId>,
 }
 
 /// What the Transport reads of the map about its unit (the caller's).
@@ -164,7 +165,7 @@ pub(crate) struct TransportReads {
     /// The sprites a `MoveTo` the update's `set_state` makes takes when its maker gives none.
     pub(crate) defaults: MoveDefaults,
     /// The sprite its maker gives it ([`Ship::given`]).
-    pub(crate) given: Option<i16>,
+    pub(crate) given: Option<SpriteId>,
     /// The master's standing sprite (`+0x470`), which state 2 shows.
     pub(crate) standing: Option<Graphic>,
 }

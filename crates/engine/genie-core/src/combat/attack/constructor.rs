@@ -17,7 +17,9 @@ use crate::movement::Speed;
 use crate::movement::move_to::{MoveToReads, TargetMoved};
 use crate::movement::{Mover, footprint_gap, footprint_gap_squared};
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::layers::Body;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -342,9 +344,9 @@ impl Attack {
 #[must_use]
 pub fn arms(
     master: &crate::objects::masters::Master,
-    graphics: &std::collections::BTreeMap<i16, Graphic>,
-    sprites: [i16; 4],
-    moving: i16,
+    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    sprites: TaskSprites,
+    moving: Option<SpriteId>,
 ) -> Arms {
     arms_looking(master, None, graphics, sprites, moving)
 }
@@ -360,17 +362,16 @@ pub fn arms(
 pub fn arms_looking(
     master: &crate::objects::masters::Master,
     look: Option<&crate::combat::abilities::Look>,
-    graphics: &std::collections::BTreeMap<i16, Graphic>,
-    sprites: [i16; 4],
-    moving: i16,
+    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    sprites: TaskSprites,
+    moving: Option<SpriteId>,
 ) -> Arms {
-    let g = |id: i16| (0 <= id).then(|| graphics.get(&id).copied()).flatten();
-    let slot = |id: Option<i16>| id.and_then(g);
+    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
     Arms {
         move_sprite: g(moving)
-            .or_else(|| slot(crate::objects::sprite::running(master, look)))
-            .or_else(|| slot(crate::objects::sprite::walking(master, look, false))),
-        sprite: g(sprites[1]).or_else(|| g(master.attack_sprite)),
+            .or_else(|| g(crate::objects::sprite::running(master, look)))
+            .or_else(|| g(crate::objects::sprite::walking(master, look, false))),
+        sprite: g(sprites.proceeding).or_else(|| g(master.attack_sprite)),
         second_sprite: g(master.attack_sprite2),
         idle_sprite: g(master.standing_sprite),
         idle_attack_sprite: g(master.idle_attack_sprite),

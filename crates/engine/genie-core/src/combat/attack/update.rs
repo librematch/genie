@@ -17,6 +17,7 @@ use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
@@ -384,7 +385,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-        graphics: &BTreeMap<i16, Graphic>,
+        graphics: &BTreeMap<SpriteId, Graphic>,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::GotoSeen, unit)?;
         self.range = f.own.source.weapon_range;
@@ -402,7 +403,7 @@ impl Attack {
         &mut self,
         unit: &Unit,
         r: &AttackReads,
-        graphics: &BTreeMap<i16, Graphic>,
+        graphics: &BTreeMap<SpriteId, Graphic>,
     ) -> Result<(), GenieError> {
         self.walk_to_seen(&move_reads(unit, r, graphics)?)
     }

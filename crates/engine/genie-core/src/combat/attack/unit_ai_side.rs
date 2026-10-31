@@ -12,6 +12,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
@@ -87,8 +88,13 @@ impl UnitView<'_, '_> {
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
         let look = unit.abilities.look.as_ref();
-        let arms =
-            crate::combat::attack::arms_looking(master, look, &self.c.w.graphics, [-1; 4], -1);
+        let arms = crate::combat::attack::arms_looking(
+            master,
+            look,
+            &self.c.w.graphics,
+            TaskSprites::NONE,
+            None,
+        );
         let standing = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
         if unit.sprite.is_none() {
             return Err(GenieError::unsupported(

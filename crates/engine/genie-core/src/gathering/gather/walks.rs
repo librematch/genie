@@ -7,8 +7,9 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
 use crate::movement::move_to::{MoveToAction, MoveToReads, SpriteReads, TargetMoved, WalkTo};
+use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
-use crate::objects::sprite::{Graphic, sprite_id};
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 
 /// What the Gather's and the Hunt's `MoveTo` constructors read of the unit as `set_state` makes
@@ -45,7 +46,7 @@ impl GatherReads {
     /// What the `MoveTo`s the update makes read of `unit`, with the sprites' table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
-        graphics: &'g std::collections::BTreeMap<i16, Graphic>,
+        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
         unit: &Unit,
     ) -> Walks<'g> {
         Walks::of(self.sprites_of(graphics), unit)
@@ -54,7 +55,7 @@ impl GatherReads {
     /// The sprites a `MoveTo` takes when its maker gives none.
     const fn sprites_of<'g>(
         &self,
-        graphics: &'g std::collections::BTreeMap<i16, Graphic>,
+        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
     ) -> SpriteReads<'g> {
         SpriteReads {
             defaults: self.defaults,
@@ -80,7 +81,7 @@ impl GatherAction {
         mover: &Mover,
         walks: &Walks<'_>,
     ) -> Result<Option<MoveToAction>, GenieError> {
-        let given = sprite_id(self.task.walk_sprite_id(walks.held));
+        let given = self.task.walk_sprite_id(walks.held);
         walks
             .live(mover)
             .to_object(to, self.task.range, given, TargetMoved::AsksAgain)
@@ -103,7 +104,7 @@ impl GatherAction {
         mover: &Mover,
         walks: &Walks<'_>,
     ) -> Result<Option<MoveToAction>, GenieError> {
-        let given = sprite_id(self.task.walk_sprite_id(walks.held));
+        let given = self.task.walk_sprite_id(walks.held);
         let walk = walks.live(mover).to_point(point, range, given)?;
         Ok(walk.map(|m| MoveToAction {
             on_target_moved,

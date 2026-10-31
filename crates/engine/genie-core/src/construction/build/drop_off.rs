@@ -8,7 +8,7 @@ use crate::movement::Me;
 use crate::movement::move_to::TargetMoved;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::sprite::sprite_id;
+use crate::objects::SpriteId;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -35,7 +35,7 @@ pub enum DropSearch {
         /// The `MoveTo`'s range.
         range: Distance,
         /// The found task's carrying sprite, None without the task or the sprite.
-        sprite: Option<i16>,
+        sprite: Option<SpriteId>,
     },
 }
 
@@ -135,7 +135,7 @@ impl BuildAction {
             _ => None,
         };
         let range = task.map_or(task_range, |(t, _)| t.work_range);
-        let sprite = task.and_then(|(t, _)| sprite_id(t.sprites[3]));
+        let sprite = task.and_then(|(t, _)| t.sprites.carrying);
         Ok(DropSearch::Site { id, range, sprite })
     }
 

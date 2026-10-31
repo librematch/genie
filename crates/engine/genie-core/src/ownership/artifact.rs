@@ -16,6 +16,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveToReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::actions::Action;
 use crate::objects::masters::ActionType;
 use crate::objects::release::Releaser;
@@ -98,7 +99,7 @@ pub struct Artifact {
     /// top), which its update runs first ([`Artifact::hold_enter`]).
     pub enter: Option<crate::garrison::EnterAction>,
     /// Its task's moving sprite (`+0x40`), which its `MoveTo`s take; None for none.
-    pub moving: Option<i16>,
+    pub moving: Option<SpriteId>,
 }
 
 /// The action type the checkpoint adds for an Artifact action.
@@ -113,7 +114,7 @@ const TOWN_CENTRE_OFFSET: f32 = crate::math::image::artifact::TOWN_CENTRE_OFFSET
 impl Artifact {
     /// A new action of a task whose moving sprite is `moving`, about to check for a new owner.
     #[must_use]
-    pub const fn new(gaia: bool, moving: Option<i16>) -> Self {
+    pub const fn new(gaia: bool, moving: Option<SpriteId>) -> Self {
         Self {
             state: ArtifactState::Check,
             timer: Seconds::ZERO,
@@ -1062,7 +1063,7 @@ mod tests {
 
     /// The `MoveTo`s' sprites without defaults or a table: a `MoveTo` shows none.
     fn sprites() -> SpriteReads<'static> {
-        static NONE: BTreeMap<i16, Graphic> = BTreeMap::new();
+        static NONE: BTreeMap<SpriteId, Graphic> = BTreeMap::new();
         SpriteReads {
             defaults: MoveDefaults::default(),
             graphics: &NONE,
@@ -1109,7 +1110,7 @@ mod tests {
     /// A sprite `id` of 10 frames in 16 facets.
     const fn graphic(id: i16) -> Graphic {
         Graphic {
-            id,
+            id: SpriteId::named(id),
             frames: 10,
             facets: 16,
             speed_multiplier: 1.0,
@@ -1123,11 +1124,13 @@ mod tests {
     /// constructor, toward an object (`FUN_140aa0df0`) or the point (`FUN_140aa0d30`).
     #[test]
     fn an_artifact_s_move_to_shows_its_task_s_moving_sprite_else_its_default() {
-        let graphics = [3, 20, 21].map(|id| (id, graphic(id))).into();
+        let graphics = [3, 20, 21]
+            .map(|id| (SpriteId::named(id), graphic(id)))
+            .into();
         let sprites = SpriteReads {
             defaults: MoveDefaults {
-                point: Some(20),
-                object: Some(21),
+                point: Some(SpriteId::named(20)),
+                object: Some(SpriteId::named(21)),
             },
             graphics: &graphics,
         };
@@ -1136,7 +1139,7 @@ mod tests {
         let _ = a
             .take_point(Position::new(28.5, 93.5, 0.0), &move_reads(&sprites))
             .unwrap();
-        assert_eq!(shown(&a), Some(20));
+        assert_eq!(shown(&a), Some(SpriteId::named(20)));
         let _ = a
             .take_object(
                 object(9149, Position::new(1.0, 1.0, 0.0), true),
@@ -1144,15 +1147,15 @@ mod tests {
                 &move_reads(&sprites),
             )
             .unwrap();
-        assert_eq!(shown(&a), Some(21));
-        a.moving = Some(3);
+        assert_eq!(shown(&a), Some(SpriteId::named(21)));
+        a.moving = Some(SpriteId::named(3));
         let _ = a
             .take_point(Position::new(28.5, 93.5, 0.0), &move_reads(&sprites))
             .unwrap();
-        assert_eq!(shown(&a), Some(3));
+        assert_eq!(shown(&a), Some(SpriteId::named(3)));
         // a sprite the table lacks fails the move before it changes anything
         let before = Artifact {
-            moving: Some(4),
+            moving: Some(SpriteId::named(4)),
             ..a
         };
         let mut lacking = before;
@@ -1203,8 +1206,8 @@ mod tests {
     /// to the unit AI at once, starting or walking on.
     #[test]
     fn an_artifact_s_walk_shows_its_sprite_as_it_starts() {
-        let mut a = Artifact::new(false, Some(3));
-        let graphics = BTreeMap::from([(3, graphic(3))]);
+        let mut a = Artifact::new(false, Some(SpriteId::named(3)));
+        let graphics = BTreeMap::from([(SpriteId::named(3), graphic(3))]);
         let with_3 = SpriteReads {
             defaults: MoveDefaults::default(),
             graphics: &graphics,
@@ -1215,14 +1218,14 @@ mod tests {
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
         // the top speed derives from the base and the sprite shown
         (rig.mover_mut().stats.speed, rig.mover_mut().stats.base) = (Speed::ZERO, Speed::ZERO);
-        assert_eq!(rig.t.graphics.insert(3, graphic(3)), None);
+        assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic(3)), None);
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         let in_the_way = (crate::unit_ai::NotifyKind::IN_THE_WAY, [77, -1, -1]);
         assert_eq!(
             (a.move_to.map(|m| m.state), rig.sprite()),
-            (Some(MoveTo::Failed), Some(3))
+            (Some(MoveTo::Failed), Some(SpriteId::named(3)))
         );
         assert_eq!(rig.posted(), vec![in_the_way]);
         let mut walking = Artifact::new(false, None);

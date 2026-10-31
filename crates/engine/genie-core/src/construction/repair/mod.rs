@@ -18,6 +18,7 @@ use crate::movement::move_to::MoveToAction;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
@@ -25,7 +26,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
-use crate::objects::sprite::sprite_id;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use genie_diff::Diff;
@@ -86,9 +86,9 @@ pub struct RepairTask {
     pub work_value: f32,
     /// Its moving sprite (`+0x40`), which its `MoveTo`s take and its turn toward the target
     /// (state 6) shows; None for none.
-    pub moving: Option<i16>,
+    pub moving: Option<SpriteId>,
     /// Its proceeding sprite (`+0x48`), which its work (state 7) shows; None for none.
-    pub proceeding: Option<i16>,
+    pub proceeding: Option<SpriteId>,
 }
 
 impl RepairTask {
@@ -98,8 +98,8 @@ impl RepairTask {
         Self {
             id: task.id,
             work_value: task.work_val1,
-            moving: sprite_id(task.sprites[0]),
-            proceeding: sprite_id(task.sprites[1]),
+            moving: task.sprites.moving,
+            proceeding: task.sprites.proceeding,
         }
     }
 }
@@ -178,7 +178,7 @@ pub(crate) struct RepairReads {
     /// ([`crate::movement::move_to::MoveWait::give_up`]).
     pub(crate) stance: crate::unit_ai::UnitStance,
     /// The master's standing sprite (`+0x470`), which slot 0x68 shows for none.
-    pub(crate) standing: Option<i16>,
+    pub(crate) standing: Option<SpriteId>,
     /// The master's terrain restriction, whose mask its quick path takes.
     pub(crate) restriction: Option<crate::map::RestrictionId>,
 }

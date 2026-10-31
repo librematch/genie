@@ -15,6 +15,7 @@ use crate::map::Offset;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -94,9 +95,8 @@ pub struct Task {
     pub work_flag: i16,
     /// `+0x38`, `enablement_resource_id` (`enabled`): the resource that enables the task, -1 none.
     pub enablement: Option<AttributeId>,
-    /// `+0x40`..`+0x58`: the moving, proceeding, working and carrying sprites (graphic ids, -1 for
-    /// none).
-    pub sprites: [i16; 4],
+    /// `+0x40`..`+0x58`: the moving, proceeding, working and carrying sprites.
+    pub sprites: TaskSprites,
     /// `+0x60` and `+0x78`: the event ids (`mEventId`) of the gathering and the deposit sound,
     /// as the task's load (`FUN_141062470`) leaves them; a terrain look task (159) names its
     /// dying and its undead sprite with them ([`crate::combat::abilities`]).
@@ -135,7 +135,7 @@ impl Default for Task {
             work_range: Distance::ZERO,
             work_flag: 0,
             enablement: None,
-            sprites: [-1; 4],
+            sprites: TaskSprites::NONE,
             sound_events: SoundEvents::new(0, 0),
         }
     }
@@ -217,10 +217,10 @@ pub struct BuildingMaster {
     /// `+0x960`, the `.dat`'s `destruction_graphic_id` (the save's third building sprite): the
     /// sprite a building that dies before it is built shows (`RGE_Static_Object::update`), −1
     /// for none.
-    pub destruction_sprite: i16,
+    pub destruction_sprite: Option<SpriteId>,
     /// `+0x950`, the `.dat`'s `construction_graphic_id` (the save's first building sprite): the
     /// sprite a building under construction shows, −1 for none.
-    pub construction_sprite: i16,
+    pub construction_sprite: Option<SpriteId>,
 }
 
 /// The master values the task finder and the work command read.
@@ -358,7 +358,7 @@ pub struct Master {
     pub special_graphic: bool,
     /// The special graphic's sprite (the `.dat`'s `special_graphic`), −1 for none: a herder
     /// leading livestock shows it.
-    pub special_sprite: i16,
+    pub special_sprite: Option<SpriteId>,
     /// `area_effect_object_level` (`+0x62b`): the blasts that reach it.
     pub blast_defense: u8,
     /// `area_effect_range` (`+0x82c`): its blast's radius.
@@ -404,7 +404,7 @@ pub struct Master {
     /// The death sprite (`+0x480`, −1 for none) and the death spawns (`+0x5e4`, `+0x5e6`, −1 for
     /// none), and what a dead object's steps read of the master
     /// ([`crate::objects::lifecycle::MasterData`]), for a new object's [`crate::objects::lifecycle::Lifecycle`].
-    pub death_sprite: i16,
+    pub death_sprite: Option<SpriteId>,
     /// The death spawns (`+0x5e4`, `+0x5e6`, −1 for none).
     pub death_spawns: [Option<MasterId>; 2],
     /// What a dead object's steps read of the master.
@@ -415,21 +415,21 @@ pub struct Master {
     /// `interrupt_frame`, `base_hit_chance`, `speed_of_attack` (the reload time) and its weapons
     /// (class, amount); and the sprite it waits with between swings (`+0x910`, the `.dat`'s
     /// `idle_attack_graphic`, −1 for none).
-    pub standing_sprite: i16,
+    pub standing_sprite: Option<SpriteId>,
     /// Its second standing sprite (`+0x478`, the `.dat`'s `standing_graphic[1]`), whose idle
     /// animation the object swaps in (`0x141071880`); None for none.
-    pub standing_sprite_2: Option<i16>,
+    pub standing_sprite_2: Option<SpriteId>,
     /// The sprite it waits with between swings (`+0x910`, −1 for none).
-    pub idle_attack_sprite: i16,
+    pub idle_attack_sprite: Option<SpriteId>,
     /// Its walking sprite (`+0x748`, `move_sprite_id`; the unit's slot 0x7c8) and its running
     /// one (`+0x750`, `run_sprite_id`; slot 0x7d0), −1 for none.
-    pub move_sprite: i16,
+    pub move_sprite: Option<SpriteId>,
     /// Its running sprite (`+0x750`), −1 for none.
-    pub run_sprite: i16,
+    pub run_sprite: Option<SpriteId>,
     /// Its attack sprite (`+0x7f8`, `fight_sprite_id`).
-    pub attack_sprite: i16,
+    pub attack_sprite: Option<SpriteId>,
     /// A second attack sprite (`+0x878`).
-    pub attack_sprite2: i16,
+    pub attack_sprite2: Option<SpriteId>,
     /// `missile_id`, −1 for none.
     pub missile: Option<MasterId>,
     /// `fire_missile_at_frame`.
@@ -476,7 +476,7 @@ pub struct Master {
     /// follows.
     pub turn_speed: Seconds,
     /// `+0x488`, the undead sprite (`undeadSpriteId`, −1 for none).
-    pub undead_sprite: i16,
+    pub undead_sprite: Option<SpriteId>,
     /// `+0x650`, `occlusion_flag` (the `.dat`'s `occlusion_mode`).
     pub occlusion: u8,
     /// `+0x684`, the `.dat`'s `selection_effect`.
@@ -516,9 +516,9 @@ pub struct Master {
     /// `mConversionChanceAdj`.
     pub conversion: ConversionAdjust,
     /// `+0x908`, the hero glow sprite (−1 for none).
-    pub hero_glow_sprite: i16,
+    pub hero_glow_sprite: Option<SpriteId>,
     /// `+0x8f0`, the garrison sprite (−1 for none).
-    pub garrison_sprite: i16,
+    pub garrison_sprite: Option<SpriteId>,
     /// A building master's `+0x982`, `building_facet` (the attribute list's "Building Icon
     /// Override").
     pub building_facet: i16,
@@ -528,7 +528,7 @@ pub struct Master {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
 pub struct DamageGraphic {
     /// `+0x0`, the sprite (`tempId`, −1 for none).
-    pub sprite: i16,
+    pub sprite: Option<SpriteId>,
     /// `+0x8`, `damage_percent`.
     pub percent: u8,
     /// `+0x9`, the `flag` (the `.dat`'s `apply_mode`).
@@ -539,7 +539,7 @@ pub struct DamageGraphic {
 impl Default for DamageGraphic {
     fn default() -> Self {
         Self {
-            sprite: -1,
+            sprite: None,
             percent: 0,
             apply_mode: 0,
         }
@@ -606,6 +606,7 @@ pub mod master_type;
 mod obstruction_class;
 mod obstruction_type;
 mod sound_events;
+mod task_sprites;
 mod volley_spread;
 
 pub use self::action_type::ActionType;
@@ -621,6 +622,7 @@ pub use self::master_kind::MasterKind;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
 pub use self::sound_events::SoundEvents;
+pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;
 
 #[cfg(test)]

@@ -52,6 +52,7 @@ file for what the save does not hold.
 | [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`). |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
 | [`task_id.rs`](task_id.rs) | A task's id as one type: the place of a task in its master's task list, which an action keeps to name the task it works on. |
+| [`task_sprites.rs`](task_sprites.rs) | A task's four sprites (`TaskSprites`). |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tribe_setters.rs`](tribe_setters.rs) | The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the train locations. |
 | [`values.rs`](values.rs) | What the attribute setters share: the caps, the truncations, the sprite and class amounts, the damage sprites' and train locations' entries. |

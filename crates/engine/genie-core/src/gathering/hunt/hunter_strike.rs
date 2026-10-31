@@ -15,6 +15,7 @@ use crate::movement::move_to::{MoveDefaults, MoveTo};
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
@@ -96,7 +97,7 @@ impl Unit {
             .copied()
             .filter(|&v| Amount::ZERO < v)
             .unwrap_or(Amount::new(1.0));
-        let g = |id: i16| (0 <= id).then(|| c.w.graphics.get(&id).copied()).flatten();
+        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(&s).copied());
         Ok(HuntReads {
             defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
             attack: AttackReads::of(
@@ -115,9 +116,9 @@ impl Unit {
             tree_searched: tree_lost,
             predator_hunts_end: c.w.settings.predator_hunts_end(),
             sprites: HuntSprites {
-                moving: g(hunt.task.sprites[0]),
-                working: g(hunt.task.sprites[2]),
-                carrying: g(hunt.task.sprites[3]),
+                moving: g(hunt.task.sprites.moving),
+                working: g(hunt.task.sprites.working),
+                carrying: g(hunt.task.sprites.carrying),
                 standing: g(master.standing_sprite),
             },
             herd,
@@ -227,9 +228,15 @@ impl Unit {
             arms,
             idle,
             special_graphic: if master.kind == COMBAT && master.special_graphic {
-                Some(c.w.graphics.get(&master.special_sprite).copied().ok_or(
-                    GenieError::unsupported("a special graphic the data file does not have"),
-                )?)
+                Some(
+                    master
+                        .special_sprite
+                        .and_then(|s| c.w.graphics.get(&s))
+                        .copied()
+                        .ok_or(GenieError::unsupported(
+                            "a special graphic the data file does not have",
+                        ))?,
+                )
             } else {
                 None
             },

@@ -11,6 +11,7 @@ use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::Speed;
 use genie_core::objects::ObjectId;
+use genie_core::objects::SpriteId;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
 use genie_save::generated::world::{
@@ -224,9 +225,11 @@ pub(super) fn mover(
     let factor = if s.sprite == -1 {
         0.0
     } else {
-        table.sprite_speed(s.sprite).ok_or(GenieError::unsupported(
-            "a sprite the data file does not have",
-        ))?
+        SpriteId::of_data(s.sprite)
+            .and_then(|sprite| table.sprite_speed(sprite))
+            .ok_or(GenieError::unsupported(
+                "a sprite the data file does not have",
+            ))?
     };
     let speed = if 0.0 < factor { base * factor } else { base };
     let turning =
@@ -238,7 +241,9 @@ pub(super) fn mover(
     let (turn_speed, walking) = turn.ok_or(GenieError::unsupported(
         "a moving master without a moving part",
     ))?;
-    let facets = table.graphics.get(&walking).map(|g| g.facets);
+    let facets = SpriteId::of_data(walking)
+        .and_then(|w| table.graphics.get(&w))
+        .map(|g| g.facets);
     let velocity = (m.have_movement == 1).then(|| Velocity {
         velocity: m.velocity.as_ref().map_or(BVector::ZERO, vec3),
         acceleration: m.acceleration.as_ref().map_or(BVector::ZERO, vec3),

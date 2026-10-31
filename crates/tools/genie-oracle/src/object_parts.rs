@@ -8,6 +8,7 @@ use genie_core::map::Point;
 use genie_core::map::Position;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
+use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::{Class, Lifecycle, MasterData};
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
@@ -46,32 +47,29 @@ pub(super) fn lifecycle(
             objects
                 .master(s.master_obj)
                 .and_then(|m| m.static_part())
-                .map_or(-1, |m| m.death_sprite_id)
+                .and_then(|m| SpriteId::of_data(m.death_sprite_id))
         },
-        |own| own.death_sprite_num,
+        |own| SpriteId::of_data(own.death_sprite_num),
     );
     // the sprite after the death: the dying one, else the current one
-    let after = if death_sprite >= 0 {
-        death_sprite
-    } else {
-        s.sprite
-    };
+    let after = death_sprite.or_else(|| SpriteId::of_data(s.sprite));
     let death_facets = masters
-        .and_then(|t| t.graphics.get(&after))
+        .zip(after)
+        .and_then(|(t, after)| t.graphics.get(&after))
         .filter(|g| pure_static && g.flags & 4 != 0 && 1 < g.facets)
         .map(|g| g.facets);
     let (dying_sprite, [death_spawn, remains], master) = s.own_master().map_or_else(
         || {
             let player = objects.master(s.master_obj).and_then(|m| m.static_part());
             (
-                player.map(|m| m.death_sprite_id).filter(|&d| d >= 0),
+                player.and_then(|m| SpriteId::of_data(m.death_sprite_id)),
                 player.map_or([-1, -1], |m| [m.death_spawn_obj_id, m.death_spawn_obj_id2]),
                 masters.and_then(|t| t.get(civ, objects.dat_master(s.master_obj))),
             )
         },
         |own| {
             (
-                (own.death_sprite_num >= 0).then_some(own.death_sprite_num),
+                SpriteId::of_data(own.death_sprite_num),
                 [own.death_spawn_obj_id, own.death_spawn_obj_id2],
                 Some(MasterData {
                     decay: AmountRate::new(own.attribute_rot),

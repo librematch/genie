@@ -11,6 +11,7 @@ use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -455,12 +456,13 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         let mut t = crate::world::tests::forage_world();
         // the villager's standing sprite (a graphic of ten frames, eight facets)
         for masters in &mut t.masters {
-            masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite = 300;
+            masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite =
+                Some(SpriteId::named(300));
         }
         let _ = t.graphics.insert(
-            300,
+            SpriteId::named(300),
             crate::objects::sprite::Graphic {
-                id: 300,
+                id: SpriteId::named(300),
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
@@ -593,12 +595,13 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
     let waits = |state| {
         let mut t = crate::world::tests::forage_world();
         for masters in &mut t.masters {
-            masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite = 300;
+            masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite =
+                Some(SpriteId::named(300));
         }
         let _ = t.graphics.insert(
-            300,
+            SpriteId::named(300),
             crate::objects::sprite::Graphic {
-                id: 300,
+                id: SpriteId::named(300),
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
@@ -885,13 +888,14 @@ fn remains_world() -> World {
         flags,
     };
     for (id, flags) in [(20, 4), (21, 1)] {
+        let id = SpriteId::named(id);
         let _ = t.graphics.insert(id, graphic(id, flags));
     }
     let static_remains = Master {
         id: master_id(800),
         kind: master_type::STATIC,
-        death_sprite: 20,
-        standing_sprite: -1,
+        death_sprite: Some(SpriteId::named(20)),
+        standing_sprite: None,
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(attribute::POPULATION), Amount::new(5.0), 0),
@@ -901,7 +905,7 @@ fn remains_world() -> World {
     let moving_remains = Master {
         id: master_id(801),
         kind: master_type::MOVING,
-        standing_sprite: 21,
+        standing_sprite: Some(SpriteId::named(21)),
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         ..Master::default()
     };

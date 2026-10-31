@@ -59,6 +59,7 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::VolleySpread;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
@@ -471,9 +472,9 @@ pub(crate) fn builder_masters() -> Masters {
             weapon_range: Distance::ZERO,
         }),
         // no sprites (the world's sprites' table is empty)
-        standing_sprite: -1,
-        move_sprite: -1,
-        run_sprite: -1,
+        standing_sprite: None,
+        move_sprite: None,
+        run_sprite: None,
         ..Master::default()
     };
     let base = || {
@@ -699,7 +700,7 @@ fn a_flare_at_a_point_stands_on_the_ground() {
     let flare = Master {
         id: master_id(274),
         kind: master_type::ANIMATED,
-        standing_sprite: -1,
+        standing_sprite: None,
         ..Master::default()
     };
     t.masters = (0..3).map(|_| Masters::new([flare.clone()])).collect();
@@ -730,7 +731,7 @@ fn a_hit_s_flare_lasts_twice_as_long_from_a_trebuchet() {
     let flare = Master {
         id: master_id(112),
         kind: master_type::ANIMATED,
-        standing_sprite: -1,
+        standing_sprite: None,
         storage: vec![(Some(AttributeId::numbered(12)), Amount::new(1.0), 0)],
         ..Master::default()
     };
@@ -779,7 +780,10 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         replay_delay: Seconds::ZERO,
         flags: 7,
     };
-    t.graphics = std::collections::BTreeMap::from([(13124, idle(13124)), (13170, idle(13170))]);
+    t.graphics = std::collections::BTreeMap::from([
+        (SpriteId::named(13124), idle(SpriteId::named(13124))),
+        (SpriteId::named(13170), idle(SpriteId::named(13170))),
+    ]);
     let pasture = Master {
         id: ids::PASTURE,
         kind: BUILDING,
@@ -800,7 +804,14 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
     };
     let mut masters = vec![pasture];
     for &m in livestock_masters {
-        masters.push(animal(m, if m.get() == 1899 { 13124 } else { 13170 }));
+        masters.push(animal(
+            m,
+            if m.get() == 1899 {
+                Some(SpriteId::named(13124))
+            } else {
+                Some(SpriteId::named(13170))
+            },
+        ));
     }
     t.masters = (0..2).map(|_| Masters::new(masters.clone())).collect();
     t.players[1].objects.push(Unit {
@@ -985,7 +996,7 @@ fn a_pasture_counts_each_attempt_and_shares_its_food() {
 fn a_dying_livestock_shows_its_dying_sprite() {
     for (factor, speed) in [(0.0, 0.737), (2.0, 1.474)] {
         let u = dying_animal(master_type::MOVING, factor);
-        assert_eq!(u.sprite.map(|s| s.graphic.id), Some(13171));
+        assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(13171)));
         assert_eq!(u.life.state, ObjectState::DyingSprite);
         assert_eq!(
             u.body.mover().map(|m| m.stats.speed),
@@ -1005,7 +1016,7 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Unit {
         &[master_id(1899), master_id(1900)],
     );
     let dying = Graphic {
-        id: 13171,
+        id: SpriteId::named(13171),
         frames: 10,
         facets: 16,
         speed_multiplier: factor,
@@ -1013,12 +1024,12 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Unit {
         replay_delay: Seconds::ZERO,
         flags: 7,
     };
-    let _ = t.graphics.insert(13171, dying);
+    let _ = t.graphics.insert(SpriteId::named(13171), dying);
     for m in &mut t.masters {
         let mut all: Vec<Master> = m.iter().cloned().collect();
         for a in all.iter_mut().filter(|a| a.kind == master_type::MOVING) {
             a.kind = kind;
-            a.death_sprite = 13171;
+            a.death_sprite = Some(SpriteId::named(13171));
             a.max_speed = Speed::new(0.737);
         }
         *m = Masters::new(all);
@@ -1582,11 +1593,15 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let graphics: std::collections::BTreeMap<i16, Graphic> =
-        [(100, g(100)), (101, g(101))].into_iter().collect();
+    let graphics: std::collections::BTreeMap<SpriteId, Graphic> = [
+        (SpriteId::named(100), g(SpriteId::named(100))),
+        (SpriteId::named(101), g(SpriteId::named(101))),
+    ]
+    .into_iter()
+    .collect();
     let master = Master {
-        standing_sprite: 100,
-        standing_sprite_2: Some(101),
+        standing_sprite: Some(SpriteId::named(100)),
+        standing_sprite_2: Some(SpriteId::named(101)),
         ..Master::default()
     };
     let shown = |id, looped| ActiveSprite {
@@ -1607,7 +1622,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         .find(|&s| rng(s).rand15() <= 0x3fff)
         .expect("a low draw");
     let mut u = Unit {
-        sprite: Some(shown(100, true)),
+        sprite: Some(shown(SpriteId::named(100), true)),
         ..Unit::default()
     };
     let mut r = rng(high);
@@ -1619,11 +1634,11 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
     );
     assert_eq!(u.idle_variant, 1);
     let s = u.sprite.unwrap();
-    assert_eq!((s.graphic.id, s.frame), (101, 0));
+    assert_eq!((s.graphic.id, s.frame), (SpriteId::named(101), 0));
     assert_eq!(r.draws, 1 + rng(high).draws);
     // a low draw keeps the sprite
     let mut u = Unit {
-        sprite: Some(shown(100, true)),
+        sprite: Some(shown(SpriteId::named(100), true)),
         ..Unit::default()
     };
     u.idle_swap(
@@ -1632,13 +1647,16 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         &graphics,
         &mut rng(low),
     );
-    assert_eq!((u.idle_variant, u.sprite.unwrap().graphic.id), (0, 100));
+    assert_eq!(
+        (u.idle_variant, u.sprite.unwrap().graphic.id),
+        (0, SpriteId::named(100))
+    );
     // no loop, another sprite, no second standing sprite: no draw
     for (sprite, m) in [
-        (shown(100, false), master.clone()),
-        (shown(7, true), master.clone()),
+        (shown(SpriteId::named(100), false), master.clone()),
+        (shown(SpriteId::named(7), true), master.clone()),
         (
-            shown(100, true),
+            shown(SpriteId::named(100), true),
             Master {
                 standing_sprite_2: None,
                 ..master
@@ -2540,7 +2558,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         notified: true,
     };
     let walking = Graphic {
-        id: 7,
+        id: SpriteId::named(7),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -2548,7 +2566,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let _ = t.graphics.insert(7, walking);
+    let _ = t.graphics.insert(SpriteId::named(7), walking);
     let shown_after_update = |t: &mut World| {
         in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
             let me = crate::movement::Me {
@@ -2569,13 +2587,13 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
     assert_eq!(shown_after_update(&mut table), None);
     // the MoveTo's constructor (FUN_140aa0df0) reads the builder's own master for its sprite
     let own = Master {
-        move_sprite: 7,
+        move_sprite: Some(SpriteId::named(7)),
         ..t.masters[1].get(ids::BUILDER).unwrap().clone()
     };
     t.players[1].objects[ListIndex::new(0)].own_master = Some(Box::new(own));
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
-    assert_eq!(shown_after_update(&mut t), Some(7));
+    assert_eq!(shown_after_update(&mut t), Some(SpriteId::named(7)));
 }
 
 /// The work command again on the Build's own foundation (`FUN_140ab1b30`): a Build at work
@@ -6090,8 +6108,8 @@ fn livestock_enter_world() -> World {
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         // no walking or standing sprite: its Enter's MoveTo takes none (the world's sprites'
         // table holds none)
-        move_sprite: -1,
-        standing_sprite: -1,
+        move_sprite: None,
+        standing_sprite: None,
         ..Master::default()
     };
     for masters in &mut t.masters {
@@ -6140,7 +6158,10 @@ fn livestock_s_enter_command_becomes_its_artifact_s_sub_action() {
 /// else `FUN_140aa0df0`'s default toward a building, the master's walking sprite.
 #[test]
 fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
-    for (moving, shown) in [(Some(30), 30), (None, 31)] {
+    for (moving, shown) in [
+        (Some(SpriteId::named(30)), SpriteId::named(30)),
+        (None, SpriteId::named(31)),
+    ] {
         let mut t = enter_world(vec![], 5);
         t.pathing = Pathing::new(
             GridSize::new(120, 120),
@@ -6151,7 +6172,7 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
         t.build_mesh().unwrap();
         for id in [30, 31] {
             let g = Graphic {
-                id,
+                id: SpriteId::named(id),
                 frames: 10,
                 facets: 16,
                 speed_multiplier: 1.0,
@@ -6159,9 +6180,9 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
                 replay_delay: Seconds::ZERO,
                 flags: 1,
             };
-            let _ = t.graphics.insert(id, g);
+            let _ = t.graphics.insert(SpriteId::named(id), g);
         }
-        t.masters[1].get_mut(VILLAGER_MALE).unwrap().move_sprite = 31;
+        t.masters[1].get_mut(VILLAGER_MALE).unwrap().move_sprite = Some(SpriteId::named(31));
         let v = &mut t.players[1].objects[ListIndex::new(0)];
         let here = v.position();
         v.body.mover_mut().unwrap().moved_at = here;
@@ -10006,8 +10027,8 @@ fn teardown_world() -> World {
         id,
         kind,
         class,
-        move_sprite: -1,
-        standing_sprite: -1,
+        move_sprite: None,
+        standing_sprite: None,
         ..Master::default()
     };
     let table = Masters::new([
@@ -10337,7 +10358,7 @@ fn deaths_world() -> World {
         id,
         kind,
         class,
-        death_sprite: -1,
+        death_sprite: None,
         ..Master::default()
     };
     let table = Masters::new([
@@ -10700,8 +10721,8 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
             radius: Footprint::new(0.2, 0.2),
             drop_sites: vec![ids::TOWN_CENTRE],
             // no sprites: the sprites' table holds none
-            move_sprite: -1,
-            standing_sprite: -1,
+            move_sprite: None,
+            standing_sprite: None,
             ..Master::default()
         },
         Master {
@@ -12742,7 +12763,7 @@ fn a_restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
         (
             Some(Position::new(30.0, 20.25, 0.5)),
             Distance::ZERO,
-            Some(13154)
+            Some(SpriteId::named(13154))
         )
     );
 }
@@ -12764,7 +12785,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         area_effect: Distance::new(2.0),
         area_damage: 1.0,
         missile: None,
-        death_sprite: 1751,
+        death_sprite: Some(SpriteId::named(1751)),
         ..Master::default()
     };
     let wall = Master {
@@ -12847,9 +12868,9 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         )
     });
     t.graphics = std::collections::BTreeMap::from([(
-        1751,
+        SpriteId::named(1751),
         Graphic {
-            id: 1751,
+            id: SpriteId::named(1751),
             frames: 10,
             facets: 1,
             speed_multiplier: 1.0,
@@ -12931,7 +12952,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
 #[test]
 fn an_annex_follows_its_dying_main_building_into_state_4() {
     let g = Graphic {
-        id: 1751,
+        id: SpriteId::named(1751),
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
@@ -12944,8 +12965,8 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         kind: BUILDING,
         class: class::GATE,
         hit_points: 1650,
-        standing_sprite: 1751,
-        death_sprite: 1751,
+        standing_sprite: Some(SpriteId::named(1751)),
+        death_sprite: Some(SpriteId::named(1751)),
         building: Some(crate::objects::masters::BuildingMaster {
             stack_unit: None,
             foundation_terrain: -1,
@@ -12970,7 +12991,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
             master_id: master,
             state: ObjectState::Alive,
             hp,
-            dying_sprite: Some(1751),
+            dying_sprite: Some(SpriteId::named(1751)),
             master: Some(MasterData::default()),
             ..Lifecycle::default()
         },
@@ -13017,7 +13038,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         Masters::new([]),
         Masters::new([gate(master_id(88)), gate(master_id(95))]),
     ];
-    t.graphics = std::collections::BTreeMap::from([(1751, g)]);
+    t.graphics = std::collections::BTreeMap::from([(SpriteId::named(1751), g)]);
     t.tick(Millis::new(100));
     assert_eq!(t.players[1].unsupported, None);
     let states: Vec<(i32, ObjectState)> = t.players[1]
@@ -13057,7 +13078,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         class: class::GATE,
         hit_points: 10,
         build_time: 70,
-        standing_sprite: 1751,
+        standing_sprite: Some(SpriteId::named(1751)),
         death_sprite,
         building: Some(crate::objects::masters::BuildingMaster {
             stack_unit: None,
@@ -13066,7 +13087,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             head_unit: None,
             transform_unit: None,
             destruction_sprite,
-            construction_sprite: -1,
+            construction_sprite: None,
             ..crate::objects::masters::BuildingMaster::default()
         }),
         ..Master::default()
@@ -13076,7 +13097,10 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         pasture: None,
         my_pasture: None,
         annex_of,
-        sprite: Some(crate::objects::sprite::ActiveSprite::at_rest(g(1751, 0), 0)),
+        sprite: Some(crate::objects::sprite::ActiveSprite::at_rest(
+            g(SpriteId::named(1751), 0),
+            0,
+        )),
         body: crate::objects::layers::Body::new(
             Position::new(150.0, 46.0, 0.0),
             Some(crate::objects::layers::Animated::default()),
@@ -13087,7 +13111,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             master_id: m,
             state: ObjectState::Foundation,
             hp,
-            dying_sprite: Some(38),
+            dying_sprite: Some(SpriteId::named(38)),
             master: Some(MasterData::default()),
             ..Lifecycle::default()
         },
@@ -13145,15 +13169,19 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
     t.masters = vec![
         Masters::new([]),
         Masters::new([
-            master(master_id(800), 38, -1),
-            master(master_id(1192), 37, 112),
+            master(master_id(800), Some(SpriteId::named(38)), None),
+            master(
+                master_id(1192),
+                Some(SpriteId::named(37)),
+                Some(SpriteId::named(112)),
+            ),
         ]),
     ];
     t.graphics = std::collections::BTreeMap::from([
-        (1751, g(1751, 0)),
-        (38, g(38, 9)),
-        (37, g(37, 9)),
-        (112, g(112, 9)),
+        (SpriteId::named(1751), g(SpriteId::named(1751), 0)),
+        (SpriteId::named(38), g(SpriteId::named(38), 9)),
+        (SpriteId::named(37), g(SpriteId::named(37), 9)),
+        (SpriteId::named(112), g(SpriteId::named(112), 9)),
     ]);
     let looks = |t: &World| -> Vec<(ObjectId, ObjectState, f32, Option<ObjectId>)> {
         t.players[1]
@@ -13183,12 +13211,19 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             (object_id(34600), ObjectState::DyingSprite)
         ]
     );
-    let sprites: Vec<Option<i16>> = t.players[1]
+    let sprites: Vec<Option<SpriteId>> = t.players[1]
         .objects
         .iter()
         .map(|u| u.sprite.map(|s| s.graphic.id))
         .collect();
-    assert_eq!(sprites, [Some(112), Some(112), Some(38)]);
+    assert_eq!(
+        sprites,
+        [
+            Some(SpriteId::named(112)),
+            Some(SpriteId::named(112)),
+            Some(SpriteId::named(38))
+        ]
+    );
 }
 
 /// The regeneration's end: an object at its most hit points after it (slot 0xc0 at least slot
@@ -13402,13 +13437,13 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         id: master_id(12),
         kind: BUILDING,
         class: class::BUILDING,
-        standing_sprite: 207,
-        death_sprite: 2573,
+        standing_sprite: Some(SpriteId::named(207)),
+        death_sprite: Some(SpriteId::named(2573)),
         build_time: 50,
         hit_points: 1200,
         building: Some(crate::objects::masters::BuildingMaster {
-            destruction_sprite: 389,
-            construction_sprite: -1,
+            destruction_sprite: Some(SpriteId::named(389)),
+            construction_sprite: None,
             ..crate::objects::masters::BuildingMaster::default()
         }),
         ..Master::default()
@@ -13421,7 +13456,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             hp: HitPoints::new(0.5),
             master_id: master_id(12),
             master: Some(MasterData::default()),
-            dying_sprite: Some(2573),
+            dying_sprite: Some(SpriteId::named(2573)),
             ..Lifecycle::default()
         },
         construction: Some(Construction {
@@ -13437,7 +13472,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             snow: false,
             sprite_override: false,
         }),
-        sprite: Some(ActiveSprite::at_rest(g(207), 0)),
+        sprite: Some(ActiveSprite::at_rest(g(SpriteId::named(207)), 0)),
         pasture: None,
         my_pasture: None,
         ..Unit::default()
@@ -13454,14 +13489,18 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         }],
     );
     t.masters = vec![Masters::new([barracks])];
-    t.graphics = [(207, g(207)), (389, g(389)), (2573, g(2573))]
-        .into_iter()
-        .collect();
+    t.graphics = [
+        (SpriteId::named(207), g(SpriteId::named(207))),
+        (SpriteId::named(389), g(SpriteId::named(389))),
+        (SpriteId::named(2573), g(SpriteId::named(2573))),
+    ]
+    .into_iter()
+    .collect();
     t.tick(Millis::new(10));
     assert_eq!(t.players[0].unsupported, None);
     let u = &t.players[0].objects[ListIndex::new(0)];
     assert_eq!(u.life.state, ObjectState::DyingSprite);
-    assert_eq!(u.sprite.unwrap().graphic.id, 389);
+    assert_eq!(u.sprite.unwrap().graphic.id, SpriteId::named(389));
 }
 
 /// GAME's cheat code (sub-command 6, `FUN_1415c92c0`): without the game's cheats it does
@@ -13562,19 +13601,19 @@ fn ai_move_of(
 
 /// The master 83 of [`mover_unit`] with its running (13154), walking (13153) and standing
 /// (13151) sprites, and their table.
-fn scout_sprites() -> (Masters, std::collections::BTreeMap<i16, Graphic>) {
+fn scout_sprites() -> (Masters, std::collections::BTreeMap<SpriteId, Graphic>) {
     let master = Master {
         id: VILLAGER_MALE,
-        run_sprite: 13154,
-        move_sprite: 13153,
-        standing_sprite: 13151,
+        run_sprite: Some(SpriteId::named(13154)),
+        move_sprite: Some(SpriteId::named(13153)),
+        standing_sprite: Some(SpriteId::named(13151)),
         ..Master::default()
     };
     let graphics = [13154, 13153, 13151]
         .into_iter()
         .map(|id| {
             let g = Graphic {
-                id,
+                id: SpriteId::named(id),
                 frames: 10,
                 facets: 16,
                 speed_multiplier: 1.0,
@@ -13582,7 +13621,7 @@ fn scout_sprites() -> (Masters, std::collections::BTreeMap<i16, Graphic>) {
                 replay_delay: Seconds::ZERO,
                 flags: 1,
             };
-            (id, g)
+            (g.id, g)
         })
         .collect();
     (Masters::new([master]), graphics)
@@ -13628,7 +13667,7 @@ fn an_ai_move_replaces_a_done_attack_with_a_move_to_the_point() {
             Some(AI_POINT),
             -1,
             Distance::new(0.5),
-            Some(13154)
+            Some(SpriteId::named(13154))
         )
     );
     // walking: the master's walking sprite
@@ -13638,7 +13677,7 @@ fn an_ai_move_replaces_a_done_attack_with_a_move_to_the_point() {
         Ok(vec![])
     );
     let walked = u.actions.move_to().copied().unwrap().sprite;
-    assert_eq!(walked.map(|g| g.id), Some(13153));
+    assert_eq!(walked.map(|g| g.id), Some(SpriteId::named(13153)));
 }
 
 /// The Gather's slot 0x40 (`0x140a8b740`) takes a move to a point: the target goes (slot 0x68
@@ -13650,7 +13689,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
         id: TaskId::test(2),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
-        sprites: [-1; 4],
+        sprites: TaskSprites::NONE,
         work_value: 1.0,
         productivity: None,
         kind4: None,
@@ -13831,7 +13870,7 @@ fn an_ai_move_of_a_unit_without_speed_fails_at_its_start_standing() {
 #[test]
 fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
     let standing = Graphic {
-        id: 764,
+        id: SpriteId::named(764),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -13840,13 +13879,16 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         flags: 1,
     };
     let walking = Graphic {
-        id: 765,
+        id: SpriteId::named(765),
         ..standing
     };
-    let graphics = std::collections::BTreeMap::from([(764, standing), (765, walking)]);
+    let graphics = std::collections::BTreeMap::from([
+        (SpriteId::named(764), standing),
+        (SpriteId::named(765), walking),
+    ]);
     let masters = Masters::new([Master {
         id: master_id(65),
-        standing_sprite: 764,
+        standing_sprite: Some(SpriteId::named(764)),
         ..Master::default()
     }]);
     let mut rng = Well512::default();
@@ -13879,7 +13921,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         u.body.mover().map(|m| m.stats.speed),
         Some(Speed::new(0.737))
     );
-    assert_eq!(u.sprite.map(|s| s.graphic.id), Some(764));
+    assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(764)));
     assert_eq!(u.body.anim_speed(), Some(0.0));
     let mut v = deer(&mut rng);
     v.own_move_gave_up(
@@ -13893,7 +13935,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         v.body.mover().map(|m| m.stats.speed),
         Some(Speed::new(1.4003))
     );
-    assert_eq!(v.sprite.map(|s| s.graphic.id), Some(765));
+    assert_eq!(v.sprite.map(|s| s.graphic.id), Some(SpriteId::named(765)));
 }
 
 /// The unit AI's attack command ([`crate::unit_ai::UnitSide::attack`]) of the scout 123 (master
@@ -13915,7 +13957,7 @@ fn on_side<R>(
     (spatial, every, graphics): (
         Spatial,
         Vec<Masters>,
-        std::collections::BTreeMap<i16, Graphic>,
+        std::collections::BTreeMap<SpriteId, Graphic>,
     ),
     groups: crate::groups::UnitGroups,
     f: impl FnOnce(&mut crate::unit_ai::world_view::UnitView<'_, '_>) -> R,
@@ -13992,7 +14034,7 @@ fn scout_attack_on(
 ) -> (Unit, crate::unit_ai::Attacked, Vec<i32>) {
     use crate::unit_ai::UnitSide;
     let standing = Graphic {
-        id: 300,
+        id: SpriteId::named(300),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -14001,11 +14043,11 @@ fn scout_attack_on(
         flags: 1,
     };
     let graphics = std::collections::BTreeMap::from([
-        (300, standing),
+        (SpriteId::named(300), standing),
         (
-            301,
+            SpriteId::named(301),
             Graphic {
-                id: 301,
+                id: SpriteId::named(301),
                 ..standing
             },
         ),
@@ -14014,8 +14056,8 @@ fn scout_attack_on(
         id: ids::ID_448,
         kind: master_type::COMBAT,
         class: class::CLASS_47,
-        standing_sprite: 300,
-        attack_sprite: 301,
+        standing_sprite: Some(SpriteId::named(300)),
+        attack_sprite: Some(SpriteId::named(301)),
         weapon_range: Distance::new(1.0),
         reload: Seconds::new(2.0),
         ..Master::default()
@@ -14122,7 +14164,7 @@ fn attack_by(
     let (timer, inside, own, force) = (0.0, None, None, true);
     let attacker_master = who.id;
     let standing = Graphic {
-        id: 300,
+        id: SpriteId::named(300),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -14131,11 +14173,11 @@ fn attack_by(
         flags: 1,
     };
     let graphics = std::collections::BTreeMap::from([
-        (300, standing),
+        (SpriteId::named(300), standing),
         (
-            301,
+            SpriteId::named(301),
             Graphic {
-                id: 301,
+                id: SpriteId::named(301),
                 ..standing
             },
         ),
@@ -14144,8 +14186,8 @@ fn attack_by(
         id: ids::ID_448,
         kind: master_type::COMBAT,
         class: class::CLASS_47,
-        standing_sprite: 300,
-        attack_sprite: 301,
+        standing_sprite: Some(SpriteId::named(300)),
+        attack_sprite: Some(SpriteId::named(301)),
         weapon_range: Distance::new(1.0),
         reload: Seconds::new(2.0),
         ..Master::default()
@@ -14248,8 +14290,8 @@ fn a_villager_s_attack_command_switches_it_to_the_villager_first() {
         class: class::VILLAGER,
         task_by_group: 1,
         hit_points: 25,
-        standing_sprite: 300,
-        attack_sprite: 301,
+        standing_sprite: Some(SpriteId::named(300)),
+        attack_sprite: Some(SpriteId::named(301)),
         weapon_range: Distance::new(0.5),
         reload: Seconds::new(2.0),
         storage,
@@ -14570,11 +14612,17 @@ fn an_attack_command_of_a_unit_that_cannot_move_goes_ready_and_swings_at_once() 
         (attack.state, attack.pending, attack.point),
         (AttackState::Swing, true, Position::new(10.5, 10.0, 0.0))
     );
-    assert_eq!(unit.sprite.map(|s| s.graphic.id), Some(301));
+    assert_eq!(
+        unit.sprite.map(|s| s.graphic.id),
+        Some(SpriteId::named(301))
+    );
     let (unit, _, _) = scout_attack(0.5, None);
     let attack = unit.actions.attack().copied().expect("the scout's Attack");
     assert_eq!((attack.state, attack.pending), (AttackState::Ready, false));
-    assert_eq!(unit.sprite.map(|s| s.graphic.id), Some(300));
+    assert_eq!(
+        unit.sprite.map(|s| s.graphic.id),
+        Some(SpriteId::named(300))
+    );
     let (unit, attacked, takes) = scout_attack(0.0, Some(object_id(9149)));
     assert_eq!((attacked.attacks, takes), (true, vec![50]));
     assert_eq!(
@@ -14701,7 +14749,7 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
     let build = |flags: u8| {
         let mut masters = builder_masters();
         let house = masters.get_mut(ids::HOUSE).unwrap();
-        house.standing_sprite = 588;
+        house.standing_sprite = Some(SpriteId::named(588));
         house.moving = Some(house_moves());
         let mut t = World::new(
             WorldTime::ZERO,
@@ -14740,9 +14788,9 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
         t.masters = vec![Masters::default(), masters];
         t.streams.seed_all(0x5eed);
         let _ = t.graphics.insert(
-            588,
+            SpriteId::named(588),
             Graphic {
-                id: 588,
+                id: SpriteId::named(588),
                 frames: 1,
                 facets: 5,
                 speed_multiplier: 1.0,
@@ -14820,7 +14868,7 @@ fn reseed_world() -> World {
         id: TaskId::test(2),
         range: Distance::new(0.25),
         resource: Some(attribute::MEAT),
-        sprites: [-1; 4],
+        sprites: TaskSprites::NONE,
         work_value: 1.0,
         productivity: None,
         kind4: None,
@@ -15497,8 +15545,8 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         class: class::CLASS_0,
         hit_points: 30,
         radius: Footprint::new(0.2, 0.2),
-        standing_sprite: 300,
-        attack_sprite: 301,
+        standing_sprite: Some(SpriteId::named(300)),
+        attack_sprite: Some(SpriteId::named(301)),
         missile: Some(master_id(363)),
         weapon_offset: Offset::new(0.0, 0.0, 1.0),
         weapon_range: Distance::new(4.0),
@@ -15519,8 +15567,8 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         class: class::WALL,
         hit_points: 1,
         radius: Footprint::new(0.1, 0.1),
-        standing_sprite: -1,
-        death_sprite: -1,
+        standing_sprite: None,
+        death_sprite: None,
         death_spawns: [None, None],
         life: Some(MasterData::default()),
         recyclable: true,
@@ -15586,7 +15634,10 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    t.graphics = std::collections::BTreeMap::from([(300, sprite(300)), (301, sprite(301))]);
+    t.graphics = std::collections::BTreeMap::from([
+        (SpriteId::named(300), sprite(SpriteId::named(300))),
+        (SpriteId::named(301), sprite(SpriteId::named(301))),
+    ]);
     let masters = archer_masters(hit_chance, max_volley, spread);
     t.masters = vec![masters.clone(), masters];
     walker(
@@ -15608,8 +15659,8 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
     attack.range = Distance::new(4.0);
     attack.arms.missile = Some(master_id(363));
     attack.arms.fire_frame = 5;
-    attack.arms.sprite = Some(sprite(301));
-    attack.arms.idle_sprite = Some(sprite(300));
+    attack.arms.sprite = Some(sprite(SpriteId::named(301)));
+    attack.arms.idle_sprite = Some(sprite(SpriteId::named(300)));
     archer.actions.set_attack(Some(attack));
     let mut deer = unit(50, master_id(65), HitPoints::new(5.0));
     deer.place_for_test(Position::new(13.0, 10.0, 0.0));
@@ -15647,7 +15698,7 @@ fn a_hit_s_flare_is_made_where_the_volley_runs() {
     let flare = Master {
         id: master_id(112),
         kind: master_type::ANIMATED,
-        standing_sprite: -1,
+        standing_sprite: None,
         storage: vec![(Some(AttributeId::numbered(12)), Amount::new(1.0), 0)],
         ..Master::default()
     };
@@ -15940,7 +15991,7 @@ fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
     let mut plain = archer_world(100, 0, 0.0);
     let mut drawn = archer_world(100, 0, 0.0);
     let sprite = Graphic {
-        id: 302,
+        id: SpriteId::named(302),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -15948,9 +15999,9 @@ fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
         replay_delay: Seconds::ZERO,
         flags: 7,
     };
-    let _ = drawn.graphics.insert(302, sprite);
+    let _ = drawn.graphics.insert(SpriteId::named(302), sprite);
     for m in &mut drawn.masters {
-        m.get_mut(master_id(363)).unwrap().standing_sprite = 302;
+        m.get_mut(master_id(363)).unwrap().standing_sprite = Some(SpriteId::named(302));
     }
     for _ in 0..6 {
         plain.tick(Millis::new(100));
@@ -16980,7 +17031,7 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
     );
     t.build_mesh().unwrap();
     let walking = Graphic {
-        id: 31,
+        id: SpriteId::named(31),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -16988,9 +17039,9 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let _ = t.graphics.insert(31, walking);
+    let _ = t.graphics.insert(SpriteId::named(31), walking);
     let master = t.players[1].objects[ListIndex::new(0)].life.master_id;
-    t.masters[1].get_mut(master).unwrap().move_sprite = 31;
+    t.masters[1].get_mut(master).unwrap().move_sprite = Some(SpriteId::named(31));
     let r = in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -17010,9 +17061,9 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
     let move_to = v.actions.explore().and_then(|e| e.move_to);
     assert_eq!(
         move_to.map(|m| (m.state, m.sprite.map(|g| g.id))),
-        Some((MoveTo::Moving, Some(31)))
+        Some((MoveTo::Moving, Some(SpriteId::named(31))))
     );
-    assert_eq!(v.sprite.map(|s| s.graphic.id), Some(31));
+    assert_eq!(v.sprite.map(|s| s.graphic.id), Some(SpriteId::named(31)));
 }
 
 /// What [`explored`] gives: the part's result, the Explore after it and the notifies heard.
@@ -17668,9 +17719,9 @@ fn a_dying_desolid_foundation_s_owner_watches_it_within_its_update() {
     let mut t = house_builder();
     for masters in &mut t.masters {
         let house = masters.get_mut(ids::HOUSE).unwrap();
-        house.death_sprite = -1;
+        house.death_sprite = None;
         if let Some(b) = house.building.as_mut() {
-            b.destruction_sprite = -1;
+            b.destruction_sprite = None;
         }
     }
     let k = t.players[1].objects[ListIndex::new(1)]
@@ -18487,6 +18538,14 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
     t.spatial.set_annex(object_id(700), Some(object_id(10028)));
     t.players[1].objects[ListIndex::new(2)].annex_of = Some(object_id(10028));
     let house = &t.players[1].objects[ListIndex::new(1)];
+    let house_master = house.life.master_id;
+    // the unbuilt house dies on its dying sprite, 0 here (it has no destruction sprite)
+    for masters in &mut t.masters {
+        if let Some(m) = masters.get_mut(house_master) {
+            m.death_sprite = Some(SpriteId::named(0));
+        }
+    }
+    let house = &t.players[1].objects[ListIndex::new(1)];
     let master = t.masters[1].get(house.life.master_id).unwrap();
     let progress = house.construction.unwrap().progress;
     let id = building_death(master, None, progress).unwrap();
@@ -18842,12 +18901,12 @@ fn a_built_building_s_death_reaches_its_owner_within_its_update() {
         for masters in &mut t.masters {
             let mut castle = Master {
                 id: ids::CASTLE,
-                death_sprite: -1,
+                death_sprite: None,
                 cost: costs(&[(attribute::STONE, 650, true)]),
                 ..masters.get(ids::HOUSE).unwrap().clone()
             };
             let b = castle.building.as_mut().unwrap();
-            (b.tech, b.destruction_sprite) = (Some(tech_id(0)), -1);
+            (b.tech, b.destruction_sprite) = (Some(tech_id(0)), None);
             *masters = Masters::new(masters.iter().cloned().chain([castle]));
         }
         t.players[1].objects[ListIndex::new(1)].life.master_id = ids::CASTLE;

@@ -12,6 +12,7 @@ use crate::movement::move_to::SpriteReads;
 use crate::movement::{Me, Planning, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
 use crate::objects::release::Releaser;
@@ -165,12 +166,14 @@ impl Unit {
     ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
         let gather = self.actions.gather().expect("the caller's gather");
         let master = self.master(&c.w.masters, c.player)?;
-        let standing = (0 <= master.standing_sprite)
-            .then(|| c.w.graphics.get(&master.standing_sprite).copied())
-            .flatten();
-        let carrying = (0 <= gather.task.sprites[3])
-            .then(|| c.w.graphics.get(&gather.task.sprites[3]).copied())
-            .flatten();
+        let standing = master
+            .standing_sprite
+            .and_then(|s| c.w.graphics.get(&s).copied());
+        let carrying = gather
+            .task
+            .sprites
+            .carrying
+            .and_then(|s| c.w.graphics.get(&s).copied());
         Ok(match carrying {
             Some(g)
                 if gather.task.resource.is_some()
@@ -323,7 +326,7 @@ impl Unit {
         &mut self,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
-        graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
@@ -359,7 +362,7 @@ impl Unit {
         &mut self,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
-        graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(

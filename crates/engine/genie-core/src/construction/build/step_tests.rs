@@ -55,13 +55,13 @@ const HOUSE: ObjectId = object_id(10028);
 const AT_HOUSE: Position = Position::new(10.5, 10.5, 0.0);
 /// The builder's walking sprite, which its `MoveTo`s show by default, and its standing sprite,
 /// which `set_state` 1, 2, 3 and 13 show (slot 0x68).
-const WALKING: i16 = 10;
-const STANDING: i16 = 11;
+const WALKING: SpriteId = SpriteId::named(10);
+const STANDING: SpriteId = SpriteId::named(11);
 /// The moving sprite of [`MOVING_TASK`].
-const TASK_SPRITE: i16 = 3;
+const TASK_SPRITE: SpriteId = SpriteId::named(3);
 
 /// A looped sprite of `id`: 10 frames of 16 facets.
-const fn graphic(id: i16) -> Graphic {
+const fn graphic(id: SpriteId) -> Graphic {
     Graphic {
         id,
         frames: 10,
@@ -134,7 +134,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     ];
     masters = Masters::new(masters.iter().cloned().chain(others));
     let v = masters.get_mut(ids::VILLAGER_MALE).unwrap();
-    (v.class, v.move_sprite, v.standing_sprite) = (class, WALKING, STANDING);
+    (v.class, v.move_sprite, v.standing_sprite) = (class, Some(WALKING), Some(STANDING));
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.moved_at = at;
     let builder = Unit {
@@ -199,7 +199,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
         (WALKING, graphic(WALKING)),
         (STANDING, graphic(STANDING)),
         (TASK_SPRITE, graphic(TASK_SPRITE)),
-        (7, graphic(7)),
+        (SpriteId::named(7), graphic(SpriteId::named(7))),
     ]);
     t.spatial = Spatial::with_tiles(
         GridSize::new(20, 20),
@@ -436,7 +436,7 @@ fn a_builder_whose_foundation_dies_walks_to_its_point() {
     // a drop's sprite, which the walk to the point drops for the task's moving one (none)
     let b = BuildAction {
         move_to: Some(MoveToAction {
-            sprite: Some(graphic(7)),
+            sprite: Some(graphic(SpriteId::named(7))),
             ..walk_in(MoveTo::Moving)
         }),
         added: true,
@@ -1297,7 +1297,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
         range: Distance::new(0.5),
         sprite,
     };
-    let b = drop(&mut t, site(Some(7)));
+    let b = drop(&mut t, site(Some(SpriteId::named(7))));
     let walk = b.move_to.unwrap();
     assert_eq!(
         (
@@ -1318,7 +1318,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
     // the drop task's carrying sprite; +0x61 1: it asks again when its target moves
     assert_eq!(
         (walk.sprite.map(|g| g.id), walk.on_target_moved),
-        (Some(7), TargetMoved::AsksAgain)
+        (Some(SpriteId::named(7)), TargetMoved::AsksAgain)
     );
     assert_eq!(
         (b.added, house(&t).0, b.target, mill(&t)),

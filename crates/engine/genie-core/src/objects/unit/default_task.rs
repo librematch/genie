@@ -40,7 +40,7 @@ impl Unit {
         if self.default_artifact {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
             let moving = Master::default_task(self.master(&c.w.masters, c.player)?)
-                .and_then(|t| crate::objects::sprite::sprite_id(t.sprites[0]));
+                .and_then(|t| t.sprites.moving);
             self.actions
                 .set_artifact(Some(Artifact::new(c.player == PlayerId::GAIA, moving)));
             return Ok(true);

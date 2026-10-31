@@ -10,10 +10,12 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -99,21 +101,21 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
         flags: 0,
     };
     let arms = crate::combat::attack::Arms {
-        move_sprite: Some(g(1)),
-        sprite: Some(g(2)),
-        second_sprite: Some(g(3)),
-        idle_sprite: Some(g(4)),
+        move_sprite: Some(g(SpriteId::named(1))),
+        sprite: Some(g(SpriteId::named(2))),
+        second_sprite: Some(g(SpriteId::named(3))),
+        idle_sprite: Some(g(SpriteId::named(4))),
         idle_attack_sprite: None,
         missile: None,
         fire_frame: 0,
         interrupt_frame: -1,
     };
     let sprites = MasterSprites {
-        moving: Some(g(11)),
-        attack: Some(g(12)),
-        standing: Some(g(14)),
-        idle_attack: Some(g(15)),
-        second: Some(g(13)),
+        moving: Some(g(SpriteId::named(11))),
+        attack: Some(g(SpriteId::named(12))),
+        standing: Some(g(SpriteId::named(14))),
+        idle_attack: Some(g(SpriteId::named(15))),
+        second: Some(g(SpriteId::named(13))),
         combat: false,
     };
     let mut a = arms;
@@ -126,14 +128,24 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
             a.second_sprite,
             a.idle_attack_sprite
         ],
-        [Some(g(11)), Some(g(12)), Some(g(14)), Some(g(3)), None]
+        [
+            Some(g(SpriteId::named(11))),
+            Some(g(SpriteId::named(12))),
+            Some(g(SpriteId::named(14))),
+            Some(g(SpriteId::named(3))),
+            None
+        ]
     );
     // the task's moving (1) and working (4, the standing sprite's) sprites stay
     let mut a = arms;
-    follow_master(&mut a, Some([1, 9, 4, 9]), &sprites);
+    follow_master(&mut a, Some(TaskSprites::of_data([1, 9, 4, 9])), &sprites);
     assert_eq!(
         [a.move_sprite, a.sprite, a.idle_sprite],
-        [Some(g(1)), Some(g(12)), Some(g(4))]
+        [
+            Some(g(SpriteId::named(1))),
+            Some(g(SpriteId::named(12))),
+            Some(g(SpriteId::named(4)))
+        ]
     );
     // a sprite it lacks stays lacking; a combat master's last two replace its own
     let mut a = crate::combat::attack::Arms {
@@ -150,7 +162,11 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
     );
     assert_eq!(
         [a.move_sprite, a.second_sprite, a.idle_attack_sprite],
-        [None, Some(g(13)), Some(g(15))]
+        [
+            None,
+            Some(g(SpriteId::named(13))),
+            Some(g(SpriteId::named(15)))
+        ]
     );
 }
 
@@ -289,7 +305,7 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
     use crate::garrison::tests::{TC, VILLAGER, let_out_world};
     let mut t = let_out_world();
     let standing = crate::objects::sprite::Graphic {
-        id: 300,
+        id: SpriteId::named(300),
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
@@ -297,9 +313,9 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let _ = t.graphics.insert(300, standing);
+    let _ = t.graphics.insert(SpriteId::named(300), standing);
     for ms in &mut t.masters {
-        ms.get_mut(VILLAGER).unwrap().standing_sprite = 300;
+        ms.get_mut(VILLAGER).unwrap().standing_sprite = Some(SpriteId::named(300));
         let female = Master {
             id: master_id(0x125),
             ..ms.get(VILLAGER).unwrap().clone()
@@ -828,7 +844,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
 fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     use crate::objects::masters::attribute as a;
     let fast = crate::objects::sprite::Graphic {
-        id: 7,
+        id: SpriteId::named(7),
         frames: 1,
         facets: 1,
         speed_multiplier: 2.0,
@@ -862,7 +878,8 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         vec![player],
     );
     let mut m = combat(master_id(4), class::CLASS_6, 60);
-    (m.max_speed, m.move_sprite, m.run_sprite, m.standing_sprite) = (Speed::new(1.5), -1, -1, -1);
+    (m.max_speed, m.move_sprite, m.run_sprite, m.standing_sprite) =
+        (Speed::new(1.5), None, None, None);
     t.masters = vec![Masters::new([m])];
     t.master_followers(PlayerId::new(0), master_id(4), a::MOVEMENT_SPEED)
         .unwrap();
@@ -899,7 +916,10 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         vec![player],
     );
     let mut m = combat(master_id(4), class::CLASS_6, 60);
-    (m.death_sprite, m.death_spawns) = (7, [Some(master_id(0)), Some(master_id(9))]);
+    (m.death_sprite, m.death_spawns) = (
+        Some(SpriteId::named(7)),
+        [Some(master_id(0)), Some(master_id(9))],
+    );
     (m.build_time, m.obstruction_type, m.obstruction_class) =
         (33, ObstructionType::CIRCLE, ObstructionClass::UNIT);
     (m.line_of_sight, m.tall) = (Distance::new(6.0), true);
@@ -963,11 +983,11 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
     let p = &t.players[0];
     assert_eq!(
         follows(&p.objects[ListIndex::new(0)]),
-        (Some(7), true, Some(master_id(9)))
+        (Some(SpriteId::named(7)), true, Some(master_id(9)))
     );
     assert_eq!(
         follows(&p.sleeping[ListIndex::new(0)]),
-        (Some(7), true, Some(master_id(9)))
+        (Some(SpriteId::named(7)), true, Some(master_id(9)))
     );
     assert_eq!(follows(&p.objects[ListIndex::new(1)]), (None, false, None));
     let c = p.objects[ListIndex::new(0)].construction.unwrap();
@@ -987,7 +1007,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         (Distance::new(6.0), Distance::new(2.0))
     );
     // a dying sprite below 0 is none
-    t.masters[0].get_mut(master_id(4)).unwrap().death_sprite = -1;
+    t.masters[0].get_mut(master_id(4)).unwrap().death_sprite = None;
     t.master_followers(PlayerId::new(0), master_id(4), a::DYING_GRAPHIC)
         .unwrap();
     assert_eq!(
@@ -1908,7 +1928,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
     let mut rng = crate::math::rng::Well512::default();
     let mut shown = |id, variant| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));
-        u.sprite = Some(ActiveSprite::start(graphic(300), &mut rng));
+        u.sprite = Some(ActiveSprite::start(graphic(SpriteId::named(300)), &mut rng));
         u.idle_variant = variant;
         u
     };
@@ -1933,12 +1953,15 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         vec![player],
     );
     t.masters = vec![Masters::new([Master {
-        standing_sprite: 300,
+        standing_sprite: Some(SpriteId::named(300)),
         ..combat(master_id(4), class::CLASS_6, 60)
     }])];
-    t.graphics = [(300, graphic(300)), (301, graphic(301))]
-        .into_iter()
-        .collect();
+    t.graphics = [
+        (SpriteId::named(300), graphic(SpriteId::named(300))),
+        (SpriteId::named(301), graphic(SpriteId::named(301))),
+    ]
+    .into_iter()
+    .collect();
     t.load_trackers().unwrap();
     t.do_effect(PlayerId::new(0), &[attribute(0, 4, -1, 71, 301.0)], None)
         .unwrap();
@@ -1950,7 +1973,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
     };
     assert_eq!(
         t.masters[0].get(master_id(4)).map(|m| m.standing_sprite),
-        Some(301)
+        Some(Some(SpriteId::named(301)))
     );
     // the unit with an action leaves its sprite to the action (an Explore holds none)
     assert_eq!(
@@ -1959,7 +1982,11 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
             sprite(ListIndex::new(1)),
             sprite(ListIndex::new(2))
         ),
-        (Some(301), Some(300), Some(300))
+        (
+            Some(SpriteId::named(301)),
+            Some(SpriteId::named(300)),
+            Some(SpriteId::named(300))
+        )
     );
 }
 

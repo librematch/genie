@@ -15,6 +15,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -98,7 +99,7 @@ fn world() -> World {
         line_of_sight: Distance::new(4.0),
         search_radius: Distance::new(3.0),
         radius: Footprint::new(0.2, 0.2),
-        standing_sprite: -1,
+        standing_sprite: None,
         formation_category: 1,
         ..Master::default()
     };
@@ -592,9 +593,9 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
             class,
             hit_points: 60,
             radius: Footprint::new(0.2, 0.2),
-            standing_sprite: sprites[0],
-            move_sprite: sprites[1],
-            run_sprite: sprites[2],
+            standing_sprite: SpriteId::of_data(sprites[0]),
+            move_sprite: SpriteId::of_data(sprites[1]),
+            run_sprite: SpriteId::of_data(sprites[2]),
             formation_category: 1,
             ..Master::default()
         };
@@ -609,7 +610,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
     // the sprites' factors on the walker's top speed 0.8
     for (id, factor) in [(6, 0.125), (7, 1.125), (8, 1.875)] {
         let graphic = crate::objects::sprite::Graphic {
-            id,
+            id: SpriteId::named(id),
             frames: 1,
             facets: 8,
             speed_multiplier: factor,
@@ -617,7 +618,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
             replay_delay: Seconds::ZERO,
             flags: 0,
         };
-        let _ = t.graphics.insert(id, graphic);
+        let _ = t.graphics.insert(graphic.id, graphic);
     }
     assert_eq!(t.show_walking(object_id(10)), Ok(true));
     assert_eq!(speed(&t), Speed::new(0.8 * 1.125));
@@ -628,7 +629,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
     // a held sprite needs the graphic
     t.graphics.clear();
     let graphic = crate::objects::sprite::Graphic {
-        id: 1,
+        id: SpriteId::named(1),
         frames: 1,
         facets: 8,
         speed_multiplier: 1.0,
@@ -1978,7 +1979,7 @@ fn gate_world() -> World {
         kind: master_type::BUILDING,
         class: class::GATE,
         radius: Footprint::new(0.5, 0.5),
-        standing_sprite: -1,
+        standing_sprite: None,
         ..Master::default()
     };
     t.masters[2] = Masters::new([m4, gate]);

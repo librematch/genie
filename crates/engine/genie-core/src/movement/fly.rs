@@ -14,9 +14,11 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, graphic_of};
 use crate::movement::{Me, Mover};
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Task;
-use crate::objects::sprite::{Graphic, sprite_id};
+use crate::objects::masters::TaskSprites;
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
@@ -60,9 +62,9 @@ pub struct Fly {
 #[derive(Clone, Copy, Debug)]
 pub struct FlightSprites<'a> {
     /// The bird's master's walking sprite, None for none.
-    pub walking: Option<i16>,
+    pub walking: Option<SpriteId>,
     /// The sprites' table.
-    pub graphics: &'a std::collections::BTreeMap<i16, Graphic>,
+    pub graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
 }
 
 /// The height a bird of fly mode 1 flies at once its Fly starts (`FUN_140a84900`).
@@ -135,7 +137,7 @@ impl Fly {
             FlyState::Choosing => {
                 let mover = bird.body.mover().ok_or(NO_MOVER)?;
                 let sprites = FlightSprites {
-                    walking: sprite_id(bird.master(&c.w.masters, c.player)?.move_sprite),
+                    walking: bird.master(&c.w.masters, c.player)?.move_sprite,
                     graphics: &c.w.graphics,
                 };
                 let action = c.w.streams.get(Stream::Action);
@@ -275,9 +277,14 @@ impl Fly {
         t: Task,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
-    ) -> Result<Option<i16>, GenieError> {
-        let [moving, proceeding, working, carrying] = t.sprites;
-        if moving == -1 && carrying == -1 && proceeding == -1 {
+    ) -> Result<Option<SpriteId>, GenieError> {
+        let TaskSprites {
+            moving,
+            proceeding,
+            working,
+            carrying,
+        } = t.sprites;
+        if moving.is_none() && carrying.is_none() && proceeding.is_none() {
             return Ok(sprites.walking);
         }
         let first = action.rand15() % 3;
@@ -286,8 +293,8 @@ impl Fly {
             .cycle()
             .skip(first as usize)
             .take(3)
-            .find(|&s| s != -1);
-        drawn.map(Some).ok_or(GenieError::unsupported(
+            .find(Option::is_some);
+        drawn.ok_or(GenieError::unsupported(
             "a flight whose task has only a carrying sprite",
         ))
     }
@@ -411,7 +418,7 @@ mod tests {
                 action_type: FLY,
                 object_group: None,
                 work_val2: 0.0,
-                sprites: [846, 1595, 846, -1],
+                sprites: TaskSprites::of_data([846, 1595, 846, -1]),
                 ..Task::default()
             },
         }
@@ -449,7 +456,7 @@ mod tests {
         t.masters = vec![crate::objects::masters::Masters::new([
             crate::objects::masters::Master {
                 id: master_id(96),
-                move_sprite: 846,
+                move_sprite: Some(SpriteId::named(846)),
                 ..crate::objects::masters::Master::default()
             },
         ])];
@@ -458,11 +465,11 @@ mod tests {
 
     /// The hawk's sprites: 846 (its task's moving and working one, its master's walking one)
     /// and 1595 (the task's proceeding one).
-    fn hawk_graphics() -> std::collections::BTreeMap<i16, Graphic> {
+    fn hawk_graphics() -> std::collections::BTreeMap<SpriteId, Graphic> {
         [(846, 0.0625), (1595, 0.0625)]
             .map(|(id, frame_duration)| {
                 let g = Graphic {
-                    id,
+                    id: SpriteId::named(id),
                     frames: 60,
                     facets: 16,
                     speed_multiplier: 1.0,
@@ -470,7 +477,7 @@ mod tests {
                     replay_delay: Seconds::ZERO,
                     flags: 3,
                 };
-                (id, g)
+                (g.id, g)
             })
             .into()
     }
@@ -565,7 +572,7 @@ mod tests {
             ..hawk(FlyState::Choosing, 10.0)
         };
         let unsprited = Task {
-            sprites: [-1; 4],
+            sprites: TaskSprites::NONE,
             ..hawk(FlyState::Choosing, 10.0).task
         };
         let mut fly = plain(unsprited);
@@ -587,7 +594,7 @@ mod tests {
                 ..unsprited
             },
             Task {
-                sprites: [-1, -1, -1, 5],
+                sprites: TaskSprites::of_data([-1, -1, -1, 5]),
                 ..unsprited
             },
         ] {
@@ -603,11 +610,11 @@ mod tests {
     fn a_flight_s_sprite_is_the_first_of_the_task_s_from_the_drawn_index_on() {
         let graphics = hawk_graphics();
         let sprites = FlightSprites {
-            walking: Some(846),
+            walking: Some(SpriteId::named(846)),
             graphics: &graphics,
         };
         let with = |s: [i16; 4]| Task {
-            sprites: s,
+            sprites: TaskSprites::of_data(s),
             ..hawk(FlyState::Choosing, 0.0).task
         };
         // the draw for each seed, then the sprite it gives: [moving, proceeding, working, carrying]
@@ -618,20 +625,20 @@ mod tests {
             // moving 1, working 3, proceeding 2: index 0 → 1, 1 → 3, 2 → 2
             let task = with([1, 2, 3, -1]);
             let got = Fly::flight_sprite(task, &mut r, &sprites).unwrap();
-            assert_eq!(got, Some([1, 3, 2][first as usize]));
+            assert_eq!(got, Some(SpriteId::named([1, 3, 2][first as usize])));
             assert_eq!(r.draws, 1);
             // only the proceeding sprite: every index comes round to it
             let mut r2 = Well512::default();
             r2.set_seed(seed);
             assert_eq!(
                 Fly::flight_sprite(with([-1, 2, -1, -1]), &mut r2, &sprites),
-                Ok(Some(2))
+                Ok(Some(SpriteId::named(2)))
             );
         }
         let mut r = Well512::default();
         assert_eq!(
             Fly::flight_sprite(with([-1, -1, 5, -1]), &mut r, &sprites),
-            Ok(Some(846))
+            Ok(Some(SpriteId::named(846)))
         );
         assert_eq!(r.draws, 0);
         assert!(Fly::flight_sprite(with([-1, -1, -1, 7]), &mut r, &sprites).is_err());
@@ -654,7 +661,7 @@ mod tests {
         // the sprite draw: the task's moving 846, working 846, proceeding 1595 from r % 3 on
         let drawn = [846, 846, 1595][e.rand15() as usize % 3];
         let to = point.with_height(9.0);
-        let sprite = hawk_graphics().get(&drawn).copied();
+        let sprite = hawk_graphics().get(&SpriteId::named(drawn)).copied();
         assert_eq!(
             (fly.state, fly.move_to),
             (

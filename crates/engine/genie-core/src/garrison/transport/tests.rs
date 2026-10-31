@@ -4,6 +4,7 @@ use crate::map::Tile;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ObjectState;
+use crate::objects::masters::TaskSprites;
 use crate::test_ids::object_id;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
@@ -51,7 +52,7 @@ fn coast(near: bool) -> Coast {
 
 /// The sprite a hull shows first, and its master's standing sprite.
 const SHOWN: Graphic = Graphic {
-    id: 1,
+    id: SpriteId::named(1),
     frames: 10,
     facets: 16,
     speed_multiplier: 1.0,
@@ -59,7 +60,10 @@ const SHOWN: Graphic = Graphic {
     replay_delay: Seconds::ZERO,
     flags: 1,
 };
-const STANDING: Graphic = Graphic { id: 300, ..SHOWN };
+const STANDING: Graphic = Graphic {
+    id: SpriteId::named(300),
+    ..SHOWN
+};
 
 /// The transport's unit as the update's effects read it: a mover in motion (its animation at
 /// speed 1), a sprite ([`SHOWN`]) and a unit AI that takes its notifies (state 2).
@@ -142,7 +146,8 @@ fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
 }
 
 /// The sprites' table of a world without sprites.
-static NO_GRAPHICS: std::collections::BTreeMap<i16, Graphic> = std::collections::BTreeMap::new();
+static NO_GRAPHICS: std::collections::BTreeMap<SpriteId, Graphic> =
+    std::collections::BTreeMap::new();
 
 fn ship(loaded: bool) -> Ship<'static> {
     Ship {
@@ -496,7 +501,10 @@ fn a_sail_ends_with_its_move_to_and_a_failed_one_returns_3() {
 #[test]
 fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     use crate::combat::attack::tests::Rig;
-    let graphic = Graphic { id: 3, ..SHOWN };
+    let graphic = Graphic {
+        id: SpriteId::named(3),
+        ..SHOWN
+    };
     // its MoveTo to the point with the sprite its maker resolved
     let sailing = |state: Option<MoveTo>| TransportAction {
         move_to: state.map(|state| MoveToAction {
@@ -517,7 +525,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     };
     let rig = || {
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
-        assert_eq!(rig.t.graphics.insert(3, graphic), None);
+        assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic), None);
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig
     };
@@ -530,7 +538,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     assert_eq!(walker.mover().paths.len(), 2);
     assert_eq!(
         (walker.sprite(), walker.posted()),
-        (Some(3), in_the_way.clone())
+        (Some(SpriteId::named(3)), in_the_way.clone())
     );
     let mut walker = rig();
     let mut t = sailing(Some(MoveTo::Moving));
@@ -567,11 +575,11 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
 fn a_transport_s_move_to_shows_its_task_s_or_its_master_s_sprite() {
     use crate::objects::masters::{Master, Task, TaskId};
     let master = Master {
-        move_sprite: 7,
+        move_sprite: Some(SpriteId::named(7)),
         tasks: vec![
             Task {
                 id: TaskId::test(4),
-                sprites: [3, -1, -1, -1],
+                sprites: TaskSprites::of_data([3, -1, -1, -1]),
                 ..Task::default()
             },
             Task {
@@ -582,11 +590,14 @@ fn a_transport_s_move_to_shows_its_task_s_or_its_master_s_sprite() {
         ..Master::default()
     };
     let on = |task, master: &Master| TransportAction::given_sprite(task, master);
-    assert_eq!(on(Some(TaskId::test(4)), &master), Ok(Some(3)));
+    assert_eq!(
+        on(Some(TaskId::test(4)), &master),
+        Ok(Some(SpriteId::named(3)))
+    );
     assert_eq!(on(Some(TaskId::test(5)), &master), Ok(None));
-    assert_eq!(on(None, &master), Ok(Some(7)));
+    assert_eq!(on(None, &master), Ok(Some(SpriteId::named(7))));
     let walkless = Master {
-        move_sprite: -1,
+        move_sprite: None,
         ..master.clone()
     };
     assert_eq!(on(None, &walkless), Ok(None));

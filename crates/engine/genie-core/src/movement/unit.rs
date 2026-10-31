@@ -6,8 +6,9 @@ use crate::math::rng::Stream;
 use crate::movement::ASIDE;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
+use crate::objects::SpriteId;
 use crate::objects::masters::class;
-use crate::objects::sprite::{sprite_id, standing};
+use crate::objects::sprite::standing;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -190,10 +191,11 @@ impl Unit {
                     c.w.masters.get(c.player.index()),
                 )
                 .ok();
-                let graphic = |id: Option<i16>| id.and_then(|id| c.w.graphics.get(&id).copied());
+                let graphic =
+                    |id: Option<SpriteId>| id.and_then(|id| c.w.graphics.get(&id).copied());
                 let look = self.abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
-                let master_standing = graphic(master.and_then(|m| sprite_id(m.standing_sprite)));
+                let master_standing = graphic(master.and_then(|m| m.standing_sprite));
                 let (walk, rng) = c.walk_and_sprites(&mut self.body, me);
                 let shows = Shows {
                     sprite: &mut self.sprite,

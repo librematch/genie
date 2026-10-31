@@ -8,6 +8,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -336,7 +337,7 @@ impl World {
 pub(crate) struct SwitchWorld<'a> {
     pub(crate) spatial: &'a mut crate::map::spatial::Spatial,
     pub(crate) pathing: &'a mut crate::pathing::Pathing,
-    pub(crate) graphics: &'a std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+    pub(crate) graphics: &'a std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     pub(crate) sprite: &'a mut crate::math::rng::Well512,
 }
 
@@ -451,9 +452,9 @@ pub(crate) fn switch_master(
         // on; a unit whose sprite it does not hold shows its old master's. Without the
         // graphics (no data file) the Sprite stream is not modelled.
         if !world.graphics.is_empty() && old.standing_sprite != next.standing_sprite {
-            let g = (0 <= next.standing_sprite)
-                .then(|| world.graphics.get(&next.standing_sprite).copied())
-                .flatten()
+            let g = next
+                .standing_sprite
+                .and_then(|s| world.graphics.get(&s).copied())
                 .ok_or(GenieError::unsupported(
                     "a new master's standing sprite the data file does not have",
                 ))?;

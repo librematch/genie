@@ -305,9 +305,9 @@ impl World {
             "a new combat unit without a unit AI",
         ))?;
         let new_object = self.new_object(p, master, made, position)?;
-        let standing = (0 <= made.standing_sprite)
-            .then(|| self.graphics.get(&made.standing_sprite).copied())
-            .flatten()
+        let standing = made
+            .standing_sprite
+            .and_then(|s| self.graphics.get(&s).copied())
             .ok_or(GenieError::unsupported(
                 "a new unit's standing sprite the data file does not have",
             ))?;
@@ -389,7 +389,7 @@ impl World {
                 hp: HitPoints::of_master(made.hit_points),
                 attribute_type: None,
                 amount: Amount::ZERO,
-                dying_sprite: (0 <= made.death_sprite).then_some(made.death_sprite),
+                dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
                 remains: made.death_spawns[1],
                 death_facets: None,

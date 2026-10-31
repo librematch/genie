@@ -1,6 +1,7 @@
 //! What the attribute setters share: the caps, the truncations, the sprite and class amounts,
 //! the damage sprites' and train locations' entries.
 
+use crate::objects::SpriteId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{DamageGraphic, TrainLocation, attribute};
@@ -70,16 +71,16 @@ pub(super) fn id_of(id: i32) -> Option<MasterId> {
 
 /// `FUN_14152e360`: the sprite `id`, when the world's table holds one there; else the field keeps
 /// its sprite (the game releases the old one first, which is not simulation).
-pub(super) fn set_sprite(field: &mut i16, id: i32, world: &AttributeWorld<'_>) {
+pub(super) fn set_sprite(field: &mut Option<SpriteId>, id: i32, world: &AttributeWorld<'_>) {
     if (world.sprite)(id) {
-        *field = id as i16;
+        *field = SpriteId::of_data(id as i16);
     }
 }
 
 /// An add to a sprite attribute: its id (−1 for none) plus the amount (`CVTTSS2SI`, in 32
 /// bits), then [`set_sprite`].
-pub(super) fn add_sprite(field: &mut i16, v: f32, world: &AttributeWorld<'_>) {
-    let id = i32::from(*field) + crate::math::conversions::cvttss2si(v);
+pub(super) fn add_sprite(field: &mut Option<SpriteId>, v: f32, world: &AttributeWorld<'_>) {
+    let id = i32::from(field.map_or(-1, SpriteId::get)) + crate::math::conversions::cvttss2si(v);
     set_sprite(field, id, world);
 }
 

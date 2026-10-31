@@ -123,7 +123,10 @@ impl World {
             // a moving dead object's override (FUN_14119d490, FUN_14114d780): the new unit takes
             // its facet's angle
             if let Some(facet) = facet {
-                let standing = self.graphics.get(&made.standing_sprite).copied();
+                let standing = made
+                    .standing_sprite
+                    .and_then(|s| self.graphics.get(&s))
+                    .copied();
                 let own = standing.map_or(
                     crate::objects::facing::SpriteFacets {
                         count: 0,
@@ -205,9 +208,9 @@ impl World {
         // fly mode (slot 0x60, FUN_141193a10)
         let at = self.on_ground(p, master, at);
         let id = self.take_object_id(p, master);
-        let standing = (0 <= made.standing_sprite)
-            .then(|| self.graphics.get(&made.standing_sprite).copied())
-            .flatten();
+        let standing = made
+            .standing_sprite
+            .and_then(|s| self.graphics.get(&s).copied());
         let mut sprite = None;
         if let Some(g) = standing {
             sprite = Some(ActiveSprite::start(g, self.streams.get(Stream::Sprite)));
@@ -281,13 +284,9 @@ impl World {
         // a static object (type 10) dies on its sprite after its death (the dying one, else its
         // standing one), which may start on a random facet
         let death_facets = if made.kind == STATIC {
-            let after = if 0 <= made.death_sprite {
-                made.death_sprite
-            } else {
-                made.standing_sprite
-            };
-            self.graphics
-                .get(&after)
+            let after = made.death_sprite.or(made.standing_sprite);
+            after
+                .and_then(|after| self.graphics.get(&after))
                 .filter(|g| g.flags & 4 != 0 && 1 < g.facets)
                 .map(|g| g.facets)
         } else {
@@ -305,7 +304,7 @@ impl World {
                 hp: HitPoints::of_master(made.hit_points),
                 attribute_type: held.kind,
                 amount: held.amount,
-                dying_sprite: (0 <= made.death_sprite).then_some(made.death_sprite),
+                dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
                 remains: made.death_spawns[1],
                 death_facets,

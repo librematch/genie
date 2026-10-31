@@ -2,6 +2,7 @@
 //! what a unit carries.
 
 use crate::gathering::hunt::HuntTask;
+use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
 use crate::objects::sprite::Graphic;
 use crate::players::attribute::{self, AttributeId};
@@ -11,12 +12,12 @@ use crate::players::attribute::{self, AttributeId};
 /// sprite (`standing`).
 pub(crate) fn stand_sprite(
     task: &HuntTask,
-    standing: i16,
+    standing: Option<SpriteId>,
     held: Held,
-    graphics: &std::collections::BTreeMap<i16, Graphic>,
+    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
 ) -> Option<Graphic> {
-    let g = |id: i16| (0 <= id).then(|| graphics.get(&id).copied()).flatten();
-    let carrying = task.sprites[3];
+    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
+    let carrying = task.sprites.carrying;
     if task.resource.is_some()
         && task.resource == held.kind
         && 1 <= held.amount.get() as i32
@@ -84,13 +85,13 @@ impl HuntTask {
     /// [`walk_sprite`]'s id from the task's sprites (`FUN_140ac51d0`), which the hunt's Attack
     /// takes for its `MoveTo` (`FUN_140a7c210`'s argument 4).
     #[must_use]
-    pub fn walk_sprite_id(&self, held: Held) -> i16 {
+    pub fn walk_sprite_id(&self, held: Held) -> Option<SpriteId> {
         let carrying =
             self.resource.is_some() && held.kind == self.resource && 1 <= held.amount.get() as i32;
-        if carrying && 0 <= self.sprites[3] {
-            self.sprites[3]
+        if carrying && self.sprites.carrying.is_some() {
+            self.sprites.carrying
         } else {
-            self.sprites[0]
+            self.sprites.moving
         }
     }
 }

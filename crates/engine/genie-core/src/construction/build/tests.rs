@@ -432,17 +432,17 @@ pub(super) const TASK: BuildTask = BuildTask {
 
 /// [`TASK`] with moving sprite 3.
 pub(super) const MOVING_TASK: BuildTask = BuildTask {
-    moving: Some(3),
+    moving: Some(SpriteId::named(3)),
     ..TASK
 };
 
 /// The sprites' table of the Build's tests: 3 (the moving sprite of [`MOVING_TASK`]), 7, 20 and
 /// 21, each looped, 10 frames of 16 facets.
-pub(crate) fn graphics() -> BTreeMap<i16, crate::objects::sprite::Graphic> {
+pub(crate) fn graphics() -> BTreeMap<SpriteId, crate::objects::sprite::Graphic> {
     [3, 7, 20, 21]
         .map(|id| {
             let g = crate::objects::sprite::Graphic {
-                id,
+                id: SpriteId::named(id),
                 frames: 10,
                 facets: 16,
                 speed_multiplier: 1.0,
@@ -450,7 +450,7 @@ pub(crate) fn graphics() -> BTreeMap<i16, crate::objects::sprite::Graphic> {
                 replay_delay: Seconds::ZERO,
                 flags: 1,
             };
-            (id, g)
+            (g.id, g)
         })
         .into()
 }
@@ -498,7 +498,10 @@ fn a_build_s_move_to_takes_its_task_s_moving_sprite() {
         Distance::new(5.0),
         MOVING_TASK,
     );
-    assert_eq!(moving.move_to.and_then(|m| m.sprite).map(|g| g.id), Some(3));
+    assert_eq!(
+        moving.move_to.and_then(|m| m.sprite).map(|g| g.id),
+        Some(SpriteId::named(3))
+    );
 }
 
 /// MarvinBlue/426048731's house 10028 as BUILD placed it: a foundation of master 70.
@@ -708,8 +711,8 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
             annex_offsets: [GroundOffset::ZERO; 4],
             head_unit: None,
             transform_unit: None,
-            destruction_sprite: -1,
-            construction_sprite: -1,
+            destruction_sprite: None,
+            construction_sprite: None,
         }),
         ..Master::default()
     }

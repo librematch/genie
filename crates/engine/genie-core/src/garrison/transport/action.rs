@@ -19,8 +19,9 @@ use crate::movement::Me;
 use crate::movement::PathAsk;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
+use crate::objects::SpriteId;
 use crate::objects::masters::{Master, TaskId};
-use crate::objects::sprite::{Graphic, new_sprite, sprite_id};
+use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::unit_ai::{ActionKind, UnitAi};
 use crate::world::World;
@@ -357,16 +358,19 @@ impl TransportAction {
     /// # Errors
     ///
     /// A task the unit's master (`master`) lacks.
-    pub fn given_sprite(task: Option<TaskId>, master: &Master) -> Result<Option<i16>, GenieError> {
+    pub fn given_sprite(
+        task: Option<TaskId>,
+        master: &Master,
+    ) -> Result<Option<SpriteId>, GenieError> {
         Ok(match task {
             Some(id) => {
                 let task = master.tasks.iter().find(|t| t.id == id).ok_or_else(|| {
                     GenieError::missing_data("a Transport's task its master lacks")
                         .with("task", id.get())
                 })?;
-                sprite_id(task.sprites[0])
+                task.sprites.moving
             }
-            None => sprite_id(master.move_sprite),
+            None => master.move_sprite,
         })
     }
 
@@ -497,7 +501,7 @@ impl<'a> Ship<'a> {
         unit: &Unit,
         master: &Master,
         map: GridSize,
-        graphics: &'a std::collections::BTreeMap<i16, Graphic>,
+        graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
         task: Option<TaskId>,
     ) -> Result<Self, GenieError> {
         let walk = MoveToReads::of(unit, master, graphics);
@@ -513,7 +517,7 @@ impl<'a> Ship<'a> {
         radius: Footprint,
         map: GridSize,
         walk: MoveToReads<'a>,
-        given: Option<i16>,
+        given: Option<SpriteId>,
     ) -> Self {
         Self {
             position: unit.position(),

@@ -12,6 +12,7 @@ use crate::movement::move_to::{MoveDefaults, SpriteReads};
 use crate::movement::{Me, footprint_gap, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
 use crate::objects::release::Releaser;
@@ -115,7 +116,7 @@ impl Unit {
         &self,
         every: &[Masters],
         player: PlayerId,
-        graphics: &'g BTreeMap<i16, Graphic>,
+        graphics: &'g BTreeMap<SpriteId, Graphic>,
     ) -> Result<Walks<'g>, GenieError> {
         let sprites = SpriteReads::of(
             self.master(every, player)?,
@@ -140,7 +141,7 @@ impl Unit {
         gather: &crate::gathering::gather::GatherAction,
     ) -> Result<crate::gathering::gather::GatherReads, GenieError> {
         let master = self.master(&c.w.masters, c.player)?;
-        let g = |id: i16| (0 <= id).then(|| c.w.graphics.get(&id).copied()).flatten();
+        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(&s).copied());
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
         Ok(crate::gathering::gather::GatherReads {
@@ -153,9 +154,9 @@ impl Unit {
                 .unwrap_or(Amount::new(1.0))
                 .get(),
             sprites: HuntSprites {
-                moving: g(task.sprites[0]),
-                working: g(task.sprites[2]),
-                carrying: g(task.sprites[3]),
+                moving: g(task.sprites.moving),
+                working: g(task.sprites.working),
+                carrying: g(task.sprites.carrying),
                 standing: g(master.standing_sprite),
             },
             class: master.class,

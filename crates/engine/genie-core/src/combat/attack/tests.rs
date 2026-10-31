@@ -21,6 +21,7 @@ use crate::objects::layers::Animated;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -80,12 +81,12 @@ fn a_swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
 }
 
 /// The sprites' table of a world without sprites.
-pub(crate) static NO_GRAPHICS: BTreeMap<i16, Graphic> = BTreeMap::new();
+pub(crate) static NO_GRAPHICS: BTreeMap<SpriteId, Graphic> = BTreeMap::new();
 
 /// What a new `MoveTo` reads of a unit in object state `state` with top speed `speed`: the
 /// sprites' table `graphics` with the defaults `defaults`.
 fn walking_reads(
-    graphics: &BTreeMap<i16, Graphic>,
+    graphics: &BTreeMap<SpriteId, Graphic>,
     defaults: MoveDefaults,
     state: ObjectState,
     speed: f32,
@@ -140,7 +141,7 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
 #[test]
 fn a_stop_ends_the_attack_and_the_unit_stands() {
     let stand = Graphic {
-        id: 1,
+        id: SpriteId::named(1),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -165,7 +166,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
         ),
         (AttackState::Done, None, 77, Some(1.0))
     );
-    assert_eq!(sprite.map(|s| s.graphic.id), Some(1));
+    assert_eq!(sprite.map(|s| s.graphic.id), Some(SpriteId::named(1)));
     assert_eq!(body.mover().unwrap().velocity.unwrap().velocity.y(), 0.0);
     // a unit without a standing sprite is not modelled
     let mut bare = own_attack(77, AttackState::Ready, Distance::new(1.0));
@@ -431,7 +432,7 @@ fn an_area_effect_s_attack_takes_a_building_s_main_building() {
 #[test]
 fn a_sprite_resets_only_for_its_own_graphic() {
     let swing = Graphic {
-        id: 224,
+        id: SpriteId::named(224),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -439,7 +440,10 @@ fn a_sprite_resets_only_for_its_own_graphic() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let other = Graphic { id: 225, ..swing };
+    let other = Graphic {
+        id: SpriteId::named(225),
+        ..swing
+    };
     let mut sprite = Some(ActiveSprite {
         frame: 6,
         last_frame: 5,
@@ -505,7 +509,7 @@ fn soldier_mover(speed: f32) -> Mover {
 }
 
 const STANDING: Graphic = Graphic {
-    id: 300,
+    id: SpriteId::named(300),
     frames: 10,
     facets: 8,
     speed_multiplier: 1.0,
@@ -600,8 +604,8 @@ impl Rig {
             id: master_id(4),
             kind: master_type::COMBAT,
             class: class::CLASS_6,
-            move_sprite: -1,
-            standing_sprite: -1,
+            move_sprite: None,
+            standing_sprite: None,
             ..Master::default()
         };
         t.masters = vec![Masters::new([master]); t.players.len()];
@@ -715,7 +719,7 @@ impl Rig {
     }
 
     /// Its sprite's graphic.
-    pub(crate) fn sprite(&self) -> Option<i16> {
+    pub(crate) fn sprite(&self) -> Option<SpriteId> {
         self.unit().sprite.map(|sp| sp.graphic.id)
     }
 }
@@ -1596,7 +1600,7 @@ fn a_swing_that_fails_its_interrupt_check_stays_failed() {
         victim,
     );
     let swing = Graphic {
-        id: 301,
+        id: SpriteId::named(301),
         ..STANDING
     };
     rig.unit_mut().sprite = Some(ActiveSprite {
@@ -1633,7 +1637,7 @@ fn a_rangeless_attack_reaches_a_tenth_squared_in_f32() {
 #[test]
 fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
     let standing = Graphic {
-        id: 418,
+        id: SpriteId::named(418),
         frames: 1,
         facets: 1,
         speed_multiplier: 1.0,
@@ -1686,7 +1690,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
     assert_eq!(posted, Some((NotifyKind::ACTION_INVALIDATED, [600, -1, 0])));
     assert_eq!(
         (body.anim_speed(), sprite.map(|s| s.graphic.id)),
-        (Some(1.0), Some(418))
+        (Some(1.0), Some(SpriteId::named(418)))
     );
     // the Hunt's Attack, a sub-action, posts nothing
     a.sub_action = true;
@@ -1707,32 +1711,38 @@ fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let graphics: BTreeMap<i16, Graphic> = [10, 11, 12, 20, 21]
+    let graphics: BTreeMap<SpriteId, Graphic> = [10, 11, 12, 20, 21]
         .into_iter()
-        .map(|id| (id, g(id)))
+        .map(|id| (SpriteId::named(id), g(SpriteId::named(id))))
         .collect();
     let master = Master {
-        move_sprite: 10,
-        run_sprite: 11,
-        attack_sprite: 12,
+        move_sprite: Some(SpriteId::named(10)),
+        run_sprite: Some(SpriteId::named(11)),
+        attack_sprite: Some(SpriteId::named(12)),
         ..Master::default()
     };
-    let a = arms(&master, &graphics, [-1; 4], -1);
-    assert_eq!(a.move_sprite.map(|s| s.id), Some(11));
+    let a = arms(&master, &graphics, TaskSprites::NONE, None);
+    assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(11)));
     let look = crate::combat::abilities::Look {
         standing: None,
-        walking: Some(20),
-        attacking: Some(21),
+        walking: Some(SpriteId::named(20)),
+        attacking: Some(SpriteId::named(21)),
         running: None,
         dying: None,
         undead: None,
     };
-    let a = arms_looking(&master, Some(&look), &graphics, [-1; 4], -1);
-    assert_eq!(a.move_sprite.map(|s| s.id), Some(20));
-    assert_eq!(a.sprite.map(|s| s.id), Some(12));
+    let a = arms_looking(&master, Some(&look), &graphics, TaskSprites::NONE, None);
+    assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(20)));
+    assert_eq!(a.sprite.map(|s| s.id), Some(SpriteId::named(12)));
     // its own MoveTo sprite first
-    let a = arms_looking(&master, Some(&look), &graphics, [-1; 4], 10);
-    assert_eq!(a.move_sprite.map(|s| s.id), Some(10));
+    let a = arms_looking(
+        &master,
+        Some(&look),
+        &graphics,
+        TaskSprites::NONE,
+        Some(SpriteId::named(10)),
+    );
+    assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(10)));
 }
 
 /// The soldier at (10, 10), master 4, of speed `speed` whose unit AI may move to attack
@@ -2073,7 +2083,7 @@ fn a_gate_s_reach_is_to_its_nearest_part() {
 fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
     let at = Position::new(10.5, 10.0, 0.0);
     let attack_sprite = Graphic {
-        id: 301,
+        id: SpriteId::named(301),
         ..STANDING
     };
     let ready = |timer: f32| {
@@ -2096,7 +2106,10 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
         assert_eq!(rig.posted(), vec![]);
         (a.state, a.pending, rig.sprite())
     };
-    assert_eq!(ready(0.0), (AttackState::Swing, true, Some(301)));
+    assert_eq!(
+        ready(0.0),
+        (AttackState::Swing, true, Some(SpriteId::named(301)))
+    );
     assert_eq!(ready(0.5), (AttackState::Ready, false, None));
     let mut rig = Rig::on(
         world_with(7, PlayerId::new(0), class::CLASS_6, at),
@@ -2119,7 +2132,10 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
 #[test]
 fn a_swing_with_a_second_sprite_draws_which_one_it_shows() {
     let at = Position::new(10.5, 10.0, 0.0);
-    let sprite = |id: i16| Graphic { id, ..STANDING };
+    let sprite = |id: i16| Graphic {
+        id: SpriteId::named(id),
+        ..STANDING
+    };
     let swing = |object: Well512, sprites: SwingSprites| {
         let victim = Victim {
             id: object_id(7),
@@ -2155,20 +2171,26 @@ fn a_swing_with_a_second_sprite_draws_which_one_it_shows() {
     let (shown, left) = swing(seeded(zero), SwingSprites::default());
     let mut drawn = seeded(zero);
     let _ = drawn.below_checked(2);
-    assert_eq!((shown, left), (Some(301), drawn));
-    assert_eq!(swing(seeded(one), SwingSprites::default()).0, Some(302));
+    assert_eq!((shown, left), (Some(SpriteId::named(301)), drawn));
+    assert_eq!(
+        swing(seeded(one), SwingSprites::default()).0,
+        Some(SpriteId::named(302))
+    );
     // the look's sprite draws nothing
     let looked = SwingSprites {
         look: Some(sprite(303)),
         special: None,
     };
-    assert_eq!(swing(seeded(one), looked), (Some(303), seeded(one)));
+    assert_eq!(
+        swing(seeded(one), looked),
+        (Some(SpriteId::named(303)), seeded(one))
+    );
     // a special graphic without a charge that hits draws as before
     let special = SwingSprites {
         look: None,
         special: Some(sprite(304)),
     };
-    assert_eq!(swing(seeded(one), special).0, Some(302));
+    assert_eq!(swing(seeded(one), special).0, Some(SpriteId::named(302)));
 }
 
 /// readyToAttack's leash in an update: a unit in stance 1 whose target stands the range
@@ -2220,7 +2242,7 @@ fn ready_to_attack_s_leash_fails_a_target_too_far_from_the_unit_ai_s_point() {
 fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     use crate::world::tests::{forage_world, in_update};
     let stand = Graphic {
-        id: 9,
+        id: SpriteId::named(9),
         frames: 10,
         facets: 1,
         speed_multiplier: 1.0,
@@ -2259,7 +2281,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
             centre.sprite.map(|s| s.graphic.id),
             centre.body.anim_speed()
         ),
-        (Some(9), Some(1.0))
+        (Some(SpriteId::named(9)), Some(1.0))
     );
     let posted = &centre.ai.as_ref().unwrap().notifies;
     assert!(
@@ -2344,7 +2366,7 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
             last_frame: frame - 1,
             changed: true,
             looped: false,
-            ..ActiveSprite::start(t.graphics[&301], &mut Well512::default())
+            ..ActiveSprite::start(t.graphics[&SpriteId::named(301)], &mut Well512::default())
         };
         crate::world::tests::in_update(t, (PlayerId::new(1), ListIndex::new(0)), 100, |u, c| {
             a.swing_to_hit(c, u, &mut f, &r, sprite)
@@ -2433,7 +2455,7 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
         frame: 5,
         last_frame: 4,
         changed: true,
-        ..ActiveSprite::start(t.graphics[&301], &mut Well512::default())
+        ..ActiveSprite::start(t.graphics[&SpriteId::named(301)], &mut Well512::default())
     };
     crate::world::tests::in_update(
         &mut t,
@@ -2503,7 +2525,7 @@ fn walk_to_house(state: MoveTo, wait: MoveWait) -> MoveToAction {
 #[test]
 fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
     let walking = Graphic {
-        id: 301,
+        id: SpriteId::named(301),
         speed_multiplier: 1.5,
         ..STANDING
     };
@@ -2540,7 +2562,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
         (
             0,
             Some((MoveTo::Moving, MoveWaitState::AskedAgain)),
-            Some(301),
+            Some(SpriteId::named(301)),
             1.0,
             Speed::new(1.2)
         )

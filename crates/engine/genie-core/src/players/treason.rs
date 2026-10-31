@@ -191,7 +191,7 @@ mod tests {
         let flare = crate::objects::masters::Master {
             id: FLARE4,
             kind: crate::objects::masters::master_type::ANIMATED,
-            standing_sprite: -1,
+            standing_sprite: None,
             ..crate::objects::masters::Master::default()
         };
         t.masters = (0..t.players.len())

@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::{Animated, Body};
@@ -22,7 +23,7 @@ use crate::world::tests::{forage_world, in_update};
 
 /// A graphic of sixteen facets, its sequence flag bit 1 set (`flag_1`).
 const WALKING: Graphic = Graphic {
-    id: 300,
+    id: SpriteId::named(300),
     frames: 10,
     facets: 16,
     speed_multiplier: 1.0,

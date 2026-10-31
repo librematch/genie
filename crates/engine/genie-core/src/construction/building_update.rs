@@ -10,6 +10,7 @@ use crate::math::rng::Well512;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
+use crate::objects::SpriteId;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
@@ -324,9 +325,9 @@ impl Unit {
     /// frame, [`crate::objects::sprite::ActiveSprite::reset_frame`]).
     pub(crate) fn idle_swap(
         &mut self,
-        standing: i16,
-        second: Option<i16>,
-        graphics: &std::collections::BTreeMap<i16, Graphic>,
+        standing: Option<SpriteId>,
+        second: Option<SpriteId>,
+        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
         sprite_rng: &mut Well512,
     ) {
         let Some(second) = second else {
@@ -343,7 +344,7 @@ impl Unit {
             return;
         };
         let id = shown.graphic.id;
-        if (id != standing && id != second) || !shown.looped {
+        if (Some(id) != standing && id != second) || !shown.looped {
             return;
         }
         if sprite_rng.rand15() <= 0x3fff {
@@ -353,9 +354,9 @@ impl Unit {
         let next = if self.idle_variant == 0 {
             standing
         } else {
-            second
+            Some(second)
         };
-        if let Some(&g) = graphics.get(&next) {
+        if let Some(&g) = next.and_then(|next| graphics.get(&next)) {
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
                 self.body.move_stats_mut(),

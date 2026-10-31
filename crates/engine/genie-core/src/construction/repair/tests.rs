@@ -27,18 +27,18 @@ const TASK: RepairTask = RepairTask {
 
 /// [`TASK`] with the moving sprite 3 and the proceeding sprite 4.
 const SHOWING: RepairTask = RepairTask {
-    moving: Some(3),
-    proceeding: Some(4),
+    moving: Some(SpriteId::named(3)),
+    proceeding: Some(SpriteId::named(4)),
     ..TASK
 };
 
 /// The sprites' table of the tests: the task's 3 and 4, the master's standing sprite 5 and the
 /// `MoveTo`s' defaults 20 (to a point) and 21 (to an object), each of speed factor 1.
-fn graphics() -> std::collections::BTreeMap<i16, crate::objects::sprite::Graphic> {
+fn graphics() -> std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic> {
     [3, 4, 5, 20, 21]
         .map(|id| {
             let g = crate::objects::sprite::Graphic {
-                id,
+                id: SpriteId::named(id),
                 frames: 10,
                 facets: 16,
                 speed_multiplier: 1.0,
@@ -46,21 +46,21 @@ fn graphics() -> std::collections::BTreeMap<i16, crate::objects::sprite::Graphic
                 replay_delay: Seconds::ZERO,
                 flags: 1,
             };
-            (id, g)
+            (g.id, g)
         })
         .into()
 }
 
 /// The `MoveTo`s' defaults of the tests' repairer: 20 to a point, 21 to an object.
 const DEFAULTS: MoveDefaults = MoveDefaults {
-    point: Some(20),
-    object: Some(21),
+    point: Some(SpriteId::named(20)),
+    object: Some(SpriteId::named(21)),
 };
 
 /// What the tests' repairer's `MoveTo`s read of it: [`DEFAULTS`] in the table `graphics`, alive
 /// (state 2), of speed 1, at (10, 10) with radii 0.2.
 const fn move_reads(
-    graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+    graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
 ) -> MoveToReads<'_> {
     MoveToReads {
         sprites: SpriteReads {
@@ -297,7 +297,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
     t.graphics = graphics();
     for masters in &mut t.masters {
         let m = masters.get_mut(ids::BUILDER).unwrap();
-        (m.standing_sprite, m.move_sprite) = (5, 20);
+        (m.standing_sprite, m.move_sprite) = (Some(SpriteId::named(5)), Some(SpriteId::named(20)));
     }
     let work = crate::orders::Work {
         target: Some(object_id(10028)),
@@ -309,7 +309,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    let standing = graphics()[&5];
+    let standing = graphics()[&SpriteId::named(5)];
     v.sprite = Some(crate::objects::sprite::ActiveSprite::start(
         standing,
         &mut crate::math::rng::Well512::default(),
@@ -356,7 +356,7 @@ fn heard(t: &crate::world::World) -> Vec<crate::unit_ai::NotifyKind> {
 }
 
 /// The repairer's sprite.
-fn sprite_of(t: &crate::world::World) -> Option<i16> {
+fn sprite_of(t: &crate::world::World) -> Option<SpriteId> {
     t.players[1].objects[ListIndex::new(0)]
         .sprite
         .map(|s| s.graphic.id)
@@ -384,10 +384,13 @@ fn a_repair_s_move_to_shows_its_task_s_moving_sprite_else_its_default() {
                 .unwrap()),
         ]
     };
-    assert_eq!(shown(TASK), [Some(21), Some(20)]);
-    assert_eq!(shown(SHOWING), [Some(3); 2]);
+    assert_eq!(
+        shown(TASK),
+        [Some(SpriteId::named(21)), Some(SpriteId::named(20))]
+    );
+    assert_eq!(shown(SHOWING), [Some(SpriteId::named(3)); 2]);
     let lacking = RepairTask {
-        moving: Some(6),
+        moving: Some(SpriteId::named(6)),
         ..TASK
     };
     let r = RepairAction {
@@ -412,7 +415,7 @@ fn a_repair_s_move_tos_are_quiet() {
         point: Position::new(11.0, 10.0, 0.0),
         target: Some(object_id(20)),
         range: Distance::new(1.5),
-        sprite: Some(g[&21]),
+        sprite: Some(g[&SpriteId::named(21)]),
         quiet: true,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         wait: MoveWait::NEW,
@@ -423,7 +426,7 @@ fn a_repair_s_move_tos_are_quiet() {
         Ok(Some(MoveToAction::sub_to_point(
             Position::new(1.0, 2.0, 0.0),
             Distance::ZERO,
-            Some(g[&20])
+            Some(g[&SpriteId::named(20)])
         )))
     );
 }
@@ -471,12 +474,12 @@ fn a_repairer_shows_its_task_s_sprites_as_it_faces_and_works() {
         assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
         assert_eq!(
             (repair_of(&t).state, sprite_of(&t)),
-            (RepairState::Face, Some(sprites[0]))
+            (RepairState::Face, Some(SpriteId::named(sprites[0])))
         );
         assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
         assert_eq!(
             (repair_of(&t).state, sprite_of(&t)),
-            (RepairState::Work, Some(sprites[1]))
+            (RepairState::Work, Some(SpriteId::named(sprites[1])))
         );
     }
 }
@@ -497,7 +500,7 @@ fn a_repair_s_walk_to_its_point_shows_its_sprite_as_it_starts() {
             .unwrap();
         assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
         assert_eq!(repair_of(&t).move_to.map(|m| m.state), Some(MoveTo::Moving));
-        assert_eq!(sprite_of(&t), Some(shown));
+        assert_eq!(sprite_of(&t), Some(SpriteId::named(shown)));
     }
 }
 
@@ -544,7 +547,7 @@ fn a_repair_ends_with_its_target_gone_foreign_or_dead() {
         let r = repair_of(&t);
         assert_eq!((r.state, r.target), (RepairState::Done, None));
         assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);
-        assert_eq!(sprite_of(&t), Some(5));
+        assert_eq!(sprite_of(&t), Some(SpriteId::named(5)));
         if held {
             assert_eq!(the_house(&t).2, 0, "the house let go");
         }
@@ -612,7 +615,11 @@ fn a_repairer_at_its_target_faces_it_or_waits_or_fails() {
     let r = repair_of(&t);
     assert_eq!(
         (r.state, r.timer, sprite_of(&t)),
-        (RepairState::Wait, Seconds::new(1.0), Some(5))
+        (
+            RepairState::Wait,
+            Seconds::new(1.0),
+            Some(SpriteId::named(5))
+        )
     );
     let mut t = repair_at(OFF, arrived);
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));

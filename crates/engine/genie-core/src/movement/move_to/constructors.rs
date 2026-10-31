@@ -13,6 +13,7 @@ use crate::movement::move_to::{
 };
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -91,7 +92,7 @@ impl<'g> MoveToReads<'g> {
     /// to), with the sprites' table `graphics`: an object without movement has no speed (a
     /// static object's slot 0x208).
     #[must_use]
-    pub fn of(unit: &Unit, master: &Master, graphics: &'g BTreeMap<i16, Graphic>) -> Self {
+    pub fn of(unit: &Unit, master: &Master, graphics: &'g BTreeMap<SpriteId, Graphic>) -> Self {
         Self {
             sprites: SpriteReads::of(master, unit.abilities.look.as_ref(), graphics),
             state: unit.life.state,
@@ -150,7 +151,7 @@ impl<'g> MoveToReads<'g> {
         &self,
         to: WalkTo,
         range: Distance,
-        given: Option<i16>,
+        given: Option<SpriteId>,
         on_target_moved: TargetMoved,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let (target, gap) = to.held();
@@ -179,7 +180,7 @@ impl<'g> MoveToReads<'g> {
         &self,
         to: WalkTo,
         (point, range): (Position, f32),
-        given: Option<i16>,
+        given: Option<SpriteId>,
         on_target_moved: TargetMoved,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let (target, gap) = to.held();
@@ -200,7 +201,7 @@ impl<'g> MoveToReads<'g> {
     pub fn to_nothing(
         &self,
         range: Distance,
-        given: Option<i16>,
+        given: Option<SpriteId>,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let walk = MoveToAction {
             state: MoveTo::Start,
@@ -226,7 +227,7 @@ impl<'g> MoveToReads<'g> {
         &self,
         point: Position,
         range: Distance,
-        given: Option<i16>,
+        given: Option<SpriteId>,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let walk = MoveToAction::sub_to_point(point, range, self.sprites.to_point(given)?);
         Ok(walk.added(self.state, Distance::new(NO_TARGET_GAP), self.speed))
@@ -244,7 +245,7 @@ impl Unit {
         &self,
         every: &[Masters],
         player: PlayerId,
-        graphics: &'g BTreeMap<i16, Graphic>,
+        graphics: &'g BTreeMap<SpriteId, Graphic>,
     ) -> Result<MoveToReads<'g>, GenieError> {
         Ok(MoveToReads::of(self, self.master(every, player)?, graphics))
     }
@@ -268,8 +269,8 @@ mod tests {
         let move_reads = MoveToReads {
             sprites: SpriteReads {
                 defaults: MoveDefaults {
-                    point: Some(20),
-                    object: Some(21),
+                    point: Some(SpriteId::named(20)),
+                    object: Some(SpriteId::named(21)),
                 },
                 graphics: &graphics,
             },
@@ -301,11 +302,13 @@ mod tests {
         );
         assert_eq!(
             (m.sprite.map(|g| g.id), m.quiet, m.wait),
-            (Some(21), true, MoveWait::NEW)
+            (Some(SpriteId::named(21)), true, MoveWait::NEW)
         );
         assert_eq!(
-            to(&move_reads, house, Some(3)).sprite.map(|g| g.id),
-            Some(3)
+            to(&move_reads, house, Some(SpriteId::named(3)))
+                .sprite
+                .map(|g| g.id),
+            Some(SpriteId::named(3))
         );
         let near = WalkTo {
             gap: Distance::new(0.01),
@@ -354,7 +357,7 @@ mod tests {
                 point.range,
                 point.sprite.map(|g| g.id)
             ),
-            (MoveTo::Start, -1, Distance::ZERO, Some(20))
+            (MoveTo::Start, -1, Distance::ZERO, Some(SpriteId::named(20)))
         );
         let dying = MoveToReads {
             state: ObjectState::Dying,
@@ -370,7 +373,11 @@ mod tests {
         );
         assert!(
             move_reads
-                .to_point(Position::new(4.0, 5.0, 0.0), Distance::ZERO, Some(99))
+                .to_point(
+                    Position::new(4.0, 5.0, 0.0),
+                    Distance::ZERO,
+                    Some(SpriteId::named(99))
+                )
                 .is_err()
         );
     }

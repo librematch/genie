@@ -9,6 +9,7 @@ use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::TargetMoved;
 use genie_core::objects::ObjectId;
+use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
@@ -44,10 +45,12 @@ pub(super) fn saved_reload(
 /// for a graphic the table lacks.
 pub(super) fn saved_sprite(
     s: &RgeStaticObject,
-    graphics: &std::collections::BTreeMap<i16, genie_core::objects::sprite::Graphic>,
+    graphics: &std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>,
 ) -> Option<genie_core::objects::sprite::ActiveSprite> {
     let list = s.active_sprite_list.as_deref()?;
-    let graphic = graphics.get(&s.sprite).copied()?;
+    let graphic = SpriteId::of_data(s.sprite)
+        .and_then(|id| graphics.get(&id))
+        .copied()?;
     let nodes = || {
         list.sprite_type_list
             .iter()
@@ -85,7 +88,7 @@ pub(super) fn saved_sprite(
 /// swing's times (`+0xb0`, `+0xb4`) are not saved, and a loaded Attack starts without them.
 pub(super) fn saved_attack(
     sub: &genie_save::generated::world::Action,
-    graphics: Option<&std::collections::BTreeMap<i16, genie_core::objects::sprite::Graphic>>,
+    graphics: Option<&std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>>,
 ) -> Result<genie_core::combat::attack::Attack, GenieError> {
     use genie_core::movement::move_to::MOVE_TO;
     let b = sub
@@ -101,10 +104,7 @@ pub(super) fn saved_attack(
     let graphics = graphics.ok_or(GenieError::unsupported(
         "a saved Attack without the sprites' table",
     ))?;
-    let g = |id: u16| {
-        let id = id as i16;
-        (0 <= id).then(|| graphics.get(&id).copied()).flatten()
-    };
+    let g = |id: u16| SpriteId::of_data(id as i16).and_then(|id| graphics.get(&id).copied());
     // every MoveTo of the Attack is quiet (`FUN_140a7a170` with 1)
     let move_to = match first_action(&b.sub_actions)? {
         None => None,
@@ -437,8 +437,7 @@ pub(super) fn default_task(
             let moving = masters
                 .and_then(|t| t.work(civ, objects.dat_master(s.master_obj)))
                 .and_then(genie_core::objects::masters::Master::default_task)
-                .map(|t| t.sprites[0])
-                .filter(|&id| 0 <= id);
+                .and_then(|t| t.sprites.moving);
             Ok(Some(DefaultStart::Artifact(
                 genie_core::ownership::artifact::Artifact::new(s.owner == 0, moving),
             )))

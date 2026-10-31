@@ -4,6 +4,7 @@
 //! from the `.dat` of the recording's game, never from constants.
 
 use genie_core::GenieError;
+use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::{ActionType, MasterId};
@@ -246,9 +247,9 @@ impl TerrainTable {
 pub struct MasterTable {
     rows: HashMap<(u8, i16), Row>,
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
-    sprite_speed: HashMap<i16, f32>,
+    sprite_speed: HashMap<SpriteId, f32>,
     /// What the sprite clock reads of each graphic.
-    pub graphics: std::collections::BTreeMap<i16, genie_core::objects::sprite::Graphic>,
+    pub graphics: std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>,
     /// The terrain table.
     pub terrain: TerrainTable,
     /// The drop-site table (`dropsites.json` beside the `.dat`, [`crate::drop_sites`]); empty
@@ -425,7 +426,10 @@ impl MasterTable {
             .graphics
             .iter()
             .enumerate()
-            .filter_map(|(id, g)| Some((id as i16, g.as_ref()?.speed_multiplier)))
+            .filter_map(|(id, g)| {
+                let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
+                Some((id, g.as_ref()?.speed_multiplier))
+            })
             .collect();
         table.graphics = dat
             .graphics
@@ -433,10 +437,11 @@ impl MasterTable {
             .enumerate()
             .filter_map(|(id, g)| {
                 let g = g.as_ref()?;
+                let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
                 Some((
-                    id as i16,
+                    id,
                     genie_core::objects::sprite::Graphic {
-                        id: id as i16,
+                        id,
                         frames: g.frame_count,
                         facets: g.angle_count,
                         speed_multiplier: g.speed_multiplier,
@@ -526,7 +531,7 @@ impl MasterTable {
 
     /// A sprite's speed factor; None for a sprite the data file does not have.
     #[must_use]
-    pub fn sprite_speed(&self, sprite: i16) -> Option<f32> {
+    pub fn sprite_speed(&self, sprite: SpriteId) -> Option<f32> {
         self.sprite_speed.get(&sprite).copied()
     }
 }
@@ -552,7 +557,13 @@ impl MasterTable {
     }
 
     /// The sprite `sprite`'s speed factor and graphic of `facets` facets and `flags`.
-    pub(crate) fn with_sprite(mut self, sprite: i16, speed: f32, facets: i16, flags: u8) -> Self {
+    pub(crate) fn with_sprite(
+        mut self,
+        sprite: SpriteId,
+        speed: f32,
+        facets: i16,
+        flags: u8,
+    ) -> Self {
         let _ = self.sprite_speed.insert(sprite, speed);
         let graphic = genie_core::objects::sprite::Graphic {
             id: sprite,

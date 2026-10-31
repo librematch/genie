@@ -9,6 +9,7 @@ use genie_core::map::{Offset, Position};
 use genie_core::movement::fly::{FLY, Fly};
 use genie_core::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, TargetMoved};
 use genie_core::objects::ObjectId;
+use genie_core::objects::SpriteId;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{ActionType, Task};
 use genie_core::objects::sprite::Graphic;
@@ -42,7 +43,7 @@ pub(super) fn saved_actions(
     work: impl Fn(i16) -> Result<BuildTask, GenieError>,
     fly_task: impl Fn(i16) -> Result<Task, GenieError>,
     task_at: impl Fn(i16, i16) -> Result<Task, GenieError>,
-    graphics: Option<&BTreeMap<i16, Graphic>>,
+    graphics: Option<&BTreeMap<SpriteId, Graphic>>,
     unit: &mut Unit,
 ) -> Result<(), GenieError> {
     let mut entries = object
@@ -134,7 +135,7 @@ struct Saved<'a> {
     objects: &'a PlayerObjects,
     action: &'a Action,
     base: &'a RgeAction,
-    graphics: Option<&'a BTreeMap<i16, Graphic>>,
+    graphics: Option<&'a BTreeMap<SpriteId, Graphic>>,
 }
 
 impl Saved<'_> {
@@ -196,8 +197,7 @@ fn import_artifact(
     let moving = if base.short_val < 0 {
         None
     } else {
-        let id = saved.task(task_at)?.sprites[0];
-        (0 <= id).then_some(id)
+        saved.task(task_at)?.sprites.moving
     };
     let sub = saved.move_to_sub(GenieError::unsupported(
         "a saved Artifact action with another sub-action",
@@ -238,7 +238,7 @@ fn import_move_to(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
 /// range, sprite and wait. The save does not hold `+0x60`: `quiet` is its maker's.
 pub(crate) fn saved_move_to(
     action: &Action,
-    graphics: Option<&BTreeMap<i16, Graphic>>,
+    graphics: Option<&BTreeMap<SpriteId, Graphic>>,
     quiet: bool,
 ) -> Result<MoveToAction, GenieError> {
     let base = action.base().ok_or(MOVE_TO_BASELESS)?;
@@ -249,7 +249,7 @@ pub(crate) fn saved_move_to(
         target: ObjectId::of_field(base.target_id),
         range: Distance::new(sub_range(action)?),
         // its sprite (`+0x58`, the save's second `short_val`; −1 for none)
-        sprite: saved_move_to_sprite(base.short_val_2, graphics)?,
+        sprite: saved_move_to_sprite(SpriteId::of_data(base.short_val_2), graphics)?,
         quiet,
         // what it does when its target moves (`+0x61`)
         on_target_moved: TargetMoved::try_from(base.target_moved_state)?,
@@ -261,14 +261,14 @@ pub(crate) fn saved_move_to(
 /// A saved `MoveTo` without its base.
 const MOVE_TO_BASELESS: GenieError = GenieError::unsupported("a saved MoveTo without its base");
 
-/// A saved `MoveTo`'s sprite (`id`, −1 for none) from the sprites' table.
+/// A saved `MoveTo`'s sprite (`id`, none for −1) from the sprites' table.
 fn saved_move_to_sprite(
-    id: i16,
-    graphics: Option<&BTreeMap<i16, Graphic>>,
+    id: Option<SpriteId>,
+    graphics: Option<&BTreeMap<SpriteId, Graphic>>,
 ) -> Result<Option<Graphic>, GenieError> {
-    if id < 0 {
+    let Some(id) = id else {
         return Ok(None);
-    }
+    };
     graphics
         .and_then(|g| g.get(&id).copied())
         .map(Some)
@@ -465,7 +465,7 @@ fn import_enter(saved: &Saved<'_>, task_at: TaskAt<'_>, unit: &mut Unit) -> Resu
         timer: Seconds::new(base.timer),
         retry: first_time != 0,
         task_class: task.object_group,
-        moving: (0 <= task.sprites[0]).then_some(task.sprites[0]),
+        moving: task.sprites.moving,
     }));
     Ok(())
 }

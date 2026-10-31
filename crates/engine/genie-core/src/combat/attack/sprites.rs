@@ -5,6 +5,7 @@ use crate::combat::attack::{Arms, RELOAD_MS};
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::movement::Mover;
+use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::world::Millis;
@@ -18,11 +19,11 @@ use crate::world::WorldTime;
 pub fn swing_sprites(
     look: Option<&crate::combat::abilities::Look>,
     master: &crate::objects::masters::Master,
-    graphics: &std::collections::BTreeMap<i16, Graphic>,
+    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
 ) -> SwingSprites {
-    let g = |id: i16| (0 <= id).then(|| graphics.get(&id).copied()).flatten();
+    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
     SwingSprites {
-        look: look.and_then(|l| l.attacking).and_then(g),
+        look: g(look.and_then(|l| l.attacking)),
         special: master
             .special_graphic
             .then(|| g(master.special_sprite))
@@ -86,7 +87,7 @@ pub(crate) fn show_arrived(
 /// `FUN_1413b9f00` on the object's sprite list (`+0x148`, genie's: the unit's one sprite): the
 /// first instance of graphic `g` (a node's `+0x8`) goes back to its first frame (its slot 9 with
 /// `0x7fff`, [`ActiveSprite::reset_frame`]); false when the list holds none.
-pub(crate) const fn reset_sprite(sprite: &mut Option<ActiveSprite>, g: Graphic) -> bool {
+pub(crate) fn reset_sprite(sprite: &mut Option<ActiveSprite>, g: Graphic) -> bool {
     match sprite.as_mut() {
         Some(sp) if sp.graphic.id == g.id => {
             sp.reset_frame();

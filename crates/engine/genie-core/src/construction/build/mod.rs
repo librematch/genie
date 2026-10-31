@@ -17,6 +17,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::lifecycle::death_parts::FarmBonus;
 use crate::objects::masters::ActionType;
@@ -126,7 +127,7 @@ pub struct BuildTask {
     /// master's task by (−1 for none).
     pub id: TaskId,
     /// The task's moving sprite (`+0x40`), which it gives its `MoveTo`s; None for none.
-    pub moving: Option<i16>,
+    pub moving: Option<SpriteId>,
 }
 
 impl BuildTask {
@@ -139,7 +140,7 @@ impl BuildTask {
             work_rate,
             resource: task.attribute_type,
             id: task.id,
-            moving: crate::objects::sprite::sprite_id(task.sprites[0]),
+            moving: task.sprites.moving,
         }
     }
 }
@@ -290,12 +291,12 @@ pub(crate) fn show_built(
     stats: Option<&mut crate::movement::MoveStats>,
     master: &Master,
     frame: u8,
-    graphics: &BTreeMap<i16, crate::objects::sprite::Graphic>,
+    graphics: &BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     sprite_rng: &mut crate::math::rng::Well512,
 ) {
-    let standing = (0 <= master.standing_sprite)
-        .then(|| graphics.get(&master.standing_sprite).copied())
-        .flatten();
+    let standing = master
+        .standing_sprite
+        .and_then(|s| graphics.get(&s).copied());
     if let Some(g) = standing {
         crate::objects::sprite::new_sprite(sprite, stats, g, sprite_rng);
         if let Some(s) = sprite.as_mut().filter(|s| s.graphic.id == g.id) {
@@ -324,20 +325,29 @@ mod built_sprite_tests {
             replay_delay: Seconds::ZERO,
             flags,
         };
-        let graphics = BTreeMap::from([(10, g(10, 1)), (11, g(11, 1))]);
+        let graphics = BTreeMap::from([
+            (SpriteId::named(10), g(SpriteId::named(10), 1)),
+            (SpriteId::named(11), g(SpriteId::named(11), 1)),
+        ]);
         let master = Master {
-            standing_sprite: 11,
+            standing_sprite: Some(SpriteId::named(11)),
             ..Master::default()
         };
         let mut rng = crate::math::rng::Well512::default();
-        let mut sprite = Some(ActiveSprite::start(g(10, 1), &mut rng));
+        let mut sprite = Some(ActiveSprite::start(g(SpriteId::named(10), 1), &mut rng));
         show_built(&mut sprite, None, &master, 2, &graphics, &mut rng);
         let s = sprite.unwrap();
-        assert_eq!((s.graphic.id, s.frame, s.last_frame), (11, 2, 2));
-        let statics = BTreeMap::from([(11, g(11, 0))]);
+        assert_eq!(
+            (s.graphic.id, s.frame, s.last_frame),
+            (SpriteId::named(11), 2, 2)
+        );
+        let statics = BTreeMap::from([(SpriteId::named(11), g(SpriteId::named(11), 0))]);
         let mut none = None;
         show_built(&mut none, None, &master, 3, &statics, &mut rng);
-        assert_eq!(none.map(|s| (s.graphic.id, s.frame)), Some((11, 3)));
+        assert_eq!(
+            none.map(|s| (s.graphic.id, s.frame)),
+            Some((SpriteId::named(11), 3))
+        );
     }
 }
 

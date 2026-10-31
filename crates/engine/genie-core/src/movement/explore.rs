@@ -17,10 +17,11 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToAction, MoveToReads, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::class;
-use crate::objects::sprite::{Graphic, sprite_id};
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::{Unit, object_master};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
@@ -75,16 +76,16 @@ pub struct ExploreMove<'a> {
     /// What every new sub-action `MoveTo` reads of the unit.
     pub reads: MoveToReads<'a>,
     /// The master's walking sprite (`+0x748`).
-    pub given: Option<i16>,
+    pub given: Option<SpriteId>,
 }
 
 impl<'a> ExploreMove<'a> {
     /// What the `MoveTo` of `unit` of `master` reads, with the sprites' table `graphics`.
     #[must_use]
-    pub fn of(unit: &Unit, master: &Master, graphics: &'a BTreeMap<i16, Graphic>) -> Self {
+    pub fn of(unit: &Unit, master: &Master, graphics: &'a BTreeMap<SpriteId, Graphic>) -> Self {
         Self {
             reads: MoveToReads::of(unit, master, graphics),
-            given: sprite_id(master.move_sprite),
+            given: master.move_sprite,
         }
     }
 }
@@ -599,10 +600,11 @@ impl Unit {
             )?,
             Owner::Standing => {}
         }
-        let standing =
-            c.w.graphics
-                .get(&self.master(&c.w.masters, c.player)?.standing_sprite)
-                .copied();
+        let standing = self
+            .master(&c.w.masters, c.player)?
+            .standing_sprite
+            .and_then(|s| c.w.graphics.get(&s))
+            .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());
         }
@@ -623,7 +625,7 @@ impl Unit {
 
 /// The sprites' table of a world without sprites.
 #[cfg(test)]
-static NO_GRAPHICS: BTreeMap<i16, Graphic> = BTreeMap::new();
+static NO_GRAPHICS: BTreeMap<SpriteId, Graphic> = BTreeMap::new();
 
 /// What an Explore's `MoveTo` reads of a unit in state 2 with speed 1 in a world without sprites,
 /// for tests that make an Explore.
@@ -653,7 +655,7 @@ mod tests {
     use crate::world::Seconds;
 
     const WALKING: Graphic = Graphic {
-        id: 7,
+        id: SpriteId::named(7),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -664,10 +666,10 @@ mod tests {
 
     /// What an Explore's `MoveTo` reads of a unit in state 2 with speed 1: the sprites in
     /// `graphics` with the point default 20, and the walking sprite `given`.
-    fn walk_of(graphics: &BTreeMap<i16, Graphic>, given: Option<i16>) -> ExploreMove<'_> {
+    fn walk_of(graphics: &BTreeMap<SpriteId, Graphic>, given: Option<SpriteId>) -> ExploreMove<'_> {
         let defaults = MoveDefaults {
-            point: Some(20),
-            object: Some(21),
+            point: Some(SpriteId::named(20)),
+            object: Some(SpriteId::named(21)),
         };
         ExploreMove {
             reads: MoveToReads {
@@ -685,15 +687,18 @@ mod tests {
     /// default.
     #[test]
     fn an_explore_s_move_to_shows_the_master_s_walking_sprite_else_the_default() {
-        let other = Graphic { id: 20, ..WALKING };
-        let table = BTreeMap::from([(7, WALKING), (20, other)]);
+        let other = Graphic {
+            id: SpriteId::named(20),
+            ..WALKING
+        };
+        let table = BTreeMap::from([(SpriteId::named(7), WALKING), (SpriteId::named(20), other)]);
         let sprite = |given| {
             let walk = walk_of(&table, given);
             let (a, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &walk).unwrap();
             a.move_to.and_then(|m| m.sprite).map(|g| g.id)
         };
-        assert_eq!(sprite(Some(7)), Some(7));
-        assert_eq!(sprite(None), Some(20));
+        assert_eq!(sprite(Some(SpriteId::named(7))), Some(SpriteId::named(7)));
+        assert_eq!(sprite(None), Some(SpriteId::named(20)));
     }
 
     /// The scout map (`FUN_140f4a240`, `FUN_140f4d5e0`): 480 by 480 from tile (0, 0), each
@@ -736,8 +741,8 @@ mod tests {
     /// 0, the sprite its maker resolved, a new wait), which a code of 1 drops again.
     #[test]
     fn an_explore_without_a_point_waits_for_one_then_walks() {
-        let table = BTreeMap::from([(7, WALKING)]);
-        let walk = walk_of(&table, Some(7));
+        let table = BTreeMap::from([(SpriteId::named(7), WALKING)]);
+        let walk = walk_of(&table, Some(SpriteId::named(7)));
         let (mut a, owner) = ExploreAction::new(Position::new(-1.0, -1.0, 0.0), &walk).unwrap();
         assert_eq!(
             (a.state, owner, a.move_to),

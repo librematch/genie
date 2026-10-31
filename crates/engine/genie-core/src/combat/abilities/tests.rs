@@ -11,6 +11,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::SoundEvents;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -450,7 +451,7 @@ fn longboat_look() -> Task {
         terrain: -32,
         work_val1: 0.35,
         work_val2: 1.0,
-        sprites: [19601, -1, 19599, 19599],
+        sprites: TaskSprites::of_data([19601, -1, 19599, 19599]),
         sound_events: SoundEvents::new(19598, 19600),
         ..task(TERRAIN_LOOK)
     }
@@ -463,19 +464,22 @@ fn a_terrain_look_gives_the_task_s_sprites_on_its_terrains() {
     assert_eq!(
         look(&t, 32, 0x21, all),
         Some(Look {
-            standing: Some(19599),
-            walking: Some(19601),
-            attacking: Some(19599),
+            standing: Some(SpriteId::named(19599)),
+            walking: Some(SpriteId::named(19601)),
+            attacking: Some(SpriteId::named(19599)),
             running: None,
-            dying: Some(19598),
-            undead: Some(19600),
+            dying: Some(SpriteId::named(19598)),
+            undead: Some(SpriteId::named(19600)),
         })
     );
     assert_eq!(look(&t, 32, 1, all), None);
     // a sprite the table lacks is a null one
     let some = |id: i32| id != 19600 && id != 19599;
     let l = look(&t, 32, 32, some).unwrap();
-    assert_eq!((l.standing, l.undead, l.walking), (None, None, Some(19601)));
+    assert_eq!(
+        (l.standing, l.undead, l.walking),
+        (None, None, Some(SpriteId::named(19601)))
+    );
     // an event id past the table's ids is none
     let t = Task {
         sound_events: SoundEvents::new(0x62d4_b3ec, -5),
@@ -950,6 +954,7 @@ fn waters(t: &mut World) {
         flags: 1,
     };
     for id in [19598, 19599, 19600, 19601] {
+        let id = SpriteId::named(id);
         let _ = t.graphics.insert(id, g(id));
     }
 }
@@ -985,12 +990,12 @@ fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() 
     assert_eq!(
         u.abilities.look,
         Some(Look {
-            standing: Some(19599),
-            walking: Some(19601),
-            attacking: Some(19599),
+            standing: Some(SpriteId::named(19599)),
+            walking: Some(SpriteId::named(19601)),
+            attacking: Some(SpriteId::named(19599)),
             running: None,
-            dying: Some(19598),
-            undead: Some(19600),
+            dying: Some(SpriteId::named(19598)),
+            undead: Some(SpriteId::named(19600)),
         })
     );
     // where it last moved to decides, not its place

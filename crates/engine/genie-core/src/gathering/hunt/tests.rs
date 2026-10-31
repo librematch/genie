@@ -15,6 +15,7 @@ use crate::movement::move_to::{
 };
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -53,7 +54,8 @@ pub(crate) fn hunt_reads() -> HuntReads {
 }
 
 /// The sprites' table of a world without sprites.
-static NO_GRAPHICS: std::collections::BTreeMap<i16, Graphic> = std::collections::BTreeMap::new();
+static NO_GRAPHICS: std::collections::BTreeMap<SpriteId, Graphic> =
+    std::collections::BTreeMap::new();
 
 /// What the `MoveTo` constructors read of a hunter that carries `held`: no sprites, a unit in
 /// state 2.
@@ -321,7 +323,7 @@ const CHOP: HuntTask = HuntTask {
     id: TaskId::test(0),
     range: Distance::ZERO,
     resource: Some(attribute::MEAT),
-    sprites: [-1, 1239, 1961, 1960],
+    sprites: TaskSprites::of_data([-1, 1239, 1961, 1960]),
     work_value: 1.0,
     productivity: None,
     kind4: None,
@@ -761,7 +763,7 @@ fn a_hunt_whose_target_went_walks_to_its_point() {
 #[test]
 fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
     const MOVING: Graphic = Graphic {
-        id: 1880,
+        id: SpriteId::named(1880),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -801,7 +803,7 @@ fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
         (hunt.state, hunt.timer, hunt.move_to),
         (HuntState::Face, Seconds::ZERO, None)
     );
-    assert_eq!(shown, Some(1880));
+    assert_eq!(shown, Some(SpriteId::named(1880)));
     assert!(
         face(Victim {
             player: PlayerId::new(2),
@@ -1369,7 +1371,7 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
         let mut a = own_attack(10028, state, Distance::new(1.0));
         (a.sub_action, a.seen) = (true, Position::new(30.0, 88.0, 0.0));
         a.arms.idle_sprite = Some(Graphic {
-            id: 1,
+            id: SpriteId::named(1),
             frames: 10,
             facets: 8,
             speed_multiplier: 1.0,
@@ -1677,7 +1679,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
 #[test]
 fn a_hunt_s_walk_starts_toward_its_target() {
     const MOVING: Graphic = Graphic {
-        id: 1880,
+        id: SpriteId::named(1880),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -1717,7 +1719,7 @@ fn a_hunt_s_walk_starts_toward_its_target() {
             Ok(HuntNext::Stay),
             Some((MoveTo::Moving, MoveWaitState::AskedAgain)),
             2,
-            Some(1880)
+            Some(SpriteId::named(1880))
         )
     );
     let (got, walk, ..) = start(Distance::new(5.0));

@@ -17,6 +17,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
@@ -44,7 +45,7 @@ const RUNNING: f32 = 0.8 * 1.875;
 /// The graphic `id` with the speed factor `factor`.
 const fn graphic(id: i16, factor: f32) -> Graphic {
     Graphic {
-        id,
+        id: SpriteId::named(id),
         frames: 1,
         facets: 8,
         speed_multiplier: factor,
@@ -118,15 +119,15 @@ fn world() -> World {
         class: class::CLASS_6,
         hit_points: 60,
         radius: Footprint::new(0.2, 0.2),
-        standing_sprite: 6,
-        move_sprite: 7,
-        run_sprite: 8,
+        standing_sprite: Some(SpriteId::named(6)),
+        move_sprite: Some(SpriteId::named(7)),
+        run_sprite: Some(SpriteId::named(8)),
         formation_category: 1,
         ..Master::default()
     };
     t.masters = vec![Masters::new([master]); 2];
     for (id, factor) in [(6, 0.0), (7, 1.125), (8, 1.875)] {
-        let _ = t.graphics.insert(id, graphic(id, factor));
+        let _ = t.graphics.insert(SpriteId::named(id), graphic(id, factor));
     }
     t.spatial = Spatial::with_tiles(
         GridSize::new(32, 32),

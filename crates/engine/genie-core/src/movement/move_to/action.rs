@@ -15,11 +15,12 @@ use crate::movement::move_to::{
 use crate::movement::{Mover, PathAsk, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::objects::masters::master_type;
-use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, sprite_id, standing, walking};
+use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, standing, walking};
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{ActionKind, Inbox};
 use crate::world::Seconds;
@@ -121,15 +122,15 @@ pub fn object_range(range: Distance, master: Option<&Master>) -> f32 {
 /// 0): slot 0x7c8's, the walking sprite ([`walking`]), else slot 0x798's, the standing one
 /// ([`standing`]); `look` and `goods` as those read them.
 #[must_use]
-pub fn point_sprite(master: &Master, look: Option<&Look>, goods: bool) -> Option<i16> {
+pub fn point_sprite(master: &Master, look: Option<&Look>, goods: bool) -> Option<SpriteId> {
     walking(master, look, goods).or_else(|| standing(master, look, goods))
 }
 
 /// The sprite (`+0x58`) of a `MoveTo` to an object whose maker gives none (`FUN_140aa0df0` with
 /// 0): the master's walking sprite (`+0x748`), else its standing one (`+0x470`); no terrain look.
 #[must_use]
-pub fn object_sprite(master: &Master) -> Option<i16> {
-    sprite_id(master.move_sprite).or_else(|| sprite_id(master.standing_sprite))
+pub fn object_sprite(master: &Master) -> Option<SpriteId> {
+    master.move_sprite.or(master.standing_sprite)
 }
 
 /// The sprite the unit AI's moves give their `MoveTo` (slot 0x340, `FUN_1410866e0`, with
@@ -137,9 +138,9 @@ pub fn object_sprite(master: &Master) -> Option<i16> {
 /// sprite (`+0x750`) unless the move walks, else (or without one) its walking sprite (`+0x748`);
 /// no terrain look. None leaves the constructor's default ([`point_sprite`], [`object_sprite`]).
 #[must_use]
-pub fn ai_sprite(master: &Master, walk: bool) -> Option<i16> {
-    let run = sprite_id(master.run_sprite).filter(|_| !walk);
-    run.or_else(|| sprite_id(master.move_sprite))
+pub fn ai_sprite(master: &Master, walk: bool) -> Option<SpriteId> {
+    let run = master.run_sprite.filter(|_| !walk);
+    run.or(master.move_sprite)
 }
 
 /// What a `MoveTo`'s constructors take for the sprite (`+0x58`) when their maker gives none,
@@ -148,9 +149,9 @@ pub fn ai_sprite(master: &Master, walk: bool) -> Option<i16> {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MoveDefaults {
     /// `FUN_140aa0d30`'s, a `MoveTo` to a point.
-    pub point: Option<i16>,
+    pub point: Option<SpriteId>,
     /// `FUN_140aa0df0`'s, a `MoveTo` to an object.
-    pub object: Option<i16>,
+    pub object: Option<SpriteId>,
 }
 
 impl MoveDefaults {
@@ -166,7 +167,7 @@ impl MoveDefaults {
 
     /// The sprite of a `MoveTo` to a point (`FUN_140aa0d30`) whose maker gives `given`.
     #[must_use]
-    pub const fn to_point(self, given: Option<i16>) -> Option<i16> {
+    pub const fn to_point(self, given: Option<SpriteId>) -> Option<SpriteId> {
         match given {
             Some(id) => Some(id),
             None => self.point,
@@ -175,7 +176,7 @@ impl MoveDefaults {
 
     /// The sprite of a `MoveTo` to an object (`FUN_140aa0df0`) whose maker gives `given`.
     #[must_use]
-    pub const fn to_object(self, given: Option<i16>) -> Option<i16> {
+    pub const fn to_object(self, given: Option<SpriteId>) -> Option<SpriteId> {
         match given {
             Some(id) => Some(id),
             None => self.object,
@@ -514,7 +515,7 @@ mod tests {
     /// A sprite `id` whose speed factor is `factor`, looped.
     const fn graphic(id: i16, factor: f32) -> Graphic {
         Graphic {
-            id,
+            id: SpriteId::named(id),
             frames: 10,
             facets: 16,
             speed_multiplier: factor,
@@ -566,7 +567,7 @@ mod tests {
         }
 
         /// The id of the sprite the unit shows.
-        fn shown(&self) -> Option<i16> {
+        fn shown(&self) -> Option<SpriteId> {
             self.sprite.map(|s| s.graphic.id)
         }
     }
@@ -593,7 +594,7 @@ mod tests {
             (m.state, m.wait.state),
             (MoveTo::Moving, MoveWaitState::AskedAgain)
         );
-        assert_eq!(looks.shown(), Some(13154));
+        assert_eq!(looks.shown(), Some(SpriteId::named(13154)));
         assert_eq!(rig.mover_mut().stats.speed, Speed::new(0.8 * 1.5));
         let step = m
             .update(rig.walk(0), PathAsk::default(), looks.shows())
@@ -605,7 +606,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             (on.state, looks.shown(), rig.mover_mut().stats.speed),
-            (MoveTo::Moving, Some(13153), Speed::new(0.8))
+            (
+                MoveTo::Moving,
+                Some(SpriteId::named(13153)),
+                Speed::new(0.8)
+            )
         );
         let ended = |state| {
             let mut rig = WalkRig::on_the_path();
@@ -669,11 +674,19 @@ mod tests {
         };
         assert_eq!(
             started(Some(RUNNING)),
-            (MoveTo::Moving, Some(13154), Speed::new(0.8 * 1.5))
+            (
+                MoveTo::Moving,
+                Some(SpriteId::named(13154)),
+                Speed::new(0.8 * 1.5)
+            )
         );
         assert_eq!(
             started(None),
-            (MoveTo::Moving, Some(13151), Speed::new(0.8 * 1.25))
+            (
+                MoveTo::Moving,
+                Some(SpriteId::named(13151)),
+                Speed::new(0.8 * 1.25)
+            )
         );
         // at the point already: state 1, which shows the standing sprite
         let mut rig = WalkRig::on_the_path();
@@ -687,7 +700,7 @@ mod tests {
         };
         let _ = at.update(rig.walk(0), ask, looks.shows()).unwrap();
         assert_eq!(at.state, MoveTo::Arrived);
-        assert_eq!(looks.shown(), Some(13151));
+        assert_eq!(looks.shown(), Some(SpriteId::named(13151)));
         assert_eq!(rig.mover_mut().stats.speed, Speed::new(0.8 * 1.25));
         assert_eq!(rig.mover_mut().animated.speed, 0.0);
     }
@@ -699,37 +712,49 @@ mod tests {
     #[test]
     fn a_move_to_without_a_sprite_takes_its_constructor_s() {
         let master = Master {
-            run_sprite: 13154,
-            move_sprite: 13153,
-            standing_sprite: 13151,
+            run_sprite: Some(SpriteId::named(13154)),
+            move_sprite: Some(SpriteId::named(13153)),
+            standing_sprite: Some(SpriteId::named(13151)),
             ..Master::default()
         };
-        assert_eq!(point_sprite(&master, None, false), Some(13153));
-        assert_eq!(object_sprite(&master), Some(13153));
-        assert_eq!(ai_sprite(&master, false), Some(13154));
-        assert_eq!(ai_sprite(&master, true), Some(13153));
+        assert_eq!(
+            point_sprite(&master, None, false),
+            Some(SpriteId::named(13153))
+        );
+        assert_eq!(object_sprite(&master), Some(SpriteId::named(13153)));
+        assert_eq!(ai_sprite(&master, false), Some(SpriteId::named(13154)));
+        assert_eq!(ai_sprite(&master, true), Some(SpriteId::named(13153)));
         let look = Look {
-            standing: Some(501),
-            walking: Some(500),
+            standing: Some(SpriteId::named(501)),
+            walking: Some(SpriteId::named(500)),
             attacking: None,
             running: None,
             dying: None,
             undead: None,
         };
-        assert_eq!(point_sprite(&master, Some(&look), false), Some(500));
+        assert_eq!(
+            point_sprite(&master, Some(&look), false),
+            Some(SpriteId::named(500))
+        );
         let still = Master {
-            run_sprite: -1,
-            move_sprite: -1,
+            run_sprite: None,
+            move_sprite: None,
             ..master
         };
-        assert_eq!(point_sprite(&still, None, false), Some(13151));
-        assert_eq!(object_sprite(&still), Some(13151));
+        assert_eq!(
+            point_sprite(&still, None, false),
+            Some(SpriteId::named(13151))
+        );
+        assert_eq!(object_sprite(&still), Some(SpriteId::named(13151)));
         assert_eq!(ai_sprite(&still, false), None);
         let standing_look = Look {
             walking: None,
             ..look
         };
-        assert_eq!(point_sprite(&still, Some(&standing_look), false), Some(501));
+        assert_eq!(
+            point_sprite(&still, Some(&standing_look), false),
+            Some(SpriteId::named(501))
+        );
     }
 
     /// The walk of a `MoveTo` of its own on the house 10028 (`0x140aa2a70`, state 4): a target

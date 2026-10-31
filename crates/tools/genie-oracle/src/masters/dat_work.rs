@@ -5,6 +5,7 @@ use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::{Footprint, GroundOffset, Radii};
 use genie_core::objects::HitPoints;
+use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
@@ -13,6 +14,7 @@ use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
@@ -79,12 +81,12 @@ fn dat_task(
         work_range: Distance::new(t.work_range),
         work_flag: t.gather_type,
         enablement: t.enabled.map(AttributeId::of_field).transpose()?.flatten(),
-        sprites: [
+        sprites: TaskSprites::of_data([
             t.moving_graphic_id,
             t.proceeding_graphic_id,
             t.working_graphic_id,
             t.carrying_graphic_id,
-        ],
+        ]),
         sound_events: SoundEvents::new(
             sound_event(
                 t.wwise_resource_gathering_sound_id,
@@ -183,12 +185,12 @@ pub(super) fn dat_work(
             .type50
             .as_ref()
             .and_then(|t| t.attack_graphic2)
-            .unwrap_or(-1),
+            .and_then(SpriteId::of_data),
         idle_attack_sprite: unit
             .creatable
             .as_ref()
             .and_then(|c| c.idle_attack_graphic)
-            .unwrap_or(-1),
+            .and_then(SpriteId::of_data),
         clearance: Footprint::from(unit.clearance_size),
         outline: Radii::from(unit.outline_size).ground(),
         outline_height: Radii::from(unit.outline_size).z(),
@@ -206,8 +208,8 @@ pub(super) fn dat_work(
             annex_offsets: b.annexes.map(|a| GroundOffset::from(a.misplacement)),
             head_unit: MasterId::of_data(b.head_unit),
             transform_unit: MasterId::of_data(b.transform_unit),
-            destruction_sprite: b.destruction_graphic_id,
-            construction_sprite: b.construction_graphic_id,
+            destruction_sprite: SpriteId::of_data(b.destruction_graphic_id),
+            construction_sprite: SpriteId::of_data(b.construction_graphic_id),
         }),
         garrison: unit.garrison_capacity,
         recyclable: unit.recyclable != 0,
@@ -231,8 +233,9 @@ pub(super) fn dat_work(
         special_sprite: unit
             .creatable
             .as_ref()
-            .map_or(-1, |c| i16::try_from(c.special_graphic).unwrap_or(-1)),
-        death_sprite: unit.dying_graphic,
+            .and_then(|c| i16::try_from(c.special_graphic).ok())
+            .and_then(SpriteId::of_data),
+        death_sprite: SpriteId::of_data(unit.dying_graphic),
         death_spawns: [unit.dead_unit_id, unit.blood_unit_id].map(MasterId::of_data),
         garrison_firepower: unit
             .type50

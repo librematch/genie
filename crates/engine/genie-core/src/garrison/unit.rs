@@ -13,6 +13,7 @@ use crate::movement::move_to::MoveDefaults;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
@@ -186,7 +187,10 @@ impl Unit {
             restriction: master.terrain_restriction,
             defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
             given,
-            standing: c.w.graphics.get(&master.standing_sprite).copied(),
+            standing: master
+                .standing_sprite
+                .and_then(|s| c.w.graphics.get(&s))
+                .copied(),
         };
         // written back before an error too: the stop's context reads the list
         let code = t.update(c, self, me, &reads);
@@ -205,7 +209,7 @@ impl Unit {
         (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
         (masters, graphics, sprite_rng): (
             Option<&Masters>,
-            &std::collections::BTreeMap<i16, Graphic>,
+            &std::collections::BTreeMap<SpriteId, Graphic>,
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
@@ -270,7 +274,7 @@ impl Unit {
     pub(crate) fn set_entered(
         &mut self,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<i16, Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let enter = self

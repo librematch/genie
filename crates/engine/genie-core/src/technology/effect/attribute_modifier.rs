@@ -5,10 +5,12 @@ use crate::GenieError;
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{AttributeWorld, Master, master_type, player_master};
 use crate::players::PlayerId;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
@@ -152,17 +154,17 @@ impl World {
             return Ok(());
         };
         let master = u.master(&self.masters, p)?.clone();
-        let g = |id: i16| self.graphics.get(&id).copied();
+        let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(&id)).copied();
         if master.kind < master_type::ACTION || !has_actions(u) {
             let sprite = match (attribute, u.idle_variant) {
-                (a::STANDING_GRAPHIC, 0) => Some(master.standing_sprite),
+                (a::STANDING_GRAPHIC, 0) => master.standing_sprite,
                 (a::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,
                 _ => return Ok(()),
             };
             // slot 0x68 with no sprite (a second standing sprite the table lacks) shows none,
             // which the slice's sprites cannot hold; without the graphics the Sprite stream is not
             // modelled
-            let (Some(graphic), false) = (sprite.and_then(g), self.graphics.is_empty()) else {
+            let (Some(graphic), false) = (g(sprite), self.graphics.is_empty()) else {
                 return Ok(());
             };
             let place = self.place(id).ok_or(OBJECT_GONE)?;
@@ -473,7 +475,7 @@ impl World {
             }
             match attribute {
                 a::DYING_GRAPHIC => {
-                    u.life.dying_sprite = (0 <= master.death_sprite).then_some(master.death_sprite);
+                    u.life.dying_sprite = master.death_sprite;
                 }
                 a::DEAD_UNIT_ID => u.life.death_spawn = master.death_spawns[0].is_some(),
                 a::BLOOD_UNIT => u.life.remains = master.death_spawns[1],
@@ -530,19 +532,25 @@ pub(crate) struct MasterSprites {
 /// second attack sprites.
 pub(crate) fn follow_master(
     arms: &mut crate::combat::attack::Arms,
-    task: Option<[i16; 4]>,
+    task: Option<TaskSprites>,
     sprites: &MasterSprites,
 ) {
-    let of_task = |s: Option<crate::objects::sprite::Graphic>, i: usize| {
-        task.zip(s).is_some_and(|(t, s)| t.get(i) == Some(&s.id))
+    let of_task = |s: Option<crate::objects::sprite::Graphic>,
+                   pick: fn(TaskSprites) -> Option<SpriteId>| {
+        task.zip(s).is_some_and(|(t, s)| pick(t) == Some(s.id))
     };
-    if arms.move_sprite.is_some() && !of_task(arms.move_sprite, 0) {
+    let proceeding = |t: TaskSprites| t.proceeding;
+    let working = |t: TaskSprites| t.working;
+    if arms.move_sprite.is_some() && !of_task(arms.move_sprite, |t| t.moving) {
         arms.move_sprite = sprites.moving;
     }
-    if arms.sprite.is_some() && !of_task(arms.sprite, 1) && !of_task(arms.sprite, 2) {
+    if arms.sprite.is_some() && !of_task(arms.sprite, proceeding) && !of_task(arms.sprite, working)
+    {
         arms.sprite = sprites.attack;
     }
-    if arms.idle_sprite.is_some() && !of_task(arms.idle_sprite, 1) && !of_task(arms.idle_sprite, 2)
+    if arms.idle_sprite.is_some()
+        && !of_task(arms.idle_sprite, proceeding)
+        && !of_task(arms.idle_sprite, working)
     {
         arms.idle_sprite = sprites.standing;
     }

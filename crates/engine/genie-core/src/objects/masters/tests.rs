@@ -14,6 +14,11 @@ use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 
+/// A sprite field as the attribute tests read it: its id, −1 for none.
+fn sprite_value(s: Option<SpriteId>) -> f32 {
+    f32::from(s.map_or(-1, SpriteId::get))
+}
+
 fn task(action_type: ActionType, object_group: i16, object_id: i16, work_val1: f32) -> Task {
     Task {
         action_type,
@@ -237,22 +242,22 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::STANDING_GRAPHIC,
-            |m| f32::from(m.standing_sprite),
+            |m| sprite_value(m.standing_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             a::STANDING_GRAPHIC_2,
-            |m| f32::from(m.standing_sprite_2.unwrap_or(-1)),
+            |m| sprite_value(m.standing_sprite_2),
             [3.0, 5.0, 5.0],
         ),
         (
             a::DYING_GRAPHIC,
-            |m| f32::from(m.death_sprite),
+            |m| sprite_value(m.death_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             a::UNDEAD_GRAPHIC,
-            |m| f32::from(m.undead_sprite),
+            |m| sprite_value(m.undead_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -272,7 +277,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::DAMAGE_GRAPHIC,
-            |m| f32::from(m.damage_graphics[1].sprite),
+            |m| sprite_value(m.damage_graphics[1].sprite),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -437,7 +442,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         (a::ATTACK_DISPERSION, |m| m.missed_spread, [3.0, 5.0, 10.0]),
         (
             a::ATTACK_GRAPHIC,
-            |m| f32::from(m.attack_sprite),
+            |m| sprite_value(m.attack_sprite),
             [3.0, 5.0, 5.0],
         ),
         (a::AREA_DAMAGE, |m| m.area_damage, [3.0, 5.0, 10.0]),
@@ -505,7 +510,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SPECIAL_GRAPHIC,
-            |m| f32::from(m.special_sprite),
+            |m| sprite_value(m.special_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -515,17 +520,17 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::IDLE_ATTACK_GRAPHIC,
-            |m| f32::from(m.idle_attack_sprite),
+            |m| sprite_value(m.idle_attack_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             a::HERO_GLOW_GRAPHIC,
-            |m| f32::from(m.hero_glow_sprite),
+            |m| sprite_value(m.hero_glow_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             a::GARRISON_GRAPHIC,
-            |m| f32::from(m.garrison_sprite),
+            |m| sprite_value(m.garrison_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -583,7 +588,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::ATTACK_GRAPHIC_2,
-            |m| f32::from(m.attack_sprite2),
+            |m| sprite_value(m.attack_sprite2),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -684,16 +689,16 @@ fn the_static_setters_truncate_as_the_game_does() {
 #[test]
 fn a_sprite_attribute_takes_only_a_sprite_the_world_has() {
     let mut m = of_type(master_type::MOVING);
-    m.standing_sprite = 5;
-    m.move_sprite = -1;
+    m.standing_sprite = Some(SpriteId::named(5));
+    m.move_sprite = None;
     m.set_attribute(attribute::STANDING_GRAPHIC, 150.0, &world(false));
-    assert_eq!(m.standing_sprite, 5);
+    assert_eq!(m.standing_sprite, Some(SpriteId::named(5)));
     m.add_attribute(attribute::STANDING_GRAPHIC, 3.0, &world(false));
-    assert_eq!(m.standing_sprite, 8);
+    assert_eq!(m.standing_sprite, Some(SpriteId::named(8)));
     m.add_attribute(attribute::WALKING_GRAPHIC, 11.0, &world(false));
-    assert_eq!(m.move_sprite, 10);
+    assert_eq!(m.move_sprite, Some(SpriteId::named(10)));
     m.set_attribute(attribute::STANDING_GRAPHIC_2, 7.0, &world(false));
-    assert_eq!(m.standing_sprite_2, Some(7));
+    assert_eq!(m.standing_sprite_2, Some(SpriteId::named(7)));
 }
 
 /// `FUN_1410a8b60`, `FUN_1410a8c00`: a capped add or multiply of the speed stops at 4.5, a
@@ -923,7 +928,7 @@ fn the_damage_sprite_attributes_resize_and_select() {
     assert_eq!(m.damage_graphic_entry, 1);
     m.set_attribute(attribute::DAMAGE_GRAPHIC, 40.0, &world(false));
     m.set_attribute(attribute::DAMAGE_GRAPHIC_PERCENT, 75.0, &world(false));
-    assert_eq!(m.damage_graphics[1].sprite, 40);
+    assert_eq!(m.damage_graphics[1].sprite, Some(SpriteId::named(40)));
     assert_eq!(m.damage_graphics[1].percent, 75);
     m.set_attribute(
         attribute::DAMAGE_GRAPHICS_TOTAL_NUM,
@@ -987,16 +992,16 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         flags: 1,
     };
     let graphics = [
-        (1, graphic(1, 0.0, 8)),
-        (2, graphic(2, 1.5, 8)),
-        (3, graphic(3, 0.5, 16)),
+        (SpriteId::named(1), graphic(SpriteId::named(1), 0.0, 8)),
+        (SpriteId::named(2), graphic(SpriteId::named(2), 1.5, 8)),
+        (SpriteId::named(3), graphic(SpriteId::named(3), 0.5, 16)),
     ]
     .into_iter()
     .collect();
     let mut m = of_type(master_type::COMBAT);
-    m.standing_sprite = 1;
-    m.move_sprite = 2;
-    m.run_sprite = -1;
+    m.standing_sprite = Some(SpriteId::named(1));
+    m.move_sprite = Some(SpriteId::named(2));
+    m.run_sprite = None;
     m.max_speed = Speed::new(1.0);
     m.radius = Footprint::new(0.2, 0.2);
     m.moving = Some(MoveStats {
@@ -1088,7 +1093,7 @@ fn the_action_and_moving_setters_change_their_values() {
 fn the_combat_master_s_own_values_change() {
     let mut m = of_type(master_type::COMBAT);
     m.hit_points = 100;
-    m.attack_sprite2 = 10;
+    m.attack_sprite2 = Some(SpriteId::named(10));
     m.set_attribute(attribute::HERO_STATUS, 1.0, &world(false));
     m.add_attribute(attribute::HERO_STATUS, 4.0, &world(false));
     m.set_attribute(attribute::MAXIMUM_CHARGE, 10.0, &world(false));
@@ -1125,7 +1130,7 @@ fn the_combat_master_s_own_values_change() {
     assert_eq!(m.regeneration, 30.0);
     assert_eq!(
         (m.volley_fire, m.max_volley, m.attack_sprite2),
-        (2.0, 0, 12)
+        (2.0, 0, Some(SpriteId::named(12)))
     );
     assert_eq!(
         m.volley_spread,

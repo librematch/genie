@@ -9,8 +9,10 @@ use crate::movement::move_to::{
 use crate::movement::{Me, Mover};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::Graphic;
@@ -45,7 +47,8 @@ fn reads() -> GatherReads {
 }
 
 /// The sprites' table of a world without sprites.
-static NO_GRAPHICS: std::collections::BTreeMap<i16, Graphic> = std::collections::BTreeMap::new();
+static NO_GRAPHICS: std::collections::BTreeMap<SpriteId, Graphic> =
+    std::collections::BTreeMap::new();
 
 /// What the `MoveTo` constructors read of a villager that carries `held`: no sprites.
 fn walks(held: Held) -> Walks<'static> {
@@ -187,7 +190,7 @@ fn task() -> HuntTask {
         id: TaskId::test(2),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
-        sprites: [-1; 4],
+        sprites: TaskSprites::NONE,
         work_value: 1.0,
         productivity: None,
         kind4: None,
@@ -321,7 +324,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
         ..GatherAction::new(task(), &farm(), false, rate()).unwrap()
     };
     let stand = Graphic {
-        id: 4,
+        id: SpriteId::named(4),
         frames: 1,
         facets: 1,
         speed_multiplier: 1.0,
@@ -345,7 +348,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
             None
         )
     );
-    assert_eq!(sprite.map(|s| s.graphic.id), Some(4));
+    assert_eq!(sprite.map(|s| s.graphic.id), Some(SpriteId::named(4)));
     assert_eq!(mover.velocity.unwrap().velocity.y(), 0.0);
 }
 
@@ -960,7 +963,7 @@ fn a_walk_to_a_point_ends_on_its_target_let_go_as_on_its_arrival() {
 #[test]
 fn a_gatherer_facing_its_target_works_it() {
     let working = Graphic {
-        id: 7,
+        id: SpriteId::named(7),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -997,7 +1000,10 @@ fn a_gatherer_facing_its_target_works_it() {
         )
     );
     assert_eq!(rig.load(), carrying(Some(AttributeId::numbered(17)), 0.0));
-    assert_eq!(rig.unit().sprite.map(|s| s.graphic.id), Some(7));
+    assert_eq!(
+        rig.unit().sprite.map(|s| s.graphic.id),
+        Some(SpriteId::named(7))
+    );
 }
 
 /// A farmer waiting for another farm (state 0xf3), its farm gone.

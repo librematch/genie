@@ -373,9 +373,9 @@ impl Unit {
             (id, true)
         };
         // the setups' draws: static (its sprite, its facet), then moving (its angle)
-        let standing = (0 <= made.standing_sprite)
-            .then(|| c.w.graphics.get(&made.standing_sprite).copied())
-            .flatten();
+        let standing = made
+            .standing_sprite
+            .and_then(|s| c.w.graphics.get(&s).copied());
         if let Some(g) = standing {
             let _ = ActiveSprite::start(g, c.w.streams.get(Stream::Sprite));
             if g.flags & 4 != 0 && 1 < g.facets {
@@ -522,7 +522,7 @@ impl Unit {
                 hp: HitPoints::of_master(made.hit_points),
                 attribute_type: held.kind,
                 amount: held.amount,
-                dying_sprite: (0 <= made.death_sprite).then_some(made.death_sprite),
+                dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
                 remains,
                 death_facets: None,

@@ -15,6 +15,7 @@ use crate::math::rng::Well512;
 use crate::movement::{Me, Motion, Planning, footprint_gap, footprint_gap_squared};
 use crate::movement::{MoveStats, PathAsk};
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::masters::ActionType;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
@@ -282,8 +283,8 @@ const SPRITE_LACKING: GenieError =
 ///
 /// A sprite the table lacks.
 pub fn graphic_of(
-    graphics: &std::collections::BTreeMap<i16, Graphic>,
-    id: Option<i16>,
+    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    id: Option<SpriteId>,
 ) -> Result<Option<Graphic>, GenieError> {
     id.map(|id| {
         graphics
@@ -301,7 +302,7 @@ pub struct SpriteReads<'a> {
     /// The constructors' defaults ([`MoveDefaults::of`]).
     pub defaults: MoveDefaults,
     /// The sprites' table.
-    pub graphics: &'a std::collections::BTreeMap<i16, Graphic>,
+    pub graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
 }
 
 impl<'a> SpriteReads<'a> {
@@ -311,7 +312,7 @@ impl<'a> SpriteReads<'a> {
     pub fn of(
         master: &crate::objects::masters::Master,
         look: Option<&crate::combat::abilities::Look>,
-        graphics: &'a std::collections::BTreeMap<i16, Graphic>,
+        graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
     ) -> Self {
         Self {
             defaults: MoveDefaults::of(master, look),
@@ -324,7 +325,7 @@ impl<'a> SpriteReads<'a> {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn to_point(&self, given: Option<i16>) -> Result<Option<Graphic>, GenieError> {
+    pub fn to_point(&self, given: Option<SpriteId>) -> Result<Option<Graphic>, GenieError> {
         graphic_of(self.graphics, self.defaults.to_point(given))
     }
 
@@ -333,7 +334,7 @@ impl<'a> SpriteReads<'a> {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn to_object(&self, given: Option<i16>) -> Result<Option<Graphic>, GenieError> {
+    pub fn to_object(&self, given: Option<SpriteId>) -> Result<Option<Graphic>, GenieError> {
         graphic_of(self.graphics, self.defaults.to_object(given))
     }
 }
@@ -347,7 +348,7 @@ pub struct Sprites<'a> {
     /// The Sprite stream.
     pub rng: &'a mut Well512,
     /// The sprites' table.
-    pub graphics: &'a std::collections::BTreeMap<i16, Graphic>,
+    pub graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
 }
 
 impl Sprites<'_> {
@@ -356,7 +357,7 @@ impl Sprites<'_> {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn shown(&mut self, id: Option<i16>) -> Result<Shown<'_>, GenieError> {
+    pub fn shown(&mut self, id: Option<SpriteId>) -> Result<Shown<'_>, GenieError> {
         let graphic = graphic_of(self.graphics, id)?;
         Ok(Shown {
             sprite: &mut *self.sprite,

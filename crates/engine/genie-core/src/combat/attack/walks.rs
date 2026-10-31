@@ -10,6 +10,7 @@ use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::objects::SpriteId;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
@@ -30,7 +31,7 @@ pub(super) const QUIET_CODE: GenieError =
 pub(super) fn move_reads<'g>(
     unit: &Unit,
     r: &AttackReads,
-    graphics: &'g BTreeMap<i16, Graphic>,
+    graphics: &'g BTreeMap<SpriteId, Graphic>,
 ) -> Result<MoveToReads<'g>, GenieError> {
     let _ = speed_of(unit)?;
     let sprites = SpriteReads {
@@ -57,7 +58,7 @@ pub(crate) fn speed_of(unit: &Unit) -> Result<Speed, GenieError> {
 impl Attack {
     /// The sprite the Attack gives its `MoveTo`s (`+0x68`): its constructor's argument, the
     /// master's running or walking one; none leaves the `MoveTo` constructor's default.
-    const fn given_sprite(&self) -> Option<i16> {
+    const fn given_sprite(&self) -> Option<SpriteId> {
         match self.arms.move_sprite {
             Some(g) => Some(g.id),
             None => None,

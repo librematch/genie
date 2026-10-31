@@ -12,12 +12,14 @@ use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
+use crate::objects::SpriteId;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -329,9 +331,9 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
                 class: class::VILLAGER,
                 radius: Footprint::new(0.2, 0.2),
                 // no sprites (the world's sprites' table is empty)
-                standing_sprite: -1,
-                move_sprite: -1,
-                run_sprite: -1,
+                standing_sprite: None,
+                move_sprite: None,
+                run_sprite: None,
                 ..Master::default()
             },
             Master {
@@ -509,7 +511,10 @@ fn a_work_attack_on_a_touching_target_starts_its_move_to_arrived() {
             Some(object_id(50))
         )
     );
-    assert_eq!(unit.sprite.map(|s| s.graphic.id), Some(300));
+    assert_eq!(
+        unit.sprite.map(|s| s.graphic.id),
+        Some(SpriteId::named(300))
+    );
     assert_eq!(unit.body.anim_speed(), Some(0.0));
     assert_eq!(
         unit.body.mover().map(|m| m.stats.speed),
@@ -722,7 +727,10 @@ fn an_attack_task_of_a_unit_that_cannot_move_goes_ready_in_reach() {
             (state, pending, Some(object_id(50))),
             "reload timer {timer}"
         );
-        assert_eq!(unit.sprite.map(|s| s.graphic.id), Some(sprite));
+        assert_eq!(
+            unit.sprite.map(|s| s.graphic.id),
+            Some(SpriteId::named(sprite))
+        );
     }
 }
 
@@ -783,7 +791,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     use crate::math::rng::Well512;
     use crate::objects::sprite::Graphic;
     let standing = Graphic {
-        id: 300,
+        id: SpriteId::named(300),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -793,18 +801,18 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     };
     let mut t = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
     t.graphics = std::collections::BTreeMap::from([
-        (300, standing),
+        (SpriteId::named(300), standing),
         (
-            301,
+            SpriteId::named(301),
             Graphic {
-                id: 301,
+                id: SpriteId::named(301),
                 ..standing
             },
         ),
         (
-            302,
+            SpriteId::named(302),
             Graphic {
-                id: 302,
+                id: SpriteId::named(302),
                 speed_multiplier: 1.5,
                 ..standing
             },
@@ -814,9 +822,9 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     // the soldier's speed 0.8: its standing sprite's factor 1, its walking one's 1.5
     walker.stats.speed = Speed::new(1.2);
     let soldier = t.masters[1].get_mut(master_id(4)).unwrap();
-    soldier.standing_sprite = 300;
-    soldier.attack_sprite = 301;
-    soldier.move_sprite = 302;
+    soldier.standing_sprite = Some(SpriteId::named(300));
+    soldier.attack_sprite = Some(SpriteId::named(301));
+    soldier.move_sprite = Some(SpriteId::named(302));
     soldier.weapon_range = Distance::ZERO;
     soldier.reload = Seconds::new(2.0);
     soldier.moving = Some(walker.stats);
@@ -864,7 +872,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     unit.body.put_mover(Some(walker));
     unit.sprite = Some(crate::objects::sprite::ActiveSprite::start(
         Graphic {
-            id: 302,
+            id: SpriteId::named(302),
             ..standing
         },
         &mut rng,
@@ -880,7 +888,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     });
     let task = crate::objects::masters::Task {
         action_type: ATTACK_TASK,
-        sprites: [-1; 4],
+        sprites: TaskSprites::NONE,
         ..crate::objects::masters::Task::default()
     };
     (t, task)
@@ -936,8 +944,8 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         terrain_restriction: Some(RestrictionId::named(0)),
         kind: master_type::COMBAT,
         formation_category,
-        move_sprite: -1,
-        standing_sprite: -1,
+        move_sprite: None,
+        standing_sprite: None,
         ..Master::default()
     };
     t.masters = vec![
@@ -1842,8 +1850,8 @@ fn an_auto_scout_reaches_any_player_s_scout_of_its_first_60_ids() {
         class: class::CLASS_12,
         object_flags: 0x10,
         // no sprites: the Explore's MoveTo takes none (the world's sprites' table holds none)
-        move_sprite: -1,
-        standing_sprite: -1,
+        move_sprite: None,
+        standing_sprite: None,
         ..Master::default()
     };
     t.masters
@@ -1999,7 +2007,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         class: class::CLASS_6,
         hit_points: 40,
         radius: Footprint::new(0.2, 0.2),
-        standing_sprite: -1,
+        standing_sprite: None,
         ..Master::default()
     };
     let next = Master {
@@ -2008,7 +2016,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         class: class::CLASS_6,
         hit_points: 60,
         radius: Footprint::new(0.3, 0.3),
-        standing_sprite: -1,
+        standing_sprite: None,
         ..Master::default()
     };
     let mut spatial = crate::map::spatial::Spatial::new(GridSize::new(10, 10));
@@ -2097,7 +2105,7 @@ fn switched_in_the_open(
         .iter()
         .map(|&id| {
             let g = crate::objects::sprite::Graphic {
-                id,
+                id: SpriteId::named(id),
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
@@ -2105,7 +2113,7 @@ fn switched_in_the_open(
                 replay_delay: Seconds::ZERO,
                 flags: 1,
             };
-            (id, g)
+            (g.id, g)
         })
         .collect();
     let mut rng = crate::math::rng::Well512::default();
@@ -2129,7 +2137,7 @@ fn switch_masters() -> (Master, Master) {
         class: class::CLASS_6,
         hit_points: 40,
         radius: Footprint::new(0.2, 0.2),
-        standing_sprite: 10,
+        standing_sprite: Some(SpriteId::named(10)),
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(attribute::POPULATION), Amount::new(1.0), 16),
@@ -2145,7 +2153,7 @@ fn switch_masters() -> (Master, Master) {
         class: class::CLASS_6,
         hit_points: 60,
         radius: Footprint::new(0.3, 0.3),
-        standing_sprite: 11,
+        standing_sprite: Some(SpriteId::named(11)),
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(AttributeId::numbered(14)), Amount::new(1.0), 16),
@@ -2181,7 +2189,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
     let showing = Unit {
         sprite: Some(crate::objects::sprite::ActiveSprite::start(
             crate::objects::sprite::Graphic {
-                id: 10,
+                id: SpriteId::named(10),
                 frames: 10,
                 facets: 8,
                 speed_multiplier: 1.0,
@@ -2211,7 +2219,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         (u.life.master_id, u.life.hp, u.firepower),
         (master_id(5), HitPoints::new(30.0), 3.0)
     );
-    assert_eq!(u.sprite.map(|s| s.graphic.id), Some(11));
+    assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(11)));
     assert_eq!(
         (record.master, record.radius, record.obstruction_type),
         (
@@ -4462,7 +4470,7 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
     let mut hunt = crate::gathering::hunt::tests::hunting(600);
     hunt.task.resource = Some(AttributeId::numbered(17));
     // the sprites' table of the world holds none
-    hunt.task.sprites = [-1; 4];
+    hunt.task.sprites = TaskSprites::NONE;
     v.actions.set_hunt(Some(hunt));
     t.unit_order(player_id(1), &object_ids([9175]), 7).unwrap();
     let h = t.players[1].objects[ListIndex::new(0)]
@@ -4534,7 +4542,7 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
         (state, unit.body.anim_speed(), sprite, notifies)
     };
     let (near, _, sprite, near_notifies) = started(true, 10.4);
-    assert_eq!(sprite, Some(300));
+    assert_eq!(sprite, Some(SpriteId::named(300)));
     let (far, _, _, far_notifies) = started(true, 30.0);
     assert_eq!(
         (far, far_notifies),
@@ -4544,7 +4552,11 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
     let (failed, speed, sprite, _) = started(false, 30.0);
     assert_eq!(
         (failed, speed, sprite),
-        (Some(AttackState::Failed), Some(1.0), Some(300))
+        (
+            Some(AttackState::Failed),
+            Some(1.0),
+            Some(SpriteId::named(300))
+        )
     );
 }
 

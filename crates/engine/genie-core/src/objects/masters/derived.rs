@@ -3,6 +3,7 @@
 
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::SpriteId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::{Master, master_type};
 
@@ -11,10 +12,10 @@ use crate::objects::masters::{Master, master_type};
 /// [`MoveStats`]' speeds).
 pub(super) fn sprite_speed(
     base: f32,
-    sprite: i16,
-    graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+    sprite: Option<SpriteId>,
+    graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
 ) -> f32 {
-    crate::objects::sprite::top_speed(base, graphics.get(&sprite))
+    crate::objects::sprite::top_speed(base, sprite.and_then(|s| graphics.get(&s)))
 }
 
 impl Master {
@@ -25,9 +26,9 @@ impl Master {
     #[must_use]
     pub fn sprite_facets(
         &self,
-        graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     ) -> Option<crate::objects::facing::SpriteFacets> {
-        let mut sprites = vec![self.standing_sprite, self.standing_sprite_2.unwrap_or(-1)];
+        let mut sprites = vec![self.standing_sprite, self.standing_sprite_2];
         if master_type::MOVING <= self.kind {
             sprites.extend([self.move_sprite, self.run_sprite]);
         }
@@ -35,11 +36,11 @@ impl Master {
             sprites.push(self.attack_sprite);
         }
         for t in &self.tasks {
-            sprites.extend(t.sprites);
+            sprites.extend(t.sprites.ids());
         }
         let mut seen = sprites
             .into_iter()
-            .filter(|&id| 0 <= id)
+            .flatten()
             .filter_map(|id| graphics.get(&id))
             .map(|g| crate::objects::facing::SpriteFacets {
                 count: g.facets,
@@ -57,7 +58,7 @@ impl Master {
         &self,
         stats: &mut MoveStats,
         attribute: MasterAttribute,
-        graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
         terrain: Option<&crate::map::terrain::Terrain>,
     ) {
         use crate::objects::masters::attribute as a;
@@ -67,11 +68,7 @@ impl Master {
             }
             a::MOVEMENT_SPEED | a::STANDING_GRAPHIC | a::WALKING_GRAPHIC | a::RUNNING_GRAPHIC => {
                 stats.base = self.max_speed;
-                let run = if 0 <= self.run_sprite {
-                    self.run_sprite
-                } else {
-                    self.move_sprite
-                };
+                let run = self.run_sprite.or(self.move_sprite);
                 stats.speed = Speed::new(sprite_speed(self.max_speed.get(), run, graphics));
             }
             a::ROTATION_SPEED => stats.turn_time = self.turn_speed,
@@ -107,7 +104,7 @@ impl Master {
     pub fn follow(
         &mut self,
         attribute: MasterAttribute,
-        graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
         terrain: Option<&crate::map::terrain::Terrain>,
     ) {
         use crate::objects::masters::attribute as a;
@@ -126,7 +123,7 @@ impl Master {
             a::DAMAGE_GRAPHICS_ENTRY_MOD | a::DAMAGE_GRAPHICS_TOTAL_NUM => {
                 self.damage_sprites = !self.damage_graphics.is_empty();
             }
-            a::SPECIAL_GRAPHIC => self.special_graphic = 0 <= self.special_sprite,
+            a::SPECIAL_GRAPHIC => self.special_graphic = self.special_sprite.is_some(),
             a::TRAIN_LOCATION
             | a::TRAIN_TIME
             | a::TRAIN_LOCATIONS_ENTRY_MOD

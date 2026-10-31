@@ -12,9 +12,11 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskSprites;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -196,7 +198,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         id: TaskId::test(0),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
-        sprites: [-1; 4],
+        sprites: TaskSprites::NONE,
         work_value: 1.0,
         productivity: None,
         kind4: None,
@@ -281,7 +283,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     let mut attack =
         crate::combat::attack::tests::own_attack(-1, AttackState::Done, Distance::new(1.0));
     attack.arms.idle_sprite = Some(crate::objects::sprite::Graphic {
-        id: 1,
+        id: SpriteId::named(1),
         frames: 10,
         facets: 8,
         speed_multiplier: 1.0,
@@ -370,7 +372,7 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
                 id: TaskId::test(0),
                 range: Distance::ZERO,
                 resource: None,
-                sprites: [-1; 4],
+                sprites: TaskSprites::NONE,
                 work_value: 0.0,
                 productivity: None,
                 kind4: None,

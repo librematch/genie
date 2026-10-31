@@ -23,6 +23,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
@@ -108,8 +109,8 @@ fn garrison_masters() -> Masters {
             tasks: vec![task(GARRISON, 3), task(GARRISON, 20)],
             // no walking or standing sprite: a MoveTo the villager makes takes none (the
             // world's sprites' table holds none)
-            move_sprite: -1,
-            standing_sprite: -1,
+            move_sprite: None,
+            standing_sprite: None,
             ..Master::default()
         },
         Master {
@@ -126,9 +127,9 @@ fn garrison_masters() -> Masters {
             object_flags: 1,
             garrison: 1,
             // no sprites (the world's sprites' table is empty)
-            standing_sprite: -1,
-            move_sprite: -1,
-            run_sprite: -1,
+            standing_sprite: None,
+            move_sprite: None,
+            run_sprite: None,
             ..Master::default()
         },
         Master {
@@ -472,7 +473,7 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
     let mut t = shore_world(at, ship);
     for m in &mut t.masters {
         if let Some(v) = m.get_mut(VILLAGER) {
-            (v.standing_sprite, v.move_sprite, v.run_sprite) = (-1, -1, -1);
+            (v.standing_sprite, v.move_sprite, v.run_sprite) = (None, None, None);
         }
     }
     // its walk turns by 16 facets
@@ -2439,7 +2440,7 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
     // there (slot 0x340: a MoveTo, range 0, with the master's running sprite 2001)
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
     let running = crate::objects::sprite::Graphic {
-        id: 2001,
+        id: SpriteId::named(2001),
         frames: 10,
         facets: 16,
         speed_multiplier: 1.0,
@@ -2447,10 +2448,10 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
         replay_delay: Seconds::ZERO,
         flags: 1,
     };
-    let _ = t.graphics.insert(2001, running);
+    let _ = t.graphics.insert(SpriteId::named(2001), running);
     for m in &mut t.masters {
         if let Some(s) = m.get_mut(SHIP) {
-            s.run_sprite = 2001;
+            s.run_sprite = Some(SpriteId::named(2001));
         }
     }
     t.garrison_order(
@@ -2479,7 +2480,7 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
         (
             Some(Position::new(5.5, 17.5, 0.0)),
             Distance::ZERO,
-            Some(2001),
+            Some(SpriteId::named(2001)),
             -1
         )
     );

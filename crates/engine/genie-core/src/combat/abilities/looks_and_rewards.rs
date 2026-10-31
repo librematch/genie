@@ -2,6 +2,7 @@
 
 use crate::combat::abilities::{Look, ONE, Reward};
 use crate::objects::ListIndex;
+use crate::objects::SpriteId;
 use crate::objects::masters::CostSlot;
 use crate::objects::masters::Task;
 use crate::players::PlayerId;
@@ -32,14 +33,19 @@ pub fn look(task: &Task, mask: u8, flags: u8, exists: impl Fn(i32) -> bool) -> O
     if flags & mask == 0 {
         return None;
     }
-    let sprite = |id: i32| i16::try_from(id).ok().filter(|&i| 0 <= i && exists(id));
-    let task_sprite = |id: i16| (id != -1).then_some(id).and_then(|id| sprite(id.into()));
-    let [moving, proceeding, working, carrying] = task.sprites;
+    let sprite = |id: i32| {
+        i16::try_from(id)
+            .ok()
+            .and_then(SpriteId::of_data)
+            .filter(|_| exists(id))
+    };
+    let task_sprite = |id: Option<SpriteId>| id.and_then(|id| sprite(id.get().into()));
+    let sprites = task.sprites;
     Some(Look {
-        standing: task_sprite(carrying),
-        walking: task_sprite(moving),
-        attacking: task_sprite(working),
-        running: task_sprite(proceeding),
+        standing: task_sprite(sprites.carrying),
+        walking: task_sprite(sprites.moving),
+        attacking: task_sprite(sprites.working),
+        running: task_sprite(sprites.proceeding),
         dying: sprite(task.sound_events.gathering),
         undead: sprite(task.sound_events.deposit),
     })
@@ -100,7 +106,12 @@ impl World {
                 .map_or(0, |k| k.flags)
         });
         let graphics = &self.graphics;
-        let exists = |id: i32| i16::try_from(id).is_ok_and(|id| graphics.contains_key(&id));
+        let exists = |id: i32| {
+            i16::try_from(id)
+                .ok()
+                .and_then(SpriteId::of_data)
+                .is_some_and(|id| graphics.contains_key(&id))
+        };
         let look = look(task, mask, flags, exists);
         let unit = &mut self.players[p].objects[i];
         let (factor, rate) = if look.is_some() {

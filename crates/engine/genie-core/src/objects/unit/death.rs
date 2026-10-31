@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::construction::build::{Completion, Construction};
 use crate::math::rng::Stream;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::lifecycle::Class;
 use crate::objects::lifecycle::death_parts::{built_death, combat_dies, farm_bonus, refund_of};
 use crate::objects::masters::Master;
@@ -129,7 +130,7 @@ impl Unit {
     /// ([`crate::objects::sprite::top_speed`]: the deer 9655 of MarvinBlue/426048731, running at
     /// 1.4003 when the spears kill it in update 3147, moves at its master's 0.737 with its
     /// dying sprite).
-    fn show_dying(&mut self, c: &mut Step<'_>, id: i16) -> Result<(), GenieError> {
+    fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> Result<(), GenieError> {
         let g = c.w.graphics.get(&id).copied().ok_or(NO_DYING_SPRITE)?;
         crate::objects::sprite::new_sprite(
             &mut self.sprite,

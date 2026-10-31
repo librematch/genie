@@ -8,7 +8,8 @@ use crate::map::Distance;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, SpriteReads, TargetMoved, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
-use crate::objects::sprite::{Graphic, sprite_id};
+use crate::objects::SpriteId;
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::world::step::Step;
 
@@ -21,7 +22,7 @@ impl HuntReads {
     /// What the `MoveTo`s the update makes read of `unit`, with the sprites' table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
-        graphics: &'g std::collections::BTreeMap<i16, Graphic>,
+        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
         unit: &Unit,
     ) -> Walks<'g> {
         let sprites = SpriteReads {
@@ -49,7 +50,7 @@ impl HuntAction {
         mover: &Mover,
         walks: &Walks<'_>,
     ) -> Result<Option<MoveToAction>, GenieError> {
-        let given = sprite_id(self.task.walk_sprite_id(walks.held));
+        let given = self.task.walk_sprite_id(walks.held);
         walks
             .live(mover)
             .to_object(to, range, given, TargetMoved::AsksAgain)
@@ -68,7 +69,7 @@ impl HuntAction {
         mover: &Mover,
         walks: &Walks<'_>,
     ) -> Result<Option<MoveToAction>, GenieError> {
-        let given = sprite_id(self.task.walk_sprite_id(walks.held));
+        let given = self.task.walk_sprite_id(walks.held);
         let walk = walks
             .live(mover)
             .to_point(self.point, self.task.range, given)?;

@@ -175,9 +175,9 @@ impl World {
         };
         // the setups the combat setup runs first, with its master's standing sprite current
         // (slot 0x798, FUN_1412029f0): their draws, the sprite and the angle it faces
-        let standing = (0 <= made.standing_sprite)
-            .then(|| self.graphics.get(&made.standing_sprite).copied())
-            .flatten();
+        let standing = made
+            .standing_sprite
+            .and_then(|s| self.graphics.get(&s).copied());
         let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |g| {
             let (s, _, angle) = self.setup_draws(g);
             (Some(s), angle)
@@ -188,7 +188,7 @@ impl World {
         let death =
             player_master(&self.masters, player, master).map_or((None, false, None, None), |m| {
                 (
-                    (0 <= m.death_sprite).then_some(m.death_sprite),
+                    m.death_sprite,
                     m.death_spawns[0].is_some(),
                     m.death_spawns[1],
                     m.life,
@@ -228,9 +228,9 @@ impl World {
         // a foundation shows its master's construction sprite (+0x950; its standing one for
         // none, FUN_141158620) through slot 0x68 (FUN_141217000)
         if foundation && 0 < made.build_time {
-            let shown = (0 <= building.construction_sprite)
-                .then(|| self.graphics.get(&building.construction_sprite).copied())
-                .flatten()
+            let shown = building
+                .construction_sprite
+                .and_then(|s| self.graphics.get(&s).copied())
                 .or(standing);
             if let Some(g) = shown {
                 crate::objects::sprite::new_sprite(

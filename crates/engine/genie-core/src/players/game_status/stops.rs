@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
+use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
@@ -240,7 +241,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        standing: i16,
+        standing: Option<SpriteId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;

@@ -7,6 +7,7 @@ use crate::map::Distance;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
@@ -39,9 +40,14 @@ impl World {
     ///
     /// [`AttributeWorld`]: crate::objects::masters::AttributeWorld
     pub(super) fn attribute_world(
-        graphics: &std::collections::BTreeMap<i16, crate::objects::sprite::Graphic>,
+        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     ) -> impl Fn(i32) -> bool + '_ {
-        move |id| i16::try_from(id).is_ok_and(|id| graphics.contains_key(&id))
+        move |id| {
+            i16::try_from(id)
+                .ok()
+                .and_then(SpriteId::of_data)
+                .is_some_and(|id| graphics.contains_key(&id))
+        }
     }
 
     /// The ids player `p`'s tracker files under class `class` (`FUN_14104f8f0`, key class + 900)

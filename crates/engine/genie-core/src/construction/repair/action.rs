@@ -17,6 +17,7 @@ use crate::movement::{Me, footprint_gap};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::teardown::HeadCode;
@@ -57,8 +58,8 @@ fn notify(repairer: &mut Unit, kind: NotifyKind) -> Result<(), GenieError> {
 fn show(
     c: &mut Step<'_>,
     repairer: &mut Unit,
-    id: Option<i16>,
-    standing: Option<i16>,
+    id: Option<SpriteId>,
+    standing: Option<SpriteId>,
 ) -> Result<(), GenieError> {
     let mut sprites = Sprites {
         sprite: &mut repairer.sprite,
