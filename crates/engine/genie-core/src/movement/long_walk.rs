@@ -152,7 +152,9 @@ pub(crate) fn long_path_for(
         near_player: false,
         allies: world
             .get(walker.id)
-            .map_or(0, |p| world.allies_of(p.player)),
+            .map_or(crate::players::PlayerSet::NONE, |p| {
+                world.allies_of(p.player)
+            }),
     };
     crate::pathing::long_path::path(world.tiles(), world.map, &req, walker.position.z())
 }

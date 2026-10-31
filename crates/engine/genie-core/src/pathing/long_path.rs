@@ -37,6 +37,7 @@ use crate::map::spatial::{BLOCKED, Tiles};
 use crate::map::{Tile, TileOffset, TileRect};
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::Path;
+use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
 
 /// A heap pop finds the heap empty where the caller checked its top.
@@ -198,9 +199,9 @@ pub struct LongRequest {
     pub within_range: bool,
     /// Argument 11 is not −1: a blocked tile with no object of the player around counts as open.
     pub near_player: bool,
-    /// The players the unit's player counts as allies (`FUN_141663dc0` with the ally flag), one
-    /// bit each: a gate's tile of another player is closed.
-    pub allies: u64,
+    /// The players the unit's player counts as allies (`FUN_141663dc0` with the ally flag): a
+    /// gate's tile of another player is closed.
+    pub allies: crate::players::PlayerSet,
 }
 
 /// The open tiles: a binary heap from slot 1, slot 0 the sentinel (`+0x119420`, count
@@ -491,8 +492,8 @@ impl<'a> Grid<'a> {
             // a gate's record: its owner (bits 16 to 22) an ally of the unit's player
             // (`FUN_141663dc0` with the ally flag) asks the gate on the tile's anchor (slot
             // 0x678); another's gate is closed
-            let owner = (word >> 16) & 0x7f;
-            if req.allies & (1 << owner) != 0 {
+            let owner = PlayerId::from(((word >> 16) & 0x7f) as u8);
+            if req.allies.holds(owner) {
                 return Err(GenieError::unsupported(
                     "the long pather at an allied gate's tile (slot 0x678)",
                 ));
@@ -725,7 +726,7 @@ mod tests {
             lowered: Vec::new(),
             within_range: false,
             near_player: false,
-            allies: 0b10,
+            allies: crate::players::PlayerSet::of(PlayerId::new(1)),
         }
     }
 
@@ -875,7 +876,7 @@ mod tests {
         ]);
         assert_eq!(reaches(&t, map, &request([1, 2], [8, 2])), Ok(false));
         let mut req = request([1, 2], [8, 2]);
-        req.allies |= 1 << 4;
+        req.allies |= crate::players::PlayerSet::of(PlayerId::new(4));
         assert!(reaches(&t, map, &req).is_err());
     }
 

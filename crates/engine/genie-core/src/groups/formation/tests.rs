@@ -258,7 +258,7 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
         tile: Tile::new(3, 4),
         footprint: 0,
         bits: VisionBits::NONE,
-        cant_see: 0,
+        cant_see: crate::players::PlayerSet::NONE,
         seen: false,
         state: ObjectState::Alive,
     }];
@@ -598,7 +598,7 @@ pub(crate) fn ghost_at(id: i32, x: f32, y: f32) -> crate::vision::ghost::Ghost {
         tile: Tile::new(x as i32, y as i32),
         footprint: 0,
         bits: VisionBits::NONE,
-        cant_see: 0,
+        cant_see: crate::players::PlayerSet::NONE,
         seen: false,
         state: ObjectState::Alive,
     }

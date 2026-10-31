@@ -292,12 +292,14 @@ impl Spatial {
         self.allied(from, to)
     }
 
-    /// The players `from` counts as allies ([`Spatial::allied_with`]), one bit each.
+    /// The players `from` counts as allies ([`Spatial::allied_with`]), of the 32 a set holds.
     #[must_use]
-    pub fn allies_of(&self, from: PlayerId) -> u64 {
-        PlayerId::each(64)
+    pub fn allies_of(&self, from: PlayerId) -> crate::players::PlayerSet {
+        PlayerId::each(32)
             .filter(|&to| self.allied(from, to))
-            .fold(0, |bits, to| bits | (1 << to.get()))
+            .fold(crate::players::PlayerSet::NONE, |set, to| {
+                set | crate::players::PlayerSet::of(to)
+            })
     }
 
     /// `FUN_141663dc0` with the ally flag: `to` counts for `from` when it is `from`, or `from`

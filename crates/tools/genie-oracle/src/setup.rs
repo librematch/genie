@@ -580,7 +580,7 @@ pub(super) fn saved_ghosts(
                 tile: Tile::new(s.t_x as i32, s.t_y as i32),
                 footprint: d.multi_unified_points,
                 bits: VisionBits::NONE,
-                cant_see: d.cant_see_bits,
+                cant_see: genie_core::players::PlayerSet::from_bits_retain(d.cant_see_bits),
                 seen: false,
                 state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
             })

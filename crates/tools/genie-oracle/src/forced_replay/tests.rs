@@ -33,7 +33,7 @@ fn ghost(id: i32) -> Ghost {
         tile: Tile::new(1, 2),
         footprint: 0,
         bits: VisionBits::NONE,
-        cant_see: 0,
+        cant_see: genie_core::players::PlayerSet::NONE,
         seen: false,
         state: ObjectState::Alive,
     }

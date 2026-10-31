@@ -28,6 +28,7 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
+use crate::players::PlayerSet;
 use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -103,7 +104,7 @@ pub struct Ghost {
     /// The bits last seen (`+0x7e8`, not saved).
     pub bits: VisionBits,
     /// The players who cannot see it (`+0x7f0`, the save's `CantSeeBits`).
-    pub cant_see: u32,
+    pub cant_see: PlayerSet,
     /// `+0x7f7`: its viewer saw its tile while the original's mask had not.
     pub seen: bool,
     /// Its state: alive, then removed once destroyed, gone, and it leaves.
@@ -415,7 +416,7 @@ impl World {
             tile: Self::tile_at(at),
             footprint: if MASKED_KIND <= kind { umv } else { 0 },
             bits: VisionBits::NONE,
-            cant_see: 0,
+            cant_see: PlayerSet::NONE,
             seen: false,
             state: ObjectState::Alive,
         };
@@ -447,8 +448,8 @@ impl World {
                     self.destroy_ghost(q, k)?;
                 } else {
                     self.players.player_mut(q)?.ghosts.checked_mut(k)?.cant_see |=
-                        1 << viewer.get();
-                    ghost.cant_see |= 1 << q.get();
+                        PlayerSet::of(viewer);
+                    ghost.cant_see |= PlayerSet::of(q);
                 }
             }
         }
@@ -546,13 +547,13 @@ impl World {
 
     /// Whether the ghost is unseen by a player that sees its original's tile no more, and the
     /// players who cannot see it: those sharing the original owner's sight note themselves.
-    fn ghost_viewers(&self, p: PlayerId, g: &Ghost, bits: VisionBits) -> (bool, u32) {
+    fn ghost_viewers(&self, p: PlayerId, g: &Ghost, bits: VisionBits) -> (bool, PlayerSet) {
         let mut unseen = false;
         let mut cant_see = g.cant_see;
         for i in PlayerId::each(self.players.len()).skip(1) {
             let mask = self.vision_mask(i);
             if mask.intersects(VisionBits::visible(g.original_owner)) {
-                cant_see |= 1 << i.get();
+                cant_see |= PlayerSet::of(i);
             } else if mask.intersects(VisionBits::visible(p)) && !bits.intersects(mask) {
                 unseen = true;
             }
@@ -854,7 +855,7 @@ mod tests {
         );
         assert_eq!(
             (g.tile, g.state, g.cant_see, g.footprint),
-            (Tile::new(1, 2), ObjectState::Alive, 0, 0)
+            (Tile::new(1, 2), ObjectState::Alive, PlayerSet::NONE, 0)
         );
         // then the owner watches its tile at the tile's bits
         assert_eq!(
@@ -945,7 +946,7 @@ mod tests {
             tile: Tile::new(position.x() as i32, position.y() as i32),
             footprint: 0,
             bits: VisionBits::NONE,
-            cant_see: 0,
+            cant_see: PlayerSet::NONE,
             seen: false,
             state,
         };
@@ -1011,9 +1012,17 @@ mod tests {
             ]
         );
         // player 1's twin and the new ghost note each other
-        assert_eq!(t.players[1].ghosts[0].cant_see, 1 << 2);
-        assert_eq!(ghost.cant_see, 1 << 1);
-        assert!(t.players[2].ghosts.iter().all(|g| g.cant_see == 0));
+        assert_eq!(
+            t.players[1].ghosts[0].cant_see,
+            PlayerSet::of(PlayerId::new(2))
+        );
+        assert_eq!(ghost.cant_see, PlayerSet::of(PlayerId::new(1)));
+        assert!(
+            t.players[2]
+                .ghosts
+                .iter()
+                .all(|g| g.cant_see == PlayerSet::NONE)
+        );
     }
 
     #[test]
@@ -1030,7 +1039,7 @@ mod tests {
             tile: Tile::new(2, 1),
             footprint: 0,
             bits: VisionBits::NONE,
-            cant_see: 0,
+            cant_see: PlayerSet::NONE,
             seen: false,
             state: ObjectState::Alive,
         };
@@ -1071,7 +1080,7 @@ mod tests {
             tile: Tile::new(2, 1),
             footprint,
             bits: VisionBits::NONE,
-            cant_see: 0,
+            cant_see: PlayerSet::NONE,
             seen: false,
             state: ObjectState::Alive,
         }
@@ -1093,12 +1102,12 @@ mod tests {
             (
                 ObjectState::Alive,
                 VisionBits::from_bits_retain(1 << 1),
-                1 << 1
+                PlayerSet::of(PlayerId::new(1))
             )
         );
-        t.players[2].ghosts[0].cant_see = 0;
+        t.players[2].ghosts[0].cant_see = PlayerSet::NONE;
         t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].cant_see, 0);
+        assert_eq!(t.players[2].ghosts[0].cant_see, PlayerSet::NONE);
         set_tile(&mut t, 2, 1, (1 << 1) | (1 << 2));
         t.update_ghosts(PlayerId::new(2)).unwrap();
         assert_eq!(t.players[2].ghosts[0].state, ObjectState::Removed);
@@ -1145,7 +1154,7 @@ mod tests {
             (
                 ObjectState::Alive,
                 VisionBits::from_bits_retain(1 << 4),
-                1 << 1
+                PlayerSet::of(PlayerId::new(1))
             )
         );
         set_tile(&mut t, 2, 1, (1 << 3) | (1 << 4));

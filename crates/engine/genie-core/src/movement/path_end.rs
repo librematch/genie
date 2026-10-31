@@ -184,7 +184,11 @@ impl Mover {
             lowered,
             within_range: false,
             near_player: false,
-            allies: world.get(me.id).map_or(0, |p| world.allies_of(p.player)),
+            allies: world
+                .get(me.id)
+                .map_or(crate::players::PlayerSet::NONE, |p| {
+                    world.allies_of(p.player)
+                }),
         };
         crate::pathing::long_path::reaches(world.tiles(), world.map, &req)
     }
