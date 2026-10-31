@@ -31,11 +31,11 @@ const DT: f32 = 0.02;
 /// 0.05 turns 2π / 0.8 a second, 11.25° in a tick of 0.025 s; a villager turns at once.
 #[test]
 fn a_master_s_turn_rate_comes_from_its_turn_speed_and_walking_facets() {
-    let rate = turn_rate(0.05, Some(16));
-    assert_eq!(rate, TWO_PI / (16.0f32 * 0.05));
-    assert_eq!(rate.to_bits(), 7.853_982f32.to_bits());
-    assert_eq!(turn_rate(0.0, Some(16)), f32::MAX);
-    assert_eq!(turn_rate(0.05, None), f32::MAX);
+    let rate = turn_rate(Seconds::new(0.05), Some(16));
+    assert_eq!(rate, TurnRate::new(TWO_PI / (16.0f32 * 0.05)));
+    assert_eq!(rate.get().to_bits(), 7.853_982f32.to_bits());
+    assert_eq!(turn_rate(Seconds::ZERO, Some(16)), TurnRate::MAX);
+    assert_eq!(turn_rate(Seconds::new(0.05), None), TurnRate::MAX);
 }
 
 /// `FUN_1410e3a70` writes all five turning values: a zero turn speed resets them, a walking
@@ -45,26 +45,32 @@ fn a_master_s_turning_values_follow_its_turn_speed_and_walking_sprite() {
     let before = Turning {
         radius: Distance::new(1.0),
         radius_speed: Speed::new(2.0),
-        rate: 3.0,
-        revolution: 4.0,
-        revolution_rate: 5.0,
+        rate: TurnRate::new(3.0),
+        revolution: Seconds::new(4.0),
+        revolution_rate: TurnRate::new(5.0),
     };
-    assert_eq!(turning(0.0, Some(16), before), (Turning::PRESET, false));
-    assert_eq!(turning(0.05, None, before), (before, false));
-    let (after, set) = turning(0.05, Some(16), before);
+    assert_eq!(
+        turning(Seconds::ZERO, Some(16), before),
+        (Turning::PRESET, false)
+    );
+    assert_eq!(turning(Seconds::new(0.05), None, before), (before, false));
+    let (after, set) = turning(Seconds::new(0.05), Some(16), before);
     assert!(set);
     let rate = TWO_PI / (16.0f32 * 0.05);
     assert_eq!(
         after,
         Turning {
-            revolution: 16.0f32 * 0.05,
-            revolution_rate: rate,
-            rate,
+            revolution: Seconds::new(16.0f32 * 0.05),
+            revolution_rate: TurnRate::new(rate),
+            rate: TurnRate::new(rate),
             ..before
         }
     );
     // a sprite of no facets: a revolution of 0, the largest float
-    assert_eq!(turning(0.05, Some(0), before).0.rate, f32::MAX);
+    assert_eq!(
+        turning(Seconds::new(0.05), Some(0), before).0.rate,
+        TurnRate::MAX
+    );
 }
 
 fn stats() -> MoveStats {
@@ -72,13 +78,13 @@ fn stats() -> MoveStats {
         fly_mode: 0,
         speed: Speed::new(0.8),
         base: Speed::new(0.8),
-        turn_rate: f32::MAX,
-        turn_radius: 0.0,
+        turn_rate: TurnRate::MAX,
+        turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(0.2, 0.2, 0.5),
         restriction: RestrictionId::named(7),
         restriction_mask: TerrainMask::of_bits(6),
-        turn_time: 0.0,
+        turn_time: Seconds::ZERO,
         move_algorithm: 0,
         min_collision: 1.0,
         fast_turn: false,
@@ -168,8 +174,8 @@ pub(crate) fn builder_9177() -> Mover {
         substitute_count: 0,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
-        last_turn: 0.0,
-        angle: 0.0,
+        last_turn: Seconds::ZERO,
+        angle: Angle::ZERO,
         animated: Animated::default(),
         pauses: Vec::new(),
         in_the_way: Vec::new(),
@@ -961,7 +967,7 @@ fn a_nan_most_turns_the_whole_angle_unclipped() {
     let mut m = builder_9177();
     m.forward = BVector::new(1.0, 0.0, 0.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
-    m.stats.turn_rate = f32::INFINITY;
+    m.stats.turn_rate = TurnRate::new(f32::INFINITY);
     assert_eq!(
         m.steer(BVector::new(0.0, 0.0, 1.0), Seconds::ZERO),
         Ok(false)
@@ -970,7 +976,7 @@ fn a_nan_most_turns_the_whole_angle_unclipped() {
     assert!(0.99 < m.forward.y());
     // a small most clips the turn
     m.forward = BVector::new(1.0, 0.0, 0.0);
-    m.stats.turn_rate = 1.0;
+    m.stats.turn_rate = TurnRate::new(1.0);
     assert_eq!(
         m.steer(BVector::new(0.0, 0.0, 1.0), Seconds::new(0.02)),
         Ok(true)
@@ -984,18 +990,24 @@ fn a_nan_most_turns_the_whole_angle_unclipped() {
 #[test]
 fn a_turn_toward_a_direction_is_signed_and_clipped_by_the_turn_rate() {
     let mut m = builder_9177();
-    m.stats.turn_rate = 1.0;
+    m.stats.turn_rate = TurnRate::new(1.0);
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
-    assert_eq!(m.turn_toward(x, z, 0.5), (-0.5, true));
-    assert_eq!(m.turn_toward(z, x, 0.5), (0.5, true));
-    let (turn, clipped) = m.turn_toward(x, z, 2.0);
+    assert_eq!(
+        m.turn_toward(x, z, Seconds::new(0.5)),
+        (Angle::new(-0.5), true)
+    );
+    assert_eq!(
+        m.turn_toward(z, x, Seconds::new(0.5)),
+        (Angle::new(0.5), true)
+    );
+    let (turn, clipped) = m.turn_toward(x, z, Seconds::new(2.0));
     assert!(!clipped);
-    assert_eq!(turn, -std::f32::consts::FRAC_PI_2);
+    assert_eq!(turn, Angle::new(-std::f32::consts::FRAC_PI_2));
     // a NaN most turns the whole angle (JBE on unordered)
-    assert!(!m.turn_toward(x, z, f32::NAN).1);
-    assert_eq!(m.turn_dt(Seconds::new(0.02)), 0.02);
+    assert!(!m.turn_toward(x, z, Seconds::new(f32::NAN)).1);
+    assert_eq!(m.turn_dt(Seconds::new(0.02)), Seconds::new(0.02));
     m.stats.fast_turn = true;
-    assert_eq!(m.turn_dt(Seconds::new(0.02)), 0.02 * 100.0);
+    assert_eq!(m.turn_dt(Seconds::new(0.02)), Seconds::new(0.02 * 100.0));
 }
 
 /// Slot 184 (`FUN_141163140`): the yaw turns the forward vector about the up axis and
@@ -1010,7 +1022,8 @@ fn a_yaw_turns_forward_and_right_and_takes_the_facet_s_angle() {
         count: 16,
         flag_1: true,
     };
-    m.yaw(-std::f32::consts::FRAC_PI_2, Some(facets)).unwrap();
+    m.yaw(Angle::new(-std::f32::consts::FRAC_PI_2), Some(facets))
+        .unwrap();
     assert!(m.forward.x().abs() < 1e-6 && (m.forward.y() - 1.0).abs() < 1e-6);
     assert_eq!(m.right, fmath::normalize(fmath::cross(UP, m.forward)));
     let facet = crate::objects::facing::facet_of_forward(m.forward, facets);
@@ -1019,7 +1032,7 @@ fn a_yaw_turns_forward_and_right_and_takes_the_facet_s_angle() {
         crate::objects::facing::angle_of_facet(facet, facets)
     );
     let before = m.angle;
-    assert!(m.yaw(0.1, None).is_err());
+    assert!(m.yaw(Angle::new(0.1), None).is_err());
     assert_eq!(m.angle, before);
     assert!(m.forward.x() != 0.0);
 }
@@ -1031,11 +1044,11 @@ fn a_yaw_turns_forward_and_right_and_takes_the_facet_s_angle() {
 #[test]
 fn the_orientation_speed_and_pause_slots() {
     let mut m = builder_9177();
-    m.angle = 1.0;
+    m.angle = Angle::new(1.0);
     m.set_orientation(BVector::new(0.0, 0.0, 1.0), BVector::new(0.0, 1.0, 0.0));
     assert_eq!(m.forward, BVector::new(0.0, 0.0, 1.0));
     assert_eq!(m.right, BVector::new(1.0, 0.0, 0.0));
-    assert_eq!(m.angle, 1.0);
+    assert_eq!(m.angle, Angle::new(1.0));
     m.velocity = None;
     m.set_speed(Speed::ZERO);
     assert_eq!(m.velocity, None);
@@ -1212,7 +1225,7 @@ fn a_loop_s_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     let flat = fmath::normalize(expect.forward.with_height(0.0));
     let (turn, _) = expect.turn_toward(flat, BVector::ZERO, expect.turn_dt(Seconds::new(DT)));
     expect.yaw(turn, expect.facets()).unwrap();
-    assert_ne!(turn, 0.0);
+    assert_ne!(turn, Angle::ZERO);
     assert_eq!(
         m.motion(&me, Seconds::new(DT), &mut world, None),
         Ok(Motion::Moving)
@@ -2151,7 +2164,7 @@ fn the_step_and_the_speed_control_start_where_the_unit_last_moved_to() {
     );
     // the speed control's turning circle around (10.5, 20) grown to the right by 1: a
     // waypoint inside it brakes, one beyond it speeds up
-    m.stats.turn_radius = 2.0;
+    m.stats.turn_radius = Distance::new(2.0);
     m.stats.turn_radius_speed = Speed::new(1.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
     m.control_speed(BVector::new(10.5, 0.0, 19.2), false);

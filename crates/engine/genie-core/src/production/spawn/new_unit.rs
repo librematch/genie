@@ -6,6 +6,7 @@ use crate::commands::GatherPointState;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::{Obstruction, Placed};
+use crate::math::Angle;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::objects::HitPoints;
@@ -246,7 +247,7 @@ impl World {
     pub(crate) fn setup_draws(
         &mut self,
         standing: Graphic,
-    ) -> (ActiveSprite, crate::objects::facing::SpriteFacets, f32) {
+    ) -> (ActiveSprite, crate::objects::facing::SpriteFacets, Angle) {
         if standing.flags & 4 != 0 && 1 < standing.facets {
             let _ = self.streams.get(Stream::Object).rand15();
         }
@@ -259,7 +260,7 @@ impl World {
             let r = self.streams.get(Stream::Object).rand15();
             crate::objects::facing::drawn_angle(r, facets)
         } else {
-            0.0
+            Angle::ZERO
         };
         (sprite, facets, angle)
     }

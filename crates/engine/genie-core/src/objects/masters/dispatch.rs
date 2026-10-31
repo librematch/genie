@@ -7,6 +7,7 @@ use crate::objects::masters::{
     AttributeWorld, DamageGraphic, Master, TrainLocation, attribute, master_type,
 };
 use crate::players::Amount;
+use crate::world::Seconds;
 
 impl Master {
     /// Slot 0x18 (`set`): attribute `attribute` of this master takes `v`, by its type's setter
@@ -118,7 +119,8 @@ impl Master {
                 Some("a master's speed (+0x740) the loader did not fill")
             }
             a::ROTATION_SPEED
-                if self.turn_speed == 0.0 && moving.is_some_and(|m| m.turn_time != 0.0) =>
+                if self.turn_speed == Seconds::ZERO
+                    && moving.is_some_and(|m| m.turn_time != Seconds::ZERO) =>
             {
                 Some("a master's turn speed (+0x758) the loader did not fill")
             }

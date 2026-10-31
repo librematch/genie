@@ -110,7 +110,7 @@ pub(crate) fn face_target(
         "a unit facing a target whose sprites differ in their facets",
     ))?;
     let (at, to) = (at.ground(), to.ground());
-    if mover.stats.turn_time == 0.0 {
+    if mover.stats.turn_time == Seconds::ZERO {
         mover.angle = crate::objects::facing::face(at, mover.angle, to, Some(facets));
         return Ok(true);
     }

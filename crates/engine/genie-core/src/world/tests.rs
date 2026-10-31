@@ -32,9 +32,11 @@ use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, Spatial};
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::{Stream, Streams, Well512};
 use crate::movement::Speed;
+use crate::movement::TurnRate;
 use crate::movement::ai_moves::PointMove;
 use crate::movement::fly::Fly;
 use crate::movement::fly::FlyState;
@@ -451,13 +453,13 @@ pub(crate) fn builder_masters() -> Masters {
             fly_mode: 0,
             speed: Speed::new(0.8),
             base: Speed::new(0.8),
-            turn_rate: f32::MAX,
-            turn_radius: 0.0,
+            turn_rate: TurnRate::MAX,
+            turn_radius: Distance::ZERO,
             turn_radius_speed: Speed::MAX,
             radius: Radii::new(0.2, 0.2, 0.5),
             restriction: RestrictionId::named(7),
             restriction_mask: TerrainMask::of_bits(6),
-            turn_time: 0.0,
+            turn_time: Seconds::ZERO,
             move_algorithm: 0,
             min_collision: 1.0,
             fast_turn: false,
@@ -14581,13 +14583,13 @@ const fn house_moves() -> crate::movement::MoveStats {
         fly_mode: 0,
         speed: Speed::ZERO,
         base: Speed::ZERO,
-        turn_rate: f32::MAX,
-        turn_radius: 0.0,
+        turn_rate: TurnRate::MAX,
+        turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(1.0, 1.0, 1.0),
         restriction: RestrictionId::named(7),
         restriction_mask: TerrainMask::of_bits(6),
-        turn_time: 0.0,
+        turn_time: Seconds::ZERO,
         move_algorithm: 0,
         min_collision: 1.0,
         fast_turn: false,
@@ -14769,14 +14771,14 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
     };
     let foundation = t.players[1].objects.last().unwrap();
     let angle = crate::objects::facing::drawn_angle(facing, facets);
-    assert_ne!(angle, 0.0);
+    assert_ne!(angle, Angle::ZERO);
     assert_eq!(foundation.body.mover().map(|m| m.angle), Some(angle));
     // without sequence flag 2 only the powerup offset's
     let (mut t, mut before) = build(1);
     let _ = before.rand15();
     assert_eq!(t.streams.get(Stream::Object), &before);
     let foundation = t.players[1].objects.last().unwrap();
-    assert_eq!(foundation.body.mover().map(|m| m.angle), Some(0.0));
+    assert_eq!(foundation.body.mover().map(|m| m.angle), Some(Angle::ZERO));
 }
 
 /// [`builder_masters`] with the farmer (259, of the villagers' group 1, which builds as 118)

@@ -22,6 +22,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Radii;
 use crate::map::spatial::{Placed, Spatial};
+use crate::math::Angle;
 use crate::math::fmath::{self, BVector};
 use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
@@ -50,7 +51,9 @@ pub use self::path_state::PathState;
 mod request;
 mod request_plans;
 mod speed;
+mod turn_rate;
 pub use self::speed::Speed;
+pub use self::turn_rate::TurnRate;
 mod step;
 pub use self::step::GroupSpeed;
 mod unit;
@@ -185,10 +188,10 @@ pub struct MoveStats {
     /// The master's speed (`+0x740`, the master's slot 0xe8): the top speed's base.
     pub base: Speed,
     /// Master `+0x774`: the most the unit turns per second ([`turn_rate`]).
-    pub turn_rate: f32,
+    pub turn_rate: TurnRate,
     /// Master `+0x76c` and `+0x770`: the turn radius is `turn_radius × speed / turn_radius_speed`
     /// (0 and the largest float for every master the game copies, [`turn_rate`]).
-    pub turn_radius: f32,
+    pub turn_radius: Distance,
     /// `+0x770`: the speed at which the turn radius is its value.
     pub turn_radius_speed: Speed,
     /// Master `+0x5d8`, `+0x5dc`, `+0x5e0`.
@@ -201,7 +204,7 @@ pub struct MoveStats {
     pub restriction_mask: crate::map::TerrainMask,
     /// The master's turn time (`+0x758`, the `.dat`'s `rotation_speed`): the seconds between the
     /// facet steps of a unit facing a target; 0 faces at once (`FUN_141162db0`).
-    pub turn_time: f32,
+    pub turn_time: Seconds,
     /// The master's move algorithm (`+0x768`, the `.dat`'s `move_algorithm`): bit 0 has a stop
     /// reset the unit's sprite (slot 0x5d8).
     pub move_algorithm: u8,
@@ -270,9 +273,9 @@ pub struct Mover {
     pub user_waypoints: Vec<BVector>,
     /// `+0x7ec`, `turn_towards_time`: the world time in seconds of its last facet step toward a
     /// target (`FUN_141162db0`).
-    pub last_turn: f32,
+    pub last_turn: Seconds,
     /// `+0x7e8`: where the unit faces, radians 0 to 2π ([`crate::objects::facing`]).
-    pub angle: f32,
+    pub angle: Angle,
     /// The pauses its walk gave units it met (slot 0x5f0 on each: the met unit's walked level's
     /// `+0x34`), for the caller to hand on.
     pub pauses: Vec<(ObjectId, Seconds)>,

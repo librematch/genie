@@ -14,6 +14,7 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Radii;
 use crate::map::{GroundOffset, Offset, Position};
+use crate::math::Angle;
 use crate::math::fmath;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
@@ -174,8 +175,8 @@ pub struct Missile {
 /// offset (`+0x844`..`+0x84c`) turned by its facing (`+0x7e8`): x by cos·oy − sin·ox, y by
 /// cos·ox + sin·oy, the height by oz.
 #[must_use]
-pub fn spawn_point(at: Position, angle: f32, offset: Offset) -> Position {
-    let (c, s) = (fmath::cos(angle), fmath::sin(angle));
+pub fn spawn_point(at: Position, angle: Angle, offset: Offset) -> Position {
+    let (c, s) = (fmath::cos(angle.get()), fmath::sin(angle.get()));
     let (ox, oy) = (offset.x(), offset.y());
     let y = c * ox + s * oy + at.y();
     let x = (c * oy - s * ox) + at.x();
@@ -213,7 +214,7 @@ pub fn scatter(draw: u32, spread: f32) -> f32 {
 #[must_use]
 pub fn volley_spawn_point(
     at: Position,
-    angle: f32,
+    angle: Angle,
     offset: Offset,
     adjustment: f32,
     scatter: GroundOffset,
@@ -353,7 +354,7 @@ impl MissileAction {
         from: Position,
         aimed: Position,
         stats: &MissileStats,
-    ) -> Result<Option<f32>, GenieError> {
+    ) -> Result<Option<Angle>, GenieError> {
         let dx = aimed.x() - from.x();
         let dy = aimed.y() - from.y();
         let dz = aimed.z() - from.z();
@@ -373,11 +374,14 @@ impl MissileAction {
                     Offset::new(dx / way, dy / way, dz / way)
                 };
                 self.timer = 0.0;
-                Some(fmath::atan2(self.direction.y(), self.direction.x()))
+                Some(Angle::new(fmath::atan2(
+                    self.direction.y(),
+                    self.direction.x(),
+                )))
             }
             3 => {
                 self.direction = Offset::new(dx, dy, dz);
-                Some(fmath::atan2(dy, dx))
+                Some(Angle::new(fmath::atan2(dy, dx)))
             }
             _ => {
                 return Err(GenieError::unsupported(
@@ -530,7 +534,7 @@ mod tests {
                 &stats,
             )
             .unwrap();
-        assert_eq!(angle, Some(0.0));
+        assert_eq!(angle, Some(Angle::ZERO));
         assert_eq!(a.state, MissileState::Flying);
         assert!((a.ballistic_acceleration - -23.52).abs() < 1e-3);
         assert!((a.ballistic_velocity - 4.71503).abs() < 1e-4);
@@ -636,7 +640,7 @@ mod tests {
         // facing along x: the offset's y is ahead, its x to the side
         let p = spawn_point(
             Position::new(10.0, 20.0, 0.0),
-            0.0,
+            Angle::ZERO,
             Offset::new(0.0, 0.5, 1.5),
         );
         assert_eq!(p, Position::new(10.5, 20.0, 1.5));
@@ -702,7 +706,7 @@ mod tests {
         // facing x (angle 0): the offset's x goes along -y, its y along x
         let p = volley_spawn_point(
             at,
-            0.0,
+            Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
             0.0,
             GroundOffset::ZERO,
@@ -712,7 +716,7 @@ mod tests {
         // the scatter over the adjustment adds to the offset
         let p = volley_spawn_point(
             at,
-            0.0,
+            Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
             0.5,
             GroundOffset::new(0.0, 0.25),
@@ -722,7 +726,7 @@ mod tests {
         // a building's target a tile off: nearer than the offset's 2
         let p = volley_spawn_point(
             at,
-            0.0,
+            Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
             0.0,
             GroundOffset::ZERO,
@@ -731,7 +735,7 @@ mod tests {
         assert_eq!(p, Position::new(11.0, 10.0, 1.0));
         let p = volley_spawn_point(
             at,
-            0.0,
+            Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
             0.0,
             GroundOffset::ZERO,

@@ -54,8 +54,8 @@ impl WorldTime {
     /// The moment in seconds (`cvtsi2ss`, then `divss` by the image's 1000.0, `DAT_14330ebe0`:
     /// the facing's clock, `FUN_141162db0`).
     #[must_use]
-    pub fn seconds(self) -> f32 {
-        self.0 as f32 / crate::math::image::facing::MS_PER_SECOND
+    pub fn seconds(self) -> Seconds {
+        Seconds(self.0 as f32 / crate::math::image::facing::MS_PER_SECOND)
     }
 }
 
@@ -297,6 +297,9 @@ mod tests {
             Millis::new(50).seconds().get().to_bits(),
             (50.0_f32 / 1000.0).to_bits()
         );
-        assert_eq!(WorldTime::from_millis(16_777_217).seconds(), 16_777.216);
+        assert_eq!(
+            WorldTime::from_millis(16_777_217).seconds(),
+            Seconds::new(16_777.216)
+        );
     }
 }

@@ -6,6 +6,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::{Placed, RecordId, Spatial, WalkQuery};
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -161,7 +162,7 @@ impl Mover {
         stats: MoveStats,
         at: Position,
         now: WorldTime,
-        angle: f32,
+        angle: Angle,
         sprite_facets: Option<crate::objects::facing::SpriteFacets>,
     ) -> Self {
         Self {
@@ -181,7 +182,7 @@ impl Mover {
             substitute_count: 0,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
-            last_turn: 0.0,
+            last_turn: Seconds::ZERO,
             angle,
             pauses: Vec::new(),
             in_the_way: Vec::new(),

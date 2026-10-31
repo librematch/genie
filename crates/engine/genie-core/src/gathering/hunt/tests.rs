@@ -5,8 +5,10 @@ use crate::map::Footprint;
 use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
+use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, TargetMoved, WalkTo,
@@ -235,13 +237,13 @@ pub(crate) fn walker() -> Mover {
             fly_mode: 0,
             speed: Speed::new(0.8),
             base: Speed::new(0.8),
-            turn_rate: f32::MAX,
-            turn_radius: 0.0,
+            turn_rate: TurnRate::MAX,
+            turn_radius: Distance::ZERO,
             turn_radius_speed: Speed::MAX,
             radius: Radii::new(0.2, 0.2, 0.5),
             restriction: RestrictionId::named(7),
             restriction_mask: TerrainMask::of_bits(6),
-            turn_time: 0.0,
+            turn_time: Seconds::ZERO,
             move_algorithm: 0,
             min_collision: 1.0,
             fast_turn: false,
@@ -259,8 +261,8 @@ pub(crate) fn walker() -> Mover {
         substitute_count: 0,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
-        last_turn: 0.0,
-        angle: 0.0,
+        last_turn: Seconds::ZERO,
+        angle: Angle::ZERO,
         animated: crate::objects::layers::Animated::default(),
         pauses: Vec::new(),
         in_the_way: Vec::new(),

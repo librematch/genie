@@ -64,7 +64,7 @@ fn a_walker_moves_by_its_master_and_sprites() {
             genie_core::map::TerrainMask::of_bits(0b11)
         )
     );
-    assert_eq!(m.angle.to_bits(), 0.25_f32.to_bits());
+    assert_eq!(m.angle.get().to_bits(), 0.25_f32.to_bits());
     assert!(m.velocity.is_none() && m.paths.is_empty());
     // without a sprite, no factor; without a run sprite, running is walking
     let mut no_run = master();

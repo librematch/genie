@@ -7,6 +7,7 @@ use crate::{combat_master, master_facets};
 use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::{Position, Radii};
+use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::Speed;
 use genie_core::objects::ObjectId;
@@ -263,8 +264,8 @@ pub(super) fn mover(
                 .unwrap_or(0),
             speed: Speed::new(speed),
             base: Speed::new(base),
-            turn_rate: genie_core::movement::turn_rate(turn_speed, facets),
-            turn_radius: 0.0,
+            turn_rate: genie_core::movement::turn_rate(Seconds::new(turn_speed), facets),
+            turn_radius: Distance::ZERO,
             turn_radius_speed: Speed::MAX,
             radius,
             restriction: genie_core::map::RestrictionId::of_field(restriction)?
@@ -275,7 +276,7 @@ pub(super) fn mover(
                 .ok_or(GenieError::unsupported(
                     "a terrain restriction the data file does not have",
                 ))?,
-            turn_time: turn_speed,
+            turn_time: Seconds::new(turn_speed),
             move_algorithm: turning.move_algorithm,
             min_collision: turning.min_collision_size_multiplier,
             fast_turn: flags & 2 != 0,
@@ -301,8 +302,8 @@ pub(super) fn mover(
         ignore_units,
         // the save's userDefinedWaypoints, in the game's layout (x, height, y)
         user_waypoints: m.user_defined_waypoints.iter().map(vec3).collect(),
-        last_turn: m.turn_towards_time,
-        angle: m.angle,
+        last_turn: Seconds::new(m.turn_towards_time),
+        angle: Angle::new(m.angle),
         pauses: Vec::new(),
         in_the_way: Vec::new(),
         // the current sprite's, which the unit's update takes from its sprite

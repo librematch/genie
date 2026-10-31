@@ -33,7 +33,7 @@ fn a_new_motion_holds_the_constructor_s_values() {
             m.maximum_yaw_per_second_moving,
             m.maximum_yaw_per_second_stationary
         ),
-        (Speed::new(f32::MAX), f32::MAX, f32::MAX)
+        (Speed::new(f32::MAX), TurnRate::MAX, TurnRate::MAX)
     );
     assert_eq!((m.flags, m.lead, m.number_wait_delays), (3, None, 0));
     assert_eq!((m.velocity, m.acceleration), (BVector::ZERO, BVector::ZERO));

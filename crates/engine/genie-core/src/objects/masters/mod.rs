@@ -16,6 +16,7 @@ use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::technology::TechId;
 use crate::unit_ai::UnitAiType;
+use crate::world::Seconds;
 use genie_diff::Diff;
 
 mod combat_setters;
@@ -468,7 +469,7 @@ pub struct Master {
     pub max_speed: Speed,
     /// `+0x758`, `turn_speed` (the `.dat`'s `rotation_speed`), which [`MoveStats::turn_time`]
     /// follows.
-    pub turn_speed: f32,
+    pub turn_speed: Seconds,
     /// `+0x488`, the undead sprite (`undeadSpriteId`, −1 for none).
     pub undead_sprite: i16,
     /// `+0x650`, `occlusion_flag` (the `.dat`'s `occlusion_mode`).

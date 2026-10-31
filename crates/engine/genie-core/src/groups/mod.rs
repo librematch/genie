@@ -17,6 +17,7 @@ use crate::map::Distance;
 use crate::math::fmath::BVector;
 use crate::movement::PathData;
 use crate::movement::Speed;
+use crate::movement::TurnRate;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::masters::ActionType;
@@ -77,15 +78,15 @@ pub struct Motion {
     /// `mAngularAcceleration`.
     pub angular_acceleration: BVector,
     /// `mTurnRadius`.
-    pub turn_radius: f32,
+    pub turn_radius: Distance,
     /// `mTurnRadiusSpeed`.
     pub turn_radius_speed: Speed,
     /// `mMaximumYawPerSecondMoving`.
-    pub maximum_yaw_per_second_moving: f32,
+    pub maximum_yaw_per_second_moving: TurnRate,
     /// `mStationaryYawRevolutionTime` (its 32 bits).
     pub stationary_yaw_revolution_time: u32,
     /// `mMaximumYawPerSecondStationary`.
-    pub maximum_yaw_per_second_stationary: f32,
+    pub maximum_yaw_per_second_stationary: TurnRate,
     /// The path levels (`numPathDatas`, `tempPathData`): the level the group walks first, each
     /// next one its parent (`+8`), the top level last, as a unit's (the save writes them top
     /// first).
@@ -454,8 +455,8 @@ impl Motion {
             position: frame,
             new_position: frame,
             turn_radius_speed: Speed::MAX,
-            maximum_yaw_per_second_moving: f32::MAX,
-            maximum_yaw_per_second_stationary: f32::MAX,
+            maximum_yaw_per_second_moving: TurnRate::MAX,
+            maximum_yaw_per_second_stationary: TurnRate::MAX,
             paths: vec![PathData::without_path()],
             flags: 3,
             lead: None,

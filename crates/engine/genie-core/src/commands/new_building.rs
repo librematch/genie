@@ -6,6 +6,7 @@ use crate::construction::build::Construction;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::math::Angle;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::objects::HitPoints;
@@ -173,7 +174,7 @@ impl World {
         let standing = (0 <= made.standing_sprite)
             .then(|| self.graphics.get(&made.standing_sprite).copied())
             .flatten();
-        let (mut sprite, angle) = standing.map_or((None, 0.0), |g| {
+        let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |g| {
             let (s, _, angle) = self.setup_draws(g);
             (Some(s), angle)
         });

@@ -403,6 +403,7 @@ mod stack_tests {
     use crate::map::Radii;
     use crate::map::spatial::{Placed, Tiles};
     use crate::movement::Speed;
+    use crate::movement::TurnRate;
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::lifecycle::{Class, Lifecycle};
@@ -794,13 +795,13 @@ mod stack_tests {
                         fly_mode: 0,
                         speed: Speed::ZERO,
                         base: Speed::ZERO,
-                        turn_rate: 0.0,
-                        turn_radius: 0.0,
+                        turn_rate: TurnRate::ZERO,
+                        turn_radius: Distance::ZERO,
                         turn_radius_speed: Speed::MAX,
                         radius: Radii::new(2.0, 2.0, 0.0),
                         restriction: crate::map::RestrictionId::named(0),
                         restriction_mask: crate::map::TerrainMask::ALL,
-                        turn_time: 0.0,
+                        turn_time: Seconds::ZERO,
                         move_algorithm: 0,
                         min_collision: 0.0,
                         fast_turn: false,

@@ -13,8 +13,10 @@ use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
+use crate::movement::TurnRate;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::MoveWaitState;
 use crate::objects::HitPoints;
@@ -929,13 +931,13 @@ fn walled_map(
         fly_mode: 0,
         speed: Speed::new(0.8),
         base: Speed::new(0.8),
-        turn_rate: f32::MAX,
-        turn_radius: 0.0,
+        turn_rate: TurnRate::MAX,
+        turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(0.2, 0.2, 0.5),
         restriction: RestrictionId::named(0),
         restriction_mask: TerrainMask::of_bits(1),
-        turn_time: 0.0,
+        turn_time: Seconds::ZERO,
         move_algorithm: 0,
         min_collision: 1.0,
         fast_turn: false,
@@ -1518,13 +1520,13 @@ fn standing() -> crate::movement::MoveStats {
         fly_mode: 0,
         speed: Speed::ZERO,
         base: Speed::ZERO,
-        turn_rate: 0.0,
-        turn_radius: 0.0,
+        turn_rate: TurnRate::ZERO,
+        turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(0.2, 0.2, 2.0),
         restriction: RestrictionId::named(0),
         restriction_mask: TerrainMask::ALL,
-        turn_time: 0.0,
+        turn_time: Seconds::ZERO,
         move_algorithm: 0,
         min_collision: 0.0,
         fast_turn: false,
@@ -2040,8 +2042,8 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
         substitute_count: 0,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
-        last_turn: 0.0,
-        angle: 0.0,
+        last_turn: Seconds::ZERO,
+        angle: Angle::ZERO,
         animated: crate::objects::layers::Animated::default(),
         pauses: Vec::new(),
         in_the_way: Vec::new(),

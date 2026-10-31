@@ -6,6 +6,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::{Obstruction, Placed};
+use crate::math::Angle;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::movement::Speed;
@@ -218,7 +219,7 @@ impl World {
             count: g.facets,
             flag_1: g.flags & 2 != 0,
         });
-        let mut angle = 0.0;
+        let mut angle = Angle::ZERO;
         let moving = if MOVING <= made.kind {
             // the moving setup's angle draw (FUN_141141640, "setup" line 0x2c3)
             let drawn = if crate::objects::facing::draws_angle(facets) {
@@ -229,7 +230,7 @@ impl World {
             };
             angle = match facing {
                 // no draw leaves the constructor's 0
-                Facing::Drawn => drawn.unwrap_or(0.0),
+                Facing::Drawn => drawn.unwrap_or(Angle::ZERO),
                 // the dead object's facet replaces it: that facet's angle (FUN_14119d490,
                 // FUN_14114d780, with the remains' own sprite's facets)
                 Facing::Dead(facet) => {

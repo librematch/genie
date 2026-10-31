@@ -7,6 +7,7 @@ use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::movement::NEW_PATH_FLAGS;
 use crate::movement::PathState;
+use crate::movement::TurnRate;
 use crate::movement::WaypointLevel;
 use crate::objects::actions::ActionList;
 use crate::objects::masters::ObstructionClass;
@@ -301,7 +302,7 @@ fn a_turn_is_limited_by_the_yaw_per_second() {
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     let free = m.calculate_yaw_angle(x, z, Seconds::new(0.1), true);
     assert_eq!(free, -std::f32::consts::FRAC_PI_2);
-    m.maximum_yaw_per_second_moving = 1.0;
+    m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
     assert_eq!(m.calculate_yaw_angle(x, z, Seconds::new(0.1), true), -0.1);
     assert_eq!(m.calculate_yaw_angle(z, x, Seconds::new(0.1), true), 0.1);
     assert_eq!(
@@ -317,12 +318,12 @@ fn a_turn_is_limited_by_the_yaw_per_second() {
 fn the_yaw_clamp_keeps_the_angle_for_a_nan_operand() {
     let mut m = Motion::new();
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
-    m.maximum_yaw_per_second_moving = f32::NAN;
+    m.maximum_yaw_per_second_moving = TurnRate::new(f32::NAN);
     assert_eq!(
         m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
         -std::f32::consts::FRAC_PI_2
     );
-    m.maximum_yaw_per_second_moving = 1.0;
+    m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
     let nan = m.calculate_yaw_angle(BVector::new(f32::NAN, 0.0, 0.0), z, Seconds::new(0.1), true);
     assert!(nan.is_nan(), "{nan}");
 }

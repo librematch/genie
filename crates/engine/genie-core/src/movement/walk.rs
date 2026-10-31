@@ -4,6 +4,7 @@
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::spatial::{RecordId, Spatial};
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -123,7 +124,7 @@ impl Mover {
         flat = flat.with_height(0.0);
         let flat = fmath::normalize(flat);
         let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt));
-        if self.paths[0].flags & 1 != 0 && turn == 0.0 {
+        if self.paths[0].flags & 1 != 0 && turn == Angle::ZERO {
             return Ok(clipped);
         }
         self.yaw(turn, self.facets())?;
@@ -135,11 +136,11 @@ impl Mover {
     /// steering (`FUN_141025fb0` at `0x141027887`) multiply it before slot 195.
     ///
     /// [`MoveStats::fast_turn`]: crate::movement::MoveStats::fast_turn
-    pub(crate) fn turn_dt(&self, dt: Seconds) -> f32 {
+    pub(crate) fn turn_dt(&self, dt: Seconds) -> Seconds {
         if self.stats.fast_turn {
-            dt.get() * FAST_TURN
+            dt * FAST_TURN
         } else {
-            dt.get()
+            dt
         }
     }
 
@@ -149,11 +150,16 @@ impl Mover {
     /// either NaN turns whole, unclipped); else the most, negated for a negative angle, and
     /// clipped. The turn is negated when the cross product of the direction and `forward` has a
     /// height above 0.
-    pub(crate) fn turn_toward(&self, forward: BVector, direction: BVector, dt: f32) -> (f32, bool) {
+    pub(crate) fn turn_toward(
+        &self,
+        forward: BVector,
+        direction: BVector,
+        dt: Seconds,
+    ) -> (Angle, bool) {
         let angle = fmath::angle_between(direction, forward);
         let most = self.stats.turn_rate * dt;
-        let (mut turn, clipped) = if fmath::at_most_or_unordered(angle, most) {
-            (angle, false)
+        let (mut turn, clipped) = if fmath::at_most_or_unordered(angle, most.get()) {
+            (Angle::new(angle), false)
         } else if angle < 0.0 {
             (-most, true)
         } else {
@@ -176,10 +182,10 @@ impl Mover {
     /// Without the current sprite's facets: a unit whose sprites differ in their facets.
     pub(crate) fn yaw(
         &mut self,
-        turn: f32,
+        turn: Angle,
         facets: Option<crate::objects::facing::SpriteFacets>,
     ) -> Result<(), GenieError> {
-        let m = fmath::rotation(turn, UP);
+        let m = fmath::rotation(turn.get(), UP);
         let forward = fmath::normalize(fmath::rotate(&m, self.forward));
         self.set_orientation(forward, UP);
         let facets = facets.ok_or(GenieError::unsupported(
@@ -249,7 +255,8 @@ impl Mover {
         let length = fmath::sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
         let toward = BVector::new(d.x() / length, d.height() / length, d.y() / length);
         let angle = fmath::angle_between(self.forward, toward);
-        let radius = (self.stats.turn_radius * v.velocity.y()) / self.stats.turn_radius_speed.get();
+        let radius =
+            ((self.stats.turn_radius * v.velocity.y()) / self.stats.turn_radius_speed.get()).get();
         if 0.0 < v.velocity.y() && EPSILON < angle.abs() {
             let mut side = self.right;
             if 0.0 < fmath::cross(toward, self.forward).height() {

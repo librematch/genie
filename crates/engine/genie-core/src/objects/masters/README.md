@@ -58,5 +58,5 @@ file for what the save does not hold.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`players`](../../players/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/).
+- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`players`](../../players/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

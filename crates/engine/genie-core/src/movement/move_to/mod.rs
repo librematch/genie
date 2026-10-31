@@ -508,6 +508,7 @@ pub fn target_left(
 mod tests {
     use super::*;
     use crate::map::spatial::Placed;
+    use crate::math::Angle;
     use crate::movement::Speed;
     use crate::objects::ObjectState;
     use crate::objects::masters::ObstructionType;
@@ -685,7 +686,13 @@ mod tests {
             );
             let posted: Vec<crate::unit_ai::NotifyKind> =
                 ai.map_or(vec![], |ai| ai.notifies.iter().map(|n| n.kind).collect());
-            (code, m.state, posted, rig.mover_mut().angle != 0.0, m.point)
+            (
+                code,
+                m.state,
+                posted,
+                rig.mover_mut().angle != Angle::ZERO,
+                m.point,
+            )
         };
         let off = Position::new(30.6, 88.0, 0.0);
         assert_eq!(

@@ -16,6 +16,7 @@ use genie_core::objects::masters::{
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
+use genie_core::world::Seconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 
 /// The facets every sprite a live object of a saved master shows ([`genie_core::objects::facing::SpriteFacets`]):
@@ -318,7 +319,7 @@ pub(super) fn work_masters(
         // what the masters' attribute setters change: the top and turn speeds (+0x740,
         // +0x758), the damage sprites (+0x638) and the train locations (+0x898)
         work.max_speed = animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed));
-        work.turn_speed = moving_master(m).map_or(0.0, |mv| mv.turn_speed);
+        work.turn_speed = moving_master(m).map_or(Seconds::ZERO, |mv| Seconds::new(mv.turn_speed));
         work.damage_graphics = s
             .damage_sprite
             .iter()
@@ -396,13 +397,13 @@ pub(super) fn moving_stats(
             Speed::new(base)
         },
         base: Speed::new(base),
-        turn_rate: genie_core::movement::turn_rate(moving.turn_speed, facets),
-        turn_radius: 0.0,
+        turn_rate: genie_core::movement::turn_rate(Seconds::new(moving.turn_speed), facets),
+        turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
         restriction,
         restriction_mask: *table.terrain.masks().get(restriction.index())?,
-        turn_time: moving.turn_speed,
+        turn_time: Seconds::new(moving.turn_speed),
         move_algorithm: turning.move_algorithm,
         min_collision: turning.min_collision_size_multiplier,
         fast_turn: s.object_flags & 2 != 0,

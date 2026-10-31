@@ -191,7 +191,7 @@ impl Motion {
     ) -> f32 {
         let mut angle = fmath::angle_between(direction, forward);
         if clamp {
-            angle = fmath::minss(self.maximum_yaw_per_second_moving * dt, angle);
+            angle = fmath::minss((self.maximum_yaw_per_second_moving * dt).get(), angle);
         }
         if 0.0 < fmath::cross(direction, forward).height() {
             -angle

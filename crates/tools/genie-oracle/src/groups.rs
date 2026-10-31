@@ -14,6 +14,7 @@ use genie_core::groups::{
 use genie_core::map::Distance;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::Speed;
+use genie_core::movement::TurnRate;
 use genie_core::objects::ObjectId;
 use genie_core::unit_ai::UnitStance;
 use genie_core::world::Millis;
@@ -51,11 +52,11 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
         acceleration: vec3(&m.acceleration),
         angular_velocity: vec3(&m.angular_velocity),
         angular_acceleration: vec3(&m.angular_acceleration),
-        turn_radius: m.turn_radius,
+        turn_radius: Distance::new(m.turn_radius),
         turn_radius_speed: Speed::new(m.turn_radius_speed),
-        maximum_yaw_per_second_moving: m.maximum_yaw_per_second_moving,
+        maximum_yaw_per_second_moving: TurnRate::new(m.maximum_yaw_per_second_moving),
         stationary_yaw_revolution_time: m.stationary_yaw_revolution_time,
-        maximum_yaw_per_second_stationary: m.maximum_yaw_per_second_stationary,
+        maximum_yaw_per_second_stationary: TurnRate::new(m.maximum_yaw_per_second_stationary),
         // the save writes the top level first; genie-core keeps the walked level first, as a
         // unit's (the unit mapping's reverse)
         paths: m
@@ -456,6 +457,13 @@ impl Flat for Distance {
 
 /// A speed flattens as its f32, as the save holds it.
 impl Flat for Speed {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A turn rate flattens as its f32, as the save holds it.
+impl Flat for TurnRate {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }

@@ -598,7 +598,7 @@ fn a_shield_spends_a_charge_per_blocked_hit() {
 fn a_facing_offset_counts_facets_from_the_angle() {
     let at = Position::new(10.0, 10.0, 0.0);
     let facing = Facing {
-        angle: 0.0,
+        angle: Angle::ZERO,
         facets: 16,
     };
     assert_eq!(
@@ -639,7 +639,7 @@ fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
     let x = sheep.armored.as_mut().unwrap();
     x.special_attack = 1;
     x.facing = Some(Facing {
-        angle: std::f32::consts::FRAC_PI_2,
+        angle: Angle::new(std::f32::consts::FRAC_PI_2),
         facets: 8,
     });
     take(
@@ -692,7 +692,7 @@ fn a_retaliation_strikes_the_melee_attacker_first() {
     x.unit_ai = true;
     x.alert_idle = Some(true);
     x.facing = Some(Facing {
-        angle: std::f32::consts::FRAC_PI_2,
+        angle: Angle::new(std::f32::consts::FRAC_PI_2),
         facets: 8,
     });
     take(
@@ -794,7 +794,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
     // a narrow cone keeps a NaN offset
     elephant.source.blast_level = 0x82;
     elephant.armored.as_mut().unwrap().facing = Some(Facing {
-        angle: f32::NAN,
+        angle: Angle::new(f32::NAN),
         facets: 8,
     });
     let mut t = enemy(10.8, 11.0);
@@ -802,7 +802,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
         facing_offset(
             center,
             Facing {
-                angle: f32::NAN,
+                angle: Angle::new(f32::NAN),
                 facets: 8
             },
             t.position
@@ -1654,7 +1654,7 @@ fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
     );
     assert!(outside_cone(&attacker, &level(0x82), &front, (1.0, 0.0)).is_err());
     attacker.armored.as_mut().unwrap().facing = Some(Facing {
-        angle: 0.0,
+        angle: Angle::ZERO,
         facets: 8,
     });
     let narrow = level(0x82);

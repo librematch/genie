@@ -44,6 +44,7 @@ use self::taking::take_static;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::math::Angle;
 #[cfg(test)]
 use crate::math::fmath;
 use crate::objects::HitPoints;
@@ -275,7 +276,7 @@ pub struct Kill {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Facing {
     /// `+0x7e8`, where it faces.
-    pub angle: f32,
+    pub angle: Angle,
     /// Its sprite's facets, 0 without a sprite.
     pub facets: i16,
 }

@@ -2,6 +2,7 @@ use super::*;
 use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
+use crate::movement::TurnRate;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::class;
@@ -381,7 +382,7 @@ fn a_combat_multiply_takes_a_percentage_of_the_class_s_amount() {
 fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
     use attribute as a;
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
-        (a::ROTATION_SPEED, |m| m.turn_speed, [3.0, 5.0, 10.0]),
+        (a::ROTATION_SPEED, |m| m.turn_speed.get(), [3.0, 5.0, 10.0]),
         (a::ATTACK_RELOAD_TIME, |m| m.reload, [3.0, 5.0, 10.0]),
         (
             a::ACCURACY_PERCENT,
@@ -777,7 +778,7 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
     m.multiply_attribute(attribute::SHOWN_ATTACK, 3.5, &world(false));
     assert_eq!(m.shown.attack, 21);
     m.add_attribute(attribute::ROTATION_SPEED, 0.25, &world(false));
-    assert_eq!(m.turn_speed, 0.25);
+    assert_eq!(m.turn_speed, Seconds::new(0.25));
     m.set_attribute(attribute::DISPLACEMENT_Y, 0.75, &world(false));
     assert_eq!(m.weapon_offset, Offset::new(0.0, 0.75, 0.0));
 }
@@ -992,13 +993,13 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         fly_mode: 0,
         speed: Speed::new(1.5),
         base: Speed::new(1.5),
-        turn_rate: 1.0,
-        turn_radius: 0.0,
+        turn_rate: TurnRate::new(1.0),
+        turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(0.2, 0.2, 2.0),
         restriction: RestrictionId::named(7),
         restriction_mask: TerrainMask::of_bits(1),
-        turn_time: 0.0,
+        turn_time: Seconds::ZERO,
         move_algorithm: 0,
         min_collision: 0.0,
         fast_turn: false,
@@ -1058,7 +1059,7 @@ fn the_action_and_moving_setters_change_their_values() {
         (m.work_rate, m.search_radius, m.run_pattern),
         (1.5, Distance::new(6.0), 1)
     );
-    assert_eq!(m.turn_speed, 1.0);
+    assert_eq!(m.turn_speed, Seconds::new(1.0));
     assert_eq!(
         m.trail,
         Trail {

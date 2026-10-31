@@ -4,9 +4,11 @@ use crate::map::GridSize;
 use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveTo, MoveToReads, MoveWait, SpriteReads};
 use crate::objects::HitPoints;
@@ -467,13 +469,13 @@ fn soldier_mover(speed: f32) -> Mover {
             fly_mode: 0,
             speed: Speed::new(speed),
             base: Speed::new(speed),
-            turn_rate: f32::MAX,
-            turn_radius: 0.0,
+            turn_rate: TurnRate::MAX,
+            turn_radius: Distance::ZERO,
             turn_radius_speed: Speed::MAX,
             radius: Radii::new(0.2, 0.2, 0.5),
             restriction: RestrictionId::named(7),
             restriction_mask: TerrainMask::of_bits(6),
-            turn_time: 0.0,
+            turn_time: Seconds::ZERO,
             move_algorithm: 0,
             min_collision: 1.0,
             fast_turn: false,
@@ -491,8 +493,8 @@ fn soldier_mover(speed: f32) -> Mover {
         substitute_count: 0,
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
-        last_turn: 0.0,
-        angle: 0.0,
+        last_turn: Seconds::ZERO,
+        angle: Angle::ZERO,
         animated: Animated::default(),
         pauses: Vec::new(),
         in_the_way: Vec::new(),
@@ -1970,7 +1972,7 @@ fn the_start_faces_the_target_but_for_masters_1704_and_1706() {
     let world = world_with(7, PlayerId::new(2), class::CLASS_6, north.target_position);
     let angle = |master| {
         let mut mover = soldier_mover(0.0);
-        mover.angle = 0.0;
+        mover.angle = Angle::ZERO;
         let e = Engagement { master, ..north };
         let _ = own_start(
             &world,
@@ -1983,9 +1985,9 @@ fn the_start_faces_the_target_but_for_masters_1704_and_1706() {
         .unwrap();
         mover.angle
     };
-    assert_ne!(angle(master_id(4)), 0.0);
-    assert_eq!(angle(master_id(1704)), 0.0);
-    assert_eq!(angle(master_id(1706)), 0.0);
+    assert_ne!(angle(master_id(4)), Angle::ZERO);
+    assert_eq!(angle(master_id(1704)), Angle::ZERO);
+    assert_eq!(angle(master_id(1706)), Angle::ZERO);
 }
 
 /// A gate's reach (class 39): the nearest of it and its first two parts (slot 0x680 in id

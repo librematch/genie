@@ -12,6 +12,7 @@ use crate::objects::masters::{
     select_entry, set_sprite,
 };
 use crate::players::Amount;
+use crate::world::Seconds;
 
 impl Master {
     /// `FUN_141126400`, the static master's slot 0x18.
@@ -382,7 +383,7 @@ impl Master {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed = v,
+            a::ROTATION_SPEED => self.turn_speed = Seconds::new(v),
             a::WALKING_GRAPHIC => set_sprite(&mut self.move_sprite, cvttss2si(v), world),
             a::RUNNING_GRAPHIC => set_sprite(&mut self.run_sprite, cvttss2si(v), world),
             a::TRAILING_UNIT => self.trail.unit = MasterId::of_data(low16(v)),
@@ -401,7 +402,7 @@ impl Master {
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed += v,
+            a::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
             a::WALKING_GRAPHIC => add_sprite(&mut self.move_sprite, v, world),
             a::RUNNING_GRAPHIC => add_sprite(&mut self.run_sprite, v, world),
             a::TRAILING_UNIT => {
@@ -422,7 +423,7 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::ROTATION_SPEED => self.turn_speed *= v,
+            attribute::ROTATION_SPEED => self.turn_speed = self.turn_speed * v,
             attribute::TRAIL_DENSITY => self.trail.density *= v,
             _ => self.multiply_animated(attribute, v, world),
         }

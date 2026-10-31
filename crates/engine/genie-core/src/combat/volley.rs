@@ -7,6 +7,7 @@ use crate::map::Distance;
 use crate::map::Radii;
 use crate::map::spatial::Placed;
 use crate::map::{GroundOffset, Offset, Position};
+use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
@@ -374,7 +375,7 @@ impl Unit {
             count: g.facets,
             flag_1: g.flags & 2 != 0,
         });
-        let mut angle = 0.0;
+        let mut angle = Angle::ZERO;
         if let Some(f) = facets.filter(|_| crate::objects::facing::draws_angle(facets)) {
             let r = c.w.streams.get(Stream::Object).rand15();
             angle = crate::objects::facing::drawn_angle(r, f);
@@ -395,7 +396,7 @@ impl Unit {
             substitute_count: 0,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
-            last_turn: 0.0,
+            last_turn: Seconds::ZERO,
             angle,
             pauses: Vec::new(),
             in_the_way: Vec::new(),

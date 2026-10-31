@@ -8,6 +8,7 @@ use crate::objects::masters::{
     low16, set_sprite,
 };
 use crate::objects::masters::{ClassAmount, DamageClass};
+use crate::world::Seconds;
 
 impl Master {
     /// The armor (`+0x808`) or attack (`+0x818`) entry of `class`, the first in the list.
@@ -98,7 +99,7 @@ impl Master {
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed += v,
+            a::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
             a::ARMOR | a::ATTACK => self.add_class_amount(attribute, v, world),
             a::ATTACK_RELOAD_TIME => self.reload += v,
             a::ACCURACY_PERCENT => self.hit_chance = self.hit_chance.wrapping_add(low16(v)),
@@ -184,7 +185,7 @@ impl Master {
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed *= v,
+            a::ROTATION_SPEED => self.turn_speed = self.turn_speed * v,
             a::ARMOR | a::ATTACK => self.multiply_class_amount(attribute, v, world),
             a::ATTACK_RELOAD_TIME => self.reload *= v,
             a::ACCURACY_PERCENT => self.hit_chance = low16(f32::from(self.hit_chance) * v + ROUND),

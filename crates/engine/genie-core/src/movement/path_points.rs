@@ -6,10 +6,12 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Placed;
+use crate::math::Angle;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
+use crate::movement::TurnRate;
 use crate::movement::{EPSILON, Motion, PathData, RANGE_FLOOR, SHORTEST};
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
@@ -116,7 +118,7 @@ pub(super) const TWO_PI: f32 = crate::math::image::movement::TWO_PI;
 /// `FUN_1410e39e0`), and 2π over that is the rate (`+0x77c`, copied to `+0x774`); without either
 /// the largest float. The `.dat`'s own turning values do not survive the copy.
 #[must_use]
-pub fn turn_rate(turn_speed: f32, walking_facets: Option<i16>) -> f32 {
+pub fn turn_rate(turn_speed: Seconds, walking_facets: Option<i16>) -> TurnRate {
     turning(turn_speed, walking_facets, Turning::PRESET).0.rate
 }
 
@@ -128,11 +130,11 @@ pub struct Turning {
     /// `+0x770`: the speed at which the turn radius is its value.
     pub radius_speed: Speed,
     /// `+0x774`: the most the unit turns per second.
-    pub rate: f32,
+    pub rate: TurnRate,
     /// `+0x778`: a revolution's time (slot 0x98, `FUN_1410e39e0`).
-    pub revolution: f32,
+    pub revolution: Seconds,
     /// `+0x77c`: 2π over the revolution's time.
-    pub revolution_rate: f32,
+    pub revolution_rate: TurnRate,
 }
 
 impl Turning {
@@ -142,9 +144,9 @@ impl Turning {
     pub const PRESET: Self = Self {
         radius: Distance::ZERO,
         radius_speed: Speed::MAX,
-        rate: f32::MAX,
-        revolution: 0.0,
-        revolution_rate: f32::MAX,
+        rate: TurnRate::MAX,
+        revolution: Seconds::ZERO,
+        revolution_rate: TurnRate::MAX,
     };
 }
 
@@ -155,18 +157,22 @@ impl Turning {
 /// over it, the largest float for 0) and the rate takes 2π over it (true); without one nothing
 /// changes (false).
 #[must_use]
-pub fn turning(turn_speed: f32, walking_facets: Option<i16>, before: Turning) -> (Turning, bool) {
-    if turn_speed == 0.0 {
+pub fn turning(
+    turn_speed: Seconds,
+    walking_facets: Option<i16>,
+    before: Turning,
+) -> (Turning, bool) {
+    if turn_speed == Seconds::ZERO {
         return (Turning::PRESET, false);
     }
     let Some(facets) = walking_facets else {
         return (before, false);
     };
-    let revolution = f32::from(facets) * turn_speed;
-    let revolution_rate = if revolution == 0.0 {
-        f32::MAX
+    let revolution = Seconds::new(f32::from(facets) * turn_speed.get());
+    let revolution_rate = if revolution == Seconds::ZERO {
+        TurnRate::MAX
     } else {
-        TWO_PI / revolution
+        Angle::new(TWO_PI) / revolution
     };
     let after = Turning {
         revolution,

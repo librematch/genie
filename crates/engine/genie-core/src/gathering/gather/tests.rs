@@ -1,5 +1,6 @@
 use super::*;
 use crate::map::DistanceSquared;
+use crate::math::Angle;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::movement::move_to::{
@@ -636,12 +637,12 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
         ..GatherAction::new(task(), &farm(), false, rate()).unwrap()
     };
     let mut mover = crate::gathering::hunt::tests::walker();
-    mover.stats.turn_time = 1.0;
+    mover.stats.turn_time = Seconds::new(1.0);
     mover.stats.facets = Some(crate::objects::facing::SpriteFacets {
         count: 16,
         flag_1: true,
     });
-    mover.angle = 0.0;
+    mover.angle = Angle::ZERO;
     let before = mover.angle;
     let mut rig = Rig::on_the_path();
     rig.t.world_time = WorldTime::from_millis(5000);
@@ -968,7 +969,7 @@ fn a_gatherer_facing_its_target_works_it() {
         flags: 0,
     };
     let mut rig = Rig::on_the_path();
-    rig.mover_mut().stats.turn_time = 0.0;
+    rig.mover_mut().stats.turn_time = Seconds::ZERO;
     rig.set_load(Some(attribute::STONE), 4.0);
     let mut g = GatherAction {
         state: GatherState::Face,

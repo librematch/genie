@@ -63,6 +63,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`speed.rs`](speed.rs) | A speed on the map in tiles per second (`Speed`), with the game's `f32` operations. |
 | [`step.rs`](step.rs) | The velocity step, a new object's setup, the position setter and the motion step's loop. |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`turn_rate.rs`](turn_rate.rs) | How fast a unit or a group turns (`TurnRate`, radians per second), with the game's `f32` operations. |
 | [`unit.rs`](unit.rs) | The movement actions in a unit's update: the velocity step, the unit's own `MoveTo`, its Explore and a bird's Fly. |
 | [`walk.rs`](walk.rs) | The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed control. |
 | [`waypoint.rs`](waypoint.rs) | A reached waypoint and what follows it: the next waypoint, a level's end and the moving state. |
