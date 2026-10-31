@@ -528,7 +528,14 @@ impl Unit {
         }
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
         if bm.kind == BUILDING {
-            let _ = v.sight_on_los(target, at, radius, false, 5, false)?;
+            let _ = v.sight_on_los(
+                target,
+                at,
+                radius,
+                false,
+                crate::garrison::INSIDE_SIGHT,
+                false,
+            )?;
         }
         Ok(())
     }

@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::map::Distance;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -17,6 +18,7 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::technology::effect::{Change, OBJECT_GONE};
+use crate::vision::SightTiles;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -182,7 +184,7 @@ impl World {
                     Change::Add => v + master.line_of_sight.get(),
                     Change::Multiply => (v * master.line_of_sight).get(),
                 };
-                self.sight_again(id, crate::math::conversions::cvttss2si(los))?;
+                self.sight_again(id, SightTiles::of(Distance::new(los)))?;
             }
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 if change == Change::Set => {
                 let j = match attribute {
@@ -206,7 +208,7 @@ impl World {
     /// The line of sight's change on object `id` (`FUN_141195a50`'s attribute 1): an object on
     /// the map (its tile `+0x2e8`, which one inside another has not) in state 2 lets its circle go
     /// (slot 0x1d8, its master's line of sight) and takes one of `los` (slot 0x1d0).
-    pub(super) fn sight_again(&mut self, id: ObjectId, los: i32) -> Result<(), GenieError> {
+    pub(super) fn sight_again(&mut self, id: ObjectId, los: SightTiles) -> Result<(), GenieError> {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };

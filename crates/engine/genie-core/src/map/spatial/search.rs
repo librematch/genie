@@ -20,6 +20,7 @@ use crate::objects::masters::ids::FISH_TRAP;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, QueryRelation, UnitRelation};
 use crate::unit_ai::{Found, Pick, Search};
+use crate::vision::SightTiles;
 use crate::vision::registry::Record;
 use crate::vision::registry::VisibleQuery;
 use crate::vision::visibility::Seer;
@@ -132,11 +133,13 @@ impl Spatial {
             let Some(u) = p.unknown.filter(|&u| 0.0 < u && p.player == player) else {
                 return false;
             };
-            let los = v.seer(id).map_or(0, |s| s.los.get() as i32);
-            if los <= 0 {
+            let los = v
+                .seer(id)
+                .map_or(SightTiles::NONE, |s| SightTiles::of(s.los));
+            if !los.sees() {
                 return false;
             }
-            let grow = u + los as f32 + 1.0;
+            let grow = u + los.get() as f32 + 1.0;
             rect.overlaps(p.bounds().grown(Distance::new(grow)))
         });
         if near {

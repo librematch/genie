@@ -20,6 +20,7 @@ use crate::orders::Place;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
+use crate::vision::SightTiles;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -436,7 +437,7 @@ impl World {
                 placed.position,
                 placed.radius,
                 false,
-                crate::math::conversions::cvttss2si(los.get()),
+                SightTiles::of(los),
                 false,
             )?;
             if let Some(s) = sight.seer_mut(id) {

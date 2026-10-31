@@ -23,6 +23,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::task_finder::DropSite;
+use crate::vision::SightTiles;
 
 /// What the searches read of an object in a map tile's list.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -386,7 +387,7 @@ pub fn closest_resource_at<W>(
         ));
     }
     let (ux, uy) = (seeker.position.x(), seeker.position.y());
-    let los = seeker.line_of_sight.get() as i32;
+    let los = SightTiles::of(seeker.line_of_sight);
     let unit_tile = Tile::new(ux as i32, uy as i32);
     // the sort's point, and the box's side (fixed for both passes)
     let (sort_at, side) = sort_point_and_side(Point::new(ux, uy), los, site);
@@ -467,12 +468,12 @@ fn search_passes(
     map: GridSize,
     passable: &dyn Fn(Tile) -> bool,
     unit_tile: Tile,
-    los: i32,
+    los: SightTiles,
     nearer: &impl Fn(Cell, Cell) -> bool,
 ) -> Vec<Pass> {
     let single = |at: Tile| Pass {
         origin: at,
-        max_steps: los + 5,
+        max_steps: los.get().wrapping_add(5),
         seeds: vec![Cell { tile: at, steps: 0 }],
     };
     let mut passes = Vec::with_capacity(2);
@@ -482,7 +483,7 @@ fn search_passes(
             msvc::sort(&mut seeds, nearer);
             passes.push(Pass {
                 origin: Tile::new(s.position.x() as i32, s.position.y() as i32),
-                max_steps: s.line_of_sight.get() as i32 + 10,
+                max_steps: SightTiles::of(s.line_of_sight).get().wrapping_add(10),
                 seeds,
             });
             passes.push(single(unit_tile));
@@ -523,31 +524,36 @@ fn push_neighbours(
 /// [`closest_resource_at`]'s sort point and box side: without a site the unit's place and
 /// three times its line of sight plus 10; with one the point a quarter of the way from the
 /// site's place to the unit's, and for a footprint search the larger line of sight of the two.
-fn sort_point_and_side(at: Point, los: i32, site: Option<&SearchSite>) -> ((f32, f32), i32) {
+fn sort_point_and_side(at: Point, los: SightTiles, site: Option<&SearchSite>) -> ((f32, f32), i32) {
     const SITE_SHARE: f32 = crate::math::image::gather_search::SITE_SHARE;
     const UNIT_SHARE: f32 = crate::math::image::gather_search::UNIT_SHARE;
     let (ux, uy) = (at.x(), at.y());
-    site.map_or(((ux, uy), (los + 10) * 3), |s| {
-        let (sx, sy) = (s.position.x(), s.position.y());
-        let at = (
-            sx * SITE_SHARE + ux * UNIT_SHARE,
-            sy * SITE_SHARE + uy * UNIT_SHARE,
-        );
-        let site_los = s.line_of_sight.get() as i32;
-        let wide = if site_los + 10 <= los + 10 {
-            los
-        } else {
-            site_los
-        };
-        (
-            at,
-            if s.footprint {
-                (wide + 10) * 3
+    let box_side = |los: i32| los.wrapping_add(10).wrapping_mul(3);
+    let los = los.get();
+    site.map_or_else(
+        || ((ux, uy), box_side(los)),
+        |s| {
+            let (sx, sy) = (s.position.x(), s.position.y());
+            let at = (
+                sx * SITE_SHARE + ux * UNIT_SHARE,
+                sy * SITE_SHARE + uy * UNIT_SHARE,
+            );
+            let site_los = SightTiles::of(s.line_of_sight).get();
+            let wide = if site_los.wrapping_add(10) <= los.wrapping_add(10) {
+                los
             } else {
-                (los + 10) * 3
-            },
-        )
-    })
+                site_los
+            };
+            (
+                at,
+                if s.footprint {
+                    box_side(wide)
+                } else {
+                    box_side(los)
+                },
+            )
+        },
+    )
 }
 
 /// [`closest_resource_at`]'s first pass from a site's footprint: every tile of the footprint

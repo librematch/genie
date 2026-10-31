@@ -30,6 +30,7 @@ use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
+use crate::vision::SightTiles;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
@@ -782,7 +783,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
             Position::new(10.5, 10.5, 0.0),
             Footprint::new(0.5, 0.5),
             false,
-            los,
+            SightTiles::new(los),
             false,
         );
         sight(&t)

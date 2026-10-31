@@ -12,6 +12,7 @@ use crate::players::ai_module::search::{DEAD_END, EXPLORED, PUNTED, UNEXPLORED};
 use crate::players::ai_module::{
     AiModule, AiModules, InfoModule, SLOTS, SearchArea, SearchUnit, TacticalModule,
 };
+use crate::vision::SightTiles;
 use crate::world::Millis;
 use crate::world::WorldTime;
 
@@ -104,11 +105,11 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![false, true, false],
     );
     assert_eq!(
-        v.explore(PlayerId::new(1), Tile::new(3, 2), 0, false),
+        v.explore(PlayerId::new(1), Tile::new(3, 2), SightTiles::new(0), false),
         Ok(1)
     );
     assert_eq!(
-        v.explore(PlayerId::new(2), Tile::new(5, 5), 0, false),
+        v.explore(PlayerId::new(2), Tile::new(5, 5), SightTiles::new(0), false),
         Ok(1)
     );
     t.spatial.sight = Some(v);

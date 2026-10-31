@@ -4,7 +4,9 @@
 use crate::GenieError;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
-use crate::garrison::{NO_POINT, SIEGE_UNLOAD, WHOLE_SHARE_CLASS, attack_rate, share};
+use crate::garrison::{
+    INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, WHOLE_SHARE_CLASS, attack_rate, share,
+};
 use crate::map::Point;
 use crate::map::Position;
 use crate::objects::ListIndex;
@@ -180,7 +182,7 @@ impl World {
         if bm.kind == BUILDING
             && let Some(v) = self.spatial.sight.as_mut()
         {
-            v.sight_off_los(bid, b_at, b_radius, false, 5, false)?;
+            v.sight_off_los(bid, b_at, b_radius, false, INSIDE_SIGHT, false)?;
         }
         // slot 0x58: on the map at the spot (new_position: its tile's list, its sight)
         let mut placed = self.spatial.come_out(id).ok_or_else(|| {

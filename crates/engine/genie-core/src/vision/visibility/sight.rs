@@ -12,6 +12,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::MARKET;
+use crate::vision::SightTiles;
 use crate::vision::registry::MASK;
 use crate::vision::visibility::{CIRCLE_MASTER, EDGE, Seer, Visibility, tile_of};
 use crate::world::slots::CheckedIndex;
@@ -31,7 +32,7 @@ pub(super) struct SightOn {
     /// Whether it explores its footprint as a rectangle.
     pub(super) square: bool,
     /// Its line of sight.
-    pub(super) line_of_sight: i32,
+    pub(super) line_of_sight: SightTiles,
     /// The circle's offset.
     pub(super) offset: bool,
 }
@@ -51,7 +52,7 @@ impl Visibility {
         let Some(s) = self.seers.get(&id).copied() else {
             return Ok(0);
         };
-        self.sight_on_los(id, position, radius, square, s.los.get() as i32, offset)
+        self.sight_on_los(id, position, radius, square, SightTiles::of(s.los), offset)
     }
 
     /// Slot 0x1d0 with a line of sight of its own (its fourth argument not −1): a building takes
@@ -62,7 +63,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         square: bool,
-        los: i32,
+        los: SightTiles,
         offset: bool,
     ) -> Result<i32, GenieError> {
         let Some(s) = self.seers.get(&id).copied() else {
@@ -119,7 +120,7 @@ impl Visibility {
             offset,
         } = on;
         let square = square && s.master != CIRCLE_MASTER;
-        if los <= 0 {
+        if !los.sees() {
             return Ok(0);
         }
         let (x, y) = (position.x(), position.y());
@@ -159,7 +160,7 @@ impl Visibility {
         let Some(s) = self.seers.get(&id).copied() else {
             return Ok(());
         };
-        self.sight_off_los(id, position, radius, square, s.los.get() as i32, offset)?;
+        self.sight_off_los(id, position, radius, square, SightTiles::of(s.los), offset)?;
         Ok(())
     }
 
@@ -171,7 +172,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         square: bool,
-        los: i32,
+        los: SightTiles,
         offset: bool,
     ) -> Result<(), GenieError> {
         let Some(s) = self.seers.get(&id).copied() else {
@@ -189,7 +190,7 @@ impl Visibility {
             None => offset,
         };
         let square = square && s.master != CIRCLE_MASTER;
-        if los <= 0 {
+        if !los.sees() {
             return Ok(());
         }
         let (x, y) = (position.x(), position.y());

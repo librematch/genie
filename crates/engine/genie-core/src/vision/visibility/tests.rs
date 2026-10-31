@@ -6,6 +6,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::test_ids::object_id;
+use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
 
 fn world(players: PlayerId) -> Visibility {
@@ -298,10 +299,20 @@ fn the_closest_resource_skips_the_ids_given_and_keeps_its_distance() {
 fn newly_explored_tiles_join_the_player_s_tile_list_until_its_update_ends() {
     let mut v = world(PlayerId::new(2));
     let _ = v
-        .explore(PlayerId::new(1), Tile::new(10, 10), 0, false)
+        .explore(
+            PlayerId::new(1),
+            Tile::new(10, 10),
+            SightTiles::new(0),
+            false,
+        )
         .unwrap();
     let _ = v
-        .explore(PlayerId::new(1), Tile::new(10, 10), 1, false)
+        .explore(
+            PlayerId::new(1),
+            Tile::new(10, 10),
+            SightTiles::new(1),
+            false,
+        )
         .unwrap();
     assert_eq!(
         v.new_tiles[1],
@@ -342,7 +353,12 @@ fn a_resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
         r.add(object_id(7), GatherGroup::FORAGE, 20.5, 30.5);
     }
     let _ = v
-        .explore(PlayerId::new(2), Tile::new(20, 30), 0, false)
+        .explore(
+            PlayerId::new(2),
+            Tile::new(20, 30),
+            SightTiles::new(0),
+            false,
+        )
         .unwrap();
     v.forget_resource(
         object_id(7),
@@ -359,8 +375,13 @@ fn a_resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
 fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
     let mut v = world(PlayerId::new(3));
     assert_eq!(
-        v.explore(PlayerId::new(2), Tile::new(10, 10), 1, false)
-            .unwrap(),
+        v.explore(
+            PlayerId::new(2),
+            Tile::new(10, 10),
+            SightTiles::new(1),
+            false
+        )
+        .unwrap(),
         9
     );
     assert_eq!(v.maps[2].explored, 9);
@@ -368,25 +389,50 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
     assert_eq!(v.maps[2].counts[i], 1);
     assert_eq!(v.unified[i], 1 << 2 | 1 << 34);
     assert_eq!(
-        v.explore(PlayerId::new(2), Tile::new(11, 10), 1, false)
-            .unwrap(),
+        v.explore(
+            PlayerId::new(2),
+            Tile::new(11, 10),
+            SightTiles::new(1),
+            false
+        )
+        .unwrap(),
         3
     );
     assert_eq!(v.maps[2].counts[i], 2);
-    v.unexplore(PlayerId::new(2), Tile::new(10, 10), 1, false)
-        .unwrap();
+    v.unexplore(
+        PlayerId::new(2),
+        Tile::new(10, 10),
+        SightTiles::new(1),
+        false,
+    )
+    .unwrap();
     assert_eq!(v.maps[2].counts[i], 1);
-    v.unexplore(PlayerId::new(2), Tile::new(11, 10), 1, false)
-        .unwrap();
+    v.unexplore(
+        PlayerId::new(2),
+        Tile::new(11, 10),
+        SightTiles::new(1),
+        false,
+    )
+    .unwrap();
     assert_eq!(v.maps[2].counts[i], 0);
     assert_eq!(v.unified[i], 1 << 34, "explored, no longer visible");
     assert_eq!(v.maps[2].explored, 12);
     // a tile at 0 stays 0; one never explored goes to -2
-    v.unexplore(PlayerId::new(2), Tile::new(10, 10), 0, false)
-        .unwrap();
+    v.unexplore(
+        PlayerId::new(2),
+        Tile::new(10, 10),
+        SightTiles::new(0),
+        false,
+    )
+    .unwrap();
     assert_eq!(v.maps[2].counts[i], 0);
-    v.unexplore(PlayerId::new(2), Tile::new(20, 20), 0, false)
-        .unwrap();
+    v.unexplore(
+        PlayerId::new(2),
+        Tile::new(20, 20),
+        SightTiles::new(0),
+        false,
+    )
+    .unwrap();
     assert_eq!(v.maps[2].counts[v.index(Tile::new(20, 20))], -2);
 }
 
@@ -561,8 +607,13 @@ fn a_first_sight_of_a_building_s_tile_explores_the_building() {
     );
     // a sight of LOS 0 on the building's corner tile
     assert_eq!(
-        v.explore(PlayerId::new(1), Tile::new(27, 92), 0, false)
-            .unwrap(),
+        v.explore(
+            PlayerId::new(1),
+            Tile::new(27, 92),
+            SightTiles::new(0),
+            false
+        )
+        .unwrap(),
         1
     );
     assert_eq!(v.maps[1].counts[v.index(Tile::new(27, 92))], 1);
@@ -616,15 +667,30 @@ fn a_computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
     let mut v = world(PlayerId::new(3));
     v.computer = vec![false, true, false];
     assert_eq!(
-        v.explore(PlayerId::new(1), Tile::new(10, 10), 0, false),
+        v.explore(
+            PlayerId::new(1),
+            Tile::new(10, 10),
+            SightTiles::new(0),
+            false
+        ),
         Ok(1)
     );
     assert_eq!(
-        v.explore(PlayerId::new(1), Tile::new(10, 10), 0, false),
+        v.explore(
+            PlayerId::new(1),
+            Tile::new(10, 10),
+            SightTiles::new(0),
+            false
+        ),
         Ok(0)
     );
     assert_eq!(
-        v.explore(PlayerId::new(2), Tile::new(20, 20), 0, false),
+        v.explore(
+            PlayerId::new(2),
+            Tile::new(20, 20),
+            SightTiles::new(0),
+            false
+        ),
         Ok(1)
     );
     assert_eq!(

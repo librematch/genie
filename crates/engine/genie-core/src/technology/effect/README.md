@@ -36,5 +36,5 @@ disable a technology, spawn an object, change a cost.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`garrison`](../../garrison/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`orders`](../../orders/), [`ownership`](../../ownership/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`garrison`](../../garrison/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`orders`](../../orders/), [`ownership`](../../ownership/), [`players`](../../players/), [`vision`](../../vision/), [`world`](../../world/).
 <!-- /uses -->

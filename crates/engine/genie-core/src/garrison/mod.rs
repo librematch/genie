@@ -8,6 +8,7 @@
 //! unit in (`FUN_14120eb10`).
 
 use crate::GenieError;
+use crate::vision::SightTiles;
 
 mod enter;
 mod enter_state;
@@ -57,6 +58,9 @@ pub(crate) const NEARBY: f32 = crate::math::image::garrison::NEARBY;
 /// The squared footprint gap within which the town bell reaches (its ring `FUN_14163a650`, its
 /// end `FUN_14163ab80`, and `FUN_141621220` with `param_6` 1: `DAT_142ef3e70`, 625.0, 25 tiles).
 /// An enter into an object the world holds asleep.
+/// The circle a building sees while a unit is inside it (`FUN_141212e10`, `FUN_141213120`:
+/// slots 0x1d0 and 0x1d8 with 5).
+pub(crate) const INSIDE_SIGHT: SightTiles = SightTiles::new(5);
 const ENTER_SLEEPING: GenieError = GenieError::unsupported("an enter into a sleeping object");
 /// An enter without its owner's masters.
 pub(crate) const NO_MASTERS: GenieError = GenieError::unsupported("an enter without the masters");

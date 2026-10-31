@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::map::Tile;
 use crate::map::TileRect;
 use crate::players::PlayerId;
+use crate::vision::SightTiles;
 use crate::vision::los_tables::{CENTRED, OFFSET};
 use crate::vision::visibility::{ANCHOR, LINKED, MOST, Visibility};
 use crate::world::slots::CheckedIndex;
@@ -21,11 +22,11 @@ impl Visibility {
         &mut self,
         player: PlayerId,
         centre: Tile,
-        los: i32,
+        los: SightTiles,
         offset: bool,
     ) -> Result<i32, GenieError> {
         let (x, y) = (centre.x(), centre.y());
-        let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.clamp(0, 20) as usize)?;
+        let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
         let (visible, seen) = (1u64 << player.get(), 1u64 << (32 + player.get()));
         let mut newly = 0;
         for &(dy, dx0, dx1) in table {
@@ -109,11 +110,11 @@ impl Visibility {
         &mut self,
         player: PlayerId,
         centre: Tile,
-        los: i32,
+        los: SightTiles,
         offset: bool,
     ) -> Result<(), GenieError> {
         let (x, y) = (centre.x(), centre.y());
-        let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.clamp(0, 20) as usize)?;
+        let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
         let hidden = !(1u64 << player.get());
         for &(dy, dx0, dx1) in table {
             let ty = y + i32::from(dy);

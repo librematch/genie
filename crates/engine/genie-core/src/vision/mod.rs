@@ -24,7 +24,10 @@ pub(crate) mod explored;
 pub mod ghost;
 pub mod los_tables;
 pub mod registry;
+mod sight_tiles;
 pub mod visibility;
+
+pub use self::sight_tiles::SightTiles;
 
 /// The visible bit no tile has that every player's mask carries.
 pub const NO_TILE: u64 = 1 << 29;
