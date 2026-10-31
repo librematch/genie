@@ -11,6 +11,8 @@ use genie_core::map::Position;
 use genie_core::map::Tile;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
+use genie_core::players::PlayerId;
+use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::world::{GameState, World};
 
@@ -26,11 +28,11 @@ fn ghost(id: i32) -> Ghost {
         original: None,
         original_id: ObjectId::of_field(id + 100),
         original_master: None,
-        original_owner: 0,
+        original_owner: PlayerId::new(0),
         position: Position::new(1.0, 2.0, 0.0),
         tile: Tile::new(1, 2),
         footprint: 0,
-        bits: 0,
+        bits: VisionBits::NONE,
         cant_see: 0,
         seen: false,
         state: ObjectState::Alive,

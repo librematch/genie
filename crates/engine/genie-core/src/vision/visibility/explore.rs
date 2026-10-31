@@ -6,6 +6,7 @@ use crate::map::Tile;
 use crate::map::TileRect;
 use crate::players::PlayerId;
 use crate::vision::SightTiles;
+use crate::vision::VisionBits;
 use crate::vision::los_tables::{CENTRED, OFFSET};
 use crate::vision::visibility::{ANCHOR, LINKED, MOST, Visibility};
 use crate::world::slots::CheckedIndex;
@@ -27,7 +28,7 @@ impl Visibility {
     ) -> Result<i32, GenieError> {
         let (x, y) = (centre.x(), centre.y());
         let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
-        let (visible, seen) = (1u64 << player.get(), 1u64 << (32 + player.get()));
+        let (visible, seen) = (VisionBits::visible(player), VisionBits::explored(player));
         let mut newly = 0;
         for &(dy, dx0, dx1) in table {
             let ty = y + i32::from(dy);
@@ -115,7 +116,7 @@ impl Visibility {
     ) -> Result<(), GenieError> {
         let (x, y) = (centre.x(), centre.y());
         let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
-        let hidden = !(1u64 << player.get());
+        let hidden = !VisionBits::visible(player);
         for &(dy, dx0, dx1) in table {
             let ty = y + i32::from(dy);
             if ty < 0 || self.size.height() <= ty {
@@ -155,7 +156,7 @@ impl Visibility {
             return Ok(0);
         };
         let [x0, y0, x1, y1] = held.get();
-        let (visible, seen) = (1u64 << player.get(), 1u64 << (32 + player.get()));
+        let (visible, seen) = (VisionBits::visible(player), VisionBits::explored(player));
         let mut newly = 0;
         for y in y0..=y1 {
             for x in x0..=x1 {
@@ -193,7 +194,7 @@ impl Visibility {
             return Ok(());
         };
         let [x0, y0, x1, y1] = held.get();
-        let hidden = !(1u64 << player.get());
+        let hidden = !VisionBits::visible(player);
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
@@ -220,7 +221,7 @@ impl Visibility {
             return Ok(0);
         };
         let [x0, y0, x1, y1] = held.get();
-        let seen = 1u64 << (32 + player.get());
+        let seen = VisionBits::explored(player);
         let mut newly = 0;
         for y in y0..=y1 {
             for x in x0..=x1 {

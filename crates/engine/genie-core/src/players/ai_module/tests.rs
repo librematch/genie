@@ -13,6 +13,7 @@ use crate::players::ai_module::{
     AiModule, AiModules, InfoModule, SLOTS, SearchArea, SearchUnit, TacticalModule,
 };
 use crate::vision::SightTiles;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
 
@@ -99,7 +100,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
             };
             3
         ],
-        vec![0; n],
+        vec![VisionBits::NONE; n],
         Vec::new(),
         0,
         vec![false, true, false],

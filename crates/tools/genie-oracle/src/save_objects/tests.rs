@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::save_objects::{ghost_pool_from_dump, recycle_pools_from_dump, registry_from_dump};
 use crate::test_ids::object_id;
+use genie_core::vision::VisionBits;
 use genie_core::vision::registry::SLOTS;
 
 /// Two pools: the missiles (type 60), the next to come back first, and the ghosts (type 25).
@@ -71,7 +72,7 @@ fn a_registry_dump_reads_its_lists_and_masks() {
     assert_eq!(record.distance.get().to_bits(), one);
     assert_eq!(record.y.to_bits(), 2.0_f32.to_bits());
     let entry = &registry.entries[&object_id(77)];
-    assert_eq!(entry.mask, 3);
+    assert_eq!(entry.mask, VisionBits::from_bits_retain(3));
     assert_eq!(entry.slots[..2], [None, Some(0)]);
 }
 

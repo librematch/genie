@@ -63,7 +63,7 @@ impl PlaceMap for WorldMap<'_> {
         self.turns.spatial.visible(player, tile)
     }
 
-    fn vision(&self, player: PlayerId) -> [u64; 2] {
+    fn vision(&self, player: PlayerId) -> crate::vision::VisionMasks {
         self.turns.spatial.vision(player)
     }
 
@@ -122,7 +122,7 @@ impl PlaceMap for WorldMap<'_> {
                             v.registry
                                 .as_ref()
                                 .and_then(|r| r.entry(id))
-                                .map_or(0, |e| e.mask)
+                                .map_or(crate::vision::VisionBits::NONE, |e| e.mask)
                         })
                     }),
                     holds: Amount::ZERO < unit.life.amount

@@ -19,6 +19,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::vision::visibility::Visibility;
+use crate::vision::{VisionBits, VisionMasks};
 impl Spatial {
     /// The Artifact action's owner search (`FUN_140aabc40`) for the animal `me`: the objects on
     /// the lists of the tiles within the animal's radius (whole) plus 3 tiles of its own tile
@@ -214,9 +215,9 @@ impl Spatial {
     /// The vision masks of player `player` (`+0x2a8`, `+0x2a0`; [`crate::vision`]): the world's
     /// rebuild's, else its own bits and the ones no tile has.
     #[must_use]
-    pub fn vision(&self, player: PlayerId) -> [u64; 2] {
+    pub fn vision(&self, player: PlayerId) -> VisionMasks {
         self.vision
-            .get(player.index())
+            .get(player)
             .copied()
             .unwrap_or_else(|| crate::vision::own_masks(player, false))
     }
@@ -225,16 +226,15 @@ impl Spatial {
     /// `0x4000000040000000`): every word of the unified map takes the ended bits 30 and 62, and
     /// the player's masks (`+0x2a8`, `+0x2a0`) too.
     pub fn reveal_to(&mut self, player: PlayerId) {
-        use crate::vision::{ENDED, ENDED_EXPLORED};
-        self.reveal_map(ENDED | ENDED_EXPLORED);
-        if let Some(m) = self.vision.get_mut(player.index()) {
-            m[0] |= ENDED;
-            m[1] |= ENDED_EXPLORED;
+        self.reveal_map(VisionBits::ENDED | VisionBits::ENDED_EXPLORED);
+        if let Some(m) = self.vision.get_mut(player) {
+            m.visible |= VisionBits::ENDED;
+            m.explored |= VisionBits::ENDED_EXPLORED;
         }
     }
 
     /// The unified map's word (`+0x5e30`) at `tile`, none off the map.
-    pub(super) fn unified_word(v: &Visibility, tile: Tile) -> Option<u64> {
+    pub(super) fn unified_word(v: &Visibility, tile: Tile) -> Option<VisionBits> {
         Some(*v.unified.get(v.size.index(tile)?)?)
     }
 
@@ -247,16 +247,19 @@ impl Spatial {
     /// players' sight.
     #[must_use]
     pub fn tile_sight(&self, player: PlayerId, tile: Tile) -> Option<u8> {
-        use crate::vision::registry::MASK;
-        use crate::vision::{NO_TILE, NO_TILE_EXPLORED};
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
             return Some(0);
         };
-        let [seen, explored] = self.vision(player);
-        let explored = explored & word & MASK != 0;
-        let all_explored = word & NO_TILE_EXPLORED != 0;
-        let revealed = word & NO_TILE != 0;
-        if seen & word & MASK != 0 || (revealed && (explored || all_explored)) {
+        let VisionMasks {
+            visible: seen,
+            explored,
+        } = self.vision(player);
+        let explored = explored.intersects(word & VisionBits::OBJECT_MASK);
+        let all_explored = word.intersects(VisionBits::NO_TILE_EXPLORED);
+        let revealed = word.intersects(VisionBits::NO_TILE);
+        if seen.intersects(word & VisionBits::OBJECT_MASK)
+            || (revealed && (explored || all_explored))
+        {
             return Some(0xf);
         }
         Some(if explored || all_explored { 0x80 } else { 0 })
@@ -282,9 +285,9 @@ impl Spatial {
             .registry
             .as_ref()
             .and_then(|r| r.entries.get(&id))
-            .map_or(0, |e| e.mask);
-        let [visible, explored] = self.vision(player);
-        if umv && (visible & mask != 0 || explored & mask != 0) {
+            .map_or(VisionBits::NONE, |e| e.mask);
+        let VisionMasks { visible, explored } = self.vision(player);
+        if umv && (visible.intersects(mask) || explored.intersects(mask)) {
             return Some(0xf);
         }
         None
@@ -300,11 +303,14 @@ impl Spatial {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
             return Some(0);
         };
-        let word = word & crate::vision::registry::MASK;
-        let [seen, explored] = self.vision(player);
-        Some(if seen & word != 0 {
+        let word = word & VisionBits::OBJECT_MASK;
+        let VisionMasks {
+            visible: seen,
+            explored,
+        } = self.vision(player);
+        Some(if seen.intersects(word) {
             0xf
-        } else if explored & word != 0 {
+        } else if explored.intersects(word) {
             0x80
         } else {
             0
@@ -323,11 +329,14 @@ impl Spatial {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
             return Some(0);
         };
-        let word = word & crate::vision::registry::MASK;
-        let [seen, explored] = self.vision(player);
-        Some(if seen & word != 0 {
+        let word = word & VisionBits::OBJECT_MASK;
+        let VisionMasks {
+            visible: seen,
+            explored,
+        } = self.vision(player);
+        Some(if seen.intersects(word) {
             0xf
-        } else if explored & word != 0 {
+        } else if explored.intersects(word) {
             0x80
         } else {
             0
@@ -337,7 +346,7 @@ impl Spatial {
     /// `FUN_1412847b0`: every word of the unified map (`+0x5e30`, width × height) takes the bits
     /// of `mask` (the end of the game `0x4000000040000000`, a revealed map `0x2000000020000000`,
     /// both `0x6000000060000000`). Nothing without the players' sight.
-    pub fn reveal_map(&mut self, mask: u64) {
+    pub fn reveal_map(&mut self, mask: VisionBits) {
         if let Some(v) = self.sight.as_mut() {
             for w in &mut v.unified {
                 *w |= mask;
@@ -373,7 +382,7 @@ impl Spatial {
     /// `RGE_Combat_Object::update`'s sight ([`Visibility::combat_sight`]); an annex reads its
     /// main building's place and UMV entry. The changed mask of an object others take over by
     /// seeing it is the answer.
-    pub fn combat_sight(&mut self, id: ObjectId) -> Result<Option<u64>, GenieError> {
+    pub fn combat_sight(&mut self, id: ObjectId) -> Result<Option<VisionBits>, GenieError> {
         let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(&id)) else {
             return Ok(None);
         };

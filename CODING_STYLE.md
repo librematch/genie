@@ -129,6 +129,11 @@ primitive `f32`: they are two kinds of value and need two types.
 - Let the type hold only what it names. No `ObjectId` is −1. No `MasterId` is negative.
 - Derive what the value allows: `Clone`, `Copy`, `Debug`, `PartialEq`, `Eq`, `PartialOrd`,
   `Ord`, `Hash` (C-COMMON-TRAITS). Give a mask type `Binary` and `LowerHex` (C-NUM-FMT).
+- Make a set of bits a `bitflags` type (C-BITFLAG). Name the bits that have a meaning, and
+  declare `const _ = !0;` so that no operation drops a bit. Build a word from the save with
+  `from_bits_retain`, never `from_bits_truncate`. Give a positional bit (a player's) a
+  constructor, and a mask of several bits a plain associated constant
+  (`vision::VisionBits`).
 - Give a quantity type the operations that its meaning has, and no others: a duration plus a
   duration is a duration, a point minus a point is an offset.
 - Keep the game's arithmetic in a quantity type. Each operator does the one `f32` operation

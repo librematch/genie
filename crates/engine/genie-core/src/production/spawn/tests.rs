@@ -31,6 +31,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -129,8 +130,8 @@ impl PlaceMap for Hill {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         true
     }
-    fn vision(&self, _: PlayerId) -> [u64; 2] {
-        [0; 2]
+    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
+        crate::vision::VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(self.1)
@@ -280,8 +281,9 @@ impl PlaceMap for Fogged {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         false
     }
-    fn vision(&self, _: PlayerId) -> [u64; 2] {
-        self.1
+    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
+        let [visible, explored] = self.1.map(VisionBits::from_bits_retain);
+        crate::vision::VisionMasks { visible, explored }
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)
@@ -317,7 +319,7 @@ fn a_fogged_building_blocks_a_build_by_its_visibility_mask() {
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::Alive,
-        fog_mask: Some((1 << 1) | (1 << 33)),
+        fog_mask: Some(VisionBits::from_bits_retain((1 << 1) | (1 << 33))),
         ..sheep(ObjectState::Alive)
     };
     let site = BuildSite {
@@ -374,8 +376,8 @@ impl PlaceMap for Flat {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         true
     }
-    fn vision(&self, _: PlayerId) -> [u64; 2] {
-        [0; 2]
+    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
+        crate::vision::VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)
@@ -1027,8 +1029,8 @@ impl PlaceMap for Dark {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         false
     }
-    fn vision(&self, _: PlayerId) -> [u64; 2] {
-        [0; 2]
+    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
+        crate::vision::VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)
@@ -1468,8 +1470,8 @@ impl PlaceMap for Terrains {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         true
     }
-    fn vision(&self, _: PlayerId) -> [u64; 2] {
-        [0; 2]
+    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
+        crate::vision::VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)

@@ -31,6 +31,7 @@ use crate::players::attribute;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
+use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
@@ -516,18 +517,18 @@ impl Unit {
             return Ok(());
         };
         if let Some(r) = v.registry.as_mut().filter(|_| 0 <= id.get()) {
-            let mask = r.entry(id).map_or(0, |e| e.mask);
+            let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
             r.update_unit(UnitUpdate {
                 id,
                 owner: c.player.index() as u8,
                 position: self.position().ground(),
                 radii: placed.radius,
                 class: placed.class,
-                old: mask & 0xffff_ffff,
-                new: 0,
+                old: mask & VisionBits::VISIBLE_HALF,
+                new: VisionBits::NONE,
             })?;
             // its mask (`+0x8f8`) is none after
-            r.entries.entry(id).or_default().mask = 0;
+            r.entries.entry(id).or_default().mask = VisionBits::NONE;
         }
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
         if bm.kind == BUILDING {

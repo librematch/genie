@@ -1,6 +1,10 @@
 //! One value per player, looked up by the player ([`ByPlayer`]).
 
+use crate::GenieError;
 use crate::players::PlayerId;
+
+/// A player the row does not hold, where the caller's own loop over the players named it.
+const NO_PLAYER: GenieError = GenieError::unreachable("a player the row does not hold");
 
 /// One value per player, in the players' order (Gaia first): a row the game indexes by a
 /// player's number, such as a player's relations (`player+0x260`) or the spatial copies of
@@ -24,6 +28,24 @@ impl<T> ByPlayer<T> {
     /// Player `p`'s value to change, none past the row.
     pub fn get_mut(&mut self, p: PlayerId) -> Option<&mut T> {
         self.0.get_mut(p.index())
+    }
+
+    /// Player `p`'s value, as an error where the caller's own loop names a player past the row.
+    ///
+    /// # Errors
+    ///
+    /// A player the row does not hold.
+    pub fn checked(&self, p: PlayerId) -> Result<&T, GenieError> {
+        self.get(p).ok_or_else(|| NO_PLAYER.with("player", p))
+    }
+
+    /// Player `p`'s value to change, as an error past the row.
+    ///
+    /// # Errors
+    ///
+    /// A player the row does not hold.
+    pub fn checked_mut(&mut self, p: PlayerId) -> Result<&mut T, GenieError> {
+        self.get_mut(p).ok_or_else(|| NO_PLAYER.with("player", p))
     }
 
     /// Player `p`'s value becomes `value`; a row shorter than `p` grows first, with the
@@ -89,6 +111,9 @@ mod tests {
         assert_eq!(row.get(PlayerId::new(3)), None);
         *row.get_mut(PlayerId::new(2)).unwrap() = 4;
         assert!(row.get_mut(PlayerId::new(3)).is_none());
+        assert_eq!(row.checked(PlayerId::new(0)), Ok(&7));
+        assert!(row.checked(PlayerId::new(3)).is_err());
+        assert!(row.checked_mut(PlayerId::new(3)).is_err());
         assert_eq!(row.values(), &[7, 8, 4]);
         let mut grown = row.clone();
         grown.set(PlayerId::new(5), 1);

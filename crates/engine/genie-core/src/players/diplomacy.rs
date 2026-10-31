@@ -24,6 +24,7 @@ use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::Stance;
 use crate::players::UnitRelation;
+use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -36,9 +37,6 @@ pub(crate) const REVEAL_UNITS: GenieError =
 const REVEAL_UNIT: usize = 204;
 /// The teams a world has at most past the lone one (2 to 5, `FUN_1415e23f0`).
 const LAST_TEAM: i32 = 5;
-/// The bits of the unified map a player's masks name players by (`FUN_141285cb0`'s
-/// `0x1ffffff01ffffff`).
-const PLAYER_BITS: u64 = 0x01ff_ffff_01ff_ffff;
 
 /// `FUN_141676b80`'s kind of player `q`'s objects for player `p` of relation `relation` toward
 /// it: Gaia's 0, its own 1, relations 0 and 4 an ally's (2), 1 a neutral's (3), any other an
@@ -300,14 +298,15 @@ impl World {
     /// unified word has a player bit of the player's visible or explored mask joins its tile
     /// list (`FUN_14165d500`).
     pub(crate) fn refill_tiles(&mut self, p: PlayerId) {
-        let [visible, explored] = self.spatial.vision(p);
+        let masks = self.spatial.vision(p);
         if let Some(sight) = self.spatial.sight.as_mut() {
             let (w, h) = (sight.size.width(), sight.size.height());
             let rows = sight.unified.chunks(usize::try_from(w).unwrap_or(0).max(1));
             for (y, row) in (0..h).zip(rows) {
                 for (x, &word) in (0..w).zip(row) {
-                    let seen =
-                        (visible & word & PLAYER_BITS) != 0 || (explored & word & PLAYER_BITS) != 0;
+                    // the bits the masks name players by (`0x1ffffff01ffffff`)
+                    let word = word & VisionBits::OBJECT_MASK;
+                    let seen = masks.visible.intersects(word) || masks.explored.intersects(word);
                     if seen && let Some(list) = sight.new_tiles.get_mut(p.index()) {
                         list.push(Tile::new(x, y));
                     }

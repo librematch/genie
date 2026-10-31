@@ -17,6 +17,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
+use genie_core::vision::VisionBits;
 use genie_core::world::{Player, World};
 use genie_save::{Header, PlayerSection};
 
@@ -573,11 +574,12 @@ pub(super) fn saved_ghosts(
                 original,
                 original_id: original,
                 original_master: MasterId::of_data(d.long_val_2 as i16),
-                original_owner: usize::try_from(d.doppled_player).unwrap_or(0),
+                original_owner: u8::try_from(d.doppled_player)
+                    .map_or(PlayerId::GAIA, PlayerId::from),
                 position: Position::new(s.t_x, s.t_y, s.t_z),
                 tile: Tile::new(s.t_x as i32, s.t_y as i32),
                 footprint: d.multi_unified_points,
-                bits: 0,
+                bits: VisionBits::NONE,
                 cant_see: d.cant_see_bits,
                 seen: false,
                 state: genie_core::objects::ObjectState::of_byte(s.object_state)?,

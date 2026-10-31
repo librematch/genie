@@ -20,7 +20,7 @@ fn world(players: PlayerId) -> Visibility {
             };
             players.index()
         ],
-        vec![0; n],
+        vec![VisionBits::NONE; n],
         Vec::new(),
         0,
         vec![false; players.index()],
@@ -72,37 +72,85 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
     let humans = players([false; 4]);
     let none = [false; 4];
     assert_eq!(
-        sight_taker(0b0111, PlayerId::new(0), true, &humans, &none),
+        sight_taker(
+            VisionBits::from_bits_retain(0b0111),
+            PlayerId::new(0),
+            true,
+            &humans,
+            &none
+        ),
         Some(PlayerId::new(1))
     );
     assert_eq!(
-        sight_taker(0b0110, PlayerId::new(1), true, &humans, &none),
+        sight_taker(
+            VisionBits::from_bits_retain(0b0110),
+            PlayerId::new(1),
+            true,
+            &humans,
+            &none
+        ),
         Some(PlayerId::new(2))
     );
     assert_eq!(
-        sight_taker(0b0001, PlayerId::new(1), true, &humans, &none),
+        sight_taker(
+            VisionBits::from_bits_retain(0b0001),
+            PlayerId::new(1),
+            true,
+            &humans,
+            &none
+        ),
         None
     );
     assert_eq!(
-        sight_taker(1 << 33 | 0b10, PlayerId::new(1), true, &humans, &none),
+        sight_taker(
+            VisionBits::from_bits_retain(1 << 33 | 0b10),
+            PlayerId::new(1),
+            true,
+            &humans,
+            &none
+        ),
         None
     );
     let ai = players([false, true, false, true]);
     let allows = [false, false, false, true];
     assert_eq!(
-        sight_taker(0b1110, PlayerId::new(0), false, &ai, &allows),
+        sight_taker(
+            VisionBits::from_bits_retain(0b1110),
+            PlayerId::new(0),
+            false,
+            &ai,
+            &allows
+        ),
         Some(PlayerId::new(2))
     );
     assert_eq!(
-        sight_taker(0b1010, PlayerId::new(0), false, &ai, &allows),
+        sight_taker(
+            VisionBits::from_bits_retain(0b1010),
+            PlayerId::new(0),
+            false,
+            &ai,
+            &allows
+        ),
         Some(PlayerId::new(3))
     );
     assert_eq!(
-        sight_taker(0b0010, PlayerId::new(0), false, &ai, &allows),
+        sight_taker(
+            VisionBits::from_bits_retain(0b0010),
+            PlayerId::new(0),
+            false,
+            &ai,
+            &allows
+        ),
         None
     );
     assert_eq!(
-        sight_taker(0b0010, PlayerId::new(0), true, &ai, &allows),
+        sight_taker(
+            VisionBits::from_bits_retain(0b0010),
+            PlayerId::new(0),
+            true,
+            &ai,
+            &allows
+        ),
         Some(PlayerId::new(1))
     );
 }
@@ -118,7 +166,7 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
     v.add_seer(object_id(7), gaia);
     v.add_seer(object_id(8), unit(PlayerId::new(0), Distance::new(2.0)));
     let i = 10 * 120 + 10;
-    v.unified[i] = 0b011;
+    v.unified[i] = VisionBits::from_bits_retain(0b011);
     let at = Position::new(10.5, 10.5, 0.0);
     assert_eq!(
         v.combat_sight(
@@ -129,7 +177,7 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
             class::CLASS_6,
             None
         ),
-        Ok(Some(0b011))
+        Ok(Some(VisionBits::from_bits_retain(0b011)))
     );
     assert_eq!(
         v.combat_sight(
@@ -154,7 +202,10 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
         Ok(None)
     );
     let r = v.registry.as_ref().unwrap();
-    assert_eq!(r.entry(object_id(8)).map(|e| e.mask), Some(0b011));
+    assert_eq!(
+        r.entry(object_id(8)).map(|e| e.mask),
+        Some(VisionBits::from_bits_retain(0b011))
+    );
     assert_eq!(r.lists[1][6].len(), 2);
 }
 
@@ -164,15 +215,15 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
 fn an_ownership_change_writes_the_new_owner_into_the_object_s_records() {
     let mut v = world(PlayerId::new(3));
     let mut r = Registry::new(3, 65);
-    r.entries.entry(object_id(7)).or_default().mask = 0b11;
+    r.entries.entry(object_id(7)).or_default().mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(7),
         owner: 0,
         position: Point::new(10.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class: class::CLASS_6,
-        old: 0,
-        new: 0b11,
+        old: VisionBits::NONE,
+        new: VisionBits::from_bits_retain(0b11),
     })
     .unwrap();
     v.registry = Some(r);
@@ -387,7 +438,7 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
     assert_eq!(v.maps[2].explored, 9);
     let i = v.index(Tile::new(10, 10));
     assert_eq!(v.maps[2].counts[i], 1);
-    assert_eq!(v.unified[i], 1 << 2 | 1 << 34);
+    assert_eq!(v.unified[i], VisionBits::from_bits_retain(1 << 2 | 1 << 34));
     assert_eq!(
         v.explore(
             PlayerId::new(2),
@@ -415,7 +466,11 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
     )
     .unwrap();
     assert_eq!(v.maps[2].counts[i], 0);
-    assert_eq!(v.unified[i], 1 << 34, "explored, no longer visible");
+    assert_eq!(
+        v.unified[i],
+        VisionBits::from_bits_retain(1 << 34),
+        "explored, no longer visible"
+    );
     assert_eq!(v.maps[2].explored, 12);
     // a tile at 0 stays 0; one never explored goes to -2
     v.unexplore(

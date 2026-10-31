@@ -13,7 +13,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::MARKET;
 use crate::vision::SightTiles;
-use crate::vision::registry::MASK;
+use crate::vision::VisionBits;
 use crate::vision::visibility::{CIRCLE_MASTER, EDGE, Seer, Visibility, tile_of};
 use crate::world::slots::CheckedIndex;
 
@@ -306,8 +306,8 @@ impl Visibility {
 
     /// The unified map's word at the tile of point `at` (its x and y truncated), masked
     /// ([`MASK`]).
-    pub(super) fn word_at(&self, at: Point) -> Result<u64, GenieError> {
+    pub(super) fn word_at(&self, at: Point) -> Result<VisionBits, GenieError> {
         let tile = Tile::new(at.x() as i32, at.y() as i32);
-        Ok(*self.unified.checked(self.index(tile))? & MASK)
+        Ok(*self.unified.checked(self.index(tile))? & VisionBits::OBJECT_MASK)
     }
 }

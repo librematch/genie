@@ -10,6 +10,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::players::PlayerId;
+use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Visibility;
 use crate::world::player::Player;
@@ -29,7 +30,7 @@ const NO_REGISTRY: GenieError =
 /// is in `mask` ends the loop: it is the answer, which takes the object when it has its master.
 #[must_use]
 pub fn sight_taker(
-    mask: u64,
+    mask: VisionBits,
     owner: PlayerId,
     standard: bool,
     players: &[Player],
@@ -42,7 +43,7 @@ pub fn sight_taker(
             standard || !player.computer || allows.get(q.index()).copied().unwrap_or(false)
         })
         .map(|(q, _)| q)
-        .find(|&q| q != owner && mask & (1u64 << (q.index() & 63)) != 0)
+        .find(|&q| q != owner && mask.intersects(VisionBits::visible(q)))
 }
 
 impl Visibility {
@@ -64,7 +65,7 @@ impl Visibility {
         radius: Footprint,
         class: ClassId,
         main: Option<(Position, u8)>,
-    ) -> Result<Option<u64>, GenieError> {
+    ) -> Result<Option<VisionBits>, GenieError> {
         let Some(s) = self.seers.get(&id).copied() else {
             return Ok(None);
         };
@@ -99,7 +100,7 @@ impl Visibility {
             }
         }
         let registry = self.registry.as_mut().ok_or(NO_REGISTRY)?;
-        let old = registry.entry(id).map_or(0, |e| e.mask);
+        let old = registry.entry(id).map_or(VisionBits::NONE, |e| e.mask);
         if mask == old {
             return Ok(None);
         }
@@ -110,7 +111,7 @@ impl Visibility {
             position: Point::new(x, y),
             radii: radius,
             class,
-            old: old & 0xffff_ffff,
+            old: old & VisionBits::VISIBLE_HALF,
             new: mask,
         })?;
         Ok((s.capture == 1).then_some(mask))
@@ -139,7 +140,7 @@ impl Visibility {
         let Some(r) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
             return Ok(());
         };
-        let mask = r.entry(id).map_or(0, |e| e.mask);
+        let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
         let place = at.ground();
         r.update_unit(UnitUpdate {
             id,
@@ -147,8 +148,8 @@ impl Visibility {
             position: place,
             radii: old.0,
             class: old.1,
-            old: mask & 0xffff_ffff,
-            new: 0,
+            old: mask & VisionBits::VISIBLE_HALF,
+            new: VisionBits::NONE,
         })?;
         r.update_unit(UnitUpdate {
             id,
@@ -156,7 +157,7 @@ impl Visibility {
             position: place,
             radii: new.0,
             class: new.1,
-            old: 0,
+            old: VisionBits::NONE,
             new: mask,
         })
     }
@@ -173,15 +174,15 @@ impl Visibility {
         let Some(r) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
             return Ok(());
         };
-        let mask = r.entry(id).map_or(0, |e| e.mask);
+        let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
         r.update_unit(UnitUpdate {
             id,
             owner: owner.index() as u8,
             position: at.ground(),
             radii: radius,
             class,
-            old: mask & 0xffff_ffff,
-            new: 0,
+            old: mask & VisionBits::VISIBLE_HALF,
+            new: VisionBits::NONE,
         })?;
         let _ = r.entries.remove(&id);
         Ok(())

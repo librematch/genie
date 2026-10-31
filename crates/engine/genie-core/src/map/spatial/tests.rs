@@ -16,6 +16,7 @@ use crate::players::relation_row;
 use crate::players::relations;
 use crate::test_ids::class_id;
 use crate::test_ids::{master_id, object_id};
+use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 
 /// The record cells (FD-030-D03) give every query the objects whose record is filed in a
@@ -289,8 +290,8 @@ fn a_search_near_the_last_reads_its_answer_until_a_unit_ai_lets_it_go() {
         position: Point::new(12.0, 10.0),
         radii: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
-        old: 0,
-        new: 1 << 2,
+        old: VisionBits::NONE,
+        new: VisionBits::from_bits_retain(1 << 2),
     })
     .unwrap();
     let mut v = Visibility::new(
@@ -1331,15 +1332,15 @@ fn a_tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
 /// end of the game for a player) also gives the player's masks the ended bits.
 #[test]
 fn revealing_the_map_sets_the_mask_in_every_word() {
-    use crate::vision::{ENDED, ENDED_EXPLORED, NO_TILE, NO_TILE_EXPLORED};
-    let mut s = sighted(vec![0, 1 << 1, 1 << 33]);
-    s.reveal_map(NO_TILE | NO_TILE_EXPLORED);
-    let words = &s.sight.as_ref().unwrap().unified;
+    let revealed = VisionBits::NO_TILE | VisionBits::NO_TILE_EXPLORED;
+    let words = [0, 1 << 1, 1 << 33].map(VisionBits::from_bits_retain);
+    let mut s = sighted(words.to_vec());
+    s.reveal_map(revealed);
     assert_eq!(
-        *words,
-        [0, 1 << 1, 1 << 33].map(|w: u64| w | NO_TILE | NO_TILE_EXPLORED)
+        s.sight.as_ref().unwrap().unified,
+        words.map(|w| w | revealed)
     );
-    let mut s = sighted(vec![0, 0]);
+    let mut s = sighted(vec![VisionBits::NONE; 2]);
     s.reveal_to(PlayerId::new(1));
     assert!(
         s.sight
@@ -1347,13 +1348,13 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
             .unwrap()
             .unified
             .iter()
-            .all(|&w| w == ENDED | ENDED_EXPLORED)
+            .all(|&w| w == VisionBits::ENDED | VisionBits::ENDED_EXPLORED)
     );
     // player 1 lost: its masks take the ended bits; the tile tests mask them out
     // (registry::MASK holds neither bit 30 nor 62)
     assert_eq!(
-        s.vision[1],
-        crate::vision::own_masks(PlayerId::new(1), true)
+        s.vision.get(PlayerId::new(1)),
+        Some(&crate::vision::own_masks(PlayerId::new(1), true))
     );
     assert_eq!(s.tile_sight(PlayerId::new(1), Tile::new(0, 0)), Some(0));
 }
@@ -1361,25 +1362,25 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
 #[test]
 fn a_revealed_map_gives_the_player_the_ended_bits() {
     let mut s = Spatial {
-        vision: vec![
+        vision: ByPlayer::new(vec![
             crate::vision::own_masks(PlayerId::new(0), false),
             crate::vision::own_masks(PlayerId::new(1), false),
-        ],
+        ]),
         ..Spatial::default()
     };
     s.reveal_to(PlayerId::new(1));
     assert_eq!(
-        s.vision[1],
-        crate::vision::own_masks(PlayerId::new(1), true)
+        s.vision.get(PlayerId::new(1)),
+        Some(&crate::vision::own_masks(PlayerId::new(1), true))
     );
     assert_eq!(
-        s.vision[0],
-        crate::vision::own_masks(PlayerId::new(0), false)
+        s.vision.get(PlayerId::new(0)),
+        Some(&crate::vision::own_masks(PlayerId::new(0), false))
     );
 }
 
 /// A map of two tiles holding `words`, which players 0 and 1 see with their own masks.
-fn sighted(words: Vec<u64>) -> Spatial {
+fn sighted(words: Vec<VisionBits>) -> Spatial {
     let n = words.len() as i32;
     Spatial {
         sight: Some(Visibility::new(
@@ -1390,10 +1391,10 @@ fn sighted(words: Vec<u64>) -> Spatial {
             0,
             Vec::new(),
         )),
-        vision: vec![
+        vision: ByPlayer::new(vec![
             crate::vision::own_masks(PlayerId::new(0), false),
             crate::vision::own_masks(PlayerId::new(1), false),
-        ],
+        ]),
         ..Spatial::default()
     }
 }
@@ -1402,15 +1403,17 @@ fn sighted(words: Vec<u64>) -> Spatial {
 /// an explored hit or bit 61) is seen, one explored for all (bit 61) explored.
 #[test]
 fn a_player_s_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits() {
-    use crate::vision::{NO_TILE, NO_TILE_EXPLORED};
-    let (seen, explored) = (1 << 1, 1 << 33);
+    let (seen, explored) = (
+        VisionBits::from_bits_retain(1 << 1),
+        VisionBits::from_bits_retain(1 << 33),
+    );
     let s = sighted(vec![
         seen,
         explored,
-        NO_TILE_EXPLORED,
-        NO_TILE | NO_TILE_EXPLORED,
-        NO_TILE,
-        NO_TILE | explored,
+        VisionBits::NO_TILE_EXPLORED,
+        VisionBits::NO_TILE | VisionBits::NO_TILE_EXPLORED,
+        VisionBits::NO_TILE,
+        VisionBits::NO_TILE | explored,
     ]);
     let answers = |p: PlayerId| {
         (0..7)
@@ -1442,9 +1445,16 @@ fn a_player_s_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_
 /// revealed bits 29 and 61 count for nothing.
 #[test]
 fn the_visible_map_s_tile_test_reads_only_the_players_bits() {
-    use crate::vision::{NO_TILE, NO_TILE_EXPLORED};
-    let (seen, explored) = (1 << 1, 1 << 33);
-    let s = sighted(vec![seen, explored, NO_TILE | NO_TILE_EXPLORED, 0]);
+    let (seen, explored) = (
+        VisionBits::from_bits_retain(1 << 1),
+        VisionBits::from_bits_retain(1 << 33),
+    );
+    let s = sighted(vec![
+        seen,
+        explored,
+        VisionBits::NO_TILE | VisionBits::NO_TILE_EXPLORED,
+        VisionBits::NONE,
+    ]);
     let scout = (0..5)
         .map(|x| s.scout_sight(PlayerId::new(1), Tile::new(x, 0)))
         .collect::<Vec<_>>();

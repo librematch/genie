@@ -118,6 +118,7 @@ use crate::unit_ai::task_finder::world::{
 use crate::unit_ai::task_finder::{Actor, Diplomacy};
 use crate::unit_ai::world_view::{DropWorld, Foreign, Wait, patrol_information};
 use crate::unit_ai::{Effect, Notify, UnitAi};
+use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::checkpoint::TopAction;
@@ -575,7 +576,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
                 explored: 0,
             })
             .collect(),
-        vec![seen; n],
+        vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
         vec![false; players],
@@ -1505,7 +1506,7 @@ fn a_new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
     placeable(&mut t);
     let v = t.spatial.sight.as_mut().unwrap();
     // players 0 and 2 explored the tile, player 1 did not
-    v.unified[30 * 120 + 20] = 1 << 32 | 1 << 34;
+    v.unified[30 * 120 + 20] = VisionBits::from_bits_retain(1 << 32 | 1 << 34);
     for r in &mut v.resources {
         *r = VisibleResources {
             capacities: vec![32; 5],
@@ -8417,7 +8418,7 @@ fn the_forced_replay_s_removal_leaves_as_an_update_s_leave_does() {
     t.players[0].watched.push(crate::vision::ghost::Watched {
         id: object_id(9),
         cell: crate::vision::ghost::Cell::Tile(0),
-        bits: 0,
+        bits: VisionBits::NONE,
     });
     let game = GameState {
         players: vec![vec![live(7)]],
@@ -9320,21 +9321,21 @@ fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Dist
                 explored: 0,
             })
             .collect(),
-        vec![0; n],
+        vec![VisionBits::NONE; n],
         Vec::new(),
         0,
         vec![false; 3],
     );
     let mut r = crate::vision::registry::Registry::new(3, 65);
-    r.entries.entry(object_id(id)).or_default().mask = 1 << p.get();
+    r.entries.entry(object_id(id)).or_default().mask = VisionBits::from_bits_retain(1 << p.get());
     r.update_unit(UnitUpdate {
         id: object_id(id),
         owner: p.index() as u8,
         position: Point::new(10.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class,
-        old: 0,
-        new: 1 << p.get(),
+        old: VisionBits::NONE,
+        new: VisionBits::from_bits_retain(1 << p.get()),
     })
     .unwrap();
     v.registry = Some(r);
@@ -9918,7 +9919,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
             Distance::new(6.0),
         );
         let v = t.spatial.sight.as_mut().unwrap();
-        v.unified[10 * 40 + 10] = 0b111;
+        v.unified[10 * 40 + 10] = VisionBits::from_bits_retain(0b111);
         t
     };
     let mut t = world(hands_masters(), false, 0);
@@ -11321,7 +11322,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
     t.players[0].watched.push(crate::vision::ghost::Watched {
         id: object_id(7),
         cell: crate::vision::ghost::Cell::Tile(10 * 40 + 10),
-        bits: 0,
+        bits: VisionBits::NONE,
     });
     t.spatial.unit_diplomacy = ByPlayer::new(vec![
         relations([1, 4, 4]),
@@ -11360,15 +11361,15 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         },
     );
     let r = v.registry.as_mut().unwrap();
-    r.entries.entry(object_id(500)).or_default().mask = 0b11;
+    r.entries.entry(object_id(500)).or_default().mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(500),
         owner: 1,
         position: Point::new(11.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
-        old: 0,
-        new: 0b11,
+        old: VisionBits::NONE,
+        new: VisionBits::from_bits_retain(0b11),
     })
     .unwrap();
     t.tick(Millis::new(100));
@@ -11510,15 +11511,15 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
         },
     );
     let r = v.registry.as_mut().unwrap();
-    r.entries.entry(object_id(500)).or_default().mask = 0b11;
+    r.entries.entry(object_id(500)).or_default().mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(500),
         owner: 1,
         position: Point::new(11.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
-        old: 0,
-        new: 0b11,
+        old: VisionBits::NONE,
+        new: VisionBits::from_bits_retain(0b11),
     })
     .unwrap();
     t.tick(Millis::new(100));
@@ -17212,15 +17213,15 @@ fn hunted_without_a_deer(setup: impl FnOnce(&mut Unit)) -> World {
     t.build_mesh().unwrap();
     let mut r = crate::vision::registry::Registry::new(2, 65);
     for (id, x) in [(500, 32.5), (501, 36.5)] {
-        r.entries.entry(object_id(id)).or_default().mask = 1 << 1;
+        r.entries.entry(object_id(id)).or_default().mask = VisionBits::from_bits_retain(1 << 1);
         r.update_unit(UnitUpdate {
             id: object_id(id),
             owner: 0,
             position: Point::new(x, 89.5),
             radii: Footprint::new(0.2, 0.2),
             class: class::PREY,
-            old: 0,
-            new: 1 << 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1 << 1),
         })
         .unwrap();
     }
@@ -19002,7 +19003,7 @@ fn a_built_building_s_death_reaches_its_owner_within_its_update() {
         t.players[1].watched.push(crate::vision::ghost::Watched {
             id: object_id(10028),
             cell: crate::vision::ghost::Cell::Tile(0),
-            bits: 0,
+            bits: VisionBits::NONE,
         });
         in_update(
             &mut t,

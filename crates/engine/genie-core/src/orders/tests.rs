@@ -46,6 +46,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::vision::VisionBits;
 use crate::world::Seconds;
 
 /// The object's own update knows its slot: it is taken while it still holds the object, and
@@ -3041,7 +3042,7 @@ fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     let sight = crate::vision::visibility::Visibility::new(
         GridSize::new(40, 40),
         vec![],
-        vec![u64::MAX; 1600],
+        vec![VisionBits::from_bits_retain(u64::MAX); 1600],
         vec![],
         0,
         vec![],

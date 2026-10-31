@@ -2,6 +2,7 @@ use crate::map_and_sight::{resource_differences, visibility_differences};
 use crate::test_ids::object_id;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
+use genie_core::vision::VisionBits;
 use genie_core::vision::visibility::{Visibility, VisibleMap, VisibleResource, VisibleResources};
 
 /// A 2 × 2 map, Gaia and one player, each tile counted once and the player's unified bits set.
@@ -23,7 +24,7 @@ fn sight() -> Visibility {
     let mut sight = Visibility::default();
     sight.size = GridSize::new(2, 2);
     sight.maps = vec![map(), map()];
-    sight.unified = vec![1 << 1 | 1 << 33; 4];
+    sight.unified = vec![VisionBits::from_bits_retain(1 << 1 | 1 << 33); 4];
     sight.resources = vec![resources(), resources()];
     sight
 }
@@ -42,7 +43,7 @@ fn a_tile_differs_by_its_count_or_its_unified_bits() {
     let mut slice = sight();
     slice.maps[1].explored = 3;
     slice.maps[1].counts[3] = 0;
-    slice.unified[2] = 1 << 1;
+    slice.unified[2] = VisionBits::from_bits_retain(1 << 1);
     assert_eq!(
         visibility_differences(&slice, &sight(), 1),
         [
@@ -53,7 +54,7 @@ fn a_tile_differs_by_its_count_or_its_unified_bits() {
     );
     // another player's bits do not count
     slice = sight();
-    slice.unified[0] |= 1;
+    slice.unified[0] |= VisionBits::from_bits_retain(1);
     assert_eq!(
         visibility_differences(&slice, &sight(), 1),
         Vec::<String>::new()

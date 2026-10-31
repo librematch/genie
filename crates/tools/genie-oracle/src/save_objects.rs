@@ -9,6 +9,7 @@ use genie_core::map::Tile;
 use genie_core::objects::ListIndex;
 use genie_core::objects::ObjectId;
 use genie_core::objects::unit::Unit;
+use genie_core::vision::VisionBits;
 use genie_core::vision::visibility::Visibility;
 use genie_core::world::World;
 use genie_save::generated::world::RgeStaticObject;
@@ -252,7 +253,9 @@ pub fn registry_from_dump(text: &str) -> Result<genie_core::vision::registry::Re
             }
             Some("mask") if w.len() == 3 + genie_core::vision::registry::SLOTS => {
                 let mut entry = Entry {
-                    mask: u64::from_str_radix(w[2], 16).map_err(|_| bad())?,
+                    mask: VisionBits::from_bits_retain(
+                        u64::from_str_radix(w[2], 16).map_err(|_| bad())?,
+                    ),
                     ..Entry::default()
                 };
                 for (k, slot) in entry.slots.iter_mut().enumerate() {

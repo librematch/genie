@@ -33,6 +33,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
 use crate::vision::SightTiles;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
@@ -743,7 +744,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
                 counts: vec![0; n],
                 explored: 0,
             }],
-            vec![0; n],
+            vec![VisionBits::NONE; n],
             Vec::new(),
             0,
             vec![false],
@@ -945,7 +946,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
     let mut v = crate::vision::visibility::Visibility::new(
         GridSize::new(10, 10),
         Vec::new(),
-        vec![0; 100],
+        vec![VisionBits::NONE; 100],
         Vec::new(),
         0,
         Vec::new(),
@@ -1167,12 +1168,18 @@ fn the_resource_commands_side_effects() {
             player(vec![3, 0, 0]),
         ],
     );
-    t.spatial.vision = vec![[0; 2]; 3];
+    t.spatial.vision =
+        crate::players::ByPlayer::new(vec![crate::vision::VisionMasks::default(); 3]);
     t.do_effect(PlayerId::new(1), &[attribute(1, 50, 1, -1, 1.0)], None)
         .unwrap();
     assert!(t.players[1].allied_vision);
     assert_eq!(t.players[1].attributes[50], Amount::new(1.0));
-    assert_eq!(t.spatial.vision[1][0] & 0b110, 0b110);
+    assert!(
+        t.spatial
+            .vision
+            .get(PlayerId::new(1))
+            .is_some_and(|m| m.visible.bits() & 0b110 == 0b110)
+    );
     t.do_effect(PlayerId::new(2), &[attribute(1, 0xc4, 0, -1, 7.0)], None)
         .unwrap();
     let spread: Vec<f32> = t.players.iter().map(|p| p.attributes[0xc4].get()).collect();
@@ -1182,7 +1189,12 @@ fn the_resource_commands_side_effects() {
     assert_eq!(t.players[1].attributes[0xc4], Amount::new(7.0));
     t.do_effect(PlayerId::new(1), &[attribute(1, 0xb7, 0, -1, 1.0)], None)
         .unwrap();
-    assert_eq!(t.spatial.vision[1][0] & 0b110, 0b110);
+    assert!(
+        t.spatial
+            .vision
+            .get(PlayerId::new(1))
+            .is_some_and(|m| m.visible.bits() & 0b110 == 0b110)
+    );
     assert!(
         t.do_effect(PlayerId::new(1), &[attribute(1, 0x21, 0, -1, 7.0)], None)
             .is_err()

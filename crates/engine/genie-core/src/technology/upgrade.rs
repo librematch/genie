@@ -715,6 +715,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
+    use crate::vision::VisionBits;
     use crate::world::Millis;
     use crate::world::Seconds;
     use crate::world::WorldTime;
@@ -1552,7 +1553,7 @@ mod tests {
             let mut v = crate::vision::visibility::Visibility::new(
                 GridSize::new(20, 20),
                 vec![map()],
-                vec![0; 400],
+                vec![VisionBits::NONE; 400],
                 Vec::new(),
                 0,
                 vec![false],

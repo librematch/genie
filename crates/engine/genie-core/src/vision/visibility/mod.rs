@@ -36,7 +36,8 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
-use crate::vision::registry::{MASK, Registry};
+use crate::vision::VisionBits;
+use crate::vision::registry::Registry;
 use crate::world::slots::CheckedIndex;
 use std::collections::BTreeMap;
 
@@ -232,7 +233,7 @@ pub struct Visibility {
     /// By player index (Gaia 0).
     pub maps: Vec<VisibleMap>,
     /// Map `+0x5e30`, row by row.
-    pub unified: Vec<u64>,
+    pub unified: Vec<VisionBits>,
     /// Per tile, the `+0x19` link bits and the `+0x1a` byte (a direction to the anchor, or the
     /// anchor's UMV entry).
     links: Vec<(u8, u8)>,
@@ -312,7 +313,7 @@ impl Visibility {
     pub fn new(
         size: GridSize,
         maps: Vec<VisibleMap>,
-        unified: Vec<u64>,
+        unified: Vec<VisionBits>,
         extents: Vec<Extent>,
         extents_capacity: i32,
         computer: Vec<bool>,
@@ -387,17 +388,11 @@ impl Visibility {
         if !self.size.holds(tile) {
             return Ok(());
         }
-        let mut explored = (*self.unified.checked(self.index(tile))? & MASK) >> 32;
-        let mut p = 0;
-        while explored != 0 {
-            if explored & 1 != 0 {
-                let Some(r) = self.resources.get_mut(p) else {
-                    break;
-                };
+        let word = *self.unified.checked(self.index(tile))? & VisionBits::OBJECT_MASK;
+        for (p, r) in PlayerId::each(self.resources.len()).zip(&mut self.resources) {
+            if word.intersects(VisionBits::explored(p)) {
                 let _ = r.remove(id, group);
             }
-            p += 1;
-            explored >>= 1;
         }
         Ok(())
     }

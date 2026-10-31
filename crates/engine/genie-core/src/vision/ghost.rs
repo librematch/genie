@@ -28,7 +28,7 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
-use crate::vision::registry::MASK;
+use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -64,7 +64,7 @@ pub struct Watched {
     /// What it follows (`+8`).
     pub cell: Cell,
     /// The bits last seen (`+0x10`).
-    pub bits: u64,
+    pub bits: VisionBits,
 }
 
 /// What a ghost's link (`FUN_14108f9b0`) reads of its original.
@@ -92,7 +92,7 @@ pub struct Ghost {
     /// The original's master (`+0x7d0`), while it is known.
     pub original_master: Option<MasterId>,
     /// The original's owner (`+0x7d8`, the save's `doppled_player`).
-    pub original_owner: usize,
+    pub original_owner: PlayerId,
     /// Its place.
     pub position: Position,
     /// Its tile (`+0x7dc`, `+0x7e0`).
@@ -101,7 +101,7 @@ pub struct Ghost {
     /// building's footprint it follows besides its own; 0 for none.
     pub footprint: u8,
     /// The bits last seen (`+0x7e8`, not saved).
-    pub bits: u64,
+    pub bits: VisionBits,
     /// The players who cannot see it (`+0x7f0`, the save's `CantSeeBits`).
     pub cant_see: u32,
     /// `+0x7f7`: its viewer saw its tile while the original's mask had not.
@@ -112,20 +112,20 @@ pub struct Ghost {
 
 impl World {
     /// The vision mask of player `p` (`player+0x2a8`, [`crate::vision`]).
-    fn vision_mask(&self, p: PlayerId) -> u64 {
-        self.spatial.vision(p)[0]
+    fn vision_mask(&self, p: PlayerId) -> VisionBits {
+        self.spatial.vision(p).visible
     }
 
     /// The unified map's visible and explored bits at `tile` (`map+0x5e30`, masked); 0 off the
     /// map or without the players' sight.
-    fn tile_bits(&self, tile: Tile) -> Result<u64, GenieError> {
+    fn tile_bits(&self, tile: Tile) -> Result<VisionBits, GenieError> {
         let Some(v) = self.spatial.sight.as_ref() else {
-            return Ok(0);
+            return Ok(VisionBits::NONE);
         };
         let Some(i) = v.size.index(tile) else {
-            return Ok(0);
+            return Ok(VisionBits::NONE);
         };
-        Ok(*v.unified.checked(i)? & MASK)
+        Ok(*v.unified.checked(i)? & VisionBits::OBJECT_MASK)
     }
 
     /// `tile`'s index in the unified map.
@@ -134,14 +134,14 @@ impl World {
     }
 
     /// What a cell shows now.
-    fn cell_bits(&self, cell: Cell) -> Result<u64, GenieError> {
+    fn cell_bits(&self, cell: Cell) -> Result<VisionBits, GenieError> {
         match cell {
             Cell::Tile(i) => Ok(self
                 .spatial
                 .sight
                 .as_ref()
                 .and_then(|v| v.unified.get(i))
-                .map_or(0, |b| b & MASK)),
+                .map_or(VisionBits::NONE, |&b| b & VisionBits::OBJECT_MASK)),
             Cell::Mask(id) => {
                 let registry = self
                     .spatial
@@ -151,7 +151,11 @@ impl World {
                     .ok_or(GenieError::unsupported(
                         "a watched building without the objects-in-sight registry",
                     ))?;
-                Ok(registry.entries.get(&id).map_or(0, |e| e.mask) & MASK)
+                Ok(registry
+                    .entries
+                    .get(&id)
+                    .map_or(VisionBits::NONE, |e| e.mask)
+                    & VisionBits::OBJECT_MASK)
             }
         }
     }
@@ -352,20 +356,12 @@ impl World {
         }
         let tile = Self::tile_at(position);
         let bits = self.tile_bits(tile)?;
-        let (mut explored, mut visible) = (bits >> 32, bits & 0x1ff_ffff);
-        let mut i = 0usize;
-        while explored != 0 {
-            if explored & 1 != 0 {
-                if self.players.len() <= i {
-                    break;
-                }
-                if visible & 1 == 0 && 0 < i {
-                    self.make_ghost(PlayerId::try_from(i)?, position, original)?;
-                }
+        // each player past Gaia that explored the tile and does not see it, in order
+        for i in PlayerId::each(self.players.len()).skip(1) {
+            if bits.intersects(VisionBits::explored(i)) && !bits.intersects(VisionBits::visible(i))
+            {
+                self.make_ghost(i, position, original)?;
             }
-            i += 1;
-            explored >>= 1;
-            visible >>= 1;
         }
         let _ = self.watch(p, id, tile)?;
         Ok(())
@@ -414,11 +410,11 @@ impl World {
             original: (!gone).then_some(original.id),
             original_id: if gone { None } else { Some(original.id) },
             original_master: Some(original.master),
-            original_owner: original.owner.index(),
+            original_owner: original.owner,
             position: at,
             tile: Self::tile_at(at),
             footprint: if MASKED_KIND <= kind { umv } else { 0 },
-            bits: 0,
+            bits: VisionBits::NONE,
             cant_see: 0,
             seen: false,
             state: ObjectState::Alive,
@@ -527,7 +523,7 @@ impl World {
     }
 
     /// The bits of the ghost's tile and, for a building's ghost, of its footprint's tiles.
-    fn ghost_bits(&self, g: &Ghost) -> Result<u64, GenieError> {
+    fn ghost_bits(&self, g: &Ghost) -> Result<VisionBits, GenieError> {
         let (px, py) = (g.position.x(), g.position.y());
         let mut bits = self.tile_bits(g.tile)?;
         if g.footprint != 0 {
@@ -550,17 +546,15 @@ impl World {
 
     /// Whether the ghost is unseen by a player that sees its original's tile no more, and the
     /// players who cannot see it: those sharing the original owner's sight note themselves.
-    fn ghost_viewers(&self, p: PlayerId, g: &Ghost, bits: u64) -> (bool, u32) {
+    fn ghost_viewers(&self, p: PlayerId, g: &Ghost, bits: VisionBits) -> (bool, u32) {
         let mut unseen = false;
         let mut cant_see = g.cant_see;
         for i in PlayerId::each(self.players.len()).skip(1) {
             let mask = self.vision_mask(i);
-            if (mask >> g.original_owner) & 1 == 0 {
-                if (mask >> p.get()) & 1 != 0 && bits & mask == 0 {
-                    unseen = true;
-                }
-            } else {
+            if mask.intersects(VisionBits::visible(g.original_owner)) {
                 cant_see |= 1 << i.get();
+            } else if mask.intersects(VisionBits::visible(p)) && !bits.intersects(mask) {
+                unseen = true;
             }
         }
         (unseen, cant_see)
@@ -572,18 +566,19 @@ impl World {
         &self,
         p: PlayerId,
         g: &Ghost,
-        bits: u64,
+        bits: VisionBits,
         unseen: bool,
     ) -> Result<(bool, bool), GenieError> {
         let viewer = self.vision_mask(p);
         let mut seen = g.seen;
         let mut destroy = false;
-        if bits & viewer != 0 && !unseen && g.state < ObjectState::Dying {
+        if bits.intersects(viewer) && !unseen && g.state < ObjectState::Dying {
             if g.footprint != 0
                 && let Some(o) = g.original
             {
                 let original_mask = self.cell_bits(Cell::Mask(o))?;
-                if original_mask & viewer == 0 && self.tile_bits(g.tile)? & viewer == 0 {
+                if !original_mask.intersects(viewer) && !self.tile_bits(g.tile)?.intersects(viewer)
+                {
                     seen = true;
                 }
             }
@@ -648,19 +643,17 @@ impl World {
                         state: u.life.state,
                         master: u.life.master_id,
                     };
-                    let mut lost = (((w.bits ^ bits) & w.bits) >> 1) & 0x7fff_ffff;
-                    let mut i = 1usize;
-                    while lost != 0 {
-                        if lost & 1 != 0 && i != p.index() {
-                            self.make_ghost(PlayerId::try_from(i)?, at, original)?;
-                            if self.players.get(i).is_some_and(|q| q.computer) {
+                    // the visible bits the entry lost, of players 1 to 31 other than its own
+                    let lost = w.bits & !bits;
+                    for i in PlayerId::each(32).skip(1) {
+                        if lost.intersects(VisionBits::visible(i)) && i != p {
+                            self.make_ghost(i, at, original)?;
+                            if self.players.player(i).is_ok_and(|q| q.computer) {
                                 return Err(GenieError::unsupported(
                                     "a computer player's notify of its ghost (0x20d)",
                                 ));
                             }
                         }
-                        i += 1;
-                        lost >>= 1;
                     }
                 }
             }
@@ -766,7 +759,7 @@ mod tests {
         let mut sight = Visibility::new(
             GridSize::new(4, 4),
             Vec::new(),
-            vec![0; 16],
+            vec![VisionBits::NONE; 16],
             Vec::new(),
             0,
             Vec::new(),
@@ -792,7 +785,7 @@ mod tests {
     }
 
     fn set_tile(t: &mut World, x: usize, y: usize, bits: u64) {
-        t.spatial.sight.as_mut().unwrap().unified[y * 4 + x] = bits;
+        t.spatial.sight.as_mut().unwrap().unified[y * 4 + x] = VisionBits::from_bits_retain(bits);
     }
 
     #[test]
@@ -810,7 +803,7 @@ mod tests {
             [Watched {
                 id: object_id(9),
                 cell: Cell::Mask(object_id(9)),
-                bits: 0x0000_0002_0000_0002,
+                bits: VisionBits::from_bits_retain(0x0000_0002_0000_0002),
             }]
         );
         // a second watch and another owner's object are refused
@@ -833,7 +826,7 @@ mod tests {
             [Watched {
                 id: object_id(5),
                 cell: Cell::Tile(9),
-                bits: 0x0000_0001_0000_0000,
+                bits: VisionBits::from_bits_retain(0x0000_0001_0000_0000),
             }]
         );
     }
@@ -855,7 +848,10 @@ mod tests {
             (g.id, g.original, g.original_id),
             (object_id(-3), Some(object_id(5)), Some(object_id(5)))
         );
-        assert_eq!((g.original_owner, g.original_master), (0, Some(MINE)));
+        assert_eq!(
+            (g.original_owner, g.original_master),
+            (PlayerId::GAIA, Some(MINE))
+        );
         assert_eq!(
             (g.tile, g.state, g.cant_see, g.footprint),
             (Tile::new(1, 2), ObjectState::Alive, 0, 0)
@@ -866,7 +862,7 @@ mod tests {
             [Watched {
                 id: object_id(5),
                 cell: Cell::Tile(9),
-                bits: 0x0000_000f_0000_0002,
+                bits: VisionBits::from_bits_retain(0x0000_000f_0000_0002),
             }]
         );
         // a master that leaves no ghosts, or an id below 0, gives none and no watch
@@ -944,11 +940,11 @@ mod tests {
             original: None,
             original_id,
             original_master: Some(HOUSE),
-            original_owner: 1,
+            original_owner: PlayerId::new(1),
             position,
             tile: Tile::new(position.x() as i32, position.y() as i32),
             footprint: 0,
-            bits: 0,
+            bits: VisionBits::NONE,
             cant_see: 0,
             seen: false,
             state,
@@ -1029,11 +1025,11 @@ mod tests {
             original: None,
             original_id: Some(object_id(9)),
             original_master: Some(HOUSE),
-            original_owner: 1,
+            original_owner: PlayerId::new(1),
             position: Position::new(2.5, 1.5, 0.0),
             tile: Tile::new(2, 1),
             footprint: 0,
-            bits: 0,
+            bits: VisionBits::NONE,
             cant_see: 0,
             seen: false,
             state: ObjectState::Alive,
@@ -1070,11 +1066,11 @@ mod tests {
             original: Some(object_id(9)),
             original_id: Some(object_id(9)),
             original_master: Some(HOUSE),
-            original_owner: 1,
+            original_owner: PlayerId::new(1),
             position: Position::new(2.5, 1.5, 0.0),
             tile: Tile::new(2, 1),
             footprint,
-            bits: 0,
+            bits: VisionBits::NONE,
             cant_see: 0,
             seen: false,
             state: ObjectState::Alive,
@@ -1094,7 +1090,11 @@ mod tests {
         let g = t.players[2].ghosts[0];
         assert_eq!(
             (g.state, g.bits, g.cant_see),
-            (ObjectState::Alive, 1 << 1, 1 << 1)
+            (
+                ObjectState::Alive,
+                VisionBits::from_bits_retain(1 << 1),
+                1 << 1
+            )
         );
         t.players[2].ghosts[0].cant_see = 0;
         t.update_ghosts(PlayerId::new(2)).unwrap();
@@ -1110,7 +1110,7 @@ mod tests {
         set_tile(&mut t, 2, 1, 1 << 1);
         t.update_ghosts(PlayerId::new(2)).unwrap();
         let g = t.players[2].ghosts[0];
-        assert_eq!((g.state, g.bits), (ObjectState::Removed, 0));
+        assert_eq!((g.state, g.bits), (ObjectState::Removed, VisionBits::NONE));
     }
 
     /// A ghost its viewer sees stays while a player sharing the viewer's sight (but not the
@@ -1125,23 +1125,28 @@ mod tests {
         }
         let own = |p| crate::vision::own_masks(p, false);
         let with = |p, bits: u64| {
-            let [v, e] = own(p);
-            [v | bits, e]
+            let mut masks = own(p);
+            masks.visible |= VisionBits::from_bits_retain(bits);
+            masks
         };
-        t.spatial.vision = vec![
+        t.spatial.vision = crate::players::ByPlayer::new(vec![
             own(PlayerId::new(0)),
             own(PlayerId::new(1)),
             with(PlayerId::new(2), (1 << 3) | (1 << 4)),
             with(PlayerId::new(3), 1 << 2),
             own(PlayerId::new(4)),
-        ];
+        ]);
         t.players[2].ghosts = vec![house_ghost(0)];
         set_tile(&mut t, 2, 1, 1 << 4);
         t.update_ghosts(PlayerId::new(2)).unwrap();
         let g = t.players[2].ghosts[0];
         assert_eq!(
             (g.state, g.bits, g.cant_see),
-            (ObjectState::Alive, 1 << 4, 1 << 1)
+            (
+                ObjectState::Alive,
+                VisionBits::from_bits_retain(1 << 4),
+                1 << 1
+            )
         );
         set_tile(&mut t, 2, 1, (1 << 3) | (1 << 4));
         t.update_ghosts(PlayerId::new(2)).unwrap();
@@ -1165,7 +1170,7 @@ mod tests {
         let _ = registry.entries.insert(
             object_id(9),
             crate::vision::registry::Entry {
-                mask: 1 << 1,
+                mask: VisionBits::from_bits_retain(1 << 1),
                 ..crate::vision::registry::Entry::default()
             },
         );
@@ -1177,7 +1182,11 @@ mod tests {
         let g = t.players[2].ghosts[0];
         assert_eq!(
             (g.state, g.seen, g.bits),
-            (ObjectState::Alive, true, (1 << 1) | (1 << 2))
+            (
+                ObjectState::Alive,
+                true,
+                VisionBits::from_bits_retain((1 << 1) | (1 << 2))
+            )
         );
         t.update_ghosts(PlayerId::new(2)).unwrap();
         assert_eq!(t.players[2].ghosts[0].state, ObjectState::Removed);
@@ -1202,7 +1211,10 @@ mod tests {
         t.watch_pass(PlayerId::new(0)).unwrap();
         assert_eq!(t.players[1].ghosts.len(), 1);
         assert_eq!(t.players[2].ghosts.len(), 1);
-        assert_eq!(t.players[0].watched[0].bits, 0x0000_0007_0000_0001);
+        assert_eq!(
+            t.players[0].watched[0].bits,
+            VisionBits::from_bits_retain(0x0000_0007_0000_0001)
+        );
         // a computer viewer gets its ghost, then its AI's notify is not modelled
         let mut t = world(true);
         t.players[2].computer = true;

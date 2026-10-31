@@ -62,6 +62,8 @@ tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "registry", "std"] }
 # the getters of the engine's newtypes, whose values only their checked constructors set
 getset = "0.1.7"
+# the engine's bit sets (C-BITFLAG, FD-043): named bits, the bit operators and their formats
+bitflags = "2.13"
 
 # see: https://nnethercote.github.io/perf-book/build-configuration.html
 [profile.dev]

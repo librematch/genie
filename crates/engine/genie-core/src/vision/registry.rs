@@ -17,11 +17,9 @@ use crate::players::ByRelation;
 use crate::players::PlayerId;
 #[cfg(test)]
 use crate::players::UnitRelation;
+use crate::vision::VisionBits;
 use crate::world::slots::CheckedIndex;
 use std::collections::BTreeMap;
-
-/// The unified map bits an object's mask keeps (`0x1ffffff01ffffff`): 25 visible and 25 explored.
-pub const MASK: u64 = 0x1ff_ffff_01ff_ffff;
 
 /// The players a mask has room for in `Update_Unit_Info`'s loop: the object's record pointers
 /// (`+0x8b0`) are nine.
@@ -65,7 +63,7 @@ pub struct Record {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Entry {
     /// Its mask (`+0x8f8`): the players whose lists hold it.
-    pub mask: u64,
+    pub mask: VisionBits,
     /// Per player, its record's index in that player's list of its class (`+0x8b0`).
     pub slots: [Option<usize>; SLOTS],
 }
@@ -85,9 +83,9 @@ pub struct UnitUpdate {
     /// Its master's class.
     pub class: ClassId,
     /// The mask of the players that saw it.
-    pub old: u64,
+    pub old: VisionBits,
     /// The mask of the players that see it.
-    pub new: u64,
+    pub new: VisionBits,
 }
 
 /// A query for the visible units of a player ([`Registry::visible_units`]'s arguments,
@@ -158,8 +156,8 @@ impl Registry {
         } = unit;
         let (x, y) = (position.x(), position.y());
         let (rx, ry) = (radii.x(), radii.y());
-        let mut changed = (old ^ new) & 0xffff;
-        let mut seen = new;
+        let mut changed = (old.bits() ^ new.bits()) & 0xffff;
+        let mut seen = new.bits();
         let Some(class) = class.index() else {
             return Err(GenieError::unsupported(
                 "a registry update for a master without a class",
@@ -374,8 +372,8 @@ mod tests {
                 position: Point::new(id as f32, 5.0),
                 radii: Footprint::new(0.2, 0.2),
                 class: class::VILLAGER,
-                old: 0,
-                new: 0b101,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(0b101),
             })
             .unwrap();
         }
@@ -392,8 +390,8 @@ mod tests {
             position: Point::new(1.0, 5.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
-            old: 0b101,
-            new: 0b100,
+            old: VisionBits::from_bits_retain(0b101),
+            new: VisionBits::from_bits_retain(0b100),
         })
         .unwrap();
         assert_eq!(
@@ -416,8 +414,8 @@ mod tests {
             position: Point::new(12.0, 10.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         r.update_unit(UnitUpdate {
@@ -426,8 +424,8 @@ mod tests {
             position: Point::new(10.0, 13.5),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         r.update_unit(UnitUpdate {
@@ -436,8 +434,8 @@ mod tests {
             position: Point::new(13.0, 13.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         r.update_unit(UnitUpdate {
@@ -446,8 +444,8 @@ mod tests {
             position: Point::new(10.5, 10.5),
             radii: Footprint::new(0.2, 0.2),
             class: class::PREY,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         let relations = crate::players::relations([1, 4, 4]);
@@ -512,8 +510,8 @@ mod tests {
             position: Point::new(53.5, 10.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         r.update_unit(UnitUpdate {
@@ -522,8 +520,8 @@ mod tests {
             position: Point::new(60.0, 10.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         let found = r
@@ -562,8 +560,8 @@ mod tests {
             position: Point::new(15.0, 10.0),
             radii: Footprint::new(2.0, 2.0),
             class: class::VILLAGER,
-            old: 0,
-            new: 1,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
         let found = r

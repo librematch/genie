@@ -39,7 +39,10 @@ pub struct GameState {
     /// Objects the slice modelled but got wrong this tick: they take the game's state too.
     pub resync: Vec<ObjectId>,
     /// The players' visible maps and the unified map, when the slice's differ.
-    pub sight: Option<(Vec<crate::vision::visibility::VisibleMap>, Vec<u64>)>,
+    pub sight: Option<(
+        Vec<crate::vision::visibility::VisibleMap>,
+        Vec<crate::vision::VisionBits>,
+    )>,
     /// `next_reusable_object_id`: the fog ghosts that take reusable ids are not modelled.
     pub next_reusable_id: ObjectId,
     /// The map tiles' object lists in the game's order (`x`, `y`, ids; each tile of two objects

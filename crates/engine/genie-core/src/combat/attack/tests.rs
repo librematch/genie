@@ -1160,9 +1160,9 @@ fn ready_to_attack_on_a_target_out_of_sight_fails_or_waits() {
 /// The players' sight over a 16×16 map: every tile revealed and explored (seen), or none.
 fn sight(seen: bool) -> crate::vision::visibility::Visibility {
     let word = if seen {
-        crate::vision::NO_TILE | crate::vision::NO_TILE_EXPLORED
+        crate::vision::VisionBits::NO_TILE | crate::vision::VisionBits::NO_TILE_EXPLORED
     } else {
-        0
+        crate::vision::VisionBits::NONE
     };
     crate::vision::visibility::Visibility::new(
         GridSize::new(16, 16),

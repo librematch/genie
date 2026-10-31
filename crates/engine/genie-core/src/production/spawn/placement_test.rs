@@ -62,7 +62,7 @@ pub struct Near {
     pub fog_visibility: u8,
     /// A building's visibility mask (`+0x8f8`, the registry's) when its footprint has a UMV entry
     /// (`+0x904` not 0); None otherwise.
-    pub fog_mask: Option<u64>,
+    pub fog_mask: Option<crate::vision::VisionBits>,
     /// It holds an amount (`+0x310` above 0) of food, wood, stone or gold (its attribute,
     /// `+0x308`, through `FUN_140fdd470` below 4: 0 to 3 and the meats 15 to 17).
     pub holds: bool,
@@ -161,7 +161,7 @@ pub trait PlaceMap {
     /// The player sees the tile now (its mask `+0x2a8` meets the tile's visible bits).
     fn visible(&self, player: PlayerId, tile: Tile) -> bool;
     /// The player's masks: what it sees (`+0x2a8`) and what it explored (`+0x2a0`).
-    fn vision(&self, player: PlayerId) -> [u64; 2];
+    fn vision(&self, player: PlayerId) -> crate::vision::VisionMasks;
     /// A tile's elevation (`+0x14`), when the map holds it.
     fn elevation(&self, tile: Tile) -> Option<u8>;
     /// A tile's shape (`+0x8`, [`crate::map::terrain::Terrain::set_elevations`]), when the map holds
@@ -409,11 +409,11 @@ pub(super) fn build_sees(
         // without a fog visibility only the player's own objects count, and a
         // building (not a farm) whose visibility mask meets both the player's masks
         if fog == 0 {
-            let [sees, explored] = map.vision(player);
+            let masks = map.vision(player);
             let shown = o.class != class::FARM
                 && master_type::RGE_COMBAT <= o.kind
                 && o.fog_mask
-                    .is_some_and(|m| m & explored != 0 && m & sees != 0);
+                    .is_some_and(|m| m.intersects(masks.explored) && m.intersects(masks.visible));
             if !shown && (o.player != player || !map.allied(o.player, player, true)) {
                 return Ok(false);
             }

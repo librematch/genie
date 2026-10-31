@@ -18,6 +18,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::test_ids::carrying;
 use crate::unit_ai::NotifyKind;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
 
@@ -753,7 +754,7 @@ fn a_builder_whose_move_to_failed_waits_or_halts_on_marks() {
         t.spatial.sight = Some(crate::vision::visibility::Visibility::new(
             GridSize::new(20, 20),
             Vec::new(),
-            vec![1 << 1; 400],
+            vec![VisionBits::from_bits_retain(1 << 1); 400],
             Vec::new(),
             0,
             Vec::new(),

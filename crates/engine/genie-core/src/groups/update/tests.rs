@@ -38,6 +38,7 @@ use crate::test_ids::object_id_list;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -123,7 +124,7 @@ fn world() -> World {
     s.sight = Some(crate::vision::visibility::Visibility::new(
         GridSize::new(8, 8),
         Vec::new(),
-        vec![0; 64],
+        vec![VisionBits::NONE; 64],
         Vec::new(),
         0,
         Vec::new(),
@@ -153,7 +154,11 @@ fn world() -> World {
 /// Player `p` sees tile (`x`, `y`) (`seen`) or only explored it.
 fn light(t: &mut World, p: usize, x: usize, y: usize, seen: bool) {
     let v = t.spatial.sight.as_mut().unwrap();
-    v.unified[y * 8 + x] |= if seen { 1 << p } else { 1 << (32 + p) };
+    v.unified[y * 8 + x] |= if seen {
+        VisionBits::from_bits_retain(1 << p)
+    } else {
+        VisionBits::from_bits_retain(1 << (32 + p))
+    };
 }
 
 /// The members' check of `FUN_14103d910`: 11 below 1 hit point, 12 of another player, 13

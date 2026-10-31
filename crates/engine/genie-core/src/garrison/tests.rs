@@ -60,6 +60,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
@@ -1619,7 +1620,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
                 explored: 0,
             })
             .collect(),
-        vec![seen; n],
+        vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
         vec![false; 4],

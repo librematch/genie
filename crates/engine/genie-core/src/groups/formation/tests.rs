@@ -28,6 +28,7 @@ use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
+use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -252,11 +253,11 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
         original: None,
         original_id: None,
         original_master: None,
-        original_owner: 1,
+        original_owner: PlayerId::new(1),
         position: Position::new(3.0, 4.0, 0.0),
         tile: Tile::new(3, 4),
         footprint: 0,
-        bits: 0,
+        bits: VisionBits::NONE,
         cant_see: 0,
         seen: false,
         state: ObjectState::Alive,
@@ -592,11 +593,11 @@ pub(crate) fn ghost_at(id: i32, x: f32, y: f32) -> crate::vision::ghost::Ghost {
         original: None,
         original_id: None,
         original_master: None,
-        original_owner: 1,
+        original_owner: PlayerId::new(1),
         position: Position::new(x, y, 0.0),
         tile: Tile::new(x as i32, y as i32),
         footprint: 0,
-        bits: 0,
+        bits: VisionBits::NONE,
         cant_see: 0,
         seen: false,
         state: ObjectState::Alive,

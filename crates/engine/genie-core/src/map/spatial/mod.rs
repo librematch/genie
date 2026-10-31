@@ -611,7 +611,7 @@ pub struct Spatial {
     pub sight: Option<Visibility>,
     /// Each player's vision masks, visible (`+0x2a8`) and explored (`+0x2a0`), as the world's
     /// rebuild sets them ([`crate::vision`]); a player without them sees with its own bits.
-    pub vision: Vec<[u64; 2]>,
+    pub vision: crate::players::ByPlayer<crate::vision::VisionMasks>,
     /// The map's terrain, when the slice holds it.
     pub terrain: Option<crate::map::terrain::Terrain>,
     /// The unit AIs' search cache ([`SearchCache`]).

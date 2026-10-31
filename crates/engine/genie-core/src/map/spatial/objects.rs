@@ -52,7 +52,7 @@ impl Spatial {
             unit_diplomacy: crate::players::ByPlayer::default(),
             task_0x99: Vec::new(),
             sight: None,
-            vision: Vec::new(),
+            vision: crate::players::ByPlayer::default(),
             terrain: None,
             search_cache: SearchCache::default(),
             grid: Grid::new(map),
@@ -212,9 +212,9 @@ impl Spatial {
         let Some(&unified) = v.size.index(tile).and_then(|i| v.unified.get(i)) else {
             return false;
         };
-        let word = unified & crate::vision::registry::MASK;
-        let [seen, explored] = self.vision(player);
-        word & seen != 0 && word & explored != 0
+        let word = unified & crate::vision::VisionBits::OBJECT_MASK;
+        let masks = self.vision(player);
+        word.intersects(masks.visible) && word.intersects(masks.explored)
     }
 
     /// The object `id`'s place, if the world holds it.

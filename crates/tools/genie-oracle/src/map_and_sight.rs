@@ -12,6 +12,7 @@ use genie_core::map::Position;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::players::PlayerId;
+use genie_core::vision::VisionBits;
 use genie_core::vision::visibility::{
     BuildingSight, Extent, Seer, Visibility, VisibleMap, VisibleResource, VisibleResources,
     capture_kind,
@@ -325,8 +326,17 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
         maps,
         map.unified_vis_map
             .unified_visible_map
-            .clone()
-            .unwrap_or_else(|| vec![0; n]),
+            .as_ref()
+            .map_or_else(
+                || vec![VisionBits::NONE; n],
+                |words| {
+                    words
+                        .iter()
+                        .copied()
+                        .map(VisionBits::from_bits_retain)
+                        .collect()
+                },
+            ),
         extents,
         umv.umv_data_list_size,
         players
@@ -397,13 +407,15 @@ pub fn visibility_differences(slice: &Visibility, game: &Visibility, player: usi
     }
     out.extend(resource_differences(slice, game, player));
     let w = slice.size.width().max(1) as usize;
-    let bits = 1u64 << player | 1u64 << (32 + player);
+    let bits = PlayerId::try_from(player).map_or(VisionBits::NONE, |p| {
+        VisionBits::visible(p) | VisionBits::explored(p)
+    });
     let unified_same = || {
         slice
             .unified
             .iter()
             .zip(&game.unified)
-            .all(|(u, v)| u & bits == v & bits)
+            .all(|(&u, &v)| u & bits == v & bits)
     };
     // the usual case, every tile the same, without a look at each tile's place
     if a.counts == b.counts && unified_same() {

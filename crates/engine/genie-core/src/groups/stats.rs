@@ -577,6 +577,7 @@ mod tests {
     use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
     use crate::players::PlayerId;
+    use crate::vision::VisionBits;
     use crate::world::Millis;
     use crate::world::WorldTime;
 
@@ -713,8 +714,8 @@ mod tests {
                 position: at,
                 radii: Footprint::new(0.2, 0.2),
                 class,
-                old: 0,
-                new: 1 << 1,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1 << 1),
             })
             .unwrap();
         }
@@ -797,8 +798,8 @@ mod tests {
                     position: Point::new(13.0, 5.0),
                     radii: Footprint::new(0.2, 0.2),
                     class: class::CLASS_6,
-                    old: 0,
-                    new: 1 << 1,
+                    old: VisionBits::NONE,
+                    new: VisionBits::from_bits_retain(1 << 1),
                 })
                 .unwrap();
             t.players[1].objects[ListIndex::new(0)]

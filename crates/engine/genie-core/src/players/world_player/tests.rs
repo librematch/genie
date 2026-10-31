@@ -23,6 +23,7 @@ use crate::players::tracker::Key;
 use crate::technology::ResearchState;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::vision::VisionBits;
 use crate::vision::visibility::{Visibility, VisibleMap};
 use crate::world::Millis;
 use crate::world::Player;
@@ -135,7 +136,7 @@ fn attribute_22_is_the_explored_share_in_percent() {
     t.spatial.sight = Some(Visibility::new(
         GridSize::new(10, 10),
         vec![map(0), map(37), map(0), map(0)],
-        vec![0; 100],
+        vec![VisionBits::NONE; 100],
         Vec::new(),
         0,
         vec![false; 4],
@@ -688,8 +689,8 @@ fn the_upgradable_count_follows_the_tech_tree() {
 #[test]
 fn the_scout_map_takes_the_new_tiles() {
     let mut t = world();
-    let mut unified = vec![0u64; 100];
-    unified[0] = 1 << 1;
+    let mut unified = vec![VisionBits::NONE; 100];
+    unified[0] = VisionBits::from_bits_retain(1 << 1);
     let map = VisibleMap {
         counts: vec![-1; 100],
         explored: 0,
