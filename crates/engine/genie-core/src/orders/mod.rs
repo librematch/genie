@@ -217,7 +217,7 @@ struct Followed {
 /// The splitter's path from one unit to another (`FUN_140f7cb30` -> `FUN_140f7c530`): the
 /// planner's result code and the path's length; None without a planner for the restriction.
 type SplitPath<'a> =
-    dyn FnMut(&Splittable, &Splittable) -> Result<Option<(u8, f32)>, GenieError> + 'a;
+    dyn FnMut(&Splittable, &Splittable) -> Result<Option<(u8, Distance)>, GenieError> + 'a;
 
 /// The drop-site table's search starts beyond this squared distance (`FUN_141658e20`,
 /// `DAT_142f89ac4`).
@@ -285,7 +285,8 @@ fn splits_together(
         && d < SPLIT_PATH_REACH
         && let Some((code, length)) = path(a, b)?
     {
-        let joins = code == 1 && crate::math::fmath::at_most_or_unordered(length, f.influence);
+        let joins =
+            code == 1 && crate::math::fmath::at_most_or_unordered(length.get(), f.influence);
         if !joins {
             let _ = far.insert(b.id);
         }

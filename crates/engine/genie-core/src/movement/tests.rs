@@ -112,7 +112,7 @@ fn level(level: u8, points: &[Point], state: PathState) -> PathData {
         target: Some(object_id(10028)),
         pause_time: Seconds::ZERO,
         flags: 0,
-        length: 0.0,
+        length: Distance::ZERO,
         created: WorldTime::from_millis(16360),
         continue_counter: 10,
         repath_time: 0.0,
@@ -1337,15 +1337,15 @@ fn a_path_loses_a_point_or_its_end_only_for_an_index_inside_it() {
             BVector::new(3.0, 0.0, 4.0),
             BVector::ZERO,
         ],
-        length: 12.0,
+        length: Distance::new(12.0),
     };
     assert!(!cut_path(&mut path, -1));
     assert!(!cut_path(&mut path, 4));
-    assert_eq!(path.length, 12.0);
+    assert_eq!(path.length, Distance::new(12.0));
     assert!(cut_path(&mut path, 3));
-    assert_eq!((path.points.len(), path.length), (3, 7.0));
+    assert_eq!((path.points.len(), path.length), (3, Distance::new(7.0)));
     assert!(cut_path(&mut path, 0));
-    assert_eq!((path.points.len(), path.length), (0, 0.0));
+    assert_eq!((path.points.len(), path.length), (0, Distance::ZERO));
     assert!(!cut_path(&mut path, 0));
 }
 
@@ -1381,7 +1381,7 @@ fn a_split_takes_the_midpoint_of_a_stretch_and_skips_an_empty_path() {
     assert_eq!(empty.points, Vec::<BVector>::new());
     let mut path = Path {
         points: vec![BVector::ZERO, BVector::new(4.0, 0.0, 0.0)],
-        length: 4.0,
+        length: Distance::new(4.0),
     };
     split(&mut path, 1);
     assert_eq!(path.points.len(), 2);
@@ -1740,7 +1740,7 @@ fn a_long_path_ends_before_its_first_walled_stretch() {
             BVector::new(28.0, 0.0, 85.0),
             BVector::new(28.0, 0.0, 80.0),
         ],
-        length: 9.0,
+        length: Distance::new(9.0),
     };
     let obstacle = |class, speed, y| Placed {
         position: Position::new(28.0, y, 0.0),
@@ -1847,7 +1847,7 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
         (
             Ok(Some((true, None))),
             vec![BVector::new(28.5, 0.0, 89.5), BVector::new(28.5, 0.0, 60.5)],
-            29.0
+            Distance::new(29.0)
         )
     );
     assert_eq!(
@@ -1859,12 +1859,12 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
         (
             Ok(Some((false, None))),
             vec![BVector::new(28.5, 0.0, 89.5), BVector::new(28.5, 0.0, 75.5)],
-            14.0
+            Distance::new(14.0)
         )
     );
     let short = plan(&band, BVector::new(28.0, 0.0, 72.0), 0.5);
     assert_eq!(short.0, Ok(Some((false, Some(12.5f32.sqrt())))));
-    assert_eq!((short.1.len(), short.2), (0, 0.0));
+    assert_eq!((short.1.len(), short.2), (0, Distance::ZERO));
 }
 
 /// The new level's path is no path (`0x141150f00` after the plans), on 9177's walked level:
@@ -3089,7 +3089,10 @@ fn a_unit_without_a_footprint_takes_the_straight_way() {
     m.paths[0].waypoint = 2;
     let mut np = NewPath::new(WorldTime::ZERO);
     m.straight_way(start, &mut np);
-    assert_eq!((np.path.points, np.path.length), (vec![start], 0.0));
+    assert_eq!(
+        (np.path.points, np.path.length),
+        (vec![start], Distance::ZERO)
+    );
 }
 
 /// A new `MoveTo`'s wait (`FUN_140aa0d30`, `FUN_140aa0df0`): never waited, no time waited, and

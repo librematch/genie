@@ -80,8 +80,8 @@ impl Seeker<'_, '_> {
                 if !by_path {
                     return Ok(Some(squared));
                 }
-                *last = length;
-                if length <= SHORT_DROP_REACH
+                *last = length.get();
+                if length.get() <= SHORT_DROP_REACH
                     && let Some(short) = self.mover.short_reach(
                         &self.me,
                         self.spatial,
@@ -90,7 +90,7 @@ impl Seeker<'_, '_> {
                     )?
                     && short < length
                 {
-                    *last = short;
+                    *last = short.get();
                 }
                 Some(*last)
             }

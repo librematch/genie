@@ -515,7 +515,7 @@ mod tests {
         g.motion.flags = 0;
         g.desired_spacing = 2.0;
         g.stored_positions.points = vec![crate::groups::LinePoint::default(); 2];
-        g.stored_positions.length = 3.0;
+        g.stored_positions.length = Distance::new(3.0);
         t.groups = crate::groups::UnitGroups {
             groups: vec![g],
             ..crate::groups::UnitGroups::default()
@@ -552,7 +552,10 @@ mod tests {
                 0
             )
         );
-        assert_eq!(t.groups.groups[0].stored_positions.length, 3.0);
+        assert_eq!(
+            t.groups.groups[0].stored_positions.length,
+            Distance::new(3.0)
+        );
     }
 
     /// With no member in front the group moves onto the member nearest the point ahead; with

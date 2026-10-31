@@ -15,6 +15,7 @@
 //! in the world, not in the save: the slice builds it from the map's terrain, the restriction's
 //! passability and the obstruction manager's blocked tiles, as the game does at load.
 
+use crate::map::Distance;
 use crate::math::fmath::{self, BVector};
 use genie_diff::Diff;
 
@@ -105,7 +106,7 @@ pub struct Path {
     /// The points.
     pub points: Vec<BVector>,
     /// The length.
-    pub length: f32,
+    pub length: Distance,
 }
 
 impl Path {
@@ -138,7 +139,7 @@ impl Path {
             let d = fmath::sub(*b, *a);
             total += fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
         }
-        self.length = total;
+        self.length = Distance::new(total);
     }
 
     /// Append `other`'s points to these (`FUN_140f95c00`); the length is `other`'s, or measured
@@ -147,7 +148,7 @@ impl Path {
         for &p in &other.points {
             let _ = self.push(p);
         }
-        if fmath::at_most_or_unordered(other.length, 1e-7) {
+        if fmath::at_most_or_unordered(other.length.get(), 1e-7) {
             self.measure();
         } else {
             self.length = other.length;

@@ -264,7 +264,7 @@ impl Mover {
     pub(crate) fn take_record_path(
         &mut self,
         points: Vec<BVector>,
-        length: f32,
+        length: Distance,
         now: WorldTime,
         planned: bool,
     ) {

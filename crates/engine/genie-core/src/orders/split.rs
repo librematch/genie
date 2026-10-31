@@ -219,26 +219,27 @@ impl World {
         // it to the first (FUN_140f7c530, its result and the measured path's length)
         let tiles = self.spatial.tiles();
         let pathing = &mut self.pathing;
-        let mut path = |a: &Splittable, b: &Splittable| -> Result<Option<(u8, f32)>, GenieError> {
-            let Some(restriction) = b.restriction else {
-                return Ok(None);
+        let mut path =
+            |a: &Splittable, b: &Splittable| -> Result<Option<(u8, Distance)>, GenieError> {
+                let Some(restriction) = b.restriction else {
+                    return Ok(None);
+                };
+                let Some(planner) = pathing.planner(restriction, tiles) else {
+                    return Ok(None);
+                };
+                let req = crate::pathing::tile_path::Request {
+                    from: b.position.ground(),
+                    to: a.position.ground(),
+                    radii: a.radius.get(),
+                    range: b.radius,
+                    closed: Vec::new(),
+                    full: false,
+                };
+                let mut p = crate::pathing::tile_path::Path::default();
+                let found = planner.plan::<GenieError>(&req, false, &mut p, None)?;
+                p.measure();
+                Ok(Some((found.code(), p.length)))
             };
-            let Some(planner) = pathing.planner(restriction, tiles) else {
-                return Ok(None);
-            };
-            let req = crate::pathing::tile_path::Request {
-                from: b.position.ground(),
-                to: a.position.ground(),
-                radii: a.radius.get(),
-                range: b.radius,
-                closed: Vec::new(),
-                full: false,
-            };
-            let mut p = crate::pathing::tile_path::Path::default();
-            let found = planner.plan::<GenieError>(&req, false, &mut p, None)?;
-            p.measure();
-            Ok(Some((found.code(), p.length)))
-        };
         // then the unit with the most others that join it, the first of equals, with them
         while !left.is_empty() {
             let mut best = (0, 0);

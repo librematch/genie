@@ -214,7 +214,8 @@ impl World {
                 r.differentiators,
                 &mut way.record,
             )?;
-            if way.record.points.len() < 2 || at_most_or_unordered(way.record.length, EPSILON) {
+            if way.record.points.len() < 2 || at_most_or_unordered(way.record.length.get(), EPSILON)
+            {
                 way.record.points.clear();
             } else {
                 way.result = res;
@@ -274,7 +275,7 @@ impl World {
             && (way.result != REACHED
                 || ROUND_LENGTH < way.record.length
                 || way.record.points.len() < 2
-                || at_most_or_unordered(way.record.length, EPSILON))
+                || at_most_or_unordered(way.record.length.get(), EPSILON))
         {
             way.result = BLOCKED;
             way.record.points.clear();
@@ -307,7 +308,8 @@ impl World {
                 r.differentiators,
                 &mut way.record,
             )?;
-            if way.record.points.len() < 2 || at_most_or_unordered(way.record.length, EPSILON) {
+            if way.record.points.len() < 2 || at_most_or_unordered(way.record.length.get(), EPSILON)
+            {
                 way.result = BLOCKED;
                 way.record.points.clear();
             }

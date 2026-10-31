@@ -177,8 +177,8 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
                     right: vec3(&p.ve_right),
                 })
                 .collect(),
-            length: g.stored_positions.length,
-            desired_length: g.stored_positions.desired_length,
+            length: Distance::new(g.stored_positions.length),
+            desired_length: Distance::new(g.stored_positions.desired_length),
         },
         unit_types: g
             .unit_types

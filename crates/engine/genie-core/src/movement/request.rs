@@ -98,7 +98,7 @@ impl Mover {
         } else {
             self.straight_way(position, &mut np);
         }
-        if np.path.points.len() < 2 || np.path.length < EPSILON {
+        if np.path.points.len() < 2 || np.path.length.get() < EPSILON {
             return self.no_path(np.found, goal.target.map(|(_, t)| t), goal.to_end);
         }
         Ok(self.link(np.new, np.path, np.found, np.partial, np.planned, solid))
@@ -257,14 +257,14 @@ impl Mover {
         )?;
         *path = long;
         path.measure();
-        if path.length < EPSILON {
+        if path.length.get() < EPSILON {
             self.stop()?;
             return Ok(None);
         }
         let end = ground(waypoint, point_or_zero(path, path.points.len() as i32 - 1));
         if way < end {
             path.points.clear();
-            path.length = 0.0;
+            path.length = Distance::ZERO;
             return Ok(Some((found, Some(end))));
         }
         if !self.walled_off(me, world, target_id, path)? {

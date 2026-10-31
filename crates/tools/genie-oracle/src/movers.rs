@@ -131,7 +131,7 @@ pub(super) fn path_level(
         target: ObjectId::of_field(d.target_id),
         pause_time: Seconds::new(f32::from_bits(d.pause_time)),
         flags: d.flags_m_bits,
-        length: path.map_or(0.0, |p| p.path_length_value),
+        length: path.map_or(Distance::ZERO, |p| Distance::new(p.path_length_value)),
         created: path.map_or(WorldTime::ZERO, |p| {
             WorldTime::from_millis(p.creation_time_value)
         }),

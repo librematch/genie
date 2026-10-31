@@ -12660,7 +12660,7 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
     let mut top = crate::movement::PathData::without_path();
     top.has_path = true;
     top.points = vec![BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)];
-    top.length = 10.0;
+    top.length = Distance::new(10.0);
     top.path_flags = 7;
     top.waypoint = 1;
     m.paths = vec![walked, top];
@@ -12669,7 +12669,10 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
         saved.path.points,
         [BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)]
     );
-    assert_eq!((saved.path.length, saved.flags, waypoint), (10.0, 7, 1));
+    assert_eq!(
+        (saved.path.length, saved.flags, waypoint),
+        (Distance::new(10.0), 7, 1)
+    );
     m.paths[1].has_path = false;
     assert_eq!(patrol_information(Some(&m)), None);
     assert_eq!(patrol_information(None), None);
@@ -12687,7 +12690,7 @@ fn a_restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
                 BVector::new(20.0, 0.5, 20.0),
                 BVector::new(30.0, 0.5, 20.25),
             ],
-            length: 10.0,
+            length: Distance::new(10.0),
         },
         flags: 7,
     };

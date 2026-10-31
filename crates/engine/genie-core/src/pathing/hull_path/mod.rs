@@ -230,7 +230,7 @@ impl Waypoints {
 
     /// `BPath::calculatePathLength` (`FUN_140f95a60`): the waypoints' distances summed.
     #[must_use]
-    pub fn length(&self) -> f32 {
+    pub fn length(&self) -> Distance {
         let mut total = 0.0;
         for w in self.points.windows(2) {
             let [a, b] = w else {
@@ -239,7 +239,7 @@ impl Waypoints {
             let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
             total += sqrt(dx * dx + 0.0 * 0.0 + dy * dy);
         }
-        total
+        Distance::new(total)
     }
 }
 

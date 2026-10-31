@@ -154,7 +154,7 @@ pub struct PathData {
     /// pathfinder found only the nearest point.
     pub flags: u32,
     /// The path's length (its `+4`, `mPathLengthValue`).
-    pub length: f32,
+    pub length: Distance,
     /// The path's creation time (its `+8`, `mCreationTimeValue`): the world's time when it was
     /// made.
     pub created: WorldTime,
@@ -379,14 +379,14 @@ const LOOK_AHEAD: f32 = crate::math::image::movement::LOOK_AHEAD;
 /// `FUN_141142750` grows the walk's query by the unit's radius times `DAT_142e7f384`.
 const STRAIGHT_GROW: f32 = crate::math::image::movement::STRAIGHT_GROW;
 /// A path shorter than this is too short (`DAT_142eb99cc`).
-const SHORTEST: f32 = crate::math::image::movement::SHORTEST;
+const SHORTEST: Distance = Distance::new(crate::math::image::movement::SHORTEST);
 /// The point `FUN_140f9bcd0` returns outside a path: `DAT_143f0dc88`, in `.bss` (zero at the
 /// load; probed zero in records/425906646 with no write in the update after).
 pub(crate) const OUTSIDE_PATH: BVector = BVector::ZERO;
 
 /// A planned path shorter than this replaces no short path (`DAT_143cc2f28`), and a path is long
 /// when it is longer than this and than 1.25 times the way (`DAT_14330ebb8`, `DAT_142eb56a8`).
-const LONG: f32 = 5.0;
+const LONG: Distance = Distance::new(5.0);
 const DETOUR: f32 = 1.25;
 /// A new level's stretches longer than this squared get a midpoint (`DAT_142ed6f20`).
 const SPLIT: f32 = crate::math::image::movement::SPLIT;
@@ -431,7 +431,7 @@ impl PathData {
             target: None,
             pause_time: Seconds::ZERO,
             flags: 0,
-            length: 0.0,
+            length: Distance::ZERO,
             created: now,
             continue_counter: CONTINUE,
             repath_time: 0.0,
@@ -456,7 +456,7 @@ impl PathData {
             target: None,
             pause_time: Seconds::ZERO,
             flags: 0,
-            length: 0.0,
+            length: Distance::ZERO,
             created: WorldTime::ZERO,
             continue_counter: CONTINUE,
             repath_time: 0.0,

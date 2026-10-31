@@ -166,16 +166,16 @@ fn the_differentiator_units_are_the_members_of_the_listed_groups() {
 fn clearing_a_lines_points_keeps_its_lengths() {
     let mut line = PointLine {
         points: vec![LinePoint::default(); 3],
-        length: 2.5,
-        desired_length: 4.0,
+        length: Distance::new(2.5),
+        desired_length: Distance::new(4.0),
     };
     line.clear_points();
     assert_eq!(
         line,
         PointLine {
             points: Vec::new(),
-            length: 2.5,
-            desired_length: 4.0,
+            length: Distance::new(2.5),
+            desired_length: Distance::new(4.0),
         }
     );
 }
@@ -187,23 +187,23 @@ fn the_stored_positions_keep_their_desired_length() {
         ..LinePoint::default()
     };
     let mut line = PointLine {
-        desired_length: 2.0,
+        desired_length: Distance::new(2.0),
         ..PointLine::default()
     };
     line.add_at_front(at(0.0, 0.0)).unwrap();
-    assert_eq!((line.points.len(), line.length), (1, 0.0));
+    assert_eq!((line.points.len(), line.length), (1, Distance::ZERO));
     line.add_at_front(at(1.0, 5.0)).unwrap();
     assert_eq!(line.points[0].point, BVector::new(1.0, 0.0, 0.0));
-    assert_eq!(line.length, 1.0);
+    assert_eq!(line.length, Distance::new(1.0));
     line.add_at_front(at(2.0, 0.0)).unwrap();
     // 3 is longer than 2, but not without its last stretch (2): all stay
     line.add_at_front(at(3.0, 0.0)).unwrap();
-    assert_eq!((line.points.len(), line.length), (4, 3.0));
+    assert_eq!((line.points.len(), line.length), (4, Distance::new(3.0)));
     // 4 less 1 is 3: the oldest goes; 3 less 1 is 2: the rest stay
     line.add_at_front(at(4.0, 0.0)).unwrap();
     let xs: Vec<f32> = line.points.iter().map(|p| p.point.x()).collect();
     assert_eq!(xs, [4.0, 3.0, 2.0, 1.0]);
-    assert_eq!(line.length, 3.0);
+    assert_eq!(line.length, Distance::new(3.0));
 }
 
 #[test]

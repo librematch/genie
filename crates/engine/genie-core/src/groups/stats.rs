@@ -123,7 +123,8 @@ impl World {
         let largest = g.largest_unit_radius;
         g.desired_spacing = largest + largest;
         g.total_spacing = largest + g.total_spacing + largest + g.total_spacing;
-        g.stored_positions.desired_length = g.members.len() as f32 * (largest + largest);
+        g.stored_positions.desired_length =
+            Distance::new(g.members.len() as f32 * (largest + largest));
         if g.flags >> 9 & 1 != 0 {
             slowest /= SLOW_GROUP_FACTOR;
         }

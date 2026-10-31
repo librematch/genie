@@ -290,8 +290,8 @@ impl World {
             .with_y(point.y());
         g.current_command = MOVE_COMMAND;
         if g.motion.flags & 2 == 0 && !patrol {
-            let column =
-                length.is_none_or(|l| crate::math::fmath::below_or_unordered(min_column as f32, l));
+            let column = length
+                .is_none_or(|l| crate::math::fmath::below_or_unordered(min_column as f32, l.get()));
             self.update_desired_positions(
                 group,
                 Some(if column {
@@ -315,7 +315,7 @@ impl World {
         point: Point,
         how: &MoveTo,
         (target, changed): (Option<ObjectId>, bool),
-    ) -> Result<Option<(bool, Option<f32>)>, GenieError> {
+    ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
         let world_time = self.world_time;
         let g = self.groups.held_mut(group)?;
         // FUN_141046500: the top ancestor's path, else the walked level's
@@ -348,7 +348,7 @@ impl World {
         }
         path.measure();
         let path = (2 <= path.points.len()
-            && crate::math::fmath::below_or_unordered(EPSILON, path.length))
+            && crate::math::fmath::below_or_unordered(EPSILON, path.length.get()))
         .then_some(path);
         if path.is_none() {
             g.flags &= !0x800;

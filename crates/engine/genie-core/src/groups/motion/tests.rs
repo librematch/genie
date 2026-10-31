@@ -632,7 +632,7 @@ fn a_top_level_without_a_planner_plans_the_straight_way() {
     );
     assert_eq!(
         (new.length, new.created),
-        (25.0, WorldTime::from_millis(100))
+        (Distance::new(25.0), WorldTime::from_millis(100))
     );
     assert_eq!((top.state, top.continue_counter), (PathState::Idle, 10));
 }

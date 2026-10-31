@@ -252,11 +252,11 @@ fn short_plan(
     if r == 3 || r == 4 {
         return Ok(None);
     }
-    if EPSILON < plan.path.length && 1 < plan.path.points.len() {
+    if EPSILON < plan.path.length.get() && 1 < plan.path.points.len() {
         (plan.found, plan.has_plan) = (true, true);
         return Ok(None);
     }
-    if r != 0 || !(plan.path.points.len() < 2 || plan.path.length < EPSILON) {
+    if r != 0 || !(plan.path.points.len() < 2 || plan.path.length.get() < EPSILON) {
         return Ok(None);
     }
     let reach = if target.is_none() || Distance::ZERO < leg.range {
@@ -361,12 +361,12 @@ fn long_plan(
     plan.path = long;
     plan.path.measure();
     plan.found = reached;
-    if EPSILON <= plan.path.length {
+    if EPSILON <= plan.path.length.get() {
         if plan.found {
             let end = plan.path.points.last().copied().unwrap_or(BVector::ZERO);
             if leg.way < ground(leg.waypoint, end) {
                 plan.path.points.clear();
-                plan.path.length = 0.0;
+                plan.path.length = Distance::ZERO;
             }
         }
     } else {

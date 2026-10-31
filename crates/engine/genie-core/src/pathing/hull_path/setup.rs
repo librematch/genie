@@ -64,7 +64,7 @@ pub fn quick_reach_from(
     mask: crate::map::TerrainMask,
     radius: Distance,
     range: Distance,
-) -> Result<Option<f32>, GenieError> {
+) -> Result<Option<Distance>, GenieError> {
     let Some(t) = world.get_known(target)? else {
         return Ok(None);
     };

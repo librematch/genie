@@ -11407,7 +11407,7 @@ fn a_unit_with_patrol_information_leashes_to_its_patrol_s_path() {
     let path = PatrolPath {
         path: crate::pathing::tile_path::Path {
             points: vec![BVector::new(0.0, 0.0, 10.0), BVector::new(20.0, 0.0, 10.0)],
-            length: 20.0,
+            length: Distance::new(20.0),
         },
         flags: 3,
     };

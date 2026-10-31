@@ -223,9 +223,9 @@ pub struct PointLine {
     /// The points (`mNumberPoints`).
     pub points: Vec<LinePoint>,
     /// `mLength`.
-    pub length: f32,
+    pub length: Distance,
     /// `mDesiredLength`.
-    pub desired_length: f32,
+    pub desired_length: Distance,
 }
 
 impl PointLine {
@@ -242,7 +242,7 @@ impl PointLine {
         p.point = p.point.with_height(0.0);
         self.points.insert(0, p);
         if self.points.len() == 1 {
-            self.length = 0.0;
+            self.length = Distance::ZERO;
         } else {
             self.length += stretch(self.points.checked(0)?, self.points.checked(1)?);
         }
@@ -268,9 +268,11 @@ impl PointLine {
 }
 
 /// The 3D distance between two stored points (`FUN_14087e560`, `FUN_14099ef70`).
-fn stretch(a: &LinePoint, b: &LinePoint) -> f32 {
+fn stretch(a: &LinePoint, b: &LinePoint) -> Distance {
     let d = crate::math::fmath::sub(a.point, b.point);
-    crate::math::fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y())
+    Distance::new(crate::math::fmath::sqrt(
+        d.x() * d.x() + d.height() * d.height() + d.y() * d.y(),
+    ))
 }
 
 /// The members of one formation category (`FUN_141023570`).

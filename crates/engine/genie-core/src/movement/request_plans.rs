@@ -98,7 +98,7 @@ impl Mover {
         if (!np.found || too_short(&np.path)) && w.level == WaypointLevel::TOP && TILE_PATHER {
             self.tile_again(me, world, plan, w, np)?;
         }
-        if !(np.path.length <= (w.distance * DETOUR).get() || np.path.length <= LONG) {
+        if !(np.path.length <= w.distance * DETOUR || np.path.length <= LONG) {
             np.new.repath_time = (plan.object.rand15() as f32 * 0.5) / 32767.0 + 2.0;
         }
         Ok(None)
@@ -150,7 +150,7 @@ impl Mover {
         }
         let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end);
         let r = self.short_path_to(me, world, plan, w, near, np)?;
-        if r != 1 || np.path.length <= EPSILON {
+        if r != 1 || np.path.length.get() <= EPSILON {
             np.failed = true;
             np.path.points.clear();
             return Ok(false);
@@ -292,7 +292,7 @@ impl Mover {
         np.planned = false;
         np.path.points.clear();
         let r = self.short_path_to(me, world, plan, w, near, np)?;
-        let length = np.path.length;
+        let length = np.path.length.get();
         let blocked = r == 3
             || r == 4
             || length <= EPSILON && (r != 0 || (1 < np.path.points.len() && EPSILON <= length));

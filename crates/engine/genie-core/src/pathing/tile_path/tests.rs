@@ -198,7 +198,7 @@ fn a_path_skips_a_point_equal_to_its_neighbour() {
     assert!(!path.push(BVector::new(1.0, 0.0, 2.0)));
     assert!(path.push(BVector::new(4.0, 0.0, 6.0)));
     path.measure();
-    assert_eq!(path.length, 5.0);
+    assert_eq!(path.length, Distance::new(5.0));
 }
 
 /// `FUN_140f761b0` with fewer than one point between `first` and `last`: no change, 0 fewer.
@@ -210,7 +210,7 @@ fn a_stretch_without_points_between_is_left_as_it_is() {
             BVector::new(1.0, 0.0, 0.0),
             BVector::new(30.0, 0.0, 0.0),
         ],
-        length: 0.0,
+        length: Distance::ZERO,
     };
     let before = path.points.clone();
     assert_eq!(straighten(&mut path, 0, 1), 0);
@@ -243,7 +243,7 @@ fn the_smoothing_keeps_the_points_before_a_blocked_walk() {
             .iter()
             .map(|p| BVector::new(p.x(), 0.0, p.y()))
             .collect(),
-        length: 0.0,
+        length: Distance::ZERO,
     };
     // blocked: any walk from the start that ends beyond y = 44.5
     let mut walls = Walls::default();
@@ -261,7 +261,7 @@ fn the_smoothing_keeps_the_points_before_a_blocked_walk() {
     // a path of two points tests nothing and ends no pass
     let mut short = Path {
         points: vec![BVector::ZERO, BVector::new(5.0, 0.0, 5.0)],
-        length: 0.0,
+        length: Distance::ZERO,
     };
     smooth(&mut short, &mut walls).unwrap();
     assert_eq!((walls.tests, walls.passes), (10, 1));
@@ -300,21 +300,21 @@ fn an_appended_path_takes_the_source_s_length_or_measures_a_short_or_nan_one() {
     let _ = path.push(BVector::ZERO);
     let other = Path {
         points: vec![BVector::ZERO, BVector::new(3.0, 0.0, 4.0)],
-        length: 9.0,
+        length: Distance::new(9.0),
     };
     path.append(&other);
     assert_eq!(
         path.points,
         [BVector::new(0.0, 0.0, 0.0), BVector::new(3.0, 0.0, 4.0)]
     );
-    assert_eq!(path.length, 9.0);
+    assert_eq!(path.length, Distance::new(9.0));
     for short in [1e-7, 0.0, f32::NAN] {
         let mut path = Path::default();
         path.append(&Path {
-            length: short,
+            length: Distance::new(short),
             ..other.clone()
         });
-        assert_eq!(path.length, 5.0, "{short}");
+        assert_eq!(path.length, Distance::new(5.0), "{short}");
     }
 }
 

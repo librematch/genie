@@ -1135,7 +1135,7 @@ fn a_member_s_own_move_walks_its_path() {
     walker.moved_at = Position::new(1.0, 1.0, 0.0);
     walker.take_record_path(
         vec![BVector::new(1.0, 0.0, 1.0), BVector::new(5.0, 0.0, 1.0)],
-        4.0,
+        Distance::new(4.0),
         WorldTime::ZERO,
         false,
     );

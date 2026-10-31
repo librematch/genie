@@ -5,6 +5,7 @@
 
 use crate::GenieError;
 use crate::groups::Motion;
+use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::fmath::{self, BVector};
@@ -42,7 +43,7 @@ const NEAR: f32 = crate::math::image::group::NEAR;
 /// (`DAT_14330eb8c`).
 const CLOSE: f32 = crate::math::image::group::CLOSE;
 /// A path shorter than this is no path (`DAT_142eb99cc`).
-const SHORT_LENGTH: f32 = crate::math::image::group::SHORT_LENGTH;
+const SHORT_LENGTH: Distance = Distance::new(crate::math::image::group::SHORT_LENGTH);
 /// The short pather serves a waypoint this near (`DAT_142eb0f4c`).
 const SHORT_REACH: f32 = crate::math::image::group::SHORT_REACH;
 /// The members' centre pulls the group when it is this far (squared, `DAT_142eb0f48`) ...

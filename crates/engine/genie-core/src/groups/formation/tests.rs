@@ -873,7 +873,7 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
         target: None,
         pause_time: Seconds::ZERO,
         flags: 0,
-        length: 0.0,
+        length: Distance::ZERO,
         created: WorldTime::ZERO,
         continue_counter: 10,
         repath_time: 0.0,

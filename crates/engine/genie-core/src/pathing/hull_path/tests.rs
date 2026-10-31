@@ -354,7 +354,10 @@ fn a_unit_s_short_reach_is_its_old_short_path_s_length() {
     let by = 5.5 - 0.7 * SQRT_2;
     let expected = (3.5f32 * 3.5 + (5.5 - by) * (5.5 - by)).sqrt()
         + (5.1f32 * 5.1 + (5.5 - by) * (5.5 - by)).sqrt();
-    assert!((length - expected).abs() < 1e-4, "{length} {expected}");
+    assert!(
+        (length.get() - expected).abs() < 1e-4,
+        "{length} {expected}"
+    );
     assert_eq!(
         mover
             .short_reach(&me, &mut w, object_id(777), Distance::new(0.1))
@@ -1458,7 +1461,10 @@ fn a_unit_s_quick_reach_is_its_quick_path_alone() {
     .unwrap();
     let expected = (3.5f32 * 3.5 + (5.5 - by) * (5.5 - by)).sqrt()
         + (5.1f32 * 5.1 + (5.5 - by) * (5.5 - by)).sqrt();
-    assert!((length - expected).abs() < 1e-4, "{length} {expected}");
+    assert!(
+        (length.get() - expected).abs() < 1e-4,
+        "{length} {expected}"
+    );
     assert!(
         quick_reach(
             &mut w,
@@ -1482,7 +1488,7 @@ fn a_unit_s_quick_reach_is_its_quick_path_alone() {
             Distance::new(0.1)
         )
         .unwrap(),
-        Some(0.0)
+        Some(Distance::ZERO)
     );
     // a target the world does not hold
     assert!(
@@ -2677,7 +2683,7 @@ fn a_unit_within_range_needs_no_path() {
             Distance::new(0.1),
         )
         .unwrap();
-    assert_eq!((result, path.length()), (0, 0.0));
+    assert_eq!((result, path.length()), (0, Distance::ZERO));
 }
 
 /// The triangle hull (5, 6), (5, 4), (4, 5) crossed on its edge 1 by a node at `at` (the

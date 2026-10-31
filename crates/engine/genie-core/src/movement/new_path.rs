@@ -129,7 +129,7 @@ impl Mover {
             level.has_path = false;
             level.points.clear();
             level.path_flags = 0;
-            level.length = 0.0;
+            level.length = Distance::ZERO;
             level.created = WorldTime::ZERO;
         }
         self.paths.insert(0, new);
@@ -397,7 +397,7 @@ impl Mover {
         world: &mut Spatial,
         target: ObjectId,
         range: Distance,
-    ) -> Result<Option<f32>, GenieError> {
+    ) -> Result<Option<Distance>, GenieError> {
         let Some(t) = world.get_known(target)? else {
             return Ok(None);
         };
@@ -425,7 +425,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         to: Point,
         radii: f32,
-    ) -> Result<Option<(u8, f32)>, GenieError> {
+    ) -> Result<Option<(u8, Distance)>, GenieError> {
         let full = !plan.computer;
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
             return Ok(None);
