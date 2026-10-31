@@ -50,7 +50,7 @@ file for what the save does not hold.
 | [`obstruction_class.rs`](obstruction_class.rs) | A master's obstruction class as one type: what its obstruction record blocks, the value the `.dat` names `obstruction_class`. |
 | [`obstruction_type.rs`](obstruction_type.rs) | A master's obstruction type as one type: the shape of the record its objects file in the obstruction manager, the value the `.dat` names `obstruction_type`. |
 | [`placement_terrains.rs`](placement_terrains.rs) | A master's placement terrains (`PlacementTerrains`). |
-| [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`). |
+| [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`) and a sound event's id (`SoundEventId`). |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
 | [`task_id.rs`](task_id.rs) | A task's id as one type: the place of a task in its master's task list, which an action keeps to name the task it works on. |
 | [`task_sprites.rs`](task_sprites.rs) | A task's four sprites (`TaskSprites`). |

@@ -46,8 +46,9 @@ pub fn look(task: &Task, mask: u8, flags: u8, exists: impl Fn(i32) -> bool) -> O
         walking: task_sprite(sprites.moving),
         attacking: task_sprite(sprites.working),
         running: task_sprite(sprites.proceeding),
-        dying: sprite(task.sound_events.gathering),
-        undead: sprite(task.sound_events.deposit),
+        // the two sound events' ids, read as sprite ids
+        dying: sprite(task.sound_events.gathering.get()),
+        undead: sprite(task.sound_events.deposit.get()),
     })
 }
 

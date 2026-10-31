@@ -622,7 +622,7 @@ pub use self::master_kind::MasterKind;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
 pub use self::placement_terrains::PlacementTerrains;
-pub use self::sound_events::SoundEvents;
+pub use self::sound_events::{SoundEventId, SoundEvents};
 pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;
 
