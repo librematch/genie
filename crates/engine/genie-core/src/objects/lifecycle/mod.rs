@@ -13,6 +13,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
+use crate::players::AmountRate;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use genie_diff::Diff;
@@ -27,7 +28,7 @@ pub use self::object_state::ObjectState;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct MasterData {
     /// Master `+0x620`: how much of the held attribute a dead object loses per second.
-    pub decay: f32,
+    pub decay: AmountRate,
     /// Master `+0x490`: a dead object turns undead (state 6) instead of leaving.
     pub undead: bool,
 }
@@ -256,8 +257,8 @@ impl Lifecycle {
             }
             // set_state(7), then its death spawn (slot 0x160, the caller's)
             self.state = ObjectState::Removed;
-        } else if master.decay > 0.0 {
-            self.amount -= Amount::new(master.decay * dt_seconds);
+        } else if master.decay > AmountRate::ZERO {
+            self.amount -= master.decay * dt_seconds;
             if self.amount < Amount::ZERO {
                 self.amount = Amount::ZERO;
             }
@@ -313,7 +314,7 @@ mod tests {
             attribute_type: Some(AttributeId::numbered(12)),
             amount: Amount::new(1.0),
             master: Some(MasterData {
-                decay: 1.0,
+                decay: AmountRate::new(1.0),
                 undead: false,
             }),
             ..dead(Class::Static)
@@ -344,7 +345,7 @@ mod tests {
             attribute_type: Some(AttributeId::numbered(12)),
             amount: Amount::new(0.05),
             master: Some(MasterData {
-                decay: 1.0,
+                decay: AmountRate::new(1.0),
                 undead: false,
             }),
             ..dead(Class::Static)
@@ -430,7 +431,7 @@ mod tests {
             Lifecycle {
                 state: ObjectState::Dead,
                 master: Some(MasterData {
-                    decay: 0.0,
+                    decay: AmountRate::ZERO,
                     undead: true,
                 }),
                 ..dead(Class::Animated)

@@ -13,6 +13,7 @@ use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::players::AmountRate;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::step::Step;
@@ -137,9 +138,10 @@ impl HuntAction {
     /// [`HuntAction::decay_check`]'s test and its sign change on the target's copy: true when it
     /// stopped the decay.
     pub(super) fn stops_decay_of(&self, stops_decay: bool, victim: &mut Victim) -> bool {
-        let stops = self.task.kind4 == Some(DECAY_TASK) && stops_decay && 0.0 < victim.decay;
+        let stops =
+            self.task.kind4 == Some(DECAY_TASK) && stops_decay && AmountRate::ZERO < victim.decay;
         if stops {
-            victim.decay = f32::from_bits(victim.decay.to_bits() ^ 0x8000_0000);
+            victim.decay = -victim.decay;
         }
         stops
     }

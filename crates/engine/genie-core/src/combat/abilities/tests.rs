@@ -192,15 +192,19 @@ fn the_amount_is_dt_times_the_rate_times_the_attribute_in_that_order() {
     let t = feitoria_food();
     let dt = 0.044_f32;
     assert_eq!(
-        generated(Seconds::new(dt), &t, 1.0).to_bits(),
+        generated(Seconds::new(dt), &t, Amount::new(1.0))
+            .get()
+            .to_bits(),
         (dt * 1.6 * 1.0).to_bits()
     );
     let m = 0.3_f32;
     assert_eq!(
-        generated(Seconds::new(dt), &t, m).to_bits(),
+        generated(Seconds::new(dt), &t, Amount::new(m))
+            .get()
+            .to_bits(),
         ((dt * 1.6) * m).to_bits()
     );
-    assert_eq!(generated(Seconds::new(dt), &t, 0.0), 0.0);
+    assert_eq!(generated(Seconds::new(dt), &t, Amount::ZERO), Amount::ZERO);
 }
 
 #[test]

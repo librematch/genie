@@ -13,6 +13,7 @@ use genie_core::objects::lifecycle::{Class, Lifecycle, MasterData};
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::Amount;
+use genie_core::players::AmountRate;
 use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::best_target::AttackCategory;
 use genie_core::unit_ai::{ActionKind, OrderKind};
@@ -74,7 +75,7 @@ pub(super) fn lifecycle(
                 (own.death_sprite_num >= 0).then_some(own.death_sprite_num),
                 [own.death_spawn_obj_id, own.death_spawn_obj_id2],
                 Some(MasterData {
-                    decay: own.attribute_rot,
+                    decay: AmountRate::new(own.attribute_rot),
                     undead: own.undead_flag != 0,
                 }),
             )

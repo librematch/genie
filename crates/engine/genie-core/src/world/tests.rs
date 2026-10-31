@@ -71,6 +71,7 @@ use crate::ownership::artifact::Artifact;
 use crate::ownership::artifact::ArtifactState;
 use crate::ownership::change::change_hands;
 use crate::players::Amount;
+use crate::players::AmountRate;
 use crate::players::CivId;
 use crate::players::PlayerType;
 use crate::players::Relation;
@@ -1372,7 +1373,7 @@ fn a_resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
             master_id: master,
             attribute_type: None,
             master: Some(MasterData {
-                decay: 0.0,
+                decay: AmountRate::ZERO,
                 undead: false,
             }),
             ..Lifecycle::default()
@@ -17650,7 +17651,7 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieErr
         let centre = masters.get_mut(ids::TOWN_CENTRE).unwrap();
         centre.hit_points = 2400;
         centre.building = Some(BuildingMaster {
-            garrison_heal_rate: 2.0,
+            garrison_heal_rate: HitPoints::new(2.0),
             ..BuildingMaster::default()
         });
         masters.get_mut(master_id(120)).unwrap().hit_points = 25;
@@ -17726,7 +17727,7 @@ fn a_building_heals_its_garrison_each_whole_second() {
                 .building
                 .as_mut()
                 .unwrap();
-            b.garrison_repair_rate = 1.0;
+            b.garrison_repair_rate = HitPoints::new(1.0);
         }
         t.players[1].objects[ListIndex::new(2)].life.hp = HitPoints::new(2000.0);
     };

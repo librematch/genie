@@ -1,6 +1,7 @@
 //! The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the
 //! train locations.
 
+use crate::objects::HitPoints;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
@@ -371,7 +372,7 @@ impl Master {
             }
             a::GARRISON_HEAL_RATE => {
                 if let Some(b) = self.building.as_mut() {
-                    b.garrison_heal_rate = v;
+                    b.garrison_heal_rate = HitPoints::new(v);
                 }
             }
             a::CONSTRUCTION_GRAPHIC
@@ -412,7 +413,7 @@ impl Master {
             }
             a::GARRISON_HEAL_RATE => {
                 if let Some(b) = self.building.as_mut() {
-                    b.garrison_heal_rate += v;
+                    b.garrison_heal_rate += HitPoints::new(v);
                 }
             }
             a::CONSTRUCTION_GRAPHIC

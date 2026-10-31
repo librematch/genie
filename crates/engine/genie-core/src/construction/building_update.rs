@@ -296,12 +296,12 @@ impl Unit {
                 villagers += 1;
             }
             let (class, hit_points) = (m.class, m.hit_points);
-            if 0.0 < rate && u.life.hp < HitPoints::new(f32::from(hit_points)) {
-                u.heal(class, hit_points, HitPoints::new(rate))?;
+            if HitPoints::ZERO < rate && u.life.hp < HitPoints::new(f32::from(hit_points)) {
+                u.heal(class, hit_points, rate)?;
             }
         }
         if 0 < villagers
-            && 0.0 < bm.garrison_repair_rate
+            && HitPoints::ZERO < bm.garrison_repair_rate
             && self.life.hp < HitPoints::new(f32::from(master.hit_points))
         {
             return Err(GenieError::unsupported(

@@ -12,6 +12,7 @@ use crate::map::GroundOffset;
 use crate::map::Offset;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::HitPoints;
 use crate::objects::WorkRate;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -196,9 +197,9 @@ pub struct BuildingMaster {
     /// `+0x9bc`, `garrison_type`: the kinds of units it takes in (bit 0 villagers, `FUN_14120eb10`).
     pub garrison_type: u8,
     /// `+0x9c0`, `garrison_heal_rate`: the hit points a second it gives the units inside.
-    pub garrison_heal_rate: f32,
+    pub garrison_heal_rate: HitPoints,
     /// `+0x9c4`, `garrison_repair_rate`: its repair a second per villager inside.
-    pub garrison_repair_rate: f32,
+    pub garrison_repair_rate: HitPoints,
     /// `+0x990`, the masters of its annexes (−1 for none; their places beside it at `+0x998`).
     pub annexes: [Option<MasterId>; 4],
     /// `+0x998` (x) and `+0x9a8` (y), each annex slot's place off the building's (the `.dat`'s

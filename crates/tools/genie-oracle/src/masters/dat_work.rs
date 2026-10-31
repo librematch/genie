@@ -4,6 +4,7 @@
 use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::{Footprint, GroundOffset, Radii};
+use genie_core::objects::HitPoints;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
@@ -196,8 +197,8 @@ pub(super) fn dat_work(
             foundation_terrain: b.foundation_terrain_id,
             tech: genie_core::technology::TechId::of_data(b.tech_id),
             garrison_type: b.garrison_type,
-            garrison_heal_rate: b.garrison_heal_rate,
-            garrison_repair_rate: b.garrison_repair_rate,
+            garrison_heal_rate: HitPoints::new(b.garrison_heal_rate),
+            garrison_repair_rate: HitPoints::new(b.garrison_repair_rate),
             annexes: b.annexes.map(|a| MasterId::of_data(a.unit_id)),
             annex_offsets: b.annexes.map(|a| GroundOffset::from(a.misplacement)),
             head_unit: MasterId::of_data(b.head_unit),

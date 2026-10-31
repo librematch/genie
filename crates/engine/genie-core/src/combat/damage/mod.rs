@@ -56,6 +56,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::players::Amount;
+use crate::players::AmountRate;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 
@@ -171,7 +172,7 @@ pub struct Victim {
     pub goto_sleep: bool,
     /// Its master's decay (`+0x620`), which a hunt's decay stop negates (`FUN_140ac44b0`; the
     /// write-back gives it to the object's own master).
-    pub decay: f32,
+    pub decay: AmountRate,
     /// Its master's `fog_visibility` (`+0x605`): an Attack goes on against it in the fog.
     pub fog_visibility: u8,
     /// Its player, and that player's attributes 272 and 273 (a higher or lower attacker's hits

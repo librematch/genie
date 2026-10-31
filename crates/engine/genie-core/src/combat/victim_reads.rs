@@ -9,6 +9,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::master_type::{BUILDING, RGE_COMBAT};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
+use crate::players::AmountRate;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
 
@@ -87,7 +88,7 @@ pub(crate) fn victim_of(
         blast_defense: master.blast_defense,
         fog_visibility: master.fog_visibility,
         goto_sleep: u.life.goto_sleep,
-        decay: u.life.master.map_or(0.0, |m| m.decay),
+        decay: u.life.master.map_or(AmountRate::ZERO, |m| m.decay),
         player: p,
         elevation: ElevationBonus {
             higher: at(272).get(),

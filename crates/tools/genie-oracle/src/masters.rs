@@ -7,6 +7,7 @@ use genie_core::GenieError;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::{ActionType, MasterId};
+use genie_core::players::AmountRate;
 use genie_core::players::attribute::AttributeId;
 use genie_dat::de::DatFile;
 use std::collections::HashMap;
@@ -97,7 +98,7 @@ fn dat_row(
     };
     Ok(Some(Row {
         data: MasterData {
-            decay: unit.resource_decay,
+            decay: AmountRate::new(unit.resource_decay),
             undead: unit.undead_mode != 0,
         },
         default_action,
@@ -597,6 +598,7 @@ impl MasterTable {
 mod tests {
     use super::*;
     use crate::masters::dat_work::sound_event;
+    use genie_core::players::AmountRate;
 
     /// A directory of its own under the system's temporary one, emptied first.
     fn scratch(name: &str) -> std::path::PathBuf {
@@ -734,7 +736,7 @@ mod tests {
             (
                 (1, 332),
                 MasterData {
-                    decay: 1.0,
+                    decay: AmountRate::new(1.0),
                     undead: false,
                 },
                 DefaultAction::None,
@@ -742,13 +744,13 @@ mod tests {
             (
                 (2, 705),
                 MasterData {
-                    decay: 0.25,
+                    decay: AmountRate::new(0.25),
                     undead: false,
                 },
                 DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE),
             ),
         ]);
-        assert_eq!(t.get(1, 332).map(|d| d.decay), Some(1.0));
+        assert_eq!(t.get(1, 332).map(|d| d.decay), Some(AmountRate::new(1.0)));
         assert_eq!(
             t.default_action(2, 705),
             Some(DefaultAction::Type(

@@ -4,6 +4,7 @@
 
 pub mod ai_module;
 mod amount;
+mod amount_rate;
 pub mod attribute;
 mod civ_id;
 pub mod diplomacy;
@@ -22,6 +23,7 @@ mod unit_relation;
 pub mod world_player;
 
 pub use self::amount::Amount;
+pub use self::amount_rate::AmountRate;
 pub use self::civ_id::CivId;
 pub use self::player_id::PlayerId;
 pub use self::player_type::PlayerType;

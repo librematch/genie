@@ -952,7 +952,10 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
     m.set_attribute(attribute::REGENERATION_HP_PERCENT, 0.5, &world(false));
     m.add_attribute(attribute::FOUNDATION_TERRAIN, 2.0, &world(false));
     let b = m.building.unwrap();
-    assert_eq!((b.garrison_heal_rate, b.foundation_terrain), (3.0, 2));
+    assert_eq!(
+        (b.garrison_heal_rate, b.foundation_terrain),
+        (HitPoints::new(3.0), 2)
+    );
     assert_eq!(m.regeneration, 300.0);
     assert_eq!(m, {
         let mut same = of_type(master_type::BUILDING);

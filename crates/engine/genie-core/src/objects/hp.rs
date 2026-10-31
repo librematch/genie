@@ -80,6 +80,13 @@ impl std::ops::Mul<f32> for HitPoints {
     }
 }
 
+impl std::ops::MulAssign<f32> for HitPoints {
+    /// The points scaled by `f` in place (an effect's multiplier).
+    fn mul_assign(&mut self, f: f32) {
+        self.0 *= f;
+    }
+}
+
 impl std::ops::Mul<HitPoints> for f32 {
     type Output = HitPoints;
 
@@ -131,6 +138,9 @@ mod tests {
         assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
         assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
         assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        let mut scaled = a;
+        scaled *= 3.0;
+        assert_eq!(scaled, a * 3.0);
         assert_eq!((3.0 * a).get().to_bits(), (3.0_f32 * 0.1).to_bits());
         assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
         assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());

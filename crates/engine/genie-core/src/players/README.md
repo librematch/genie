@@ -24,6 +24,7 @@ A player has more than its objects. This folder holds the rest:
 | File | What it holds |
 | --- | --- |
 | [`amount.rs`](amount.rs) | An amount of a player attribute (`Amount`), with the game's `f32` operations. |
+| [`amount_rate.rs`](amount_rate.rs) | How fast an amount changes (`AmountRate`, an attribute's amount per second), with the game's `f32` operations. |
 | [`attribute.rs`](attribute.rs) | The indices of the player's attributes (`player+0x8`'s array of `f32`): the one definition of the attributes the engine reads and writes by number. |
 | [`civ_id.rs`](civ_id.rs) | A civilisation's number. |
 | [`diplomacy.rs`](diplomacy.rs) | A player's diplomacy change (the world player's slot 0x30, `FUN_141639690`, which GAME's sub-command 0 runs): its stance toward another player (`diplomacy[i]`, `+0xe12`), the relation it makes (`relation[i]`, `+0x260`) and what its queries make of that player's objects (`unit_diplomacy[i]`, `+0x278`); its objects hear of it (slot 0x120: units inside a building or siege tower of a player no longer allied leave it); the players' sight masks and tile lists are made again; then the world's teams (`FUN_1415e23f0`) and the units the players reveal (`FUN_14152bcb0`). |

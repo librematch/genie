@@ -20,6 +20,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::sprite::Graphic;
+use crate::players::AmountRate;
 use crate::players::attribute;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
@@ -176,22 +177,22 @@ pub(crate) fn hunting(target: i32) -> HuntAction {
 fn a_decay_task_stops_its_target_s_decay_once() {
     let mut hunt = hunting(7);
     let decaying = || Victim {
-        decay: 0.25,
+        decay: AmountRate::new(0.25),
         ..Victim::default()
     };
     let mut v = decaying();
     assert!(!hunt.stops_decay_of(true, &mut v));
-    assert_eq!(v.decay, 0.25);
+    assert_eq!(v.decay, AmountRate::new(0.25));
     hunt.task.kind4 = Some(DECAY_TASK);
     assert!(!hunt.stops_decay_of(false, &mut v));
-    assert_eq!(v.decay, 0.25);
+    assert_eq!(v.decay, AmountRate::new(0.25));
     assert!(hunt.stops_decay_of(true, &mut v));
-    assert_eq!(v.decay, -0.25);
+    assert_eq!(v.decay, AmountRate::new(-0.25));
     assert!(!hunt.stops_decay_of(true, &mut v));
-    assert_eq!(v.decay, -0.25);
+    assert_eq!(v.decay, AmountRate::new(-0.25));
     let mut none = Victim::default();
     assert!(!hunt.stops_decay_of(true, &mut none));
-    assert_eq!(none.decay.to_bits(), 0);
+    assert_eq!(none.decay.get().to_bits(), 0);
 }
 
 /// The decay check on the step ([`HuntAction::decay_check`]): a target whose decay it stops
@@ -200,7 +201,7 @@ fn a_decay_task_stops_its_target_s_decay_once() {
 fn a_stopped_decay_goes_back_to_the_world_at_once() {
     let decaying = Victim {
         id: object_id(10028),
-        decay: 0.25,
+        decay: AmountRate::new(0.25),
         ..Victim::default()
     };
     let mut hunt = hunting(10028);
@@ -208,11 +209,11 @@ fn a_stopped_decay_goes_back_to_the_world_at_once() {
     let mut rig = Rig::on_the_path(decaying.clone());
     rig.run(100, |c, u, f, _| hunt.decay_check(c, u, true, f))
         .unwrap();
-    assert_eq!(rig.f.victim.decay, -0.25);
+    assert_eq!(rig.f.victim.decay, AmountRate::new(-0.25));
     let mut rig = Rig::on_the_path(decaying);
     rig.run(100, |c, u, f, _| hunt.decay_check(c, u, false, f))
         .unwrap();
-    assert_eq!(rig.f.victim.decay, 0.25);
+    assert_eq!(rig.f.victim.decay, AmountRate::new(0.25));
 }
 
 /// [`walker`] in motion: its animation runs at speed 1 (`+0x7b8`), which a stop clears.

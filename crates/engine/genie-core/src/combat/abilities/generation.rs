@@ -79,8 +79,8 @@ pub fn generates(
 /// times the task's `work_val1` times the player's attribute the task's `attribute_type2` names,
 /// in that order (`MULSS`, `MULSS`).
 #[must_use]
-pub fn generated(dt: Seconds, task: &Task, multiplier: f32) -> f32 {
-    dt.get() * task.work_val1 * multiplier
+pub fn generated(dt: Seconds, task: &Task, multiplier: Amount) -> Amount {
+    Amount::new(dt.get() * task.work_val1 * multiplier.get())
 }
 
 /// The player's store of what its generation tasks made (`player+0x658`): `amount` above 0 (not
@@ -166,7 +166,7 @@ impl World {
         let multiplier = (task.attribute_type2)
             .and_then(|a| player.attribute(a))
             .unwrap_or(Amount::ZERO);
-        let amount = Amount::new(generated(self.dt_seconds, task, multiplier.get()));
+        let amount = generated(self.dt_seconds, task, multiplier);
         // no store without the task's attribute: nothing reaches the player
         let Some(out) = task.attribute_type3 else {
             return Ok(());
