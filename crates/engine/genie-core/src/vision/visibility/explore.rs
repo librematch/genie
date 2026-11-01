@@ -6,6 +6,7 @@ use crate::map::Tile;
 use crate::map::TileRect;
 use crate::players::PlayerId;
 use crate::vision::SightTiles;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::los_tables::{CENTRED, OFFSET};
 use crate::vision::visibility::{ANCHOR, LINKED, MOST, Visibility};
@@ -25,11 +26,11 @@ impl Visibility {
         centre: Tile,
         los: SightTiles,
         offset: bool,
-    ) -> Result<i32, GenieError> {
+    ) -> Result<TileCount, GenieError> {
         let (x, y) = (centre.x(), centre.y());
         let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
         let (visible, seen) = (VisionBits::visible(player), VisionBits::explored(player));
-        let mut newly = 0;
+        let mut newly = TileCount::ZERO;
         for &(dy, dx0, dx1) in table {
             let ty = y + i32::from(dy);
             if ty < 0 || self.size.height() <= ty {
@@ -47,8 +48,8 @@ impl Visibility {
                     .checked(i)?
                     .wrapping_add(1);
                 if c == 0 {
-                    newly += 1;
-                    self.maps.checked_mut(player.index())?.explored += 1;
+                    newly += TileCount::ONE;
+                    self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
                     if self.computer.get(player.index()).copied().unwrap_or(false) {
                         self.ai_tiles.push((player, tile));
@@ -151,13 +152,17 @@ impl Visibility {
 
     /// `explore_terrain_sq` (`FUN_141284f10`): `explore_terrain` over a rectangle, without the
     /// buildings' case.
-    pub fn explore_rect(&mut self, player: PlayerId, rect: TileRect) -> Result<i32, GenieError> {
+    pub fn explore_rect(
+        &mut self,
+        player: PlayerId,
+        rect: TileRect,
+    ) -> Result<TileCount, GenieError> {
         let Some(held) = self.held(rect) else {
-            return Ok(0);
+            return Ok(TileCount::ZERO);
         };
         let [x0, y0, x1, y1] = held.get();
         let (visible, seen) = (VisionBits::visible(player), VisionBits::explored(player));
-        let mut newly = 0;
+        let mut newly = TileCount::ZERO;
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
@@ -169,8 +174,8 @@ impl Visibility {
                     .checked(i)?
                     .wrapping_add(1);
                 if c == 0 {
-                    newly += 1;
-                    self.maps.checked_mut(player.index())?.explored += 1;
+                    newly += TileCount::ONE;
+                    self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
                     c = 1;
                     *self.unified.checked_mut(i)? |= seen;
@@ -216,20 +221,24 @@ impl Visibility {
 
     /// `reveal_terrain_sq` (`FUN_141285da0`): the rectangle's never explored tiles count as
     /// explored.
-    pub fn reveal_rect(&mut self, player: PlayerId, rect: TileRect) -> Result<i32, GenieError> {
+    pub fn reveal_rect(
+        &mut self,
+        player: PlayerId,
+        rect: TileRect,
+    ) -> Result<TileCount, GenieError> {
         let Some(held) = self.held(rect) else {
-            return Ok(0);
+            return Ok(TileCount::ZERO);
         };
         let [x0, y0, x1, y1] = held.get();
         let seen = VisionBits::explored(player);
-        let mut newly = 0;
+        let mut newly = TileCount::ZERO;
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
                 let i = self.index(tile);
                 if *self.maps.checked(player.index())?.counts.checked(i)? == -1 {
-                    self.maps.checked_mut(player.index())?.explored += 1;
-                    newly += 1;
+                    self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
+                    newly += TileCount::ONE;
                     self.new_tile(player, tile);
                     *self.unified.checked_mut(i)? |= seen;
                     *self

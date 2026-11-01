@@ -5,6 +5,7 @@ use genie_core::map::Distance;
 use genie_core::map::terrain::TileTerrain;
 use genie_core::map::{GridSize, TileOffset};
 use genie_core::movement::Speed;
+use genie_core::vision::TileCount;
 
 use crate::masters::{MasterTable, TerrainTable};
 use crate::{Error, game_state, header_objects, moving_speed, placement, saved_ghosts};
@@ -306,7 +307,7 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
             let vm = &p.objects().rge_visible_map;
             VisibleMap {
                 counts: vm.visible_map.clone().unwrap_or_else(|| vec![-1; n]),
-                explored: vm.number_tiles_explored_value,
+                explored: TileCount::new(vm.number_tiles_explored_value),
             }
         })
         .collect();
@@ -405,7 +406,8 @@ pub fn visibility_differences(slice: &Visibility, game: &Visibility, player: usi
     if a.explored != b.explored {
         out.push(format!(
             "player {player} explored {} tiles, the game {}",
-            a.explored, b.explored
+            a.explored.get(),
+            b.explored.get()
         ));
     }
     out.extend(resource_differences(slice, game, player));

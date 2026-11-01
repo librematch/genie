@@ -13,6 +13,7 @@ use crate::players::ai_module::{
     AiModule, AiModules, InfoModule, SLOTS, SearchArea, SearchUnit, TacticalModule,
 };
 use crate::vision::SightTiles;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -96,7 +97,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![
             VisibleMap {
                 counts: vec![-1; n],
-                explored: 0,
+                explored: TileCount::ZERO,
             };
             3
         ],
@@ -107,11 +108,11 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
     );
     assert_eq!(
         v.explore(PlayerId::new(1), Tile::new(3, 2), SightTiles::new(0), false),
-        Ok(1)
+        Ok(TileCount::ONE)
     );
     assert_eq!(
         v.explore(PlayerId::new(2), Tile::new(5, 5), SightTiles::new(0), false),
-        Ok(1)
+        Ok(TileCount::ONE)
     );
     t.spatial.sight = Some(v);
     let mut m = module();

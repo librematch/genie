@@ -157,6 +157,7 @@ use crate::unit_ai::task_finder::world::{
 use crate::unit_ai::task_finder::{Actor, Diplomacy};
 use crate::unit_ai::world_view::{DropWorld, Foreign, Wait, patrol_information};
 use crate::unit_ai::{Effect, Notify, UnitAi};
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::{Seer, capture_kind};
@@ -615,7 +616,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
         (0..players)
             .map(|_| crate::vision::visibility::VisibleMap {
                 counts: vec![0; n],
-                explored: 0,
+                explored: TileCount::ZERO,
             })
             .collect(),
         vec![VisionBits::from_bits_retain(seen); n],
@@ -9584,7 +9585,7 @@ fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Dist
         (0..3)
             .map(|_| crate::vision::visibility::VisibleMap {
                 counts: vec![-1; n],
-                explored: 0,
+                explored: TileCount::ZERO,
             })
             .collect(),
         vec![VisionBits::NONE; n],

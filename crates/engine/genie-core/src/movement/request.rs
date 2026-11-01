@@ -10,6 +10,7 @@ use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::StepPlans;
 use crate::movement::WaitDelays;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
@@ -55,7 +56,7 @@ impl Mover {
         world: &mut Spatial,
         plan: &mut Planning<'_>,
         goal: Goal<'_>,
-        plans: &mut u32,
+        plans: &mut StepPlans,
         include: &[ObjectId],
     ) -> Result<AfterRequest, GenieError> {
         // the request measures and plans from +0x824 (`pfVar14`, `local_18c8`), where the unit
@@ -150,7 +151,7 @@ impl Mover {
         world: &Spatial,
         plan: &mut Planning<'_>,
         trade_cart: bool,
-        plans: &mut u32,
+        plans: &mut StepPlans,
     ) -> Result<bool, GenieError> {
         let owner = world.get(me.id).map(|p| p.player);
         let budget = owner.map(|o| plan.pathing.budget(o));
@@ -162,7 +163,7 @@ impl Mover {
         if let Some(o) = owner {
             plan.pathing.count_plan(o);
         }
-        *plans += 1;
+        *plans = plans.plus_one();
         self.wait_delays = WaitDelays::NONE;
         Ok(true)
     }

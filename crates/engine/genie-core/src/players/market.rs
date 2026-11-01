@@ -10,6 +10,7 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::ResourceStat;
 use crate::players::attribute::{self, AttributeId};
 use crate::players::{NetTrades, Price, PriceSwing};
 use crate::world::World;
@@ -170,9 +171,15 @@ impl World {
             let fee = self.fee(p) * worth;
             let gold = cvttss2si(worth - fee + ROUND) as f32;
             // The gold a sale gives and a purchase costs.
-            self.add_resource(p, attribute::GOLD, Amount::new(gold), 1, true)?;
+            self.add_resource(
+                p,
+                attribute::GOLD,
+                Amount::new(gold),
+                ResourceStat::GATHERED,
+                true,
+            )?;
             let lot = volume.negated_f32();
-            self.add_resource(p, commodity, Amount::new(lot), 0, true)?;
+            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::NONE, true)?;
         }
         Ok(())
     }
@@ -211,9 +218,15 @@ impl World {
                 return Ok(());
             }
             let paid = cvttss2si(cost) as f32;
-            self.add_resource(p, attribute::GOLD, Amount::new(-paid), 0, true)?;
+            self.add_resource(
+                p,
+                attribute::GOLD,
+                Amount::new(-paid),
+                ResourceStat::NONE,
+                true,
+            )?;
             self.market.trade(commodity, true);
-            self.add_resource(p, commodity, Amount::new(lot), 0, true)?;
+            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::NONE, true)?;
         }
         Ok(())
     }

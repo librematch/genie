@@ -52,7 +52,7 @@ mod path_flags;
 mod path_points;
 mod path_state;
 pub use self::move_algorithm::MoveAlgorithm;
-pub use self::path_counts::{LinkedPathType, PlanTries, SubstituteCount, WaitDelays};
+pub use self::path_counts::{LinkedPathType, PlanTries, StepPlans, SubstituteCount, WaitDelays};
 pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;
 pub use self::waypoint_index::WaypointIndex;
@@ -400,7 +400,7 @@ const DETOUR: f32 = 1.25;
 /// A new level's stretches longer than this squared get a midpoint (`DAT_142ed6f20`).
 const SPLIT: f32 = crate::math::image::movement::SPLIT;
 /// How many plans one motion step makes at most.
-const PLANS: u32 = 3;
+const PLANS: StepPlans = StepPlans::new(3);
 /// What a gate's annex's gap loses against the gate's own (`XMM14`, the motion step's load at
 /// 0x1411510e7, the same as [`RANGE_FLOOR`]'s).
 const ANNEX_GAP: Distance = Distance::new(crate::math::image::movement::RANGE_FLOOR);

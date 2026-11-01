@@ -17,7 +17,7 @@ fn world(players: PlayerId) -> Visibility {
         vec![
             VisibleMap {
                 counts: vec![-1; n],
-                explored: 0,
+                explored: TileCount::ZERO,
             };
             players.index()
         ],
@@ -451,9 +451,9 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
             false
         )
         .unwrap(),
-        9
+        TileCount::new(9)
     );
-    assert_eq!(v.maps[2].explored, 9);
+    assert_eq!(v.maps[2].explored, TileCount::new(9));
     let i = v.index(Tile::new(10, 10));
     assert_eq!(v.maps[2].counts[i], 1);
     assert_eq!(v.unified[i], VisionBits::from_bits_retain(1 << 2 | 1 << 34));
@@ -465,7 +465,7 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
             false
         )
         .unwrap(),
-        3
+        TileCount::new(3)
     );
     assert_eq!(v.maps[2].counts[i], 2);
     v.unexplore(
@@ -489,7 +489,7 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
         VisionBits::from_bits_retain(1 << 34),
         "explored, no longer visible"
     );
-    assert_eq!(v.maps[2].explored, 12);
+    assert_eq!(v.maps[2].explored, TileCount::new(12));
     // a tile at 0 stays 0; one never explored goes to -2
     v.unexplore(
         PlayerId::new(2),
@@ -687,11 +687,11 @@ fn a_first_sight_of_a_building_s_tile_explores_the_building() {
             false
         )
         .unwrap(),
-        1
+        TileCount::ONE
     );
     assert_eq!(v.maps[1].counts[v.index(Tile::new(27, 92))], 1);
     assert_eq!(v.maps[1].counts[v.index(Tile::new(30, 95))], 0);
-    assert_eq!(v.maps[1].explored, 16);
+    assert_eq!(v.maps[1].explored, TileCount::new(16));
     v.unlink_building(Position::new(29.0, 94.0, 0.0), Footprint::new(2.0, 2.0))
         .unwrap();
     assert_eq!(v.link(Tile::new(29, 94)).unwrap(), (0, 0));
@@ -711,7 +711,7 @@ fn a_building_sees_its_footprint_while_built_then_its_circle_from_a_tile_corner(
     let (at, r) = (Position::new(10.0, 10.0, 0.0), Footprint::new(1.0, 1.0));
     assert_eq!(
         v.sight_on(object_id(9), at, r, false, false).unwrap(),
-        0,
+        TileCount::ZERO,
         "not started"
     );
     v.sight_off(object_id(9), at, r, true, false).unwrap();
@@ -746,7 +746,7 @@ fn a_computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
             SightTiles::new(0),
             false
         ),
-        Ok(1)
+        Ok(TileCount::ONE)
     );
     assert_eq!(
         v.explore(
@@ -755,7 +755,7 @@ fn a_computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
             SightTiles::new(0),
             false
         ),
-        Ok(0)
+        Ok(TileCount::ZERO)
     );
     assert_eq!(
         v.explore(
@@ -764,7 +764,7 @@ fn a_computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
             SightTiles::new(0),
             false
         ),
-        Ok(1)
+        Ok(TileCount::ONE)
     );
     assert_eq!(
         v.take_ai_tiles(),

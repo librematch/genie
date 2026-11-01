@@ -13,6 +13,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::MARKET;
 use crate::vision::SightTiles;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::visibility::{CIRCLE_MASTER, EDGE, Seer, Visibility, tile_of};
 use crate::world::slots::CheckedIndex;
@@ -48,9 +49,9 @@ impl Visibility {
         radius: Footprint,
         square: bool,
         offset: bool,
-    ) -> Result<i32, GenieError> {
+    ) -> Result<TileCount, GenieError> {
         let Some(s) = self.seers.get(&id).copied() else {
-            return Ok(0);
+            return Ok(TileCount::ZERO);
         };
         self.sight_on_los(id, position, radius, square, SightTiles::of(s.los), offset)
     }
@@ -65,9 +66,9 @@ impl Visibility {
         square: bool,
         los: SightTiles,
         offset: bool,
-    ) -> Result<i32, GenieError> {
+    ) -> Result<TileCount, GenieError> {
         let Some(s) = self.seers.get(&id).copied() else {
-            return Ok(0);
+            return Ok(TileCount::ZERO);
         };
         let (square, offset) = match s.building {
             Some(b) if !b.built => {
@@ -75,7 +76,7 @@ impl Visibility {
                     if let Some(s) = self.seers.get_mut(&id) {
                         s.explored = false;
                     }
-                    return Ok(0);
+                    return Ok(TileCount::ZERO);
                 }
                 (true, offset)
             }
@@ -109,7 +110,7 @@ impl Visibility {
     }
 
     /// `FUN_141192560`.
-    pub(super) fn base_sight_on(&mut self, on: SightOn) -> Result<i32, GenieError> {
+    pub(super) fn base_sight_on(&mut self, on: SightOn) -> Result<TileCount, GenieError> {
         let SightOn {
             id,
             seer: s,
@@ -121,13 +122,13 @@ impl Visibility {
         } = on;
         let square = square && s.master != CIRCLE_MASTER;
         if !los.sees() {
-            return Ok(0);
+            return Ok(TileCount::ZERO);
         }
         let (x, y) = (position.x(), position.y());
         let newly = if square {
             let (rx, ry) = (radius.x(), radius.y());
             if rx <= 0.0 || ry <= 0.0 {
-                return Ok(0);
+                return Ok(TileCount::ZERO);
             }
             self.explore_rect(
                 s.player,

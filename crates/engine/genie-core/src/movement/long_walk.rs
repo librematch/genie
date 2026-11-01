@@ -2,6 +2,7 @@
 
 use crate::map::Distance;
 use crate::map::Tile;
+use crate::movement::StepPlans;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionType;
 use crate::players::PlayerId;
@@ -262,7 +263,7 @@ pub(super) fn may_plan(
     trade_cart: bool,
     budget: Option<PlanBudget>,
     wait_delays: crate::movement::WaitDelays,
-    plans: u32,
+    plans: StepPlans,
 ) -> bool {
     let allowed = !trade_cart || budget.is_none_or(|b| b.allows(wait_delays.count()));
     allowed && plans < PLANS

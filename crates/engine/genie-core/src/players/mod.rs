@@ -21,6 +21,7 @@ mod player_type;
 mod posture;
 mod query_relation;
 mod relation;
+mod resource_stat;
 mod stance;
 mod team;
 pub mod tracker;
@@ -46,6 +47,7 @@ pub(crate) use self::relation::NO_RELATIONS;
 #[cfg(test)]
 pub(crate) use self::relation::relation_row;
 pub use self::relation::{Relation, Relations};
+pub use self::resource_stat::ResourceStat;
 pub use self::stance::Stance;
 pub use self::team::Team;
 pub use self::tribute_fee::TributeFee;

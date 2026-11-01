@@ -2,6 +2,7 @@ use crate::map_and_sight::{resource_differences, visibility_differences};
 use crate::test_ids::object_id;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
+use genie_core::vision::TileCount;
 use genie_core::vision::VisionBits;
 use genie_core::vision::visibility::{Visibility, VisibleMap, VisibleResource, VisibleResources};
 
@@ -9,7 +10,7 @@ use genie_core::vision::visibility::{Visibility, VisibleMap, VisibleResource, Vi
 fn sight() -> Visibility {
     let map = || VisibleMap {
         counts: vec![1; 4],
-        explored: 4,
+        explored: TileCount::new(4),
     };
     let resources = || VisibleResources {
         capacities: vec![4],
@@ -40,7 +41,7 @@ fn the_same_sight_has_no_difference() {
 #[test]
 fn a_tile_differs_by_its_count_or_its_unified_bits() {
     let mut slice = sight();
-    slice.maps[1].explored = 3;
+    slice.maps[1].explored = TileCount::new(3);
     slice.maps[1].counts[3] = 0;
     slice.unified[2] = VisionBits::from_bits_retain(1 << 1);
     assert_eq!(

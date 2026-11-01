@@ -145,9 +145,37 @@ impl genie_diff::Diff for SubstituteCount {
     }
 }
 
+/// The plans one motion step made (`0x141150f00`'s `local_19a8`): a unit makes at most 3 in
+/// one step.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct StepPlans(u32);
+
+impl StepPlans {
+    /// None yet.
+    pub const ZERO: Self = Self(0);
+
+    /// A count of `n` plans.
+    #[must_use]
+    pub const fn new(n: u32) -> Self {
+        Self(n)
+    }
+
+    /// The count.
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+
+    /// One plan more.
+    #[must_use]
+    pub const fn plus_one(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::movement::{PlanTries, WaitDelays};
+    use crate::movement::{PlanTries, StepPlans, WaitDelays};
 
     /// A level's tries run out at 0; the delays wrap as a byte.
     #[test]
@@ -155,5 +183,12 @@ mod tests {
         assert!(PlanTries::of_data(1).left() && !PlanTries::of_data(1).spent().left());
         assert_eq!(PlanTries::FULL.get(), 10);
         assert_eq!(WaitDelays::of_data(255).plus_one(), WaitDelays::NONE);
+    }
+
+    /// A step's plans count up one by one.
+    #[test]
+    fn a_step_s_plans_count_up() {
+        assert_eq!(StepPlans::ZERO.plus_one().plus_one(), StepPlans::new(2));
+        assert!(StepPlans::new(2) < StepPlans::new(3));
     }
 }

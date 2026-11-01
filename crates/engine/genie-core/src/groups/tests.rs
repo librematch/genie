@@ -100,6 +100,17 @@ fn member(id: i32) -> Member {
     }
 }
 
+/// `FUN_1410175f0`: a member's place in the list, none for a unit that is no member, which
+/// orders before every member as the game's −1 does.
+#[test]
+fn a_member_s_index_is_its_place_and_a_stranger_s_none() {
+    let mut g = UnitGroup::new(group_id(1));
+    g.members = vec![member(10), member(11)];
+    assert_eq!(g.index_of(object_id(11)), Some(1));
+    assert_eq!(g.index_of(object_id(12)), None);
+    assert!(g.index_of(object_id(12)) < g.index_of(object_id(10)));
+}
+
 /// `FUN_141017590`: a member's own move's reason (`+0xf8`'s record at the member's index,
 /// its `+8`), whatever its place in the list; −1 for a unit that is no member.
 #[test]

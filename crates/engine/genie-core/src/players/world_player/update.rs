@@ -106,7 +106,7 @@ impl World {
     pub fn explored_share(&self, p: PlayerId) -> Option<f32> {
         let sight = self.spatial.sight.as_ref()?;
         let map = sight.maps.get(p.index())?;
-        Some(map.explored as f32 / (sight.size.width() * sight.size.height()) as f32)
+        Some(map.explored.get() as f32 / (sight.size.width() * sight.size.height()) as f32)
     }
 
     /// The defeat check of player `p` (`0x14163b72b`). The player stays in the game while one of

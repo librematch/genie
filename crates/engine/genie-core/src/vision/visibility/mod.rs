@@ -38,6 +38,7 @@ use crate::objects::masters::ids;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
 use crate::world::slots::CheckedIndex;
@@ -74,7 +75,7 @@ pub struct VisibleMap {
     /// Per tile, row by row (`+0x18`).
     pub counts: Vec<i16>,
     /// `numberTilesExploredValue` (`+0x28`).
-    pub explored: i32,
+    pub explored: TileCount,
 }
 
 /// A building's sight state (`TRIBE_Building_Object`: its slots 0x1d0 `FUN_1411d0190` and 0x1d8

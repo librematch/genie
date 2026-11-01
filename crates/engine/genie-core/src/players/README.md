@@ -40,6 +40,7 @@ A player has more than its objects. This folder holds the rest:
 | [`posture.rs`](posture.rs) | A player's offensive posture. |
 | [`query_relation.rs`](query_relation.rs) | A search's relation number: which players' objects `ClosestObject` asks for or passes over. |
 | [`relation.rs`](relation.rs) | How a player stands to another as one type (`Relation`), and a player's row of them (`Relations`, `relation[i]`, `player+0x260`). |
+| [`resource_stat.rs`](resource_stat.rs) | How a resource add counts in a player's statistics (`ResourceStat`). |
 | [`stance.rs`](stance.rs) | A player's stance toward another as one type: `diplomacy[i]` (`+0xe12`). |
 | [`team.rs`](team.rs) | A player's team. |
 | [`tracker.rs`](tracker.rs) | The player's object tracker (`player+0x18`, the "Object Tracker"): lists of the player's object ids by key, in the order the ids came in. |

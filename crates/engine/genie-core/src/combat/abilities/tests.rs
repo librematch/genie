@@ -33,6 +33,7 @@ use crate::test_ids::class_id;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -722,7 +723,7 @@ fn rewards(t: &mut World, p: PlayerId, id: i32, leaves: bool) -> Vec<Reward> {
 fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
     let map = || crate::vision::visibility::VisibleMap {
         counts: vec![0; 400],
-        explored: 0,
+        explored: TileCount::ZERO,
     };
     let mut v = crate::vision::visibility::Visibility::new(
         GridSize::new(20, 20),

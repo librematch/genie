@@ -12,6 +12,7 @@ use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::StepPlans;
 use crate::movement::{
     ANNEX_GAP, AfterRequest, EDGE_GAP, EDGE_POSITION_GAP, EPSILON, FAR, Goal, Me, Motion,
     MoveStats, Mover, Next, Planning, RANGE_FLOOR, Reach, footprint_gap, gate_gap, ground,
@@ -375,7 +376,7 @@ impl Mover {
         world: &mut Spatial,
         plan: Option<&mut Planning<'_>>,
         goal: Goal<'_>,
-        plans: &mut u32,
+        plans: &mut StepPlans,
         include: &[ObjectId],
     ) -> Result<Next, GenieError> {
         match self.paths[0].state {
@@ -415,7 +416,7 @@ impl Mover {
             return Ok(Motion::Moving);
         }
         let ground_radius = self.stats.radius.ground();
-        let mut plans = 0;
+        let mut plans = StepPlans::ZERO;
         // the walk's kept hits, which the step's short paths include (`DAT_143f4a000`, its count
         // `local_19bc`, 0 at the step's start)
         let mut include = Vec::new();

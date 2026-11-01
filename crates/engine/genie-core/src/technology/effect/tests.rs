@@ -45,6 +45,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
 use crate::vision::SightTiles;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Player;
@@ -763,7 +764,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
             GridSize::new(w, h),
             vec![crate::vision::visibility::VisibleMap {
                 counts: vec![0; n],
-                explored: 0,
+                explored: TileCount::ZERO,
             }],
             vec![VisionBits::NONE; n],
             Vec::new(),

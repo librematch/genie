@@ -26,10 +26,12 @@ pub mod ghost;
 pub mod los_tables;
 pub mod registry;
 mod sight_tiles;
+mod tile_count;
 pub mod visibility;
 mod vision_bits;
 
 pub use self::sight_tiles::SightTiles;
+pub use self::tile_count::TileCount;
 pub use self::vision_bits::{VisionBits, VisionMasks};
 
 /// The attribute whose change turns the allied vision on (`FUN_141616820`'s case 0x32).

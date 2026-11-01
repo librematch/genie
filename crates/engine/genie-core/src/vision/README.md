@@ -34,6 +34,7 @@ loop, the ghosts update and the vision masks are rebuilt.
 | [`mod.rs`](mod.rs) | What each player sees: the visible maps its objects' sight keeps, the vision masks that share sight among allies, the objects-in-sight registry, the fog's ghosts and the newly explored tiles. |
 | [`registry.rs`](registry.rs) | The objects-in-sight registry (`Visible_Unit_Manager`, `DAT_143f69170`): per player and per master class, a record of each combat object the player sees, kept by the objects' own updates from the unified map's visible bits, and the query the unit AIs search it with (`GetVisibleUnits`, `FUN_141288c00`). |
 | [`sight_tiles.rs`](sight_tiles.rs) | A line of sight in whole tiles (`SightTiles`), as the visible map's routines and the resource search take it. |
+| [`tile_count.rs`](tile_count.rs) | A count of tiles a player explored (`TileCount`). |
 | [`vision_bits.rs`](vision_bits.rs) | The vision's player bits (`VisionBits`) and a player's two masks (`VisionMasks`). |
 | [`visibility/`](visibility/) | What each player sees: the players' `RGE_Visible_Map`s and the map's `RGE_Unified_Visible_Map` (both saved), which the objects' lines of sight keep. |
 <!-- /files -->

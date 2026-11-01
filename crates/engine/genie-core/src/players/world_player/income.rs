@@ -9,6 +9,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
+use crate::players::ResourceStat;
 use crate::players::attribute::{self, AttributeId, RESOURCES};
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{EARLY_SCOUTING_MS, LIVESTOCK_SCALE, MINUTE, SECOND, get, set};
@@ -29,7 +30,7 @@ impl World {
             if at_most_or_unordered(rate.get(), 0.0) {
                 continue;
             }
-            self.add_resource(p, kind, rate / MINUTE, 1, true)?;
+            self.add_resource(p, kind, rate / MINUTE, ResourceStat::GATHERED, true)?;
         }
         Ok(())
     }
@@ -65,7 +66,7 @@ impl World {
             p,
             attribute::FOOD,
             Amount::new(rate * (time * grows)),
-            1,
+            ResourceStat::GATHERED,
             true,
         )?;
         Ok(())
@@ -83,24 +84,30 @@ impl World {
         p: PlayerId,
         kind: AttributeId,
         amount: Amount,
-        stat: u8,
+        stat: ResourceStat,
         share: bool,
     ) -> Result<(), GenieError> {
         if kind == attribute::GOLD {
-            if stat != 0 {
+            if stat.counts_gold() {
                 let a = &mut self.players.player_mut(p)?.attributes;
                 let counter = get(a, attribute::GOLD_COUNTER);
                 set(a, attribute::GOLD_COUNTER, amount + counter);
-                if stat == 1 {
-                    self.add_attribute_base(p, attribute::GOLD_GATHERED, amount, 1, share)?;
+                if stat.gathered() {
+                    self.add_attribute_base(
+                        p,
+                        attribute::GOLD_GATHERED,
+                        amount,
+                        ResourceStat::GATHERED,
+                        share,
+                    )?;
                 }
             }
-        } else if stat == 1 {
+        } else if stat.gathered() {
             self.add_attribute_base(
                 p,
                 attribute::GATHERED.offset(kind.index())?,
                 amount,
-                1,
+                ResourceStat::GATHERED,
                 share,
             )?;
         }
@@ -123,7 +130,7 @@ impl World {
         p: PlayerId,
         kind: AttributeId,
         amount: Amount,
-        stat: u8,
+        stat: ResourceStat,
         share: bool,
     ) -> Result<(), GenieError> {
         let player = self.players.player_mut(p)?;

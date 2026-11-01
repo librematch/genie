@@ -16,6 +16,7 @@ use crate::objects::unit::Unit;
 use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
+use crate::players::ResourceStat;
 use crate::players::attribute;
 use crate::players::game_status::GameStatus;
 use crate::players::relation_row;
@@ -23,6 +24,7 @@ use crate::players::tracker::Key;
 use crate::technology::ResearchState;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::visibility::{Visibility, VisibleMap};
 use crate::world::Millis;
@@ -147,7 +149,12 @@ fn attribute_22_is_the_explored_share_in_percent() {
     };
     t.spatial.sight = Some(Visibility::new(
         GridSize::new(10, 10),
-        vec![map(0), map(37), map(0), map(0)],
+        vec![
+            map(TileCount::ZERO),
+            map(TileCount::new(37)),
+            map(TileCount::ZERO),
+            map(TileCount::ZERO),
+        ],
         vec![VisionBits::NONE; 100],
         Vec::new(),
         0,
@@ -257,7 +264,7 @@ fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
         PlayerId::new(1),
         attribute::FOOD,
         Amount::new(10.0),
-        1,
+        ResourceStat::GATHERED,
         true,
     )
     .unwrap();
@@ -269,7 +276,7 @@ fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
         PlayerId::new(1),
         attribute::FOOD,
         Amount::new(-20.0),
-        1,
+        ResourceStat::GATHERED,
         true,
     )
     .unwrap();
@@ -280,8 +287,14 @@ fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
     t.players[1].relations = relation_row([1, 0, 0, 3]);
     t.players[2].relations = relation_row([1, 0, 0, 3]);
     t.players[3].relations = relation_row([1, 0, 3, 0]);
-    t.add_resource(PlayerId::new(1), attribute::WOOD, Amount::new(4.0), 1, true)
-        .unwrap();
+    t.add_resource(
+        PlayerId::new(1),
+        attribute::WOOD,
+        Amount::new(4.0),
+        ResourceStat::GATHERED,
+        true,
+    )
+    .unwrap();
     assert_eq!(
         [1, 2, 3].map(|p| (
             t.players[p].attributes[1].get(),
@@ -711,7 +724,7 @@ fn the_scout_map_takes_the_new_tiles() {
     unified[0] = VisionBits::from_bits_retain(1 << 1);
     let map = VisibleMap {
         counts: vec![-1; 100],
-        explored: 0,
+        explored: TileCount::ZERO,
     };
     let mut sight = Visibility::new(
         GridSize::new(10, 10),

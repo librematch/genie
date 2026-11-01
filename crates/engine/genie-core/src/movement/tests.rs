@@ -882,7 +882,7 @@ fn a_big_unit_s_path_request_takes_the_old_pather_with_the_walk_s_kept_hits() {
             None,
             WorldTime::from_millis(100),
         );
-        let mut plans = 0;
+        let mut plans = StepPlans::ZERO;
         assert!(
             m.request(&me, &mut w, &mut plan, goal, &mut plans, include)
                 .is_ok()
@@ -1628,11 +1628,26 @@ fn a_trade_cart_plans_within_its_owners_budget() {
         delay_cap: PlanCap::of_data(2),
         plans: PlanCount::of_data(6),
     };
-    assert!(!may_plan(true, Some(spent), WaitDelays::of_data(0), 0));
+    assert!(!may_plan(
+        true,
+        Some(spent),
+        WaitDelays::of_data(0),
+        StepPlans::ZERO
+    ));
     // a villager is not held to the budget
-    assert!(may_plan(false, Some(spent), WaitDelays::of_data(0), 0));
+    assert!(may_plan(
+        false,
+        Some(spent),
+        WaitDelays::of_data(0),
+        StepPlans::ZERO
+    ));
     // past the delay cap the budget lets the cart plan again
-    assert!(may_plan(true, Some(spent), WaitDelays::of_data(3), 0));
+    assert!(may_plan(
+        true,
+        Some(spent),
+        WaitDelays::of_data(3),
+        StepPlans::ZERO
+    ));
     assert!(may_plan(
         true,
         Some(PlanBudget {
@@ -1640,9 +1655,14 @@ fn a_trade_cart_plans_within_its_owners_budget() {
             ..spent
         }),
         WaitDelays::of_data(0),
-        0
+        StepPlans::ZERO
     ));
-    assert!(may_plan(true, None, WaitDelays::of_data(0), 0));
+    assert!(may_plan(
+        true,
+        None,
+        WaitDelays::of_data(0),
+        StepPlans::ZERO
+    ));
     assert!(!may_plan(false, None, WaitDelays::of_data(0), PLANS));
 }
 

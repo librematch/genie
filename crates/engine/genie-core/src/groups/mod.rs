@@ -550,15 +550,11 @@ impl UnitGroup {
         self.members.iter().any(|m| m.id.key() == id)
     }
 
-    /// Unit `id`'s place among the members (`FUN_1410175f0`: its index in `+0xf0`), −1 when it is
-    /// not one.
+    /// Unit `id`'s place among the members (`FUN_1410175f0`: its index in `+0xf0`); none (the
+    /// game's −1, which orders before every member) when it is not one.
     #[must_use]
-    pub fn index_of(&self, id: ObjectId) -> i32 {
-        self.members
-            .iter()
-            .position(|m| m.id == id)
-            .and_then(|i| i32::try_from(i).ok())
-            .unwrap_or(-1)
+    pub fn index_of(&self, id: ObjectId) -> Option<usize> {
+        self.members.iter().position(|m| m.id == id)
     }
 
     /// `FUN_141017590`: unit `id`'s own move's reason (`mReason`, the `+8` of its record in

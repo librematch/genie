@@ -76,6 +76,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Player;
@@ -1734,7 +1735,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
         (0..4)
             .map(|_| crate::vision::visibility::VisibleMap {
                 counts: vec![0; n],
-                explored: 0,
+                explored: TileCount::ZERO,
             })
             .collect(),
         vec![VisionBits::from_bits_retain(seen); n],
