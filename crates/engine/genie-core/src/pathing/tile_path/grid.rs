@@ -1,6 +1,7 @@
 //! A terrain restriction's planner ([`Planner`]) and its four-level grid: built, read and
 //! rebuilt over a changed rectangle.
 
+use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
@@ -34,7 +35,7 @@ pub struct Planner {
     pub(super) open: OpenList,
     /// `+0x470` and `+0xb8`: the node nearest the goal and its estimate.
     pub(super) best: Option<NodeIndex>,
-    pub(super) best_cost: f32,
+    pub(super) best_cost: Distance,
     /// `+0x448`: the path's points from the goal back.
     pub(super) points: Vec<BVector>,
 }

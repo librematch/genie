@@ -44,7 +44,7 @@ use self::smoothing::{SHORTCUT_REACH, TILE_SEARCH_LENGTH};
 pub use self::smoothing::{SegmentTest, smooth};
 
 /// The cost the best node starts from in each search (`0x497423f0`).
-const NO_COST: f32 = 999_999.0;
+const NO_COST: Distance = Distance::new(999_999.0);
 /// The goal's own tile counts when the goal is this near it (`DAT_142eb99cc`).
 const GOAL_GAP: f32 = crate::math::image::tile_path::GOAL_GAP;
 /// The planner's half tile (`DAT_142e7f384`) and its −0.5 (`DAT_142eb6e58`).
@@ -54,8 +54,8 @@ const ONE: f32 = crate::math::image::tile_path::ONE;
 /// The hierarchical search marks 0.1 more on the square's far sides (`DAT_142eb5690`).
 const FAR_SIDE: f32 = crate::math::image::tile_path::FAR_SIDE;
 /// A computer player's search stops early near the goal (`DAT_14330ebb8`, `DAT_142eb0f4c`).
-const EARLY_LEFT: f32 = crate::math::image::tile_path::EARLY_LEFT;
-const EARLY_START: f32 = crate::math::image::tile_path::EARLY_START;
+const EARLY_LEFT: Distance = Distance::new(crate::math::image::tile_path::EARLY_LEFT);
+const EARLY_START: Distance = Distance::new(crate::math::image::tile_path::EARLY_START);
 /// The level-0 search costs a turn's shortcut from the node before at 1.1 times its cost
 /// (`DAT_142e86c14`).
 const SHORTCUT_COST: f32 = crate::math::image::tile_path::SHORTCUT_COST;

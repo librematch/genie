@@ -1,6 +1,7 @@
 //! The A* searches over the node cells and over the tiles: the nodes, the open list, the
 //! estimates and the expansions.
 
+use crate::map::Distance;
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{
     CellEdges, CellIndex, CellKind, EARLY_LEFT, EARLY_START, GridLevel, NO_COST, Planner,
@@ -68,8 +69,8 @@ pub(super) struct Node {
     /// `+0xc`, `+0xe`: the tile the cost is measured from.
     pub(super) entry: PlanTile,
     /// `+0x10`: cost so far plus the estimate to the goal; `+0x14`: the cost so far.
-    pub(super) f: f32,
-    pub(super) g: f32,
+    pub(super) f: Distance,
+    pub(super) g: Distance,
     /// `+0x18`.
     pub(super) level: GridLevel,
     /// `+0x19`: the edge back to the parent (none for the start).
@@ -108,7 +109,7 @@ impl OpenList {
     /// more; into a new lowest or a higher bucket at its end.
     pub(super) fn push(&mut self, node: NodeIndex, nodes: &Nodes) {
         let f = nodes[node].f;
-        let b = f as i32;
+        let b = f.get() as i32;
         let index = b as usize;
         if self.buckets.len() <= index {
             self.buckets.resize_with(index + 1, Vec::new);
@@ -163,9 +164,9 @@ pub(super) struct TileNode {
     /// The cell's level.
     pub(super) level: GridLevel,
     /// The cost so far.
-    pub(super) cost: f32,
+    pub(super) cost: Distance,
     /// The estimate to the goal.
-    pub(super) estimate: f32,
+    pub(super) estimate: Distance,
     /// The node it comes from.
     pub(super) parent: Option<NodeIndex>,
     /// The edge it was entered by (none for the start).
@@ -201,23 +202,27 @@ impl Planner {
     }
 
     /// The estimate from a tile to the goal's, in whole tiles (`FUN_140f764c0`, `FUN_140f76840`).
-    pub(super) fn estimate_from(&self, t: PlanTile) -> f32 {
+    pub(super) fn estimate_from(&self, t: PlanTile) -> Distance {
         let dx = i32::from(self.goal.x()) - i32::from(t.x());
         let dy = i32::from(self.goal.y()) - i32::from(t.y());
-        fmath::sqrt((dy * dy + dx * dx) as f32)
+        Distance::new(fmath::sqrt((dy * dy + dx * dx) as f32))
     }
 
     /// The start's estimate (`FUN_140f78850`, `FUN_140f79250`): in f32 differences.
-    pub(super) fn start_estimate(&self, t: PlanTile) -> f32 {
+    pub(super) fn start_estimate(&self, t: PlanTile) -> Distance {
         let dx = f32::from(self.goal.x()) - f32::from(t.x());
         let dy = f32::from(self.goal.y()) - f32::from(t.y());
-        fmath::sqrt(dy * dy + dx * dx)
+        Distance::new(fmath::sqrt(dy * dy + dx * dx))
     }
 
     /// Where a new node's cost is measured from (`FUN_140f764c0`, `FUN_140f76840`): a turn
     /// (a move across the parent's own move) measures from the grandparent, unless the parent
     /// already did; returns that node's cost so far, its tile and whether it was the grandparent.
-    pub(super) fn measured_from(&self, parent: NodeIndex, dir: CellEdges) -> (f32, PlanTile, bool) {
+    pub(super) fn measured_from(
+        &self,
+        parent: NodeIndex,
+        dir: CellEdges,
+    ) -> (Distance, PlanTile, bool) {
         let p = &self.nodes[parent];
         if let (Some(gp), false) = (p.parent, p.shortcut) {
             let turn = if dir == CellEdges::W || dir == CellEdges::E {
@@ -239,7 +244,7 @@ impl Planner {
         &mut self,
         level: GridLevel,
         at: PlanTile,
-        g: f32,
+        g: Distance,
         parent: NodeIndex,
         dir: CellEdges,
     ) -> Option<NodeIndex> {
@@ -286,7 +291,7 @@ impl Planner {
         };
         let dx = i32::from(entry.x()) - i32::from(centre.x());
         let dy = i32::from(entry.y()) - i32::from(centre.y());
-        let d = fmath::sqrt((dy * dy + dx * dx) as f32);
+        let d = Distance::new(fmath::sqrt((dy * dy + dx * dx) as f32));
         let h = self.estimate_from(centre);
         let n = self.alloc(TileNode {
             at,
@@ -310,7 +315,7 @@ impl Planner {
     pub(super) fn expand0(
         &mut self,
         at: PlanTile,
-        g: f32,
+        g: Distance,
         parent: NodeIndex,
         dir: CellEdges,
     ) -> Option<NodeIndex> {
@@ -325,7 +330,7 @@ impl Planner {
         };
         let dx = i32::from(entry.x()) - i32::from(at.x());
         let dy = i32::from(entry.y()) - i32::from(at.y());
-        let d = fmath::sqrt((dy * dy + dx * dx) as f32);
+        let d = Distance::new(fmath::sqrt((dy * dy + dx * dx) as f32));
         let h = self.estimate_from(at);
         let n = self.alloc(TileNode {
             at,
@@ -380,7 +385,7 @@ impl Planner {
         let n = self.alloc(TileNode {
             at: cell,
             level,
-            cost: 0.0,
+            cost: Distance::ZERO,
             estimate: h0,
             parent: None,
             dir: CellEdges::NONE,
@@ -400,7 +405,11 @@ impl Planner {
             let Some(b) = self.close(n) else { continue };
             let node = self.nodes[n];
             let h = node.f - node.g;
-            if !full && h <= EARLY_LEFT && h0 <= EARLY_START && (h0 as i32 * 10) as u32 <= count {
+            if !full
+                && h <= EARLY_LEFT
+                && h0 <= EARLY_START
+                && (h0.get() as i32 * 10) as u32 <= count
+            {
                 self.best = Some(n);
                 return None;
             }
@@ -425,7 +434,7 @@ impl Planner {
         let n = self.alloc(TileNode {
             at: start,
             level: GridLevel::TILES,
-            cost: 0.0,
+            cost: Distance::ZERO,
             estimate: h0,
             parent: None,
             dir: CellEdges::NONE,
