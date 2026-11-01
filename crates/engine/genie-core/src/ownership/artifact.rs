@@ -22,6 +22,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
@@ -521,7 +522,7 @@ impl Unit {
                 .and_then(|v| v.seer(self.id))
                 .map(|s| s.capture);
         let r = ArtifactReads {
-            searches: !(self.combat && capture == Some(0)),
+            searches: !(self.combat && capture == Some(CaptureKind::NONE)),
             by,
         };
         // written back before an error too: the stop's context reads the list

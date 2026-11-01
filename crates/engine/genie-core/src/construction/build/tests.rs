@@ -15,6 +15,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::AdjacentMode;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::ObstructionClass;
@@ -75,7 +76,7 @@ fn on_map(
         player: PlayerId::new(1),
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: buildable,
+        buildable_on: BuildableOn::of_data(buildable),
         tall: false,
         speed: Speed::ZERO,
         unknown: None,
@@ -521,7 +522,7 @@ fn house() -> crate::map::spatial::Placed {
         player: PlayerId::new(2),
         master: ids::HOUSE,
         obstruction_type: ObstructionType::TYPE_2,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,

@@ -29,6 +29,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
@@ -1212,7 +1213,7 @@ fn a_member_s_own_move_walks_its_path() {
             player: PlayerId::new(1),
             master: master_id(4),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::new(0.8),
             unknown: None,
@@ -1690,7 +1691,7 @@ fn grounded() -> World {
                     player: p,
                     master: master_id(4),
                     obstruction_type: ObstructionType::NONE,
-                    buildable_on: 0,
+                    buildable_on: BuildableOn::NO,
                     tall: true,
                     speed: Speed::ZERO,
                     unknown: None,
@@ -1881,7 +1882,7 @@ fn register(t: &mut World) {
                     player: p,
                     master: m.id,
                     obstruction_type: ObstructionType::NONE,
-                    buildable_on: 0,
+                    buildable_on: BuildableOn::NO,
                     tall: false,
                     speed: Speed::ZERO,
                     unknown: None,

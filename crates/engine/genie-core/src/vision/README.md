@@ -41,6 +41,6 @@ loop, the ghosts update and the vision masks are rebuilt.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../construction/), [`map`](../map/), [`math`](../math/), [`objects`](../objects/), [`players`](../players/), [`world`](../world/).
+- Uses: [`construction`](../construction/), [`map`](../map/), [`math`](../math/), [`objects`](../objects/), [`ownership`](../ownership/), [`players`](../players/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

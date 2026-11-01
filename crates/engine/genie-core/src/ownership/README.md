@@ -24,6 +24,7 @@ unit, a player loses a building with its garrison.
 | [`artifact.rs`](artifact.rs) | The Artifact action (type 107): the default task of livestock, which keeps checking whether a unit of another player is close enough to take the animal over (the search is the caller's, `crate::map::spatial::Spatial::artifact_owner`). |
 | [`artifact_state.rs`](artifact_state.rs) | An Artifact's state: checking for a new owner and waiting between checks. |
 | [`capture.rs`](capture.rs) | Captures and takeovers: an animal or artifact a player takes over, its stop, the unit AI's ownership change, a takeover by sight, a unit's ownership change, and the scan for more livestock after a capture. |
+| [`capture_kind.rs`](capture_kind.rs) | How another player takes an object over. |
 | [`change.rs`](change.rs) | An ownership change (slot 0x70, `FUN_14120f800`): to Gaia, a building's with its foundation, annexes and garrison, and the attributes and storage it moves. |
 | [`mod.rs`](mod.rs) | Objects that change hands: the Artifact action of livestock, which a unit of another player takes over, and an ownership change with what it carries along (a building's annexes, its garrison, the attributes it counts). |
 | [`tests.rs`](tests.rs) | Tests. |
@@ -33,5 +34,5 @@ unit, a player loses a building with its garrison.
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`garrison`](../garrison/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`unit_ai`](../unit_ai/), [`world`](../world/).
-- Used by: [`garrison`](../garrison/), [`gathering`](../gathering/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
+- Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

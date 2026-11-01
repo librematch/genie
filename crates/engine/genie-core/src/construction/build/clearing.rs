@@ -208,14 +208,14 @@ pub(super) fn clearing_takes(
     // The wall class (27, `0x1b`): two walls beside a builder on a footprint's diagonal stop it.
     let own_wall = o.player == site.player && under_gate && o.class == class::WALL;
     let tree = site.trees && o.class == class::TREE;
-    if o.buildable_on == 0 && !own_wall && !tree {
+    if !o.buildable_on.cleared() && !own_wall && !tree {
         return Ok(None);
     }
     let seen = *looks.get(&id).ok_or(GenieError::unsupported(
         "a footprint clearing of an object the slice does not hold",
     ))?;
     // the tree's test: COMISS 1.0 against its hit points, JC passes it over (a NaN too)
-    if o.buildable_on == 0 && !own_wall && below_or_unordered(STUMP_HP, seen.hp.get()) {
+    if !o.buildable_on.cleared() && !own_wall && below_or_unordered(STUMP_HP, seen.hp.get()) {
         return Ok(None);
     }
     let (rx, ry) = (site.radius.x(), site.radius.y());

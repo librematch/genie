@@ -467,14 +467,14 @@ fn tribute(c: &TributeCommand) -> Packet {
         field_0x08: second.amount.get(),
         field_0x0c: third.amount.get(),
         field_0x10: fourth.amount.get(),
-        cost: first.fee,
-        field_0x18: second.fee,
-        field_0x1c: third.fee,
-        field_0x20: fourth.fee,
-        attr: first.attribute,
-        field_0x26: second.attribute,
-        field_0x28: third.attribute,
-        field_0x2a: fourth.attribute,
+        cost: first.fee.get(),
+        field_0x18: second.fee.get(),
+        field_0x1c: third.fee.get(),
+        field_0x20: fourth.fee.get(),
+        attr: first.attribute.get(),
+        field_0x26: second.attribute.get(),
+        field_0x28: third.attribute.get(),
+        field_0x2a: fourth.attribute.get(),
         to: c.to.get(),
     })
 }
@@ -485,14 +485,14 @@ fn trade(c: &TradeCommand) -> Packet {
     if c.buy {
         Packet::BuyCommodity(packets::BuyCommodity {
             commp_id: player,
-            attr: c.attribute,
+            attr: c.attribute.get(),
             amt: c.times.get(),
             u_id: ObjectId::field(c.market),
         })
     } else {
         Packet::SellCommodity(packets::SellCommodity {
             commp_id: player,
-            attr: c.attribute,
+            attr: c.attribute.get(),
             amt: c.times.get(),
             u_id: ObjectId::field(c.market),
         })

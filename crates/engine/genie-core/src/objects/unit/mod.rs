@@ -16,6 +16,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::MISSILE;
 use crate::objects::masters::master_type::TREE;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -98,7 +99,7 @@ pub struct Unit {
     /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
     pub undeletable: bool,
     /// `capture_flag` (`+0x924`).
-    pub capture_flag: u8,
+    pub capture_flag: CaptureKind,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
     pub annex_of: Option<ObjectId>,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).

@@ -35,6 +35,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
@@ -107,7 +108,7 @@ pub struct Seer {
     pub umv: u8,
     /// `+0x924` (`FUN_14121df60`): 1 for an object another player takes over by seeing it, 3
     /// for livestock.
-    pub capture: u8,
+    pub capture: CaptureKind,
     /// The object's type (`+0xf`): 70 a combat unit, 80 a building, below 70 anything else.
     pub kind: MasterKind,
 }
@@ -266,7 +267,7 @@ pub struct Visibility {
 /// and 10, and master 826), and for masters 854 and Gaia's 814, which another player takes over
 /// by seeing them; 3 for classes 58 and 1 (livestock).
 #[must_use]
-pub fn capture_kind(player: PlayerId, class: ClassId, master: MasterId) -> u8 {
+pub fn capture_kind(player: PlayerId, class: ClassId, master: MasterId) -> CaptureKind {
     const KEPT: [ClassId; 11] = [
         class::CLASS_40,
         class::RELIC,
@@ -280,17 +281,17 @@ pub fn capture_kind(player: PlayerId, class: ClassId, master: MasterId) -> u8 {
         class::PREY,
         class::PREDATOR,
     ];
-    let mut kind = 0;
+    let mut kind = CaptureKind::NONE;
     if (player == PlayerId::GAIA && !KEPT.contains(&class) && master != ids::ID_826)
         || master == ids::ID_854
     {
-        kind = 1;
+        kind = CaptureKind::BY_SIGHT;
     }
     if player == PlayerId::GAIA && master == ids::ID_814 {
-        kind = 1;
+        kind = CaptureKind::BY_SIGHT;
     }
     if class == class::LIVESTOCK || class == class::ARTIFACT {
-        kind = 3;
+        kind = CaptureKind::LIVESTOCK;
     }
     kind
 }

@@ -4,6 +4,7 @@ use crate::encode::encode;
 use crate::names::unmodelled_command;
 use genie_core::GenieError;
 use genie_core::commands::QueueId;
+use genie_core::commands::ResourceWord;
 use genie_core::commands::SpriteOverride;
 use genie_core::commands::TradeLots;
 use genie_core::commands::{
@@ -22,6 +23,7 @@ use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::orders::{Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
+use genie_core::players::TributeFee;
 use genie_core::players::tribute::Gift;
 use genie_core::technology::TechId;
 use genie_rec::de::command::{self as packets, Command as Packet};
@@ -422,7 +424,7 @@ fn single_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
 fn trade(player: u8, attribute: u16, times: u16, market: i32, buy: bool) -> Command {
     Command::Trade(TradeCommand {
         player: PlayerId::from(player),
-        attribute,
+        attribute: ResourceWord::of_data(attribute),
         times: TradeLots::of_data(times),
         market: ObjectId::of_field(market),
         buy,
@@ -433,18 +435,18 @@ fn trade(player: u8, attribute: u16, times: u16, market: i32, buy: bool) -> Comm
 /// fees (`+0x14`..), the receiver at `+0x2c`.
 fn tribute(c: &packets::TribeGiveAttributes) -> Command {
     let gift = |attribute, amount, fee| Gift {
-        attribute,
-        amount,
-        fee,
+        attribute: ResourceWord::of_data(attribute),
+        amount: Amount::new(amount),
+        fee: TributeFee::of_data(fee),
     };
     Command::Tribute(TributeCommand {
         player: PlayerId::from(c.commp_id),
         to: PlayerId::from(c.to),
         gifts: [
-            gift(c.attr, Amount::new(c.amt), c.cost),
-            gift(c.field_0x26, Amount::new(c.field_0x08), c.field_0x18),
-            gift(c.field_0x28, Amount::new(c.field_0x0c), c.field_0x1c),
-            gift(c.field_0x2a, Amount::new(c.field_0x10), c.field_0x20),
+            gift(c.attr, c.amt, c.cost),
+            gift(c.field_0x26, c.field_0x08, c.field_0x18),
+            gift(c.field_0x28, c.field_0x0c, c.field_0x1c),
+            gift(c.field_0x2a, c.field_0x10, c.field_0x20),
         ],
     })
 }

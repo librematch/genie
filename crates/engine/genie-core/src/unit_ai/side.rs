@@ -12,6 +12,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::unit_ai::{
     Attacked, Duel, Effect, Found, Notify, PatrolPath, Search, Seeker, UnitAi, UnitSeen,
@@ -429,7 +430,7 @@ pub struct TargetFlags {
     /// Its type (`+0xf`).
     pub kind: MasterKind,
     /// `capture_flag` (`+0x924`, `FUN_14107cc90`).
-    pub capture: u8,
+    pub capture: CaptureKind,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
     pub pasture: Option<ObjectId>,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (`FUN_141188bb0`).

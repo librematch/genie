@@ -157,7 +157,7 @@ pub(super) fn dat_work(
         tall: 0.0 < Radii::from(unit.collision_size).z(),
         height: Distance::new(Radii::from(unit.collision_size).z()),
         obstruction_type: ObstructionType::from(unit.obstruction_type),
-        buildable_on: unit.can_be_built_on,
+        buildable_on: genie_core::objects::masters::BuildableOn::of_data(unit.can_be_built_on),
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::of_data(unit.combat_level),

@@ -14,6 +14,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
+use crate::ownership::CaptureKind;
 use crate::ownership::change::change_hands;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
@@ -160,9 +161,9 @@ impl Unit {
             return Err(HANDS_LEFT);
         }
         let _ = self.change_owner(c, new)?;
-        self.capture_flag = 0;
+        self.capture_flag = CaptureKind::NONE;
         if let Some(s) = c.w.spatial.sight.as_mut().and_then(|v| v.seer_mut(self.id)) {
-            s.capture = 0;
+            s.capture = CaptureKind::NONE;
         }
         Ok(())
     }

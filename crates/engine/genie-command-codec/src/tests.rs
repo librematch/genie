@@ -851,7 +851,7 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Trade(TradeCommand {
                 player: player_id(2),
-                attribute: 1,
+                attribute: genie_core::commands::ResourceWord::of_data(1),
                 times: genie_core::commands::TradeLots::of_data(2),
                 market: Some(object_id(96)),
                 buy: true,
@@ -868,7 +868,7 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Trade(TradeCommand {
                 player: player_id(2),
-                attribute: 0x0102,
+                attribute: genie_core::commands::ResourceWord::of_data(0x0102),
                 times: genie_core::commands::TradeLots::of_data(1),
                 market: Some(object_id(97)),
                 buy: false,
@@ -923,9 +923,9 @@ fn a_tribute_keeps_its_four_gifts() {
     .encode()
     .unwrap();
     let gift = |attribute, amount, fee| Gift {
-        attribute,
+        attribute: genie_core::commands::ResourceWord::of_data(attribute),
         amount,
-        fee,
+        fee: genie_core::players::TributeFee::of_data(fee),
     };
     assert_eq!(
         round_trip(&tribute),

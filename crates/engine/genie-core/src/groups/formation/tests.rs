@@ -21,6 +21,7 @@ use crate::movement::WaypointLevel;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
@@ -136,7 +137,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
                 player: PlayerId::new(1),
                 master: u.life.master_id,
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,

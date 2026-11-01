@@ -454,6 +454,7 @@ mod stack_tests {
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::lifecycle::{Class, Lifecycle};
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::FlyMode;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
@@ -656,7 +657,7 @@ mod stack_tests {
                 player: PlayerId::new(1),
                 master: ids::TOWN_CENTRE_621,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,

@@ -24,6 +24,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::layers::Animated;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
@@ -1030,7 +1031,7 @@ fn world_with(id: i32, player: PlayerId, class: ClassId, at: Position) -> Spatia
             player,
             master: master_id(4),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,

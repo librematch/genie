@@ -3,10 +3,12 @@
 //! pays the market's fee on top; what it lacks lowers both alike.
 
 use crate::GenieError;
+use crate::commands::ResourceWord;
 use crate::math::fmath::maxss;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::TributeFee;
 use crate::players::attribute;
 use crate::players::tracker::ListKey;
 use crate::world::World;
@@ -21,11 +23,11 @@ const MARKETS: [MasterId; 2] = [MasterId::named(84), MasterId::named(1647)];
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Gift {
     /// The attribute given: food, wood, stone or gold (0 to 3); any other entry gives nothing.
-    pub attribute: u16,
+    pub attribute: ResourceWord,
     /// The amount the receiver gets.
     pub amount: Amount,
     /// The fee, the share of the amount the giver pays on top.
-    pub fee: f32,
+    pub fee: TributeFee,
 }
 
 /// What one entry moves for a giver that has `have` of the resource: the amount the receiver
@@ -36,7 +38,7 @@ pub struct Gift {
 #[must_use]
 pub fn settle(have: Amount, gift: Gift) -> (Amount, Amount) {
     let amount = Amount::new(maxss(gift.amount.get(), 0.0));
-    let fee = maxss(gift.fee, 0.0);
+    let fee = maxss(gift.fee.get(), 0.0);
     let mut extra = if Amount::ZERO < amount {
         amount * fee
     } else {
@@ -94,7 +96,7 @@ impl World {
             return Ok(());
         }
         for &gift in gifts {
-            let Some(&kind) = attribute::RESOURCES.get(usize::from(gift.attribute)) else {
+            let Some(kind) = gift.attribute.tributed() else {
                 continue;
             };
             let have = *self
@@ -137,9 +139,9 @@ mod tests {
 
     fn gift(attribute: u16, amount: f32, fee: f32) -> Gift {
         Gift {
-            attribute,
+            attribute: ResourceWord::of_data(attribute),
             amount: Amount::new(amount),
-            fee,
+            fee: TributeFee::of_data(fee),
         }
     }
 

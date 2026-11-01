@@ -212,7 +212,11 @@ mod spatial {
         let seer = out.sight.as_ref().unwrap().seer(object_id(10)).unwrap();
         assert_eq!(
             (seer.kind, seer.capture, seer.umv),
-            (genie_core::objects::masters::master_type::COMBAT, 5, 0)
+            (
+                genie_core::objects::masters::master_type::COMBAT,
+                genie_core::ownership::CaptureKind::of_data(5),
+                0
+            )
         );
         assert!(seer.explored && seer.building.is_none());
         assert_eq!(

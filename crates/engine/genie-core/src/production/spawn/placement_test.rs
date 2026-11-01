@@ -14,6 +14,7 @@ use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
@@ -49,7 +50,7 @@ pub struct Near {
     /// Its master.
     pub master: MasterId,
     /// Its master's `can_be_built_on` (`+0x5e9`).
-    pub buildable_on: u8,
+    pub buildable_on: BuildableOn,
     /// Its master's `obstruction_type` (`+0x651`).
     pub obstruction_type: ObstructionType,
     /// Its master's `enable_auto_gather` (`+0x681`).
@@ -288,7 +289,7 @@ fn static_scans_find(
     let first = |o: &Near| {
         let listed = !site.own.contains(&o.id)
             && o.state < ObjectState::Removed
-            && o.buildable_on != 1
+            && !o.buildable_on.passed()
             && (o.kind != BUILDING || !o.desolid);
         let tall = o.tall
             || (site.class == class::TREE && o.class == class::FARM)
@@ -301,7 +302,7 @@ fn static_scans_find(
     let second = |o: &Near| {
         let listed = !site.own.contains(&o.id)
             && o.state < ObjectState::Removed
-            && o.buildable_on != 1
+            && !o.buildable_on.passed()
             && o.kind != COMBAT
             && (o.kind != BUILDING
                 || o.class == class::CLASS_51
@@ -488,7 +489,7 @@ pub(super) fn build_passes(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -
     // a felled tree (at most 1 hit point) passes off a forest (`FUN_140f5efb0` on its
     // tile's terrain)
     passes
-        || o.buildable_on == 1
+        || o.buildable_on.passed()
         || (o.class == class::TREE && o.hp <= HitPoints::new(1.0) && !o.forest_tile)
 }
 
@@ -559,7 +560,7 @@ pub fn placement(
             }
             let counts = |o: &Near| {
                 let listed = o.state < ObjectState::Removed
-                    && o.buildable_on != 1
+                    && !o.buildable_on.passed()
                     && (o.kind != BUILDING || !o.desolid);
                 let tall = o.tall
                     || (me.class == class::TREE && o.class == class::FARM)
@@ -580,7 +581,7 @@ pub fn placement(
     // slot 0x50's own scan
     let counts = |o: &Near| {
         let listed = o.state < ObjectState::Removed
-            && o.buildable_on != 1
+            && !o.buildable_on.passed()
             && (o.kind != BUILDING
                 || o.class == class::CLASS_51
                 || o.class == class::CLASS_54

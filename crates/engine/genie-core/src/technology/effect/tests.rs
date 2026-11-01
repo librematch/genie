@@ -13,6 +13,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CostAmount;
@@ -25,6 +26,7 @@ use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{CostSlot, Master, Masters};
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
@@ -262,7 +264,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
                 player: PlayerId::new(0),
                 master: ids::HOUSE,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -774,7 +776,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
             explored: true,
             building: None,
             umv: 0,
-            capture: 0,
+            capture: CaptureKind::NONE,
             kind: master_type::STATIC,
         };
         v.add_seer(object_id(1), seer);
@@ -791,7 +793,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
                 player: PlayerId::new(0),
                 master: ids::FARM,
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: false,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -955,7 +957,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
                 player: PlayerId::new(0),
                 master: master_id(4),
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: false,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -979,7 +981,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         explored: true,
         building: None,
         umv: 0,
-        capture: 0,
+        capture: CaptureKind::NONE,
         kind: master_type::COMBAT,
     };
     v.add_seer(object_id(1), seer);
@@ -2109,7 +2111,7 @@ fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             player: PlayerId::new(0),
             master: ids::HOUSE,
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,

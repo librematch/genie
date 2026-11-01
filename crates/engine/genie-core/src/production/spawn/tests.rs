@@ -18,6 +18,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
 use crate::objects::masters::ObstructionType;
@@ -236,7 +237,7 @@ fn sheep(state: ObjectState) -> Near {
         kind: master_type::COMBAT,
         class: class::LIVESTOCK,
         master: master_id(705),
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         obstruction_type: ObstructionType::CIRCLE,
         auto_gather: false,
         state,
@@ -1333,7 +1334,7 @@ fn build_s_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
         ..walker
     };
     assert!(passes(Near {
-        buildable_on: 1,
+        buildable_on: BuildableOn::YES,
         ..still
     }));
     let stump = Near {
@@ -1391,7 +1392,7 @@ fn build_s_blockers_are_the_standing_objects_whose_box_overlaps() {
             ..house
         },
         Near {
-            buildable_on: 1,
+            buildable_on: BuildableOn::YES,
             ..house
         },
         Near {

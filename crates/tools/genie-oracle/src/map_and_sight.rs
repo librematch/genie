@@ -233,7 +233,11 @@ pub(super) fn spatial(
                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
                     capture: o.combat().map_or_else(
                         || capture_kind(player, m.class, master),
-                        |c| c.rge_combat_object.capture_flag,
+                        |c| {
+                            genie_core::ownership::CaptureKind::of_data(
+                                c.rge_combat_object.capture_flag,
+                            )
+                        },
                     ),
                     // the object's type: the save's factory types 70 and 80, any other below
                     kind: if o.tribe_combat_object.is_some() {

@@ -708,12 +708,14 @@ mod tests {
     use crate::objects::SpriteFlags;
     use crate::objects::WorkRate;
     use crate::objects::lifecycle::Held;
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ChargeType;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskSprites;
     use crate::objects::masters::action_type;
     use crate::objects::masters::{BuildingMaster, DamageGraphic, Masters};
     use crate::objects::masters::{MasterId, ids};
+    use crate::ownership::CaptureKind;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
@@ -1610,7 +1612,7 @@ mod tests {
                     player: PlayerId::new(0),
                     master: master_id(4),
                     obstruction_type: ObstructionType::NONE,
-                    buildable_on: 0,
+                    buildable_on: BuildableOn::NO,
                     tall: true,
                     speed: Speed::ZERO,
                     unknown: None,
@@ -1639,7 +1641,7 @@ mod tests {
                     explored: true,
                     building: None,
                     umv: 0,
-                    capture: 0,
+                    capture: CaptureKind::NONE,
                     kind: master_type::COMBAT,
                 },
             );

@@ -7,6 +7,7 @@ use crate::objects::ObjectId;
 use crate::objects::object_list::ObjectList;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::Posture;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
@@ -143,7 +144,7 @@ pub struct Player {
     pub fealty: crate::players::game_status::Fealty,
     /// `+0x71c`, the offensive posture (0 or 1, GAME 0x14): not saved, a load sets 0; new soldiers
     /// and scorpions read it (their unit AI's constructor, [`crate::unit_ai::NewObject`]).
-    pub posture: i32,
+    pub posture: Posture,
     /// `chance_to_dodge_missiles` (`+0xe10`, saved): a ship's unit AI dodges a missile's warning
     /// (`0x20f`) on a draw below it ([`crate::unit_ai::Surroundings::dodge_chance`]).
     pub dodge_chance: crate::players::Chance,

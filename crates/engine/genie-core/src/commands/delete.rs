@@ -25,6 +25,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::object_list::NOTHING_PUSHED;
 use crate::orders::Place;
 use crate::orders::object_gone;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
@@ -43,9 +44,6 @@ const UNDELETABLE: [ClassId; 4] = [
 
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
 const DELETABLE_TYPE: MasterKind = MasterKind::of_data(70);
-
-/// A capture flag (`+0x924`) under which no delete takes the object.
-const BEING_CAPTURED: u8 = 2;
 
 /// `CANCEL_BUILD` (0x6a, `do_command` case 0x6a): the player deletes its object `id`
 /// ([`World::delete`]).
@@ -97,7 +95,7 @@ impl World {
         if unit.undeletable
             || master.kind < DELETABLE_TYPE
             || UNDELETABLE.contains(&master.class)
-            || unit.capture_flag == BEING_CAPTURED
+            || unit.capture_flag == CaptureKind::AGAIN
         {
             return Ok(());
         }
@@ -801,6 +799,7 @@ mod clearing_tests {
     use crate::map::spatial::{Placed, Spatial, Tiles};
     use crate::movement::Speed;
     use crate::objects::lifecycle::{Class, Lifecycle};
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::master_type;
@@ -857,7 +856,7 @@ mod clearing_tests {
             kind: master_type::STATIC,
             class: class::CLASS_5,
             radius: Footprint::new(0.5, 0.5),
-            buildable_on: 1,
+            buildable_on: BuildableOn::YES,
             ..Master::default()
         };
         Masters::new([
@@ -875,7 +874,7 @@ mod clearing_tests {
                 kind: master_type::MOVING,
                 class: class::CLASS_11,
                 radius: Footprint::new(0.2, 0.2),
-                buildable_on: 1,
+                buildable_on: BuildableOn::YES,
                 storage: vec![(Some(attribute::RELICS_HELD), Amount::new(1.0), 32)],
                 ..Master::default()
             },
@@ -887,7 +886,7 @@ mod clearing_tests {
                 height: crate::map::Distance::new(1.0),
                 tall: true,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 1,
+                buildable_on: BuildableOn::YES,
                 ..Master::default()
             },
             Master {
@@ -895,7 +894,7 @@ mod clearing_tests {
                 kind: BUILDING,
                 class: class::CLASS_11,
                 radius: Footprint::new(1.5, 1.5),
-                buildable_on: 1,
+                buildable_on: BuildableOn::YES,
                 building: Some(crate::objects::masters::BuildingMaster {
                     stack_unit: None,
                     foundation_terrain: None,

@@ -22,6 +22,7 @@ use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiMove;
@@ -103,7 +104,7 @@ impl Unit {
         master: Option<&Master>,
         (player, computer): (PlayerId, bool),
         scenario: bool,
-        capture: u8,
+        capture: CaptureKind,
     ) -> crate::unit_ai::Attacker {
         crate::unit_ai::Attacker {
             ai_type,

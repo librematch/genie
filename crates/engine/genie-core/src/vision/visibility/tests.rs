@@ -5,6 +5,7 @@ use crate::map::{Tile, TileOffset, TileRect};
 use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
+use crate::ownership::CaptureKind;
 use crate::test_ids::object_id;
 use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
@@ -36,7 +37,7 @@ fn unit(player: PlayerId, los: Distance) -> Seer {
         explored: true,
         building: None,
         umv: 0,
-        capture: 0,
+        capture: CaptureKind::NONE,
         kind: master_type::COMBAT,
     }
 }
@@ -162,7 +163,7 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
     let mut v = world(PlayerId::new(3));
     v.registry = Some(Registry::new(3, 65));
     let mut gaia = unit(PlayerId::new(0), Distance::new(2.0));
-    gaia.capture = 1;
+    gaia.capture = CaptureKind::BY_SIGHT;
     v.add_seer(object_id(7), gaia);
     v.add_seer(object_id(8), unit(PlayerId::new(0), Distance::new(2.0)));
     let i = 10 * 120 + 10;

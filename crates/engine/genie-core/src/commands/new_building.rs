@@ -30,6 +30,7 @@ use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::BUILDING_COST;
@@ -304,7 +305,7 @@ impl World {
             pasture: None,
             my_pasture: None,
             undeletable: false,
-            capture_flag: 0,
+            capture_flag: CaptureKind::NONE,
             annex_of: None,
             group: crate::groups::GroupLink::default(),
             hp_powerup: HpPowerup::default(),

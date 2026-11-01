@@ -13,6 +13,7 @@ use crate::movement::PathState;
 use crate::movement::TurnRate;
 use crate::movement::WaypointLevel;
 use crate::objects::actions::ActionList;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
@@ -571,7 +572,7 @@ fn target_at(y: f32) -> Placed {
         player: PlayerId::new(0),
         master: ids::ID_0,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: false,
         speed: Speed::ZERO,
         unknown: None,

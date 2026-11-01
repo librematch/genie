@@ -32,5 +32,5 @@ one bit for each player that sees it and one for each player that saw it.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`ownership`](../../ownership/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

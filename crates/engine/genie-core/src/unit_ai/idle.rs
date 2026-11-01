@@ -156,7 +156,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        let searches = !at.scenario && COMBAT <= at.kind && at.capture == 0;
+        let searches = !at.scenario && COMBAT <= at.kind && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }
@@ -336,7 +336,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        let searches = !at.scenario && COMBAT <= at.kind && at.capture == 0;
+        let searches = !at.scenario && COMBAT <= at.kind && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }

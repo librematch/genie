@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
@@ -114,7 +115,7 @@ impl Visibility {
             old: old & VisionBits::VISIBLE_HALF,
             new: mask,
         })?;
-        Ok((s.capture == 1).then_some(mask))
+        Ok((s.capture == CaptureKind::BY_SIGHT).then_some(mask))
     }
 
     /// The registry's part of a combat object's new place (`FUN_14108c320`): its records follow.

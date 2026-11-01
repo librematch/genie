@@ -514,6 +514,7 @@ mod tests {
     use crate::movement::Speed;
     use crate::objects::ActionState;
     use crate::objects::ObjectState;
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
     use crate::players::PlayerId;
@@ -644,7 +645,7 @@ mod tests {
             player: PlayerId::new(1),
             master: master_id(594),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,

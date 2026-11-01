@@ -19,6 +19,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::unit_ai::Search;
 use crate::world::Seconds;
@@ -177,7 +178,7 @@ pub struct Surroundings {
     /// Its missiles per volley (`+0xa00`, `FUN_1412136d0`), 0 for a unit without volleys.
     pub firepower: crate::combat::Firepower,
     /// The unit's `+0x924`.
-    pub capture: u8,
+    pub capture: CaptureKind,
     /// The unit's master.
     pub master: MasterId,
     /// The game mode (the save's `mGameMode`, options `+0x34`) is one of `FUN_141302540`'s:

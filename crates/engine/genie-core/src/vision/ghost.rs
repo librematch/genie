@@ -680,6 +680,7 @@ mod tests {
     use crate::objects::masters::master_type::DOPPELGANGER;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
+    use crate::ownership::CaptureKind;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::vision::visibility::{Seer, Visibility};
@@ -776,7 +777,7 @@ mod tests {
                 explored: true,
                 building: None,
                 umv: 1,
-                capture: 0,
+                capture: CaptureKind::NONE,
                 kind: BUILDING,
             },
         );

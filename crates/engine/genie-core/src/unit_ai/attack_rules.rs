@@ -392,7 +392,7 @@ pub fn siege_can_attack(
     {
         return Ok(false);
     }
-    let takes_by_sight = !me.scenario && COMBAT <= me.kind && me.capture == 0;
+    let takes_by_sight = !me.scenario && COMBAT <= me.kind && !me.capture.any();
     if me.player == PlayerId::GAIA && !takes_by_sight {
         return Ok(false);
     }

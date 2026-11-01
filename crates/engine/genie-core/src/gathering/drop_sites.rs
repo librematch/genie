@@ -272,6 +272,7 @@ mod tests {
     use crate::objects::WorkRate;
     use crate::objects::actions::ActionList;
     use crate::objects::lifecycle::Lifecycle;
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::Master;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskId;
@@ -355,7 +356,7 @@ mod tests {
             player: PlayerId::new(1),
             master: ids::FARM,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,

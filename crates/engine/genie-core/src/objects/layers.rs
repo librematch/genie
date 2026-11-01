@@ -317,6 +317,7 @@ mod tests {
     use crate::map::Tile;
     use crate::map::spatial::Placed;
     use crate::movement::Speed;
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
     use crate::objects::masters::ids;
@@ -339,7 +340,7 @@ mod tests {
                 player: PlayerId::new(1),
                 master: ids::VILLAGER_MALE,
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,

@@ -1,9 +1,9 @@
 //! `SELL_COMMODITY` (0x7a) and `BUY_COMMODITY` (0x7b): the player trades at the market.
 
 use crate::GenieError;
+use crate::commands::ResourceWord;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
-use crate::players::attribute::AttributeId;
 use crate::world::World;
 
 /// `SELL_COMMODITY` (0x7a) and `BUY_COMMODITY` (0x7b), `do_command`'s cases: the player trades
@@ -15,7 +15,7 @@ pub struct TradeCommand {
     /// The player who trades.
     pub player: PlayerId,
     /// `+0x4`: the commodity (the dispatcher reads its low byte).
-    pub attribute: u16,
+    pub attribute: ResourceWord,
     /// `+0x6`: how many lots.
     pub times: crate::commands::TradeLots,
     /// `+0x8`: the market, which the check (`FUN_140e6f3f0`) reads; none for −1, which a
@@ -30,11 +30,9 @@ impl TradeCommand {
     /// `do_command`'s 0x7a and 0x7b): the purchase ([`World::buy`]) or the sale
     /// ([`World::sell`]); a trade cannot fail.
     pub(crate) fn run(&self, w: &mut World) -> Result<(), GenieError> {
-        let commodity = self.attribute.to_le_bytes()[0];
-        if 2 < commodity {
+        let Some(commodity) = self.attribute.traded() else {
             return Ok(());
-        }
-        let commodity = AttributeId::numbered(i16::from(commodity));
+        };
         if self.buy {
             w.buy(self.player, commodity, self.times)?;
         } else {

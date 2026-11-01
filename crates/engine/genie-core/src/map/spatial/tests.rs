@@ -5,11 +5,13 @@ use crate::map::Tile;
 use crate::map::{Rect, Segment};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::masters::master_type;
+use crate::ownership::CaptureKind;
 use crate::players::ByPlayer;
 use crate::players::Relation;
 use crate::players::relation_row;
@@ -40,7 +42,7 @@ fn the_record_cells_answer_as_the_full_scan_does() {
         player: PlayerId::new(1),
         master: master_id(4),
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: false,
         speed: Speed::ZERO,
         unknown: None,
@@ -255,7 +257,7 @@ fn villager(x: f32, y: f32) -> Placed {
         player: PlayerId::new(2),
         master: ids::ID_0,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -1089,7 +1091,7 @@ fn a_static_record_marks_its_tiles_with_its_class_and_player() {
         player: PlayerId::new(2),
         master: ids::ID_0,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -1106,7 +1108,7 @@ fn a_static_record_marks_its_tiles_with_its_class_and_player() {
         player: PlayerId::new(0),
         master: ids::ID_0,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -1521,7 +1523,7 @@ fn the_footprint_s_occupants_are_the_objects_whose_centre_is_on_it() {
     );
     assert_eq!(s.footprint_clearing(object_id(10028), &house), Ok(vec![]));
     let mut flower = villager(30.5, 87.5);
-    flower.buildable_on = 1;
+    flower.buildable_on = BuildableOn::YES;
     s.insert(object_id(77), flower);
     assert_eq!(
         s.footprint_clearing(object_id(10028), &house),
@@ -2077,7 +2079,7 @@ const fn seer_in(state: ObjectState) -> crate::vision::visibility::Seer {
         explored: true,
         building: None,
         umv: 0,
-        capture: 0,
+        capture: CaptureKind::NONE,
         kind: master_type::COMBAT,
     }
 }

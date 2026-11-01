@@ -22,6 +22,7 @@ use crate::map::Tile;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionClass;
@@ -219,7 +220,7 @@ pub struct Placed {
     pub obstruction_type: ObstructionType,
     /// The master's `can_be_built_on` (`+0x5e9`): a foundation clears such objects off its
     /// footprint.
-    pub buildable_on: u8,
+    pub buildable_on: BuildableOn,
     /// The master's height radius (`+0x5e0`) is above 0: the tile counts it as tall.
     pub tall: bool,
     /// The top speed, tiles per second; 0 for an object that does not move.

@@ -5,7 +5,10 @@
 pub mod artifact;
 mod artifact_state;
 pub(crate) mod capture;
+mod capture_kind;
 pub(crate) mod change;
+
+pub use self::capture_kind::CaptureKind;
 
 #[cfg(test)]
 mod tests;

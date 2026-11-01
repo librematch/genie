@@ -33,6 +33,7 @@ file for what the save does not hold.
 | [`attack_priority.rs`](attack_priority.rs) | A master's attack priority: which targets its unit AI's checks let it choose. |
 | [`attribute.rs`](attribute.rs) | The attributes an effect changes on a master and on its objects (the game's attribute list: string 12200 plus the number names each). |
 | [`blast_level.rs`](blast_level.rs) | A master's blast level and blast defence (`BlastLevel`, `BlastDefense`). |
+| [`buildable_on.rs`](buildable_on.rs) | Whether a building goes over an object. |
 | [`carry_capacity.rs`](carry_capacity.rs) | A master's carry capacity (`+0x61c`): how much an object of it carries. |
 | [`charge_event.rs`](charge_event.rs) | A master's charge event (`+0x920`): the range a ranged charge adds. |
 | [`charge_target.rs`](charge_target.rs) | A master's charge targets (`+0x924`): the groups of classes its charge works on. |

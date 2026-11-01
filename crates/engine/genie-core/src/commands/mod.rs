@@ -65,7 +65,7 @@ pub use self::gather_point::GatherPointCommand;
 pub use self::gather_point_state::GatherPointState;
 pub use self::go_back_to_work::{GoBackToWork2Command, GoBackToWorkCommand};
 pub use self::order::{Order, OrderCommand};
-pub use self::packet_values::{QueueId, SpriteOverride, TradeLots};
+pub use self::packet_values::{QueueId, ResourceWord, SpriteOverride, TradeLots};
 pub use self::patrol::{PatrolCommand, Waypoints};
 pub use self::queue::QueueCommand;
 pub use self::research::ResearchCommand;

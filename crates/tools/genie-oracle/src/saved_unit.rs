@@ -107,7 +107,9 @@ pub(super) fn unit(
         undeletable: s.deletion_enabled == 0,
         capture_flag: object
             .combat()
-            .map_or(0, |c| c.rge_combat_object.capture_flag),
+            .map_or(genie_core::ownership::CaptureKind::NONE, |c| {
+                genie_core::ownership::CaptureKind::of_data(c.rge_combat_object.capture_flag)
+            }),
         annex_of: object
             .tribe_building_object
             .as_deref()

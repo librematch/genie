@@ -8,6 +8,7 @@ use crate::map::Tile;
 use crate::map::TileRect;
 use crate::map::spatial::{Obstruction, Tiles};
 use crate::objects::ActionState;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -196,7 +197,7 @@ fn placed(x: f32, y: f32, r: f32, kind: ObstructionType) -> Placed {
         player: PlayerId::new(1),
         master: ids::ID_0,
         obstruction_type: kind,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -985,7 +986,7 @@ fn tall(x: f32, y: f32, r: f32, class: ClassId) -> Placed {
         player: PlayerId::new(1),
         master: ids::ID_0,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,

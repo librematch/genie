@@ -404,6 +404,7 @@ mod tests {
     use crate::map::TerrainFlags;
     use crate::map::terrain::TileTerrain;
     use crate::movement::Speed;
+    use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
@@ -494,7 +495,7 @@ mod tests {
                     player: PlayerId::new(0),
                     master: master_id(4),
                     obstruction_type: ObstructionType::NONE,
-                    buildable_on: 0,
+                    buildable_on: BuildableOn::NO,
                     tall: true,
                     speed: Speed::ZERO,
                     unknown: None,

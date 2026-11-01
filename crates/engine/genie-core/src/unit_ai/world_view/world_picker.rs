@@ -14,6 +14,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::objects::masters::{Masters, player_master};
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::NearestAttacker;
@@ -283,7 +284,7 @@ impl WorldPicker<'_> {
             .sight
             .as_ref()
             .and_then(|v| v.seer(id))
-            .map_or(0, |s| s.capture);
+            .map_or(CaptureKind::NONE, |s| s.capture);
         let target = crate::unit_ai::Target {
             owner,
             class: m.class,
@@ -361,7 +362,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             .sight
             .as_ref()
             .and_then(|v| v.seer(id))
-            .map_or(0, |s| s.capture);
+            .map_or(CaptureKind::NONE, |s| s.capture);
         let a = self.attacker;
         Ok(Some(crate::unit_ai::best_target::Thing {
             owner,
@@ -372,7 +373,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             master: t.life.master_id,
             class: m.class,
             kind: m.kind,
-            capture: capture != 0,
+            capture: capture.any(),
             targetable: !t.untargetable,
             attackable: t.attackable,
             held: t.life.amount,

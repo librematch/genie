@@ -12,6 +12,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
+use crate::players::Posture;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -294,7 +295,7 @@ pub struct NewObject {
     /// The owner is a computer player (`FUN_141659cf0`: `+0x10` 3).
     pub computer: bool,
     /// The owner's posture (`+0x71c`, its slot 0x90 `FUN_1416224f0`).
-    pub posture: i32,
+    pub posture: Posture,
     /// The owner's attribute 6, the current age (`player+0x100` at `+0x30`).
     pub age: f32,
 }
@@ -324,7 +325,7 @@ impl NewObject {
                 .find(|t| t.action_type == crate::objects::masters::action_type::HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
             computer: false,
-            posture: 0,
+            posture: Posture::AGGRESSIVE,
             age: 0.0,
         }
     }
@@ -379,7 +380,7 @@ pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
     if new.class == NO_ATTACK_CLASS {
         return UnitStance::NO_ATTACK;
     }
-    UnitStance::of_byte(new.posture as u8)
+    new.posture.stance()
 }
 
 /// The siege unit's stance (`+0x1a9`) its constructor (`FUN_140c12040`) gives a new object: 0
@@ -390,7 +391,7 @@ pub(super) fn siege_stance(new: &NewObject) -> UnitStance {
         return UnitStance::AGGRESSIVE;
     }
     if new.class == class::CLASS_55 {
-        return UnitStance::of_byte(new.posture as u8);
+        return new.posture.stance();
     }
     UnitStance::DEFENSIVE
 }

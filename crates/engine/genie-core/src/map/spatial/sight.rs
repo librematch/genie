@@ -121,7 +121,7 @@ impl Spatial {
             if s.kind != COMBAT || s.state != ObjectState::Alive || KEPT.contains(&q.class) {
                 continue;
             }
-            if (q.player == PlayerId::GAIA && s.capture != 0) || out(q.player.index()) {
+            if (q.player == PlayerId::GAIA && s.capture.any()) || out(q.player.index()) {
                 continue;
             }
             let o = q.player;

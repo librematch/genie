@@ -20,6 +20,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::QueryRelation;
 use crate::players::attribute;
@@ -204,7 +205,7 @@ pub struct Attacker {
     /// Its firepower (`+0xa00`): the units inside a building add theirs.
     pub firepower: crate::combat::Firepower,
     /// Its `+0x924` (`FUN_14107cc90`): a Gaia siege unit attacks only with 0.
-    pub capture: u8,
+    pub capture: CaptureKind,
 }
 
 /// What a unit AI's attack check and `bestUnitToAttack` read of an object it found: the owner's
@@ -224,7 +225,7 @@ pub struct Target {
     /// Its master's `combat_level`.
     pub combat_level: CombatLevel,
     /// The object's `+0x924`.
-    pub capture: u8,
+    pub capture: CaptureKind,
     /// It has a unit AI (`+0x6b0`).
     pub has_ai: bool,
     /// It is inside another (`+0x2f0`).
@@ -371,7 +372,7 @@ pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
     if me.player == PlayerId::GAIA || matches!(t.class, class::ARTIFACT | class::RELIC) {
         return Ok(false);
     }
-    let gaia_combat = !me.scenario && COMBAT <= t.kind && t.capture == 0;
+    let gaia_combat = !me.scenario && COMBAT <= t.kind && !t.capture.any();
     if !gaia_combat
         && t.owner == PlayerId::GAIA
         && !matches!(t.class, class::PREY | class::PREDATOR)
@@ -454,7 +455,7 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
     if t.class == class::CLASS_64 {
         return Ok(false);
     }
-    let gaia_combat = !me.scenario && COMBAT <= t.kind && t.capture == 0;
+    let gaia_combat = !me.scenario && COMBAT <= t.kind && !t.capture.any();
     if me.player == PlayerId::GAIA && !gaia_combat {
         return Ok(false);
     }

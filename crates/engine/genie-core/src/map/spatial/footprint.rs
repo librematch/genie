@@ -151,7 +151,7 @@ impl Spatial {
             .filter(|&(&id, o)| {
                 id != site_id
                     && (obstructs || o.speed <= Speed::ZERO)
-                    && o.buildable_on != 1
+                    && !o.buildable_on.passed()
                     && o.tall
                     && o.radius.sized()
                     && (o.position.x() - sx).abs() <= rx
@@ -180,7 +180,7 @@ impl Spatial {
             .filter(|&(&id, o)| {
                 id != site_id
                     && o.master != site.master
-                    && (o.buildable_on != 0 || o.class == class::TREE)
+                    && (o.buildable_on.cleared() || o.class == class::TREE)
                     && (o.position.x() - sx).abs() < o.radius.x() + rx
                     && (o.position.y() - sy).abs() < o.radius.y() + ry
             })

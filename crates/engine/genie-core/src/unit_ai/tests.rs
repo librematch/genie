@@ -25,7 +25,9 @@ use crate::objects::masters::ids;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
+use crate::players::Posture;
 use crate::players::QueryRelation;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::attack_category;
@@ -4877,7 +4879,7 @@ fn a_new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
 fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
     let mut computer = placed(Position::ORIGIN, class::CLASS_6);
     computer.computer = true;
-    computer.posture = 1;
+    computer.posture = Posture::DEFENSIVE;
     let mut r = rng();
     let ai = UnitAi::constructed(SOLDIER_AI, &computer, &mut r).unwrap();
     let mut expected = rng();
@@ -4897,7 +4899,10 @@ fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
     };
     // the owner's posture, its low byte
     assert_eq!(stance(&|_| {}), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(&|n| n.posture = 0x101), UnitStance::DEFENSIVE);
+    assert_eq!(
+        stance(&|n| n.posture = Posture::of_data(0x101)),
+        UnitStance::DEFENSIVE
+    );
     // the scout of the Dark Age stands its ground: flag 0x10, its own copy, age 0 (or -0)
     assert_eq!(
         stance(&|n| n.object_flags = ObjectFlags::SCOUT),
@@ -5021,7 +5026,7 @@ fn a_new_siege_unit_takes_its_stance_from_its_class_and_owner() {
         siege_stance(&NewObject {
             class,
             computer,
-            posture,
+            posture: Posture::of_data(posture),
             ..NewObject::default()
         })
     };
@@ -6659,7 +6664,7 @@ fn a_gaia_soldier_that_takes_owners_by_sight_does_not_search() {
     let (mut u, at) = idle_scout();
     let gaia = Surroundings {
         player: PlayerId::new(0),
-        capture: 1,
+        capture: CaptureKind::BY_SIGHT,
         ..at
     };
     let fx = u
@@ -6702,7 +6707,7 @@ const TC: Attacker = Attacker {
     speed: Speed::ZERO,
     scenario: false,
     firepower: crate::combat::Firepower::new(0.0),
-    capture: 0,
+    capture: CaptureKind::NONE,
 };
 
 /// Gaia's boar 9731 (master 48, class 10).
@@ -6712,7 +6717,7 @@ const BOAR: Target = Target {
     kind: master_type::COMBAT,
     master: MasterId::named(48),
     combat_level: CombatLevel::NONE,
-    capture: 0,
+    capture: CaptureKind::NONE,
     has_ai: true,
     inside: false,
     targeting: true,
@@ -6834,7 +6839,7 @@ fn a_tower_passes_a_boar_but_not_a_wolf() {
     );
     let sheep = Target {
         class: class::LIVESTOCK,
-        capture: 3,
+        capture: CaptureKind::LIVESTOCK,
         ..BOAR
     };
     assert_eq!(can_attack(&TC, &IDLE, &sheep), Ok(false));
@@ -10495,7 +10500,7 @@ fn a_siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
     // Gaia's unit, a low state, a packed unit, a packing one
     let gaia_unit = Attacker {
         player: PlayerId::new(0),
-        capture: 1,
+        capture: CaptureKind::BY_SIGHT,
         ..MANGONEL
     };
     assert_eq!(
@@ -10503,7 +10508,7 @@ fn a_siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
         Ok(false)
     );
     let gaia_taker = Attacker {
-        capture: 0,
+        capture: CaptureKind::NONE,
         ..gaia_unit
     };
     assert_eq!(
@@ -10754,7 +10759,7 @@ fn a_siege_unit_attacks_what_its_idle_search_finds() {
     // Gaia's that does not take owners by sight
     let gaia = Surroundings {
         player: PlayerId::new(0),
-        capture: 1,
+        capture: CaptureKind::BY_SIGHT,
         ..at.clone()
     };
     let mut side = SiegeSide::default();
@@ -11016,7 +11021,7 @@ impl UnitSide for TailSide {
 const PLAIN: TargetFlags = TargetFlags {
     owner: PlayerId::new(2),
     kind: master_type::COMBAT,
-    capture: 0,
+    capture: CaptureKind::NONE,
     pasture: None,
     untargetable: false,
     attackable: true,
@@ -11052,7 +11057,7 @@ fn the_tail_stops_a_gaia_unit_on_a_gaia_object_others_can_take_again() {
     // goes (FUN_140c5e1e0) and the action stops (slot 0xb0 with 1)
     let again = TargetFlags {
         owner: PlayerId::new(0),
-        capture: 2,
+        capture: CaptureKind::AGAIN,
         ..PLAIN
     };
     let mut u = on_target(Some(ActionKind::Attack));
@@ -11080,7 +11085,7 @@ fn the_tail_stops_a_gaia_unit_on_a_gaia_object_others_can_take_again() {
         (
             0,
             TargetFlags {
-                capture: 1,
+                capture: CaptureKind::BY_SIGHT,
                 ..again
             },
         ),
@@ -11146,7 +11151,7 @@ fn the_tail_stops_work_on_a_target_without_its_targeting_flag() {
     // untargetable target stops it again
     let both = TargetFlags {
         owner: PlayerId::new(0),
-        capture: 2,
+        capture: CaptureKind::AGAIN,
         untargetable: true,
         ..PLAIN
     };

@@ -1,5 +1,8 @@
-//! Values the command packets carry: a command's queue id, a trade's lots and a BUILD's sprite
-//! override.
+//! Values the command packets carry: a command's queue id, a trade's lots, a BUILD's sprite
+//! override and a tribute's or trade's resource word.
+
+use crate::players::attribute;
+use crate::players::attribute::AttributeId;
 
 /// A command's queue id (the formatter's `qId`, an int): −1 runs the command now; any other
 /// value the commands that read it leave alone or queue.
@@ -82,9 +85,43 @@ impl SpriteOverride {
     }
 }
 
+/// A packet's resource word (TRIBUTE's attributes `+0x24`.., a trade's commodity `+0x4`): an
+/// attribute id its handler checks, which a recording can hold out of range.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct ResourceWord(u16);
+
+impl ResourceWord {
+    /// The word of the packet's `value`.
+    #[must_use]
+    pub const fn of_data(value: u16) -> Self {
+        Self(value)
+    }
+
+    /// The word.
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+
+    /// The resource a tribute gives: food, wood, stone or gold for 0 to 3, none for any other.
+    #[must_use]
+    pub fn tributed(self) -> Option<AttributeId> {
+        attribute::RESOURCES.get(usize::from(self.0)).copied()
+    }
+
+    /// The commodity a trade takes: food, wood or stone for a low byte of 0 to 2
+    /// (`do_command`'s 0x7a and 0x7b), none for another.
+    #[must_use]
+    pub fn traded(self) -> Option<AttributeId> {
+        let commodity = self.0.to_le_bytes()[0];
+        (commodity <= 2).then(|| AttributeId::numbered(i16::from(commodity)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::commands::{QueueId, SpriteOverride, TradeLots};
+    use crate::commands::{QueueId, ResourceWord, SpriteOverride, TradeLots};
+    use crate::players::attribute;
 
     /// −1 runs at once; the handler keeps the six overrides from 0x2c9.
     #[test]
@@ -94,5 +131,18 @@ mod tests {
         assert!(!SpriteOverride::of_data(0x2cf).kept() && !SpriteOverride::of_data(0x2c8).kept());
         assert!(!SpriteOverride::NONE.kept());
         assert_eq!(TradeLots::of_data(3).get(), 3);
+    }
+
+    /// A tribute gives the four resources, a trade the three commodities of its low byte.
+    #[test]
+    fn the_resource_word_names_the_resources() {
+        assert_eq!(ResourceWord::of_data(3).tributed(), Some(attribute::GOLD));
+        assert_eq!(ResourceWord::of_data(4).tributed(), None);
+        assert_eq!(
+            ResourceWord::of_data(0x102).traded(),
+            Some(attribute::STONE)
+        );
+        assert_eq!(ResourceWord::of_data(3).traded(), None);
+        assert_eq!(ResourceWord::of_data(9).get(), 9);
     }
 }

@@ -9,6 +9,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker};
@@ -125,7 +126,7 @@ impl UnitView<'_, '_> {
             .sight
             .as_ref()
             .and_then(|v| v.seer(u.id))
-            .map_or(0, |s| s.capture);
+            .map_or(CaptureKind::NONE, |s| s.capture);
         let me = u.attacker_of(
             ai.ai_type,
             Some(m),

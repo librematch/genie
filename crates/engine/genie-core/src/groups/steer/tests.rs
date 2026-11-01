@@ -22,6 +22,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -184,7 +185,7 @@ fn post(x: f32, y: f32) -> Placed {
         player: PlayerId::new(2),
         master: ids::ID_0,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,

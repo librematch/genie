@@ -46,7 +46,7 @@ building commands, the unit commands and the players' each have their own dispat
 | [`mod.rs`](mod.rs) | The commands (`Command`) and their dispatch (`World::run`): the handlers of the players' orders, the buildings' placement and the production queue's. |
 | [`new_building.rs`](new_building.rs) | A new building: BUILD's foundation and the building constructor, with its combat setup, its storage and its annexes. |
 | [`order.rs`](order.rs) | The orders of units (INTERACT, WORK, MOVE, RETREAT, FOLLOW, GUARD): their units, the check, the reset and the order's run. |
-| [`packet_values.rs`](packet_values.rs) | Values the command packets carry: a command's queue id, a trade's lots and a BUILD's sprite override. |
+| [`packet_values.rs`](packet_values.rs) | Values the command packets carry: a command's queue id, a trade's lots, a BUILD's sprite override and a tribute's or trade's resource word. |
 | [`patrol.rs`](patrol.rs) | PATROL (0x15): the player's units patrol through waypoints. |
 | [`placement.rs`](placement.rs) | BUILD's tests before its foundation: a farm on rice terrain, the pending debit, the builders, the placement test and the payment. |
 | [`production.rs`](production.rs) | QUEUE: a building's production queue, its load, its units and technologies, and a new entry's costs. |
@@ -73,6 +73,6 @@ building commands, the unit commands and the players' each have their own dispat
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 - Used by: [`construction`](../construction/), [`garrison`](../garrison/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`world`](../world/).
 <!-- /uses -->

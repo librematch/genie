@@ -10,6 +10,7 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::QueryRelation;
 use crate::unit_ai::ActionKind;
@@ -219,7 +220,7 @@ impl UnitAi {
         let captured_again = at.player == PlayerId::GAIA
             && t.owner == PlayerId::GAIA
             && COMBAT <= t.kind
-            && t.capture == 2;
+            && t.capture == CaptureKind::AGAIN;
         let action = if captured_again {
             None
         } else {

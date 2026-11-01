@@ -13,6 +13,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::players::Amount;
@@ -96,7 +97,7 @@ const fn placed(at: Position, r: f32, class: ClassId, master: MasterId) -> Place
         player: PlayerId::new(1),
         master,
         obstruction_type: ObstructionType::TYPE_2,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,

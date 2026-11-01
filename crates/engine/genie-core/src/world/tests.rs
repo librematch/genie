@@ -4,6 +4,7 @@ use crate::combat::attack::AttackState;
 use crate::combat::damage::ArmorPair;
 use crate::combat::missile::SmartMode;
 use crate::commands::GatherPointState;
+use crate::commands::ResourceWord;
 use crate::commands::UnloadPick;
 use crate::commands::game::GameCommand;
 use crate::commands::{
@@ -65,6 +66,7 @@ use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
@@ -99,6 +101,7 @@ use crate::objects::object_list::ObjectList;
 use crate::objects::release::{Releaser, released};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::{Unit, loses_actions};
+use crate::ownership::CaptureKind;
 use crate::ownership::artifact::Artifact;
 use crate::ownership::artifact::ArtifactState;
 use crate::ownership::change::change_hands;
@@ -108,6 +111,7 @@ use crate::players::ByPlayer;
 use crate::players::CivId;
 use crate::players::PlayerType;
 use crate::players::Relation;
+use crate::players::TributeFee;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::game_status::GameStatus;
@@ -483,7 +487,7 @@ pub(crate) fn builder_masters() -> Masters {
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tasks,
         cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
@@ -542,7 +546,7 @@ pub(crate) fn builder_masters() -> Masters {
             radius: Footprint::new(1.0, 1.0),
             tall: true,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tasks: vec![],
             cost: costs(&[(attribute::WOOD, 25, true)]),
             obstruction_class: ObstructionClass::UNIT,
@@ -1390,7 +1394,7 @@ fn a_player_s_new_tiles_give_their_resources_to_its_lists() {
                 player: PlayerId::new(0),
                 master: u.life.master_id,
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: false,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -2340,7 +2344,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
                 player: PlayerId::new(1),
                 master: ids::HOUSE,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -2600,7 +2604,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         player: PlayerId::new(1),
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -3012,7 +3016,7 @@ pub(crate) fn forage_world() -> World {
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -3596,7 +3600,7 @@ fn the_empire_wars_start_puts_a_villager_on_its_farm_to_work() {
             player: PlayerId::new(1),
             master: ids::FARM,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,
@@ -3980,7 +3984,7 @@ fn a_unit_sent_off_a_foundation_finds_the_spot_beside_it() {
             player: PlayerId::new(1),
             master: ids::HOUSE,
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -4148,7 +4152,7 @@ fn cart_world() -> World {
             player: PlayerId::new(1),
             master: ids::MASTER_1808,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -4193,7 +4197,7 @@ fn footprint_world() -> World {
             player: PlayerId::new(1),
             master: ids::HOUSE,
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -4455,7 +4459,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
                 player: PlayerId::new(0),
                 master: ids::HOUSE,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -4538,7 +4542,7 @@ pub(crate) fn hunt_world() -> World {
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -5281,7 +5285,7 @@ fn shepherd_world(x: f32) -> World {
             player: PlayerId::new(1),
             master: master_id(594),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -5437,7 +5441,7 @@ fn lumber_world(near: f32) -> World {
                 player: PlayerId::new(0),
                 master: master_id(349),
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -5701,7 +5705,7 @@ fn a_side_s_own_release_tells_the_unit_ai_as_the_side_returns() {
                 None,
                 (PlayerId::new(1), false),
                 false,
-                0,
+                CaptureKind::NONE,
             );
             let inside = unit.with_side(
                 c,
@@ -5747,7 +5751,7 @@ fn a_step_s_own_notify_waits_for_the_unit_ai_s_side_to_return() {
                 None,
                 (PlayerId::new(1), false),
                 false,
-                0,
+                CaptureKind::NONE,
             );
             let inside = unit.with_side(
                 c,
@@ -5790,7 +5794,7 @@ fn the_ai_stream_is_the_unit_ai_s_while_its_side_runs() {
                 None,
                 (PlayerId::new(1), false),
                 false,
-                0,
+                CaptureKind::NONE,
             );
             unit.with_side(
                 c,
@@ -6019,8 +6023,13 @@ fn villager_side<R>(
     use crate::unit_ai::world_view::OwnerView;
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), 0, |unit, c| {
         let view = OwnerView::of(c, None).unwrap();
-        let attacker =
-            unit.attacker_of(UnitAiType::BOAR, None, (PlayerId::new(1), false), false, 0);
+        let attacker = unit.attacker_of(
+            UnitAiType::BOAR,
+            None,
+            (PlayerId::new(1), false),
+            false,
+            CaptureKind::NONE,
+        );
         let answer = unit.with_side(
             c,
             &view,
@@ -6046,7 +6055,7 @@ fn the_unit_ai_s_repair_command_is_the_unit_s_within_its_run() {
         player: PlayerId::new(1),
         master: ids::HOUSE,
         obstruction_type: ObstructionType::TYPE_2,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -6139,7 +6148,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
             player: PlayerId::new(1),
             master: ids::HOUSE,
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -6155,7 +6164,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
             player: PlayerId::new(1),
             master: VILLAGER_MALE,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::new(0.8),
             unknown: None,
@@ -7143,7 +7152,7 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -7650,7 +7659,7 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
         player: PlayerId::new(1),
         master: master_id(594),
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -8067,7 +8076,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
             player: PlayerId::new(2),
             master: master_id(64),
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -8139,7 +8148,7 @@ fn a_gate_counts_the_moving_units_between_its_posts() {
         player,
         master: ids::ID_0,
         obstruction_type: kind,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed,
         unknown: None,
@@ -8333,7 +8342,7 @@ fn gate_world() -> World {
         player: PlayerId::new(1),
         master: ids::ID_0,
         obstruction_type: kind,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed,
         unknown: None,
@@ -9601,7 +9610,7 @@ fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Dist
             player: p,
             master,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -9818,7 +9827,7 @@ fn owner_search_unit(s: &mut Spatial, id: i32, p: PlayerId, x: f32) {
             player: p,
             master: master_id(4),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -10133,7 +10142,7 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
                 player: PlayerId::new(0),
                 master: master_id(4),
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: false,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -10259,7 +10268,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
                 Player {
                     objects: vec![Unit {
                         ai: None,
-                        capture_flag: 1,
+                        capture_flag: CaptureKind::BY_SIGHT,
                         ..hands_unit(21712, master_id(4))
                     }]
                     .into(),
@@ -10303,7 +10312,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     let ids: Vec<ObjectId> = t.players[1].objects.iter().map(|u| u.id).collect();
     assert_eq!(ids, [object_id(500), object_id(21712)]);
     let archer = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!(archer.capture_flag, 0);
+    assert_eq!(archer.capture_flag, CaptureKind::NONE);
     assert_eq!(
         archer.own_master.as_deref().map(|m| m.fog_visibility),
         Some(FogVisibility::VISIBLE)
@@ -10311,7 +10320,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     let v = t.spatial.sight.as_ref().unwrap();
     assert_eq!(
         v.seer(object_id(21712)).map(|s| (s.player, s.capture)),
-        Some((PlayerId::new(1), 0))
+        Some((PlayerId::new(1), CaptureKind::NONE))
     );
     assert_eq!(
         [t.players[0].attributes[40], t.players[1].attributes[40]],
@@ -10322,7 +10331,10 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     masters[1] = Masters::new([]);
     let mut t = world(masters, false, 0);
     t.tick(Millis::new(100));
-    assert_eq!(t.players[0].objects[ListIndex::new(0)].capture_flag, 1);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(0)].capture_flag,
+        CaptureKind::BY_SIGHT
+    );
     assert_eq!(
         t.spatial.get(object_id(21712)).map(|p| p.player),
         Some(PlayerId::new(0))
@@ -10900,7 +10912,7 @@ fn a_move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() 
         player: PlayerId::new(0),
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -11008,7 +11020,7 @@ fn a_move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
             player: PlayerId::new(0),
             master: master_id(349),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -11183,7 +11195,7 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
         player: PlayerId::new(1),
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -11279,7 +11291,7 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
             player: PlayerId::new(1),
             master: ids::HOUSE,
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -11586,7 +11598,7 @@ fn an_artifact_s_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
                 player: PlayerId::new(1),
                 master: ids::TOWN_CENTRE,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -11760,7 +11772,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             player: PlayerId::new(1),
             master: VILLAGER_MALE,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -11778,7 +11790,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             explored: true,
             building: None,
             umv: 0,
-            capture: 0,
+            capture: CaptureKind::NONE,
             kind: master_type::COMBAT,
         },
     );
@@ -11910,7 +11922,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
             player: PlayerId::new(1),
             master: VILLAGER_MALE,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -11928,7 +11940,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
             explored: true,
             building: None,
             umv: 0,
-            capture: 0,
+            capture: CaptureKind::NONE,
             kind: master_type::COMBAT,
         },
     );
@@ -12044,7 +12056,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
             player: PlayerId::new(1),
             master: VILLAGER_MALE,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -12061,7 +12073,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
             explored: true,
             building: None,
             umv: 0,
-            capture: 0,
+            capture: CaptureKind::NONE,
             kind: master_type::COMBAT,
         },
     );
@@ -12307,7 +12319,7 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
             player: PlayerId::new(1),
             master: master_id(705),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -13351,7 +13363,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -14505,7 +14517,7 @@ fn on_side<R>(
                     speed: Speed::new(1.2),
                     scenario: false,
                     firepower: crate::combat::Firepower::new(0.0),
-                    capture: 0,
+                    capture: CaptureKind::NONE,
                 },
                 player: PlayerId::new(1),
                 computer: false,
@@ -14569,7 +14581,7 @@ fn scout_attack_on(
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -14699,7 +14711,7 @@ fn attack_by(
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -14869,7 +14881,7 @@ fn help_view<R>(
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -15624,7 +15636,7 @@ fn a_reseed_s_placement_passes_over_the_old_farm() {
                 player: PlayerId::new(1),
                 master: ids::FARM,
                 obstruction_type: ObstructionType::TYPE_2,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: true,
                 speed: Speed::ZERO,
                 unknown: None,
@@ -16218,7 +16230,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
             player: PlayerId::new(0),
             master: master_id(65),
             obstruction_type: ObstructionType::TYPE_2,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: true,
             speed: Speed::ZERO,
             unknown: None,
@@ -17742,7 +17754,7 @@ fn hunted_without_a_deer(setup: impl FnOnce(&mut Unit)) -> World {
             explored: false,
             building: None,
             umv: 0,
-            capture: 0,
+            capture: CaptureKind::NONE,
             kind: master_type::COMBAT,
         };
         sight.add_seer(object_id(id), deer);
@@ -18463,7 +18475,7 @@ pub(crate) fn repairing(at: Position) -> World {
         player: PlayerId::new(1),
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -19806,9 +19818,9 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
     use crate::players::tribute::Gift;
     let t = forage_world();
     let gifts = [Gift {
-        attribute: 0,
+        attribute: ResourceWord::of_data(0),
         amount: Amount::new(10.0),
-        fee: 0.0,
+        fee: TributeFee::of_data(0.0),
     }; 4];
     let game = |sub| GameCommand {
         issuer: player_id(1),
@@ -19855,7 +19867,7 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
             &t,
             &Command::Trade(TradeCommand {
                 player: player_id(1),
-                attribute: 1,
+                attribute: ResourceWord::of_data(1),
                 times: crate::commands::TradeLots::of_data(1),
                 market: None,
                 buy: true,
@@ -19875,7 +19887,7 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
             &t,
             &Command::Trade(TradeCommand {
                 player: player_id(1),
-                attribute: 1,
+                attribute: ResourceWord::of_data(1),
                 times: crate::commands::TradeLots::of_data(1),
                 market: None,
                 buy: false,

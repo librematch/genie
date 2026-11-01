@@ -23,6 +23,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
@@ -284,7 +285,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         player: PlayerId::new(0),
         master,
         obstruction_type: ObstructionType::TYPE_2,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -903,7 +904,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: true,
         speed: Speed::ZERO,
         unknown: None,
@@ -2085,7 +2086,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
             player: PlayerId::new(1),
             master: master_id(4),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,
@@ -2146,7 +2147,7 @@ fn switched_in_the_open(
             player: PlayerId::new(1),
             master: old.id,
             obstruction_type: old.obstruction_type,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,
@@ -2560,7 +2561,7 @@ fn followers() -> World {
             player: PlayerId::new(2),
             master: master_id(5),
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,
@@ -3187,7 +3188,7 @@ fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         player,
         master,
         obstruction_type: ObstructionType::NONE,
-        buildable_on: 0,
+        buildable_on: BuildableOn::NO,
         tall: false,
         speed: Speed::new(0.8),
         unknown: None,
@@ -3345,7 +3346,7 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
                 player: PlayerId::from(player),
                 master: master_id(4),
                 obstruction_type: ObstructionType::NONE,
-                buildable_on: 0,
+                buildable_on: BuildableOn::NO,
                 tall: false,
                 speed: Speed::ZERO,
                 unknown: None,

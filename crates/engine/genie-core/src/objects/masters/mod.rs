@@ -274,7 +274,7 @@ pub struct Master {
     /// `obstruction_type` (`+0x651`) and `can_be_built_on` (`+0x5e9`).
     pub obstruction_type: ObstructionType,
     /// `can_be_built_on` (`+0x5e9`): a new building deletes an object of it off its footprint.
-    pub buildable_on: u8,
+    pub buildable_on: BuildableOn,
     /// `obstruction_class` (`+0x652`).
     pub obstruction_class: ObstructionClass,
     /// `object_flags` (`+0x654`): its traits and the trait piece ([`ObjectFlags`]).
@@ -578,6 +578,7 @@ mod adjacent_mode;
 mod attack_priority;
 pub mod attribute;
 mod blast_level;
+mod buildable_on;
 mod carry_capacity;
 mod charge_event;
 mod charge_target;
@@ -630,6 +631,7 @@ pub use self::adjacent_mode::AdjacentMode;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
 pub use self::blast_level::{BlastDefense, BlastLevel};
+pub use self::buildable_on::BuildableOn;
 pub use self::carry_capacity::CarryCapacity;
 pub use self::charge_event::ChargeEvent;
 pub use self::charge_target::ChargeTarget;

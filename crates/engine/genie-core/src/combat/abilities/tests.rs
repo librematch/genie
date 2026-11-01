@@ -13,6 +13,7 @@ use crate::objects::ActionState;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
@@ -23,6 +24,7 @@ use crate::objects::masters::TaskTerrain;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -680,7 +682,7 @@ fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Poin
             player: p,
             master: m,
             obstruction_type: ObstructionType::NONE,
-            buildable_on: 0,
+            buildable_on: BuildableOn::NO,
             tall: false,
             speed: Speed::ZERO,
             unknown: None,
@@ -730,7 +732,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
                 started: true,
             }),
             umv: 0,
-            capture: 0,
+            capture: CaptureKind::NONE,
             kind: BUILDING,
         },
     );

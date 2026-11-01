@@ -16,6 +16,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit};
+use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitAiType;
@@ -340,12 +341,12 @@ impl Unit {
     }
 
     /// The capture kind its seer has in the players' sight (0 without one).
-    fn capture_kind(&self, c: &Step<'_>) -> u8 {
+    fn capture_kind(&self, c: &Step<'_>) -> CaptureKind {
         c.w.spatial
             .sight
             .as_ref()
             .and_then(|v| v.seer(self.id))
-            .map_or(0, |s| s.capture)
+            .map_or(CaptureKind::NONE, |s| s.capture)
     }
 
     /// One pass of the unit AI ([`Unit::ai_part`]) as the player `captured` names (its new

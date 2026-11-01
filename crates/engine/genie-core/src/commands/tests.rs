@@ -1,6 +1,7 @@
 //! The command enum's issuing player and the lane a failed run stops.
 
 use crate::GenieError;
+use crate::commands::ResourceWord;
 use crate::commands::UnloadPick;
 use crate::commands::{
     AllBackToWorkCommand, AttackMoveCommand, AutoScoutCommand, BuildCommand, BuildWallCommand,
@@ -13,6 +14,7 @@ use crate::commands::{
 use crate::map::Point;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::TributeFee;
 use crate::production::QueueButton;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -39,9 +41,9 @@ fn game_of(issuer: u8) -> GameCommand {
 fn one_of_each(p: u8) -> Vec<Command> {
     let ids = vec![7];
     let gift = crate::players::tribute::Gift {
-        attribute: 0,
+        attribute: ResourceWord::of_data(0),
         amount: Amount::ZERO,
-        fee: 0.0,
+        fee: TributeFee::of_data(0.0),
     };
     vec![
         Command::Build(BuildCommand {
@@ -142,7 +144,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
         }),
         Command::Trade(TradeCommand {
             player: player_id(p),
-            attribute: 0,
+            attribute: ResourceWord::of_data(0),
             times: crate::commands::TradeLots::of_data(1),
             market: None,
             buy: true,
@@ -269,7 +271,7 @@ fn a_trade_of_another_commodity_does_nothing() {
     for attribute in [3, 0x0103] {
         TradeCommand {
             player: player_id(1),
-            attribute,
+            attribute: ResourceWord::of_data(attribute),
             times: crate::commands::TradeLots::of_data(1),
             market: None,
             buy: true,

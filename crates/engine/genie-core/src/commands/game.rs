@@ -203,7 +203,7 @@ impl World {
             sub::POSTURE => {
                 if let Some(p) = target {
                     let owner = self.players.player_mut(p)?;
-                    owner.posture = i32::from(owner.posture == 0);
+                    owner.posture = owner.posture.flipped();
                 }
             }
             // 1 (the game speed) changes nothing a playback's simulation reads; 0 and 5 with
@@ -334,6 +334,7 @@ mod tests {
     use crate::objects::masters::ids::CASTLE;
     use crate::objects::masters::ids::FISH_TRAP;
     use crate::players::Amount;
+    use crate::players::Posture;
     use crate::players::attribute;
     use crate::test_ids::costs;
     use crate::test_ids::object_id;
@@ -501,7 +502,7 @@ mod tests {
         // refused: nothing changes
         let mut t = world();
         t.game(&game(1, sub::POSTURE, 2, 0, 0)).unwrap();
-        assert_eq!(t.players[2].posture, 0);
+        assert_eq!(t.players[2].posture, Posture::AGGRESSIVE);
     }
 
     /// 0x10, 0x13 and 0x14 flip their flags; a player outside the world changes nothing.
@@ -514,9 +515,9 @@ mod tests {
         t.game(&game(1, sub::POSTURE, 1, 0, 0)).unwrap();
         let p = &t.players[1];
         assert!(p.auto_farm_queue && p.auto_fishtrap_queue);
-        assert_eq!(p.posture, 1);
+        assert_eq!(p.posture, Posture::DEFENSIVE);
         t.game(&game(1, sub::POSTURE, 1, 0, 0)).unwrap();
-        assert_eq!(t.players[1].posture, 0);
+        assert_eq!(t.players[1].posture, Posture::AGGRESSIVE);
         t.settings.cheats_enabled = true;
         let before = t.players.clone();
         t.game(&game(1, sub::POSTURE, 7, 0, 0)).unwrap();

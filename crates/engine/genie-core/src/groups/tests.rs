@@ -8,6 +8,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterKind;
@@ -700,7 +701,7 @@ fn register(t: &mut World) {
                     player: p,
                     master: m.id,
                     obstruction_type: ObstructionType::NONE,
-                    buildable_on: 0,
+                    buildable_on: BuildableOn::NO,
                     tall: false,
                     speed: Speed::ZERO,
                     unknown: None,
