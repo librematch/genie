@@ -17,7 +17,11 @@ use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::attribute::AttributeId;
+use genie_core::production::EntrySerial;
 use genie_core::production::QueueButton;
+use genie_core::production::QueueChanges;
+use genie_core::production::QueueLength;
+use genie_core::production::QueuedUnits;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
@@ -280,10 +284,10 @@ pub(super) fn production(
             };
             Ok(Entry {
                 master: MasterId::of_data(e.production_queue_master_unit_id),
-                count: e.production_queue_unit_count,
+                count: QueuedUnits::of_data(e.production_queue_unit_count),
                 tech: genie_core::technology::TechId::of_data(e.production_queue_tech_id),
                 costs: [cost(0)?, cost(1)?, cost(2)?],
-                serial: k as i64,
+                serial: EntrySerial::new(k as i64),
                 button: QueueButton::of_data(e.production_queue_button_location_id),
                 train_time: WholeSeconds::of_data(e.production_queue_train_time),
             })
@@ -344,14 +348,14 @@ pub(super) fn production(
     {
         return Ok(None);
     }
-    let next_serial = slots.len() as i64;
+    let next_serial = EntrySerial::new(slots.len() as i64);
     Ok(Some(Production {
         queue: Queue {
             slots,
-            count: building.production_queue_count,
-            total: building.production_queue_total_units,
+            count: QueueLength::of_data(building.production_queue_count),
+            total: QueuedUnits::of_data(building.production_queue_total_units),
             enabled: building.production_queue_enabled != 0,
-            changes: 0,
+            changes: QueueChanges::NONE,
             waiting: false,
             next_serial,
         },

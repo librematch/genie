@@ -195,7 +195,10 @@ impl World {
                 loads.push(Seconds::ZERO);
                 continue;
             }
-            let total = building.production.as_ref().map_or(0, |p| p.queue.total);
+            let total = building
+                .production
+                .as_ref()
+                .map_or(0, |p| p.queue.total.get());
             let room = per - i32::from(total);
             total_room += room.max(0);
             rooms.push(room);
@@ -268,16 +271,14 @@ impl World {
             return Ok(Seconds::ZERO);
         };
         let queue = &production.queue;
-        let entries = usize::try_from(queue.count)
-            .unwrap_or(0)
-            .min(queue.slots.len());
+        let entries = queue.count.slots().min(queue.slots.len());
         let mut queued = Seconds::ZERO;
         for e in &queue.slots[..entries] {
             if let Some(master) = e.master {
                 let time = player_master(&self.masters, p, master)
                     .and_then(|m| m.train_locations.first())
                     .map_or(WholeSeconds::ZERO, |l| l.time);
-                queued += Seconds::new((i32::from(e.count) * i32::from(time.get())) as f32);
+                queued += Seconds::new((i32::from(e.count.get()) * i32::from(time.get())) as f32);
             } else if let Some(tech) = e.tech {
                 // a queued research has its locations (the queue checked them)
                 let (time, adjustment) = Some(tech.index())
@@ -286,7 +287,7 @@ impl World {
                     .map_or((WholeSeconds::ZERO, Seconds::ZERO), |l| {
                         (l.time, l.adjustment)
                     });
-                queued += (Seconds::of_master(time) + adjustment) * f32::from(e.count);
+                queued += (Seconds::of_master(time) + adjustment) * f32::from(e.count.get());
             }
         }
         if queue.slots.is_empty() {
@@ -335,14 +336,14 @@ impl World {
             .live(player, i)?
             .production
             .as_ref()
-            .map_or(0, |p| p.queue.total);
+            .map_or(0, |p| p.queue.total.get());
         if 14 < total {
             return Ok(false);
         }
         let n = if i32::from(count as i16) + i32::from(total) < 16 {
             count as i16
         } else {
-            crate::production::ROOM - total
+            crate::production::ROOM.get() - total
         };
         if let Some(tech) = tech {
             self.queue_techs(player, i, (master, tech), n, button)
@@ -397,7 +398,9 @@ impl World {
         let owner = self.players.player_mut(player)?;
         owner.add_attribute(QUEUED, pop * f32::from(n))?;
         let costs = as_entry_costs(master_costs(masters, master, &*owner)?);
-        owner.tracker.count_queued(n);
+        owner
+            .tracker
+            .count_queued(crate::production::QueuedUnits::of_data(n));
         for _ in 0..n {
             owner.tracker.place(Some(master), class);
         }
@@ -411,16 +414,25 @@ impl World {
             && crate::production::same_costs(&last.costs, &costs)
         {
             let queue = &mut production.queue;
-            let k = (queue.count - 1) as usize;
-            queue.slots[k].count = queue.slots[k].count.wrapping_add(n);
-            queue.total = queue.total.wrapping_add(n);
-            queue.changes = queue.changes.wrapping_add(1);
+            let k = (queue.count.get() - 1) as usize;
+            queue.slots[k].count = queue.slots[k]
+                .count
+                .plus(crate::production::QueuedUnits::of_data(n));
+            queue.total = queue.total.plus(crate::production::QueuedUnits::of_data(n));
+            queue.changes = queue.changes.bumped();
             return Ok(true);
         }
         let time = made
             .filter(|m| COMBAT <= m.kind)
             .map(|m| crate::production::train_time(&m.train_locations, building, button));
-        self.new_entry(player, i, (Some(master), None), n, button, time)?;
+        self.new_entry(
+            player,
+            i,
+            (Some(master), None),
+            crate::production::QueuedUnits::of_data(n),
+            button,
+            time,
+        )?;
         Ok(true)
     }
 
@@ -485,14 +497,23 @@ impl World {
             && crate::production::same_costs(&last.costs, &costs)
         {
             let queue = &mut production.queue;
-            let k = (queue.count - 1) as usize;
-            queue.slots[k].count = queue.slots[k].count.wrapping_add(n);
-            queue.total = queue.total.wrapping_add(n);
-            queue.changes = queue.changes.wrapping_add(1);
+            let k = (queue.count.get() - 1) as usize;
+            queue.slots[k].count = queue.slots[k]
+                .count
+                .plus(crate::production::QueuedUnits::of_data(n));
+            queue.total = queue.total.plus(crate::production::QueuedUnits::of_data(n));
+            queue.changes = queue.changes.bumped();
             owner.techs[t].pending = owner.techs[t].pending.plus(n);
             return Ok(true);
         }
-        self.new_entry(player, i, (master, Some(tech)), n, button, None)?;
+        self.new_entry(
+            player,
+            i,
+            (master, Some(tech)),
+            crate::production::QueuedUnits::of_data(n),
+            button,
+            None,
+        )?;
         let pending = &mut self.players.player_mut(player)?.techs[t].pending;
         *pending = pending.plus(n);
         Ok(true)
@@ -509,7 +530,7 @@ impl World {
         player: PlayerId,
         i: ListIndex,
         (master, tech): (Option<MasterId>, Option<TechId>),
-        n: i16,
+        n: crate::production::QueuedUnits,
         button: QueueButton,
         time: Option<WholeSeconds>,
     ) -> Result<(), GenieError> {
@@ -547,9 +568,9 @@ impl World {
         if let Some(time) = time {
             queue.slots[k].train_time = time;
         }
-        queue.total = queue.total.wrapping_add(n);
-        queue.count += 1;
-        queue.changes = queue.changes.wrapping_add(1);
+        queue.total = queue.total.plus(n);
+        queue.count = queue.count.grown();
+        queue.changes = queue.changes.bumped();
         Ok(())
     }
 

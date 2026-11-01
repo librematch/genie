@@ -54,9 +54,9 @@ fn a_building_s_production_holds_its_slots_and_make_action() {
     )]);
     let p = production(&town_centre).unwrap().unwrap();
     assert_eq!(p.queue.slots.len(), 2);
-    assert_eq!(p.queue.slots[1].serial, 1);
+    assert_eq!(p.queue.slots[1].serial.get(), 1);
     assert_eq!(p.queue.slots[0].costs[0], (Some(attribute::FOOD), 50.0));
-    assert_eq!((p.queue.count, p.queue.next_serial), (1, 2));
+    assert_eq!((p.queue.count.get(), p.queue.next_serial.get()), (1, 2));
     assert!(p.queue.enabled);
     let Some(Making::Unit(made)) = p.action else {
         panic!("a make action")

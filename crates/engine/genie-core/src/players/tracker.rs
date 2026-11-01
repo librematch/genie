@@ -308,8 +308,8 @@ impl Tracker {
     }
 
     /// `FUN_14104fb00`: the counter of queued units (`+0x60`) changes by `n`.
-    pub fn count_queued(&mut self, n: i16) {
-        self.queued += i32::from(n);
+    pub fn count_queued(&mut self, n: crate::production::QueuedUnits) {
+        self.queued += i32::from(n.get());
     }
 
     /// `FUN_141050230`: a queued unit of master `master` (its [`key`]'s class `class`, −1 for
@@ -420,12 +420,12 @@ impl crate::world::World {
                 tracker.add(u.id, k);
                 for e in u.production.iter().flat_map(|q| q.queue.entries()) {
                     if let Some(master) = e.master.filter(|m| 0 < m.get())
-                        && 0 < e.count
+                        && crate::production::QueuedUnits::ZERO < e.count
                     {
                         let class = self.tracker_key(p, master).class;
-                        for _ in 0..e.count {
+                        for _ in 0..e.count.get() {
                             tracker.place(Some(master), class);
-                            tracker.count_queued(1);
+                            tracker.count_queued(crate::production::QueuedUnits::ONE);
                         }
                     }
                 }

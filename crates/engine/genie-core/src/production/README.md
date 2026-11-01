@@ -32,6 +32,7 @@ A building's update runs its production action after its combat update.
 | [`make_obj_state.rs`](make_obj_state.rs) | A unit's make action's state: making the unit its building trains. |
 | [`make_tech_state.rs`](make_tech_state.rs) | A research's state: researching a technology at its building. |
 | [`mod.rs`](mod.rs) | Training units and researching technologies: a building's production queue, the actions that work it off, and a trained unit's spawn. |
+| [`queue_counts.rs`](queue_counts.rs) | A production queue's counts: the units an entry makes, the entries, the serials and the changes. |
 | [`spawn/`](spawn/) | A trained unit's spawn: where the make action (`TRIBE_Action_Make_Obj`, `FUN_140ad0240`) puts the unit its building made. |
 <!-- /files -->
 

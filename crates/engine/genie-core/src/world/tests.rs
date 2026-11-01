@@ -8671,7 +8671,12 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
     );
     let q = &production.queue;
     assert_eq!(
-        (q.count, q.total, q.slots[0].train_time, q.slots[0].costs[0]),
+        (
+            q.count.get(),
+            q.total.get(),
+            q.slots[0].train_time,
+            q.slots[0].costs[0]
+        ),
         (
             1,
             1,
@@ -8755,7 +8760,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
         t.players[0].objects[k]
             .production
             .as_ref()
-            .map_or(0, |p| p.queue.total)
+            .map_or(0, |p| p.queue.total.get())
     };
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[several(5)]);
@@ -8817,7 +8822,7 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
         t.players[0].objects[k]
             .production
             .as_ref()
-            .map_or(0, |p| p.queue.total)
+            .map_or(0, |p| p.queue.total.get())
     };
     let both = Command::Queue(QueueCommand {
         player: player_id(0),
@@ -8883,7 +8888,10 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
         .production
         .as_ref()
         .unwrap();
-    assert_eq!(production.queue.total, 1);
+    assert_eq!(
+        production.queue.total,
+        crate::production::QueuedUnits::of_data(1)
+    );
     let mut t = two(false);
     t.tick_with(Millis::new(104), &[queue(10, 83, 1)]);
     assert_eq!(t.players[1].attributes[0], Amount::new(100.0));
@@ -8912,7 +8920,10 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
         .production
         .as_ref()
         .unwrap();
-    assert_eq!(production.queue.total, 2);
+    assert_eq!(
+        production.queue.total,
+        crate::production::QueuedUnits::of_data(2)
+    );
     assert!(
         t.players[0].sleeping[ListIndex::new(0)]
             .production
@@ -9075,7 +9086,7 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
         let queued = t.players[0].objects[ListIndex::new(0)]
             .production
             .as_ref()
-            .map_or(0, |p| p.queue.total);
+            .map_or(0, |p| p.queue.total.get());
         (r, queued)
     };
     let (r, queued) = castle(GameMode::of_data(0));
@@ -9144,7 +9155,7 @@ fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
         t.players[0].objects[ListIndex::new(0)]
             .production
             .as_ref()
-            .map_or(0, |p| p.queue.total)
+            .map_or(0, |p| p.queue.total.get())
     };
     let mut t = research_world();
     research_listed(&mut t, &research_at(5, -1)).unwrap();
@@ -9289,7 +9300,7 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
             .queue
             .total
     };
-    assert_eq!(queued(&two), 2);
+    assert_eq!(queued(&two), crate::production::QueuedUnits::of_data(2));
     assert_eq!(
         two.players[0].attributes[0],
         Amount::new(100.0 - 2.0 * 46.0)
@@ -9301,12 +9312,15 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
     // 14 queued: room for one of five
     let mut full = one_player(vec![centre(9)], [1000.0; 4]);
     full.tick_with(Millis::new(104), &[queue(9, 99, 14), queue(9, 99, 5)]);
-    assert_eq!(queued(&full), 15);
+    assert_eq!(queued(&full), crate::production::QueuedUnits::of_data(15));
     // a computer player fills to 2
     let mut computer = one_player(vec![centre(9)], [1000.0; 4]);
     computer.players[0].computer = true;
     computer.tick_with(Millis::new(104), &[queue(9, 99, 5)]);
-    assert_eq!(queued(&computer), 2);
+    assert_eq!(
+        queued(&computer),
+        crate::production::QueuedUnits::of_data(2)
+    );
 }
 
 /// `FUN_1411cbc40` joins units of the last entry's master and button whose costs are the same;
@@ -9338,13 +9352,25 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         .as_ref()
         .unwrap()
         .queue;
-    assert_eq!((q.count, q.total, q.changes, q.next_serial), (2, 6, 3, 2));
     assert_eq!(
-        (q.slots[0].count, q.slots[1].count, q.slots[1].button),
+        (
+            q.count.get(),
+            q.total.get(),
+            q.changes.get(),
+            q.next_serial.get()
+        ),
+        (2, 6, 3, 2)
+    );
+    assert_eq!(
+        (
+            q.slots[0].count.get(),
+            q.slots[1].count.get(),
+            q.slots[1].button
+        ),
         (5, 1, QueueButton::of_data(1))
     );
     assert_eq!(
-        (q.slots[1].train_time, q.slots[1].serial),
+        (q.slots[1].train_time, q.slots[1].serial.get()),
         (WholeSeconds::of_data(25), 1)
     );
     assert_eq!(t.players[0].tracker.queued, 6);
@@ -9358,8 +9384,8 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         .as_ref()
         .unwrap()
         .queue;
-    assert_eq!((q.slots.len(), q.count, q.total), (20, 11, 11));
-    let serials: Vec<_> = q.entries().iter().map(|e| e.serial).collect();
+    assert_eq!((q.slots.len(), q.count.get(), q.total.get()), (20, 11, 11));
+    let serials: Vec<_> = q.entries().iter().map(|e| e.serial.get()).collect();
     assert_eq!(serials, (0..11).collect::<Vec<i64>>());
 }
 
@@ -9378,7 +9404,10 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
         (Amount::new(1000.0), Amount::ZERO, Amount::ZERO)
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
-    assert_eq!((production.queue.count, production.queue.total), (0, 0));
+    assert_eq!(
+        (production.queue.count.get(), production.queue.total.get()),
+        (0, 0)
+    );
     assert!(production.action.is_none());
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     t.players[0].objects[ListIndex::new(0)].production = Some(crate::production::Production {
@@ -9417,7 +9446,7 @@ fn game_mode_16_queues_one_military_unit_at_a_time() {
         .as_ref()
         .unwrap()
         .queue;
-    assert_eq!(q.total, 1);
+    assert_eq!(q.total, crate::production::QueuedUnits::of_data(1));
     assert!(t.players[0].one_military_queued);
 }
 

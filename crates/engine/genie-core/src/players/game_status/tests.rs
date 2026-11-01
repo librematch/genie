@@ -55,14 +55,14 @@ use crate::world::WholeSeconds;
 fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
     Entry {
         master,
-        count,
+        count: crate::production::QueuedUnits::of_data(count),
         tech: None,
         costs: [
             (Some(attribute::FOOD), food),
             (None, 0.0),
             (Some(attribute::HEADROOM), 1.0),
         ],
-        serial: 0,
+        serial: crate::production::EntrySerial::new(0),
         button: QueueButton::NONE,
         train_time: WholeSeconds::of_data(25),
     }
@@ -74,9 +74,9 @@ fn queue(entries: &[Entry]) -> Queue {
     slots[..entries.len()].copy_from_slice(entries);
     Queue {
         slots,
-        count: entries.len() as i16,
+        count: crate::production::QueueLength::of_data(entries.len() as i16),
         total: entries.iter().map(|e| e.count).sum(),
-        next_serial: 10,
+        next_serial: crate::production::EntrySerial::new(10),
         ..Queue::default()
     }
 }
@@ -450,7 +450,7 @@ fn a_cancel_gives_back_one_queued_unit() {
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     let q = &production.queue;
-    assert_eq!((q.count, q.total, q.changes), (1, 1, 1));
+    assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (1, 1, 1));
     assert!(production.action.is_some());
     assert_eq!(p.tracker.queued, -1);
     t.cancel_order(&object_ids([9]), 5, false).unwrap();
@@ -493,7 +493,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
         .as_ref()
         .unwrap()
         .queue;
-    assert_eq!((q.count, q.total, q.changes), (0, 0, 1));
+    assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (0, 0, 1));
     t.building_production(PlayerId::new(1), ListIndex::new(0), Seconds::new(0.05))
         .unwrap();
     let q = &t.players[1].objects[ListIndex::new(0)]
@@ -501,7 +501,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
         .as_ref()
         .unwrap()
         .queue;
-    assert_eq!((q.count, q.changes), (0, 2));
+    assert_eq!((q.count.get(), q.changes.get()), (0, 2));
     let mut t = game();
     let tc = t.players[1].objects[ListIndex::new(0)]
         .production
@@ -527,7 +527,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
             .unwrap()
             .queue
             .count,
-        1
+        crate::production::QueueLength::of_data(1)
     );
     assert_eq!(p.attributes[0], Amount::ZERO);
 }
@@ -548,7 +548,10 @@ fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
     let p = &t.players[1];
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     assert_eq!(
-        (production.queue.count, production.queue.slots[0].count),
+        (
+            production.queue.count.get(),
+            production.queue.slots[0].count.get()
+        ),
         (1, 2)
     );
     assert!(production.action.is_none());
@@ -598,10 +601,15 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     let q = &production.queue;
     assert_eq!(
-        (q.count, q.total, q.slots[0].master, q.slots[0].count),
+        (
+            q.count.get(),
+            q.total.get(),
+            q.slots[0].master,
+            q.slots[0].count.get()
+        ),
         (1, 2, Some(master_id(293)), 2)
     );
-    assert_eq!(q.changes, 2);
+    assert_eq!(q.changes, crate::production::QueueChanges::of_data(2));
     assert!(production.action.is_none());
     assert_eq!(p.tracker.queued, -10);
     // from the second unit the make action goes on for the other sex
@@ -622,7 +630,10 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
         .as_ref()
         .unwrap();
     assert_eq!(
-        (production.queue.count, production.queue.slots[0].count),
+        (
+            production.queue.count.get(),
+            production.queue.slots[0].count.get()
+        ),
         (1, 2)
     );
     assert!(production.action.is_some());
@@ -675,7 +686,7 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
             .unwrap()
             .queue
             .count,
-        0
+        crate::production::QueueLength::of_data(0)
     );
     // [2 villagers, a research]: the research moved into the slot ends it
     let mut t = game();
@@ -699,7 +710,7 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
         .unwrap()
         .queue;
     assert_eq!(
-        (q.count, q.slots[0].tech, t.players[1].attributes[0]),
+        (q.count.get(), q.slots[0].tech, t.players[1].attributes[0]),
         (1, Some(tech_id(22)), Amount::new(92.0))
     );
 }
@@ -798,7 +809,10 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     assert_eq!(tc.store, crate::test_ids::adds([(attribute::WOOD, 20.0)]));
     let production = tc.production.as_ref().unwrap();
     assert_eq!(production.disabled_techs, [tech_id(5)]);
-    assert_eq!((production.queue.count, production.queue.total), (0, 0));
+    assert_eq!(
+        (production.queue.count.get(), production.queue.total.get()),
+        (0, 0)
+    );
     assert!(production.action.is_none());
     assert_eq!(tc.ai.as_ref().unwrap().notifies.len(), 1);
     // one research of the second unit: 50 gold, the technology in state 1 though two stay
@@ -815,7 +829,10 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
         (Amount::new(50.0), ResearchState::Available, 2)
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
-    assert_eq!(production.queue.slots[0].count, 2);
+    assert_eq!(
+        production.queue.slots[0].count,
+        crate::production::QueuedUnits::of_data(2)
+    );
     assert!(production.action.is_some());
 }
 
@@ -841,7 +858,10 @@ fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_o
         (ResearchState::Available, 1, -1, Seconds::new(30.0))
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
-    assert_eq!((production.queue.count, production.queue.changes), (0, 1));
+    assert_eq!(
+        (production.queue.count.get(), production.queue.changes.get()),
+        (0, 1)
+    );
     // not done: state 1, nothing counted
     let mut t = researching(10.0);
     let s = &mut t.players[1].techs[22];
@@ -934,7 +954,10 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
     let tc = &p.objects[ListIndex::new(0)];
     let production = tc.production.as_ref().unwrap();
     assert!(production.queue.entries().is_empty() && production.action.is_none());
-    assert_eq!((production.queue.total, production.queue.changes), (0, 1));
+    assert_eq!(
+        (production.queue.total.get(), production.queue.changes.get()),
+        (0, 1)
+    );
     let ai = tc.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),

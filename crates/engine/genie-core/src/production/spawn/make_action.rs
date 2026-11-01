@@ -83,7 +83,9 @@ impl World {
         let Some(production) = unit.production.as_ref() else {
             return Ok(());
         };
-        if !production.queue.enabled || production.queue.count == 0 {
+        if !production.queue.enabled
+            || production.queue.count == crate::production::QueueLength::ZERO
+        {
             return Ok(());
         }
         let busy = !self.players.player(p)?.computer

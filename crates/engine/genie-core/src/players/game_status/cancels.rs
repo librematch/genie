@@ -42,18 +42,21 @@ impl World {
         for e in &entries {
             if e.tech.is_none() {
                 self.cancel_units(p, e, e.count)?;
-                self.players.player_mut(p)?.tracker.count_queued(-e.count);
+                self.players
+                    .player_mut(p)?
+                    .tracker
+                    .count_queued(e.count.negated());
             } else if !self.players.player(p)?.techs.is_empty() {
                 self.refund_researches(p, idx, e, e.count)?;
             }
         }
         if let Some(production) = self.players.live_mut(p, idx)?.production.as_mut() {
-            production.queue.count = 0;
+            production.queue.count = crate::production::QueueLength::ZERO;
         }
         self.end_production_action(p, idx)?;
         if let Some(production) = self.players.live_mut(p, idx)?.production.as_mut() {
-            production.queue.changes = production.queue.changes.wrapping_add(1);
-            production.queue.total = 0;
+            production.queue.changes = production.queue.changes.bumped();
+            production.queue.total = crate::production::QueuedUnits::ZERO;
         }
         Ok(())
     }
@@ -66,7 +69,7 @@ impl World {
         &mut self,
         p: PlayerId,
         e: &crate::production::Entry,
-        count: i16,
+        count: crate::production::QueuedUnits,
     ) -> Result<(), GenieError> {
         use crate::production::population;
         let class = e.master.map_or(Key::NONE, |m| self.tracker_key(p, m)).class;
@@ -75,17 +78,19 @@ impl World {
             .and_then(|m| player_master(&self.masters, p, m))
             .cloned();
         let owner = self.players.player_mut(p)?;
-        for _ in 0..count.max(0) {
+        for _ in 0..count.get().max(0) {
             if let Some(m) = &master {
                 refund(m, &e.costs, owner)?;
             }
-            owner.tracker.count_queued(-1);
+            owner
+                .tracker
+                .count_queued(crate::production::QueuedUnits::ONE.negated());
             owner.tracker.unplace(e.master, class);
         }
         let pop = master
             .as_ref()
             .map_or(Amount::ZERO, |m| population(&m.storage));
-        owner.add_attribute(QUEUED, -pop * f32::from(count))
+        owner.add_attribute(QUEUED, -pop * f32::from(count.get()))
     }
 
     /// `count` researches of a research entry `e` at the building at `idx` of player `p`
@@ -100,7 +105,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         e: &crate::production::Entry,
-        count: i16,
+        count: crate::production::QueuedUnits,
     ) -> Result<(), GenieError> {
         // the entry's technology is one of the tree: RESEARCH queued it, the load read it
         let tree = self.players.player(p)?.techs.len();
@@ -108,7 +113,7 @@ impl World {
             return Ok(());
         };
         let owner = self.players.player_mut(p)?;
-        refund_research(&e.costs, count, owner)?;
+        refund_research(&e.costs, count.get(), owner)?;
         let state = owner.techs.checked_mut(t)?;
         state.state = ResearchState::Available;
         state.research_done = Seconds::ZERO;
@@ -129,7 +134,7 @@ impl World {
             production.enable_tech(tech);
         }
         let pending = &mut owner.techs.checked_mut(t)?.pending;
-        *pending = pending.minus(count);
+        *pending = pending.minus(count.get());
         Ok(())
     }
 
@@ -180,7 +185,7 @@ impl World {
                     }
                 }
             }
-            let count = i16::from(all) * 4 + 1;
+            let count = crate::production::QueuedUnits::of_data(i16::from(all) * 4 + 1);
             return self.cancel_some(p, idx, (None, count), e as i32, entry.tech);
         }
         let owner = self.players.player_mut(p)?;
@@ -191,10 +196,11 @@ impl World {
             .as_mut()
             .ok_or(NO_PRODUCTION)?
             .queue;
-        queue.slots.checked_mut(e)?.count -= 1;
-        queue.total -= 1;
-        queue.changes = queue.changes.wrapping_add(1);
-        if queue.slots.checked(e)?.count < 1 {
+        let slot = queue.slots.checked_mut(e)?;
+        slot.count = slot.count.minus(crate::production::QueuedUnits::ONE);
+        queue.total = queue.total.minus(crate::production::QueuedUnits::ONE);
+        queue.changes = queue.changes.bumped();
+        if queue.slots.checked(e)?.count < crate::production::QueuedUnits::ONE {
             queue.close(e, true);
         }
         if index == 0 {
@@ -223,7 +229,9 @@ impl World {
         if let Some(m) = &master {
             refund(m, &entry.costs, owner)?;
         }
-        owner.tracker.count_queued(-1);
+        owner
+            .tracker
+            .count_queued(crate::production::QueuedUnits::ONE.negated());
         owner.tracker.unplace(entry.master, class);
         let pop = master
             .as_ref()
@@ -263,12 +271,12 @@ impl World {
         let first = *queue(self, p, idx)?.slots.checked(e)?;
         let kind = first.master;
         let mut e = e as i32;
-        let mut left = first.count.min(5);
+        let mut left = first.count.min(crate::production::QueuedUnits::of_data(5));
         let mut master = kind;
         let mut gone: u16 = 0;
         let mut n = queue(self, p, idx)?.count;
         loop {
-            if n == 0 {
+            if n == crate::production::QueueLength::ZERO {
                 return Ok(());
             }
             let Some(slot) = usize::try_from(e)
@@ -278,7 +286,7 @@ impl World {
             else {
                 return Ok(());
             };
-            if slot.tech.is_some() || slot.count == 0 {
+            if slot.tech.is_some() || slot.count == crate::production::QueuedUnits::ZERO {
                 return Ok(());
             }
             // The villager's masters, whose two sexes a cancel of five counts as one kind
@@ -288,15 +296,15 @@ impl World {
             }
             let take = if left <= slot.count { left } else { slot.count };
             self.cancel_some(p, idx, (master, take), index as i32, None)?;
-            gone = gone.wrapping_add(take as u16);
+            gone = gone.wrapping_add(take.get() as u16);
             let q = queue(self, p, idx)?;
             let at = *q.slots.checked(e as usize)?;
             n = q.count;
-            if at.tech.is_some() || i32::from(n) - 1 < e {
+            if at.tech.is_some() || i32::from(n.get()) - 1 < e {
                 e -= 1;
             }
-            if 0 < n {
-                left = 5 - gone as i16;
+            if crate::production::QueueLength::ZERO < n {
+                left = crate::production::QueuedUnits::of_data(5 - gone as i16);
                 // before the buffer: no master of the kind
                 master = match usize::try_from(e) {
                     Ok(e) => q.slots.checked(e)?.master,
@@ -328,7 +336,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        (master, count): (Option<MasterId>, i16),
+        (master, count): (Option<MasterId>, crate::production::QueuedUnits),
         from: i32,
         tech: Option<TechId>,
     ) -> Result<(), GenieError> {
@@ -336,10 +344,10 @@ impl World {
             return Ok(());
         };
         let q = &production.queue;
-        if q.count == 0 {
+        if q.count == crate::production::QueueLength::ZERO {
             return Ok(());
         }
-        let start = from.min(i32::from(q.count) - 1);
+        let start = from.min(i32::from(q.count.get()) - 1);
         if start < 0 {
             return Ok(());
         }
@@ -357,7 +365,10 @@ impl World {
         let take = count.min(entry.count);
         if tech.is_none() {
             self.cancel_units(p, &entry, take)?;
-            self.players.player_mut(p)?.tracker.count_queued(-take);
+            self.players
+                .player_mut(p)?
+                .tracker
+                .count_queued(take.negated());
         } else {
             let e = crate::production::Entry { tech, ..entry };
             self.refund_researches(p, idx, &e, take)?;
@@ -370,10 +381,10 @@ impl World {
             .ok_or(NO_PRODUCTION)?
             .queue;
         let slot = queue.slots.checked_mut(i)?;
-        slot.count = slot.count.wrapping_sub(take);
-        queue.total = queue.total.wrapping_sub(take);
-        queue.changes = queue.changes.wrapping_add(1);
-        if 0 < queue.slots.checked(i)?.count {
+        slot.count = slot.count.minus(take);
+        queue.total = queue.total.minus(take);
+        queue.changes = queue.changes.bumped();
+        if crate::production::QueuedUnits::ZERO < queue.slots.checked(i)?.count {
             return Ok(());
         }
         let villager = |m: Option<MasterId>| m == Some(VILLAGER_MALE) || m == Some(VILLAGER_FEMALE);
@@ -386,7 +397,11 @@ impl World {
         if i != 0 {
             return Ok(());
         }
-        if tech.is_none() && start != 0 && pair && 0 < queue.slots.checked(0)?.count {
+        if tech.is_none()
+            && start != 0
+            && pair
+            && crate::production::QueuedUnits::ZERO < queue.slots.checked(0)?.count
+        {
             return Ok(());
         }
         self.end_production_action(p, idx)
