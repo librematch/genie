@@ -239,6 +239,7 @@ fn a_move_to_takes_its_state_point_range_and_wait() {
     let m = imported(MOVE_TO, move_to(4, 0.5))
         .unwrap()
         .actions
+        .list
         .move_to()
         .copied()
         .unwrap();
@@ -272,6 +273,7 @@ fn a_move_to_takes_its_state_point_range_and_wait() {
         let m = imported(MOVE_TO, move_to(state, 0.5))
             .unwrap()
             .actions
+            .list
             .move_to()
             .copied()
             .unwrap();
@@ -331,7 +333,7 @@ fn a_move_to_takes_its_sprite_from_the_sprites_table() {
             Unit::default(),
             graphics,
         )
-        .map(|u| u.actions.move_to().copied().unwrap().sprite)
+        .map(|u| u.actions.list.move_to().copied().unwrap().sprite)
     };
     assert_eq!(shown(5, Some(&graphics)), Ok(Some(walking)));
     assert_eq!(shown(-1, None), Ok(None));
@@ -365,6 +367,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     let a = imported(ARTIFACT_TYPE, artifact(base(ArtifactState::Wait.get())))
         .unwrap()
         .actions
+        .list
         .artifact()
         .copied()
         .unwrap();
@@ -382,6 +385,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     )
     .unwrap()
     .actions
+    .list
     .artifact()
     .copied()
     .unwrap();
@@ -408,6 +412,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     )
     .unwrap()
     .actions
+    .list
     .artifact()
     .copied()
     .unwrap();
@@ -421,6 +426,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     let a = imported(ARTIFACT_TYPE, artifact(near.clone()))
         .unwrap()
         .actions
+        .list
         .artifact()
         .copied()
         .unwrap();
@@ -429,6 +435,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     let a = imported(ARTIFACT_TYPE, artifact(near))
         .unwrap()
         .actions
+        .list
         .artifact()
         .copied()
         .unwrap();
@@ -444,6 +451,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     )
     .unwrap()
     .actions
+    .list
     .artifact()
     .copied()
     .unwrap();
@@ -538,6 +546,7 @@ fn a_missile_flies_with_its_actions_course() {
     let action = import(&missile(), &PlayerObjects::default(), Unit::default())
         .unwrap()
         .actions
+        .list
         .missile()
         .cloned()
         .unwrap();
@@ -577,6 +586,7 @@ fn a_farms_make_takes_its_timers_and_task() {
     let m = imported(MAKE, make(b))
         .unwrap()
         .actions
+        .list
         .make()
         .copied()
         .unwrap();
@@ -602,6 +612,7 @@ fn a_birds_fly_takes_its_home_and_move_to() {
     let f = imported(FLY, bird(base(3)))
         .unwrap()
         .actions
+        .list
         .fly()
         .copied()
         .unwrap();
@@ -616,6 +627,7 @@ fn a_birds_fly_takes_its_home_and_move_to() {
     let f = imported(FLY, bird(with_sub(base(3), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
         .actions
+        .list
         .fly()
         .copied()
         .unwrap();
@@ -668,6 +680,7 @@ fn a_build_takes_its_task_move_to_and_site() {
     let a = import(&acting(BUILD, build(walking)), &objects, unit.clone())
         .unwrap()
         .actions
+        .list
         .build()
         .copied()
         .unwrap();
@@ -719,6 +732,7 @@ fn a_build_takes_its_task_move_to_and_site() {
     )
     .unwrap()
     .actions
+    .list
     .build()
     .copied()
     .unwrap();
@@ -728,6 +742,7 @@ fn a_build_takes_its_task_move_to_and_site() {
     let a = imported(BUILD, build(b.clone()))
         .unwrap()
         .actions
+        .list
         .build()
         .copied()
         .unwrap();
@@ -771,6 +786,7 @@ fn a_repair_takes_its_task_and_counts_its_builder() {
     )
     .unwrap()
     .actions
+    .list
     .repair()
     .copied()
     .unwrap();
@@ -788,6 +804,7 @@ fn a_repair_takes_its_task_and_counts_its_builder() {
     let r = imported(REPAIR, repair(b.clone()))
         .unwrap()
         .actions
+        .list
         .repair()
         .copied()
         .unwrap();
@@ -833,6 +850,7 @@ fn a_hunt_takes_its_task_lead_and_move_to() {
     let h = imported(HUNT, hunt(base(HuntState::Idle.get())))
         .unwrap()
         .actions
+        .list
         .hunt()
         .copied()
         .unwrap();
@@ -859,6 +877,7 @@ fn a_hunt_takes_its_task_lead_and_move_to() {
     )
     .unwrap()
     .actions
+    .list
     .hunt()
     .copied()
     .unwrap();
@@ -937,6 +956,7 @@ fn a_gather_takes_its_stops_and_move_to() {
     let g = imported(GATHER, gather(base(GatherState::Work.get())))
         .unwrap()
         .actions
+        .list
         .gather()
         .copied()
         .unwrap();
@@ -960,6 +980,7 @@ fn a_gather_takes_its_stops_and_move_to() {
     )
     .unwrap()
     .actions
+    .list
     .gather()
     .copied()
     .unwrap();
@@ -1014,6 +1035,7 @@ fn an_enter_takes_its_task_and_retry() {
     let e = imported(ENTER, enter(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
         .actions
+        .list
         .enter()
         .copied()
         .unwrap();
@@ -1062,6 +1084,7 @@ fn a_transport_takes_its_base_alone() {
     )
     .unwrap()
     .actions
+    .list
     .transport()
     .copied()
     .unwrap();
@@ -1096,6 +1119,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     let e = imported(EXPLORE, explore(base(ExploreState::Wait.get())))
         .unwrap()
         .actions
+        .list
         .explore()
         .copied()
         .unwrap();
@@ -1110,6 +1134,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     )
     .unwrap()
     .actions
+    .list
     .explore()
     .copied()
     .unwrap();
@@ -1166,6 +1191,7 @@ fn a_wait_solidify_waits_for_its_foundation() {
     let w = imported(WAIT_SOLIDIFY, wait(b))
         .unwrap()
         .actions
+        .list
         .wait_solidify()
         .copied()
         .unwrap();
@@ -1252,6 +1278,7 @@ fn a_hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
         )
         .unwrap()
         .actions
+        .list
         .hunt()
         .copied()
         .unwrap()

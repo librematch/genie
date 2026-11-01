@@ -345,7 +345,7 @@ impl Unit {
             ));
         }
         let fly_mode = self.master(&c.w.masters, c.player)?.fly_mode;
-        self.actions.set_fly(Some(Fly::start(
+        self.actions.list.set_fly(Some(Fly::start(
             task,
             self.position(),
             c.w.streams.get(Stream::Action),
@@ -447,7 +447,7 @@ mod tests {
             },
             ..Unit::default()
         };
-        bird.actions.set_fly(Some(fly));
+        bird.actions.list.set_fly(Some(fly));
         let gaia = Player {
             objects: vec![bird].into(),
             ..Player::default()
@@ -503,6 +503,7 @@ mod tests {
         })?;
         Ok(*t.players[0].objects[ListIndex::new(0)]
             .actions
+            .list
             .fly()
             .unwrap())
     }
@@ -737,6 +738,7 @@ mod tests {
         );
         t.players[0].objects[ListIndex::new(0)]
             .actions
+            .list
             .fly_mut()
             .unwrap()
             .timer = Seconds::new(0.01);
@@ -768,8 +770,8 @@ mod tests {
         let start = |default: Option<crate::objects::masters::TaskIndex>| {
             let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
             let bird = &mut t.players[0].objects[ListIndex::new(0)];
-            bird.actions.set_fly(None);
-            bird.default_fly = true;
+            bird.actions.list.set_fly(None);
+            bird.actions.default_fly = true;
             let master = t.masters[0].get_mut(master_id(96)).unwrap();
             master.tasks = vec![task];
             master.default_task = default;
@@ -781,6 +783,7 @@ mod tests {
             );
             let fly = t.players[0].objects[ListIndex::new(0)]
                 .actions
+                .list
                 .fly()
                 .copied();
             (r, fly)

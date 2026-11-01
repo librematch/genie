@@ -37,12 +37,12 @@ impl Unit {
     /// ([`Unit::build_reads`]), on the Build copied out of the action list and put back after
     /// it; its code (the end's 1). Nothing without a Build.
     pub(crate) fn build_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let Some(mut build) = self.actions.build().copied() else {
+        let Some(mut build) = self.actions.list.build().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.build_reads(c, build)?;
         let built = build.update(c, self, me, &reads);
-        if let Some(b) = self.actions.build_mut() {
+        if let Some(b) = self.actions.list.build_mut() {
             *b = build;
         }
         // its end's 1 deletes it; the destructor (FUN_140aadbf0) finds it out of the builders
@@ -220,11 +220,11 @@ impl BuildAction {
         builder: &mut Unit,
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        if let Some(b) = builder.actions.build_mut() {
+        if let Some(b) = builder.actions.list.build_mut() {
             *b = *self;
         }
         let answer = c.lend_at(builder, f);
-        if let Some(b) = builder.actions.build() {
+        if let Some(b) = builder.actions.list.build() {
             *self = *b;
         }
         answer

@@ -334,14 +334,17 @@ mod tests {
             moving: None,
         };
         Unit {
-            actions: ActionList::default().with_build(target.map(|t| {
-                crate::construction::build::tests::started(
-                    object_id(t),
-                    Position::new(20.0, 17.0, 0.0),
-                    Distance::ZERO,
-                    task,
-                )
-            })),
+            actions: crate::objects::layers::ActionLayer {
+                list: ActionList::default().with_build(target.map(|t| {
+                    crate::construction::build::tests::started(
+                        object_id(t),
+                        Position::new(20.0, 17.0, 0.0),
+                        Distance::ZERO,
+                        task,
+                    )
+                })),
+                ..object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0)).actions
+            },
             ..object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0))
         }
     }
@@ -474,7 +477,7 @@ mod tests {
             Ok(None)
         );
         let mut unmodelled = villager(None);
-        unmodelled.unmodelled_action = Some(GenieError::unsupported("an action"));
+        unmodelled.actions.unmodelled_action = Some(GenieError::unsupported("an action"));
         assert!(search(&sites(), &unmodelled, class::VILLAGER, at, &near_tc).is_err());
     }
 

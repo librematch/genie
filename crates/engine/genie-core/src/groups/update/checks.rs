@@ -184,7 +184,7 @@ impl World {
         if u.master(&self.masters, p)?.kind < ACTION {
             return Ok(None);
         }
-        if let Some(e) = u.unmodelled_action.clone() {
+        if let Some(e) = u.actions.unmodelled_action.clone() {
             return Err(e);
         }
         Ok(u.top_target()
@@ -477,7 +477,7 @@ impl World {
             return Err(TRADE_CART_SPRITES);
         }
         if ACTION <= master.kind
-            && let Some(e) = u.unmodelled_action.clone()
+            && let Some(e) = u.actions.unmodelled_action.clone()
         {
             return Err(e);
         }
@@ -555,7 +555,7 @@ impl Unit {
         let state = if master.kind < ACTION {
             ActionState::NO_ACTION
         } else {
-            if let Some(e) = u.unmodelled_action.clone() {
+            if let Some(e) = u.actions.unmodelled_action.clone() {
                 return Err(e);
             }
             u.top_action().map_or(ActionState::NO_ACTION, |a| a.state)

@@ -89,6 +89,7 @@ impl Unit {
     fn after_drop_search(&self, c: &mut Step<'_>) -> Result<Option<ObjectId>, GenieError> {
         let gather = self
             .actions
+            .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let Some(ai) = self.combat.ai.as_ref() else {
@@ -118,11 +119,12 @@ impl Unit {
     ) -> Result<HeadCode, GenieError> {
         let farm_waits = crate::gathering::gather::waits_for_a_farm(
             self.life.master_id,
-            self.actions.gather().and_then(|g| g.target_class),
+            self.actions.list.gather().and_then(|g| g.target_class),
         );
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
         let gather = self
             .actions
+            .list
             .gather_mut()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
@@ -147,6 +149,7 @@ impl Unit {
         let shows = self.idle_sprite(c)?;
         let gather = self
             .actions
+            .list
             .gather_mut()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         gather.tear_down(self.body.mover_mut())?;
@@ -177,6 +180,7 @@ impl Unit {
     ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
         let gather = self
             .actions
+            .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let master = self.master(&c.w.masters, c.player)?;
@@ -221,11 +225,12 @@ impl Unit {
             work_rate: self.combat.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: crate::gathering::gather::productivity_of(
-                self.actions.gather().and_then(|g| g.task.productivity),
+                self.actions.list.gather().and_then(|g| g.task.productivity),
                 &c.w.players.player(c.player)?.attributes,
             ),
         };
-        let (Some(gather), Some(mover)) = (self.actions.gather_mut(), self.body.mover_mut()) else {
+        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -350,6 +355,7 @@ impl Unit {
         }
         let gather = self
             .actions
+            .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
@@ -365,7 +371,8 @@ impl Unit {
             graphics,
         );
         let walks = Walks::of(sprites, self);
-        let (Some(gather), Some(mover)) = (self.actions.gather_mut(), self.body.mover_mut()) else {
+        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -388,7 +395,11 @@ impl Unit {
                 "a hunt's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = self
+            .actions
+            .list
+            .hunt()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) =
             self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;
@@ -407,7 +418,8 @@ impl Unit {
             graphics,
         );
         let walks = Walks::of(sprites, self);
-        let (Some(hunt), Some(mover)) = (self.actions.hunt_mut(), self.body.mover_mut()) else {
+        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));

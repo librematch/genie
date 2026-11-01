@@ -64,14 +64,22 @@ pub(super) fn unit(
     let (Some(s), Some(id)) = (saved, named) else {
         return Unit {
             id: ObjectId::UNSAVED,
-            unmodelled_action: Some(GenieError::unsupported("an object without a static part")),
+            actions: genie_core::objects::layers::ActionLayer {
+                unmodelled_action: Some(GenieError::unsupported("an object without a static part")),
+                ..Default::default()
+            },
             ..Unit::default()
         };
     };
     let Ok(master) = MasterId::try_from(s.master_obj) else {
         return Unit {
             id,
-            unmodelled_action: Some(GenieError::invalid_input("an object's master is negative")),
+            actions: genie_core::objects::layers::ActionLayer {
+                unmodelled_action: Some(GenieError::invalid_input(
+                    "an object's master is negative",
+                )),
+                ..Default::default()
+            },
             ..Unit::default()
         };
     };
@@ -291,25 +299,25 @@ pub(super) fn unit(
         // an object without actions in a save: its default task's action (an Artifact exists
         // from the load on; a Fly starts in its first update)
         default_task(object, s, objects, civ, masters).map(|d| match d {
-            Some(DefaultStart::Artifact(a)) => unit.actions.set_artifact(Some(*a)),
-            Some(DefaultStart::Fly) => unit.default_fly = true,
-            Some(DefaultStart::Make) => unit.default_make = true,
+            Some(DefaultStart::Artifact(a)) => unit.actions.list.set_artifact(Some(*a)),
+            Some(DefaultStart::Fly) => unit.actions.default_fly = true,
+            Some(DefaultStart::Make) => unit.actions.default_make = true,
             None => {}
         })
     };
     // what the default task starts once the action list empties: nothing, a Fly, the Artifact
     // again or something not modelled
-    unit.default_task = match default_task(object, s, objects, civ, masters) {
+    unit.actions.default_task = match default_task(object, s, objects, civ, masters) {
         Ok(None | Some(DefaultStart::Fly | DefaultStart::Make)) => None,
         Ok(Some(DefaultStart::Artifact(_))) => {
-            unit.default_artifact = true;
+            unit.actions.default_artifact = true;
             None
         }
         Err(e) => Some(e),
     };
     if saved {
         // a saved object's Fly is its saved action's: none starts again (it never ends)
-        unit.default_fly = false;
+        unit.actions.default_fly = false;
     }
     // a missile without its action (one that met its target, dying): the object's own fields, and
     // the flying flag the load constructor sets (`+0x994` 1, not saved)
@@ -332,7 +340,7 @@ pub(super) fn unit(
     }
     let production = production(object).map(|p| unit.building.production = p);
     let moving = mover(object, s, objects, paths, civ, masters).map(|m| unit.body.put_mover(m));
-    unit.unmodelled_action = life_read
+    unit.actions.unmodelled_action = life_read
         .and(ai_read)
         .and(lists_read)
         .and(gather_read)

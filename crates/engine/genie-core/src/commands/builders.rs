@@ -199,9 +199,9 @@ impl World {
             .objects
             .by_id(id)
             .ok_or(GenieError::unsupported("a builder the slice does not have"))?;
-        if unit.actions.artifact().is_some()
+        if unit.actions.list.artifact().is_some()
             || unit.building.production.is_some()
-            || unit.actions.fly().is_some()
+            || unit.actions.list.fly().is_some()
         {
             return Err(GenieError::unsupported(
                 "a builder with an action (its replacement)",
@@ -337,6 +337,7 @@ impl World {
         self.players
             .live_mut(player, idx)?
             .actions
+            .list
             .set_build(Some(build));
         Ok(())
     }
@@ -360,6 +361,7 @@ impl World {
         self.players
             .live_mut(player, idx)?
             .actions
+            .list
             .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify::new(
                 wait.task,
                 wait.target,
@@ -445,6 +447,7 @@ impl World {
         self.players
             .live_mut(player, idx)?
             .actions
+            .list
             .set_build(Some(build));
         Ok(true)
     }

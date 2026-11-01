@@ -311,23 +311,26 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             None,
             Some(crate::gathering::hunt::tests::walker()),
         ),
-        actions: ActionList::default().with_build(Some(crate::construction::build::BuildAction {
-            state: BuildState::Work,
-            added: true,
-            ..crate::construction::build::tests::started(
-                object_id(600),
-                Position::new(5.0, 10.0, 0.0),
-                Distance::ZERO,
-                crate::construction::build::BuildTask {
-                    range: Distance::new(0.1),
-                    work_value: crate::objects::masters::WorkValue::new(1.0),
-                    work_rate: WorkRate::new(1.0),
-                    resource: None,
-                    id: TaskId::of_task(-1),
-                    moving: None,
-                },
-            )
-        })),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_build(Some(crate::construction::build::BuildAction {
+                state: BuildState::Work,
+                added: true,
+                ..crate::construction::build::tests::started(
+                    object_id(600),
+                    Position::new(5.0, 10.0, 0.0),
+                    Distance::ZERO,
+                    crate::construction::build::BuildTask {
+                        range: Distance::new(0.1),
+                        work_value: crate::objects::masters::WorkValue::new(1.0),
+                        work_rate: WorkRate::new(1.0),
+                        resource: None,
+                        id: TaskId::of_task(-1),
+                        moving: None,
+                    },
+                )
+            })),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let foundation = Unit {
@@ -448,6 +451,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     .unwrap();
     let build = t.players[0].objects[ListIndex::new(0)]
         .actions
+        .list
         .build()
         .copied()
         .unwrap();
@@ -495,6 +499,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     .unwrap();
     let build = t.players[0].objects[ListIndex::new(0)]
         .actions
+        .list
         .build()
         .copied()
         .unwrap();
@@ -518,6 +523,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
+            .list
             .build()
             .map(|b| b.state),
         Some(BuildState::Work)
@@ -536,6 +542,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
+            .list
             .build()
             .map(|b| (b.state, b.site)),
         Some((BuildState::Drop, Some(DropSiteId::new(object_id(503)))))
@@ -550,6 +557,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
+            .list
             .build()
             .map(|b| b.state),
         Some(BuildState::Work)
@@ -578,7 +586,7 @@ fn a_work_attack_on_a_touching_target_starts_its_move_to_arrived() {
     )
     .unwrap();
     let unit = &t.players[1].objects[ListIndex::new(0)];
-    let attack = unit.actions.attack().expect("the soldier's Attack");
+    let attack = unit.actions.list.attack().expect("the soldier's Attack");
     assert_eq!(
         (
             attack.state,
@@ -811,6 +819,7 @@ fn an_attack_task_of_a_unit_that_cannot_move_goes_ready_in_reach() {
         let unit = &t.players[1].objects[ListIndex::new(0)];
         let attack = unit
             .actions
+            .list
             .attack()
             .copied()
             .expect("the soldier's Attack");
@@ -1795,7 +1804,7 @@ fn an_interact_s_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.combat.ai.as_ref().unwrap().orders, []);
-    assert_eq!(u.actions.move_to().copied(), None);
+    assert_eq!(u.actions.list.move_to().copied(), None);
     let mut t = mover();
     t.players[1].objects[ListIndex::new(0)].body.put_mover(None);
     let reason = |t: &mut World| {
@@ -1959,7 +1968,7 @@ fn a_move_inside_a_work_command_with_0_keeps_the_order_queue() {
     let unit = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(unit.combat.ai.as_ref().unwrap().orders.len(), 1);
     assert_eq!(
-        unit.actions.move_to().copied().unwrap().goal(),
+        unit.actions.list.move_to().copied().unwrap().goal(),
         Some(Position::new(30.0, 30.0, 0.0))
     );
     t.move_point_order(
@@ -2522,6 +2531,7 @@ fn the_head_action_takes_a_move_only_where_its_slot_0x40_does() {
     );
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_move_to(Some(crate::movement::move_to::MoveToAction {
             sprite: None,
             state: crate::movement::move_to::MoveTo::Start,
@@ -2543,9 +2553,11 @@ fn the_head_action_takes_a_move_only_where_its_slot_0x40_does() {
     );
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_move_to(None);
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_artifact(Some(crate::ownership::artifact::Artifact::new(false, None)));
     assert_eq!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
@@ -2553,15 +2565,18 @@ fn the_head_action_takes_a_move_only_where_its_slot_0x40_does() {
     );
     let artifact = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .artifact()
         .copied()
         .unwrap();
     assert_eq!(artifact.goal, Some(point));
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_artifact(None);
-    t.players[1].objects[ListIndex::new(0)].unmodelled_action =
-        Some(GenieError::unsupported("a test's action"));
+    t.players[1].objects[ListIndex::new(0)]
+        .actions
+        .unmodelled_action = Some(GenieError::unsupported("a test's action"));
     assert!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point)
             .is_err()
@@ -2728,12 +2743,13 @@ fn a_follower_takes_the_follow_order_and_walks_to_its_target() {
     );
     assert_eq!(ai.target_point, Position::new(40.0, 20.0, 0.0));
     assert_eq!(
-        ObjectId::field(unit.actions.move_to().copied().unwrap().target),
+        ObjectId::field(unit.actions.list.move_to().copied().unwrap().target),
         30
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(1)]
             .actions
+            .list
             .move_to()
             .copied(),
         None
@@ -2760,7 +2776,7 @@ fn followers_side_by_side_take_their_offsets_from_the_target() {
         );
         assert_eq!(unit.body.mover().unwrap().ignore_units, [object_id(other)]);
         assert_eq!(
-            ObjectId::field(unit.actions.move_to().copied().unwrap().target),
+            ObjectId::field(unit.actions.list.move_to().copied().unwrap().target),
             30
         );
     }
@@ -3034,6 +3050,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     ));
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_build(Some(crate::construction::build::BuildAction {
             target: Some(object_id(60)),
             state: BuildState::Work,
@@ -3063,6 +3080,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     assert!(
         t.players[1].objects[ListIndex::new(0)]
             .actions
+            .list
             .build()
             .copied()
             .unwrap()
@@ -3079,6 +3097,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     );
     let build = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .build()
         .copied()
         .unwrap();
@@ -3340,7 +3359,7 @@ fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
             .objects
             .iter()
             .find(|u| u.id == object_id(id))
-            .and_then(|u| u.actions.move_to().copied())
+            .and_then(|u| u.actions.list.move_to().copied())
             .map(|m| ObjectId::field(m.target))
     };
     assert_eq!(goes(1, 20), Some(11));
@@ -3862,7 +3881,7 @@ fn a_lone_unit_patrols_to_its_waypoint() {
     )
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
-    let move_to = u.actions.move_to().copied().unwrap();
+    let move_to = u.actions.list.move_to().copied().unwrap();
     assert_eq!(
         (
             move_to.goal(),
@@ -3912,7 +3931,7 @@ fn a_lone_unit_s_waypoints_but_the_last_become_its_own() {
         .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        u.actions.move_to().copied().unwrap().goal(),
+        u.actions.list.move_to().copied().unwrap().goal(),
         Some(Position::new(30.0, 20.0, 0.0))
     );
     assert_eq!(
@@ -3956,7 +3975,7 @@ fn a_move_runs_the_stop_of_a_pending_completion_first() {
         (None, Some(ActionKind::Move), 0)
     );
     assert_eq!(
-        u.actions.move_to().copied().unwrap().goal(),
+        u.actions.list.move_to().copied().unwrap().goal(),
         Some(Position::new(30.0, 20.0, 0.0))
     );
 }
@@ -3991,7 +4010,7 @@ fn a_lone_unit_attack_moves_to_its_waypoint() {
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        u.actions.move_to().copied().unwrap().goal(),
+        u.actions.list.move_to().copied().unwrap().goal(),
         Some(Position::new(30.0, 20.0, 0.0))
     );
     let ai = u.combat.ai.as_ref().unwrap();
@@ -4011,6 +4030,7 @@ fn a_lone_unit_attack_moves_to_its_waypoint() {
     // unforced: the MoveTo to the same point stands
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .move_to_mut()
         .unwrap()
         .range = Distance::new(0.25);
@@ -4024,6 +4044,7 @@ fn a_lone_unit_attack_moves_to_its_waypoint() {
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
             .actions
+            .list
             .move_to()
             .copied()
             .unwrap()
@@ -4041,6 +4062,7 @@ fn a_lone_unit_attack_moves_to_its_waypoint() {
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
             .actions
+            .list
             .move_to()
             .copied()
             .unwrap()
@@ -4149,7 +4171,7 @@ fn loose_patrollers_ignore_each_other_and_one_at_its_waypoint_stays() {
     };
     assert_eq!(a.body.mover().unwrap().ignore_units, [object_id(12)]);
     assert_eq!(b.body.mover().unwrap().ignore_units, [object_id(11)]);
-    assert!(a.actions.move_to().is_some() && b.actions.move_to().is_none());
+    assert!(a.actions.list.move_to().is_some() && b.actions.list.move_to().is_none());
     assert_eq!(b.combat.ai.as_ref().unwrap().current_order, None);
     assert_eq!(b.body.mover().unwrap().waiting, 1);
 }
@@ -4533,6 +4555,7 @@ fn a_gather_takes_a_farm_but_no_other_building() {
     );
     let g = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .gather()
         .copied()
         .unwrap();
@@ -4563,8 +4586,9 @@ fn a_gather_takes_a_farm_but_no_other_building() {
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(802))
             .is_err()
     );
-    t.players[1].objects[ListIndex::new(3)].unmodelled_action =
-        Some(GenieError::unsupported("a pack"));
+    t.players[1].objects[ListIndex::new(3)]
+        .actions
+        .unmodelled_action = Some(GenieError::unsupported("a pack"));
     assert!(
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800))
             .is_err()
@@ -4626,6 +4650,7 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
     );
     let g = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .gather_mut()
         .unwrap();
     (g.target, g.point) = (None, Position::new(NO_POINT, NO_POINT, 0.0));
@@ -4643,8 +4668,8 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
     let mut hunt = crate::gathering::hunt::tests::hunting(600);
     hunt.task.resource = Some(attribute::WOOD);
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    v.actions.set_gather(None);
-    v.actions.set_hunt(Some(hunt));
+    v.actions.list.set_gather(None);
+    v.actions.list.set_hunt(Some(hunt));
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
@@ -4660,6 +4685,7 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
     };
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     v.actions
+        .list
         .set_build(Some(crate::construction::build::tests::started(
             object_id(10028),
             Position::new(10.5, 10.5, 0.0),
@@ -4672,8 +4698,8 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
         ask(DropOffBy::Build, true, false)
     );
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    v.actions.set_build(None);
-    v.actions.set_hunt(None);
+    v.actions.list.set_build(None);
+    v.actions.list.set_hunt(None);
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
@@ -4692,6 +4718,7 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
         .unwrap();
     let g = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .gather()
         .copied()
         .expect("the Gather");
@@ -4707,12 +4734,13 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
     t.players[1].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::WOOD);
     let before = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .gather()
         .copied();
     t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
         .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(v.actions.gather().copied(), before);
+    assert_eq!(v.actions.list.gather().copied(), before);
     let ai = v.combat.ai.as_ref().expect("the forager's unit AI");
     assert!(
         ai.notifies.iter().any(|n| n.kind == NotifyKind::OTHER_LOAD),
@@ -4722,6 +4750,7 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
     let mut t = foraging();
     let g = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .gather_mut()
         .unwrap();
     (g.target, g.point) = (None, Position::new(NO_POINT, NO_POINT, 0.0));
@@ -4733,7 +4762,7 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
     .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        v.actions.gather().map(|g| (g.carry_to, g.state)),
+        v.actions.list.gather().map(|g| (g.carry_to, g.state)),
         Some((Some(DropSiteId::new(object_id(700))), GatherState::Drop))
     );
     assert_eq!(v.combat.ai.as_ref().map(|ai| ai.orders.len()), Some(1));
@@ -4745,16 +4774,17 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
 fn a_drop_off_order_takes_a_hunt_to_its_site() {
     let mut t = foraging();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    v.actions.set_gather(None);
+    v.actions.list.set_gather(None);
     let mut hunt = crate::gathering::hunt::tests::hunting(600);
     hunt.task.resource = Some(AttributeId::numbered(17));
     // the sprites' table of the world holds none
     hunt.task.sprites = TaskSprites::NONE;
-    v.actions.set_hunt(Some(hunt));
+    v.actions.list.set_hunt(Some(hunt));
     t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
         .unwrap();
     let h = t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .hunt()
         .copied()
         .expect("the Hunt");
@@ -4773,8 +4803,9 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
 #[test]
 fn a_drop_off_order_fails_on_what_it_does_not_hold() {
     let mut t = foraging();
-    t.players[1].objects[ListIndex::new(0)].unmodelled_action =
-        Some(GenieError::unsupported("a test's action"));
+    t.players[1].objects[ListIndex::new(0)]
+        .actions
+        .unmodelled_action = Some(GenieError::unsupported("a test's action"));
     assert_eq!(
         t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
             .err()
@@ -4823,7 +4854,7 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
         )
         .unwrap();
         let unit = &t.players[1].objects[ListIndex::new(0)];
-        let state = unit.actions.attack().map(|a| a.state);
+        let state = unit.actions.list.attack().map(|a| a.state);
         let notifies = unit.combat.ai.as_ref().map(|ai| ai.notifies.len());
         let sprite = unit.sprite.map(|s| s.graphic.id);
         (state, unit.body.anim_speed(), sprite, notifies)
@@ -4907,7 +4938,7 @@ fn a_work_command_retargets_a_gather_or_a_hunt_on_its_task() {
         .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        (took, v.actions.gather().map(|g| g.target)),
+        (took, v.actions.list.gather().map(|g| g.target)),
         (true, Some(Some(object_id(601))))
     );
     let ai = v.combat.ai.as_ref().unwrap();
@@ -4930,7 +4961,7 @@ fn a_work_command_retargets_a_gather_or_a_hunt_on_its_task() {
     .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        v.actions.hunt().map(|h| h.target),
+        v.actions.list.hunt().map(|h| h.target),
         Some(Some(object_id(501)))
     );
     let ai = v.combat.ai.as_ref().unwrap();
@@ -5034,6 +5065,7 @@ fn a_work_command_s_task_is_retaken_by_the_action_on_top() {
     let mut t = crate::world::tests::forage_world();
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_move_to(Some(crate::movement::move_to::MoveToAction {
             sprite: None,
             state: crate::movement::move_to::MoveTo::Moving,
@@ -5063,6 +5095,7 @@ fn a_work_command_s_task_is_retaken_by_the_action_on_top() {
     };
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_build(Some(crate::construction::build::tests::started(
             object_id(10028),
             Position::new(30.0, 88.0, 0.0),
@@ -5104,6 +5137,7 @@ fn a_work_command_s_factory_starts_the_task_s_action() {
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
             .actions
+            .list
             .gather()
             .map(|g| (g.target, g.state)),
         Some((Some(object_id(600)), GatherState::Walk))

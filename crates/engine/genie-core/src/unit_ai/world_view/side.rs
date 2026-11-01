@@ -374,7 +374,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     }
 
     fn busy_now(&mut self) -> Result<bool, GenieError> {
-        Ok(self.unit.top_action_kind().is_some() || self.unit.unmodelled_action.is_some())
+        Ok(self.unit.top_action_kind().is_some() || self.unit.actions.unmodelled_action.is_some())
     }
 
     fn interruptible_now(&mut self) -> Result<bool, GenieError> {

@@ -473,14 +473,19 @@ impl Unit {
         me: Me,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        let Some(e) = self.actions.artifact_mut().and_then(|a| a.enter.take()) else {
+        let Some(e) = self
+            .actions
+            .list
+            .artifact_mut()
+            .and_then(|a| a.enter.take())
+        else {
             return Ok(());
         };
-        let own = self.actions.take_enter();
-        self.actions.set_enter(Some(e));
+        let own = self.actions.list.take_enter();
+        self.actions.list.set_enter(Some(e));
         let updated = self.enter_part(c, me);
-        let mut after = self.actions.take_enter();
-        self.actions.set_enter(own);
+        let mut after = self.actions.list.take_enter();
+        self.actions.list.set_enter(own);
         if updated? == HeadCode::Deletes
             && let Some(e) = after.take()
         {
@@ -489,7 +494,7 @@ impl Unit {
                 .tear_down(&mut self.body)?
                 .let_go(c, self, by)?;
         }
-        if let Some(art) = self.actions.artifact_mut() {
+        if let Some(art) = self.actions.list.artifact_mut() {
             if let Some(e) = after {
                 art.enter = Some(e);
             } else {
@@ -513,7 +518,7 @@ impl Unit {
         me: Me,
         by: Releaser,
     ) -> Result<Option<Handover>, GenieError> {
-        let Some(mut artifact) = self.actions.artifact().copied() else {
+        let Some(mut artifact) = self.actions.list.artifact().copied() else {
             return Ok(None);
         };
         let capture =
@@ -530,7 +535,7 @@ impl Unit {
         };
         // written back before an error too: the stop's context reads the list
         let new = artifact.update(c, self, me, &r);
-        if let Some(own) = self.actions.artifact_mut() {
+        if let Some(own) = self.actions.list.artifact_mut() {
             *own = artifact;
         }
         new

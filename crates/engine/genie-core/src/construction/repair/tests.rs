@@ -333,7 +333,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
         standing,
         &mut crate::math::rng::Well512::default(),
     ));
-    set(v.actions.repair_mut().unwrap());
+    set(v.actions.list.repair_mut().unwrap());
     t
 }
 
@@ -361,6 +361,7 @@ fn repaired(t: &mut crate::world::World) -> Result<HeadCode, GenieError> {
 fn repair_of(t: &crate::world::World) -> RepairAction {
     *t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .repair()
         .unwrap()
 }
@@ -518,7 +519,7 @@ fn a_repair_s_walk_to_its_point_shows_its_sprite_as_it_starts() {
         let mut t = repair_at(NEAR, |r| r.task = task);
         let v = &mut t.players[1].objects[ListIndex::new(0)];
         let mover = v.body.mover_mut();
-        let r = v.actions.repair_mut().unwrap();
+        let r = v.actions.list.repair_mut().unwrap();
         let g = graphics();
         let _ = r
             .take_point(Position::new(35.5, 95.5, 0.0), mover, &move_reads(&g))
@@ -670,6 +671,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .builders = crate::construction::BuilderCount::of_data(1);
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .repair_mut()
         .unwrap()
         .counted = true;
@@ -724,6 +726,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .builders = crate::construction::BuilderCount::of_data(1);
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .repair_mut()
         .unwrap()
         .counted = true;
@@ -804,6 +807,7 @@ fn a_move_sends_the_repairer_to_its_point() {
     let mut t = repair_at(NEAR, |a| *a = r);
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .repair_mut()
         .unwrap()
         .move_to = Some(MoveToAction::sub_in(MoveTo::Arrived));

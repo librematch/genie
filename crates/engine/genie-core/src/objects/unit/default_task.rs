@@ -21,7 +21,7 @@ impl Unit {
         {
             return Ok(false);
         }
-        if self.default_fly {
+        if self.actions.default_fly {
             let task = Master::default_task(self.master(&c.w.masters, c.player)?)
                 .copied()
                 .ok_or(GenieError::missing_data(
@@ -30,11 +30,12 @@ impl Unit {
             self.start_fly(c, task)?;
             return Ok(true);
         }
-        if std::mem::take(&mut self.default_make) {
+        if std::mem::take(&mut self.actions.default_make) {
             let task = Master::default_task(self.master(&c.w.masters, c.player)?)
                 .copied()
                 .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
             self.actions
+                .list
                 .set_make(Some(crate::gathering::make::MakeAction::start(
                     task,
                     &c.w.players.player(c.player)?.attributes,
@@ -42,15 +43,16 @@ impl Unit {
                 )));
             return Ok(true);
         }
-        if self.default_artifact {
+        if self.actions.default_artifact {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
             let moving = Master::default_task(self.master(&c.w.masters, c.player)?)
                 .and_then(|t| t.sprites.moving);
             self.actions
+                .list
                 .set_artifact(Some(Artifact::new(c.player == PlayerId::GAIA, moving)));
             return Ok(true);
         }
-        if let Some(e) = &self.default_task {
+        if let Some(e) = &self.actions.default_task {
             return Err(e.clone());
         }
         Ok(false)

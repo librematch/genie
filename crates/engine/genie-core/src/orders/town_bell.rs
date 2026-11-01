@@ -540,7 +540,7 @@ impl World {
         if unit.combat.town_bell.flag {
             return Ok(());
         }
-        if unit.unmodelled_action.is_some() {
+        if unit.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "a town-bell record of an action not held",
             ));
@@ -567,8 +567,8 @@ impl World {
         );
         let actions = &unit.actions;
         let target_class = match unit.top_action_kind() {
-            Some(HUNT) => actions.hunt().and_then(|h| h.target_class),
-            Some(GATHER) => actions.gather().and_then(|g| g.target_class),
+            Some(HUNT) => actions.list.hunt().and_then(|h| h.target_class),
+            Some(GATHER) => actions.list.gather().and_then(|g| g.target_class),
             _ => None,
         };
         let ai = unit.combat.ai.as_ref().ok_or(GenieError::unsupported(
@@ -794,6 +794,7 @@ mod tests {
                 .unwrap()
                 .1
                 .actions
+                .list
                 .enter()
                 .and_then(|e| e.target)
                 .map(crate::garrison::ContainerId::id)
@@ -924,7 +925,7 @@ mod tests {
             let goal = |t: &World, id: i32| {
                 let u = t.object(object_id(id)).unwrap().1;
                 (
-                    u.actions.move_to().copied().and_then(|m| m.goal()),
+                    u.actions.list.move_to().copied().and_then(|m| m.goal()),
                     u.combat.town_bell.flag,
                 )
             };
@@ -987,7 +988,7 @@ mod tests {
             let u = t.object(object_id(1001)).unwrap().1;
             assert_eq!(
                 (
-                    u.actions.move_to().copied().and_then(|m| m.goal()),
+                    u.actions.list.move_to().copied().and_then(|m| m.goal()),
                     u.combat.town_bell.flag
                 ),
                 (Some(Position::new(3.5, 3.5, 0.0)), false)

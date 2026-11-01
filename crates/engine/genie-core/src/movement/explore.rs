@@ -536,7 +536,7 @@ impl Unit {
     pub(crate) fn explore_to(&mut self, point: Point, c: &mut Step<'_>) -> Result<(), GenieError> {
         let at = Position::new(point.x(), point.y(), self.position().z());
         let walk = self.explore_move(c);
-        let owner = if let Some(e) = self.actions.explore_mut() {
+        let owner = if let Some(e) = self.actions.list.explore_mut() {
             let walked = e.move_to.is_some();
             let owner = e.take_point(at, &walk)?;
             if walked {
@@ -544,13 +544,13 @@ impl Unit {
             }
             owner
         } else {
-            if self.top_action().is_some() || self.unmodelled_action.is_some() {
+            if self.top_action().is_some() || self.actions.unmodelled_action.is_some() {
                 return Err(GenieError::unsupported(
                     "an Explore replacing another action",
                 ));
             }
             let (e, owner) = ExploreAction::new(at, &walk)?;
-            self.actions.set_explore(Some(e));
+            self.actions.list.set_explore(Some(e));
             owner
         };
         self.explore_owner(owner, c)

@@ -194,6 +194,7 @@ pub(crate) fn herded(others: OthersRef<'_>, id: ObjectId) -> bool {
     others.get(id).is_some_and(|u| {
         u.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE)
             && u.actions
+                .list
                 .artifact()
                 .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
     })

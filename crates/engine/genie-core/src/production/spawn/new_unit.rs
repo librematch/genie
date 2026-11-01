@@ -422,10 +422,13 @@ impl World {
             pasture: None,
             my_pasture: None,
             sprite: Some(sprite),
-            // livestock's default task, the Artifact, starts once its action list is empty
-            default_artifact: made
-                .default_task()
-                .is_some_and(|t| t.action_type == crate::ownership::artifact::ARTIFACT_TYPE),
+            actions: crate::objects::layers::ActionLayer {
+                // livestock's default task, the Artifact, starts once its action list is empty
+                default_artifact: made
+                    .default_task()
+                    .is_some_and(|t| t.action_type == crate::ownership::artifact::ARTIFACT_TYPE),
+                ..Default::default()
+            },
             ..Unit::default()
         });
         let idx = owner.objects.last_place().ok_or(NOTHING_PUSHED)?;

@@ -244,7 +244,7 @@ impl World {
     /// [`World::build_directly`]). True when the foundation was made.
     pub(crate) fn reseed(&mut self, p: PlayerId, idx: ListIndex) -> Result<bool, GenieError> {
         let unit = &self.players.live(p, idx)?;
-        let Some(gather) = unit.actions.gather().copied() else {
+        let Some(gather) = unit.actions.list.gather().copied() else {
             return Ok(false);
         };
         let farm = gather.farm;
@@ -384,7 +384,7 @@ impl World {
         let standing = self.master(p, master_id)?.standing_sprite;
         let computer = self.players.player(p)?.computer;
         let unit = self.players.live_mut(p, idx)?;
-        let Some(gather) = unit.actions.gather_mut() else {
+        let Some(gather) = unit.actions.list.gather_mut() else {
             return Ok(());
         };
         let stand = crate::gathering::hunt::stand_sprite(

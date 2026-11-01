@@ -173,6 +173,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let task_range = unit
             .actions
+            .list
             .build()
             .ok_or(GenieError::unreachable(
                 "a drop-off order without its Build",
@@ -201,11 +202,11 @@ impl World {
         // the Build's set_state(8) on the builder's step: its prelude leaves the builders, its
         // second targets and its notify go to the world and the unit AI at once
         self.run_on_step(p, idx, |unit, c| {
-            let mut build = *unit.actions.build().ok_or(GenieError::unreachable(
+            let mut build = *unit.actions.list.build().ok_or(GenieError::unreachable(
                 "a drop-off order without its Build",
             ))?;
             let dropped = build.set_drop(c, unit, search, by);
-            if let Some(b) = unit.actions.build_mut() {
+            if let Some(b) = unit.actions.list.build_mut() {
                 *b = build;
             }
             dropped

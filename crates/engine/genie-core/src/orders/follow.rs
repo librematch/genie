@@ -359,7 +359,7 @@ impl World {
             return Ok(true);
         }
         let unit = &self.players.live(player, idx)?;
-        if unit.unmodelled_action.is_some() {
+        if unit.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "a move to an object of a unit with an action",
             ));
@@ -420,7 +420,7 @@ impl World {
                 self.streams.get(Stream::Sprite),
             )?;
         }
-        unit.actions.set_move_to(Some(move_to));
+        unit.actions.list.set_move_to(Some(move_to));
         Ok(false)
     }
 
@@ -444,7 +444,7 @@ impl World {
         let Some(target) = target else {
             return self.point_taken(player, idx, point);
         };
-        if unit.unmodelled_action.is_some() {
+        if unit.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
             ));

@@ -507,10 +507,11 @@ impl EnterAction {
         unit: &mut Unit,
         f: impl FnOnce(&mut Unit) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        unit.actions.set_enter(Some(*self));
+        unit.actions.list.set_enter(Some(*self));
         let answer = f(unit);
         *self = *unit
             .actions
+            .list
             .enter()
             .ok_or(GenieError::unreachable("an Enter gone in its own update"))?;
         answer

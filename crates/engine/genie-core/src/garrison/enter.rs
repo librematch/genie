@@ -220,9 +220,13 @@ impl World {
         if sub {
             let by = self.releaser(player, idx)?;
             let unit = self.players.live_mut(player, idx)?;
-            let art = unit.actions.artifact_mut().ok_or(GenieError::unreachable(
-                "an Artifact on top without its action",
-            ))?;
+            let art = unit
+                .actions
+                .list
+                .artifact_mut()
+                .ok_or(GenieError::unreachable(
+                    "an Artifact on top without its action",
+                ))?;
             let gone = art.hold_enter(action);
             // the old Enter's teardown lets its target go before its MoveTo's stops the unit
             if let Some(t) = gone.released {
@@ -271,12 +275,13 @@ impl World {
                 self.players
                     .live_mut(player, idx)?
                     .actions
+                    .list
                     .set_enter(Some(action));
                 let entered = self.enter_now(player, idx, target);
                 if sub {
                     let unit = self.players.live_mut(player, idx)?;
-                    let e = unit.actions.take_enter();
-                    if let (Some(e), Some(art)) = (e, unit.actions.artifact_mut()) {
+                    let e = unit.actions.list.take_enter();
+                    if let (Some(e), Some(art)) = (e, unit.actions.list.artifact_mut()) {
                         art.enter = Some(e);
                     }
                 }

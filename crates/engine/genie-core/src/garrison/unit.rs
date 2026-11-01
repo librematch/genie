@@ -58,12 +58,12 @@ impl Unit {
     ///
     /// The reads' and the update's.
     pub(crate) fn enter_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let Some(mut enter) = self.actions.enter().copied() else {
+        let Some(mut enter) = self.actions.list.enter().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.enter_reads(c, &enter)?;
         let updated = enter.update(c, self, me, &reads);
-        if let Some(e) = self.actions.enter_mut() {
+        if let Some(e) = self.actions.list.enter_mut() {
             *e = enter;
         }
         updated
@@ -181,6 +181,7 @@ impl Unit {
     ) -> Result<HeadCode, GenieError> {
         let mut t = *self
             .actions
+            .list
             .transport()
             .ok_or(crate::garrison::transport::NO_TRANSPORT)?;
         let master = object_master(
@@ -201,7 +202,7 @@ impl Unit {
         };
         // written back before an error too: the stop's context reads the list
         let code = t.update(c, self, me, &reads);
-        if let Some(own) = self.actions.transport_mut() {
+        if let Some(own) = self.actions.list.transport_mut() {
             *own = t;
         }
         Ok(HeadCode::of(code?))
@@ -223,6 +224,7 @@ impl Unit {
         let master = self.master_in(masters)?;
         let task = self
             .actions
+            .list
             .transport()
             .ok_or(GenieError::unreachable("a sail without its Transport"))?
             .task;
@@ -238,6 +240,7 @@ impl Unit {
         )?;
         let t = self
             .actions
+            .list
             .transport_mut()
             .ok_or(GenieError::unreachable("a sail without its Transport"))?;
         let changed = t.move_to(point, &ship, &mut shore)?;
@@ -254,9 +257,9 @@ impl Unit {
 
     /// The unit's new Enter: its own action, or with `sub` the sub-action of its Artifact on top.
     pub(crate) fn place_enter(&mut self, action: crate::garrison::EnterAction, sub: bool) {
-        match self.actions.artifact_mut().filter(|_| sub) {
+        match self.actions.list.artifact_mut().filter(|_| sub) {
             Some(art) => art.enter = Some(action),
-            None => self.actions.set_enter(Some(action)),
+            None => self.actions.list.set_enter(Some(action)),
         }
     }
 
@@ -286,6 +289,7 @@ impl Unit {
     ) -> Result<(), GenieError> {
         let enter = self
             .actions
+            .list
             .enter_mut()
             .ok_or(GenieError::unsupported("an entered unit without its Enter"))?;
         if enter.move_to.take().is_some()
@@ -604,10 +608,10 @@ impl Unit {
     /// default task instead: livestock inside makes its Artifact in one update and loses it in
     /// the next.
     pub(crate) fn inside_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        if !self.actions.is_empty() {
+        if !self.actions.list.is_empty() {
             return self.end_head_update(c, HeadCode::Deletes);
         }
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "the inside update of an action the slice does not hold",
             ));

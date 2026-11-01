@@ -59,7 +59,7 @@ impl World {
             .ok_or(crate::construction::build::NOT_HELD)?;
         let to = crate::movement::move_to::WalkTo { at, ..to };
         let unit = self.players.live_mut(player, idx)?;
-        let (targets, gone) = match unit.actions.artifact_mut() {
+        let (targets, gone) = match unit.actions.list.artifact_mut() {
             Some(a) => a.take_object(to, (to_building, to_town_centre), &reads)?,
             None => Default::default(),
         };
@@ -259,7 +259,7 @@ impl World {
             {
                 continue;
             }
-            if unit.unmodelled_action.is_some() {
+            if unit.actions.unmodelled_action.is_some() {
                 return Err(GenieError::unsupported(
                     "a UNIT_ORDER drop-off of an action not held",
                 ));
@@ -287,14 +287,17 @@ impl World {
         let found = match top {
             Some(crate::gathering::gather::GATHER) => unit
                 .actions
+                .list
                 .gather()
                 .map(|g| (DropOffBy::Gather, g.target, g.point, g.task.resource)),
             Some(action_type::BUILD) => unit
                 .actions
+                .list
                 .build()
                 .map(|b| (DropOffBy::Build, b.target, b.point, b.task.resource)),
             Some(HUNT) => unit
                 .actions
+                .list
                 .hunt()
                 .map(|h| (DropOffBy::Hunt, h.target, h.point, h.task.resource)),
             _ => None,

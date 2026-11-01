@@ -231,7 +231,7 @@ impl World {
             }
             let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
             let held = u.life.amount;
-            let Some(make) = u.actions.make_mut() else {
+            let Some(make) = u.actions.list.make_mut() else {
                 continue;
             };
             let f = (held + make.remaining).get();

@@ -1821,7 +1821,7 @@ fn a_hunt_of_a_tree_searches_on_a_failed_walk_or_a_target_let_go() {
             target_class: class_of(15),
             ..crate::unit_ai::UnitAi::default()
         });
-        rig.unit_mut().actions.set_hunt(Some(HuntAction {
+        rig.unit_mut().actions.list.set_hunt(Some(HuntAction {
             state: HuntState::Walk,
             move_to: Some(to_house(move_to, Distance::ZERO)),
             ..hunting(-1)

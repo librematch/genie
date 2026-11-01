@@ -2350,7 +2350,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     let mut attack = own_attack(-1, AttackState::Done, Distance::ZERO);
     attack.arms.idle_sprite = Some(stand);
-    centre.actions.set_attack(Some(attack));
+    centre.actions.list.set_attack(Some(attack));
     // its unit AI on the attack's action, which takes the Attack's invalidation
     centre.combat.ai = Some(UnitAi {
         current_action: Some(ActionKind::Attack),
@@ -2362,7 +2362,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     })
     .unwrap();
     let centre = &t.players[1].objects[ListIndex::new(2)];
-    assert_eq!(centre.actions.attack().copied(), None);
+    assert_eq!(centre.actions.list.attack().copied(), None);
     assert_eq!(
         (
             centre.sprite.map(|s| s.graphic.id),
@@ -2379,6 +2379,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     let mut t = forage_world();
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_attack(Some(own_attack(77, AttackState::Done, Distance::ZERO)));
     let r = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
         let code = u.attack_part(c, me(object_id(9175)), None)?;
@@ -2426,6 +2427,7 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
     let mut t = archer_world(100, 0, 0.0);
     let mut a = *t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .attack()
         .unwrap();
     a.pending = true;
@@ -2527,6 +2529,7 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
     let mut t = crate::world::tests::archer_world(100, 0, 0.0);
     let mut a = *t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .attack()
         .unwrap();
     (a.pending, a.state) = (true, AttackState::Swing);

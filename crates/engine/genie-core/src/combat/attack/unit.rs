@@ -37,7 +37,7 @@ impl Unit {
         me: Me,
         own: Option<Victim>,
     ) -> Result<HeadCode, GenieError> {
-        match self.actions.attack().map(|a| a.target) {
+        match self.actions.list.attack().map(|a| a.target) {
             None => Ok(HeadCode::Keeps),
             Some(None) => self.attack_lost_part(c, me),
             Some(_) => self.attack_strike_part(c, me, own),
@@ -53,12 +53,13 @@ impl Unit {
         let master_class = master.class;
         let walking = self
             .actions
+            .list
             .attack()
             .is_some_and(|a| matches!(a.state, AttackState::GotoSeen | AttackState::GotoPoint));
         if walking && armed {
             return self.attack_walks_unseen(c, me, master_class);
         }
-        let attack = self.actions.attack_mut().ok_or(NO_ATTACK)?;
+        let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let (code, disarmed) = attack.update_targetless(c.dt.seconds(), armed, &mut self.body)?;
         if disarmed {
             let posted = attack.disarmed(
@@ -81,7 +82,7 @@ impl Unit {
         me: Me,
         master_class: ClassId,
     ) -> Result<HeadCode, GenieError> {
-        let mut attack = *self.actions.attack().ok_or(NO_ATTACK)?;
+        let mut attack = *self.actions.list.attack().ok_or(NO_ATTACK)?;
         let master = self.master(&c.w.masters, c.player)?;
         let computer =
             c.w.players
@@ -95,7 +96,7 @@ impl Unit {
             (computer, c.w.world_time),
         );
         let code = attack.update_gone(c, self, me, &r, master_class);
-        if let Some(a) = self.actions.attack_mut() {
+        if let Some(a) = self.actions.list.attack_mut() {
             *a = attack;
         }
         Ok(HeadCode::of(code?))
@@ -111,7 +112,7 @@ impl Unit {
         me: Me,
         own: Option<Victim>,
     ) -> Result<HeadCode, GenieError> {
-        let mut attack = *self.actions.attack().ok_or(NO_ATTACK)?;
+        let mut attack = *self.actions.list.attack().ok_or(NO_ATTACK)?;
         let master = object_master(
             self.own_master.as_deref(),
             (self.id, self.life.master_id),
@@ -135,7 +136,7 @@ impl Unit {
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
         let code = attack.update(c, self, me, &mut f, &r);
-        if let Some(a) = self.actions.attack_mut() {
+        if let Some(a) = self.actions.list.attack_mut() {
             *a = attack;
         }
         let code = code?;
@@ -171,7 +172,7 @@ impl Unit {
     /// The hunter or the attacker as a combat object, which its hits read and change: none for a
     /// unit without a Hunt or an Attack, or without its master.
     pub(crate) fn own_victim(&self, c: &Step<'_>) -> Result<Option<Victim>, GenieError> {
-        if self.actions.hunt().is_none() && self.actions.attack().is_none() {
+        if self.actions.list.hunt().is_none() && self.actions.list.attack().is_none() {
             return Ok(None);
         }
         let master = self.master(&c.w.masters, c.player)?;

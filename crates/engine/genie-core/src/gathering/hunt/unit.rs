@@ -39,6 +39,7 @@ impl Unit {
     pub(crate) fn hunt_set_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let hunt = self
             .actions
+            .list
             .hunt_mut()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
         if hunt.target_class != Some(class::PREDATOR) {
@@ -55,6 +56,7 @@ impl Unit {
     pub(crate) fn hunt_search_state(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let hunt = self
             .actions
+            .list
             .hunt_mut()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let task = hunt.task;
@@ -125,7 +127,11 @@ impl Unit {
     /// found 0, and the hunt's class goes (−1).
     pub(crate) fn hunt_search_notify(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let others = OthersRef::of(&c.w.players, c.player)?;
-        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = self
+            .actions
+            .list
+            .hunt()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
         let master = self.master(&c.w.masters, c.player)?;
         let site = if let Some(carry) = carry_to {
@@ -152,6 +158,7 @@ impl Unit {
             match site {
                 None => {
                     self.actions
+                        .list
                         .hunt_mut()
                         .ok_or(crate::gathering::hunt::NO_HUNT)?
                         .target_class = None;
@@ -190,6 +197,7 @@ impl Unit {
         let _ = self.master(&c.w.masters, c.player)?;
         if self
             .actions
+            .list
             .hunt()
             .ok_or(crate::gathering::hunt::NO_HUNT)?
             .target
@@ -212,7 +220,11 @@ impl Unit {
     /// with the hunter's engagement and arms). A chase that starts arrived, or fails, is not
     /// modelled.
     fn hunt_back_to_target(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = self
+            .actions
+            .list
+            .hunt()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let master = self.master(&c.w.masters, c.player)?;
         let v = victim(c, hunt.target)?.ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold live",
@@ -250,6 +262,7 @@ impl Unit {
         let arms = crate::combat::attack::arms(master, &c.w.graphics, hunt.task.sprites, moving);
         let hunt = self
             .actions
+            .list
             .hunt_mut()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let site = hunt.carry_to.take();
@@ -258,7 +271,8 @@ impl Unit {
             crate::world::lets::release(c, self, site, by)?;
         }
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
-        let (Some(hunt), Some(mover)) = (self.actions.hunt_mut(), self.body.mover_mut()) else {
+        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -319,7 +333,11 @@ impl Unit {
         &mut self,
         c: &mut Step<'_>,
     ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
-        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = self
+            .actions
+            .list
+            .hunt()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let ai = self.combat.ai.as_ref().ok_or(GenieError::unsupported(
             "a hunt without a unit AI after its drop-off",
         ))?;
@@ -390,6 +408,7 @@ impl Unit {
             group: self.group.id,
             action_state: ActionState::new(
                 self.actions
+                    .list
                     .hunt()
                     .ok_or(crate::gathering::hunt::NO_HUNT)?
                     .state
@@ -451,6 +470,7 @@ impl Unit {
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
         let hunt = self
             .actions
+            .list
             .hunt_mut()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
         if hunt.point.x() == -1.0 || hunt.point.y() == -1.0 {
@@ -519,15 +539,20 @@ impl Unit {
             them,
             c.w.world_time,
         )?;
-        let (sprites, moving) = self.actions.hunt().map_or((TaskSprites::NONE, None), |h| {
-            let moving = h.task.walk_sprite_id(self.life.held());
-            (h.task.sprites, moving)
-        });
+        let (sprites, moving) = self
+            .actions
+            .list
+            .hunt()
+            .map_or((TaskSprites::NONE, None), |h| {
+                let moving = h.task.walk_sprite_id(self.life.held());
+                (h.task.sprites, moving)
+            });
         let arms = crate::combat::attack::arms(master, &c.w.graphics, sprites, moving);
         let drops_here = master.drop_sites.contains(&t.life.master_id);
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
         let by = self.releaser(c)?;
-        let (Some(hunt), Some(mover)) = (self.actions.hunt_mut(), self.body.mover_mut()) else {
+        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -561,6 +586,7 @@ impl Unit {
     fn hunt_failed_sprite(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let failed = self
             .actions
+            .list
             .hunt()
             .is_some_and(|h| h.state == HuntState::Failed);
         if !failed {

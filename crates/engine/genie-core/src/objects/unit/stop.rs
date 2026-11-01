@@ -58,7 +58,7 @@ impl Unit {
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "a unit AI's stop of an action list the slice does not model",
             ));
@@ -119,7 +119,10 @@ impl Unit {
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        let torn = self.actions.delete_all(&mut self.body, self.life.state)?;
+        let torn = self
+            .actions
+            .list
+            .delete_all(&mut self.body, self.life.state)?;
         releases.extend(torn.releases.into_iter().map(|t| (t, by)));
         builder_leaves.extend(torn.builder_leaves);
         Ok(())
@@ -136,7 +139,10 @@ impl Unit {
     /// The deletion's, and what it lets go.
     pub(crate) fn delete_own_head(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
-        let torn = self.actions.delete_head(&mut self.body, self.life.state)?;
+        let torn = self
+            .actions
+            .list
+            .delete_head(&mut self.body, self.life.state)?;
         torn.let_go(c, self, by)
     }
 

@@ -211,6 +211,7 @@ fn import_artifact(
         .map(|s| saved_move_to(s, saved.graphics, quiet))
         .transpose()?;
     unit.actions
+        .list
         .set_artifact(Some(genie_core::ownership::artifact::Artifact {
             state: genie_core::ownership::artifact::ArtifactState::of_byte(base.state)?,
             timer: Seconds::new(base.timer),
@@ -232,7 +233,7 @@ fn import_artifact(
 /// A `MoveTo` of its own (type 1): its state, goal, range, sprite and wait; not quiet.
 fn import_move_to(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> {
     let move_to = saved_move_to(saved.action, saved.graphics, false)?;
-    unit.actions.set_move_to(Some(move_to));
+    unit.actions.list.set_move_to(Some(move_to));
     Ok(())
 }
 
@@ -318,6 +319,7 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
         step: Offset::new(moving.velocity_x, moving.velocity_y, moving.velocity_z),
     });
     unit.actions
+        .list
         .set_missile(Some(genie_core::combat::missile::MissileAction {
             state: genie_core::combat::missile::MissileState::of_byte(base.state)?,
             target: ObjectId::of_field(base.target_id),
@@ -352,7 +354,7 @@ fn import_fly(
         ))?
         .map(|s| saved_move_to(s, saved.graphics, false))
         .transpose()?;
-    unit.actions.set_fly(Some(Fly {
+    unit.actions.list.set_fly(Some(Fly {
         state: genie_core::movement::fly::FlyState::of_byte(base.state)?,
         timer: Seconds::new(base.timer),
         move_to,
@@ -376,7 +378,7 @@ fn import_build(
         .transpose()?;
     let mut task = work(saved.s.master_obj)?;
     task.work_rate += unit.combat.work_rate_powerup;
-    unit.actions.set_build(Some(BuildAction {
+    unit.actions.list.set_build(Some(BuildAction {
         target: ObjectId::of_field(base.target_id),
         state: genie_core::construction::build::BuildState::of_byte(base.state)?,
         move_to,
@@ -412,6 +414,7 @@ fn import_repair(
         .transpose()?;
     let t = saved.task(task_at)?;
     unit.actions
+        .list
         .set_repair(Some(genie_core::construction::repair::RepairAction {
             target: ObjectId::of_field(base.target_id),
             state: genie_core::construction::repair::RepairState::of_byte(base.state)?,
@@ -462,7 +465,7 @@ fn import_enter(saved: &Saved<'_>, task_at: TaskAt<'_>, unit: &mut Unit) -> Resu
             "a saved Enter in a state the slice does not model",
         ))?;
     let task = saved.task(task_at)?;
-    unit.actions.set_enter(Some(EnterAction {
+    unit.actions.list.set_enter(Some(EnterAction {
         target: ContainerId::of_field(base.target_id),
         state,
         move_to,
@@ -485,6 +488,7 @@ fn import_transport(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError
         "a saved Transport with another sub-action",
     ))?;
     unit.actions
+        .list
         .set_transport(Some(genie_core::garrison::transport::TransportAction {
             state: genie_core::garrison::transport::TransportState::of_byte(base.state)?,
             mode: genie_core::garrison::transport::TransportMode::of_data(base.target2_id),
@@ -518,6 +522,7 @@ fn import_explore(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
             "a saved Explore in a state the slice does not model",
         ))?;
     unit.actions
+        .list
         .set_explore(Some(genie_core::movement::explore::ExploreAction {
             state,
             point: saved.point(),
@@ -529,6 +534,7 @@ fn import_explore(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
 /// The Attack (9) of its own; it reads and changes the unit's sprite from here on.
 fn import_attack(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> {
     unit.actions
+        .list
         .set_attack(Some(saved_attack(saved.action, saved.graphics)?));
     unit.sprite = saved.graphics.and_then(|g| saved_sprite(saved.s, g));
     Ok(())
@@ -560,7 +566,7 @@ fn import_wait_solidify(
     wait.set_state(
         genie_core::construction::wait_solidify::WaitSolidifyState::of_byte(saved.base.state)?,
     );
-    unit.actions.set_wait_solidify(Some(wait));
+    unit.actions.list.set_wait_solidify(Some(wait));
     Ok(())
 }
 

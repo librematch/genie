@@ -66,6 +66,7 @@ impl UnitView<'_, '_> {
         };
         if unit
             .actions
+            .list
             .attack()
             .is_some_and(|a| a.target == Some(target))
         {
@@ -137,7 +138,7 @@ impl UnitView<'_, '_> {
         };
         let unit = &mut *self.unit;
         let (attack, posted) = crate::combat::attack::Attack::command(self.c, unit, &cmd)?;
-        unit.actions.set_attack(Some(attack));
+        unit.actions.list.set_attack(Some(attack));
         self.take(target, by)?;
         Ok(crate::unit_ai::Attacked {
             attacks: true,
@@ -174,7 +175,7 @@ impl UnitView<'_, '_> {
             self.c.w.streams.get(Stream::Sprite),
         )?;
         let target = attack.target;
-        unit.actions.set_attack(Some(attack));
+        unit.actions.list.set_attack(Some(attack));
         if let Some(target) = target {
             self.take(target, by)?;
         }
@@ -249,6 +250,7 @@ impl UnitView<'_, '_> {
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE;
         let attack = unit
             .actions
+            .list
             .attack_mut()
             .ok_or(crate::combat::attack::unit::NO_ATTACK)?;
         let w = attack.work(Some(target_mark), main, &wielder, |_| can_move);

@@ -55,7 +55,7 @@ impl Unit {
     ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
         self.gather_check_targets(c, by)?;
-        let gather = *self.actions.gather().ok_or(NO_GATHER)?;
+        let gather = *self.actions.list.gather().ok_or(NO_GATHER)?;
         let reads = self.gather_reads(c, &gather)?;
         if gather.state == crate::gathering::gather::GatherState::Drop {
             return self.gather_drop_update(c, me, gather, &reads, by);
@@ -65,7 +65,7 @@ impl Unit {
 
     /// The Gather's copy `gather` back in the action list, as its update left it.
     fn put_gather(&mut self, gather: crate::gathering::gather::GatherAction) {
-        if let Some(g) = self.actions.gather_mut() {
+        if let Some(g) = self.actions.list.gather_mut() {
             *g = gather;
         }
     }
@@ -74,7 +74,7 @@ impl Unit {
     /// past state 6 is let go and goes (one the slice holds but cannot read is not modelled); a
     /// second target ([`second_target_checked`]) alike.
     fn gather_check_targets(&mut self, c: &mut Step<'_>, by: Releaser) -> Result<(), GenieError> {
-        let target = self.actions.gather().ok_or(NO_GATHER)?.target;
+        let target = self.actions.list.gather().ok_or(NO_GATHER)?.target;
         if target.is_some() {
             let state = readable(c, target)?.map(|(_, u, _)| u.life.state);
             let gone = match state {
@@ -90,10 +90,10 @@ impl Unit {
                 if state.is_some() {
                     crate::world::lets::release(c, self, target, by)?;
                 }
-                self.actions.gather_mut().ok_or(NO_GATHER)?.target = None;
+                self.actions.list.gather_mut().ok_or(NO_GATHER)?.target = None;
             }
         }
-        let site = self.actions.gather().ok_or(NO_GATHER)?.carry_to;
+        let site = self.actions.list.gather().ok_or(NO_GATHER)?.carry_to;
         let held = c.w.spatial.get(site).is_some();
         let (kept, let_go) = second_target_checked(
             site,
@@ -103,7 +103,7 @@ impl Unit {
                 OthersRef::of(&c.w.players, c.player)?,
             ),
         );
-        self.actions.gather_mut().ok_or(NO_GATHER)?.carry_to = kept;
+        self.actions.list.gather_mut().ok_or(NO_GATHER)?.carry_to = kept;
         if let Some(t) = let_go {
             crate::world::lets::release(c, self, t, by)?;
         }
@@ -268,14 +268,14 @@ impl Unit {
         radius: Footprint,
     ) -> Result<HeadCode, GenieError> {
         c.give_load(kind, amount)?;
-        let gather = self.actions.gather().ok_or(NO_GATHER)?;
+        let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
         if gather.target.is_none() {
             return self.gather_after_drop(c);
         }
         crate::world::lets::release(c, self, gather.carry_to, by)?;
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
-        let gather = self.actions.gather_mut().ok_or(NO_GATHER)?;
+        let gather = self.actions.list.gather_mut().ok_or(NO_GATHER)?;
         gather.carry_to = None;
         let t =
             c.w.spatial
@@ -344,7 +344,7 @@ impl Unit {
         if next == Next::Done {
             return Ok(HeadCode::Deletes);
         }
-        if let Some(g) = self.actions.gather() {
+        if let Some(g) = self.actions.list.gather() {
             for (old, new) in [
                 (old_target, g.target),
                 (
@@ -362,7 +362,7 @@ impl Unit {
             Next::Search => self.gather_search(c)?,
             Next::Build => {
                 // a build command on no foundation does nothing
-                if let Some(target) = self.actions.gather().and_then(|g| g.target) {
+                if let Some(target) = self.actions.list.gather().and_then(|g| g.target) {
                     c.lend_at(self, |w, p, i| {
                         w.build_command(p, i, crate::construction::FoundationId::new(target))
                             .map(drop)
@@ -384,7 +384,7 @@ impl Unit {
     /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
     pub(crate) fn gather_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let others = OthersRef::of(&c.w.players, c.player)?;
-        let gather = self.actions.gather().ok_or(NO_GATHER)?;
+        let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
         let master = self.master(&c.w.masters, c.player)?;
         let site = if let Some(carry) = carry_to {

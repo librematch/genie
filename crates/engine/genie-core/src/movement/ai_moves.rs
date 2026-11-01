@@ -99,7 +99,11 @@ impl Unit {
         }
         if !m.force
             && self.top_action_kind() == Some(crate::movement::move_to::MOVE_TO)
-            && self.actions.move_to().is_some_and(|mt| mt.point == m.point)
+            && self
+                .actions
+                .list
+                .move_to()
+                .is_some_and(|mt| mt.point == m.point)
         {
             return Ok(false);
         }
@@ -130,7 +134,7 @@ impl Unit {
         if move_to.shows_standing() {
             self.shows_standing_sprite(masters, graphics, sprite_rng)?;
         }
-        self.actions.set_move_to(Some(move_to));
+        self.actions.list.set_move_to(Some(move_to));
         Ok(false)
     }
 
@@ -159,7 +163,7 @@ impl Unit {
         masters: Option<&Masters>,
         graphics: &crate::objects::Graphics,
     ) -> Result<PointMove, GenieError> {
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
             ));
@@ -227,7 +231,7 @@ impl Unit {
         sprites: &SpriteReads<'_>,
     ) -> Result<PointMove, GenieError> {
         let reads = MoveToReads::with_sprites(*sprites, self);
-        let gone = match self.actions.artifact_mut() {
+        let gone = match self.actions.list.artifact_mut() {
             Some(a) => a.take_point(point, &reads)?,
             None => crate::ownership::artifact::SubActionsGone::default(),
         };
@@ -252,7 +256,8 @@ impl Unit {
     ) -> Result<PointMove, GenieError> {
         let my_pasture = self.my_pasture;
         let walks = Walks::of(sprites, self);
-        let (Some(hunt), Some(mover)) = (self.actions.hunt_mut(), self.body.mover_mut()) else {
+        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -284,7 +289,8 @@ impl Unit {
         sprites: SpriteReads<'_>,
     ) -> Result<PointMove, GenieError> {
         let walks = Walks::of(sprites, self);
-        let (Some(gather), Some(mover)) = (self.actions.gather_mut(), self.body.mover_mut()) else {
+        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), self.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -306,6 +312,7 @@ impl Unit {
     ) -> Result<PointMove, GenieError> {
         let repair = self
             .actions
+            .list
             .repair_mut()
             .ok_or(GenieError::unreachable("a Repair head without its Repair"))?;
         let (old, counted) = repair.take_point(point, self.body.mover_mut(), move_reads)?;
@@ -325,7 +332,7 @@ impl Unit {
         range: Distance,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit with an action",
             ));
@@ -372,7 +379,7 @@ impl Unit {
                 c.w.streams.get(Stream::Sprite),
             )?;
         }
-        self.actions.set_move_to(Some(move_to));
+        self.actions.list.set_move_to(Some(move_to));
         Ok(())
     }
 
@@ -396,7 +403,7 @@ impl Unit {
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
-        let Some(m) = self.actions.move_to_mut() else {
+        let Some(m) = self.actions.list.move_to_mut() else {
             return Ok(());
         };
         m.state = m.wait.give_up(waits, stance);

@@ -34,8 +34,11 @@ fn a_top_target_below_minus_one_is_none() {
     use crate::world::Player;
     let hunter = |target: i32| Unit {
         id: object_id(5),
-        actions: ActionList::default()
-            .with_hunt(Some(crate::gathering::hunt::tests::hunting(target))),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default()
+                .with_hunt(Some(crate::gathering::hunt::tests::hunting(target))),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let held = |id: i32| Unit {

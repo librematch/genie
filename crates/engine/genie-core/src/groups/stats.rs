@@ -438,7 +438,7 @@ impl World {
         let (p, u) = self.object(view.id).ok_or_else(|| member_gone(view.id))?;
         // The types of action objects (`RGE_Action_Object`), whose action list slot 0x538 reads.
         if u.master(&self.masters, p)?.kind >= ACTION {
-            if let Some(e) = u.unmodelled_action.clone() {
+            if let Some(e) = u.actions.unmodelled_action.clone() {
                 return Err(e);
             }
             if u.top_action_kind() == Some(crate::combat::attack::ATTACK) {

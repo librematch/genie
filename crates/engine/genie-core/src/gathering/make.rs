@@ -167,11 +167,11 @@ impl MakeAction {
 impl Unit {
     /// A farm's Make in its update ([`MakeAction::update`]) and its code: nothing without one.
     pub(crate) fn make_part(&mut self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
-        let Some(mut make) = self.actions.make().copied() else {
+        let Some(mut make) = self.actions.list.make().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let made = make.update(c, self);
-        if let Some(m) = self.actions.make_mut() {
+        if let Some(m) = self.actions.list.make_mut() {
             *m = make;
         }
         made
@@ -244,7 +244,7 @@ mod tests {
             },
             ..Unit::default()
         };
-        farm.actions.set_make(Some(make));
+        farm.actions.list.set_make(Some(make));
         let owner = Player {
             objects: vec![farm].into(),
             attributes: attributes(),
@@ -279,7 +279,7 @@ mod tests {
         let farm = &t.players[1].objects[ListIndex::new(0)];
         (
             code,
-            *farm.actions.make().unwrap(),
+            *farm.actions.list.make().unwrap(),
             farm.life.amount.get(),
             farm.life.hp.get(),
         )

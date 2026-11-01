@@ -1133,6 +1133,7 @@ fn a_farm_food_change_grows_the_farms_food() {
     farm.life.amount = Amount::new(75.0);
     farm.building.construction = Some(built());
     farm.actions
+        .list
         .set_make(Some(crate::gathering::make::MakeAction {
             state: MakeState::Done,
             remaining: Amount::new(100.0),
@@ -1165,6 +1166,7 @@ fn a_farm_food_change_grows_the_farms_food() {
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
+            .list
             .make()
             .copied()
             .unwrap()
@@ -2012,7 +2014,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         u
     };
     let mut exploring = shown(3, 0);
-    exploring.actions.set_explore(Some(
+    exploring.actions.list.set_explore(Some(
         crate::movement::explore::ExploreAction::new(
             Position::new(5.0, 5.0, 0.0),
             &crate::movement::explore::bare_walk(),

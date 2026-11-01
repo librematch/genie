@@ -247,9 +247,12 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     };
     let gather = add(Unit {
         id: object_id(30),
-        actions: ActionList::default().with_gather(Some(
-            crate::gathering::gather::GatherAction::new(task, &bush, false, rate).unwrap(),
-        )),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_gather(Some(
+                crate::gathering::gather::GatherAction::new(task, &bush, false, rate).unwrap(),
+            )),
+            ..Default::default()
+        },
         ..Unit::default()
     });
     let build_task = crate::construction::build::BuildTask {
@@ -262,14 +265,17 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     };
     let build = add(Unit {
         id: object_id(31),
-        actions: ActionList::default().with_build(Some(
-            crate::construction::build::tests::started_on(
-                None,
-                Position::new(3.5, 3.5, 0.0),
-                Distance::new(1.0),
-                build_task,
-            ),
-        )),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_build(Some(
+                crate::construction::build::tests::started_on(
+                    None,
+                    Position::new(3.5, 3.5, 0.0),
+                    Distance::new(1.0),
+                    build_task,
+                ),
+            )),
+            ..Default::default()
+        },
         ..Unit::default()
     });
     let repair_task = crate::construction::repair::RepairTask {
@@ -280,29 +286,32 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     };
     let repair = add(Unit {
         id: object_id(32),
-        actions: ActionList::default().with_repair(Some(
-            crate::construction::repair::RepairAction::start(
-                crate::movement::move_to::WalkTo {
-                    id: None,
-                    at: Position::new(3.5, 3.5, 0.0),
-                    gap: Distance::new(crate::movement::move_to::NO_TARGET_GAP),
-                    state: None,
-                },
-                repair_task,
-                Distance::ZERO,
-                &crate::movement::move_to::MoveToReads {
-                    sprites: crate::movement::move_to::SpriteReads {
-                        defaults: crate::movement::move_to::MoveDefaults::default(),
-                        graphics: &Graphics::new(),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_repair(Some(
+                crate::construction::repair::RepairAction::start(
+                    crate::movement::move_to::WalkTo {
+                        id: None,
+                        at: Position::new(3.5, 3.5, 0.0),
+                        gap: Distance::new(crate::movement::move_to::NO_TARGET_GAP),
+                        state: None,
                     },
-                    state: ObjectState::Alive,
-                    speed: Speed::new(1.0),
-                    at: Position::new(3.5, 3.5, 0.0),
-                    ground: Footprint::new(0.2, 0.2),
-                },
-            )
-            .unwrap(),
-        )),
+                    repair_task,
+                    Distance::ZERO,
+                    &crate::movement::move_to::MoveToReads {
+                        sprites: crate::movement::move_to::SpriteReads {
+                            defaults: crate::movement::move_to::MoveDefaults::default(),
+                            graphics: &Graphics::new(),
+                        },
+                        state: ObjectState::Alive,
+                        speed: Speed::new(1.0),
+                        at: Position::new(3.5, 3.5, 0.0),
+                        ground: Footprint::new(0.2, 0.2),
+                    },
+                )
+                .unwrap(),
+            )),
+            ..Default::default()
+        },
         ..Unit::default()
     });
     let mut attack =
@@ -318,14 +327,20 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     });
     let attack = add(Unit {
         id: object_id(33),
-        actions: ActionList::default().with_attack(Some(attack)),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_attack(Some(attack)),
+            ..Default::default()
+        },
         body: crate::objects::layers::Body::Moving(crate::gathering::hunt::tests::walker()),
         ..Unit::default()
     });
     let artifact = add(Unit {
         id: object_id(34),
-        actions: ActionList::default()
-            .with_artifact(Some(crate::ownership::artifact::Artifact::new(false, None))),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default()
+                .with_artifact(Some(crate::ownership::artifact::Artifact::new(false, None))),
+            ..Default::default()
+        },
         ..Unit::default()
     });
     assert_eq!(
@@ -352,23 +367,26 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     assert_eq!(t.halt_other(PlayerId::new(1), artifact, kind), Ok(true));
     let objects = &t.players[1].objects;
     assert_eq!(
-        objects[gather].actions.gather().map(|g| g.state),
+        objects[gather].actions.list.gather().map(|g| g.state),
         Some(GatherState::Idle)
     );
     assert_eq!(
-        objects[build].actions.build().map(|b| b.state),
+        objects[build].actions.list.build().map(|b| b.state),
         Some(BuildState::Halted)
     );
     assert_eq!(
-        objects[repair].actions.repair().map(|r| r.state),
+        objects[repair].actions.list.repair().map(|r| r.state),
         Some(RepairState::Halted)
     );
     let a = &objects[attack];
-    assert_eq!(a.actions.attack().map(|a| a.state), Some(AttackState::Done));
+    assert_eq!(
+        a.actions.list.attack().map(|a| a.state),
+        Some(AttackState::Done)
+    );
     assert_eq!(a.body.anim_speed(), Some(Speed::new(1.0)));
     assert!(a.sprite.is_some());
     assert_eq!(
-        objects[artifact].actions.artifact().map(|a| a.state),
+        objects[artifact].actions.list.artifact().map(|a| a.state),
         Some(crate::ownership::artifact::ArtifactState::Check)
     );
     assert!(
@@ -391,31 +409,34 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
             }),
             ..Default::default()
         },
-        actions: ActionList::default().with_hunt(Some(HuntAction {
-            target: None,
-            state: HuntState::Walk,
-            point: Position::from([-1.0; 3]),
-            target_class: None,
-            task: HuntTask {
-                id: TaskId::test(0),
-                range: Distance::ZERO,
-                resource: None,
-                sprites: TaskSprites::NONE,
-                work_value: crate::objects::masters::WorkValue::new(0.0),
-                productivity: None,
-                kind4: None,
-            },
-            attack: None,
-            move_to: None,
-            drop_site: None,
-            carry_to: None,
-            timer: Seconds::ZERO,
-            lead: Lead {
-                moved: true,
-                still_time: 2,
-                start: Point::new(3.0, 4.0),
-            },
-        })),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_hunt(Some(HuntAction {
+                target: None,
+                state: HuntState::Walk,
+                point: Position::from([-1.0; 3]),
+                target_class: None,
+                task: HuntTask {
+                    id: TaskId::test(0),
+                    range: Distance::ZERO,
+                    resource: None,
+                    sprites: TaskSprites::NONE,
+                    work_value: crate::objects::masters::WorkValue::new(0.0),
+                    productivity: None,
+                    kind4: None,
+                },
+                attack: None,
+                move_to: None,
+                drop_site: None,
+                carry_to: None,
+                timer: Seconds::ZERO,
+                lead: Lead {
+                    moved: true,
+                    still_time: 2,
+                    start: Point::new(3.0, 4.0),
+                },
+            })),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let mut t = game();
@@ -429,15 +450,18 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
     // the unit AI's stopAction (slot 0x3c0) then empties the list
     t.object_stop(PlayerId::new(1), idx).unwrap();
     let u = &t.players[1].objects[idx];
-    assert_eq!(u.actions.hunt().copied(), None);
+    assert_eq!(u.actions.list.hunt().copied(), None);
     assert_eq!(u.combat.ai.as_ref().unwrap().current_action, None);
     // without a unit AI the halted Hunt stays
     without_ai.players[1].objects[idx].combat.ai = None;
     without_ai.object_stop(PlayerId::new(1), idx).unwrap();
     let u = &without_ai.players[1].objects[idx];
-    assert_eq!(u.actions.hunt().map(|h| h.state), Some(HuntState::Idle));
+    assert_eq!(
+        u.actions.list.hunt().map(|h| h.state),
+        Some(HuntState::Idle)
+    );
     // its target went through slot 0x68 (FUN_140ac7980), which clears the lead
-    assert_eq!(u.actions.hunt().map(|h| h.lead), Some(Lead::NEW));
+    assert_eq!(u.actions.list.hunt().map(|h| h.lead), Some(Lead::NEW));
 }
 
 /// records/425906646's player 2 cancels the second villager of its town centre at update

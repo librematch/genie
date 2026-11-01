@@ -485,12 +485,14 @@ fn a_member_is_free_by_its_action_and_its_unit_ai() {
     ] {
         t.players[1].objects[ListIndex::new(0)]
             .actions
+            .list
             .set_attack(Some(attack(state)));
         assert_eq!(t.member_idle(object_id(10)).unwrap(), free, "{state}");
     }
     // a trade cart's state 2 is free, whatever its action
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_attack(Some(attack(AttackState::Killed)));
     for m in &mut t.masters {
         let mut master = m.get(master_id(4)).unwrap().clone();

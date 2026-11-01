@@ -212,14 +212,15 @@ pub(crate) fn meeting_target(
     tm: &Master,
     room: bool,
 ) -> Result<MeetingTarget, GenieError> {
-    if let Some(e) = t.unmodelled_action.clone() {
+    if let Some(e) = t.actions.unmodelled_action.clone() {
         return Err(e);
     }
-    let action_point = match (t.top_action_kind(), t.actions.move_to().copied()) {
+    let action_point = match (t.top_action_kind(), t.actions.list.move_to().copied()) {
         (Some(crate::movement::move_to::MOVE_TO), Some(m)) => Ok(m.point.ground()),
         // the Transport's point (+0x38, +0x3c), where it sails
         (Some(crate::garrison::transport::TRANSPORT), _) => t
             .actions
+            .list
             .transport()
             .map(|tr| tr.point.ground())
             .ok_or(UNPLACED),

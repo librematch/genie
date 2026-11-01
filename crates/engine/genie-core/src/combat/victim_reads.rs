@@ -151,7 +151,7 @@ pub(crate) fn victim_of(
                 t.action_type == crate::combat::abilities::REMOVAL_REWARD
                     && 1e-7 < t.work_val1.get()
             }),
-            busy: u.top_action_kind().is_some() || u.unmodelled_action.is_some(),
+            busy: u.top_action_kind().is_some() || u.actions.unmodelled_action.is_some(),
             unit_ai: u.combat.ai.is_some(),
             alert_idle: None,
             facing: None,

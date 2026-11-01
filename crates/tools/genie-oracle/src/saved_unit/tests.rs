@@ -26,7 +26,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
         PLAYERS,
     );
     assert_eq!(u.id, ObjectId::UNSAVED);
-    assert!(u.unmodelled_action.is_some());
+    assert!(u.actions.unmodelled_action.is_some());
 }
 
 /// A save from the start: livestock's default task is the Artifact, which exists from the
@@ -54,10 +54,10 @@ fn livestock_starts_with_its_artifact() {
         PLAYERS,
     );
     assert_eq!(u.id, object_id(5));
-    assert!(u.actions.artifact().is_some() && u.default_artifact);
-    assert!(u.default_task.is_none());
+    assert!(u.actions.list.artifact().is_some() && u.actions.default_artifact);
+    assert!(u.actions.default_task.is_none());
     // a combat object's mover needs its master, which this save does not hold
-    assert!(u.unmodelled_action.is_some());
+    assert!(u.actions.unmodelled_action.is_some());
 }
 
 /// Without a table the default task is unknown: reported, as the object's.
@@ -71,8 +71,8 @@ fn without_a_table_the_default_task_is_reported() {
         None,
         PLAYERS,
     );
-    assert!(u.default_task.is_some());
-    assert!(u.actions.artifact().is_none());
+    assert!(u.actions.default_task.is_some());
+    assert!(u.actions.list.artifact().is_none());
 }
 
 /// A saved action the slice does not model stops the object.
@@ -98,8 +98,8 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         None,
         PLAYERS,
     );
-    assert!(u.unmodelled_action.is_some());
-    assert!(!u.default_fly);
+    assert!(u.actions.unmodelled_action.is_some());
+    assert!(!u.actions.default_fly);
 }
 
 /// A missile without its action (it met its target) flies on with its own fields.
@@ -183,7 +183,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         PLAYERS,
     );
     assert_eq!(
-        u.unmodelled_action.map(|e| e.kind()),
+        u.actions.unmodelled_action.map(|e| e.kind()),
         Some(genie_core::ErrorKind::InvalidInput)
     );
     assert_eq!(

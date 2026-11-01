@@ -173,7 +173,7 @@ impl World {
             }
         }
         attack.target2 = Some(target);
-        unit.actions.set_attack(Some(attack));
+        unit.actions.list.set_attack(Some(attack));
         self.take(target, self.releaser(player, idx)?)?;
         Ok(())
     }
@@ -260,6 +260,7 @@ impl World {
             .players
             .live(player, idx)?
             .actions
+            .list
             .hunt()
             .map(|h| h.task)
             .ok_or(GenieError::unsupported(
@@ -278,11 +279,13 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let old = unit
             .actions
+            .list
             .hunt()
             .map(|h| h.target)
             .filter(|&t| t.is_some());
         let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
-        let (Some(hunt), Some(mover)) = (unit.actions.hunt_mut(), unit.body.mover_mut()) else {
+        let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));

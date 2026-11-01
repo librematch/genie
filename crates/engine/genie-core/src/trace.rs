@@ -423,7 +423,10 @@ mod tests {
         let at = why.location();
         let mut t = one(vec![Unit {
             id: object_id(5),
-            unmodelled_action: Some(why),
+            actions: crate::objects::layers::ActionLayer {
+                unmodelled_action: Some(why),
+                ..Default::default()
+            },
             ..Unit::default()
         }]);
         let lines = heard(|| t.tick(Millis::new(10)));

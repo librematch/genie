@@ -225,9 +225,10 @@ pub fn word9_terms(
             id: unit.id.get().cast_unsigned(),
             action: unit
                 .actions
+                .list
                 .artifact()
                 .map_or(-1, |_| i32::from(ARTIFACT_TYPE.get())),
-            state: unit.actions.artifact().map_or(0, |a| a.state.get()),
+            state: unit.actions.list.artifact().map_or(0, |a| a.state.get()),
             retarget: unit
                 .combat
                 .ai

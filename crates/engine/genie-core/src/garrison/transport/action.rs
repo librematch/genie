@@ -247,11 +247,11 @@ impl TransportAction {
     ///
     /// The unload's and the lend's, or a unit whose Transport the unload took.
     fn unload(&mut self, c: &mut Step<'_>, unit: &mut Unit) -> Result<(), GenieError> {
-        if let Some(own) = unit.actions.transport_mut() {
+        if let Some(own) = unit.actions.list.transport_mut() {
             *own = *self;
         }
         c.lend_at(unit, World::transport_unload)?;
-        *self = *unit.actions.transport().ok_or(NO_TRANSPORT)?;
+        *self = *unit.actions.list.transport().ok_or(NO_TRANSPORT)?;
         Ok(())
     }
 

@@ -167,7 +167,10 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             }),
             ..Default::default()
         },
-        actions: ActionList::default().with_build(Some(build)),
+        actions: crate::objects::layers::ActionLayer {
+            list: ActionList::default().with_build(Some(build)),
+            ..Default::default()
+        },
         sprite: Some(ActiveSprite::start(
             graphic(WALKING),
             &mut Well512::default(),
@@ -272,10 +275,10 @@ fn on_build<R>(
     f: impl FnOnce(&mut BuildAction, &mut Step<'_>, &mut Unit, &BuildReads) -> Result<R, GenieError>,
 ) -> Result<R, GenieError> {
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), 20, |u, c| {
-        let mut b = *u.actions.build().unwrap();
+        let mut b = *u.actions.list.build().unwrap();
         let reads = u.build_reads(c, b)?;
         let answer = f(&mut b, c, u, &reads);
-        *u.actions.build_mut().unwrap() = b;
+        *u.actions.list.build_mut().unwrap() = b;
         answer
     })
 }
@@ -287,7 +290,7 @@ fn builder(t: &World) -> &Unit {
 
 /// The builder's Build.
 fn build(t: &World) -> BuildAction {
-    *builder(t).actions.build().unwrap()
+    *builder(t).actions.list.build().unwrap()
 }
 
 /// Player 1's object `id`.
@@ -1027,7 +1030,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         own(&mut t, BUILDER).footprint_waits = crate::construction::FootprintWaits::of_data(waits);
         let mut other = own(&mut t, BUILDER).clone();
         other.id = object_id(6);
-        other.actions = ActionList::default();
+        other.actions.list = ActionList::default();
         other.place_for_test(Position::new(10.6, 10.6, 0.0));
         t.players[1].objects.push(other);
         let me = *t.spatial.get(BUILDER).unwrap();
@@ -1390,7 +1393,12 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
     assert_eq!((b.state, walk.state), (BuildState::Drop, MoveTo::Arrived));
     // without one, the Build task's moving sprite
     assert_eq!(walk.sprite.map(|g| g.id), Some(TASK_SPRITE));
-    own(&mut t, BUILDER).actions.build_mut().unwrap().target = None;
+    own(&mut t, BUILDER)
+        .actions
+        .list
+        .build_mut()
+        .unwrap()
+        .target = None;
     let lost = drop(&mut t, DropSearch::Empty);
     let walk = lost.move_to.unwrap();
     assert_eq!(
@@ -1479,7 +1487,7 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
     assert_eq!(wood(&t).0, 10.0);
     let _ = code(&mut t, 250);
     assert_eq!(build(&t).timer, Seconds::new(-2.75));
-    own(&mut t, BUILDER).actions.build_mut().unwrap().timer = Seconds::new(-0.1);
+    own(&mut t, BUILDER).actions.list.build_mut().unwrap().timer = Seconds::new(-0.1);
     let _ = code(&mut t, 250);
     // its search again: the mill out of reach is still the nearest, a MoveTo to it again
     let b = build(&t);
@@ -1637,7 +1645,7 @@ fn camp(t: &mut World, at: Position) {
 fn villager(t: &mut World, at: Position) {
     let mut other = own(t, BUILDER).clone();
     other.id = object_id(6);
-    other.actions = ActionList::default();
+    other.actions.list = ActionList::default();
     other.place_for_test(at);
     t.players[1].objects.push(other);
     let me = *t.spatial.get(BUILDER).unwrap();

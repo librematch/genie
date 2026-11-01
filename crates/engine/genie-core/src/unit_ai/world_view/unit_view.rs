@@ -88,7 +88,7 @@ impl UnitView<'_, '_> {
         };
         let patrolling = match u.group.id.and_then(|id| self.c.w.groups.get(id)) {
             None => {
-                let busy = u.top_action_kind().is_some() || u.unmodelled_action.is_some();
+                let busy = u.top_action_kind().is_some() || u.actions.unmodelled_action.is_some();
                 if ai.current_action.is_some()
                     || busy
                     || ai.current_order.is_some()

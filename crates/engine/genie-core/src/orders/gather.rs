@@ -90,7 +90,7 @@ impl World {
         let by = self.releaser(player, idx)?;
         // a stop farm's time per stop: the gatherer's work rate (its master's plus its powerup),
         // capacity and the task's productivity attribute (none: 1.0)
-        let productivity = unit.actions.gather().and_then(|g| g.task.productivity);
+        let productivity = unit.actions.list.gather().and_then(|g| g.task.productivity);
         let rate = crate::gathering::gather::StopRate {
             work_rate: unit.combat.work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
@@ -102,7 +102,8 @@ impl World {
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
         let unit = self.players.live_mut(player, idx)?;
-        let (Some(gather), Some(mover)) = (unit.actions.gather_mut(), unit.body.mover_mut()) else {
+        let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -181,7 +182,8 @@ impl World {
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
         let unit = self.players.live_mut(player, idx)?;
-        let (Some(gather), Some(mover)) = (unit.actions.gather_mut(), unit.body.mover_mut()) else {
+        let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -242,7 +244,8 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
         let my_pasture = unit.my_pasture;
-        let (Some(hunt), Some(mover)) = (unit.actions.hunt_mut(), unit.body.mover_mut()) else {
+        let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
+        else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -409,7 +412,7 @@ impl World {
         let drops = gather.target.is_none() && gather.carry_to.key() == Some(target);
         // a farm another farmer works: the start let it go (set_state 11, then slot 0x68)
         let waits = gather.target.is_none() && gather.carry_to.key() != Some(target);
-        unit.actions.set_gather(Some(gather));
+        unit.actions.list.set_gather(Some(gather));
         if drops {
             self.take(target, self.releaser(player, idx)?)?;
         }
@@ -483,7 +486,9 @@ impl World {
         if tm.kind == BUILDING {
             // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
             // (`FUN_140a903a0`).
-            if t.top_action_kind() == Some(action_type::UNPACK) || t.unmodelled_action.is_some() {
+            if t.top_action_kind() == Some(action_type::UNPACK)
+                || t.actions.unmodelled_action.is_some()
+            {
                 return Err(GenieError::unsupported(
                     "a gather retargeted to a building with an action (packing)",
                 ));
@@ -597,7 +602,7 @@ impl World {
             unit.body.set_anim_speed(Speed::ZERO);
         }
         let drops = hunt.target.is_none() && hunt.carry_to.key() == Some(target);
-        unit.actions.set_hunt(Some(hunt));
+        unit.actions.list.set_hunt(Some(hunt));
         // a load to its own drop site: the target taken as the second (FUN_140a7a190), then let
         // go as the first (slot 0x68 with none)
         if drops {

@@ -78,7 +78,7 @@ impl Unit {
         class: ClassId,
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
-        if let Some(artifact) = self.actions.artifact_mut() {
+        if let Some(artifact) = self.actions.list.artifact_mut() {
             let (gone, released) = artifact.stop();
             if gone.stops {
                 self.body

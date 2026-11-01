@@ -70,11 +70,12 @@ impl Unit {
     /// or an Attack without one decides none).
     pub(crate) fn attack_target(&self) -> Option<ObjectId> {
         self.actions
+            .list
             .hunt()
             .map(|h| h.target)
-            .or_else(|| self.actions.gather().and_then(|g| g.target).map(Some))
-            .or_else(|| self.actions.attack().map(|a| a.target))
-            .or_else(|| self.actions.missile().and_then(|a| a.target).map(Some))
+            .or_else(|| self.actions.list.gather().and_then(|g| g.target).map(Some))
+            .or_else(|| self.actions.list.attack().map(|a| a.target))
+            .or_else(|| self.actions.list.missile().and_then(|a| a.target).map(Some))
             .flatten()
     }
 
@@ -134,7 +135,7 @@ impl Unit {
     ///
     /// A top action the slice does not model.
     pub fn top_action_object(&self) -> Result<Option<ObjectId>, GenieError> {
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x190 of an action the slice does not model",
             ));
@@ -151,7 +152,7 @@ impl Unit {
     ///
     /// A top action the slice does not model.
     pub fn top_action_idle(&self) -> Result<bool, GenieError> {
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slots 0x190 and 0x288 of an action the slice does not model",
             ));
@@ -160,6 +161,7 @@ impl Unit {
             None => Ok(true),
             Some(crate::ownership::artifact::ARTIFACT_TYPE) => Ok(self
                 .actions
+                .list
                 .artifact()
                 .is_some_and(crate::ownership::artifact::Artifact::idle)),
             // a Make has no target, but its point (`+0x38`) is the base constructor's 0.0
@@ -179,7 +181,7 @@ impl Unit {
     /// Its top action (the list's head) as the slice models it, type and state.
     #[must_use]
     pub fn top_action(&self) -> Option<TopAction> {
-        self.actions.head().map(|a| TopAction {
+        self.actions.list.head().map(|a| TopAction {
             kind: a.kind(),
             state: a.state(),
         })
@@ -197,7 +199,7 @@ impl Unit {
                 state: ActionState::new(m.number()),
             })
         };
-        match self.actions.head()? {
+        match self.actions.list.head()? {
             Action::Artifact(a) => walking(a.move_to.map(|m| m.state)).or_else(|| {
                 a.enter.map(|e| TopAction {
                     kind: crate::garrison::ENTER,
@@ -229,14 +231,14 @@ impl Unit {
     /// action the slice holds or without a target.
     #[must_use]
     pub fn top_target(&self) -> Option<ObjectId> {
-        self.actions.head().and_then(Action::target)
+        self.actions.list.head().and_then(Action::target)
     }
 
     /// The second target of its top action ([`Action::second_target`]); None without an action
     /// the slice holds or without a second target.
     #[must_use]
     pub fn top_second_target(&self) -> Option<ObjectId> {
-        self.actions.head().and_then(Action::second_target)
+        self.actions.list.head().and_then(Action::second_target)
     }
 
     /// Slot 0x2d0 with 0 (`FUN_14106d170`): whether its top action may be interrupted (the group
@@ -245,7 +247,7 @@ impl Unit {
     /// without a target or a point (`+0x30`, `+0x38` = −1). A trade (`0x6f`) in state 4 is not
     /// modelled, nor is an action the slice does not hold.
     pub(crate) fn interruptible(&self) -> Result<bool, GenieError> {
-        if self.unmodelled_action.is_some() {
+        if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x2d0 of an action the slice does not model",
             ));
@@ -262,6 +264,7 @@ impl Unit {
             (_, 2) => kind != crate::combat::attack::ATTACK,
             (crate::ownership::artifact::ARTIFACT_TYPE, _) => self
                 .actions
+                .list
                 .artifact()
                 .is_some_and(|a| a.goal.is_none_or(|g| g.x() == -1.0)),
             _ => false,

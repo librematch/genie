@@ -486,7 +486,7 @@ pub(crate) fn change_hands(
     u.own_master = Some(own);
     let sees = u.life.state == ObjectState::Alive && u.life.inside.is_none();
     spatial.change_owner(u.id, new, los, sees)?;
-    if let Some(a) = u.actions.artifact_mut() {
+    if let Some(a) = u.actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }
     if let Some(ai) = u.combat.ai.as_mut() {

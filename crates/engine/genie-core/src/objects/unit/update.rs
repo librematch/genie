@@ -105,7 +105,7 @@ impl Unit {
         me: Me,
         captured: &mut Option<crate::ownership::capture::Captured>,
     ) -> Result<HeadCode, GenieError> {
-        match self.actions.head() {
+        match self.actions.list.head() {
             None => Ok(HeadCode::Keeps),
             Some(Action::Artifact(_)) => self.artifact_part(c, me).map(|found| {
                 *captured = found;
@@ -144,7 +144,7 @@ impl Unit {
         c: &mut Step<'_>,
         code: HeadCode,
     ) -> Result<(), GenieError> {
-        if self.actions.iter().nth(1).is_some() {
+        if self.actions.list.iter().nth(1).is_some() {
             return Err(GenieError::unreachable(BELOW_HEAD));
         }
         if code == HeadCode::Deletes {
@@ -158,6 +158,7 @@ impl Unit {
     fn wait_solidify_part(&self, others: OthersRef<'_>) -> HeadCode {
         let ended = self
             .actions
+            .list
             .wait_solidify()
             .is_some_and(|w| w.update(wait_progress(w.target, others)));
         HeadCode::ended(ended)
@@ -229,6 +230,7 @@ impl Unit {
     /// an action the slice does not model fails here.
     pub(crate) fn actions_past_life(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         if let Some(e) = self
+            .actions
             .unmodelled_action
             .clone()
             .filter(|_| self.life.state == ObjectState::Alive)

@@ -93,7 +93,11 @@ impl World {
             .ok_or(GenieError::unsupported("a gather command without a task"))?;
         let unit = &self.players.live(player, idx)?;
         if unit.top_action_kind() == Some(crate::gathering::gather::GATHER)
-            && unit.actions.gather().is_some_and(|g| g.task.id == task.id)
+            && unit
+                .actions
+                .list
+                .gather()
+                .is_some_and(|g| g.task.id == task.id)
         {
             let _ = self.retarget_gather(player, idx, target)?;
             return Ok(());
@@ -160,6 +164,7 @@ impl World {
         self.players
             .live_mut(player, idx)?
             .actions
+            .list
             .set_build(Some(build));
         Ok(())
     }
@@ -235,6 +240,7 @@ impl World {
         self.players
             .live_mut(player, idx)?
             .actions
+            .list
             .set_repair(Some(repair));
         Ok(())
     }
@@ -271,6 +277,7 @@ impl World {
                     self.players
                         .live_mut(player, idx)?
                         .actions
+                        .list
                         .set_repair(Some(repair));
                 }
             }
@@ -334,6 +341,7 @@ impl World {
             .players
             .live(player, idx)?
             .actions
+            .list
             .repair()
             .copied()
             .ok_or(NO_REPAIR)?;
@@ -359,7 +367,7 @@ impl World {
                 .walk_to(self, Some(target))?
                 .ok_or(REPAIR_TARGET_GONE)?;
             let unit = self.players.live_mut(player, idx)?;
-            let r = unit.actions.repair_mut().ok_or(NO_REPAIR)?;
+            let r = unit.actions.list.repair_mut().ok_or(NO_REPAIR)?;
             // slot 0x68 dropped the count on another target; set_state(4)'s prelude makes a
             // repairer still counted leave its repairers
             let counted = same && r.counted;
@@ -432,6 +440,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let old = unit
             .actions
+            .list
             .build()
             .copied()
             .ok_or(GenieError::unsupported(
@@ -451,7 +460,8 @@ impl World {
             // the task finder took the new target below state 3, which slot 0x68 keeps
             let _ = self.build_set_target(player, idx, (old.target, old.added), target)?;
             let unit = self.players.live_mut(player, idx)?;
-            let (Some(build), mover) = (unit.actions.build_mut(), unit.body.mover_mut()) else {
+            let (Some(build), mover) = (unit.actions.list.build_mut(), unit.body.mover_mut())
+            else {
                 return Err(GenieError::unsupported(
                     "a Build's retarget without its Build",
                 ));
@@ -465,7 +475,7 @@ impl World {
         };
         let (mut build, mut mover) = {
             let unit = self.players.live_mut(player, idx)?;
-            (unit.actions.take_build(), unit.body.take_mover())
+            (unit.actions.list.take_build(), unit.body.take_mover())
         };
         // FUN_140aaddb0's building: an annex's main building
         let counted = match self.counted_building(Some(target))? {
@@ -481,7 +491,7 @@ impl World {
                 .ok_or(NO_BUILD)?
                 .retake(t_at, walk, mover.as_mut(), builders, computer);
         let unit = self.players.live_mut(player, idx)?;
-        unit.actions.set_build(build);
+        unit.actions.list.set_build(build);
         unit.body.put_mover(mover);
         r?;
         Ok(class)
@@ -504,7 +514,7 @@ impl World {
             self.leave_builders(old)?;
         }
         let target = self.retarget_action(player, idx, old, new, false)?;
-        if let Some(build) = self.players.live_mut(player, idx)?.actions.build_mut() {
+        if let Some(build) = self.players.live_mut(player, idx)?.actions.list.build_mut() {
             build.target = target;
             build.added &= !leaves;
         }

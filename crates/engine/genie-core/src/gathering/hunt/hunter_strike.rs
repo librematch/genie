@@ -50,7 +50,7 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
-        let mut hunt = *self.actions.hunt().ok_or(NO_HUNT)?;
+        let mut hunt = *self.actions.list.hunt().ok_or(NO_HUNT)?;
         let victim = hunt_victim(c, &hunt)?;
         let own = own.take().ok_or(crate::world::HUNTER_MASTER)?;
         let herd = self.herd_for(
@@ -64,7 +64,7 @@ impl Unit {
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
         let next = hunt.update(c, self, me, &mut f, &r);
-        if let Some(h) = self.actions.hunt_mut() {
+        if let Some(h) = self.actions.list.hunt_mut() {
             *h = hunt;
         }
         let next = next?;
@@ -136,13 +136,13 @@ impl Unit {
         let tree = self.combat.ai.as_ref().is_some_and(|ai| {
             let class = ai
                 .target_class
-                .or_else(|| self.actions.hunt().and_then(|h| h.target_class));
+                .or_else(|| self.actions.list.hunt().and_then(|h| h.target_class));
             class == Some(class::TREE)
         });
         if tree && self.hunt_tree_search(c, None, Some(TREE_NEAR))? {
             return Ok(());
         }
-        let hunt = self.actions.hunt_mut().ok_or(NO_HUNT)?;
+        let hunt = self.actions.list.hunt_mut().ok_or(NO_HUNT)?;
         hunt.tear_down(self.body.mover_mut())?;
         hunt.state = HuntState::Search;
         self.hunt_search_state(c)

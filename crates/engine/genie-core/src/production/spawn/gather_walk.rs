@@ -98,6 +98,7 @@ impl World {
             unit.combat.town_bell.flag = false;
         }
         unit.actions
+            .list
             .set_move_to(Some(crate::movement::move_to::MoveToAction {
                 sprite,
                 state: crate::movement::move_to::MoveTo::Start,

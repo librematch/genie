@@ -378,18 +378,18 @@ pub(super) fn within_table(masters: &Masters, unit: MasterId) -> bool {
 /// The object has an action in its list (`+0x880`'s first node; a building producing has its
 /// Make): the slice's top actions.
 pub(super) fn has_actions(u: &Unit) -> bool {
-    u.actions.artifact().is_some()
-        || u.actions.build().is_some()
-        || u.actions.move_to().is_some()
-        || u.actions.fly().is_some()
-        || u.actions.hunt().is_some()
-        || u.actions.gather().is_some()
-        || u.actions.attack().is_some()
-        || u.actions.explore().is_some()
-        || u.actions.enter().is_some()
-        || u.actions.transport().is_some()
+    u.actions.list.artifact().is_some()
+        || u.actions.list.build().is_some()
+        || u.actions.list.move_to().is_some()
+        || u.actions.list.fly().is_some()
+        || u.actions.list.hunt().is_some()
+        || u.actions.list.gather().is_some()
+        || u.actions.list.attack().is_some()
+        || u.actions.list.explore().is_some()
+        || u.actions.list.enter().is_some()
+        || u.actions.list.transport().is_some()
         || u.missile.is_some()
-        || u.actions.make().is_some()
+        || u.actions.list.make().is_some()
         || u.building
             .production
             .as_ref()

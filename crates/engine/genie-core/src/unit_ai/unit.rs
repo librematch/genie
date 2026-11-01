@@ -154,7 +154,7 @@ impl Unit {
             under_attack: self.under_attack,
             id: self.id,
             anim_speed: self.body.anim_speed(),
-            action_state: if self.unmodelled_action.is_some() {
+            action_state: if self.actions.unmodelled_action.is_some() {
                 None
             } else {
                 Some(
@@ -162,7 +162,7 @@ impl Unit {
                         .map_or(ActionState::NO_ACTION, |a| a.state),
                 )
             },
-            attack_listed: self.actions.attack().is_some(),
+            attack_listed: self.actions.list.attack().is_some(),
             units: self.named_units(
                 c,
                 changed_view(OthersRef::of(&c.w.players, c.player)?, view.new_owner),
@@ -286,7 +286,7 @@ impl Unit {
                 "a unit AI's run of a unit without one",
             ));
         };
-        let busy = self.top_action_kind().is_some() || self.unmodelled_action.is_some();
+        let busy = self.top_action_kind().is_some() || self.actions.unmodelled_action.is_some();
         let master = Some(self.master(&c.w.masters, c.player)?);
         let class = master.map(|ms| ms.class);
         let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
@@ -366,7 +366,7 @@ impl Unit {
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
     ) -> Result<Option<AfterOrder>, GenieError> {
-        let busy = self.top_action_kind().is_some() || self.unmodelled_action.is_some();
+        let busy = self.top_action_kind().is_some() || self.actions.unmodelled_action.is_some();
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
             self.own_master.as_deref(),

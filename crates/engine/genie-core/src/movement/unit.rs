@@ -150,7 +150,7 @@ impl Unit {
     ///
     /// [`MoveToAction::check_held`]: crate::movement::move_to::MoveToAction::check_held
     fn own_move_held(&mut self, c: &mut Step<'_>) -> Result<Option<UpdateCode>, GenieError> {
-        let Some(move_to) = self.actions.move_to_mut() else {
+        let Some(move_to) = self.actions.list.move_to_mut() else {
             return Ok(None);
         };
         let target = move_to.target;
@@ -172,7 +172,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<crate::movement::move_to::MoveStep, GenieError> {
-        Ok(match self.actions.move_to_mut() {
+        Ok(match self.actions.list.move_to_mut() {
             Some(move_to) => {
                 // its state 3 reads the unit's AI for the path it asks (0x140aa2a70), with its
                 // point: its own, or the target's place (a target gone fails the update first)
@@ -226,11 +226,11 @@ impl Unit {
 
     /// The unit's Explore in its update ([`crate::movement::explore::ExploreAction::update`]): nothing without one.
     pub(crate) fn explore_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<(), GenieError> {
-        let Some(mut explore) = self.actions.explore().copied() else {
+        let Some(mut explore) = self.actions.list.explore().copied() else {
             return Ok(());
         };
         let explored = explore.update(c, self, me);
-        if let Some(e) = self.actions.explore_mut() {
+        if let Some(e) = self.actions.list.explore_mut() {
             *e = explore;
         }
         explored
@@ -238,11 +238,11 @@ impl Unit {
 
     /// A bird's Fly in its update ([`crate::movement::fly::Fly::update`]): nothing without one.
     pub(crate) fn fly_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<(), GenieError> {
-        let Some(mut fly) = self.actions.fly().copied() else {
+        let Some(mut fly) = self.actions.list.fly().copied() else {
             return Ok(());
         };
         let flown = fly.update(c, self, me);
-        if let Some(f) = self.actions.fly_mut() {
+        if let Some(f) = self.actions.list.fly_mut() {
             *f = fly;
         }
         flown

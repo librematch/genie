@@ -549,7 +549,10 @@ impl Unit {
                 attack_count: self.combat.attack_count,
                 ..Default::default()
             },
-            actions: ActionList::default().with_missile(Some(action)),
+            actions: crate::objects::layers::ActionLayer {
+                list: ActionList::default().with_missile(Some(action)),
+                ..Default::default()
+            },
             attackable: true,
             pasture: None,
             my_pasture: None,

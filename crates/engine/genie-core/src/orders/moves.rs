@@ -212,7 +212,7 @@ impl World {
                     self.streams.get(Stream::Sprite),
                 )?;
             }
-            unit.actions.set_move_to(Some(move_to));
+            unit.actions.list.set_move_to(Some(move_to));
         }
         Ok(taken)
     }
@@ -307,7 +307,7 @@ impl World {
             self.players.player(player)?.computer,
         );
         // a class 54 under an action the slice does not hold may be under its Pack or Unpack
-        if packs || (class == class::CLASS_54 && unit.unmodelled_action.is_some()) {
+        if packs || (class == class::CLASS_54 && unit.actions.unmodelled_action.is_some()) {
             return Err(GenieError::unsupported(
                 "a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)",
             ));

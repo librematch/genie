@@ -69,7 +69,11 @@ impl World {
     ) -> Result<bool, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let top = unit.top_action_kind();
-        let attacking = unit.actions.attack().filter(|a| attack_on(top, a, target));
+        let attacking = unit
+            .actions
+            .list
+            .attack()
+            .filter(|a| attack_on(top, a, target));
         let Some(a) =
             attacking.filter(|_| matches!(filter, None | Some(crate::combat::attack::ATTACK)))
         else {
@@ -339,7 +343,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let top = unit.top_action_kind();
-        Ok(match unit.actions.hunt().copied() {
+        Ok(match unit.actions.list.hunt().copied() {
             Some(h) if task.action_type == HUNT && h.task.id == task.id => {
                 self.retarget_hunt_work(player, idx, (target.ok_or(TERRAIN_TASK)?, point, clears))?;
                 true
@@ -361,7 +365,11 @@ impl World {
             }
             _ if top == Some(GATHER)
                 && task.action_type == GATHER
-                && unit.actions.gather().is_some_and(|g| g.task.id == task.id) =>
+                && unit
+                    .actions
+                    .list
+                    .gather()
+                    .is_some_and(|g| g.task.id == task.id) =>
             {
                 self.retarget_gather_work(
                     player,

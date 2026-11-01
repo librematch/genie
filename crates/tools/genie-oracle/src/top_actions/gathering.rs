@@ -31,6 +31,7 @@ pub(super) fn import_make(
         return Err(GenieError::unsupported("a saved Make with a sub-action"));
     }
     unit.actions
+        .list
         .set_make(Some(genie_core::gathering::make::MakeAction {
             state: genie_core::gathering::make::MakeState::of_byte(base.state)?,
             remaining: Amount::new(base.timer),
@@ -124,7 +125,7 @@ pub(super) fn import_hunt(
             ));
         }
     }
-    unit.actions.set_hunt(Some(hunt));
+    unit.actions.list.set_hunt(Some(hunt));
     Ok(())
 }
 
@@ -212,6 +213,6 @@ pub(super) fn import_gather(
         ))?
         .map(|sub| saved_move_to(sub, saved.graphics, true))
         .transpose()?;
-    unit.actions.set_gather(Some(gather));
+    unit.actions.list.set_gather(Some(gather));
     Ok(())
 }

@@ -602,7 +602,7 @@ pub(super) fn garrison_firepower(turns: &mut World) {
             let rate = genie_core::garrison::attack_rate(bm, masters, b.combat.reload_powerup);
             match genie_core::garrison::share(me, masters, reload_powerup, rate) {
                 Ok(share) => b.combat.firepower += share,
-                Err(e) => b.unmodelled_action = Some(e),
+                Err(e) => b.actions.unmodelled_action = Some(e),
             }
         }
     }

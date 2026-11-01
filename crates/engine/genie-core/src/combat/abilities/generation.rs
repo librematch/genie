@@ -133,7 +133,7 @@ impl World {
         let top = if short_cut || master.kind != COMBAT {
             None
         } else {
-            if let Some(e) = unit.unmodelled_action.clone() {
+            if let Some(e) = unit.actions.unmodelled_action.clone() {
                 return Err(e);
             }
             match unit.top_action() {

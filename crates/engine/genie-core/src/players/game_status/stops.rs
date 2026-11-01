@@ -159,7 +159,7 @@ impl World {
                 "a computer player's hunt stopped (set_state 1)",
             ));
         }
-        let hunt = unit.actions.hunt_mut().ok_or(NO_TOP_ACTION)?;
+        let hunt = unit.actions.list.hunt_mut().ok_or(NO_TOP_ACTION)?;
         hunt.tear_down(unit.body.mover_mut())?;
         hunt.state = crate::gathering::hunt::HuntState::Idle;
         let sprite = crate::gathering::hunt::stand_sprite(
@@ -218,7 +218,7 @@ impl World {
             crate::construction::repair::REPAIR => self.halt_repair(p, idx)?,
             crate::combat::attack::ATTACK => {
                 let unit = self.players.live_mut(p, idx)?;
-                let attack = unit.actions.attack_mut().ok_or(NO_TOP_ACTION)?;
+                let attack = unit.actions.list.attack_mut().ok_or(NO_TOP_ACTION)?;
                 attack.halt(
                     &mut unit.body,
                     &mut unit.sprite,
@@ -246,7 +246,7 @@ impl World {
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let gather = unit.actions.gather_mut().ok_or(NO_TOP_ACTION)?;
+        let gather = unit.actions.list.gather_mut().ok_or(NO_TOP_ACTION)?;
         let stand = crate::gathering::hunt::stand_sprite(
             &gather.task,
             standing,
@@ -274,7 +274,7 @@ impl World {
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let build = unit.actions.build_mut().ok_or(NO_TOP_ACTION)?;
+        let build = unit.actions.list.build_mut().ok_or(NO_TOP_ACTION)?;
         let foundation = build.target;
         let (counted, targets) = build.halt(unit.body.mover_mut())?;
         if counted {
@@ -291,7 +291,7 @@ impl World {
     /// out of its target's repairers, the standing sprite; the target stays.
     pub(super) fn halt_repair(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let repair = unit.actions.repair_mut().ok_or(NO_TOP_ACTION)?;
+        let repair = unit.actions.list.repair_mut().ok_or(NO_TOP_ACTION)?;
         let target = repair.target;
         if repair.halt(unit.body.mover_mut())? {
             self.leave_builders(target)?;
@@ -308,7 +308,7 @@ impl World {
         by: Releaser,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
-        let artifact = unit.actions.artifact_mut().ok_or(NO_TOP_ACTION)?;
+        let artifact = unit.actions.list.artifact_mut().ok_or(NO_TOP_ACTION)?;
         let (gone, released) = artifact.stop();
         if gone.stops {
             unit.body

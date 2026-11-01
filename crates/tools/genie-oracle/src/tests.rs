@@ -41,7 +41,10 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
     };
     let kind = ARTIFACT_TYPE;
     let both = Unit {
-        actions: ActionList::default().with_artifact(Some(artifact)),
+        actions: genie_core::objects::layers::ActionLayer {
+            list: ActionList::default().with_artifact(Some(artifact)),
+            ..Default::default()
+        },
         building: genie_core::objects::layers::Building {
             production: Some(making.clone()),
             ..Default::default()
@@ -56,7 +59,10 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         })
     );
     let top = Unit {
-        actions: ActionList::default().with_artifact(Some(artifact)),
+        actions: genie_core::objects::layers::ActionLayer {
+            list: ActionList::default().with_artifact(Some(artifact)),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     assert_eq!(

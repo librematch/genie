@@ -22,7 +22,7 @@ use crate::world::tests::{forage_world, in_update};
 fn walking_forager() -> World {
     let mut t = forage_world();
     let u = &mut t.players[1].objects[ListIndex::new(0)];
-    u.actions.set_move_to(Some(MoveToAction {
+    u.actions.list.set_move_to(Some(MoveToAction {
         sprite: None,
         state: MoveTo::Moving,
         point: Position::new(40.0, 80.0, 0.0),
@@ -66,7 +66,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError>
 #[test]
 fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     let (u, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
-    assert_eq!(u.actions.move_to().copied(), None);
+    assert_eq!(u.actions.list.move_to().copied(), None);
     assert_eq!(released, []);
     let m = u.body.mover().unwrap();
     assert_eq!(m.animated.speed, Speed::new(0.0));
@@ -82,7 +82,7 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     );
     // livestock's unit AI, and one on action 0x2c2, keep their order and target
     let (u, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
-    assert_eq!(u.actions.move_to().copied(), None);
+    assert_eq!(u.actions.list.move_to().copied(), None);
     let kept = |ai: &crate::unit_ai::UnitAi| (ai.current_order, ai.current_target);
     assert_eq!(
         kept(u.combat.ai.as_ref().unwrap()),
@@ -116,9 +116,10 @@ fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     let mut t = forage_world();
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_artifact(Some(artifact()));
     let (u, released) = stopped(t, class::LIVESTOCK).unwrap();
-    let a = u.actions.artifact().copied().unwrap();
+    let a = u.actions.list.artifact().copied().unwrap();
     assert_eq!(
         (a.move_to, a.goal, a.target, a.state),
         (
@@ -132,7 +133,7 @@ fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     assert_eq!(u.body.mover().unwrap().animated.speed, Speed::new(0.0));
     let mut t = forage_world();
     let u = &mut t.players[1].objects[ListIndex::new(0)];
-    u.actions.set_artifact(Some(artifact()));
+    u.actions.list.set_artifact(Some(artifact()));
     u.body.put_mover(None);
     assert_eq!(
         stopped(t, class::LIVESTOCK).unwrap_err().reason(),

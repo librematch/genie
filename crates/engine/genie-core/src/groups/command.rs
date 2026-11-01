@@ -563,7 +563,7 @@ impl World {
             Place::Live(p, i) => self.players.live(p, i)?,
             Place::Sleeping(p, i) => self.players.asleep(p, i)?,
         };
-        if u.unmodelled_action.is_some() {
+        if u.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "stopAllUnits of a member with an action the slice does not model",
             ));

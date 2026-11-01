@@ -21,6 +21,7 @@ holds it for now, with the game's defaults below type 50. `building.rs` holds th
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`action.rs`](action.rs) | `RGE_Action_Object` (types 40 and up, FD-045-D06): the action layer, the save's action list (`RgeActionObject`'s `actions`), then what genie keeps for the default task its update starts (`RGE_Action_Object::update`, `0x14106ac90`). |
 | [`building.rs`](building.rs) | `TRIBE_Building_Object` (type 80, FD-045-D06): the building layer, its fields in the save's order (`TribeBuildingObject`), then the two the save does not hold. |
 | [`combat.rs`](combat.rs) | `RGE_Combat_Object` and `TRIBE_Combat_Object` (types 50 and up, FD-045-D06): the combat layer, its fields in the save's order (`RgeCombatObject`, then `TribeCombatObject`). |
 | [`mod.rs`](mod.rs) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |

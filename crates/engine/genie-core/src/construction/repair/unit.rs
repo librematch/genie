@@ -40,12 +40,12 @@ impl Unit {
     /// reads as it starts ([`Unit::repair_reads`]), on the Repair copied out of the action list
     /// and put back after it; its code (the end's 1). Nothing without a Repair.
     pub(crate) fn repair_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let Some(mut repair) = self.actions.repair().copied() else {
+        let Some(mut repair) = self.actions.list.repair().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.repair_reads(c, repair.target)?;
         let repaired = repair.update(c, self, me, &reads);
-        if let Some(r) = self.actions.repair_mut() {
+        if let Some(r) = self.actions.list.repair_mut() {
             *r = repair;
         }
         // its end's 1 deletes it; the destructor (FUN_140ad8fd0) finds it out of the repairers

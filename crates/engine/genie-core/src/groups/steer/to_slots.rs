@@ -161,7 +161,7 @@ impl World {
         if u.master(&self.masters, p)?.kind < ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
-        if let Some(e) = u.unmodelled_action.clone() {
+        if let Some(e) = u.actions.unmodelled_action.clone() {
             return Err(e);
         }
         let top = u.top_action();

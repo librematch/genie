@@ -16,9 +16,11 @@ use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use genie_diff::Diff;
 
+mod action;
 mod building;
 mod combat;
 
+pub use self::action::ActionLayer;
 pub use self::building::Building;
 pub use self::combat::Combat;
 

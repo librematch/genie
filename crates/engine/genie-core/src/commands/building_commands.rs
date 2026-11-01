@@ -403,7 +403,7 @@ impl World {
             ));
         }
         let top = building.top_action_kind();
-        if building.unmodelled_action.is_some() {
+        if building.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "RESEARCH at a building with an unmodelled action",
             ));

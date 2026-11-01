@@ -47,9 +47,9 @@ impl Unit {
         let Some(mut missile) = self.missile.take() else {
             return Ok(());
         };
-        let mut action = self.actions.take_missile();
+        let mut action = self.actions.list.take_missile();
         let flown = self.fly_missile(&mut missile, &mut action, c);
-        self.actions.set_missile(action);
+        self.actions.list.set_missile(action);
         self.missile = Some(missile);
         flown
     }

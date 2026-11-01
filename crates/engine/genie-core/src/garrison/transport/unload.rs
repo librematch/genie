@@ -54,6 +54,7 @@ impl crate::world::World {
             .players
             .live(p, i)?
             .actions
+            .list
             .transport()
             .filter(|_| existing)
             .and_then(|t| t.task);
@@ -75,13 +76,13 @@ impl crate::world::World {
             ship.position,
         )?;
         let unit = self.players.live_mut(p, i)?;
-        let changes = if let Some(t) = unit.actions.transport_mut().filter(|_| existing) {
+        let changes = if let Some(t) = unit.actions.list.transport_mut().filter(|_| existing) {
             vec![t.work(ship.position, true, &ship, &mut shore)?]
         } else {
             let mut t = TransportAction::new(ship.position);
             let started = t.start(true, &ship, &mut shore)?;
             let worked = t.work(to, true, &ship, &mut shore)?;
-            unit.actions.set_transport(Some(t));
+            unit.actions.list.set_transport(Some(t));
             vec![started, worked]
         };
         for c in changes {
@@ -152,6 +153,7 @@ impl crate::world::World {
         let unit = self.players.live(p, i)?;
         let t = unit
             .actions
+            .list
             .transport()
             .copied()
             .ok_or(GenieError::unreachable("an unload without its Transport"))?;
@@ -196,6 +198,7 @@ impl crate::world::World {
                 .players
                 .live_mut(p, i)?
                 .actions
+                .list
                 .transport_mut()
                 .ok_or(NO_TRANSPORT)?;
             let (x, y) = (point.x(), point.y());
@@ -220,6 +223,7 @@ impl crate::world::World {
             .players
             .live_mut(p, i)?
             .actions
+            .list
             .transport_mut()
             .ok_or(NO_TRANSPORT)?;
         changes.push(t.unloaded(&ship, &mut shore)?);

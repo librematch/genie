@@ -839,6 +839,7 @@ fn keshik(t: &mut World) {
     };
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .set_attack(Some(attack));
     t.players[1].attributes[213] = Amount::new(0.5);
     t.players[1].generated[3] = Amount::new(0.999);
@@ -866,6 +867,7 @@ fn a_keshik_makes_gold_while_it_fights_a_target_of_its_task_s_class() {
     // in another state, nothing
     t.players[1].objects[ListIndex::new(0)]
         .actions
+        .list
         .attack_mut()
         .unwrap()
         .state = AttackState::Ready;
