@@ -320,11 +320,6 @@ pub(crate) fn object_gone(id: impl ObjectKey) -> GenieError {
 pub(crate) const NO_QUEUE: GenieError =
     GenieError::unreachable("a building without a production queue where one is read");
 
-/// A technology index outside the tree where RESEARCH has queued one.
-pub(crate) fn tech_outside(tech: i16) -> GenieError {
-    GenieError::invalid_input("a technology outside the tree").with("tech", tech)
-}
-
 impl World {
     pub(crate) fn place(&self, id: impl ObjectKey) -> Option<Place> {
         let id = id.key()?;

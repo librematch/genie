@@ -18,10 +18,10 @@ pub struct ResearchCommand {
     pub count: i16,
     /// `+0x11..`: the buildings the packet lists, none for −1.
     pub buildings: Vec<Option<ObjectId>>,
-    /// `+0xa`: the technology.
-    pub tech: i16,
+    /// `+0xa`: the technology, none for −1 (or any id below 0).
+    pub tech: Option<crate::technology::TechId>,
     /// `+0xc`, the formatter's `qId`: −1 for a research to run.
-    pub q_id: i32,
+    pub q_id: crate::commands::QueueId,
     /// `+0x10`: five at once.
     pub shift: bool,
 }

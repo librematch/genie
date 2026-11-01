@@ -80,7 +80,7 @@ pub struct UnitOrderCommand {
     /// `+0xc`, `+0x10`: the point, which the actions modelled do not read.
     pub point: Point,
     /// `+0x14`, the formatter's `qId`, which the actions modelled do not read.
-    pub q_id: i32,
+    pub q_id: crate::commands::QueueId,
     /// `+0x1d`: a garrison goes through the units' unit AIs (their slot 0x30); a cancel cancels
     /// up to five of a kind.
     pub through_ai: bool,

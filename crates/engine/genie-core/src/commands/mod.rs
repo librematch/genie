@@ -29,6 +29,7 @@ pub mod go_back_to_work;
 mod ground;
 mod new_building;
 pub mod order;
+mod packet_values;
 pub mod patrol;
 mod placement;
 mod production;
@@ -64,6 +65,7 @@ pub use self::gather_point::GatherPointCommand;
 pub use self::gather_point_state::GatherPointState;
 pub use self::go_back_to_work::{GoBackToWork2Command, GoBackToWorkCommand};
 pub use self::order::{Order, OrderCommand};
+pub use self::packet_values::{QueueId, SpriteOverride, TradeLots};
 pub use self::patrol::{PatrolCommand, Waypoints};
 pub use self::queue::QueueCommand;
 pub use self::research::ResearchCommand;
@@ -261,10 +263,6 @@ const ONE_UNIT_AGE: f32 = crate::math::image::turn::ONE_UNIT_AGE;
 /// A build order on a foundation the world no longer holds.
 pub(crate) const FOUNDATION_GONE: GenieError =
     GenieError::unsupported("a build order on a foundation that is gone");
-
-/// Castle Age (`0x66`), whose RESEARCH marks the treaty monitor in game mode 16
-/// ([`crate::world::GameMode::ONE_UNIT`]).
-const CASTLE_AGE: i16 = 0x66;
 
 /// The units a human player's command names at most (`FUN_140e6b290`'s `0x3c`).
 const HUMAN_UNITS: usize = 60;

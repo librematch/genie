@@ -1799,19 +1799,37 @@ fn a_human_build_with_a_target_places_nothing_and_a_house_keeps_its_sprite_overr
     };
     let mut t = build_world();
     let before = t.players[1].objects.len();
-    t.run(&build(3, -1));
+    t.run(&build(
+        crate::commands::QueueId::of_data(3),
+        crate::commands::SpriteOverride::NONE,
+    ));
     assert_eq!(t.players[1].objects.len(), before);
     let overridden = |civ, sprite_override| {
         let mut t = build_world();
         t.players[1].civ = civ;
-        t.run(&build(-1, sprite_override));
+        t.run(&build(
+            crate::commands::QueueId::of_data(-1),
+            sprite_override,
+        ));
         let foundation = t.players[1].objects.last().unwrap();
         foundation.construction.as_ref().unwrap().sprite_override
     };
-    assert!(overridden(CivId::new(12), 0x2c9));
-    assert!(!overridden(CivId::new(12), 0x2cf));
-    assert!(!overridden(CivId::new(11), 0x2c9));
-    assert!(!overridden(CivId::new(12), -1));
+    assert!(overridden(
+        CivId::new(12),
+        crate::commands::SpriteOverride::of_data(0x2c9)
+    ));
+    assert!(!overridden(
+        CivId::new(12),
+        crate::commands::SpriteOverride::of_data(0x2cf)
+    ));
+    assert!(!overridden(
+        CivId::new(11),
+        crate::commands::SpriteOverride::of_data(0x2c9)
+    ));
+    assert!(!overridden(
+        CivId::new(12),
+        crate::commands::SpriteOverride::of_data(-1)
+    ));
 }
 
 #[test]
@@ -1823,8 +1841,8 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: -1,
-            sprite_override: -1,
+            q_id: crate::commands::QueueId::of_data(-1),
+            sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids([9175, 9181])),
             queued: false,
             commits: false,
@@ -1908,8 +1926,8 @@ fn a_direct_build_empties_its_builder_s_order_queue() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: -1,
-        sprite_override: -1,
+        q_id: crate::commands::QueueId::of_data(-1),
+        sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: false,
@@ -1983,8 +2001,8 @@ fn a_queued_build_queues_its_order_for_another_player_s_villager() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: -1,
-        sprite_override: -1,
+        q_id: crate::commands::QueueId::of_data(-1),
+        sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9618, 9175])),
         queued: true,
         commits: false,
@@ -7221,8 +7239,8 @@ fn a_build_creates_a_foundation_whose_unit_ai_draws_before_the_turn_players_unit
             player: player_id(0),
             master: master_id(70),
             position: Point::new(10.0, 10.0),
-            q_id: -1,
-            sprite_override: -1,
+            q_id: crate::commands::QueueId::of_data(-1),
+            sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(vec![]),
             queued: false,
             commits: false,
@@ -8946,8 +8964,8 @@ fn a_research_at_several_buildings_takes_the_least_loaded() {
         building,
         count,
         buildings: object_ids(buildings),
-        tech: 0,
-        q_id: -1,
+        tech: TechId::of_data(0),
+        q_id: crate::commands::QueueId::of_data(-1),
         shift: false,
     };
     let loaded = |r: ResearchCommand| t.least_loaded(&r, &r.buildings).unwrap();
@@ -8983,8 +9001,8 @@ fn a_research_s_check_refuses_another_player_s_buildings() {
         building,
         count,
         buildings: object_ids(buildings),
-        tech: 0,
-        q_id: -1,
+        tech: TechId::of_data(0),
+        q_id: crate::commands::QueueId::of_data(-1),
         shift: false,
     };
     // its own: listed alone, or with the others checked
@@ -9081,8 +9099,8 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
             building: Some(object_id(9)),
             count: 1,
             buildings: vec![],
-            tech: 0x66,
-            q_id: -1,
+            tech: TechId::of_data(0x66),
+            q_id: crate::commands::QueueId::of_data(-1),
             shift: false,
         };
         let r = research_listed(&mut t, &at);
@@ -9142,8 +9160,8 @@ fn research_at(tech: i16, target: i32) -> ResearchCommand {
         building: Some(object_id(9)),
         count: 1,
         buildings: vec![],
-        tech,
-        q_id: target,
+        tech: TechId::of_data(tech),
+        q_id: crate::commands::QueueId::of_data(target),
         shift: false,
     }
 }
@@ -9245,7 +9263,9 @@ fn a_research_s_unmodelled_parts_fail() {
     );
     assert_eq!(
         fails(&|t| {
-            let _ = t.linked_techs.insert(5, crate::technology::Linked::Cycle);
+            let _ = t
+                .linked_techs
+                .insert(tech_id(5), crate::technology::Linked::Cycle);
         }),
         "RESEARCH of a linked technology (FUN_140f3a0f0, FUN_140f39e80)"
     );
@@ -15176,8 +15196,8 @@ fn a_build_command_s_foundation_holds_its_movement_state() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: -1,
-        sprite_override: -1,
+        q_id: crate::commands::QueueId::of_data(-1),
+        sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: false,
@@ -15278,8 +15298,8 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: -1,
-            sprite_override: -1,
+            q_id: crate::commands::QueueId::of_data(-1),
+            sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids([9175])),
             queued: false,
             commits: false,
@@ -15674,8 +15694,8 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: -1,
-        sprite_override: -1,
+        q_id: crate::commands::QueueId::of_data(-1),
+        sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: true,
@@ -15690,9 +15710,9 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
     wall.run(&Command::BuildWall(BuildWallCommand {
         player: player_id(1),
         master: master_id(70),
-        from: [30, 88],
-        to: [30, 88],
-        q_id: -1,
+        from: Tile::new(30, 88),
+        to: Tile::new(30, 88),
+        q_id: crate::commands::QueueId::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: true,
@@ -16020,8 +16040,8 @@ fn a_build_of_another_player_s_builders_is_refused_and_theirs_are_left_out() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: -1,
-            sprite_override: -1,
+            q_id: crate::commands::QueueId::of_data(-1),
+            sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids(builders)),
             queued: false,
             commits: false,
@@ -19638,7 +19658,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             units: unit_list(v.clone()),
             target: Some(object_id(700)),
             point: Point::new(-1.0, -1.0),
-            q_id: -1,
+            q_id: crate::commands::QueueId::of_data(-1),
             through_ai: true,
             nearby: false,
             action: UnitOrderAction::of(action),
@@ -19835,13 +19855,18 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
             &Command::Trade(TradeCommand {
                 player: player_id(1),
                 attribute: 1,
-                times: 1,
+                times: crate::commands::TradeLots::of_data(1),
                 market: None,
                 buy: true,
             }),
             PlayerId::new(1),
             |w| {
-                w.buy(player_id(1), attribute::WOOD, 1).unwrap();
+                w.buy(
+                    player_id(1),
+                    attribute::WOOD,
+                    crate::commands::TradeLots::of_data(1),
+                )
+                .unwrap();
                 Ok(())
             },
         ),
@@ -19850,13 +19875,18 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
             &Command::Trade(TradeCommand {
                 player: player_id(1),
                 attribute: 1,
-                times: 1,
+                times: crate::commands::TradeLots::of_data(1),
                 market: None,
                 buy: false,
             }),
             PlayerId::new(1),
             |w| {
-                w.sell(player_id(1), attribute::WOOD, 1).unwrap();
+                w.sell(
+                    player_id(1),
+                    attribute::WOOD,
+                    crate::commands::TradeLots::of_data(1),
+                )
+                .unwrap();
                 Ok(())
             },
         ),
@@ -20059,8 +20089,8 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
         building: Some(object_id(700)),
         count: 1,
         buildings: tc.clone(),
-        tech: 22,
-        q_id: -1,
+        tech: TechId::of_data(22),
+        q_id: crate::commands::QueueId::of_data(-1),
         shift: false,
     };
     let queue = QueueCommand {
@@ -20092,8 +20122,8 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
                 building: Some(object_id(700)),
                 count: 1,
                 buildings: tc.clone(),
-                tech: 22,
-                q_id: -1,
+                tech: TechId::of_data(22),
+                q_id: crate::commands::QueueId::of_data(-1),
                 shift: false,
             }),
             PlayerId::new(1),

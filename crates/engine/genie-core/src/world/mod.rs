@@ -270,7 +270,7 @@ pub struct World {
     pub lines: crate::objects::lines::UnitLines,
     /// The game's linked technologies (`linkedTechs.json`, the table at the game settings'
     /// `+0x18` that `FUN_140f39f40` looks up), by technology; empty when not loaded.
-    pub linked_techs: std::collections::BTreeMap<i16, crate::technology::Linked>,
+    pub linked_techs: std::collections::BTreeMap<TechId, crate::technology::Linked>,
     /// The game options the simulation reads ([`crate::world::settings::Settings`]), from the header.
     pub settings: settings::Settings,
     /// The game object's tagged value at `+0x680` (`DAT_143f07a58`, read through

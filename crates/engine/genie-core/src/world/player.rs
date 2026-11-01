@@ -161,7 +161,7 @@ pub struct Player {
     /// to its allies too.
     pub sharing: bool,
     /// `commodity_volumn_delta` (`+0x140c`, saved): the lot a market trade moves (100).
-    pub commodity_volume: i32,
+    pub commodity_volume: crate::players::LotVolume,
     /// The objects whose ghosts the player's list follows (`+0x78`, [`crate::vision::ghost`]): not
     /// saved; the load builds it ([`World::build_watched`]).
     pub watched: Vec<crate::vision::ghost::Watched>,

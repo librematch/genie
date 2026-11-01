@@ -3,6 +3,9 @@
 use crate::encode::encode;
 use crate::names::unmodelled_command;
 use genie_core::GenieError;
+use genie_core::commands::QueueId;
+use genie_core::commands::SpriteOverride;
+use genie_core::commands::TradeLots;
 use genie_core::commands::{
     AllBackToWorkCommand, AttackMoveCommand, AutoScoutCommand, BuildCommand, BuildWallCommand,
     BuildingQueueCommand, Command, DeleteCommand, FlareCommand, FormFormationCommand, GameCommand,
@@ -13,12 +16,14 @@ use genie_core::commands::{
     UnloadPick, UnmodelledCommand, Waypoints,
 };
 use genie_core::map::Point;
+use genie_core::map::Tile;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::orders::{Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::tribute::Gift;
+use genie_core::technology::TechId;
 use genie_rec::de::command::{self as packets, Command as Packet};
 
 /// The command a packet holds.
@@ -201,7 +206,7 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             units: listed(c.num, &c.ids),
             target: ObjectId::of_field(c.t_id),
             point: Point::new(c.x, c.y),
-            q_id: c.q_id,
+            q_id: QueueId::of_data(c.q_id),
             through_ai: c.field_0x1d != 0,
             nearby: c.field_0x1e != 0,
             action: UnitOrderAction::of(c.action),
@@ -301,8 +306,8 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             player: PlayerId::from(c.commp_id),
             master: MasterId::try_from(short(c.o_id))?,
             position: Point::new(c.x, c.y),
-            q_id: c.q_id,
-            sprite_override: c.field_0x18.cast_signed(),
+            q_id: QueueId::of_data(c.q_id),
+            sprite_override: SpriteOverride::of_data(c.field_0x18.cast_signed()),
             builders: listed(c.num, &c.ids),
             queued: c.field_0x1e != 0,
             commits: c.field_0x1f == 0,
@@ -311,9 +316,9 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         Packet::BuildWall(c) => Command::BuildWall(BuildWallCommand {
             player: PlayerId::from(c.commp_id),
             master: MasterId::try_from(short(c.o_id))?,
-            from: [c.x1, c.y1],
-            to: [c.x2, c.y2],
-            q_id: c.q_id,
+            from: Tile::new(i32::from(c.x1), i32::from(c.y1)),
+            to: Tile::new(i32::from(c.x2), i32::from(c.y2)),
+            q_id: QueueId::of_data(c.q_id),
             builders: listed(c.num, &c.ids),
             queued: c.field_0x1a != 0,
             commits: c.field_0x1b == 0,
@@ -331,8 +336,8 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             building: ObjectId::of_field(c.u_id),
             count: c.field_0x08.cast_signed(),
             buildings: object_ids(&c.ids),
-            tech: c.t_id,
-            q_id: c.q_id,
+            tech: TechId::of_data(c.t_id),
+            q_id: QueueId::of_data(c.q_id),
             shift: c.field_0x10 != 0,
         }),
         Packet::SetGatherPoint(c) => Command::GatherPoint(GatherPointCommand {
@@ -418,7 +423,7 @@ fn trade(player: u8, attribute: u16, times: u16, market: i32, buy: bool) -> Comm
     Command::Trade(TradeCommand {
         player: PlayerId::from(player),
         attribute,
-        times,
+        times: TradeLots::of_data(times),
         market: ObjectId::of_field(market),
         buy,
     })

@@ -11,6 +11,7 @@ use genie_core::objects::masters::CostAmount;
 use genie_core::players::Amount;
 use genie_core::players::Chance;
 use genie_core::players::EscrowShare;
+use genie_core::players::LotVolume;
 use genie_core::players::Team;
 use genie_core::players::game_status::Fealty;
 use genie_core::players::game_status::GameStatus;
@@ -211,7 +212,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 // mTCFlared bit is set; the saved map then already holds the revealed tiles
                 tc_flared: p.world_player().tcflared.iter().map(|&b| b != 0).collect(),
                 sharing: p.world_player().sharing_is_caring != 0,
-                commodity_volume: p.world_player().commodity_volumn_delta,
+                commodity_volume: LotVolume::of_data(p.world_player().commodity_volumn_delta),
                 victory: VictoryState::of_data(victory.get(i).map_or(0, |v| v.victory)),
                 fealty: Fealty::of_data(p.world_player().fealty as i16),
                 // the load sets it 0 (`FUN_14163e970`)

@@ -9,6 +9,7 @@ use genie_core::commands::{
 use genie_core::map::Axis;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionType, MasterId};
+use genie_core::technology::TechId;
 use genie_rec::de::command::{self as packets, Command as Packet};
 
 /// The bytes the client writes at `BUILDING_COMMAND_QUEUE`'s `+0x12..+0x18`, which no code
@@ -282,8 +283,8 @@ fn build(c: &BuildCommand) -> Result<Packet, GenieError> {
         x: c.position.x(),
         y: c.position.y(),
         o_id: i32::from(c.master.get()),
-        q_id: c.q_id,
-        field_0x18: c.sprite_override.cast_unsigned(),
+        q_id: c.q_id.get(),
+        field_0x18: c.sprite_override.get().cast_unsigned(),
         frame: c.frame.byte(),
         gap_0x1d: [0; 1],
         field_0x1e: u8::from(c.queued),
@@ -292,18 +293,29 @@ fn build(c: &BuildCommand) -> Result<Packet, GenieError> {
     }))
 }
 
+/// A wall's tile coordinate as the packet's word (`BUILD_WALL`'s `+0x8`..`+0xe`).
+///
+/// # Errors
+///
+/// A coordinate outside a word.
+fn tile_word(v: i32) -> Result<u16, GenieError> {
+    u16::try_from(v).map_err(|_| {
+        GenieError::invalid_input("a wall tile outside the packet's word").with("coordinate", v)
+    })
+}
+
 /// `BUILD_WALL` (0x69).
 fn build_wall(c: &BuildWallCommand) -> Result<Packet, GenieError> {
     Ok(Packet::BuildWall(packets::BuildWall {
         commp_id: c.player.get(),
         num: c.builders.count,
         gap_0x06: [0; 2],
-        x1: c.from[0],
-        y1: c.from[1],
-        x2: c.to[0],
-        y2: c.to[1],
+        x1: tile_word(c.from.x())?,
+        y1: tile_word(c.from.y())?,
+        x2: tile_word(c.to.x())?,
+        y2: tile_word(c.to.y())?,
         o_id: i32::from(c.master.get()),
-        q_id: c.q_id,
+        q_id: c.q_id.get(),
         gap_0x18: [0; 2],
         field_0x1a: u8::from(c.queued),
         field_0x1b: u8::from(!c.commits),
@@ -331,8 +343,8 @@ fn research(c: &ResearchCommand) -> Result<Packet, GenieError> {
         commp_id: c.player.get(),
         u_id: ObjectId::field(c.building),
         field_0x08: c.count.cast_unsigned(),
-        t_id: c.tech,
-        q_id: c.q_id,
+        t_id: TechId::field(c.tech),
+        q_id: c.q_id.get(),
         field_0x10: u8::from(c.shift),
         ids: ids(&c.buildings, packets::Research::FIXED)?,
     }))
@@ -425,7 +437,7 @@ fn unit_order(c: &UnitOrderCommand) -> Result<Packet, GenieError> {
         t_id: ObjectId::field(c.target),
         x: c.point.x(),
         y: c.point.y(),
-        q_id: c.q_id,
+        q_id: c.q_id.get(),
         param: c.param.cast_signed(),
         action: c.action.byte(),
         field_0x1d: u8::from(c.through_ai),
@@ -474,14 +486,14 @@ fn trade(c: &TradeCommand) -> Packet {
         Packet::BuyCommodity(packets::BuyCommodity {
             commp_id: player,
             attr: c.attribute,
-            amt: c.times,
+            amt: c.times.get(),
             u_id: ObjectId::field(c.market),
         })
     } else {
         Packet::SellCommodity(packets::SellCommodity {
             commp_id: player,
             attr: c.attribute,
-            amt: c.times,
+            amt: c.times.get(),
             u_id: ObjectId::field(c.market),
         })
     }

@@ -3,22 +3,26 @@
 
 use genie_core::objects::WorkerCount;
 use genie_core::players::attribute::AttributeId;
+use genie_core::technology::TechId;
 
 /// The game's linked technologies (`resources/_common/dat/linkedTechs.json`): each group's
 /// technologies with the group's kind. A technology of a kind the game does not know, or out of
 /// the ids' range, is left out.
 pub fn linked_techs(
     json: &str,
-) -> Result<std::collections::BTreeMap<i16, genie_core::technology::Linked>, serde_json::Error> {
+) -> Result<std::collections::BTreeMap<TechId, genie_core::technology::Linked>, serde_json::Error> {
     let file: genie_json::LinkedTechs = serde_json::from_str(json)?;
     Ok(file
         .linked_techs
         .iter()
         .filter_map(|g| genie_core::technology::Linked::of(&g.kind).map(|k| (g, k)))
         .flat_map(|(g, k)| {
-            g.techs
-                .iter()
-                .filter_map(move |&t| i16::try_from(t).ok().map(|t| (t, k)))
+            g.techs.iter().filter_map(move |&t| {
+                i16::try_from(t)
+                    .ok()
+                    .and_then(TechId::of_data)
+                    .map(|t| (t, k))
+            })
         })
         .collect())
 }

@@ -101,9 +101,52 @@ impl genie_diff::Diff for NetTrades {
     }
 }
 
+/// The lot a market trade moves (`commodity_volumn_delta`, `+0x140c`, an int, saved; 100): a
+/// sale needs that much and a lot is worth that many times the price. None below 1.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LotVolume(i32);
+
+impl LotVolume {
+    /// The volume of the save's int `value`.
+    #[must_use]
+    pub const fn of_data(value: i32) -> Self {
+        Self(value)
+    }
+
+    /// The int.
+    #[must_use]
+    pub const fn get(self) -> i32 {
+        self.0
+    }
+
+    /// Whether a trade moves anything: 1 and up.
+    #[must_use]
+    pub const fn any(self) -> bool {
+        0 < self.0
+    }
+
+    /// The volume as a float (`CVTSI2SS`).
+    #[must_use]
+    pub const fn as_f32(self) -> f32 {
+        self.0 as f32
+    }
+
+    /// The volume negated as a float (the sale's change, `NEG` then `CVTSI2SS`).
+    #[must_use]
+    pub const fn negated_f32(self) -> f32 {
+        self.0.wrapping_neg() as f32
+    }
+}
+
+impl genie_diff::Diff for LotVolume {
+    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, d);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::players::{NetTrades, Price, PriceSwing};
+    use crate::players::{LotVolume, NetTrades, Price, PriceSwing};
 
     /// A step raises or lowers a price by one `f32` operation; the net trades count both ways.
     #[test]
@@ -118,5 +161,19 @@ mod tests {
             NetTrades::new(i32::MAX)
         );
         assert_eq!(PriceSwing::default(), PriceSwing::ZERO);
+    }
+
+    /// A volume trades from 1; its floats are the int's and its negation's.
+    #[test]
+    fn a_volume_trades_from_one() {
+        assert!(LotVolume::of_data(1).any() && !LotVolume::of_data(0).any());
+        assert_eq!(
+            LotVolume::of_data(100).as_f32().to_bits(),
+            100.0f32.to_bits()
+        );
+        assert_eq!(
+            LotVolume::of_data(100).negated_f32().to_bits(),
+            (-100.0f32).to_bits()
+        );
     }
 }

@@ -25,10 +25,10 @@ pub struct BuildCommand {
     pub position: Point,
     /// `+0x14`, the formatter's `qId`: a human player's BUILD with one other than −1 does
     /// nothing (`FUN_140e7a400`'s first test).
-    pub q_id: i32,
+    pub q_id: crate::commands::QueueId,
     /// `+0x18`: the foundation's sprite override (`+0x788`, `FUN_141189e70`), which a house
     /// (master 70) of civ 12 keeps from 0x2c9 to 0x2ce; any other is −1.
-    pub sprite_override: i32,
+    pub sprite_override: crate::commands::SpriteOverride,
     /// The units told to build it, in packet order (the count at `+0x4`, the ids from `+0x20`).
     pub builders: UnitList,
     /// `+0x1e`: queued (a builder with a unit AI takes it as an order in its queue).
@@ -58,7 +58,7 @@ impl BuildCommand {
         let Some(builders) = w.command_check(player, listed)? else {
             return Ok(());
         };
-        if self.q_id != -1 && !w.players.player(player)?.computer {
+        if self.q_id.is_queued() && !w.players.player(player)?.computer {
             return Ok(());
         }
         let (x, y) = (self.position.x(), self.position.y());
@@ -74,7 +74,7 @@ impl BuildCommand {
         let sprite_override = self.sprite_override_of(w.players.player(player)?.civ);
         if let Some((_, u)) = w.object_mut(id) {
             if let Some(c) = u.construction.as_mut() {
-                c.sprite_override = sprite_override != -1;
+                c.sprite_override = sprite_override != crate::commands::SpriteOverride::NONE;
             }
             u.build_frame = self.frame;
         }
@@ -91,13 +91,15 @@ impl BuildCommand {
     /// The sprite override the handler gives the foundation (`FUN_141189e70`): the packet's
     /// `+0x18` for a house (master 70) of civ 12 when it is 0x2c9 to 0x2ce, else −1.
     #[must_use]
-    pub fn sprite_override_of(&self, civ: crate::players::CivId) -> i32 {
+    pub fn sprite_override_of(
+        &self,
+        civ: crate::players::CivId,
+    ) -> crate::commands::SpriteOverride {
         const CIV: crate::players::CivId = crate::players::CivId::new(0xc);
-        let kept = self.sprite_override.wrapping_sub(0x2c9).cast_unsigned() <= 5;
-        if self.sprite_override != -1 && kept && self.master == HOUSE && civ == CIV {
+        if self.sprite_override.kept() && self.master == HOUSE && civ == CIV {
             self.sprite_override
         } else {
-            -1
+            crate::commands::SpriteOverride::NONE
         }
     }
 }

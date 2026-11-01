@@ -59,11 +59,11 @@ pub struct BuildWallCommand {
     /// The wall's master (`+0x10`).
     pub master: MasterId,
     /// The line's first tile (`+0x8`, `+0xa`).
-    pub from: [u16; 2],
+    pub from: Tile,
     /// The line's last tile (`+0xc`, `+0xe`).
-    pub to: [u16; 2],
+    pub to: Tile,
     /// `+0x14`: anything but −1 and the command does nothing.
-    pub q_id: i32,
+    pub q_id: crate::commands::QueueId,
     /// The units told to build it, in packet order (the count at `+0x4`, the ids from `+0x1c`).
     pub builders: UnitList,
     /// `+0x1a`: queued (a builder with a unit AI takes the line as orders in its queue).
@@ -231,7 +231,7 @@ impl World {
         builders: &[Option<ObjectId>],
     ) -> Result<(), GenieError> {
         let (player, master) = (w.player, w.master);
-        if w.q_id != -1 {
+        if w.q_id.is_queued() {
             return Ok(());
         }
         let Some(site) = player_master(&self.masters, player, master) else {
@@ -286,9 +286,8 @@ impl World {
         radius: Footprint,
     ) -> Result<Vec<(ObjectId, Position)>, GenieError> {
         let (player, master) = (w.player, w.master);
-        let tile = |[x, y]: [u16; 2]| Tile::new(i32::from(x), i32::from(y));
         let mut placed: Vec<(ObjectId, Position)> = Vec::new();
-        for (a, b) in segments(tile(w.from), tile(w.to)) {
+        for (a, b) in segments(w.from, w.to) {
             for t in tiles(a, b)? {
                 let at = snap(
                     radius,
@@ -325,12 +324,13 @@ impl World {
                 continue;
             };
             let r = u.master(&self.masters, owner)?.radius;
-            let gap = |end: u16, at: f32, r: f32| {
-                let g = ((f32::from(end) + HALF) - at).abs() - r;
+            // the packet's word converted (`CVTSI2SS` of a word: exact)
+            let gap = |end: i32, at: f32, r: f32| {
+                let g = ((end as f32 + HALF) - at).abs() - r;
                 if 0.0 <= g { g } else { 0.0 }
             };
-            let gx = gap(w.to[0], u.position().x(), r.x());
-            let gy = gap(w.to[1], u.position().y(), r.y());
+            let gx = gap(w.to.x(), u.position().x(), r.x());
+            let gy = gap(w.to.y(), u.position().y(), r.y());
             sorted.push((id, gy * gy + gx * gx));
         }
         if INSERTION_SORT_MAX < sorted.len() {

@@ -17,7 +17,7 @@ pub struct TradeCommand {
     /// `+0x4`: the commodity (the dispatcher reads its low byte).
     pub attribute: u16,
     /// `+0x6`: how many lots.
-    pub times: u16,
+    pub times: crate::commands::TradeLots,
     /// `+0x8`: the market, which the check (`FUN_140e6f3f0`) reads; none for −1, which a
     /// recorded trade can hold.
     pub market: Option<ObjectId>,

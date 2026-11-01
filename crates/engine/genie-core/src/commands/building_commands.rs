@@ -1,10 +1,10 @@
 //! The commands of a building: SET GATHER POINT, the command queue and RESEARCH.
 
 use crate::GenieError;
+use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::commands::gather_point::GatherPointCommand;
 use crate::commands::research::ResearchCommand;
-use crate::commands::{CASTLE_AGE, GatherPoint};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -12,7 +12,6 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::master_type::BUILDING;
-use crate::orders::tech_outside;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -302,11 +301,10 @@ impl World {
     ) -> Result<(), GenieError> {
         let player = r.player;
         let owner = self.players.player(player)?;
-        let Some(tech_id) = TechId::of_data(r.tech).filter(|t| t.index() < owner.techs.len())
-        else {
+        let Some(tech_id) = r.tech.filter(|t| t.index() < owner.techs.len()) else {
             return Ok(());
         };
-        if r.q_id != -1 {
+        if r.q_id.is_queued() {
             return Ok(());
         }
         let tech = tech_id.index();
@@ -326,7 +324,7 @@ impl World {
             ));
         }
         let building_id = self.least_loaded(r, buildings)?;
-        if self.linked_techs.contains_key(&r.tech) {
+        if self.linked_techs.contains_key(&tech_id) {
             return Err(GenieError::unsupported(
                 "RESEARCH of a linked technology (FUN_140f3a0f0, FUN_140f39e80)",
             ));
@@ -374,15 +372,12 @@ impl World {
         if top.is_some_and(|k| BLOCKS_RESEARCH.contains(&k)) {
             return Ok(());
         }
-        if self.queue_research(
-            player,
-            i,
-            TechId::try_from(r.tech).map_err(|_| tech_outside(r.tech))?,
-            r.shift,
-        )? {
+        if self.queue_research(player, i, tech_id, r.shift)? {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
-            if r.tech == CASTLE_AGE && self.settings.game_mode == crate::world::GameMode::ONE_UNIT {
+            if tech_id == TechId::CASTLE_AGE
+                && self.settings.game_mode == crate::world::GameMode::ONE_UNIT
+            {
                 return Err(GenieError::unsupported(
                     "RESEARCH of Castle Age in game mode 16 (the treaty monitor's +0x17)",
                 ));

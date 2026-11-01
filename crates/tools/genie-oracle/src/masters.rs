@@ -267,7 +267,7 @@ pub struct MasterTable {
     pub drop_sites: Vec<genie_core::unit_ai::task_finder::DropSite>,
     /// The linked technologies (`linkedTechs.json` beside the `.dat`, [`crate::linked_techs`]);
     /// empty when not loaded.
-    pub linked_techs: std::collections::BTreeMap<i16, genie_core::technology::Linked>,
+    pub linked_techs: std::collections::BTreeMap<TechId, genie_core::technology::Linked>,
     /// The unit lines (`unitlines.json` beside the `.dat`, [`crate::unit_lines`]) as the file
     /// holds them; empty when not loaded (the game then builds tables of no line).
     pub unit_lines: Vec<genie_core::objects::lines::UnitLine>,
@@ -840,7 +840,10 @@ mod tests {
         ]}"#;
         let linked = crate::linked_techs(json).unwrap();
         assert_eq!(
-            linked.into_iter().collect::<Vec<_>>(),
+            linked
+                .into_iter()
+                .map(|(t, k)| (t.get(), k))
+                .collect::<Vec<_>>(),
             [
                 (1131, Linked::MutuallyExclusive),
                 (1133, Linked::MutuallyExclusive),
