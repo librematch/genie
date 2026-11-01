@@ -19,6 +19,7 @@ use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
@@ -326,7 +327,7 @@ impl Attack {
         let a = f.own.source;
         if Distance::ZERO < a.area_effect
             && a.weapon_range < Distance::new(damage::BLAST_RANGE)
-            && (a.charge_type != 3 || damage::charge_hit(&a, &f.victim))
+            && (a.charge_type != ChargeType::AREA || damage::charge_hit(&a, &f.victim))
         {
             return Self::trample(f, blasted, chance, object_rng);
         }
@@ -388,7 +389,7 @@ impl Attack {
             }
         }
         let a = &mut f.own.source;
-        if a.charge_hit && matches!(a.charge_type, 1 | 3) {
+        if a.charge_hit && a.charge_type.adds_to_attack() {
             a.charge = Charge::ZERO;
         }
         Ok(Some(target))

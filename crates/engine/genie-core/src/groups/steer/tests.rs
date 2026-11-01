@@ -21,6 +21,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
@@ -125,7 +126,7 @@ fn world() -> World {
         standing_sprite: Some(SpriteId::named(6)),
         move_sprite: Some(SpriteId::named(7)),
         run_sprite: Some(SpriteId::named(8)),
-        formation_category: 1,
+        formation_category: FormationClass::of_data(1),
         ..Master::default()
     };
     t.masters = vec![Masters::new([master]); 2];

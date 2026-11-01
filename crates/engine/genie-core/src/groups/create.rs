@@ -13,6 +13,7 @@ use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
 use crate::map::Distance;
 use crate::objects::ObjectId;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -48,7 +49,7 @@ pub(crate) struct FormationUnit {
     pub(crate) master: MasterId,
     pub(crate) kind: MasterKind,
     pub(crate) hero_flag: HeroFlags,
-    pub(crate) formation_category: u8,
+    pub(crate) formation_category: FormationClass,
     /// `FUN_141025920`: the unit's radius in a formation.
     pub(crate) radius: Distance,
 }
@@ -445,6 +446,7 @@ mod tests {
     use crate::movement::PathState;
     use crate::objects::ListIndex;
     use crate::objects::ObjectId;
+    use crate::objects::masters::FormationClass;
     use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::masters::{MasterId, ids};
@@ -504,7 +506,7 @@ mod tests {
         let master = |id: MasterId, category: u8| Master {
             id,
             kind: master_type::COMBAT,
-            formation_category: category,
+            formation_category: FormationClass::of_data(category),
             ..Master::default()
         };
         let masters = Masters::new([master(master_id(4), 1), master(ids::ID_6, 3)]);
@@ -614,13 +616,13 @@ mod tests {
                 Master {
                     id: ids::ID_7,
                     kind: master_type::MISSILE,
-                    formation_category: 1,
+                    formation_category: FormationClass::of_data(1),
                     ..Master::default()
                 },
                 Master {
                     id: master_id(8),
                     kind: master_type::COMBAT,
-                    formation_category: 2,
+                    formation_category: FormationClass::of_data(2),
                     ..Master::default()
                 },
             ];

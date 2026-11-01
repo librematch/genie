@@ -165,7 +165,7 @@ impl World {
                 id,
                 group: u.group.id,
                 kind: master.kind,
-                grouped: master.formation_category != 0,
+                grouped: master.formation_category.grouped(),
                 turns: master.object_flags.contains(ObjectFlags::SHIP),
                 speed: u.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
                 position: u.position(),

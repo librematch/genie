@@ -430,7 +430,7 @@ impl World {
         master: &crate::objects::masters::Master,
         target: &WorldObject<'_>,
     ) -> Result<bool, GenieError> {
-        if !matches!(master.charge_type, 6 | 7) {
+        if !master.charge_type.ranged() {
             return Ok(false);
         }
         let tm = self.master(target.player(), target.master_id())?;

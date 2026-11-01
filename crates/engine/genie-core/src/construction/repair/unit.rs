@@ -13,6 +13,7 @@ use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
@@ -122,7 +123,7 @@ impl Unit {
             missile: master.and_then(|m| m.missile.master()),
             range: master.map_or(Distance::ZERO, |m| m.weapon_range),
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
-            charge_type: master.map_or(0, |m| m.charge_type),
+            charge_type: master.map_or(ChargeType::NONE, |m| m.charge_type),
             area_effect: master.map_or(Distance::ZERO, |m| m.area_effect),
             blast_level: master.map_or(BlastLevel::NONE, |m| m.blast_level),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),

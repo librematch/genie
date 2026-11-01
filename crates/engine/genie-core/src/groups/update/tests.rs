@@ -30,6 +30,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
@@ -117,7 +118,7 @@ fn world() -> World {
         search_radius: Distance::new(3.0),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: None,
-        formation_category: 1,
+        formation_category: FormationClass::of_data(1),
         ..Master::default()
     };
     t.masters = vec![Masters::new([master]); 4];
@@ -620,7 +621,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
             standing_sprite: SpriteId::of_data(sprites[0]),
             move_sprite: SpriteId::of_data(sprites[1]),
             run_sprite: SpriteId::of_data(sprites[2]),
-            formation_category: 1,
+            formation_category: FormationClass::of_data(1),
             ..Master::default()
         };
         t.masters = vec![Masters::new([m]); 4];

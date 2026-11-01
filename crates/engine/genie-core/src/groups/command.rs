@@ -133,7 +133,7 @@ impl World {
         for m in &g.members {
             if let Some((p, u)) = self.object(m.id) {
                 let master = u.master(&self.masters, p)?;
-                if COMBAT <= master.kind && master.formation_category != 0 {
+                if COMBAT <= master.kind && master.formation_category.grouped() {
                     return Ok(false);
                 }
             }
@@ -661,6 +661,7 @@ mod tests {
     use crate::groups::MotionFlags;
     use crate::groups::{GroupCommand, Member, UnitGroups};
     use crate::objects::ListIndex;
+    use crate::objects::masters::FormationClass;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
     use crate::players::PlayerId;
@@ -696,7 +697,7 @@ mod tests {
         let master = Master {
             id: master_id(4),
             kind: COMBAT,
-            formation_category: 1,
+            formation_category: FormationClass::of_data(1),
             ..Master::default()
         };
         t.masters = vec![Masters::new([master]); 2];

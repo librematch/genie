@@ -399,7 +399,7 @@ pub fn engagement(
     them: &crate::map::spatial::Placed,
     world_time: WorldTime,
 ) -> Result<Engagement, GenieError> {
-    if matches!(master.charge_type, 6 | 7) {
+    if master.charge_type.ranged() {
         return Err(GenieError::unsupported(
             "an attacker whose charge adds to its range (slot 0x2f8)",
         ));

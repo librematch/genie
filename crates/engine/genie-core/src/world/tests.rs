@@ -63,11 +63,13 @@ use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::FogVisibility;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
@@ -4176,7 +4178,7 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
 fn a_formation_s_units_on_a_new_foundation_move_off_together() {
     let mut t = footprint_world();
     for masters in &mut t.masters {
-        masters.get_mut(master_id(120)).unwrap().formation_category = 1;
+        masters.get_mut(master_id(120)).unwrap().formation_category = FormationClass::of_data(1);
     }
     t.evacuate(object_id(10028), &[object_id(9175)]).unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -14091,7 +14093,7 @@ fn on_side<R>(
                     missile: None,
                     range: Distance::new(1.0),
                     min_range: Distance::ZERO,
-                    charge_type: 0,
+                    charge_type: ChargeType::NONE,
                     area_effect: Distance::ZERO,
                     blast_level: BlastLevel::NONE,
                     los: Distance::new(4.0),
@@ -16141,7 +16143,7 @@ fn the_missile_chain_s_unmodelled_cases_stop_the_player_with_their_reason() {
         (
             |t| {
                 for m in &mut t.masters {
-                    m.get_mut(master_id(4)).unwrap().charge_type = 6;
+                    m.get_mut(master_id(4)).unwrap().charge_type = ChargeType::of_data(6);
                 }
             },
             "a charged hit",

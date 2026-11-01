@@ -107,7 +107,7 @@ impl Unit {
                 "a self-destructing attacker's hit (its object 112 and its death)",
             ));
         }
-        if matches!(master.charge_type, 6 | 7) {
+        if master.charge_type.ranged() {
             return Err(GenieError::unsupported(
                 "a charged hit (slot 0x2f8 with charge types 6 and 7)",
             ));
@@ -203,7 +203,7 @@ impl Unit {
     pub(crate) fn fire(&mut self, c: &mut Step<'_>, aimed: &Aimed) -> Result<(), GenieError> {
         self.attack_count += 1;
         let master = self.master(&c.w.masters, c.player)?;
-        if matches!(master.charge_type, 6 | 7) {
+        if master.charge_type.ranged() {
             return Err(GenieError::unsupported(
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
             ));

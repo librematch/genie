@@ -4,6 +4,7 @@
 use crate::groups::FormationCategory;
 use crate::map::Position;
 use crate::math::fmath::BVector;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -134,7 +135,7 @@ impl crate::world::World {
 pub fn sub_formation(
     kind: MasterKind,
     hero_flag: HeroFlags,
-    formation_category: u8,
+    formation_category: FormationClass,
 ) -> Option<FormationCategory> {
     if kind < COMBAT {
         return None;
@@ -142,7 +143,7 @@ pub fn sub_formation(
     if kind == COMBAT && hero_flag.grants(HeroFlags::PROTECTED_FORMATION) {
         return Some(FormationCategory::PROTECTED);
     }
-    match formation_category {
+    match formation_category.get() {
         0 | 5 => Some(FormationCategory::PROTECTED),
         c @ 1..=4 => Some(FormationCategory::named(i32::from(c))),
         6 => Some(FormationCategory::named(0)),

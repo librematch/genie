@@ -88,7 +88,7 @@ impl World {
             if !stands || busy {
                 continue;
             }
-            if owner == site_owner && COMBAT <= master.kind && master.formation_category != 0 {
+            if owner == site_owner && COMBAT <= master.kind && master.formation_category.grouped() {
                 together.push(id);
                 continue;
             }

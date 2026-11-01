@@ -21,6 +21,7 @@ use crate::movement::WaypointLevel;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionClass;
@@ -88,7 +89,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     let master = |id: MasterId, category: u8| crate::objects::masters::Master {
         id,
         kind: master_type::COMBAT,
-        formation_category: category,
+        formation_category: FormationClass::of_data(category),
         terrain_restriction: Some(RestrictionId::named(0)),
         radius: Footprint::new(0.2, 0.2),
         ..crate::objects::masters::Master::default()
@@ -236,7 +237,7 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
             crate::objects::masters::Master {
                 id: master_id(4),
                 kind: master_type::COMBAT,
-                formation_category: 1,
+                formation_category: FormationClass::of_data(1),
                 hero_flag: HeroFlags::PROTECTED_FORMATION,
                 ..crate::objects::masters::Master::default()
             },
@@ -244,13 +245,13 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
                 id: ids::ID_35,
                 kind: master_type::COMBAT,
                 class: class::SIEGE,
-                formation_category: 2,
+                formation_category: FormationClass::of_data(2),
                 ..crate::objects::masters::Master::default()
             },
             crate::objects::masters::Master {
                 id: crate::vision::ghost::GHOST_MASTER,
                 kind: DOPPELGANGER,
-                formation_category: 1,
+                formation_category: FormationClass::of_data(1),
                 ..crate::objects::masters::Master::default()
             },
         ]);
@@ -948,7 +949,7 @@ fn type_world(paths: Vec<PathData>) -> World {
     let masters = crate::objects::masters::Masters::new([crate::objects::masters::Master {
         id: master_id(4),
         kind: master_type::COMBAT,
-        formation_category: 1,
+        formation_category: FormationClass::of_data(1),
         ..crate::objects::masters::Master::default()
     }]);
     t.masters = vec![masters.clone(), masters];

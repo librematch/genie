@@ -302,12 +302,12 @@ pub struct Master {
     pub min_range: Distance,
     /// `charge_type` (`+0x922`): 6 and 7 add `charge_event` (`+0x920`) to the range against some
     /// targets (slot 0x2f8).
-    pub charge_type: i16,
+    pub charge_type: ChargeType,
     /// `+0x61c`, `attribute_max_amount`: how much an object of this master carries.
     pub capacity: i16,
     /// `+0x8bc`, `mFormationCategory`: 0 (villagers) keeps a unit out of the groups an order's
     /// splitter forms (`FUN_140fd76d0`).
-    pub formation_category: u8,
+    pub formation_category: FormationClass,
     /// `+0x8d9`, `hero_flag`: a combat master it grants
     /// [`HeroFlags::PROTECTED_FORMATION`] joins a group's fifth sub-formation (`FUN_141011300`).
     pub hero_flag: HeroFlags,
@@ -380,7 +380,7 @@ pub struct Master {
     /// `max_charge` (`+0x918`).
     pub max_charge: Charge,
     /// `charge_target` (`+0x924`).
-    pub charge_target: i16,
+    pub charge_target: ChargeTarget,
     /// `+0x5d4`, `obj_max` (the `.dat`'s `garrison_capacity`): a building that garrisons takes a
     /// gather point (`FUN_140e7e9a0`).
     pub garrison: u8,
@@ -519,7 +519,7 @@ pub struct Master {
     /// `+0x91c`, `mRechargeRate`.
     pub recharge_rate: ChargeRate,
     /// `+0x920`, `mChargeEvent`.
-    pub charge_event: i16,
+    pub charge_event: ChargeEvent,
     /// `+0x934`, `+0x938`, `+0x93c`: `mMinConversionTimeAdj`, `mMaxConversionTimeAdj`,
     /// `mConversionChanceAdj`.
     pub conversion: ConversionAdjust,
@@ -604,6 +604,9 @@ mod adjacent_mode;
 mod attack_priority;
 pub mod attribute;
 mod blast_level;
+mod charge_event;
+mod charge_target;
+mod charge_type;
 pub mod class;
 mod class_id;
 mod class_mask;
@@ -611,6 +614,7 @@ mod combat_ability;
 mod damage_class;
 mod fly_mode;
 mod fog_visibility;
+mod formation_class;
 mod garrison_kinds;
 mod gather_group;
 mod ghost_mode;
@@ -643,6 +647,9 @@ pub use self::adjacent_mode::AdjacentMode;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
 pub use self::blast_level::{BlastDefense, BlastLevel};
+pub use self::charge_event::ChargeEvent;
+pub use self::charge_target::ChargeTarget;
+pub use self::charge_type::ChargeType;
 pub use self::class_id::ClassId;
 pub use self::class_mask::ClassMask;
 pub use self::combat_ability::CombatAbility;
@@ -650,6 +657,7 @@ pub use self::conversion_adjust::ConversionAdjust;
 pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::fly_mode::FlyMode;
 pub use self::fog_visibility::FogVisibility;
+pub use self::formation_class::FormationClass;
 pub use self::garrison_kinds::GarrisonKinds;
 pub use self::gather_group::GatherGroup;
 pub use self::ghost_mode::GhostMode;

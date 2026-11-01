@@ -12,6 +12,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::GatherGroup;
@@ -6689,7 +6690,7 @@ const TC: Attacker = Attacker {
     missile: Some(MasterId::named(54)),
     range: Distance::new(6.0),
     min_range: Distance::ZERO,
-    charge_type: 0,
+    charge_type: ChargeType::NONE,
     area_effect: Distance::ZERO,
     blast_level: BlastLevel::NONE,
     los: Distance::new(8.0),

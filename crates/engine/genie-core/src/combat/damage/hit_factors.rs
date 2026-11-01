@@ -7,6 +7,8 @@ use crate::combat::damage::{
 };
 use crate::map::Position;
 use crate::objects::Relics;
+use crate::objects::masters::ChargeTarget;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
@@ -80,15 +82,14 @@ pub fn facing_offset(at: Position, facing: Facing, other: Position) -> f32 {
 /// of the class's group, none for a class in no group.
 #[must_use]
 pub fn charge_works(
-    charge_target: i16,
-    charge_type: i16,
+    charge_target: ChargeTarget,
+    charge_type: ChargeType,
     class: ClassId,
     kind: MasterKind,
 ) -> bool {
-    let targets = charge_target as u16;
-    if targets == 0xffff
-        || charge_type == -4
-        || (targets == 0
+    if charge_target == ChargeTarget::EVERY
+        || charge_type == ChargeType::EVERY_TARGET
+        || (charge_target == ChargeTarget::ALL_BUT_BUILDINGS
             && !(BUILDING <= kind && class != class::CLASS_51 && class != class::CLASS_54))
     {
         return true;
@@ -119,14 +120,14 @@ pub fn charge_works(
         | class::CLASS_60 => 8,
         _ => return false,
     };
-    targets >> bit & 1 != 0
+    charge_target.holds(bit)
 }
 
 /// Slot 0x300 (`FUN_141203e30`): the charge is ready, at least `max_charge` for charge types 1
 /// and 3, else at least 1.
 #[must_use]
 pub fn charged(a: &Attacker) -> bool {
-    if matches!(a.charge_type, 1 | 3) {
+    if a.charge_type.adds_to_attack() {
         a.max_charge <= a.charge
     } else {
         Charge::new(1.0) <= a.charge
@@ -137,7 +138,7 @@ pub fn charged(a: &Attacker) -> bool {
 /// that works on `v` ([`charge_works`]) and is ready.
 #[must_use]
 pub fn charge_hit(a: &Attacker, v: &Victim) -> bool {
-    matches!(a.charge_type, 1 | 3)
+    a.charge_type.adds_to_attack()
         && charge_works(a.charge_target, a.charge_type, v.class, v.kind)
         && charged(a)
 }
@@ -169,7 +170,7 @@ pub(super) fn charge_damage(a: &Attacker) -> Result<f32, GenieError> {
 /// 0x308, `FUN_141203b50`) that works on `t` ([`charge_works`]) and is ready ([`charged`]).
 #[must_use]
 pub fn range_charge_hit(a: &Attacker, t: &Victim) -> bool {
-    matches!(a.charge_type, 6 | 7)
+    a.charge_type.ranged()
         && charge_works(a.charge_target, a.charge_type, t.class, t.kind)
         && charged(a)
 }

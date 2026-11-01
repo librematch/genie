@@ -8,6 +8,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::RestrictionField;
@@ -96,7 +97,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
         missile: None,
         range: Distance::ZERO,
         min_range: Distance::ZERO,
-        charge_type: 0,
+        charge_type: ChargeType::NONE,
         area_effect: Distance::ZERO,
         blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
@@ -207,7 +208,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         missile: None,
         range: Distance::ZERO,
         min_range: Distance::ZERO,
-        charge_type: 0,
+        charge_type: ChargeType::NONE,
         area_effect: Distance::ZERO,
         blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
@@ -361,7 +362,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         missile: None,
         range: Distance::new(0.5),
         min_range: Distance::ZERO,
-        charge_type: 0,
+        charge_type: ChargeType::NONE,
         area_effect: Distance::ZERO,
         blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),

@@ -52,6 +52,7 @@ use super::*;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
 use crate::map::Tile;
 use crate::objects::HpPowerup;
+use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
@@ -170,8 +171,8 @@ fn a_static_object_takes_a_ready_charge_first() {
     };
     let charging = Attacker {
         kind: master_type::COMBAT,
-        charge_type: 1,
-        charge_target: -1,
+        charge_type: ChargeType::ATTACK,
+        charge_target: ChargeTarget::EVERY,
         charge: Charge::new(5.0),
         max_charge: Charge::new(5.0),
         ..Attacker::default()
@@ -181,7 +182,7 @@ fn a_static_object_takes_a_ready_charge_first() {
     assert_eq!(t.hp, HitPoints::new(100.0 - (5.0 + 3.0)));
     let mut t = tree();
     let plain = Attacker {
-        charge_type: 0,
+        charge_type: ChargeType::NONE,
         ..charging
     };
     take_static(&mut t, &plain, &[ClassAmount::new(4, 3)], 1.0);
@@ -476,15 +477,15 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     v.bonus_tasks.clear();
     // a ready charge of type 1 for every target, or for its target's class group
     (v.source.charge_type, v.source.max_charge, v.source.charge) =
-        (1, Charge::new(5.0), Charge::new(5.5));
-    v.source.charge_target = -1;
+        (ChargeType::ATTACK, Charge::new(5.0), Charge::new(5.5));
+    v.source.charge_target = ChargeTarget::EVERY;
     assert_eq!(shown_attack(&v, &none), 4 + 5);
-    v.source.charge_target = 0;
+    v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
     assert_eq!(shown_attack(&v, &none), 4);
     assert_eq!(shown_attack(&v, &at_sheep), 4 + 5);
     // a ready charge of type 6 shows the projectile's best fighting attack, and its range
     // the charge event
-    (v.source.charge_type, v.source.charge_target) = (6, -1);
+    (v.source.charge_type, v.source.charge_target) = (ChargeType::of_data(6), ChargeTarget::EVERY);
     let projectile = [
         ClassAmount::new(13, 20),
         ClassAmount::new(3, 9),
@@ -492,7 +493,7 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     ];
     let shot = Shown {
         projectile: Some(&projectile),
-        charge_event: 2,
+        charge_event: ChargeEvent::of_data(2),
         range_powerup: Distance::new(1.0),
         ..Shown::default()
     };
@@ -527,12 +528,12 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
 fn a_range_charge_hits_a_target_its_class_group_names() {
     let (sheep, mut v) = (sheep(), hunter());
     (v.source.charge_type, v.source.max_charge, v.source.charge) =
-        (7, Charge::new(5.0), Charge::new(1.0));
-    v.source.charge_target = 0;
+        (ChargeType::of_data(7), Charge::new(5.0), Charge::new(1.0));
+    v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
     assert!(range_charge_hit(&v.source, &sheep));
     v.source.charge = Charge::new(0.5);
     assert!(!range_charge_hit(&v.source, &sheep));
-    (v.source.charge_type, v.source.charge) = (1, Charge::new(9.0));
+    (v.source.charge_type, v.source.charge) = (ChargeType::ATTACK, Charge::new(9.0));
     assert!(!range_charge_hit(&v.source, &sheep));
 }
 
@@ -557,8 +558,8 @@ fn a_terrain_defense_bonus_scales_the_damage() {
 #[test]
 fn a_ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
-    hunter.source.charge_type = 1;
-    hunter.source.charge_target = -1;
+    hunter.source.charge_type = ChargeType::ATTACK;
+    hunter.source.charge_target = ChargeTarget::EVERY;
     hunter.source.max_charge = Charge::new(5.0);
     hunter.source.charge = Charge::new(5.0);
     assert_eq!(
@@ -594,22 +595,52 @@ fn a_ready_charge_adds_to_the_first_melee_weapon_and_empties() {
 #[test]
 fn a_charge_target_picks_the_class_groups() {
     // 0: everything but buildings outside classes 51 and 54
-    assert!(charge_works(0, 1, class::CLASS_6, master_type::COMBAT));
-    assert!(!charge_works(0, 1, class::BUILDING, BUILDING));
-    assert!(charge_works(0, 1, class::CLASS_51, master_type::COMBAT));
-    // bit 0 infantry (6), bit 8 buildings (3)
-    assert!(charge_works(1, 1, class::CLASS_6, master_type::COMBAT));
-    assert!(!charge_works(1, 1, class::CLASS_12, master_type::COMBAT));
-    assert!(charge_works(0x100, 1, class::BUILDING, BUILDING));
+    assert!(charge_works(
+        ChargeTarget::ALL_BUT_BUILDINGS,
+        ChargeType::ATTACK,
+        class::CLASS_6,
+        master_type::COMBAT
+    ));
     assert!(!charge_works(
-        0x100,
-        1,
+        ChargeTarget::ALL_BUT_BUILDINGS,
+        ChargeType::ATTACK,
+        class::BUILDING,
+        BUILDING
+    ));
+    assert!(charge_works(
+        ChargeTarget::ALL_BUT_BUILDINGS,
+        ChargeType::ATTACK,
+        class::CLASS_51,
+        master_type::COMBAT
+    ));
+    // bit 0 infantry (6), bit 8 buildings (3)
+    assert!(charge_works(
+        ChargeTarget::of_data(1),
+        ChargeType::ATTACK,
+        class::CLASS_6,
+        master_type::COMBAT
+    ));
+    assert!(!charge_works(
+        ChargeTarget::of_data(1),
+        ChargeType::ATTACK,
+        class::CLASS_12,
+        master_type::COMBAT
+    ));
+    assert!(charge_works(
+        ChargeTarget::of_data(0x100),
+        ChargeType::ATTACK,
+        class::BUILDING,
+        BUILDING
+    ));
+    assert!(!charge_works(
+        ChargeTarget::of_data(0x100),
+        ChargeType::ATTACK,
         ClassId::of_master(99),
         master_type::COMBAT
     ));
     assert!(charge_works(
-        0x10,
-        -4,
+        ChargeTarget::of_data(0x10),
+        ChargeType::EVERY_TARGET,
         ClassId::of_master(99),
         master_type::COMBAT
     ));
@@ -619,7 +650,7 @@ fn a_charge_target_picks_the_class_groups() {
 #[test]
 fn a_shield_spends_a_charge_per_blocked_hit() {
     let mut sheep = sheep();
-    sheep.source.charge_type = 5;
+    sheep.source.charge_type = ChargeType::MELEE_SHIELD;
     sheep.source.charge = Charge::new(1.5);
     assert!(!shield(&mut sheep, true));
     assert!(shield(&mut sheep, false));

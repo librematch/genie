@@ -8,6 +8,8 @@ use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::objects::HitPoints;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::ChargeEvent;
+use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -116,7 +118,7 @@ pub struct Shown<'a> {
     pub projectile: Option<&'a [crate::objects::masters::ClassAmount]>,
     /// Its master's `charge_event` (`+0x920`), which a ready charge of type 6 or 7 adds to its
     /// range.
-    pub charge_event: i16,
+    pub charge_event: ChargeEvent,
     /// Its max range powerup (`+0xa40`, slot 0x700).
     pub range_powerup: Distance,
 }
@@ -129,7 +131,7 @@ pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>) -> bool {
     let a = &v.source;
     v.tribe()
         && charged(a)
-        && (a.charge_target == -1
+        && (a.charge_target == ChargeTarget::EVERY
             || target.is_some_and(|t| charge_hit(a, t) || range_charge_hit(a, t)))
 }
 
@@ -169,7 +171,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> i16 {
     let a = &v.source;
     let charge = charge_shown(v, s.target);
     if charge
-        && matches!(a.charge_type, 6 | 7)
+        && a.charge_type.ranged()
         && let Some(weapons) = s.projectile
     {
         return best_attack(weapons, true);
@@ -183,7 +185,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> i16 {
     if let Some(t) = s.target {
         attack = attack.wrapping_add(whole(bonus_damage(v, t)));
     }
-    if charge && matches!(a.charge_type, 1 | 3) {
+    if charge && a.charge_type.adds_to_attack() {
         attack = attack.wrapping_add(whole(a.charge.get()));
     }
     attack
@@ -214,8 +216,8 @@ pub fn shown_melee_armor(v: &Victim) -> Result<i16, GenieError> {
 pub fn shown_range(v: &Victim, s: &Shown<'_>) -> Distance {
     let a = &v.source;
     let mut range = a.weapon_range;
-    if matches!(a.charge_type, 6 | 7) && charge_shown(v, s.target) {
-        range += Distance::new(f32::from(s.charge_event));
+    if a.charge_type.ranged() && charge_shown(v, s.target) {
+        range += s.charge_event.range();
     }
     let powerup = if v.tribe() {
         s.range_powerup

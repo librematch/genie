@@ -401,7 +401,7 @@ impl World {
         };
         // slot 0x300 of a charge type other than 1 and 3: at least 1 (`COMISS`, a NaN is not)
         Ok(if self.charge_hits(u, master, &t)? {
-            range + Distance::new(f32::from(master.charge_event))
+            range + master.charge_event.range()
         } else {
             range
         })
@@ -578,6 +578,10 @@ mod tests {
     use crate::map::Point;
     use crate::map::Position;
     use crate::objects::ListIndex;
+    use crate::objects::masters::ChargeEvent;
+    use crate::objects::masters::ChargeTarget;
+    use crate::objects::masters::ChargeType;
+    use crate::objects::masters::FormationClass;
     use crate::objects::masters::{ClassId, class};
     use crate::objects::masters::{Master, Masters};
     use crate::objects::masters::{MasterId, ids};
@@ -606,7 +610,11 @@ mod tests {
         let mut t = searched_world();
         let charging = |t: &mut World, charge_type: i16, charge_target: i16| {
             let m = t.masters[1].get_mut(master_id(4)).unwrap();
-            (m.charge_type, m.charge_target, m.charge_event) = (charge_type, charge_target, 2);
+            (m.charge_type, m.charge_target, m.charge_event) = (
+                ChargeType::of_data(charge_type),
+                ChargeTarget::of_data(charge_target),
+                ChargeEvent::of_data(2),
+            );
         };
         let range = |t: &World, target: Option<ObjectId>| {
             let me = t.world_object(object_id(10)).unwrap();
@@ -681,7 +689,7 @@ mod tests {
             id,
             kind: master_type::COMBAT,
             class,
-            formation_category: 1,
+            formation_category: FormationClass::of_data(1),
             line_of_sight: Distance::new(4.0),
             weapon_range: Distance::new(1.0),
             radius: Footprint::new(0.2, 0.2),

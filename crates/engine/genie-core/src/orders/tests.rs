@@ -25,6 +25,7 @@ use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -965,8 +966,8 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
     t.masters = vec![
         crate::objects::masters::Masters::new([]),
         crate::objects::masters::Masters::new([
-            master(master_id(4), 3),
-            master(ids::VILLAGER_MALE, 0),
+            master(master_id(4), FormationClass::of_data(3)),
+            master(ids::VILLAGER_MALE, FormationClass::UNGROUPED),
         ]),
     ];
     if !members.is_empty() {

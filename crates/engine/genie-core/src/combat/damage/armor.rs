@@ -141,7 +141,7 @@ pub(super) fn charges(attacker: &Attacker, own_class: ClassId, kind: MasterKind)
         attacker.charge_type,
         own_class,
         kind,
-    ) && matches!(attacker.charge_type, 1 | 3)
+    ) && attacker.charge_type.adds_to_attack()
         && attacker.max_charge <= attacker.charge
 }
 

@@ -6,6 +6,9 @@ use crate::combat::ChargeRate;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::ChargeEvent;
+use crate::objects::masters::ChargeType;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::SpecialAttack;
@@ -98,7 +101,7 @@ impl Master {
             | a::CONVERSION_CHANCE_MODIFIER => {
                 *self.conversion.lane_mut(attribute) = v;
             }
-            a::FORMATION_CATEGORY => self.formation_category = low8(v),
+            a::FORMATION_CATEGORY => self.formation_category = FormationClass::of_data(low8(v)),
             a::REGENERATION_HP_PERCENT => self.regeneration = f32::from(self.hit_points) * v,
             a::ATTACK_PRIORITY => self.attack_priority = AttackPriority::of_byte(low8(v)),
             a::INVULNERABILITY_LEVEL => self.invulnerability = v,
@@ -122,8 +125,8 @@ impl Master {
         match attribute {
             a::MAXIMUM_CHARGE => self.max_charge = Charge::new(v),
             a::RECHARGE_RATE => self.recharge_rate = ChargeRate::new(v),
-            a::CHARGE_EVENT => self.charge_event = low16(v),
-            a::CHARGE_TYPE => self.charge_type = low16(v),
+            a::CHARGE_EVENT => self.charge_event = ChargeEvent::of_data(low16(v)),
+            a::CHARGE_TYPE => self.charge_type = ChargeType::of_data(low16(v)),
             a::CHARGE_PROJECTILE_UNIT => self.charge_projectile = id_of(cvttss2si(v)),
             _ => {}
         }
@@ -214,7 +217,7 @@ impl Master {
             }
             a::MAXIMUM_CHARGE => self.max_charge += Charge::new(v),
             a::RECHARGE_RATE => self.recharge_rate += ChargeRate::new(v),
-            a::CHARGE_EVENT => self.charge_event = self.charge_event.wrapping_add(low16(v)),
+            a::CHARGE_EVENT => self.charge_event = self.charge_event.plus(low16(v)),
             a::SPECIAL_GRAPHIC => add_sprite(&mut self.special_sprite, v, world),
             a::SPECIAL_ABILITY => {
                 self.special_attack =

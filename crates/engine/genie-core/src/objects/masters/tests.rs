@@ -514,10 +514,10 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::CHARGE_EVENT,
-            |m| f32::from(m.charge_event),
+            |m| f32::from(m.charge_event.get()),
             [3.0, 5.0, 5.0],
         ),
-        (a::CHARGE_TYPE, |m| f32::from(m.charge_type), [3.0; 3]),
+        (a::CHARGE_TYPE, |m| f32::from(m.charge_type.get()), [3.0; 3]),
         (
             a::SECONDARY_PROJECTILE_UNIT,
             |m| f32::from(MasterId::field(m.volley_missile)),
@@ -577,7 +577,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::FORMATION_CATEGORY,
-            |m| f32::from(m.formation_category),
+            |m| f32::from(m.formation_category.get()),
             [3.0; 3],
         ),
         // 10 hit points times the amount, set then added
@@ -1191,7 +1191,7 @@ fn the_combat_master_s_own_values_change() {
             ChargeRate::new(0.5)
         )
     );
-    assert_eq!((m.charge_event, m.charge_type), (2, 6));
+    assert_eq!((m.charge_event.get(), m.charge_type.get()), (2, 6));
     assert_eq!(
         m.conversion,
         ConversionAdjust {

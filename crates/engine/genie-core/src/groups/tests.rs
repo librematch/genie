@@ -7,6 +7,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
@@ -219,39 +220,63 @@ fn the_stored_positions_keep_their_desired_length() {
 #[test]
 fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
     assert_eq!(
-        sub_formation(master_type::MISSILE, HeroFlags::NONE, 3),
+        sub_formation(
+            master_type::MISSILE,
+            HeroFlags::NONE,
+            FormationClass::of_data(3)
+        ),
         None
     );
     assert_eq!(
-        sub_formation(master_type::COMBAT, HeroFlags::NONE, 3),
+        sub_formation(
+            master_type::COMBAT,
+            HeroFlags::NONE,
+            FormationClass::of_data(3)
+        ),
         Some(FormationCategory::named(3))
     );
     assert_eq!(
-        sub_formation(master_type::COMBAT, HeroFlags::NONE, 0),
+        sub_formation(
+            master_type::COMBAT,
+            HeroFlags::NONE,
+            FormationClass::UNGROUPED
+        ),
         Some(FormationCategory::PROTECTED)
     );
     assert_eq!(
-        sub_formation(master_type::COMBAT, HeroFlags::NONE, 6),
+        sub_formation(master_type::COMBAT, HeroFlags::NONE, FormationClass::FIRST),
         Some(FormationCategory::named(0))
     );
     assert_eq!(
-        sub_formation(master_type::COMBAT, HeroFlags::NONE, 255),
+        sub_formation(
+            master_type::COMBAT,
+            HeroFlags::NONE,
+            FormationClass::of_data(255)
+        ),
         None
     );
     assert_eq!(
-        sub_formation(master_type::COMBAT, HeroFlags::FULL_HERO, 3),
+        sub_formation(
+            master_type::COMBAT,
+            HeroFlags::FULL_HERO,
+            FormationClass::of_data(3)
+        ),
         Some(FormationCategory::PROTECTED)
     );
     assert_eq!(
         sub_formation(
             master_type::COMBAT,
             HeroFlags::PROTECTED_FORMATION | HeroFlags::INVERTED,
-            3
+            FormationClass::of_data(3)
         ),
         Some(FormationCategory::named(3))
     );
     assert_eq!(
-        sub_formation(master_type::BUILDING, HeroFlags::FULL_HERO, 3),
+        sub_formation(
+            master_type::BUILDING,
+            HeroFlags::FULL_HERO,
+            FormationClass::of_data(3)
+        ),
         Some(FormationCategory::named(3))
     );
 }
@@ -622,7 +647,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         id,
         kind: master_type::COMBAT,
         class,
-        formation_category: 1,
+        formation_category: FormationClass::of_data(1),
         weapon_range: Distance::new(4.0),
         radius: Footprint::new(0.3, 0.3),
         ..Master::default()

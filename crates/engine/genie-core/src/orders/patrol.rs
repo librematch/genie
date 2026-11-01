@@ -268,7 +268,10 @@ impl World {
                 continue;
             };
             let master = u.master(&self.masters, p)?;
-            if master.kind < COMBAT || master.formation_category == 0 || split.far.contains(&id) {
+            if master.kind < COMBAT
+                || !master.formation_category.grouped()
+                || split.far.contains(&id)
+            {
                 i += 1;
                 continue;
             }

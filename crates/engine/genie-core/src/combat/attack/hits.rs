@@ -10,6 +10,7 @@ use crate::math::rng::Well512;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MISSILE;
@@ -115,13 +116,13 @@ pub(crate) fn strike(
     };
     if MISSILE <= a.kind
         && Distance::ZERO < a.area_effect
-        && (a.charge_type != 3 || damage::charge_hit(&a, victim))
+        && (a.charge_type != ChargeType::AREA || damage::charge_hit(&a, victim))
     {
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
         let _ = damage::blast(own, hit.at, None, Some(main), &mut targets, 1.0)?;
-        if a.charge_type == 3 {
+        if a.charge_type == ChargeType::AREA {
             own.source.charge = Charge::ZERO;
         }
         return Ok(struck);

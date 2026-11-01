@@ -17,9 +17,12 @@ use genie_core::movement::Speed;
 use genie_core::objects::HitPoints;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
+use genie_core::objects::masters::ChargeTarget;
+use genie_core::objects::masters::ChargeType;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
 use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::FormationClass;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::HeroFlags;
 use genie_core::objects::masters::MasterField;
@@ -230,8 +233,8 @@ pub(super) fn work_masters(
         if let Some(c) = combat {
             work.cost = build_cost(&c.build_inventory);
             work.build_time = c.train_location.first().map_or(0, |t| t.train_time);
-            work.charge_type = c.charge_type;
-            work.formation_category = c.temp_formation_category;
+            work.charge_type = ChargeType::of_data(c.charge_type);
+            work.formation_category = FormationClass::of_data(c.temp_formation_category);
             work.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
             work.volley_fire = c.volley_fire_amount;
             work.max_volley = c.max_attacks_in_volley;
@@ -248,7 +251,7 @@ pub(super) fn work_masters(
                 genie_core::objects::masters::AttackPriority::of_byte(c.attack_priority);
             work.special_attack = SpecialAttack::of_data(c.special_attack_flag);
             work.max_charge = Charge::new(c.max_charge);
-            work.charge_target = c.charge_target;
+            work.charge_target = ChargeTarget::of_data(c.charge_target);
         }
         // the combat part a missile master has too (`RGE_Master_Missile_Object`'s base)
         let rge_combat = combat.map(|c| &c.rge_master_combat_object).or_else(|| {

@@ -12,6 +12,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
@@ -185,7 +186,7 @@ pub struct Attacker {
     /// Its master's least range (slot 0x240, `+0x850`).
     pub min_range: Distance,
     /// Its master's charge type: 6 and 7 add to the range against a target (slot 0x2f8).
-    pub charge_type: i16,
+    pub charge_type: ChargeType,
     /// Its master's `area_effect_range` (`+0x82c`).
     pub area_effect: Distance,
     /// Its master's `area_effect_level` (`+0x830`).
@@ -428,7 +429,7 @@ impl Attacker {
     ///
     /// A charge of type 6 or 7.
     pub const fn range_against(&self) -> Result<Distance, GenieError> {
-        if matches!(self.charge_type, 6 | 7) {
+        if self.charge_type.ranged() {
             return Err(GenieError::unsupported(
                 "an attacker whose charge adds to its range (slot 0x2f8)",
             ));

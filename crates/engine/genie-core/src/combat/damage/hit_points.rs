@@ -6,6 +6,7 @@ use crate::combat::damage::{Armored, Victim};
 use crate::math::fmath;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
+use crate::objects::masters::ChargeType;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 
@@ -15,7 +16,11 @@ use crate::objects::masters::master_type::COMBAT;
 /// (`FUN_140a497f0`) change no simulation state (FD-037-D20). A target without combat values has
 /// charge type 0.
 pub fn shield(v: &mut Victim, missile: bool) -> bool {
-    let kind = if missile { 4 } else { 5 };
+    let kind = if missile {
+        ChargeType::MISSILE_SHIELD
+    } else {
+        ChargeType::MELEE_SHIELD
+    };
     if v.source.charge_type == kind && fmath::at_most_or_unordered(1.0, v.source.charge.get()) {
         v.source.charge -= Charge::new(1.0);
         return true;

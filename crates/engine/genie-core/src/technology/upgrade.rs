@@ -498,8 +498,8 @@ impl World {
             .map(|&(_, to)| to);
         if master_type::COMBAT <= kind
             && master_type::COMBAT <= new.kind
-            && 0 < old.charge_type
-            && 0 < new.charge_type
+            && old.charge_type.charges()
+            && new.charge_type.charges()
         {
             let more = (new.max_charge - old.max_charge).abs();
             if Charge::ZERO < more {
@@ -703,6 +703,7 @@ mod tests {
     use crate::objects::SpriteFlags;
     use crate::objects::WorkRate;
     use crate::objects::lifecycle::Held;
+    use crate::objects::masters::ChargeType;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskSprites;
     use crate::objects::masters::action_type;
@@ -1620,7 +1621,7 @@ mod tests {
             standing_sprite_2: Some(SpriteId::named(301)),
             death_sprite: Some(SpriteId::named(302)),
             undead_sprite: Some(SpriteId::named(303)),
-            charge_type: 1,
+            charge_type: ChargeType::ATTACK,
             max_charge: Charge::new(2.0),
             ..Master::default()
         };
@@ -1671,7 +1672,7 @@ mod tests {
         };
         assert_eq!(upgraded(&none, &new, 304).0, HitPoints::ZERO);
         let uncharged = Master {
-            charge_type: 0,
+            charge_type: ChargeType::NONE,
             ..new
         };
         assert_eq!(upgraded(&old, &uncharged, 304).2, Charge::ZERO);

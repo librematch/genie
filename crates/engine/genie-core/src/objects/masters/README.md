@@ -33,6 +33,9 @@ file for what the save does not hold.
 | [`attack_priority.rs`](attack_priority.rs) | A master's attack priority: which targets its unit AI's checks let it choose. |
 | [`attribute.rs`](attribute.rs) | The attributes an effect changes on a master and on its objects (the game's attribute list: string 12200 plus the number names each). |
 | [`blast_level.rs`](blast_level.rs) | A master's blast level and blast defence (`BlastLevel`, `BlastDefense`). |
+| [`charge_event.rs`](charge_event.rs) | A master's charge event (`+0x920`): the range a ranged charge adds. |
+| [`charge_target.rs`](charge_target.rs) | A master's charge targets (`+0x924`): the groups of classes its charge works on. |
+| [`charge_type.rs`](charge_type.rs) | A master's charge type (`+0x922`): what its charge does. |
 | [`class.rs`](class.rs) | The master classes (`+0x18`, an `i16`): the one definition of the class values. |
 | [`class_id.rs`](class_id.rs) | A master's class as one type: the group of masters the game treats alike (villagers, siege weapons, gates, farms), the value the `.dat` names `unit_class`. |
 | [`class_mask.rs`](class_mask.rs) | A set of classes as the game tests one: a bit mask over the classes below a bound. |
@@ -46,6 +49,7 @@ file for what the save does not hold.
 | [`dispatch.rs`](dispatch.rs) | The attribute setters by master type (slots 0x18, 0x20 and 0x28), the master copy (slot 8), the loader's defaults and the selected entries. |
 | [`fly_mode.rs`](fly_mode.rs) | A master's fly mode (`+0x608`): where its objects' height goes on the ground. |
 | [`fog_visibility.rs`](fog_visibility.rs) | A master's fog visibility (`+0x605`): whether its objects show in the fog of war. |
+| [`formation_class.rs`](formation_class.rs) | A master's formation category (`+0x8bc`): the sub-formation its units take in a group. |
 | [`garrison_kinds.rs`](garrison_kinds.rs) | The kinds of units a building takes in (`GarrisonKinds`, `garrison_type`). |
 | [`gather_group.rs`](gather_group.rs) | A master's gather group as one type: the kind of resource the unit AI's resource searches look for, the value the `.dat` names `resource_gather_group`. |
 | [`ghost_mode.rs`](ghost_mode.rs) | A master's `create_doppelganger_on_death` (`+0x682`): whether its objects leave ghosts. |
