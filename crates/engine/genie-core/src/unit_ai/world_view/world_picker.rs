@@ -225,7 +225,7 @@ impl WorldPicker<'_> {
             range_powerup: o.range_powerup,
         };
         let attack = crate::combat::damage::shown_attack(&v, &shown);
-        if 4 < attack || (3 < attack && HARMLESS_HP <= f32::from(om.hit_points)) {
+        if 4 < attack || (3 < attack && HARMLESS_HP <= HitPoints::of_master(om.hit_points).get()) {
             return Ok(false);
         }
         if 0 < crate::combat::damage::shown_melee_armor(&v)? {

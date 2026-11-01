@@ -25,7 +25,7 @@ mod work_rate;
 
 pub use self::action_state::ActionState;
 pub use self::hit_points::HpPowerup;
-pub use self::hp::HitPoints;
+pub use self::hp::{HitPoints, MasterHitPoints};
 pub use self::lifecycle::ObjectState;
 pub use self::list_index::{ListIndex, Places};
 pub use self::object_id::{ObjectId, ObjectKey};

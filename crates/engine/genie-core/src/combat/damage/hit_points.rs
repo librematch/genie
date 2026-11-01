@@ -6,6 +6,7 @@ use crate::combat::damage::{Armored, Victim};
 use crate::math::fmath;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
+use crate::objects::MasterHitPoints;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -30,13 +31,13 @@ pub fn shield(v: &mut Victim, missile: bool) -> bool {
 
 /// `FUN_141202a80`: the hit points the master's `invulnerability_level` keeps (a share of its hit
 /// points when above 0, the level itself when below), 0 for none.
-pub(super) fn hp_floor(a: &Armored, master_hp: i16) -> HitPoints {
+pub(super) fn hp_floor(a: &Armored, master_hp: MasterHitPoints) -> HitPoints {
     invulnerability_floor(a.invulnerability, master_hp)
 }
 
 /// [`hp_floor`] of a master's `invulnerability_level` and hit points.
 #[must_use]
-pub(crate) fn invulnerability_floor(level: f32, master_hp: i16) -> HitPoints {
+pub(crate) fn invulnerability_floor(level: f32, master_hp: MasterHitPoints) -> HitPoints {
     if level == 0.0 {
         HitPoints::ZERO
     } else if 0.0 < level {
@@ -81,7 +82,12 @@ pub fn lose(t: &mut Victim, d: HitPoints) {
 /// its most (the master's plus the room), an overflow taken off the powerup (never below 0); a
 /// powerup above its room first takes the room. The hit point transforms of `FUN_141204450`,
 /// empty in the recordings, are not held.
-pub fn gain_hp(hp: &mut HitPoints, powerup: &mut HpPowerup, master_hp: i16, amount: HitPoints) {
+pub fn gain_hp(
+    hp: &mut HitPoints,
+    powerup: &mut HpPowerup,
+    master_hp: MasterHitPoints,
+    amount: HitPoints,
+) {
     let (mut up, room) = (powerup.taken, powerup.max);
     let most = HitPoints::of_master(master_hp) + room;
     if room < up {
@@ -110,7 +116,7 @@ pub fn gain_hp(hp: &mut HitPoints, powerup: &mut HpPowerup, master_hp: i16, amou
 pub fn heal_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
-    master_hp: i16,
+    master_hp: MasterHitPoints,
     amount: HitPoints,
 ) -> bool {
     gain_hp(hp, powerup, master_hp, amount);

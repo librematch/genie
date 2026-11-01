@@ -73,7 +73,7 @@ fn sheep() -> Victim {
         master_id: master_id(705),
         player: PlayerId::new(1),
         position: Position::new(10.5, 10.5, 0.0),
-        master_hp: 14,
+        master_hp: MasterHitPoints::of_data(14),
         armored: Some(Armored {
             armors: vec![
                 ClassAmount::new(4, 0),
@@ -112,7 +112,7 @@ fn hunter() -> Victim {
             ClassAmount::new(13, 6),
             ClassAmount::new(17, 0),
         ],
-        master_hp: 25,
+        master_hp: MasterHitPoints::of_data(25),
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
             terrain_bonus: RestrictionField::NONE,
@@ -356,7 +356,7 @@ fn a_hit_point_share_reads_the_powerups_and_the_master() {
         (HitPoints::new(10.0), HitPoints::new(25.0))
     );
     let mut none = hunter();
-    none.master_hp = 0;
+    none.master_hp = MasterHitPoints::of_data(0);
     assert_eq!((none.hp_share(false), none.hp_share(true)), (0.0, 0.0));
     let mut nan = hunter();
     nan.armored.as_mut().unwrap().hp_powerup = HpPowerup {
@@ -983,7 +983,7 @@ fn house() -> Victim {
         master_id: ids::HOUSE,
         player: PlayerId::new(2),
         position: Position::new(20.5, 20.5, 0.0),
-        master_hp: 550,
+        master_hp: MasterHitPoints::of_data(550),
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 7)],
             terrain_bonus: RestrictionField::NONE,
@@ -1528,18 +1528,43 @@ const fn pu(taken: f32, max: f32) -> HpPowerup {
 fn a_gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     let mut hp = HitPoints::new(50.0);
     let mut ups = pu(0.0, 0.0);
-    gain_hp(&mut hp, &mut ups, 60, HitPoints::new(5.0));
+    gain_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(5.0),
+    );
     assert_eq!((hp, ups), (HitPoints::new(55.0), pu(0.0, 0.0)));
-    gain_hp(&mut hp, &mut ups, 60, HitPoints::new(10.0));
+    gain_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(10.0),
+    );
     assert_eq!((hp, ups), (HitPoints::new(60.0), pu(0.0, 0.0)));
     let mut hp = HitPoints::new(65.0);
     let mut ups = pu(8.0, 10.0);
-    gain_hp(&mut hp, &mut ups, 60, HitPoints::new(10.0));
+    gain_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(10.0),
+    );
     assert_eq!((hp, ups), (HitPoints::new(70.0), pu(3.0, 10.0)));
-    gain_hp(&mut hp, &mut ups, 60, HitPoints::new(5.0));
+    gain_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(5.0),
+    );
     assert_eq!((hp, ups), (HitPoints::new(70.0), pu(0.0, 10.0)));
     let mut ups = pu(12.0, 10.0);
-    gain_hp(&mut hp, &mut ups, 60, HitPoints::new(0.0));
+    gain_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(0.0),
+    );
     assert_eq!(ups, pu(10.0, 10.0));
 }
 
@@ -1550,22 +1575,42 @@ fn a_gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
 fn a_heal_to_full_holds_the_master_s_hit_points() {
     let mut hp = HitPoints::new(30.0);
     let mut ups = HpPowerup::default();
-    assert!(!heal_hp(&mut hp, &mut ups, 60, HitPoints::new(10.0)));
+    assert!(!heal_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(10.0)
+    ));
     assert_eq!(hp, HitPoints::new(40.0));
-    assert!(heal_hp(&mut hp, &mut ups, 60, HitPoints::new(25.0)));
+    assert!(heal_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(25.0)
+    ));
     assert_eq!(hp, HitPoints::new(60.0));
     let mut hp = HitPoints::new(0.5);
-    assert!(!heal_hp(&mut hp, &mut ups, 60, HitPoints::new(-3.0)));
+    assert!(!heal_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(-3.0)
+    ));
     assert_eq!(hp, HitPoints::new(1.0));
     let mut hp = HitPoints::new(55.0);
     let mut ups = pu(5.0, 5.0);
-    assert!(!heal_hp(&mut hp, &mut ups, 60, HitPoints::new(4.0)));
+    assert!(!heal_hp(
+        &mut hp,
+        &mut ups,
+        MasterHitPoints::of_data(60),
+        HitPoints::new(4.0)
+    ));
     assert_eq!(hp, HitPoints::new(59.0));
     let mut hp = HitPoints::new(f32::NAN);
     assert!(!heal_hp(
         &mut hp,
         &mut HpPowerup::default(),
-        60,
+        MasterHitPoints::of_data(60),
         HitPoints::new(1.0)
     ));
 }

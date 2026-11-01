@@ -16,6 +16,7 @@ use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::attribute::AttributeId;
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 
 /// A saved unit's reload (the Strike's): its `mReloadStinger` plus its master's
@@ -280,7 +281,7 @@ pub(super) fn production(
                 costs: [cost(0)?, cost(1)?, cost(2)?],
                 serial: k as i64,
                 button: e.production_queue_button_location_id,
-                train_time: e.production_queue_train_time,
+                train_time: WholeSeconds::of_data(e.production_queue_train_time),
             })
         })
         .collect::<Result<Vec<Entry>, GenieError>>()?;
@@ -303,7 +304,7 @@ pub(super) fn production(
                 progress: Seconds::new(make.work_done),
                 unique_id: make.unique_id,
                 button: make.button_location_id,
-                train_time: make.train_time,
+                train_time: WholeSeconds::of_data(make.train_time),
             }))
         }
         Some((action_type::MAKE_TECH, action)) => {

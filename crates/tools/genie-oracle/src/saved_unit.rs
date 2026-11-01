@@ -14,6 +14,7 @@ use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
 use genie_core::objects::HitPoints;
 use genie_core::objects::HpPowerup;
+use genie_core::objects::MasterHitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
@@ -28,6 +29,7 @@ use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::{ActionKind, UnitAi};
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
 use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
 
@@ -418,12 +420,12 @@ pub(super) fn construction(
         .map(|b| &b.tribe_master_combat_object)
         .or(m.tribe_master_combat_object.as_deref())
         .and_then(|c| c.train_location.first())
-        .map_or(0, |t| t.train_time);
+        .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
     Some(genie_core::construction::build::Construction {
         progress: Seconds::new(b.build_pts),
         desolid: b.desolid_flag != 0,
         builders: b.tribe_combat_object.num_builders,
-        hit_points: ms.read_temp_6,
+        hit_points: MasterHitPoints::of_data(ms.read_temp_6),
         build_time,
         record: genie_core::map::spatial::Obstruction {
             kind: ObstructionType::from(ms.obstruction_type),

@@ -418,7 +418,7 @@ fn remains_supported(made: &crate::objects::masters::Master) -> Result<(), Genie
             "remains of a type other than 10 and 20 to 39",
         ));
     }
-    if made.kind == STATIC && 0 < made.hit_points {
+    if made.kind == STATIC && 0 < made.hit_points.get() {
         return Err(GenieError::unsupported(
             "remains with hit points (the sleeping list)",
         ));

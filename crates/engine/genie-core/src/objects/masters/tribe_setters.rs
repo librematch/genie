@@ -19,6 +19,7 @@ use crate::objects::masters::{
 use crate::objects::masters::{GarrisonKinds, HeroFlags};
 use crate::players::Amount;
 use crate::players::attribute as players_attribute;
+use crate::world::WholeSeconds;
 
 impl Master {
     /// The cost entries a cost attribute (100, 103 to 106) changes (`FUN_1412661d0`): those of
@@ -102,7 +103,9 @@ impl Master {
                 *self.conversion.lane_mut(attribute) = v;
             }
             a::FORMATION_CATEGORY => self.formation_category = FormationClass::of_data(low8(v)),
-            a::REGENERATION_HP_PERCENT => self.regeneration = f32::from(self.hit_points) * v,
+            a::REGENERATION_HP_PERCENT => {
+                self.regeneration = HitPoints::of_master(self.hit_points).get() * v;
+            }
             a::ATTACK_PRIORITY => self.attack_priority = AttackPriority::of_byte(low8(v)),
             a::INVULNERABILITY_LEVEL => self.invulnerability = v,
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
@@ -177,7 +180,7 @@ impl Master {
             }
             a::TRAIN_TIME => {
                 if let Some(t) = self.train_location_mut() {
-                    t.time = low16(v);
+                    t.time = WholeSeconds::of_data(low16(v));
                 }
             }
             a::TRAIN_LOCATIONS_ENTRY_MOD => {
@@ -233,7 +236,7 @@ impl Master {
             }
             a::TRAIN_TIME => {
                 if let Some(t) = self.train_location_mut() {
-                    t.time = t.time.wrapping_add(low16(v));
+                    t.time = t.time.plus(low16(v));
                 }
             }
             a::TOTAL_MISSILES => self.volley_fire += v,
@@ -245,7 +248,7 @@ impl Master {
                 *self.conversion.lane_mut(attribute) += v;
             }
             a::REGENERATION_HP_PERCENT => {
-                self.regeneration += f32::from(self.hit_points) * v;
+                self.regeneration += HitPoints::of_master(self.hit_points).get() * v;
             }
             a::INVULNERABILITY_LEVEL => self.invulnerability += v,
             // FUN_141533c70 tests the new id; the game takes the sprite from the same table
@@ -298,7 +301,7 @@ impl Master {
             a::TRAIN_TIME => {
                 // FUN_140ace5e0 reads 0 past the list; FUN_14126ade0 writes only within it
                 if let Some(t) = self.train_location_mut() {
-                    t.time = low16(f32::from(t.time) * v + ROUND);
+                    t.time = WholeSeconds::of_data(low16(f32::from(t.time.get()) * v + ROUND));
                 }
             }
             a::TOTAL_MISSILES => self.volley_fire *= v,

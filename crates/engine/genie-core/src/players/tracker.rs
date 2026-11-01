@@ -541,6 +541,7 @@ impl crate::world::World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::MasterHitPoints;
     use crate::objects::lines::UnitLine;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
@@ -551,6 +552,7 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::world::Millis;
+    use crate::world::WholeSeconds;
     use crate::world::WorldTime;
 
     fn building(id: i16, class: ClassId, stack: i16, head: i16, annex: i16) -> Master {
@@ -886,8 +888,8 @@ mod tests {
                     progress: Seconds::new(progress),
                     desolid: false,
                     builders: 0,
-                    hit_points: 2400,
-                    build_time: 150,
+                    hit_points: MasterHitPoints::of_data(2400),
+                    build_time: WholeSeconds::of_data(150),
                     record: crate::map::spatial::Obstruction {
                         kind: ObstructionType::NONE,
                         class: ObstructionClass::NONE,

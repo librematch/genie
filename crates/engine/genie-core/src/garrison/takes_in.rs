@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::garrison::{CLASS_FLAGS, LEAST_HP_SHARE, TRANSPORTED};
+use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
@@ -194,7 +195,7 @@ impl World {
         let bm = b.master(&self.masters, bp)?;
         // CVTPS2PD, CVTDQ2PD, MULSD, then COMISD with JBE: an unordered hit point count takes
         // nothing
-        let max_hp = f64::from(f32::from(bm.hit_points));
+        let max_hp = f64::from(HitPoints::of_master(bm.hit_points).get());
         let above = f64::from(b.life.hp.get()) > max_hp * LEAST_HP_SHARE;
         if !above || bm.garrison == 0 {
             return Ok(false);

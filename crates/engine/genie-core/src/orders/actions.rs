@@ -382,8 +382,8 @@ pub(crate) fn switch_master(
                 switched.leaving.push((kind, -amount));
             }
         }
-        let new_hp = f32::from(next.hit_points);
-        let share = unit.life.hp.get() / f32::from(old.hit_points) * new_hp;
+        let new_hp = HitPoints::of_master(next.hit_points).get();
+        let share = unit.life.hp.get() / HitPoints::of_master(old.hit_points).get() * new_hp;
         let hp = if share > new_hp {
             new_hp
         } else if 1.0 <= share {

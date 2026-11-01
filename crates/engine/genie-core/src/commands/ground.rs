@@ -17,6 +17,7 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
 use crate::players::PlayerId;
+use crate::world::WholeSeconds;
 use crate::world::slots::PlayerSlots;
 use std::collections::BTreeMap;
 
@@ -199,7 +200,7 @@ impl World {
             return Ok(());
         };
         let m = self.master(player, master)?;
-        if m.build_time <= 0 {
+        if m.build_time <= WholeSeconds::ZERO {
             return Ok(());
         }
         let f = crate::map::terrain::Foundation {

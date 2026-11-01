@@ -60,6 +60,7 @@ use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::vision::VisionBits;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 
 /// The object's own update knows its slot: it is taken while it still holds the object, and
 /// the object is found by its id once the list moved or the slot is out of the lists; an
@@ -114,19 +115,45 @@ fn an_object_s_own_slot_is_taken_while_it_holds_the_object() {
 #[test]
 fn a_damage_share_is_the_whole_less_the_hit_points_share() {
     assert_eq!(
-        damage_share(HitPoints::new(1650.0), 1650, class::GATE),
+        damage_share(
+            HitPoints::new(1650.0),
+            MasterHitPoints::of_data(1650),
+            class::GATE
+        ),
         Ok(0)
     );
     assert_eq!(
-        damage_share(HitPoints::new(825.0), 1650, class::GATE),
+        damage_share(
+            HitPoints::new(825.0),
+            MasterHitPoints::of_data(1650),
+            class::GATE
+        ),
         Ok(50)
     );
-    assert_eq!(damage_share(HitPoints::new(1.0), 1650, class::GATE), Ok(99));
     assert_eq!(
-        damage_share(HitPoints::new(2000.0), 1650, class::GATE),
+        damage_share(
+            HitPoints::new(1.0),
+            MasterHitPoints::of_data(1650),
+            class::GATE
+        ),
+        Ok(99)
+    );
+    assert_eq!(
+        damage_share(
+            HitPoints::new(2000.0),
+            MasterHitPoints::of_data(1650),
+            class::GATE
+        ),
         Ok(0)
     );
-    assert!(damage_share(HitPoints::new(10.0), 100, class::LIVESTOCK).is_err());
+    assert!(
+        damage_share(
+            HitPoints::new(10.0),
+            MasterHitPoints::of_data(100),
+            class::LIVESTOCK
+        )
+        .is_err()
+    );
 }
 
 /// records/425906646's update 1641: player 6's drop-off order reaches its goose 28766 (class
@@ -307,8 +334,8 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             progress: Seconds::new(1.0),
             desolid: false,
             builders: 1,
-            hit_points: 550,
-            build_time: 25,
+            hit_points: MasterHitPoints::of_data(550),
+            build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -1466,13 +1493,15 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
     let master = |id, build_time| Master {
         id,
         kind: BUILDING,
-        hit_points: 100,
+        hit_points: MasterHitPoints::of_data(100),
         build_time,
-        volley_fire: f32::from(build_time / 15),
+        volley_fire: f32::from(build_time.get() / 15),
         ..Master::default()
     };
-    t.masters[1] =
-        crate::objects::masters::Masters::new([master(TROPHY, 10), master(master_id(1650), 30)]);
+    t.masters[1] = crate::objects::masters::Masters::new([
+        master(TROPHY, WholeSeconds::of_data(10)),
+        master(master_id(1650), WholeSeconds::of_data(30)),
+    ]);
     let trophy = |state| Unit {
         id: object_id(60),
         firepower: 7.0,
@@ -1480,8 +1509,8 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
             progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
-            hit_points: 100,
-            build_time: 10,
+            hit_points: MasterHitPoints::of_data(100),
+            build_time: WholeSeconds::of_data(10),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -2020,7 +2049,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         id: master_id(4),
         kind: master_type::COMBAT,
         class: class::CLASS_6,
-        hit_points: 40,
+        hit_points: MasterHitPoints::of_data(40),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: None,
         ..Master::default()
@@ -2029,7 +2058,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         id: master_id(5),
         kind: master_type::COMBAT,
         class: class::CLASS_6,
-        hit_points: 60,
+        hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.3, 0.3),
         standing_sprite: None,
         ..Master::default()
@@ -2150,7 +2179,7 @@ fn switch_masters() -> (Master, Master) {
         id: master_id(4),
         kind: master_type::COMBAT,
         class: class::CLASS_6,
-        hit_points: 40,
+        hit_points: MasterHitPoints::of_data(40),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(10)),
         storage: vec![
@@ -2166,7 +2195,7 @@ fn switch_masters() -> (Master, Master) {
         id: master_id(5),
         kind: master_type::COMBAT,
         class: class::CLASS_6,
-        hit_points: 60,
+        hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.3, 0.3),
         standing_sprite: Some(SpriteId::named(11)),
         storage: vec![
@@ -2637,8 +2666,8 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
         progress: Seconds::ZERO,
         desolid: true,
         builders: 2,
-        hit_points: 100,
-        build_time: 10,
+        hit_points: MasterHitPoints::of_data(100),
+        build_time: WholeSeconds::of_data(10),
         record: crate::map::spatial::Obstruction {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
@@ -2817,8 +2846,8 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
             progress: Seconds::ZERO,
             desolid: true,
             builders,
-            hit_points: 100,
-            build_time: 10,
+            hit_points: MasterHitPoints::of_data(100),
+            build_time: WholeSeconds::of_data(10),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -2968,7 +2997,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_a_task() {
         kind: master_type::COMBAT,
         class: class::VILLAGER,
         task_by_group: TaskGroup::MALE_VILLAGERS,
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         tasks,
         ..Master::default()
     };
@@ -2982,7 +3011,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_a_task() {
             id: ids::HOUSE,
             kind: BUILDING,
             class: class::BUILDING,
-            hit_points: 550,
+            hit_points: MasterHitPoints::of_data(550),
             ..Master::default()
         },
     ]);
@@ -4912,7 +4941,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_a_group_that_attacks_it() 
         kind: BUILDING,
         class: class::BUILDING,
         radius: Footprint::new(2.0, 2.0),
-        hit_points: 550,
+        hit_points: MasterHitPoints::of_data(550),
         ..Master::default()
     };
     let soldier = Master {

@@ -123,6 +123,41 @@ impl genie_diff::Diff for Millis {
     }
 }
 
+/// A build, train or research time in whole seconds as a master's or a technology's data holds it
+/// (a short: a master's `+0x898` train locations, its build time): every short is kept, and
+/// [`Seconds::of_master`] is the game's conversion.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WholeSeconds(i16);
+
+impl WholeSeconds {
+    /// No time (0).
+    pub const ZERO: Self = Self(0);
+
+    /// The time of the data's short `value`.
+    #[must_use]
+    pub const fn of_data(value: i16) -> Self {
+        Self(value)
+    }
+
+    /// The short plus `amount` (an effect's add, wrapping as the game's 16-bit add).
+    #[must_use]
+    pub const fn plus(self, amount: i16) -> Self {
+        Self(self.0.wrapping_add(amount))
+    }
+
+    /// The short, as the data and the save hold it.
+    #[must_use]
+    pub const fn get(self) -> i16 {
+        self.0
+    }
+}
+
+impl genie_diff::Diff for WholeSeconds {
+    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, d);
+    }
+}
+
 /// A span in seconds as the game's `f32` holds it: an update's (`world+0x164`, the dt over
 /// 1000), the timers that count it down or up, the masters' times. Each operator is the one
 /// `f32` operation the game does; a comparison is `f32`'s (a NaN compares false).
@@ -144,8 +179,8 @@ impl Seconds {
     /// A master's whole seconds (a build, train or research time) as the game converts them
     /// (`CVTSI2SS`, exact for an `i16`).
     #[must_use]
-    pub fn of_master(s: i16) -> Self {
-        Self(f32::from(s))
+    pub fn of_master(s: WholeSeconds) -> Self {
+        Self(f32::from(s.0))
     }
 
     /// The seconds, as the save and the game's arithmetic hold them.
@@ -306,7 +341,15 @@ mod tests {
         assert!(Seconds::ZERO < a && a <= a);
         assert_eq!(Seconds::new(f32::NAN).partial_cmp(&Seconds::ZERO), None);
         assert_eq!(Seconds::new(0.5).to_string(), "0.5");
-        assert_eq!(Seconds::of_master(-3).get().to_bits(), (-3.0_f32).to_bits());
+        assert_eq!(
+            Seconds::of_master(WholeSeconds::of_data(-3))
+                .get()
+                .to_bits(),
+            (-3.0_f32).to_bits()
+        );
+        assert!(WholeSeconds::ZERO < WholeSeconds::of_data(1));
+        assert_eq!(WholeSeconds::default().get(), 0);
+        assert_eq!(WholeSeconds::of_data(i16::MAX).plus(1).get(), i16::MIN);
     }
 
     #[test]

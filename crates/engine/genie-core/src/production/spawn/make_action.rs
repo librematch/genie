@@ -311,7 +311,7 @@ impl World {
         let site = building.master(&self.masters, p)?;
         let rate = building.work_rate_powerup + site.work_rate;
         let made = make.master.and_then(|m| player_master(&self.masters, p, m));
-        let time = f32::from(make.time(made, building.life.master_id));
+        let time = Seconds::of_master(make.time(made, building.life.master_id)).get();
         let progress = Seconds::new(rate * dt_seconds) + make.progress;
         if let Some(Some(Making::Unit(m))) = self
             .players

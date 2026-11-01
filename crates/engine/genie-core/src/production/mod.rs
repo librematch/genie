@@ -26,6 +26,7 @@ use crate::players::Amount;
 use crate::players::attribute::{self, AttributeId};
 use crate::technology::TechId;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use genie_diff::Diff;
 
 mod costs;
@@ -61,7 +62,7 @@ pub struct Entry {
     pub button: i32,
     /// `+0x2c`, `mTrainTime`: the unit's train time at the building and button
     /// ([`train_time`]); a research entry does not write it.
-    pub train_time: i16,
+    pub train_time: WholeSeconds,
 }
 
 impl Default for Entry {
@@ -76,7 +77,7 @@ impl Default for Entry {
             costs: [(Some(attribute::FOOD), 0.0); 3],
             serial: 0,
             button: 0,
-            train_time: 0,
+            train_time: WholeSeconds::ZERO,
         }
     }
 }
@@ -275,8 +276,8 @@ impl Queue {
 /// that building whose button is the button's low byte, else the first location's; 0 without
 /// locations.
 #[must_use]
-pub fn train_time(locations: &[TrainLocation], building: MasterId, button: i32) -> i16 {
-    let first = locations.first().map_or(0, |l| l.time);
+pub fn train_time(locations: &[TrainLocation], building: MasterId, button: i32) -> WholeSeconds {
+    let first = locations.first().map_or(WholeSeconds::ZERO, |l| l.time);
     if button == -1 {
         return first;
     }
@@ -305,7 +306,7 @@ pub struct MakeObj {
     /// `+0x78`, `mButtonLocationId`.
     pub button: i32,
     /// `+0x7c`, `mTrainTime`: the train time of the entry it was made for.
-    pub train_time: i16,
+    pub train_time: WholeSeconds,
 }
 
 impl MakeObj {
@@ -329,11 +330,11 @@ impl MakeObj {
     /// `building` and the action's button ([`train_time`]); 0 for a master that is not a
     /// combat master (`TRIBE_Master_Combat_Object`, type 70 and up).
     #[must_use]
-    pub fn time(&self, master: Option<&Master>, building: MasterId) -> i16 {
+    pub fn time(&self, master: Option<&Master>, building: MasterId) -> WholeSeconds {
         // The first master type that is a `TRIBE_Master_Combat_Object` (the dynamic casts of
         // `FUN_1411cbc40` and `FUN_140acf280`).
         let Some(m) = master.filter(|m| COMBAT <= m.kind) else {
-            return 0;
+            return WholeSeconds::ZERO;
         };
         if m.object_flags.contains(ObjectFlags::OWN_TRAIN_TIME) {
             return self.train_time;
@@ -473,7 +474,7 @@ mod tests {
             costs: [(Some(attribute::FOOD), food), (None, 0.0), (None, 0.0)],
             serial: 0,
             button: -1,
-            train_time: 25,
+            train_time: WholeSeconds::of_data(25),
         }
     }
 
@@ -488,7 +489,7 @@ mod tests {
         );
         assert_eq!(
             (e.costs, e.button, e.train_time),
-            ([(Some(attribute::FOOD), 0.0); 3], 0, 0)
+            ([(Some(attribute::FOOD), 0.0); 3], 0, WholeSeconds::ZERO)
         );
     }
 
@@ -529,13 +530,13 @@ mod tests {
             unit(ids::VILLAGER_MALE, 2, 50.0),
             unit(master_id(5), 1, 30.0),
         ]);
-        q.slots[2].train_time = 40;
+        q.slots[2].train_time = WholeSeconds::of_data(40);
         q.close(0, true);
         assert_eq!(q.count, 2);
         assert_eq!(
             q.slots[..3]
                 .iter()
-                .map(|s| (s.master, s.count, s.serial, s.train_time))
+                .map(|s| (s.master, s.count, s.serial, s.train_time.get()))
                 .collect::<Vec<_>>(),
             [
                 (Some(ids::VILLAGER_MALE), 2, 0, 25),
@@ -548,11 +549,11 @@ mod tests {
             unit(master_id(4), 0, 25.0),
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
-        q.slots[0].train_time = 7;
+        q.slots[0].train_time = WholeSeconds::of_data(7);
         q.close(0, false);
         assert_eq!(
             (q.slots[0].master, q.slots[0].train_time),
-            (Some(ids::VILLAGER_MALE), 7)
+            (Some(ids::VILLAGER_MALE), WholeSeconds::of_data(7))
         );
     }
 
@@ -628,14 +629,26 @@ mod tests {
             hotkey: 0,
         };
         let locations = [
-            at(Some(ids::CASTLE), 30, 2),
-            at(Some(ids::TOWN_CENTRE), 25, 1),
+            at(Some(ids::CASTLE), WholeSeconds::of_data(30), 2),
+            at(Some(ids::TOWN_CENTRE), WholeSeconds::of_data(25), 1),
         ];
-        assert_eq!(train_time(&locations, ids::TOWN_CENTRE, 1), 25);
-        assert_eq!(train_time(&locations, ids::TOWN_CENTRE, 2), 30);
-        assert_eq!(train_time(&locations, ids::TOWN_CENTRE, -1), 30);
-        assert_eq!(train_time(&locations, ids::TOWN_CENTRE, 0x101), 25);
-        assert_eq!(train_time(&[], ids::TOWN_CENTRE, 1), 0);
+        assert_eq!(
+            train_time(&locations, ids::TOWN_CENTRE, 1),
+            WholeSeconds::of_data(25)
+        );
+        assert_eq!(
+            train_time(&locations, ids::TOWN_CENTRE, 2),
+            WholeSeconds::of_data(30)
+        );
+        assert_eq!(
+            train_time(&locations, ids::TOWN_CENTRE, -1),
+            WholeSeconds::of_data(30)
+        );
+        assert_eq!(
+            train_time(&locations, ids::TOWN_CENTRE, 0x101),
+            WholeSeconds::of_data(25)
+        );
+        assert_eq!(train_time(&[], ids::TOWN_CENTRE, 1), WholeSeconds::ZERO);
         let mut m = Master {
             kind: COMBAT,
             train_locations: locations.to_vec(),
@@ -644,18 +657,24 @@ mod tests {
         let mut make = MakeObj::for_entry(&Entry {
             master: Some(ids::VILLAGER_MALE),
             button: 1,
-            train_time: 99,
+            train_time: WholeSeconds::of_data(99),
             ..Entry::default()
         });
-        assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), 25);
+        assert_eq!(
+            make.time(Some(&m), ids::TOWN_CENTRE),
+            WholeSeconds::of_data(25)
+        );
         m.object_flags = ObjectFlags::OWN_TRAIN_TIME;
-        assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), 99);
+        assert_eq!(
+            make.time(Some(&m), ids::TOWN_CENTRE),
+            WholeSeconds::of_data(99)
+        );
         m.kind = master_type::MISSILE;
-        assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), 0);
+        assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), WholeSeconds::ZERO);
         make.button = -1;
         assert_eq!(
             (make.time(None, ids::TOWN_CENTRE), make.paid, make.unique_id),
-            (0, true, -1)
+            (WholeSeconds::ZERO, true, -1)
         );
     }
 

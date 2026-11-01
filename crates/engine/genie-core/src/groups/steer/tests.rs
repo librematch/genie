@@ -17,6 +17,7 @@ use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
@@ -121,7 +122,7 @@ fn world() -> World {
         id: master_id(4),
         kind: master_type::COMBAT,
         class: class::CLASS_6,
-        hit_points: 60,
+        hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(6)),
         move_sprite: Some(SpriteId::named(7)),

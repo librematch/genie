@@ -10,6 +10,7 @@ use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
 use crate::objects::ActionState;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::ClassId;
@@ -644,7 +645,7 @@ fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, ta
         class,
         tasks,
         radius: Footprint::new(0.5, 0.5),
-        hit_points: 100,
+        hit_points: MasterHitPoints::of_data(100),
         ..Master::default()
     };
     for ms in &mut t.masters {

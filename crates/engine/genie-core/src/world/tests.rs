@@ -54,6 +54,7 @@ use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
@@ -476,8 +477,8 @@ pub(crate) fn builder_masters() -> Masters {
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         work_rate: WorkRate::new(1.0),
-        hit_points: 25,
-        build_time: 0,
+        hit_points: MasterHitPoints::of_data(25),
+        build_time: WholeSeconds::ZERO,
         // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
         moving: Some(crate::movement::MoveStats {
             fly_mode: FlyMode::GROUND,
@@ -535,8 +536,8 @@ pub(crate) fn builder_masters() -> Masters {
             object_flags: ObjectFlags::NONE,
             combat_level: CombatLevel::NONE,
             work_rate: WorkRate::ZERO,
-            hit_points: 550,
-            build_time: 25,
+            hit_points: MasterHitPoints::of_data(550),
+            build_time: WholeSeconds::of_data(25),
             // a house's clearance, which BUILD's placement test reads
             clearance: Footprint::new(1.0, 1.0),
             // built by the villagers (the builders' test, FUN_141262270)
@@ -824,7 +825,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         id,
         kind: MOVING,
         class: class::FARM,
-        hit_points: 1,
+        hit_points: MasterHitPoints::of_data(1),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite,
         storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 0)],
@@ -2042,8 +2043,8 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
             progress: Seconds::ZERO,
             desolid: true,
             builders: 0,
-            hit_points: 550,
-            build_time: 25,
+            hit_points: MasterHitPoints::of_data(550),
+            build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -3816,7 +3817,8 @@ fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
         for masters in &mut t.masters {
             for id in [83, 118, 120] {
                 if let Some(m) = masters.get_mut(master_id(id)) {
-                    (m.kind, m.hit_points, m.regeneration) = (master_type::COMBAT, 25, 20.0);
+                    (m.kind, m.hit_points, m.regeneration) =
+                        (master_type::COMBAT, MasterHitPoints::of_data(25), 20.0);
                 }
             }
         }
@@ -4203,7 +4205,7 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
         kind: BUILDING,
         class: class::BUILDING,
         radius: Footprint::new(2.0, 2.0),
-        hit_points: 4800,
+        hit_points: MasterHitPoints::of_data(4800),
         storage: vec![(Some(attribute::HEADROOM), Amount::new(20.0), 4)],
         building: Some(crate::objects::masters::BuildingMaster {
             tech: None,
@@ -4296,8 +4298,8 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
             progress: Seconds::ZERO,
             desolid: true,
             builders: 0,
-            hit_points: 550,
-            build_time: 25,
+            hit_points: MasterHitPoints::of_data(550),
+            build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -7627,7 +7629,7 @@ fn a_building_s_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
         id: master_id(12),
         kind: BUILDING,
         class: class::BUILDING,
-        hit_points: 550,
+        hit_points: MasterHitPoints::of_data(550),
         building: Some(crate::objects::masters::BuildingMaster::default()),
         ..Master::default()
     }])];
@@ -7675,7 +7677,7 @@ fn a_unit_inside_heals_up_to_its_hit_points() {
     let master = Master {
         id: master_id(592),
         class: class::VILLAGER,
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         ..Master::default()
     };
     let mut v = Unit {
@@ -8099,7 +8101,7 @@ fn gate_world() -> World {
         kind: BUILDING,
         class: class::GATE,
         height,
-        hit_points: 1650,
+        hit_points: MasterHitPoints::of_data(1650),
         // a gate moves (its master's slot 0xe8): its last move time is the mover's
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         building: Some(crate::objects::masters::BuildingMaster {
@@ -8498,7 +8500,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
             (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
             (Some(attribute::POPULATION), Amount::new(1.0), 2),
         ],
-        ..trained(id, 25)
+        ..trained(id, WholeSeconds::of_data(25))
     };
     let centre = Master {
         id: ids::TOWN_CENTRE,
@@ -8511,12 +8513,12 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
             (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
             (Some(attribute::POPULATION), Amount::new(1.0), 2),
         ],
-        ..trained(master_id(97), 2)
+        ..trained(master_id(97), WholeSeconds::of_data(2))
     };
     t.masters = vec![Masters::new([
         villager(VILLAGER_MALE),
         villager(VILLAGER_FEMALE),
-        trained(master_id(99), 25),
+        trained(master_id(99), WholeSeconds::of_data(25)),
         quick,
         centre,
     ])];
@@ -8549,7 +8551,12 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
     let q = &production.queue;
     assert_eq!(
         (q.count, q.total, q.slots[0].train_time, q.slots[0].costs[0]),
-        (1, 1, 25, (Some(attribute::FOOD), 46.0))
+        (
+            1,
+            1,
+            WholeSeconds::of_data(25),
+            (Some(attribute::FOOD), 46.0)
+        )
     );
     assert!(p.unsupported.is_none());
 }
@@ -9197,7 +9204,10 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         (q.slots[0].count, q.slots[1].count, q.slots[1].button),
         (5, 1, 1)
     );
-    assert_eq!((q.slots[1].train_time, q.slots[1].serial), (25, 1));
+    assert_eq!(
+        (q.slots[1].train_time, q.slots[1].serial),
+        (WholeSeconds::of_data(25), 1)
+    );
     assert_eq!(t.players[0].tracker.queued, 6);
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     let alternating: Vec<_> = (0..11).map(|k| with(1, k % 2)).collect();
@@ -9298,7 +9308,7 @@ fn hands_masters() -> Vec<Masters> {
             class: class::CLASS_0,
             line_of_sight: Distance::new(6.0 + f32::from(p)),
             fog_visibility: FogVisibility::of_data(p),
-            hit_points: 30 + 5 * i16::from(p),
+            hit_points: MasterHitPoints::of_data(30 + 5 * i16::from(p)),
             death_spawns: [Some(master_id(3)), None],
             storage: vec![
                 (Some(attribute::HEADROOM), Amount::new(1.0), 2),
@@ -9315,7 +9325,7 @@ fn hands_masters() -> Vec<Masters> {
                 master_type::STATIC
             },
             class: class::CLASS_0,
-            hit_points: 9 + i16::from(p),
+            hit_points: MasterHitPoints::of_data(9 + i16::from(p)),
             ..Master::default()
         };
         let sheep = Master {
@@ -9451,9 +9461,16 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
     let own = u.own_master.as_deref().unwrap();
     assert_eq!(
         (own.hit_points, own.line_of_sight, own.fog_visibility),
-        (30, Distance::new(6.0), FogVisibility::VISIBLE)
+        (
+            MasterHitPoints::of_data(30),
+            Distance::new(6.0),
+            FogVisibility::VISIBLE
+        )
     );
-    assert_eq!(u.dead_master.as_deref().map(|d| d.hit_points), Some(9));
+    assert_eq!(
+        u.dead_master.as_deref().map(|d| d.hit_points),
+        Some(MasterHitPoints::of_data(9))
+    );
     assert_eq!(
         s.get(object_id(21712)).map(|p| p.player),
         Some(PlayerId::new(1))
@@ -9557,7 +9574,7 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     // a dead master it holds stays
     let held = Box::new(Master {
         id: master_id(3),
-        hit_points: 99,
+        hit_points: MasterHitPoints::of_data(99),
         ..Master::default()
     });
     a.dead_master = Some(held.clone());
@@ -9572,7 +9589,10 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
         Ok(true)
     );
     assert_eq!(a.dead_master, Some(held));
-    assert_eq!(a.own_master.as_deref().map(|m| m.hit_points), Some(35));
+    assert_eq!(
+        a.own_master.as_deref().map(|m| m.hit_points),
+        Some(MasterHitPoints::of_data(35))
+    );
 }
 
 /// A unit of player `p` at (`x`, 10.5) for the owner search of [`hands_world`]'s object: a
@@ -10044,8 +10064,8 @@ fn teardown_world() -> World {
             progress: Seconds::ZERO,
             desolid: false,
             builders: 1,
-            hit_points: 550,
-            build_time: 25,
+            hit_points: MasterHitPoints::of_data(550),
+            build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -10390,8 +10410,8 @@ fn deaths_world() -> World {
             progress: Seconds::ZERO,
             desolid: false,
             builders: 1,
-            hit_points: 550,
-            build_time: 25,
+            hit_points: MasterHitPoints::of_data(550),
+            build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -11255,7 +11275,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
     };
     let workshop = Master {
         kind: BUILDING,
-        build_time: 10,
+        build_time: WholeSeconds::of_data(10),
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(5.0), 4),
             (None, Amount::ZERO, 0),
@@ -11298,8 +11318,8 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
-            hit_points: 20000,
-            build_time: 10,
+            hit_points: MasterHitPoints::of_data(20000),
+            build_time: WholeSeconds::of_data(10),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -12851,7 +12871,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         id: master_id(706),
         kind: master_type::COMBAT,
         class: class::CLASS_35,
-        hit_points: 45,
+        hit_points: MasterHitPoints::of_data(45),
         weapons: vec![ClassAmount::new(4, 100)],
         area_effect: Distance::new(2.0),
         area_damage: 1.0,
@@ -12863,7 +12883,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         id: master_id(117),
         kind: BUILDING,
         class: class::WALL,
-        hit_points: 1800,
+        hit_points: MasterHitPoints::of_data(1800),
         armors: vec![ClassAmount::new(4, 0)],
         terrain_bonus: RestrictionField::NONE,
         ..Master::default()
@@ -12915,7 +12935,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         id: master_id(1250),
         kind: master_type::STATIC,
         class: class::TREE,
-        hit_points: 500,
+        hit_points: MasterHitPoints::of_data(500),
         ..Master::default()
     };
     t.masters = vec![Masters::new([petard, tree]), Masters::new([wall])];
@@ -13035,7 +13055,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         id,
         kind: BUILDING,
         class: class::GATE,
-        hit_points: 1650,
+        hit_points: MasterHitPoints::of_data(1650),
         standing_sprite: Some(SpriteId::named(1751)),
         death_sprite: Some(SpriteId::named(1751)),
         building: Some(crate::objects::masters::BuildingMaster {
@@ -13070,8 +13090,8 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
             progress: Seconds::new(100.0),
             desolid: false,
             builders: 0,
-            hit_points: 1650,
-            build_time: 100,
+            hit_points: MasterHitPoints::of_data(1650),
+            build_time: WholeSeconds::of_data(100),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -13147,8 +13167,8 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         id,
         kind: BUILDING,
         class: class::GATE,
-        hit_points: 10,
-        build_time: 70,
+        hit_points: MasterHitPoints::of_data(10),
+        build_time: WholeSeconds::of_data(70),
         standing_sprite: Some(SpriteId::named(1751)),
         death_sprite,
         building: Some(crate::objects::masters::BuildingMaster {
@@ -13190,8 +13210,8 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
-            hit_points: 10,
-            build_time: 70,
+            hit_points: MasterHitPoints::of_data(10),
+            build_time: WholeSeconds::of_data(70),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
@@ -13326,7 +13346,7 @@ fn a_unit_regenerated_to_its_most_has_its_armor_back() {
     let berserk = Master {
         id: master_id(692),
         kind: master_type::COMBAT,
-        hit_points: 54,
+        hit_points: MasterHitPoints::of_data(54),
         regeneration: 20.0,
         ..Master::default()
     };
@@ -13366,7 +13386,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     let berserk = Master {
         id: master_id(692),
         kind: master_type::COMBAT,
-        hit_points: 54,
+        hit_points: MasterHitPoints::of_data(54),
         regeneration: 20.0,
         ..Master::default()
     };
@@ -13414,7 +13434,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     assert_eq!(regeneration_rate(&not_hero, &powered), 30.0);
     // a gate of Aftermath's: -1000 a minute takes 1 hit point per 0.06 s, at most what it has
     let gate = Master {
-        hit_points: 1650,
+        hit_points: MasterHitPoints::of_data(1650),
         regeneration: -1000.0,
         kind: BUILDING,
         ..Master::default()
@@ -13531,8 +13551,8 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         class: class::BUILDING,
         standing_sprite: Some(SpriteId::named(207)),
         death_sprite: Some(SpriteId::named(2573)),
-        build_time: 50,
-        hit_points: 1200,
+        build_time: WholeSeconds::of_data(50),
+        hit_points: MasterHitPoints::of_data(1200),
         building: Some(crate::objects::masters::BuildingMaster {
             destruction_sprite: Some(SpriteId::named(389)),
             construction_sprite: None,
@@ -13555,8 +13575,8 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             progress: Seconds::new(10.0),
             desolid: false,
             builders: 0,
-            hit_points: 1200,
-            build_time: 50,
+            hit_points: MasterHitPoints::of_data(1200),
+            build_time: WholeSeconds::of_data(50),
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::NONE,
@@ -14381,7 +14401,7 @@ fn a_villager_s_attack_command_switches_it_to_the_villager_first() {
         kind: master_type::COMBAT,
         class: class::VILLAGER,
         task_by_group: TaskGroup::MALE_VILLAGERS,
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         standing_sprite: Some(SpriteId::named(300)),
         attack_sprite: Some(SpriteId::named(301)),
         weapon_range: Distance::new(0.5),
@@ -14946,8 +14966,8 @@ fn farm_masters() -> Masters {
         clearance: Footprint::new(1.5, 1.5),
         tall: false,
         cost: costs(&[(attribute::WOOD, 60, true)]),
-        hit_points: 480,
-        build_time: 15,
+        hit_points: MasterHitPoints::of_data(480),
+        build_time: WholeSeconds::of_data(15),
         ..builders.get(ids::HOUSE).unwrap().clone()
     };
     Masters::new(builders.iter().cloned().chain([farmer, farm]))
@@ -15414,7 +15434,7 @@ fn a_farm_foundation_lays_its_stage_terrain() {
             ids::FARM,
             (false, Some(TerrainId::named(7))),
             Seconds::ZERO,
-            15
+            WholeSeconds::of_data(15)
         ),
         Some(TerrainId::named(29))
     );
@@ -15423,7 +15443,7 @@ fn a_farm_foundation_lays_its_stage_terrain() {
             ids::FARM,
             (false, Some(TerrainId::named(7))),
             Seconds::new(7.5),
-            15
+            WholeSeconds::of_data(15)
         ),
         Some(TerrainId::named(30))
     );
@@ -15432,7 +15452,7 @@ fn a_farm_foundation_lays_its_stage_terrain() {
             ids::FARM,
             (false, Some(TerrainId::named(7))),
             Seconds::new(15.0),
-            15
+            WholeSeconds::of_data(15)
         ),
         Some(TerrainId::named(31))
     );
@@ -15441,7 +15461,7 @@ fn a_farm_foundation_lays_its_stage_terrain() {
             ids::ID_1187,
             (true, Some(TerrainId::named(63))),
             Seconds::new(5.0),
-            15
+            WholeSeconds::of_data(15)
         ),
         Some(TerrainId::named(66))
     );
@@ -15450,7 +15470,7 @@ fn a_farm_foundation_lays_its_stage_terrain() {
             ids::ID_1187,
             (false, Some(TerrainId::named(63))),
             Seconds::ZERO,
-            15
+            WholeSeconds::of_data(15)
         ),
         Some(TerrainId::named(65))
     );
@@ -15459,16 +15479,26 @@ fn a_farm_foundation_lays_its_stage_terrain() {
             ids::PASTURE_1889,
             (false, Some(TerrainId::named(117))),
             Seconds::new(15.0),
-            15
+            WholeSeconds::of_data(15)
         ),
         Some(TerrainId::named(121))
     );
     assert_eq!(
-        farm_stage_terrain(ids::PASTURE_1889, (false, None), Seconds::ZERO, 15),
+        farm_stage_terrain(
+            ids::PASTURE_1889,
+            (false, None),
+            Seconds::ZERO,
+            WholeSeconds::of_data(15)
+        ),
         Some(TerrainId::named(1))
     );
     assert_eq!(
-        farm_stage_terrain(ids::HOUSE, (false, None), Seconds::ZERO, 15),
+        farm_stage_terrain(
+            ids::HOUSE,
+            (false, None),
+            Seconds::ZERO,
+            WholeSeconds::of_data(15)
+        ),
         None
     );
 }
@@ -15666,7 +15696,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         id: master_id(4),
         kind: master_type::COMBAT,
         class: class::CLASS_0,
-        hit_points: 30,
+        hit_points: MasterHitPoints::of_data(30),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(300)),
         attack_sprite: Some(SpriteId::named(301)),
@@ -15688,7 +15718,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         id: master_id(363),
         kind: master_type::MISSILE,
         class: class::WALL,
-        hit_points: 1,
+        hit_points: MasterHitPoints::of_data(1),
         radius: Footprint::new(0.1, 0.1),
         standing_sprite: None,
         death_sprite: None,
@@ -15711,7 +15741,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         id: master_id(65),
         kind: master_type::COMBAT,
         class: class::PREDATOR,
-        hit_points: 5,
+        hit_points: MasterHitPoints::of_data(5),
         radius: Footprint::new(0.2, 0.2),
         height: 1.5,
         terrain_bonus: RestrictionField::NONE,
@@ -17461,7 +17491,7 @@ fn a_building_s_own_completion_completes_its_annexes_first() {
     let mut t = annexed_house();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
     let k = h.construction.as_mut().unwrap();
-    k.progress = Seconds::new(f32::from(k.build_time));
+    k.progress = Seconds::of_master(k.build_time);
     let i = t.players[1].objects.position_of(object_id(10028)).unwrap();
     let seen = in_update(&mut t, (PlayerId::new(1), i), 50, |unit, c| {
         unit.complete_on_update(c)?;
@@ -17506,8 +17536,8 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
         progress: Seconds::new(25.0),
         desolid: false,
         builders: 0,
-        hit_points: 2400,
-        build_time: 25,
+        hit_points: MasterHitPoints::of_data(2400),
+        build_time: WholeSeconds::of_data(25),
         record: crate::map::spatial::Obstruction {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
@@ -17746,7 +17776,7 @@ fn completed_house(setup: fn(&mut Unit)) -> (World, Completed) {
     let mut t = house_builder();
     let h = &mut t.players[1].objects[ListIndex::new(1)];
     let k = h.construction.as_mut().unwrap();
-    k.progress = Seconds::new(f32::from(k.build_time));
+    k.progress = Seconds::of_master(k.build_time);
     setup(h);
     let r = in_update(
         &mut t,
@@ -17802,7 +17832,7 @@ fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_le
     let finish = |t: &mut World| {
         let h = &mut t.players[1].objects[ListIndex::new(1)];
         let k = h.construction.as_mut().unwrap();
-        k.progress = Seconds::new(f32::from(k.build_time));
+        k.progress = Seconds::of_master(k.build_time);
         in_update(t, (PlayerId::new(1), ListIndex::new(1)), 50, |unit, c| {
             unit.complete_on_update(c)?;
             let events: Vec<(crate::players::history::EventKind, f32)> = c.w.players[1]
@@ -17884,12 +17914,12 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieErr
     let mut t = house_builder();
     for masters in &mut t.masters {
         let centre = masters.get_mut(ids::TOWN_CENTRE).unwrap();
-        centre.hit_points = 2400;
+        centre.hit_points = MasterHitPoints::of_data(2400);
         centre.building = Some(BuildingMaster {
             garrison_heal_rate: HitPoints::new(2.0),
             ..BuildingMaster::default()
         });
-        masters.get_mut(master_id(120)).unwrap().hit_points = 25;
+        masters.get_mut(master_id(120)).unwrap().hit_points = MasterHitPoints::of_data(25);
     }
     t.world_time = WorldTime::from_millis(3000);
     t.players[1].objects[ListIndex::new(2)].garrison = vec![object_id(9175)];
@@ -18221,7 +18251,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         let house = masters.get(ids::HOUSE).unwrap().clone();
         let castle = Master {
             id: ids::CASTLE,
-            hit_points: 4800,
+            hit_points: MasterHitPoints::of_data(4800),
             cost: costs(&[(attribute::STONE, 650, true)]),
             ..house
         };

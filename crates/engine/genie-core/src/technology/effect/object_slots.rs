@@ -21,6 +21,7 @@ use crate::players::tracker::ListKey;
 use crate::technology::effect::{Change, OBJECT_GONE};
 use crate::vision::SightTiles;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -166,7 +167,7 @@ impl World {
         match attribute {
             a::HIT_POINTS => {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                let full = f32::from(master.hit_points);
+                let full = HitPoints::of_master(master.hit_points).get();
                 let hp = u.life.hp.get();
                 let short = |x: f32| f32::from(crate::math::conversions::cvttss2si(x) as i16);
                 u.life.hp = HitPoints::new(match change {
@@ -350,8 +351,13 @@ pub(super) fn charge_after(charge: Charge, max: Charge, change: Change, v: f32) 
 
 /// A building's build points after its master's build time (`time`, the old) changes
 /// (`FUN_1411d4e70`'s `e`).
-pub(super) fn build_points_after(points: Seconds, time: i16, change: Change, v: f32) -> Seconds {
-    let (points, t) = (points.get(), f32::from(time));
+pub(super) fn build_points_after(
+    points: Seconds,
+    time: WholeSeconds,
+    change: Change,
+    v: f32,
+) -> Seconds {
+    let (points, t) = (points.get(), Seconds::of_master(time).get());
     Seconds::new(match change {
         Change::Set => v / t * points,
         Change::Add => (t + v) / t * points,

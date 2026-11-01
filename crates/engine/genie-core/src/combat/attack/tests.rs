@@ -16,6 +16,7 @@ use crate::movement::move_to::{GiveUp, MoveDefaults, MoveTo, MoveToReads, MoveWa
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
@@ -753,7 +754,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
         position: at,
         radius: Footprint::new(0.5, 0.5),
         blast_defense: BlastDefense::new(2),
-        master_hp: 100,
+        master_hp: MasterHitPoints::of_data(100),
         armored: Some(damage::Armored {
             armors: vec![ClassAmount::new(4, 0)],
             terrain_bonus: RestrictionField::NONE,

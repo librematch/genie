@@ -2,6 +2,7 @@
 
 use crate::map::Distance;
 use crate::movement::Speed;
+use crate::objects::MasterHitPoints;
 use crate::objects::WorkRate;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::CombatLevel;
@@ -36,7 +37,7 @@ impl Master {
         use crate::math::conversions::cvttss2si_64;
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::HIT_POINTS => self.hit_points = low16(v),
+            a::HIT_POINTS => self.hit_points = MasterHitPoints::of_data(low16(v)),
             a::LINE_OF_SIGHT => self.line_of_sight = Distance::new(v),
             a::GARRISON_CAPACITY => self.garrison = low8(v),
             a::SIZE_X => self.radius = self.radius.with_x(v),
@@ -179,7 +180,10 @@ impl Master {
         use crate::math::conversions::cvttss2si_64;
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::HIT_POINTS => self.hit_points = add_short(self.hit_points, v, world.capped),
+            a::HIT_POINTS => {
+                self.hit_points =
+                    MasterHitPoints::of_data(add_short(self.hit_points.get(), v, world.capped));
+            }
             a::LINE_OF_SIGHT => self.line_of_sight += Distance::new(v),
             a::GARRISON_CAPACITY => self.garrison = self.garrison.wrapping_add(low8(v)),
             a::SIZE_X => self.radius = self.radius.with_x(self.radius.x() + v),
@@ -298,7 +302,13 @@ impl Master {
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::HIT_POINTS => self.hit_points = multiply_short(self.hit_points, v, world.capped),
+            a::HIT_POINTS => {
+                self.hit_points = MasterHitPoints::of_data(multiply_short(
+                    self.hit_points.get(),
+                    v,
+                    world.capped,
+                ));
+            }
             a::LINE_OF_SIGHT => self.line_of_sight *= v,
             a::GARRISON_CAPACITY => self.garrison = low8(f32::from(self.garrison) * v + ROUND),
             a::SIZE_X => self.radius = self.radius.with_x(self.radius.x() * v),

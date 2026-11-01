@@ -166,8 +166,8 @@ impl Construction {
     /// points reach its build time.
     pub(crate) fn add_work(&mut self, hp: &mut HitPoints, amount: f32) -> bool {
         let mut amount = amount;
-        let build_time = f32::from(self.build_time);
-        let hit_points = f32::from(self.hit_points);
+        let build_time = Seconds::of_master(self.build_time).get();
+        let hit_points = HitPoints::of_master(self.hit_points).get();
         if build_time < self.progress.get() + amount {
             amount = build_time - self.progress.get();
         }

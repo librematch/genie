@@ -110,8 +110,8 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
         progress: Seconds::new(progress),
         desolid,
         builders,
-        hit_points: 550,
-        build_time: 25,
+        hit_points: MasterHitPoints::of_data(550),
+        build_time: WholeSeconds::of_data(25),
         record: Obstruction {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
@@ -1056,7 +1056,7 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
     h.life.master_id = PASTURE_1889;
     h.life.state = ObjectState::Alive;
     h.construction = Some(Construction {
-        build_time: 20,
+        build_time: WholeSeconds::of_data(20),
         ..construction(20.0, 1, false)
     });
     h.stack_made = Some(object_id(10031));

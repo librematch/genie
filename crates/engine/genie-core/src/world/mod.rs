@@ -63,7 +63,7 @@ pub mod settings;
 mod setup;
 mod world_update;
 
-pub use self::clock::{Millis, Seconds, WorldTime};
+pub use self::clock::{Millis, Seconds, WholeSeconds, WorldTime};
 pub use self::forced::GameState;
 pub use self::world_update::{scenario_mode, standard_mode};
 

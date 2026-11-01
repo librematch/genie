@@ -36,6 +36,7 @@ use crate::players::attribute::BUILDING_COST;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
 use crate::world::{Gate, World};
@@ -222,14 +223,14 @@ impl World {
         let foundation = !matches!(made.class, class::CLASS_51 | class::CLASS_54)
             && !matches!(master, ids::ID_357 | ids::ID_1188)
             && building.head_unit.is_none();
-        let hp = if foundation && 0 < made.build_time {
+        let hp = if foundation && WholeSeconds::ZERO < made.build_time {
             1.0
         } else {
-            f32::from(made.hit_points)
+            HitPoints::of_master(made.hit_points).get()
         };
         // a foundation shows its master's construction sprite (+0x950; its standing one for
         // none, FUN_141158620) through slot 0x68 (FUN_141217000)
-        if foundation && 0 < made.build_time {
+        if foundation && WholeSeconds::ZERO < made.build_time {
             let shown = building
                 .construction_sprite
                 .and_then(|s| self.graphics.get(&s).copied())
@@ -249,7 +250,7 @@ impl World {
             Seconds::of_master(made.build_time)
         };
         // FUN_1411cf770 with no master copy of its own and no annex link yet
-        let desolid = 0 < made.build_time
+        let desolid = WholeSeconds::ZERO < made.build_time
             && !matches!(made.class, class::CLASS_51 | class::CLASS_54)
             && progress == Seconds::ZERO;
         let owner = self.players.player_mut(player)?;
@@ -391,7 +392,7 @@ impl World {
         let master = made.id;
         self.track_add(player, id, master)?;
         self.building_place(player, id, made, position, desolid)?;
-        if foundation && 0 < made.build_time {
+        if foundation && WholeSeconds::ZERO < made.build_time {
             self.construction_terrain(player, master, position)?;
         }
         self.clear_footprint(player, master, position.ground(), false)

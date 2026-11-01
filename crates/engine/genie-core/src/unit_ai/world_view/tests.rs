@@ -5,6 +5,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
@@ -268,7 +269,7 @@ fn a_villager_fights_back_a_weak_attacker_of_its_own_master() {
         kind: master_type::COMBAT,
         class: class::VILLAGER,
         object_flags: ObjectFlags::SCOUT,
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         weapons: vec![ClassAmount::new(4, 3), ClassAmount::new(21, 6)],
         armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
         weapon_range: Distance::ZERO,
@@ -285,12 +286,10 @@ fn a_villager_fights_back_a_weak_attacker_of_its_own_master() {
     assert!(!with(&|m| m.weapons = vec![ClassAmount::new(4, 5)]));
     // an attack of 4 below 60 hit points
     assert!(with(&|m| m.weapons = vec![ClassAmount::new(4, 4)]));
-    assert!(!with(
-        &|m| (m.weapons, m.hit_points) = (vec![ClassAmount::new(4, 4)], 60)
-    ));
-    assert!(with(
-        &|m| (m.weapons, m.hit_points) = (vec![ClassAmount::new(4, 3)], 60)
-    ));
+    assert!(!with(&|m| (m.weapons, m.hit_points) =
+        (vec![ClassAmount::new(4, 4)], MasterHitPoints::of_data(60))));
+    assert!(with(&|m| (m.weapons, m.hit_points) =
+        (vec![ClassAmount::new(4, 3)], MasterHitPoints::of_data(60))));
     assert!(!with(&|m| m.armors = vec![ClassAmount::new(4, 1)]));
     assert!(with(&|m| m.weapon_range = Distance::new(0.5)));
     assert!(!with(&|m| m.weapon_range = Distance::new(0.6)));

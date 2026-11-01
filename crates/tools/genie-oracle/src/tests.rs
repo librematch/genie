@@ -6,6 +6,7 @@ use genie_core::objects::actions::ActionList;
 use genie_core::objects::masters::{MasterId, ids};
 use genie_core::ownership::artifact::ArtifactState;
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_core::world::checkpoint::ActionTerm;
 
 /// Word 9 reads a building's production action's state over its top action's (records
@@ -32,7 +33,7 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
                 progress: Seconds::new(0.5),
                 unique_id: -1,
                 button: 0,
-                train_time: 25,
+                train_time: WholeSeconds::of_data(25),
             },
         )),
         ..genie_core::production::Production::default()

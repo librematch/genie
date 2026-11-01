@@ -100,7 +100,7 @@ pub(crate) fn strike(
     object_rng: &mut Well512,
 ) -> Result<Struck, GenieError> {
     if victim.kind == COMBAT && damage::shield(victim, hit.missile) {
-        let master_hp = i32::from(own.master_hp);
+        let master_hp = i32::from(own.master_hp.get());
         victim
             .damaged
             .push((Some(own.id), [own.id.get(), own.hp.get() as i32, master_hp]));

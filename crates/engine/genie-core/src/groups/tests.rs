@@ -4,6 +4,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
@@ -396,7 +397,7 @@ fn task_master(
         kind: master_type::COMBAT,
         class: class::VILLAGER,
         task_by_group: TaskGroup::MALE_VILLAGERS,
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         tasks,
         ..crate::objects::masters::Master::default()
     }
@@ -407,7 +408,7 @@ fn building_master() -> crate::objects::masters::Master {
         id: ids::HOUSE,
         kind: master_type::BUILDING,
         class: class::BUILDING,
-        hit_points: 550,
+        hit_points: MasterHitPoints::of_data(550),
         ..crate::objects::masters::Master::default()
     }
 }

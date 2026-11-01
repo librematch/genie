@@ -58,7 +58,7 @@ pub(super) fn damage(
             "an attacker whose combat ability marks its target (FUN_141206250)",
         ));
     }
-    let master_hp = i32::from(t.master_hp);
+    let master_hp = i32::from(t.master_hp.get());
     if src.source.class != ELEPHANT_ARCHER {
         let sender = if src.kind == MISSILE {
             src.source.fired_from

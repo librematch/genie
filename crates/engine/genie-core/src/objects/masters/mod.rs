@@ -16,6 +16,7 @@ use crate::map::TerrainId;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
+use crate::objects::MasterHitPoints;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::players::Amount;
@@ -23,6 +24,7 @@ use crate::players::attribute::AttributeId;
 use crate::technology::TechId;
 use crate::unit_ai::UnitAiType;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use genie_diff::Diff;
 
 mod combat_level;
@@ -289,9 +291,9 @@ pub struct Master {
     pub drop_sites: Vec<MasterId>,
     /// The hit points (`+0x530`) and the build time: the first train location's train time
     /// (`+0x898`'s first entry), 0 without one.
-    pub hit_points: i16,
+    pub hit_points: MasterHitPoints,
     /// The build time: the first train location's train time, 0 without one.
-    pub build_time: i16,
+    pub build_time: WholeSeconds,
     /// The train locations' ids (`+0x898`, each entry's first short): the units that build a
     /// building, the buildings that train a unit (`FUN_141263610`).
     pub trained_at: Vec<MasterId>,
@@ -561,7 +563,7 @@ pub struct TrainLocation {
     /// `+0x0`, `trainLocationID`: the master that makes it.
     pub location: Option<MasterId>,
     /// `+0x2`, `trainTime`.
-    pub time: i16,
+    pub time: WholeSeconds,
     /// `+0x4`, `buttonLocationID`.
     pub button: u8,
     /// `+0x8`, `hotkeyID`.

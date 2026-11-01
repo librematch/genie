@@ -17,6 +17,7 @@ use crate::map::Position;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
@@ -604,7 +605,11 @@ const DAMAGE_WHOLE: f32 = crate::math::image::order::DAMAGE_WHOLE;
 /// The damage share `FUN_1411859a0` picks damage sprites by: `100 − hp × 100 / hit points`,
 /// whole, of hit points at most the master's. An object whose share is its resource's (the
 /// classes `FUN_141193590` names; its master's `+0x681` would add any) is not modelled.
-fn damage_share(hp: HitPoints, hit_points: i16, class: ClassId) -> Result<u8, GenieError> {
+fn damage_share(
+    hp: HitPoints,
+    hit_points: MasterHitPoints,
+    class: ClassId,
+) -> Result<u8, GenieError> {
     if matches!(
         class,
         class::CLASS_5
@@ -629,7 +634,7 @@ fn damage_share(hp: HitPoints, hit_points: i16, class: ClassId) -> Result<u8, Ge
             "the damage share of a resource object (FUN_141193590)",
         ));
     }
-    let most = f32::from(hit_points);
+    let most = HitPoints::of_master(hit_points).get();
     let hp = hp.get().min(most);
     Ok((DAMAGE_WHOLE - hp * DAMAGE_WHOLE / most) as i32 as u8)
 }

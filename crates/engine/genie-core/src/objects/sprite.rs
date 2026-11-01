@@ -426,7 +426,7 @@ pub fn building_death(
     build_points: Seconds,
 ) -> Option<SpriteId> {
     let points = crate::math::conversions::cvttss2si(build_points.get()).to_le_bytes();
-    if i16::from_le_bytes([points[0], points[1]]) < master.build_time {
+    if i16::from_le_bytes([points[0], points[1]]) < master.build_time.get() {
         let destruction = master.building.as_ref().and_then(|b| b.destruction_sprite);
         return destruction.or(master.death_sprite);
     }
@@ -440,6 +440,7 @@ mod tests {
     use crate::objects::masters::TaskSprites;
     use crate::objects::masters::master_type;
     use crate::test_ids::master_id;
+    use crate::world::WholeSeconds;
 
     /// Build 158041's Lumberjack Female (Attack), graphic 1239: 45 frames of 0.0444 s, animated.
     const CHOP: Graphic = Graphic {
@@ -680,7 +681,7 @@ mod tests {
             move_sprite: Some(SpriteId::named(10)),
             run_sprite: Some(SpriteId::named(11)),
             attack_sprite: Some(SpriteId::named(12)),
-            build_time: 50,
+            build_time: WholeSeconds::of_data(50),
             building: Some(crate::objects::masters::BuildingMaster {
                 destruction_sprite: Some(SpriteId::named(389)),
                 construction_sprite: None,

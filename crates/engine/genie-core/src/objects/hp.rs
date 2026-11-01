@@ -1,9 +1,10 @@
-//! An object's hit points ([`HitPoints`]), with the game's `f32` operations.
+//! An object's hit points ([`HitPoints`]), with the game's `f32` operations, and a master's whole
+//! hit points ([`MasterHitPoints`]).
 
 /// Hit points as the game's `f32` holds them: an object's (`+0x40`), its powerup's room, what a
 /// heal, a gain or a loss moves, a building's loss while it is built. A master holds whole hit
-/// points (`i16`, [`HitPoints::of_master`]). Each operator is the one `f32` operation the game
-/// does, in its order; a comparison is `f32`'s (a NaN compares false).
+/// points ([`MasterHitPoints`], [`HitPoints::of_master`]). Each operator is the one `f32` operation
+/// the game does, in its order; a comparison is `f32`'s (a NaN compares false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct HitPoints(f32);
 
@@ -19,14 +20,41 @@ impl HitPoints {
 
     /// A master's whole hit points as the game converts them (`CVTSI2SS`, exact for an `i16`).
     #[must_use]
-    pub fn of_master(points: i16) -> Self {
-        Self(f32::from(points))
+    pub fn of_master(points: MasterHitPoints) -> Self {
+        Self(f32::from(points.0))
     }
 
     /// The points, as the save and the game's arithmetic hold them.
     #[must_use]
     pub const fn get(self) -> f32 {
         self.0
+    }
+}
+
+/// A master's hit points (`+0x530`, the `.dat`'s `hit_points`): the whole points an object of it
+/// starts with and heals up to (before powerups), a short the effects set, add to and scale
+/// (capped at 32767 where the game caps them). Every short is kept; [`HitPoints::of_master`] is
+/// the game's conversion.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MasterHitPoints(i16);
+
+impl MasterHitPoints {
+    /// The points of the data's short `value`.
+    #[must_use]
+    pub const fn of_data(value: i16) -> Self {
+        Self(value)
+    }
+
+    /// The short, as the data and the save hold it.
+    #[must_use]
+    pub const fn get(self) -> i16 {
+        self.0
+    }
+}
+
+impl genie_diff::Diff for MasterHitPoints {
+    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, d);
     }
 }
 
@@ -128,7 +156,7 @@ impl genie_diff::Diff for HitPoints {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::HitPoints;
+    use crate::objects::{HitPoints, MasterHitPoints};
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
@@ -157,8 +185,10 @@ mod tests {
     /// A master's whole points convert exactly, the negative ones too.
     #[test]
     fn a_master_s_whole_points_convert_exactly() {
-        assert_eq!(HitPoints::of_master(25), HitPoints::new(25.0));
-        assert_eq!(HitPoints::of_master(i16::MAX).get(), 32767.0);
-        assert_eq!(HitPoints::of_master(-1).get(), -1.0);
+        let of = |points| HitPoints::of_master(MasterHitPoints::of_data(points));
+        assert_eq!(of(25), HitPoints::new(25.0));
+        assert_eq!(of(i16::MAX).get(), 32767.0);
+        assert_eq!(of(-1).get(), -1.0);
+        assert!(MasterHitPoints::default() < MasterHitPoints::of_data(i16::MAX));
     }
 }

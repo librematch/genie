@@ -6,6 +6,7 @@ use genie_core::map::Distance;
 use genie_core::map::TerrainId;
 use genie_core::map::{Footprint, GroundOffset, Radii};
 use genie_core::objects::HitPoints;
+use genie_core::objects::MasterHitPoints;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
@@ -34,6 +35,7 @@ use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 
 /// The default event id a task's load gives a sound without one (`FUN_141062470`'s
 /// `FUN_1413af9a0` calls, an immediate of the code).
@@ -169,13 +171,13 @@ pub(super) fn dat_work(
                 .filter_map(|&d| MasterId::of_data(d))
                 .collect()
         }),
-        hit_points: unit.hit_points,
+        hit_points: MasterHitPoints::of_data(unit.hit_points),
         capacity: unit.resource_capacity,
         build_time: unit
             .creatable
             .as_ref()
             .and_then(|c| c.train_locations.first())
-            .map_or(0, |t| t.queue_time),
+            .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.queue_time)),
         trained_at: unit.creatable.as_ref().map_or_else(Vec::new, |c| {
             c.train_locations
                 .iter()
@@ -189,7 +191,7 @@ pub(super) fn dat_work(
                 .iter()
                 .map(|t| work::TrainLocation {
                     location: MasterId::of_data(t.location_id),
-                    time: t.queue_time,
+                    time: WholeSeconds::of_data(t.queue_time),
                     button: t.button_id,
                     hotkey: t.hot_key_id.unwrap_or_default(),
                 })

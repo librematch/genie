@@ -377,7 +377,8 @@ impl Unit {
         if bm.kind == BUILDING
             && hp
                 <= HitPoints::new(
-                    f32::from(bm.hit_points) * crate::math::image::garrison::ENTER_HP_SHARE,
+                    HitPoints::of_master(bm.hit_points).get()
+                        * crate::math::image::garrison::ENTER_HP_SHARE,
                 )
         {
             return Err(GenieError::unsupported(

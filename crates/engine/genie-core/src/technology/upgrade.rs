@@ -202,10 +202,10 @@ fn share_of(u: &Unit, master: &Master) -> Option<(u8, f32)> {
         });
         return Some((share, hp));
     }
-    if master.hit_points < 1 {
+    if master.hit_points.get() < 1 {
         return None;
     }
-    let most = f32::from(master.hit_points);
+    let most = HitPoints::of_master(master.hit_points).get();
     // COMISS hp, most; JBE: a NaN keeps; then COMISS 0, hp; JBE
     if most < hp {
         hp = most;
@@ -469,7 +469,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let kind = old.kind;
         let u = self.object_at(place)?;
-        let most = f32::from(old.hit_points);
+        let most = HitPoints::of_master(old.hit_points).get();
         let share = if most.abs() <= NO_HIT_POINTS {
             0.0
         } else {
@@ -506,7 +506,8 @@ impl World {
                 self.object_at_mut(place)?.charge += more;
             }
         }
-        self.object_at_mut(place)?.life.hp = HitPoints::new(f32::from(new.hit_points) * share);
+        self.object_at_mut(place)?.life.hp =
+            HitPoints::new(HitPoints::of_master(new.hit_points).get() * share);
         if let Some(s) = next.flatten() {
             self.show(place, s)?;
         }
@@ -699,6 +700,7 @@ mod tests {
     use crate::map::Position;
     use crate::movement::Speed;
     use crate::objects::ListIndex;
+    use crate::objects::MasterHitPoints;
     use crate::objects::ObjectId;
     use crate::objects::SpriteFlags;
     use crate::objects::WorkRate;
@@ -742,7 +744,7 @@ mod tests {
             id: master_id(id),
             kind: master_type::BUILDING,
             class: class::BUILDING,
-            hit_points: hp,
+            hit_points: MasterHitPoints::of_data(hp),
             standing_sprite: Some(SpriteId::named(id + 1000)),
             death_spawns: [opt_master(dead), None],
             damage_graphics: [25, 50, 75]
@@ -788,7 +790,7 @@ mod tests {
             .collect();
         let (mut object, mut sprite) = (Well512::default(), Well512::default());
         let bare = Master {
-            hit_points: 100,
+            hit_points: MasterHitPoints::of_data(100),
             ..Master::default()
         };
         let mut u = object_of(HitPoints::new(150.0));
@@ -870,7 +872,7 @@ mod tests {
     fn a_resource_object_s_damage_share_is_its_storage_s() {
         let tree = Master {
             class: class::TREE,
-            hit_points: 20,
+            hit_points: MasterHitPoints::of_data(20),
             storage: vec![(Some(attribute::WOOD), Amount::new(100.0), 0)],
             damage_graphics: vec![DamageGraphic {
                 sprite: None,
@@ -996,7 +998,10 @@ mod tests {
             Some(SpriteId::named(1464))
         );
         assert!(house.own_master.is_none());
-        assert_eq!(dead.own_master.as_deref().map(|m| m.hit_points), Some(550));
+        assert_eq!(
+            dead.own_master.as_deref().map(|m| m.hit_points),
+            Some(MasterHitPoints::of_data(550))
+        );
         assert_eq!(
             dead.dead_master.as_deref().map(|m| m.id),
             Some(master_id(1403))
@@ -1008,7 +1013,11 @@ mod tests {
         let master = t.masters[0].get(ids::HOUSE).unwrap();
         assert_eq!(
             (master.id, master.hit_points, master.death_spawns[0]),
-            (master_id(70), 900, Some(master_id(1435)))
+            (
+                master_id(70),
+                MasterHitPoints::of_data(900),
+                Some(master_id(1435))
+            )
         );
     }
 
@@ -1021,7 +1030,7 @@ mod tests {
             id: ids::VILLAGER_MALE,
             kind: master_type::COMBAT,
             class: class::VILLAGER,
-            hit_points: 25,
+            hit_points: MasterHitPoints::of_data(25),
             volley_fire: 1.0,
             ..Master::default()
         };
@@ -1029,7 +1038,7 @@ mod tests {
             id: ids::ID_6,
             kind: master_type::COMBAT,
             class: class::CLASS_6,
-            hit_points: 50,
+            hit_points: MasterHitPoints::of_data(50),
             volley_fire: 3.0,
             ..Master::default()
         };
@@ -1227,7 +1236,10 @@ mod tests {
             ..Master::default()
         };
         let mut own = object(11, master_id(4), ObjectState::Alive, HitPoints::new(20.0));
-        own.own_master = Some(Box::new(soldier(master_id(4), 40)));
+        own.own_master = Some(Box::new(soldier(
+            master_id(4),
+            MasterHitPoints::of_data(40),
+        )));
         let player = crate::world::Player {
             objects: vec![
                 object(10, master_id(4), ObjectState::Alive, HitPoints::new(20.0)),
@@ -1252,9 +1264,9 @@ mod tests {
             vec![player],
         );
         t.masters = vec![Masters::new([
-            soldier(master_id(4), 40),
-            soldier(master_id(5), 60),
-            soldier(master_id(0x67f), 60),
+            soldier(master_id(4), MasterHitPoints::of_data(40)),
+            soldier(master_id(5), MasterHitPoints::of_data(60)),
+            soldier(master_id(0x67f), MasterHitPoints::of_data(60)),
         ])];
         t.track_add(PlayerId::new(0), object_id(10), master_id(4))
             .unwrap();
@@ -1288,11 +1300,14 @@ mod tests {
             .own_master
             .as_deref()
             .unwrap();
-        assert_eq!((own.id, own.hit_points), (master_id(4), 60));
+        assert_eq!(
+            (own.id, own.hit_points),
+            (master_id(4), MasterHitPoints::of_data(60))
+        );
         assert_eq!(hp(&t), [30.0, 20.0, 20.0]);
         assert_eq!(
             t.masters[0].get(master_id(4)).map(|m| m.hit_points),
-            Some(40)
+            Some(MasterHitPoints::of_data(40))
         );
         let mut t = upgrade_world();
         t.upgrade_objects(PlayerId::new(0), master_id(4), master_id(5), 3, None)
@@ -1302,10 +1317,13 @@ mod tests {
             .own_master
             .as_deref()
             .unwrap();
-        assert_eq!((own.id, own.hit_points), (master_id(4), 60));
+        assert_eq!(
+            (own.id, own.hit_points),
+            (master_id(4), MasterHitPoints::of_data(60))
+        );
         assert_eq!(
             t.masters[0].get(master_id(4)).map(|m| m.hit_points),
-            Some(60)
+            Some(MasterHitPoints::of_data(60))
         );
         for (p, to) in [(0, 99), (3, 5)] {
             let mut t = upgrade_world();
@@ -1452,7 +1470,7 @@ mod tests {
             id: ids::VILLAGER_MALE,
             kind: master_type::COMBAT,
             class: class::VILLAGER,
-            hit_points: 25,
+            hit_points: MasterHitPoints::of_data(25),
             ..Master::default()
         };
         let soldier = Master {
@@ -1616,7 +1634,7 @@ mod tests {
         let old = Master {
             id: master_id(4),
             kind: master_type::COMBAT,
-            hit_points: 40,
+            hit_points: MasterHitPoints::of_data(40),
             standing_sprite: Some(SpriteId::named(300)),
             standing_sprite_2: Some(SpriteId::named(301)),
             death_sprite: Some(SpriteId::named(302)),
@@ -1627,7 +1645,7 @@ mod tests {
         };
         let new = Master {
             id: master_id(5),
-            hit_points: 60,
+            hit_points: MasterHitPoints::of_data(60),
             standing_sprite: Some(SpriteId::named(400)),
             standing_sprite_2: None,
             death_sprite: Some(SpriteId::named(402)),
@@ -1667,7 +1685,7 @@ mod tests {
         assert_eq!(upgraded(&old, &new, 303).1, Some(SpriteId::named(403)));
         assert_eq!(upgraded(&old, &new, 304).1, Some(SpriteId::named(304)));
         let none = Master {
-            hit_points: 0,
+            hit_points: MasterHitPoints::of_data(0),
             ..old.clone()
         };
         assert_eq!(upgraded(&none, &new, 304).0, HitPoints::ZERO);

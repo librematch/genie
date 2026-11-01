@@ -46,6 +46,7 @@ use crate::unit_ai::UnitAi;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 
 /// An entry of `count` villagers of master `master` that paid `food` each.
 fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
@@ -60,7 +61,7 @@ fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
         ],
         serial: 0,
         button: -1,
-        train_time: 25,
+        train_time: WholeSeconds::of_data(25),
     }
 }
 

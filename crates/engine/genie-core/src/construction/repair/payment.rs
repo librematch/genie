@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::construction::repair::ONE;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -48,7 +49,7 @@ pub struct Repaired {
     /// Its master.
     pub master: MasterId,
     /// Its master's hit points (`+0x530`).
-    pub master_hp: i16,
+    pub master_hp: MasterHitPoints,
     /// Its hit points (`+0x278`).
     pub hp: HitPoints,
     /// Its hit point powerup (`+0xa38`, `+0xa3c`).

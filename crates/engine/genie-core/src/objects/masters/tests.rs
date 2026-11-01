@@ -49,8 +49,8 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         work_rate: WorkRate::new(1.0),
-        hit_points: 25,
-        build_time: 0,
+        hit_points: MasterHitPoints::of_data(25),
+        build_time: WholeSeconds::ZERO,
         ..Master::default()
     }
 }
@@ -71,8 +71,8 @@ fn house() -> Master {
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         work_rate: WorkRate::ZERO,
-        hit_points: 550,
-        build_time: 25,
+        hit_points: MasterHitPoints::of_data(550),
+        build_time: WholeSeconds::of_data(25),
         ..Master::default()
     }
 }
@@ -144,7 +144,7 @@ type Read = fn(&Master) -> f32;
 fn stocked(kind: MasterKind) -> Master {
     Master {
         kind,
-        hit_points: 10,
+        hit_points: MasterHitPoints::of_data(10),
         storage: vec![
             (Some(player_attribute::FOOD), Amount::new(1.0), 1),
             (Some(player_attribute::WOOD), Amount::new(1.0), 1),
@@ -181,7 +181,11 @@ fn sets_adds_multiplies(kind: MasterKind, rows: &[(MasterAttribute, Read, [f32; 
 fn each_static_attribute_sets_adds_and_multiplies_its_field() {
     use attribute as a;
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
-        (a::HIT_POINTS, |m| f32::from(m.hit_points), [3.0, 5.0, 10.0]),
+        (
+            a::HIT_POINTS,
+            |m| HitPoints::of_master(m.hit_points).get(),
+            [3.0, 5.0, 10.0],
+        ),
         (
             a::LINE_OF_SIGHT,
             |m| m.line_of_sight.get(),
@@ -555,7 +559,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::TRAIN_TIME,
-            |m| f32::from(m.train_locations[1].time),
+            |m| f32::from(m.train_locations[1].time.get()),
             [3.0, 5.0, 10.0],
         ),
         (a::TOTAL_MISSILES, |m| m.volley_fire, [3.0, 5.0, 10.0]),
@@ -638,24 +642,24 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
 fn the_hit_points_add_and_multiply_up_to_their_cap_when_capped() {
     let mut m = of_type(master_type::STATIC);
     m.set_attribute(attribute::HIT_POINTS, 25.9, &world(false));
-    assert_eq!(m.hit_points, 25);
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(25));
     m.add_attribute(attribute::HIT_POINTS, 15.7, &world(false));
-    assert_eq!(m.hit_points, 40);
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(40));
     m.multiply_attribute(attribute::HIT_POINTS, 1.2, &world(false));
     // 40 × 1.2 + 0.5 = 48.5
-    assert_eq!(m.hit_points, 48);
-    m.hit_points = 32760;
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(48));
+    m.hit_points = MasterHitPoints::of_data(32760);
     m.add_attribute(attribute::HIT_POINTS, 10.0, &world(false));
-    assert_eq!(m.hit_points, -32766);
-    m.hit_points = 32760;
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(-32766));
+    m.hit_points = MasterHitPoints::of_data(32760);
     m.add_attribute(attribute::HIT_POINTS, 10.0, &world(true));
-    assert_eq!(m.hit_points, 0x7fff);
-    m.hit_points = 100;
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
+    m.hit_points = MasterHitPoints::of_data(100);
     m.add_attribute(attribute::HIT_POINTS, f32::NAN, &world(true));
-    assert_eq!(m.hit_points, 0x7fff);
-    m.hit_points = 20000;
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
+    m.hit_points = MasterHitPoints::of_data(20000);
     m.multiply_attribute(attribute::HIT_POINTS, 2.0, &world(true));
-    assert_eq!(m.hit_points, 0x7fff);
+    assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
     m.capacity = 10;
     m.multiply_attribute(attribute::CARRY_CAPACITY, 1.25, &world(true));
     // 12.5 + 0.5 = 13
@@ -899,11 +903,14 @@ fn the_train_location_attributes_change_the_selected_entry() {
         hotkey: 16_000,
     };
     let mut m = of_type(master_type::COMBAT);
-    m.train_locations = vec![barracks(21), barracks(30)];
+    m.train_locations = vec![
+        barracks(WholeSeconds::of_data(21)),
+        barracks(WholeSeconds::of_data(30)),
+    ];
     m.train_location_entry = 1;
     m.multiply_attribute(attribute::TRAIN_TIME, 0.9, &world(false));
     // 30 × 0.9 + 0.5 = 27.5
-    assert_eq!(m.train_locations[1].time, 27);
+    assert_eq!(m.train_locations[1].time, WholeSeconds::of_data(27));
     m.set_attribute(attribute::TRAIN_LOCATIONS_ENTRY_MOD, 9.0, &world(false));
     assert_eq!(m.train_location_entry, 1);
     // the add's count is the selected entry plus the amount: 1 + 2
@@ -913,13 +920,16 @@ fn the_train_location_attributes_change_the_selected_entry() {
     m.set_attribute(attribute::TRAIN_LOCATIONS_TOTAL_NUM, -4.0, &world(false));
     assert_eq!(m.train_locations, []);
     assert_eq!(m.train_location_entry, -1);
-    m.train_locations = vec![barracks(21), barracks(30)];
+    m.train_locations = vec![
+        barracks(WholeSeconds::of_data(21)),
+        barracks(WholeSeconds::of_data(30)),
+    ];
     m.train_location_entry = 0;
     // ~(−1) = 0: the first goes, the entry stays at 0
     m.multiply_attribute(attribute::TRAIN_LOCATIONS_ENTRY_MOD, -1.0, &world(false));
     assert_eq!(
         (m.train_locations.len(), m.train_locations[0].time),
-        (1, 30)
+        (1, WholeSeconds::of_data(30))
     );
     m.multiply_attribute(attribute::TRAIN_LOCATIONS_ENTRY_MOD, 5.0, &world(false));
     assert_eq!((m.train_locations.len(), m.train_location_entry), (2, 1));
@@ -930,7 +940,10 @@ fn the_train_location_attributes_change_the_selected_entry() {
     );
     assert_eq!(
         (m.trained_at.clone(), m.build_time),
-        (vec![master_id(12), master_id(12)], 30)
+        (
+            vec![master_id(12), master_id(12)],
+            WholeSeconds::of_data(30)
+        )
     );
 }
 
@@ -978,7 +991,7 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
         foundation_terrain: Some(TerrainId::named(0)),
         ..BuildingMaster::default()
     });
-    m.hit_points = 600;
+    m.hit_points = MasterHitPoints::of_data(600);
     m.set_attribute(attribute::GARRISON_HEAL_RATE, 2.0, &world(false));
     m.multiply_attribute(attribute::GARRISON_HEAL_RATE, 1.5, &world(false));
     m.set_attribute(attribute::CONSTRUCTION_GRAPHIC, 9.0, &world(false));
@@ -993,7 +1006,7 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
     assert_eq!(m, {
         let mut same = of_type(master_type::BUILDING);
         same.building = Some(b);
-        same.hit_points = 600;
+        same.hit_points = MasterHitPoints::of_data(600);
         same.regeneration = 300.0;
         same
     });
@@ -1161,7 +1174,7 @@ fn the_action_and_moving_setters_change_their_values() {
 #[test]
 fn the_combat_master_s_own_values_change() {
     let mut m = of_type(master_type::COMBAT);
-    m.hit_points = 100;
+    m.hit_points = MasterHitPoints::of_data(100);
     m.attack_sprite2 = Some(SpriteId::named(10));
     m.set_attribute(attribute::HERO_STATUS, 1.0, &world(false));
     m.add_attribute(attribute::HERO_STATUS, 4.0, &world(false));
@@ -1279,7 +1292,7 @@ fn a_master_copy_keeps_its_id_class_and_flags() {
         ],
     );
     man.class = class::CLASS_7;
-    man.hit_points = 45;
+    man.hit_points = MasterHitPoints::of_data(45);
     man.disabled = true;
     militia.copy_from(&man);
     assert_eq!(
@@ -1287,7 +1300,10 @@ fn a_master_copy_keeps_its_id_class_and_flags() {
         (master_id(74), class::CLASS_6, Some(master_id(74)))
     );
     assert!(militia.available && !militia.disabled);
-    assert_eq!((militia.hit_points, militia.tasks.len()), (45, 2));
+    assert_eq!(
+        (militia.hit_points, militia.tasks.len()),
+        (MasterHitPoints::of_data(45), 2)
+    );
     assert_eq!(militia.task_by_group, TaskGroup::FEMALE_VILLAGERS);
 }
 

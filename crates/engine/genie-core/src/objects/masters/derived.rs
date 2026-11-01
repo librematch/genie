@@ -8,6 +8,7 @@ use crate::objects::SpriteId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{Master, master_type};
+use crate::world::WholeSeconds;
 
 /// A sprite's speed factor (the `.dat` graphic's `speed_multiplier`): the master's speed times
 /// it when above 0, else the master's speed (as the masters' loader derives
@@ -137,7 +138,10 @@ impl Master {
                     .iter()
                     .filter_map(|t| t.location)
                     .collect();
-                self.build_time = self.train_locations.first().map_or(0, |t| t.time);
+                self.build_time = self
+                    .train_locations
+                    .first()
+                    .map_or(WholeSeconds::ZERO, |t| t.time);
             }
             _ => {}
         }

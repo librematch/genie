@@ -29,6 +29,7 @@ use crate::objects::unit::{Unit, annexes_of};
 use crate::players::Amount;
 use crate::world::Millis;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -142,10 +143,9 @@ impl Unit {
     /// own (`+0x2e8`'s `+10`), which the slice does not hold; the masters' foundations (7, 63,
     /// 117) never give them.
     pub(crate) fn farm_stage(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let Some(cons) = self
-            .construction
-            .filter(|k| self.life.state == ObjectState::Foundation && 0 < k.build_time)
-        else {
+        let Some(cons) = self.construction.filter(|k| {
+            self.life.state == ObjectState::Foundation && WholeSeconds::ZERO < k.build_time
+        }) else {
             return Ok(());
         };
         let m = self.master(&c.w.masters, c.player)?;
@@ -239,7 +239,8 @@ impl Unit {
         // at most a fifth of its hit points (DAT_142eae8d0), it lets its garrison out
         // (FUN_1411e7220 for each from the last, then their slots 0x1a8 and 0xd0); its master's
         // slot 0x110 only sets a sound flag
-        if self.life.hp <= HitPoints::new(f32::from(master.hit_points) * EJECT_SHARE)
+        if self.life.hp
+            <= HitPoints::new(HitPoints::of_master(master.hit_points).get() * EJECT_SHARE)
             && !self.garrison.is_empty()
         {
             return Err(GenieError::unsupported(
@@ -301,13 +302,13 @@ impl Unit {
                 villagers += 1;
             }
             let (class, hit_points) = (m.class, m.hit_points);
-            if HitPoints::ZERO < rate && u.life.hp < HitPoints::new(f32::from(hit_points)) {
+            if HitPoints::ZERO < rate && u.life.hp < HitPoints::of_master(hit_points) {
                 u.heal(class, hit_points, rate)?;
             }
         }
         if 0 < villagers
             && HitPoints::ZERO < bm.garrison_repair_rate
-            && self.life.hp < HitPoints::new(f32::from(master.hit_points))
+            && self.life.hp < HitPoints::new(HitPoints::of_master(master.hit_points).get())
         {
             return Err(GenieError::unsupported(
                 "a building its villagers inside repair (FUN_1411d33e0)",
@@ -438,7 +439,7 @@ pub(crate) fn farm_stage_terrain(
     master: MasterId,
     (rice, foundation): (bool, Option<TerrainId>),
     progress: Seconds,
-    build_time: i16,
+    build_time: WholeSeconds,
 ) -> Option<TerrainId> {
     /// The stages over the build time (`DAT_142eb1c98`).
     const STAGES: f32 = crate::math::image::turn::FARM_STAGES;
@@ -446,7 +447,8 @@ pub(crate) fn farm_stage_terrain(
     const FIRST_STAGE: u8 = 29;
     /// A rice farm's first stage terrain on mangrove or rice (`0x41`).
     const RICE_STAGE: u8 = 65;
-    let stage = (((progress.get() * STAGES) / f32::from(build_time)) as i32 as u8).min(2);
+    let stage =
+        (((progress.get() * STAGES) / Seconds::of_master(build_time).get()) as i32 as u8).min(2);
     let stage_byte = match master {
         ids::FARM => FIRST_STAGE + stage,
         ids::ID_1187 | ids::PASTURE_1889 if rice => RICE_STAGE + stage,

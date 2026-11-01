@@ -9,6 +9,7 @@ use crate::movement::move_to::{
 use crate::objects::ActionState;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -131,7 +132,7 @@ fn masters() -> crate::objects::masters::Masters {
             terrain_restriction: Some(crate::map::RestrictionId::named(0)),
             kind: master_type::BUILDING,
             class: class::BUILDING,
-            hit_points: 550,
+            hit_points: MasterHitPoints::of_data(550),
             cost: costs(&[(attribute::WOOD, 25, true)]),
             ..crate::objects::masters::Master::default()
         },
@@ -140,7 +141,7 @@ fn masters() -> crate::objects::masters::Masters {
             terrain_restriction: Some(crate::map::RestrictionId::named(0)),
             kind: master_type::COMBAT,
             class: class::SIEGE,
-            hit_points: 175,
+            hit_points: MasterHitPoints::of_data(175),
             cost: costs(&[(attribute::WOOD, 160, true), (attribute::GOLD, 75, true)]),
             ..crate::objects::masters::Master::default()
         },
@@ -153,7 +154,7 @@ fn house(id: i32, hp: HitPoints) -> Repaired {
         kind: master_type::BUILDING,
         class: class::BUILDING,
         master: ids::HOUSE,
-        master_hp: 550,
+        master_hp: MasterHitPoints::of_data(550),
         hp,
         hp_powerup: HpPowerup::default(),
         main: None,
@@ -264,7 +265,7 @@ fn a_siege_unit_s_repair_pays_its_unit_share() {
         kind: master_type::COMBAT,
         class: class::SIEGE,
         master: ids::ID_35,
-        master_hp: 175,
+        master_hp: MasterHitPoints::of_data(175),
         ..house(5, HitPoints::new(100.0))
     }];
     let mut payer = Payer {

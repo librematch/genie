@@ -6,6 +6,7 @@
 use crate::GenieError;
 use crate::combat::damage::ArmorPair;
 use crate::objects::HitPoints;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HeroFlags;
@@ -87,7 +88,7 @@ impl Unit {
     pub(crate) fn heal(
         &mut self,
         class: ClassId,
-        hit_points: i16,
+        hit_points: MasterHitPoints,
         amount: HitPoints,
     ) -> Result<(), GenieError> {
         if matches!(
@@ -179,7 +180,7 @@ impl Unit {
         if at_most_or_unordered(whole, 0.0) {
             return;
         }
-        let most = f32::from(master.hit_points) + self.hp_powerup.max.get();
+        let most = HitPoints::of_master(master.hit_points).get() + self.hp_powerup.max.get();
         let now = (self.hp_powerup.room() + self.life.hp).get();
         if at_most_or_unordered(rate, 0.0) {
             let amount = if at_most_or_unordered(whole, now) {

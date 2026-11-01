@@ -15,6 +15,7 @@ use genie_core::map::TerrainId;
 use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::Speed;
 use genie_core::objects::HitPoints;
+use genie_core::objects::MasterHitPoints;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ChargeTarget;
@@ -42,6 +43,7 @@ use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 
 /// The facets every sprite a live object of a saved master shows ([`genie_core::objects::facing::SpriteFacets`]):
@@ -209,7 +211,7 @@ pub(super) fn work_masters(
         work.buildable_on = s.can_be_built_on;
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
         work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
-        work.hit_points = s.read_temp_6;
+        work.hit_points = MasterHitPoints::of_data(s.read_temp_6);
         work.available = s.available != 0;
         work.disabled = s.disabled != 0;
         work.line_of_sight = Distance::new(s.los);
@@ -232,7 +234,10 @@ pub(super) fn work_masters(
         });
         if let Some(c) = combat {
             work.cost = build_cost(&c.build_inventory);
-            work.build_time = c.train_location.first().map_or(0, |t| t.train_time);
+            work.build_time = c
+                .train_location
+                .first()
+                .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
             work.charge_type = ChargeType::of_data(c.charge_type);
             work.formation_category = FormationClass::of_data(c.temp_formation_category);
             work.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
@@ -360,7 +365,7 @@ pub(super) fn work_masters(
                 .iter()
                 .map(|t| genie_core::objects::masters::TrainLocation {
                     location: MasterId::of_data(t.train_location_id),
-                    time: t.train_time,
+                    time: WholeSeconds::of_data(t.train_time),
                     button: t.button_location_id,
                     hotkey: t.hotkey_id,
                 })

@@ -16,6 +16,7 @@ use self::update::drop_done_orders;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HitPoints;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
@@ -28,6 +29,7 @@ use crate::objects::masters::{MasterId, ids};
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use std::collections::BTreeMap;
 
 use crate::GenieError;
@@ -156,9 +158,9 @@ pub struct Construction {
     pub builders: u8,
     /// Its master's hit points (`+0x530`) and build time (`+0x898`, the first train location's
     /// train time; 0 without one).
-    pub hit_points: i16,
+    pub hit_points: MasterHitPoints,
     /// Its master's build time (the first train location's train time; 0 without one).
-    pub build_time: i16,
+    pub build_time: WholeSeconds,
     /// The record its start adds: its master's obstruction kind and class.
     pub record: Obstruction,
     /// `+0xc61`, `snow_flag`: it was completed on snow (its decal is not held).
@@ -477,9 +479,9 @@ mod stack_tests {
             tall: 0.0 < z,
             obstruction_type: kind,
             obstruction_class: ObstructionClass::UNIT,
-            build_time: bt,
+            build_time: WholeSeconds::of_data(bt),
             trained_at: vec![master_id(9999)],
-            hit_points: hp,
+            hit_points: MasterHitPoints::of_data(hp),
             building: Some(BuildingMaster {
                 stack_unit: None,
                 foundation_terrain: None,
@@ -587,8 +589,8 @@ mod stack_tests {
                 progress: Seconds::new(149.99),
                 desolid: false,
                 builders: 1,
-                hit_points: 2400,
-                build_time: 150,
+                hit_points: MasterHitPoints::of_data(2400),
+                build_time: WholeSeconds::of_data(150),
                 record: Obstruction {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
@@ -789,7 +791,7 @@ mod stack_tests {
             let mut t = world();
             for ms in &mut t.masters {
                 let m = ms.get_mut(ids::TOWN_CENTRE).unwrap();
-                m.build_time = 0;
+                m.build_time = WholeSeconds::ZERO;
                 m.obstruction_type = ObstructionType::CIRCLE;
                 m.obstruction_class = ObstructionClass::UNIT;
                 m.height = height;

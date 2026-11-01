@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
@@ -540,7 +541,7 @@ fn a_unit_reads_its_own_master_before_its_player_s() {
     use crate::objects::masters::{Master, Masters};
     let shared = Master {
         id: master_id(4),
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         ..Master::default()
     };
     let every = vec![Masters::default(), Masters::new([shared])];
@@ -554,20 +555,20 @@ fn a_unit_reads_its_own_master_before_its_player_s() {
     };
     assert_eq!(
         u.master(&every, PlayerId::new(1)).map(|m| m.hit_points),
-        Ok(25)
+        Ok(MasterHitPoints::of_data(25))
     );
     u.own_master = Some(Box::new(Master {
         id: master_id(4),
-        hit_points: 40,
+        hit_points: MasterHitPoints::of_data(40),
         ..Master::default()
     }));
     assert_eq!(
         u.master(&every, PlayerId::new(1)).map(|m| m.hit_points),
-        Ok(40)
+        Ok(MasterHitPoints::of_data(40))
     );
     assert_eq!(
         u.master(&every, PlayerId::new(0)).map(|m| m.hit_points),
-        Ok(40)
+        Ok(MasterHitPoints::of_data(40))
     );
     u.own_master = None;
     let missing = u

@@ -54,6 +54,7 @@ use crate::math::Angle;
 use crate::math::fmath;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
@@ -204,7 +205,7 @@ pub struct Victim {
     /// It is inside another object (`+0x2f0`): an Attack on it ends.
     pub inside: bool,
     /// Its master's hit points (`+0x530`).
-    pub master_hp: i16,
+    pub master_hp: MasterHitPoints,
     /// Its master's tasks of action type 0xa0 ([`BONUS_DAMAGE`]), in their order: the damage its
     /// hits add by hit points ([`bonus_damage`]).
     pub bonus_tasks: Vec<crate::objects::masters::Task>,

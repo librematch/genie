@@ -28,6 +28,7 @@ use crate::orders::object_gone;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::game_status::LOST;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -229,7 +230,7 @@ impl World {
         let desolid = site.is_some_and(|c| c.desolid);
         let share = if state < ObjectState::Alive && HitPoints::new(1.0) <= hp {
             let c = site.ok_or(crate::construction::build::NO_CONSTRUCTION)?;
-            let build_time = f32::from(c.build_time);
+            let build_time = Seconds::of_master(c.build_time).get();
             (build_time - c.progress.get()) / build_time
         } else {
             0.0
@@ -593,6 +594,7 @@ mod tests {
     use super::*;
     use crate::construction::build::Construction;
     use crate::map::spatial::Obstruction;
+    use crate::objects::MasterHitPoints;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::ids;
@@ -606,6 +608,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
+    use crate::world::WholeSeconds;
     use crate::world::WorldTime;
 
     /// Gaia and two players: player 1's villager 10, house foundation 11 (build time 25, cost 25
@@ -617,8 +620,8 @@ mod tests {
                 progress: Seconds::new(progress),
                 desolid,
                 builders: 0,
-                hit_points: 550,
-                build_time: 25,
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::NONE,

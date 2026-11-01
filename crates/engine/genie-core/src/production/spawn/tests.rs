@@ -14,6 +14,7 @@ use crate::map::TileRect;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
@@ -1001,7 +1002,7 @@ fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
         reason(
             &|m| {
                 m.kind = master_type::STATIC;
-                m.hit_points = 5;
+                m.hit_points = MasterHitPoints::of_data(5);
             },
             Facing::Drawn
         ),

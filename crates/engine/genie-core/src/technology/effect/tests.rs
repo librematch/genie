@@ -8,6 +8,7 @@ use crate::map::Position;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
@@ -38,6 +39,7 @@ use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use crate::world::WorldTime;
 
 /// A combat unit's charge after its master's maximum charge changes (`FUN_1412163c0`'s
@@ -384,7 +386,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
         id: ids::VILLAGER_MALE,
         kind: master_type::COMBAT,
         class: class::VILLAGER,
-        hit_points: 25,
+        hit_points: MasterHitPoints::of_data(25),
         armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
         ..Master::default()
     }])];
@@ -406,7 +408,10 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
     let m = t.masters[0].get(ids::VILLAGER_MALE).unwrap();
     assert_eq!(
         (m.hit_points, m.armors.clone()),
-        (40, vec![ClassAmount::new(4, 1), ClassAmount::new(3, 2)])
+        (
+            MasterHitPoints::of_data(40),
+            vec![ClassAmount::new(4, 1), ClassAmount::new(3, 2)]
+        )
     );
 }
 
@@ -418,8 +423,8 @@ fn built() -> crate::construction::build::Construction {
         progress: Seconds::new(1.0),
         desolid: false,
         builders: 0,
-        hit_points: 1,
-        build_time: 1,
+        hit_points: MasterHitPoints::of_data(1),
+        build_time: WholeSeconds::of_data(1),
         record: crate::map::spatial::Obstruction {
             kind: ObstructionType::NONE,
             class: ObstructionClass::NONE,
@@ -445,7 +450,7 @@ fn combat(id: MasterId, class: ClassId, hit_points: i16) -> Master {
         id,
         kind: master_type::COMBAT,
         class,
-        hit_points,
+        hit_points: MasterHitPoints::of_data(hit_points),
         ..Master::default()
     }
 }
@@ -490,17 +495,17 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
         .map(|u| u.life.hp.get())
         .collect();
     assert_eq!(hp, [45.0, 30.0]);
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points).collect();
+    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
     assert_eq!(hps, [90, 60, 60]);
     // master 6 lies within the table (up to 7) but has no master: nothing, not the class
     t.do_effect(PlayerId::new(0), &[attribute(4, 6, 6, 0, 10.0)], None)
         .unwrap();
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points).collect();
+    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
     assert_eq!(hps, [90, 60, 60]);
     // past the table the class changes: (60 + 10) × 30 / 60 = 35
     t.do_effect(PlayerId::new(0), &[attribute(4, 100, 6, 0, 10.0)], None)
         .unwrap();
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points).collect();
+    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
     assert_eq!(hps, [100, 70, 70]);
     assert_eq!(
         t.players[0].objects[ListIndex::new(1)].life.hp,
@@ -594,8 +599,13 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
         ..Master::default()
     };
     t.masters = vec![Masters::new([
-        building(30, 200, -1, [Some(master_id(31)), None, None, None]),
-        building(31, 100, 30, [None; 4]),
+        building(
+            30,
+            MasterHitPoints::of_data(200),
+            -1,
+            [Some(master_id(31)), None, None, None],
+        ),
+        building(31, MasterHitPoints::of_data(100), 30, [None; 4]),
     ])];
     // multiply the class's hit points by 1.5: every object's hit points × 1.5 + 0.5
     // the load files the objects in the players' trackers
@@ -608,7 +618,7 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
         .map(|u| u.life.hp.get())
         .collect();
     assert_eq!(hp, [150.0, 75.0, 15.0]);
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points).collect();
+    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
     assert_eq!(hps, [300, 150]);
 }
 
@@ -638,7 +648,7 @@ fn a_team_effect_reaches_the_mutual_allies() {
     let hps: Vec<i16> = t
         .masters
         .iter()
-        .map(|m| m.get(master_id(4)).unwrap().hit_points)
+        .map(|m| m.get(master_id(4)).unwrap().hit_points.get())
         .collect();
     assert_eq!(hps, [60, 65, 65, 60]);
     t.do_effect(PlayerId::new(1), &[attribute(44, -1, 6, 0, 5.0)], None)
@@ -646,7 +656,7 @@ fn a_team_effect_reaches_the_mutual_allies() {
     let hps: Vec<i16> = t
         .masters
         .iter()
-        .map(|m| m.get(master_id(4)).unwrap().hit_points)
+        .map(|m| m.get(master_id(4)).unwrap().hit_points.get())
         .collect();
     assert_eq!(hps, [65, 65, 65, 60]);
     // the enemies' block (24): player 3 counts player 1 an enemy and is counted one
@@ -655,7 +665,7 @@ fn a_team_effect_reaches_the_mutual_allies() {
     let hps: Vec<i16> = t
         .masters
         .iter()
-        .map(|m| m.get(master_id(4)).unwrap().hit_points)
+        .map(|m| m.get(master_id(4)).unwrap().hit_points.get())
         .collect();
     assert_eq!(hps, [65, 65, 65, 65]);
 }
@@ -728,7 +738,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
             id: ids::FARM,
             kind: master_type::STATIC,
             class: class::CLASS_11,
-            hit_points: 10,
+            hit_points: MasterHitPoints::of_data(10),
             line_of_sight: Distance::new(2.0),
             storage: vec![
                 (None, Amount::ZERO, 0),
@@ -922,8 +932,11 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         Some(SpriteId::named(7)),
         [Some(master_id(0)), Some(master_id(9))],
     );
-    (m.build_time, m.obstruction_type, m.obstruction_class) =
-        (33, ObstructionType::CIRCLE, ObstructionClass::UNIT);
+    (m.build_time, m.obstruction_type, m.obstruction_class) = (
+        WholeSeconds::of_data(33),
+        ObstructionType::CIRCLE,
+        ObstructionClass::UNIT,
+    );
     (m.line_of_sight, m.tall) = (Distance::new(6.0), true);
     t.masters = vec![Masters::new([m, combat(master_id(5), class::CLASS_6, 60)])];
     for id in [1, 3] {
@@ -993,7 +1006,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
     );
     assert_eq!(follows(&p.objects[ListIndex::new(1)]), (None, false, None));
     let c = p.objects[ListIndex::new(0)].construction.unwrap();
-    assert_eq!(c.build_time, 33);
+    assert_eq!(c.build_time, WholeSeconds::of_data(33));
     assert_eq!(
         c.record,
         crate::map::spatial::Obstruction {
@@ -1396,14 +1409,21 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     let m = t.masters[0].get(master_id(74)).unwrap();
     assert_eq!(
         (m.id, m.hit_points, m.weapons.clone()),
-        (master_id(74), 45, vec![ClassAmount::new(4, 6)])
+        (
+            master_id(74),
+            MasterHitPoints::of_data(45),
+            vec![ClassAmount::new(4, 6)]
+        )
     );
     assert!(m.available);
     // mode 1 leaves the master
-    t.masters[0].get_mut(master_id(75)).unwrap().hit_points = 50;
+    t.masters[0].get_mut(master_id(75)).unwrap().hit_points = MasterHitPoints::of_data(50);
     t.do_effect(PlayerId::new(0), &[attribute(3, 74, 75, 1, 0.0)], None)
         .unwrap();
-    assert_eq!(t.masters[0].get(master_id(74)).unwrap().hit_points, 45);
+    assert_eq!(
+        t.masters[0].get(master_id(74)).unwrap().hit_points,
+        MasterHitPoints::of_data(45)
+    );
     // with an object: its slot 0x98 keeps its share of the hit points (45 of 45: 50 of 50)
     t.players[0]
         .objects
@@ -1415,7 +1435,10 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
         (u.life.master_id, u.life.hp),
         (master_id(74), HitPoints::new(50.0))
     );
-    assert_eq!(t.masters[0].get(master_id(74)).unwrap().hit_points, 50);
+    assert_eq!(
+        t.masters[0].get(master_id(74)).unwrap().hit_points,
+        MasterHitPoints::of_data(50)
+    );
 }
 
 /// Kind 7 (`FUN_1416136f0`) makes objects at the built buildings of a master, which this file
@@ -1493,7 +1516,10 @@ fn the_object_kinds_without_an_object_do_nothing() {
         )
         .is_err()
     );
-    assert_eq!(t.masters[0].get(ids::CASTLE).unwrap().hit_points, 4800);
+    assert_eq!(
+        t.masters[0].get(ids::CASTLE).unwrap().hit_points,
+        MasterHitPoints::of_data(4800)
+    );
 }
 
 /// The enable command (`FUN_1416665b0`, kind 2): `available` takes the byte unless the master
@@ -2033,7 +2059,7 @@ fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             id: ids::HOUSE,
             kind: master_type::BUILDING,
             class: class::BUILDING,
-            hit_points: 550,
+            hit_points: MasterHitPoints::of_data(550),
             radius: Footprint::new(0.5, 0.5),
             obstruction_type: ObstructionType::TYPE_2,
             obstruction_class: ObstructionClass::UNIT,

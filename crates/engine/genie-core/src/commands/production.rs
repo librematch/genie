@@ -25,6 +25,7 @@ use crate::players::attribute::QUEUED;
 use crate::production::Production;
 use crate::technology::TechId;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use crate::world::slots::PlayerSlots;
 use crate::world::{
     COMPUTER_QUEUE_LIMIT, ONE_UNIT_GAME, QUEUE_LIMIT, VILLAGER_ANY, World, villager,
@@ -276,14 +277,16 @@ impl World {
             if let Some(master) = e.master {
                 let time = player_master(&self.masters, p, master)
                     .and_then(|m| m.train_locations.first())
-                    .map_or(0, |l| l.time);
-                queued += Seconds::new((i32::from(e.count) * i32::from(time)) as f32);
+                    .map_or(WholeSeconds::ZERO, |l| l.time);
+                queued += Seconds::new((i32::from(e.count) * i32::from(time.get())) as f32);
             } else if let Some(tech) = e.tech {
                 // a queued research has its locations (the queue checked them)
                 let (time, adjustment) = Some(tech.index())
                     .and_then(|t| owner.techs.get(t))
                     .and_then(|t| t.location(building.life.master_id))
-                    .map_or((0, Seconds::ZERO), |l| (l.time as i16, l.adjustment));
+                    .map_or((WholeSeconds::ZERO, Seconds::ZERO), |l| {
+                        (WholeSeconds::of_data(l.time as i16), l.adjustment)
+                    });
                 queued += (Seconds::of_master(time) + adjustment) * f32::from(e.count);
             }
         }
@@ -510,7 +513,7 @@ impl World {
         (master, tech): (Option<MasterId>, Option<TechId>),
         n: i16,
         button: i32,
-        time: Option<i16>,
+        time: Option<WholeSeconds>,
     ) -> Result<(), GenieError> {
         let queue = &self
             .players

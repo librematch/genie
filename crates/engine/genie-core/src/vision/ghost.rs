@@ -672,6 +672,7 @@ mod tests {
     use crate::map::Distance;
     use crate::map::GridSize;
     use crate::map::TileOffset;
+    use crate::objects::MasterHitPoints;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::ids;
@@ -685,6 +686,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
+    use crate::world::WholeSeconds;
     use crate::world::WorldTime;
 
     /// A gold mine's master (it leaves ghosts), a house's and the ghosts' own.
@@ -1325,8 +1327,8 @@ mod tests {
             progress: Seconds::ZERO,
             desolid: true,
             builders: 0,
-            hit_points: 0,
-            build_time: 0,
+            hit_points: MasterHitPoints::of_data(0),
+            build_time: WholeSeconds::ZERO,
             record: crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,

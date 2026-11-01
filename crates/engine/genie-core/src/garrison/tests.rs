@@ -27,6 +27,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
@@ -107,7 +108,7 @@ fn garrison_masters() -> Masters {
             id: TC,
             kind: master_type::BUILDING,
             class: class::TOWER,
-            hit_points: 2400,
+            hit_points: MasterHitPoints::of_data(2400),
             garrison: 15,
             building: Some(BuildingMaster {
                 garrison_type: (GarrisonKinds::VILLAGERS
@@ -152,7 +153,7 @@ fn garrison_masters() -> Masters {
             id: GATE,
             kind: master_type::BUILDING,
             class: class::GATE,
-            hit_points: 2750,
+            hit_points: MasterHitPoints::of_data(2750),
             garrison: 0,
             ..Master::default()
         },
