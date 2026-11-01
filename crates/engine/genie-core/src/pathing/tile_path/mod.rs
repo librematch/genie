@@ -35,7 +35,9 @@ pub use self::goal_marks::Request;
 pub use self::grid::{Blocked, Planner};
 pub use self::grid_level::GridLevel;
 pub use self::plan_tile::{PlanRect, PlanTile};
-use self::search::{Node, OpenList};
+#[cfg(test)]
+use self::search::Node;
+use self::search::{NodeIndex, Nodes, OpenList};
 #[cfg(test)]
 use self::smoothing::straighten;
 use self::smoothing::{SHORTCUT_REACH, TILE_SEARCH_LENGTH};

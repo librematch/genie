@@ -17,6 +17,47 @@ const STEPS: [(CellEdges, i16, i16, CellEdges); 4] = [
     (CellEdges::S, 0, 1, CellEdges::N),
 ];
 
+/// A node's place in the planner's pool (`+0x428`, `FUN_140f79c90` hands them out in order).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) struct NodeIndex(usize);
+
+/// The planner's node pool, read and changed by [`NodeIndex`]; a search's nodes in the order
+/// it made them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) struct Nodes(Vec<Node>);
+
+impl Nodes {
+    /// Append `node`; its place.
+    pub(super) fn push(&mut self, node: Node) -> NodeIndex {
+        self.0.push(node);
+        NodeIndex(self.0.len() - 1)
+    }
+
+    /// Every node, in the order made.
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, Node> {
+        self.0.iter()
+    }
+
+    /// The pool emptied.
+    pub(super) fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
+impl std::ops::Index<NodeIndex> for Nodes {
+    type Output = Node;
+
+    fn index(&self, n: NodeIndex) -> &Node {
+        &self.0[n.0]
+    }
+}
+
+impl std::ops::IndexMut<NodeIndex> for Nodes {
+    fn index_mut(&mut self, n: NodeIndex) -> &mut Node {
+        &mut self.0[n.0]
+    }
+}
+
 /// A search node (`0x28` bytes, from the planner's pool `+0x428`, `FUN_140f79c90`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Node {
@@ -36,14 +77,14 @@ pub(super) struct Node {
     /// `+0x1a`: the cost was measured from the grandparent.
     pub(super) shortcut: bool,
     /// `+0x20`.
-    pub(super) parent: Option<usize>,
+    pub(super) parent: Option<NodeIndex>,
 }
 
 /// The open nodes (`+0x480`): a bucket per whole cost, the lowest one sorted with its cheapest
 /// node last (`FUN_140f9cba0`, `FUN_140f9cd40`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct OpenList {
-    pub(super) buckets: Vec<Vec<usize>>,
+    pub(super) buckets: Vec<Vec<NodeIndex>>,
     /// `+0x18` with its flag `+0x1c`, `+0x20` with `+0x24`.
     pub(super) min: Option<i32>,
     pub(super) max: Option<i32>,
@@ -65,7 +106,7 @@ impl OpenList {
 
     /// `FUN_140f9cba0`: into the lowest bucket before the first node from the back that costs
     /// more; into a new lowest or a higher bucket at its end.
-    pub(super) fn push(&mut self, node: usize, nodes: &[Node]) {
+    pub(super) fn push(&mut self, node: NodeIndex, nodes: &Nodes) {
         let f = nodes[node].f;
         let b = f as i32;
         let index = b as usize;
@@ -93,7 +134,7 @@ impl OpenList {
 
     /// `FUN_140f9cd40`: the last node of the lowest bucket; an emptied bucket hands over to the
     /// next one that holds nodes, which is sorted then.
-    pub(super) fn pop(&mut self, nodes: &[Node]) -> Option<usize> {
+    pub(super) fn pop(&mut self, nodes: &Nodes) -> Option<NodeIndex> {
         let m = self.min?;
         let bucket = &mut self.buckets[m as usize];
         let node = bucket.pop()?;
@@ -101,9 +142,10 @@ impl OpenList {
             let max = self.max.unwrap_or(m);
             if let Some(i) = (m + 1..=max).find(|&i| !self.buckets[i as usize].is_empty()) {
                 self.min = Some(i);
-                msvc::sort(&mut self.buckets[i as usize], &|a: usize, b: usize| {
-                    nodes[a].f > nodes[b].f
-                });
+                msvc::sort(
+                    &mut self.buckets[i as usize],
+                    &|a: NodeIndex, b: NodeIndex| nodes[a].f > nodes[b].f,
+                );
             } else {
                 self.min = None;
                 self.max = None;
@@ -125,7 +167,7 @@ pub(super) struct TileNode {
     /// The estimate to the goal.
     pub(super) estimate: f32,
     /// The node it comes from.
-    pub(super) parent: Option<usize>,
+    pub(super) parent: Option<NodeIndex>,
     /// The edge it was entered by (none for the start).
     pub(super) dir: CellEdges,
     /// The tile its cost is measured from.
@@ -134,7 +176,7 @@ pub(super) struct TileNode {
 
 impl Planner {
     /// `FUN_140f79c90`: a new node from the pool.
-    pub(super) fn alloc(&mut self, new: TileNode) -> usize {
+    pub(super) fn alloc(&mut self, new: TileNode) -> NodeIndex {
         let TileNode {
             at,
             level,
@@ -155,8 +197,7 @@ impl Planner {
             dir,
             shortcut: false,
             parent,
-        });
-        self.nodes.len() - 1
+        })
     }
 
     /// The estimate from a tile to the goal's, in whole tiles (`FUN_140f764c0`, `FUN_140f76840`).
@@ -176,7 +217,7 @@ impl Planner {
     /// Where a new node's cost is measured from (`FUN_140f764c0`, `FUN_140f76840`): a turn
     /// (a move across the parent's own move) measures from the grandparent, unless the parent
     /// already did; returns that node's cost so far, its tile and whether it was the grandparent.
-    pub(super) fn measured_from(&self, parent: usize, dir: CellEdges) -> (f32, PlanTile, bool) {
+    pub(super) fn measured_from(&self, parent: NodeIndex, dir: CellEdges) -> (f32, PlanTile, bool) {
         let p = &self.nodes[parent];
         if let (Some(gp), false) = (p.parent, p.shortcut) {
             let turn = if dir == CellEdges::W || dir == CellEdges::E {
@@ -199,9 +240,9 @@ impl Planner {
         level: GridLevel,
         at: PlanTile,
         g: f32,
-        parent: usize,
+        parent: NodeIndex,
         dir: CellEdges,
-    ) -> Option<usize> {
+    ) -> Option<NodeIndex> {
         use CellEdges as Ed;
         let i = self.index(level, at);
         let cell = self.cells[i];
@@ -270,9 +311,9 @@ impl Planner {
         &mut self,
         at: PlanTile,
         g: f32,
-        parent: usize,
+        parent: NodeIndex,
         dir: CellEdges,
-    ) -> Option<usize> {
+    ) -> Option<NodeIndex> {
         let i = self.index(GridLevel::TILES, at);
         let b0 = self.cells[i].edges;
         if !b0.intersects(dir) || b0.contains(CellEdges::CLOSED) {
@@ -305,7 +346,7 @@ impl Planner {
 
     /// Close a popped node and keep it as the best when its estimate is the lowest yet; its
     /// cell's edges before the close, None for a cell closed already.
-    pub(super) fn close(&mut self, n: usize) -> Option<CellEdges> {
+    pub(super) fn close(&mut self, n: NodeIndex) -> Option<CellEdges> {
         let cell = self.nodes[n].cell;
         let b = self.cells[cell].edges;
         if b.contains(CellEdges::CLOSED) {
@@ -329,7 +370,7 @@ impl Planner {
         cell: PlanTile,
         start: PlanTile,
         full: bool,
-    ) -> Option<usize> {
+    ) -> Option<NodeIndex> {
         let start_cell = self.cell(level, cell);
         if !start_cell.kind.contains(CellKind::LONE) && start_cell.edges.is_empty() {
             return None;
@@ -376,7 +417,7 @@ impl Planner {
     }
 
     /// `FUN_140f79250`: A* over the tiles from the start's tile.
-    pub(super) fn search_tiles(&mut self, start: PlanTile) -> Option<usize> {
+    pub(super) fn search_tiles(&mut self, start: PlanTile) -> Option<NodeIndex> {
         if self.cell(GridLevel::TILES, start).edges.is_empty() {
             return None;
         }

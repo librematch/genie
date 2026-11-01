@@ -5,8 +5,8 @@ use crate::map::GridSize;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::{
-    Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, Node, OpenList, PlanRect,
-    PlanTile,
+    Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, NodeIndex, Nodes, OpenList,
+    PlanRect, PlanTile,
 };
 
 /// A terrain restriction's planner (`0x4a8` bytes, built by `FUN_140f74f90`).
@@ -30,10 +30,10 @@ pub struct Planner {
     pub(super) last: PlanTile,
     /// `+0x478`: the goal's marks found a node cell.
     pub(super) goal_marked: bool,
-    pub(super) nodes: Vec<Node>,
+    pub(super) nodes: Nodes,
     pub(super) open: OpenList,
     /// `+0x470` and `+0xb8`: the node nearest the goal and its estimate.
-    pub(super) best: Option<usize>,
+    pub(super) best: Option<NodeIndex>,
     pub(super) best_cost: f32,
     /// `+0x448`: the path's points from the goal back.
     pub(super) points: Vec<BVector>,
@@ -90,7 +90,7 @@ impl Planner {
             goal: PlanTile::default(),
             last: PlanTile::default(),
             goal_marked: false,
-            nodes: Vec::new(),
+            nodes: Nodes::default(),
             open: OpenList::default(),
             best: None,
             best_cost: NO_COST,

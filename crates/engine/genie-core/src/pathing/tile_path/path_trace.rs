@@ -2,7 +2,9 @@
 //! goal.
 
 use crate::math::fmath::BVector;
-use crate::pathing::tile_path::{Cell, CellEdges, CellKind, GridLevel, HALF, PlanTile, Planner};
+use crate::pathing::tile_path::{
+    Cell, CellEdges, CellKind, GridLevel, HALF, NodeIndex, PlanTile, Planner,
+};
 
 impl Planner {
     /// `FUN_140f7b9e0`: the steps from a child cell to the goal's tile at that level (`to`),
@@ -21,7 +23,7 @@ impl Planner {
 
     /// `FUN_140f77d00`: the tile of a node cell nearest the goal's tile, child by child down to
     /// level 0 (ties to the earlier child).
-    pub(super) fn tile_toward(&self, n: usize, goal: PlanTile) -> PlanTile {
+    pub(super) fn tile_toward(&self, n: NodeIndex, goal: PlanTile) -> PlanTile {
         let node = self.nodes[n];
         let mut at = node.at;
         for l in (1..=node.level.get()).rev().map(GridLevel::new) {
@@ -91,7 +93,7 @@ impl Planner {
 
     /// `FUN_140f775a0`: the tile where a node's path crosses into its parent: on the node's edge
     /// toward the parent, nearest the middle of the smaller of the two cells.
-    pub(super) fn crossing(&self, n: usize) -> Option<PlanTile> {
+    pub(super) fn crossing(&self, n: NodeIndex) -> Option<PlanTile> {
         let node = self.nodes[n];
         let parent = self.nodes[node.parent?];
         // the levels as the shifts from a cell to its tiles
@@ -160,7 +162,7 @@ impl Planner {
     /// `FUN_140f794f0`: the tile where the path from the last point `from` toward the look-ahead
     /// `toward` crosses a node's edge into its parent, moved along the edge to the nearest tile
     /// with that edge; -1 along the edge when none has it.
-    pub(super) fn aim(&self, n: usize, toward: PlanTile, from: PlanTile) -> Option<PlanTile> {
+    pub(super) fn aim(&self, n: NodeIndex, toward: PlanTile, from: PlanTile) -> Option<PlanTile> {
         let node = self.nodes[n];
         let parent = self.nodes[node.parent?];
         // the levels as the shifts from a cell to its tiles
@@ -275,7 +277,7 @@ impl Planner {
     /// The path's points from the goal's node back to the start (the loops of `FUN_140f77f20` and
     /// `FUN_140f78ba0`): per node the tile where the path enters its parent, aimed from the last
     /// point toward the crossing two nodes on (the start's tile when there is none).
-    pub(super) fn trace_back(&mut self, n: usize, start: PlanTile) {
+    pub(super) fn trace_back(&mut self, n: NodeIndex, start: PlanTile) {
         let mut node = n;
         loop {
             let parent = self.nodes[node].parent;
@@ -297,7 +299,7 @@ impl Planner {
     /// The searched cells' open and closed marks cleared and the pool emptied, after the goal's
     /// marks.
     pub(super) fn clear_nodes(&mut self) {
-        for node in &self.nodes {
+        for node in self.nodes.iter() {
             // the game keeps the byte's low nibble, the four edges
             self.cells[node.cell].edges &= CellEdges::EDGES;
         }

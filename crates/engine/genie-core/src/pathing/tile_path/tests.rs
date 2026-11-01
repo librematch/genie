@@ -414,13 +414,14 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
         shortcut: false,
         parent: None,
     };
-    let nodes = [node(5.5), node(5.25), node(5.25), node(7.0), node(6.5)];
+    let mut nodes = Nodes::default();
+    let ids = [5.5, 5.25, 5.25, 7.0, 6.5].map(|f| nodes.push(node(f)));
     let mut open = OpenList::default();
-    for i in 0..nodes.len() {
-        open.push(i, &nodes);
+    for id in ids {
+        open.push(id, &nodes);
     }
-    let order: Vec<usize> = std::iter::from_fn(|| open.pop(&nodes)).collect();
-    assert_eq!(order, [1, 2, 0, 4, 3]);
+    let order: Vec<NodeIndex> = std::iter::from_fn(|| open.pop(&nodes)).collect();
+    assert_eq!(order, [1, 2, 0, 4, 3].map(|i| ids[i]));
     assert!(open.is_empty());
 }
 
