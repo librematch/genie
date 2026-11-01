@@ -261,25 +261,37 @@ fn the_integer_square_root_is_exact_below_and_truncates_between_squares() {
 fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
     // a ray from (0, 1) to (4, 1) against the box (2, 0)-(3, 2): its left side at x = 2
     let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
-    let mut t = T_START;
+    let mut t = RayFraction::START;
     let hit = ray_rect(
         FixedPoint::new(0, ONE),
         FixedPoint::new(4 * ONE, ONE),
         r,
         &mut t,
     );
-    assert_eq!((hit, t), (Some((Meet::Cross, ShapeSide::LowX)), ONE / 2));
+    assert_eq!(
+        (hit, t),
+        (
+            Some((Meet::Cross, ShapeSide::LowX)),
+            RayFraction::new(ONE / 2)
+        )
+    );
     // a ray going the other way meets the right side
-    let mut t = T_START;
+    let mut t = RayFraction::START;
     let hit = ray_rect(
         FixedPoint::new(4 * ONE, ONE),
         FixedPoint::new(0, ONE),
         r,
         &mut t,
     );
-    assert_eq!((hit, t), (Some((Meet::Cross, ShapeSide::HighX)), ONE / 4));
+    assert_eq!(
+        (hit, t),
+        (
+            Some((Meet::Cross, ShapeSide::HighX)),
+            RayFraction::new(ONE / 4)
+        )
+    );
     // a ray beside the box meets nothing
-    let mut t = T_START;
+    let mut t = RayFraction::START;
     assert_eq!(
         ray_rect(
             FixedPoint::new(0, 3 * ONE),
@@ -298,7 +310,7 @@ fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
 fn a_ray_along_y_crosses_the_bottom_or_the_top() {
     let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let x = 2 * ONE + ONE / 2;
-    let cast = |a: FixedPoint, b: FixedPoint, t: i32| {
+    let cast = |a: FixedPoint, b: FixedPoint, t: RayFraction| {
         let mut t = t;
         let hit = ray_rect(a, b, r, &mut t);
         (hit, t)
@@ -308,55 +320,65 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
         cast(
             FixedPoint::new(x, -ONE),
             FixedPoint::new(x, 3 * ONE),
-            T_START
+            RayFraction::START
         ),
-        (Some((Meet::Cross, ShapeSide::LowY)), ONE / 4)
+        (
+            Some((Meet::Cross, ShapeSide::LowY)),
+            RayFraction::new(ONE / 4)
+        )
     );
     // down from 3 to -1: the top at a quarter
     assert_eq!(
         cast(
             FixedPoint::new(x, 3 * ONE),
             FixedPoint::new(x, -ONE),
-            T_START
+            RayFraction::START
         ),
-        (Some((Meet::Cross, ShapeSide::HighY)), ONE / 4)
+        (
+            Some((Meet::Cross, ShapeSide::HighY)),
+            RayFraction::new(ONE / 4)
+        )
     );
     // a nearer hit already: none
     assert_eq!(
         cast(
             FixedPoint::new(x, -ONE),
             FixedPoint::new(x, 3 * ONE),
-            ONE / 8
+            RayFraction::new(ONE / 8)
         ),
-        (None, ONE / 8)
+        (None, RayFraction::new(ONE / 8))
     );
     // from inside the box, or beside it (x on its edge): none
     assert_eq!(
         cast(
             FixedPoint::new(x, ONE),
             FixedPoint::new(x, 3 * ONE),
-            T_START
+            RayFraction::START
         ),
-        (None, T_START)
+        (None, RayFraction::START)
     );
     assert_eq!(
         cast(
             FixedPoint::new(3 * ONE, -ONE),
             FixedPoint::new(3 * ONE, 3 * ONE),
-            T_START
+            RayFraction::START
         ),
-        (None, T_START)
+        (None, RayFraction::START)
     );
     assert_eq!(
-        cast(FixedPoint::new(x, ONE), FixedPoint::new(x, -ONE), T_START),
-        (None, T_START)
+        cast(
+            FixedPoint::new(x, ONE),
+            FixedPoint::new(x, -ONE),
+            RayFraction::START
+        ),
+        (None, RayFraction::START)
     );
     // a slanted ray up through the bottom: the segment test against it
     let (a, b) = (
         FixedPoint::new(2 * ONE + ONE / 4, -ONE),
         FixedPoint::new(2 * ONE + 3 * ONE / 4, 3 * ONE),
     );
-    let mut t = T_START;
+    let mut t = RayFraction::START;
     let Some(k) = segment_hit(
         a,
         b,
@@ -366,9 +388,12 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
     ) else {
         panic!("the ray meets the bottom");
     };
-    assert_eq!(cast(a, b, T_START), (Some((k, ShapeSide::LowY)), t));
+    assert_eq!(
+        cast(a, b, RayFraction::START),
+        (Some((k, ShapeSide::LowY)), t)
+    );
     // and down through the top
-    let mut t = T_START;
+    let mut t = RayFraction::START;
     let Some(k) = segment_hit(
         b,
         a,
@@ -378,7 +403,10 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
     ) else {
         panic!("the ray meets the top");
     };
-    assert_eq!(cast(b, a, T_START), (Some((k, ShapeSide::HighY)), t));
+    assert_eq!(
+        cast(b, a, RayFraction::START),
+        (Some((k, ShapeSide::HighY)), t)
+    );
 }
 
 /// `FUN_140faa380`'s four outcomes: a proper crossing (its parameter into `t`), a touch at the
@@ -388,32 +416,32 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
 fn a_segment_meets_a_ray_by_crossing_or_touching() {
     let p = |x: i32, y: i32| FixedPoint::new(x * ONE, y * ONE);
     let (c, e) = (p(2, 0), p(2, 2));
-    let mut t = T_START;
+    let mut t = RayFraction::START;
     assert_eq!(
         segment_hit(p(0, 1), p(4, 1), c, e, &mut t),
         Some(Meet::Cross)
     );
-    assert_eq!(t, ONE / 2);
-    let mut t = T_START;
+    assert_eq!(t, RayFraction::new(ONE / 2));
+    let mut t = RayFraction::START;
     assert_eq!(
         segment_hit(p(0, 1), p(2, 1), c, e, &mut t),
         Some(Meet::Touch)
     );
-    assert_eq!(t, ONE);
-    let mut t = T_START;
+    assert_eq!(t, RayFraction::new(ONE));
+    let mut t = RayFraction::START;
     assert_eq!(
         segment_hit(c, p(4, 1), c, e, &mut t),
         Some(Meet::TouchAtStart)
     );
-    assert_eq!(t, 0);
-    let mut t = T_START;
+    assert_eq!(t, RayFraction::new(0));
+    let mut t = RayFraction::START;
     assert_eq!(
         segment_hit(p(0, 1), p(4, 1), p(0, 2), p(4, 2), &mut t),
         None
     );
-    let mut t = ONE / 4;
+    let mut t = RayFraction::new(ONE / 4);
     assert_eq!(segment_hit(p(0, 1), p(4, 1), c, e, &mut t), None);
-    assert_eq!(t, ONE / 4);
+    assert_eq!(t, RayFraction::new(ONE / 4));
 }
 
 /// `FUN_140fa16d0`: a segment through the box keeps the part inside, each end moved to the

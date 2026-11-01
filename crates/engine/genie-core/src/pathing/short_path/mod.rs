@@ -26,7 +26,7 @@ mod token;
 pub use self::call::{Call, Entry, Listed, Pather, Query, ShortPath, Target, to_path};
 #[cfg(test)]
 use self::geometry::segment_hit;
-use self::geometry::{Meet, contact_point, ray_rect, shrunk_corner, snap_to_side};
+use self::geometry::{Meet, RayFraction, contact_point, ray_rect, shrunk_corner, snap_to_side};
 use self::nodes::{Corner, Foot, cheb, clamp_to_box, clip, corner_emits, in_box};
 use self::start::Started;
 use self::token::Token;
@@ -34,8 +34,6 @@ use self::token::Token;
 /// `DAT_142f43b10`, `DAT_142f43a10`: fixed point to float and back.
 const TO_FLOAT: f32 = crate::math::image::short_path::TO_FLOAT;
 pub(crate) const TO_FIXED: f32 = crate::math::image::short_path::TO_FIXED;
-/// The raycast's start `t` (`0x466666`, 1.1).
-const T_START: i32 = 0x46_6666;
 
 /// `(v + 0x3fffff) >> 22` for a negative `v`: the tile of a coordinate, truncated toward zero.
 const fn tile_of(v: i32) -> i32 {

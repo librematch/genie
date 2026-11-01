@@ -4,8 +4,8 @@ use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::outline::Outline;
 use crate::pathing::short_path::{
     Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, Meet, NUDGES, Node, NodeIndex,
-    OPEN_CORNER_WITHOUT_EMIT, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, ShortPath, Started,
-    T_START, TO_FIXED, TO_FLOAT, UNSET, VertexIndex, WalkDir, cheb, corner_emits, float_distance,
+    OPEN_CORNER_WITHOUT_EMIT, Poly, PolyIndex, RECT_HEURISTIC, RayFraction, Run, Search, ShortPath,
+    Started, TO_FIXED, TO_FLOAT, UNSET, VertexIndex, WalkDir, cheb, corner_emits, float_distance,
     in_box, isqrt, through_float,
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide, ShortFound};
@@ -206,7 +206,7 @@ impl Search<'_> {
     pub(super) fn corner_expand(&mut self, n: Node, emit: Emit) -> Result<(), GenieError> {
         let p = n.at;
         let mut t = range_point(self.goal.range, p, self.goal.at)?;
-        let mut frac = T_START;
+        let mut frac = RayFraction::START;
         let reach = n.g.wrapping_add(float_distance(t, p));
         if !self.beats_goal(reach)? {
             return Ok(());
@@ -227,7 +227,7 @@ impl Search<'_> {
                 let Some(token) = corner_emits(emit.prev, emit.next, p, tj) else {
                     continue;
                 };
-                let mut f2 = T_START;
+                let mut f2 = RayFraction::START;
                 found = self.ctx.raycast(p, tj, &mut f2, Callback::Corner(token))?;
                 if !touches(found) {
                     frac = f2;
@@ -419,7 +419,7 @@ impl Search<'_> {
                     return Ok(None);
                 }
                 let t = range_point(self.goal.range, p, self.goal.at)?;
-                let mut frac = T_START;
+                let mut frac = RayFraction::START;
                 let found = self.ctx.raycast(p, t, &mut frac, Callback::Box)?;
                 match found {
                     None => {
@@ -461,23 +461,25 @@ impl Search<'_> {
         n: Node,
         p: FixedPoint,
         t: FixedPoint,
-        hit_t: i32,
+        hit_t: RayFraction,
         hit: Hit,
     ) -> Result<(), GenieError> {
-        let mut frac = hit_t - 0x6_6666;
+        // back from the hit a tenth of the ray (`0x66666`) at a time
+        let mut frac = RayFraction::new(hit_t.get() - 0x6_6666);
         let mut base = n;
-        while 1 <= frac {
+        while 1 <= frac.get() {
             let qp = Self::at_fraction(p, t, frac);
             if self.ctx.holder(qp)?.is_none() {
-                let dx = ((i64::from(t.x().wrapping_sub(p.x())) * i64::from(frac)) >> 22) as i32;
-                let dy = ((i64::from(t.y().wrapping_sub(p.y())) * i64::from(frac)) >> 22) as i32;
+                let f = i64::from(frac.get());
+                let dx = ((i64::from(t.x().wrapping_sub(p.x())) * f) >> 22) as i32;
+                let dy = ((i64::from(t.y().wrapping_sub(p.y())) * f) >> 22) as i32;
                 let fy = dy as f32 * TO_FLOAT;
                 let fx = dx as f32 * TO_FLOAT;
                 let g = FixedDistance::new((fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
                 base = self.add(n.g.wrapping_add(g), n.idx, qp, Kind::Waypoint);
                 break;
             }
-            frac -= 0x6_6666;
+            frac = RayFraction::new(frac.get() - 0x6_6666);
         }
         let r = *self.ctx.mesh.shapes.checked(hit.shape.index())?;
         let centre = FixedPoint::new(

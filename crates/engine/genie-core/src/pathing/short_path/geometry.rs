@@ -100,15 +100,35 @@ pub(super) enum Meet {
     TouchAtStart,
 }
 
+/// A place along a ray in fixed point, `ONE` its end (the raycast's `t`): a hit lowers it to
+/// the hit's place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct RayFraction(i32);
+
+impl RayFraction {
+    /// The raycast's start (`0x466666`, 1.1): past the ray's end.
+    pub(super) const START: Self = Self(0x46_6666);
+
+    /// The place `v` (`ONE` the ray's end).
+    pub(super) const fn new(v: i32) -> Self {
+        Self(v)
+    }
+
+    /// Its value.
+    pub(super) const fn get(self) -> i32 {
+        self.0
+    }
+}
+
 /// `FUN_140faa380`: segment `a`–`b` against segment `c`–`e` in fixed point; `t` the parameter along
-/// `a`–`b` (`ONE` is `b`). A proper crossing nearer than `t`; a touch or graze (tolerances 1e-4
+/// `a`–`b`. A proper crossing nearer than `t`; a touch or graze (tolerances 1e-4
 /// and 1e-3); a touch at `a` itself on an end of `c`–`e`; none. Sets `t` on a hit.
 pub(super) fn segment_hit(
     a: FixedPoint,
     b: FixedPoint,
     c: FixedPoint,
     e: FixedPoint,
-    t: &mut i32,
+    t: &mut RayFraction,
 ) -> Option<Meet> {
     let w = |v: i32| i64::from(v);
     let (x1, y1, x2, y2) = (w(a.x()), w(a.y()), w(b.x()), w(b.y()));
@@ -121,7 +141,7 @@ pub(super) fn segment_hit(
         (((((y1 - y3) * (x4 - x3)) >> 22) - (((y4 - y3) * (x1 - x3)) >> 22)) * 0x40_0000) / den;
     let ub =
         (((((y1 - y3) * (x2 - x1)) >> 22) - (((y2 - y1) * (x1 - x3)) >> 22)) * 0x40_0000) / den;
-    let current = i64::from(*t);
+    let current = i64::from(t.get());
     let mut test_ub_low = true;
     if ua < 0x1a3 {
         if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
@@ -137,7 +157,7 @@ pub(super) fn segment_hit(
         }
         if 0x1a2 < ub {
             if ub < 0x3f_fe5e {
-                *t = ua as i32;
+                *t = RayFraction::new(ua as i32);
                 return Some(Meet::Cross);
             }
             test_ub_low = false;
@@ -149,7 +169,7 @@ pub(super) fn segment_hit(
     if 0x40_1062 < ub {
         return None;
     }
-    *t = ua as i32;
+    *t = RayFraction::new(ua as i32);
     Some(if ua == 0 && (ub & !0x40_0000) == 0 {
         Meet::TouchAtStart
     } else {
@@ -164,7 +184,7 @@ pub(super) fn ray_rect(
     a: FixedPoint,
     b: FixedPoint,
     r: FixedRect,
-    t: &mut i32,
+    t: &mut RayFraction,
 ) -> Option<(Meet, ShapeSide)> {
     let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
     let mut found = None;
@@ -202,7 +222,7 @@ pub(super) fn ray_right_side(
     a: FixedPoint,
     b: FixedPoint,
     r: FixedRect,
-    t: &mut i32,
+    t: &mut RayFraction,
 ) -> Option<Meet> {
     let [_, ry0, rx1, ry1] = r.get();
     if b.y() - a.y() != 0 {
@@ -221,10 +241,10 @@ pub(super) fn ray_right_side(
         return None;
     }
     let u = ray_ratio(rx1 - a.x(), b.x() - a.x());
-    if *t <= u {
+    if t.get() <= u {
         return None;
     }
-    *t = u;
+    *t = RayFraction::new(u);
     Some(Meet::Cross)
 }
 
@@ -234,7 +254,7 @@ pub(super) fn ray_left_side(
     a: FixedPoint,
     b: FixedPoint,
     r: FixedRect,
-    t: &mut i32,
+    t: &mut RayFraction,
 ) -> Option<Meet> {
     let [rx0, ry0, _, ry1] = r.get();
     if b.y() - a.y() != 0 {
@@ -253,10 +273,10 @@ pub(super) fn ray_left_side(
         return None;
     }
     let u = ray_ratio(rx0 - a.x(), b.x() - a.x());
-    if *t <= u {
+    if t.get() <= u {
         return None;
     }
-    *t = u;
+    *t = RayFraction::new(u);
     Some(Meet::Cross)
 }
 
@@ -267,7 +287,7 @@ pub(super) fn ray_bottom_side(
     a: FixedPoint,
     b: FixedPoint,
     r: FixedRect,
-    t: &mut i32,
+    t: &mut RayFraction,
 ) -> Option<Meet> {
     let [rx0, ry0, rx1, _] = r.get();
     if b.x() - a.x() != 0 {
@@ -286,10 +306,10 @@ pub(super) fn ray_bottom_side(
         return None;
     }
     let u = ray_ratio(ry0 - a.y(), b.y() - a.y());
-    if *t <= u {
+    if t.get() <= u {
         return None;
     }
-    *t = u;
+    *t = RayFraction::new(u);
     Some(Meet::Cross)
 }
 
@@ -299,7 +319,7 @@ pub(super) fn ray_top_side(
     a: FixedPoint,
     b: FixedPoint,
     r: FixedRect,
-    t: &mut i32,
+    t: &mut RayFraction,
 ) -> Option<Meet> {
     let [rx0, _, rx1, ry1] = r.get();
     if b.x() - a.x() != 0 {
@@ -318,9 +338,9 @@ pub(super) fn ray_top_side(
         return None;
     }
     let u = ray_ratio(ry1 - a.y(), b.y() - a.y());
-    if *t <= u {
+    if t.get() <= u {
         return None;
     }
-    *t = u;
+    *t = RayFraction::new(u);
     Some(Meet::Cross)
 }

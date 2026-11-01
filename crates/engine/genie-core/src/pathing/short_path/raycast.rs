@@ -8,8 +8,8 @@ use crate::pathing::FixedRect;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Callback, Ctx, FixedPoint, Hit, Meet, Sweep, T_START, Token, inside, ray_rect, strictly_inside,
-    tile_of,
+    Callback, Ctx, FixedPoint, Hit, Meet, RayFraction, Sweep, Token, inside, ray_rect,
+    strictly_inside, tile_of,
 };
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -26,7 +26,7 @@ pub(super) struct RayTile<'a> {
     /// The ray's end.
     pub(super) end: FixedPoint,
     /// The ray's fraction so far, which a hit lowers.
-    pub(super) fraction: &'a mut i32,
+    pub(super) fraction: &'a mut RayFraction,
 }
 
 impl Ctx<'_> {
@@ -178,7 +178,7 @@ impl Ctx<'_> {
         &self,
         a: FixedPoint,
         b: FixedPoint,
-        t: &mut i32,
+        t: &mut RayFraction,
         mut cb: Callback,
     ) -> Result<Option<(Meet, Hit)>, GenieError> {
         let (x0, y0, x1, y1) = (a.x(), a.y(), b.x(), b.y());
@@ -238,8 +238,8 @@ impl Ctx<'_> {
             })?;
             let mut left = count;
             if r.is_some() {
-                let hy = ((i64::from(y1.wrapping_sub(y0)) * i64::from(*t)) >> 22) as i32 + y0;
-                let hx = ((i64::from(dx) * i64::from(*t)) >> 22) as i32 + x0;
+                let hy = ((i64::from(y1.wrapping_sub(y0)) * i64::from(t.get())) >> 22) as i32 + y0;
+                let hx = ((i64::from(dx) * i64::from(t.get())) >> 22) as i32 + x0;
                 let span =
                     (tile_of(hx) - tx).wrapping_abs() + 1 + (tile_of(hy) - ty).wrapping_abs();
                 result = r;
@@ -377,7 +377,7 @@ impl Ctx<'_> {
         if a.y() == b.y() {
             return Ok(self.sweep(a, b, AxisDir::of_dx(b.x() - a.x()))?.found);
         }
-        let mut t = T_START;
+        let mut t = RayFraction::START;
         Ok(self.raycast(a, b, &mut t, Callback::Sight)?.is_some())
     }
 }

@@ -4,8 +4,8 @@ use crate::pathing::FixedDistance;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    FixedPoint, Hit, Kind, Node, NodeIndex, Search, TO_FIXED, TO_FLOAT, contact_point, in_box,
-    shrunk_corner, snap_to_side, strictly_inside, through_float, tile_of,
+    FixedPoint, Hit, Kind, Node, NodeIndex, RayFraction, Search, TO_FIXED, TO_FLOAT, contact_point,
+    in_box, shrunk_corner, snap_to_side, strictly_inside, through_float, tile_of,
 };
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -288,10 +288,11 @@ impl Search<'_> {
     }
 
     /// The point where the walk from `p` toward `t` meets the hit at fraction `frac` (`>> 22`).
-    pub(super) fn at_fraction(p: FixedPoint, t: FixedPoint, frac: i32) -> FixedPoint {
+    pub(super) fn at_fraction(p: FixedPoint, t: FixedPoint, frac: RayFraction) -> FixedPoint {
+        let f = i64::from(frac.get());
         FixedPoint::new(
-            ((i64::from(t.x().wrapping_sub(p.x())) * i64::from(frac)) >> 22) as i32 + p.x(),
-            ((i64::from(t.y().wrapping_sub(p.y())) * i64::from(frac)) >> 22) as i32 + p.y(),
+            ((i64::from(t.x().wrapping_sub(p.x())) * f) >> 22) as i32 + p.x(),
+            ((i64::from(t.y().wrapping_sub(p.y())) * f) >> 22) as i32 + p.y(),
         )
     }
 
