@@ -90,7 +90,7 @@ impl Search<'_> {
         let mut fv = next0;
         let mut gb = cheb(*poly.vertices.checked(e as usize)?, p).wrapping_add(n.g);
         let mut gf = cheb(*poly.vertices.checked(next0 as usize)?, p).wrapping_add(n.g);
-        let alive = |cost: i32, g: i32| g < cost || cost == UNSET;
+        let alive = |cost: FixedDistance, g: FixedDistance| g < cost || cost == UNSET;
         let mut alive_b = alive(*poly.costs.checked(e as usize)?, gb);
         let mut alive_f = alive(*poly.costs.checked(next0 as usize)?, gf);
         let walk = Rewalk {
@@ -121,7 +121,7 @@ impl Search<'_> {
         &mut self,
         walk: &Rewalk,
         poly: &Poly,
-        (at, g): (u32, i32),
+        (at, g): (u32, FixedDistance),
         (dir, lo, hi): (WalkDir, u32, u32),
     ) -> Result<(), GenieError> {
         let m = walk.count;
@@ -172,9 +172,9 @@ impl Search<'_> {
         &self,
         walk: &Rewalk,
         poly: &Poly,
-        (from, g): (u32, i32),
+        (from, g): (u32, FixedDistance),
         forward: bool,
-    ) -> Result<(u32, i32, bool), GenieError> {
+    ) -> Result<(u32, FixedDistance, bool), GenieError> {
         let m = walk.count;
         let costs = &self.polys.checked(walk.poly as usize)?.costs;
         let (mut vi, mut g) = (from, g);
@@ -281,7 +281,7 @@ impl Search<'_> {
                 (1.0f32.copysign(dx as f32 * TO_FLOAT) * TO_FIXED) as i32
             };
             let w = self.add(
-                n.g.wrapping_add(dx.wrapping_abs()),
+                n.g.wrapping_add(FixedDistance::new(dx.wrapping_abs())),
                 n.idx,
                 FixedPoint::new(step.wrapping_add(p.x()), p.y()),
                 Kind::Waypoint,
@@ -470,7 +470,7 @@ impl Search<'_> {
                 let dy = ((i64::from(t.y().wrapping_sub(p.y())) * i64::from(frac)) >> 22) as i32;
                 let fy = dy as f32 * TO_FLOAT;
                 let fx = dx as f32 * TO_FLOAT;
-                let g = (fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
+                let g = FixedDistance::new((fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
                 base = self.add(n.g.wrapping_add(g), n.idx, qp, Kind::Waypoint);
                 break;
             }

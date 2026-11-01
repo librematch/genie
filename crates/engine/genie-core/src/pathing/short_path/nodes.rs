@@ -5,14 +5,14 @@ use crate::GenieError;
 use crate::pathing::short_path::{
     FixedPoint, Kind, NONE, Node, RECT_HEURISTIC, Search, Token, WalkDir,
 };
-use crate::pathing::{FixedRect, ShapeId, ShapeSide};
+use crate::pathing::{FixedDistance, FixedRect, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
 
 /// A polygon corner reached as a goal candidate (`FUN_140fa3860`'s arguments, [`Search::goal_test`]).
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Corner {
     /// The cost to the corner.
-    pub(super) cost: i32,
+    pub(super) cost: FixedDistance,
     /// The node it was reached from.
     pub(super) parent: u32,
     /// The walk's direction round the polygon.
@@ -46,7 +46,7 @@ pub(super) struct Foot {
     /// The walk's direction round the polygon.
     pub(super) dir: WalkDir,
     /// The cost at the edge's start.
-    pub(super) start_cost: i32,
+    pub(super) start_cost: FixedDistance,
     /// The node it was reached from.
     pub(super) parent: u32,
 }
@@ -176,16 +176,22 @@ pub(super) const fn clamp_to_box(p: FixedPoint, b: FixedRect) -> FixedPoint {
 }
 
 /// Chebyshev distance (`max(|dx|, |dy|)`), the polygon walks' cost.
-pub(super) const fn cheb(a: FixedPoint, b: FixedPoint) -> i32 {
+pub(super) const fn cheb(a: FixedPoint, b: FixedPoint) -> FixedDistance {
     let dy = (a.y().wrapping_sub(b.y())).wrapping_abs();
     let dx = (a.x().wrapping_sub(b.x())).wrapping_abs();
-    if dy < dx { dx } else { dy }
+    FixedDistance::new(if dy < dx { dx } else { dy })
 }
 
 impl Search<'_> {
     /// Append a node to the arena (`FUN_140fa3fe0`, `FUN_140fa40d0`, `FUN_140fa4210`,
     /// `FUN_140fa4340`): `f = g + h(at)`.
-    pub(super) fn add(&mut self, g: i32, parent: u32, at: FixedPoint, kind: Kind) -> Node {
+    pub(super) fn add(
+        &mut self,
+        g: FixedDistance,
+        parent: u32,
+        at: FixedPoint,
+        kind: Kind,
+    ) -> Node {
         let n = Node {
             g,
             f: self.goal.heuristic(at).wrapping_add(g),
@@ -211,7 +217,7 @@ impl Search<'_> {
 
     pub(super) fn side_node(
         &mut self,
-        g: i32,
+        g: FixedDistance,
         parent: u32,
         shape: ShapeId,
         side: ShapeSide,
@@ -250,7 +256,7 @@ impl Search<'_> {
         let better = self.goal_node == NONE || g < self.arena.checked(self.goal_node as usize)?.g;
         if self.goal.range2 < d2 || !better {
             let b = *self.arena.checked(self.best as usize)?;
-            let h = i64::from(b.f.wrapping_sub(b.g));
+            let h = i64::from(b.f.wrapping_sub(b.g).get());
             if d2 < (h * h) >> 22 {
                 let n = self.add(g, parent, pt, kind);
                 self.best = n.idx;
@@ -289,7 +295,7 @@ impl Search<'_> {
             } else {
                 FixedPoint::new(a.x(), gv)
             };
-            let g = g0.wrapping_add((gv.wrapping_sub(s)).wrapping_abs());
+            let g = g0.wrapping_add(FixedDistance::new((gv.wrapping_sub(s)).wrapping_abs()));
             let _ = self.goal_test(Corner {
                 cost: g,
                 parent,
@@ -312,9 +318,7 @@ impl Search<'_> {
             self.best = n.idx;
         }
         let better = self.goal_node == NONE || n.g < self.arena.checked(self.goal_node as usize)?.g;
-        if (h < self.goal.range.get() || self.goal.rect_distance2(n.at) <= self.goal.range2)
-            && better
-        {
+        if (h < self.goal.range || self.goal.rect_distance2(n.at) <= self.goal.range2) && better {
             self.goal_node = n.idx;
             return Ok(true);
         }

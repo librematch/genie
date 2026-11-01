@@ -69,15 +69,15 @@ pub const fn isqrt(mut v: u64) -> u32 {
 }
 
 /// `(int)((float)v * 2^-22 * 2^22)`: a cost through float, 24 bits kept.
-fn through_float(v: i32) -> i32 {
-    ((v as f32) * TO_FLOAT * TO_FIXED) as i32
+fn through_float(v: i32) -> FixedDistance {
+    FixedDistance::new(((v as f32) * TO_FLOAT * TO_FIXED) as i32)
 }
 
 /// The Euclidean distance in fixed point through float (`sqrtf` of the float differences).
-fn float_distance(a: FixedPoint, b: FixedPoint) -> i32 {
+fn float_distance(a: FixedPoint, b: FixedPoint) -> FixedDistance {
     let dy = (a.y().wrapping_sub(b.y())) as f32 * TO_FLOAT;
     let dx = (a.x().wrapping_sub(b.x())) as f32 * TO_FLOAT;
-    (fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32
+    FixedDistance::new((fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
 /// `FUN_14087c610`: `p` strictly inside `r` shrunk by `k`.
@@ -159,7 +159,7 @@ pub struct Ctx<'a> {
 /// `DAT_1439e60e5`: 1 in the image and at run time: the rectangle heuristic (0 is the Euclidean).
 const RECT_HEURISTIC: bool = true;
 /// `DAT_143cc1f50`: a polygon vertex no corner node reached yet.
-const UNSET: i32 = -0x40_0000;
+const UNSET: FixedDistance = FixedDistance::new(-0x40_0000);
 /// `DAT_143cc1f54`: the outline tracer's step limit.
 const TRACE_STEPS: i32 = 2000;
 /// `DAT_143cc1f60`: the four unit directions (x, y) of a type-3 node's nudges.
@@ -201,17 +201,17 @@ impl Goal {
     }
 
     /// `FUN_140fa3f10`: the estimate from `p` to the goal.
-    fn heuristic(&self, p: FixedPoint) -> i32 {
+    fn heuristic(&self, p: FixedPoint) -> FixedDistance {
         if !RECT_HEURISTIC {
             let fy = (self.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
             let fx = (self.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
-            return (fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
+            return FixedDistance::new((fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
         }
         let lx = i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - self.rrx;
         let ly = i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - self.rry;
         let a = if lx < 0 { 0 } else { (lx * lx) as u64 };
         let b = if ly < 0 { 0 } else { (ly * ly) as u64 };
-        isqrt((b & !0x3f_ffff).wrapping_add(a & !0x3f_ffff)) as i32
+        FixedDistance::new(isqrt((b & !0x3f_ffff).wrapping_add(a & !0x3f_ffff)) as i32)
     }
 }
 
@@ -260,8 +260,8 @@ struct Emit {
 /// A node (`0x34` bytes).
 #[derive(Clone, Copy, Debug)]
 struct Node {
-    g: i32,
-    f: i32,
+    g: FixedDistance,
+    f: FixedDistance,
     idx: u32,
     parent: u32,
     at: FixedPoint,
@@ -275,7 +275,7 @@ struct Poly {
     sides: Vec<ShapeSide>,
     /// Each vertex's shape, none for a vertex on the bounds' border.
     shapes: Vec<Option<ShapeId>>,
-    costs: Vec<i32>,
+    costs: Vec<FixedDistance>,
     flag: bool,
 }
 

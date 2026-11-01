@@ -467,7 +467,7 @@ impl Search<'_> {
         &mut self,
         pi: u32,
         p: FixedPoint,
-        g0: i32,
+        g0: FixedDistance,
         parent: u32,
     ) -> Result<(), GenieError> {
         let poly = self.polys.checked(pi as usize)?.clone();
@@ -539,8 +539,8 @@ impl Search<'_> {
         walk: &NewWalk,
         poly: &Poly,
         p: FixedPoint,
-        g0: i32,
-    ) -> Result<(i32, i32), GenieError> {
+        g0: FixedDistance,
+    ) -> Result<(FixedDistance, FixedDistance), GenieError> {
         let v = &poly.vertices;
         let last = v.len() - 1;
         let (vb, vf) = (*v.checked(last)?, *v.checked(0)?);
@@ -569,7 +569,7 @@ impl Search<'_> {
             parent: walk.parent,
         })?;
         let cost = |dx: i32, dy: i32| {
-            (if dy.wrapping_abs() < dx.wrapping_abs() {
+            FixedDistance::new(if dy.wrapping_abs() < dx.wrapping_abs() {
                 dx.wrapping_abs()
             } else {
                 dy.wrapping_abs()
@@ -588,7 +588,7 @@ impl Search<'_> {
         walk: &NewWalk,
         poly: &Poly,
         (at, before): (u32, u32),
-        g: i32,
+        g: FixedDistance,
         (dir, lo, hi): (WalkDir, u32, u32),
     ) -> Result<(), GenieError> {
         let vv = *poly.vertices.checked(at as usize)?;

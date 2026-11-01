@@ -33,7 +33,12 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
         goal_node: NONE,
         best: 0,
     };
-    let _ = s.add(0, NONE, FixedPoint::new(0, 0), Kind::Start);
+    let _ = s.add(
+        FixedDistance::ZERO,
+        NONE,
+        FixedPoint::new(0, 0),
+        Kind::Start,
+    );
     s
 }
 
@@ -46,7 +51,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
     let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     assert!(
         s.goal_test(Corner {
-            cost: 5 * ONE,
+            cost: FixedDistance::new(5 * ONE),
             parent: 0,
             dir: WalkDir::Forward,
             low: 0,
@@ -60,7 +65,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
     // in range but dearer: the best instead, as it lies nearer than the start's estimate
     assert!(
         !s.goal_test(Corner {
-            cost: 6 * ONE,
+            cost: FixedDistance::new(6 * ONE),
             parent: 0,
             dir: WalkDir::Forward,
             low: 0,
@@ -74,7 +79,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
     // out of range and farther than the best's estimate (one tile): nothing
     assert!(
         !s.goal_test(Corner {
-            cost: ONE,
+            cost: FixedDistance::TILE,
             parent: 0,
             dir: WalkDir::Forward,
             low: 0,
@@ -102,7 +107,7 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
         low: 0,
         high: 0,
         dir: WalkDir::Forward,
-        start_cost: ONE,
+        start_cost: FixedDistance::TILE,
         parent: 0,
     })
     .unwrap();
@@ -115,14 +120,17 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
         low: 0,
         high: 0,
         dir: WalkDir::Forward,
-        start_cost: ONE,
+        start_cost: FixedDistance::TILE,
         parent: 0,
     })
     .unwrap();
     let goal = s.arena[s.goal_node as usize];
     assert_eq!(
         (goal.at, goal.g),
-        (FixedPoint::new(10 * ONE, 9 * ONE), 6 * ONE)
+        (
+            FixedPoint::new(10 * ONE, 9 * ONE),
+            FixedDistance::new(6 * ONE)
+        )
     );
 }
 
@@ -590,7 +598,7 @@ fn square(run: bool) -> Poly {
         vertices,
         sides,
         shapes: vec![None; n],
-        costs: vec![0; n],
+        costs: vec![FixedDistance::ZERO; n],
         flag: false,
     }
 }
@@ -876,7 +884,7 @@ fn a_point_lies_on_an_edge_between_ends_its_neighbour_sides_open_or_close() {
 
 /// The escape candidates a search holds open: each one's place, cost and shape side.
 fn opened(s: &Search<'_>) -> Vec<(FixedPoint, i32, Kind)> {
-    s.open.iter().map(|n| (n.at, n.g, n.kind)).collect()
+    s.open.iter().map(|n| (n.at, n.g.get(), n.kind)).collect()
 }
 
 /// Shape 0 over tiles (2, 2) to (6, 6), and a search of doubled radius two tiles (`r` one
@@ -908,8 +916,14 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
     assert_eq!(s.open.len(), 1);
     let n = s.open[0];
     // the touching point on side 1 has the lowest estimate toward (12, 12)
-    assert_eq!((n.at, n.g), (FixedPoint::new(6 * ONE, 3 * ONE), 2 * ONE));
-    assert_eq!(n.f, s.goal.heuristic(n.at) + n.g);
+    assert_eq!(
+        (n.at, n.g),
+        (
+            FixedPoint::new(6 * ONE, 3 * ONE),
+            FixedDistance::new(2 * ONE)
+        )
+    );
+    assert_eq!(n.f, s.goal.heuristic(n.at).wrapping_add(n.g));
     assert_eq!(s.arena[n.idx as usize].f, n.f);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.goal.r = FixedDistance::new(ONE / 8);
