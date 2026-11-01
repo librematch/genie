@@ -25,7 +25,9 @@ use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterField;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -753,7 +755,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
         master_hp: 100,
         armored: Some(damage::Armored {
             armors: vec![ClassAmount::new(4, 0)],
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             friendly_fire: 1.0,
             ..damage::Armored::default()
         }),
@@ -2263,7 +2265,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     let mut t = forage_world();
     // the town centre's master without a missile cannot attack
     for masters in &mut t.masters {
-        masters.get_mut(ids::TOWN_CENTRE).unwrap().missile = None;
+        masters.get_mut(ids::TOWN_CENTRE).unwrap().missile = MasterField::NONE;
     }
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     let mut attack = own_attack(-1, AttackState::Done, Distance::ZERO);

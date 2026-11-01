@@ -4,6 +4,8 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::SpecificMove;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone, slot_gone};
@@ -356,7 +358,7 @@ impl World {
         &mut self,
         group: GroupId,
         id: ObjectId,
-        (path, reason): (i32, i32),
+        (path, reason): (MovePath, MoveReason),
         (goal, timer, distance): (BVector, f32, f32),
     ) -> Result<bool, GenieError> {
         let Some(index) = self
@@ -376,10 +378,10 @@ impl World {
             .members
             .checked_mut(index)?
             .specific_move;
-        *own = if reason == -1 {
+        *own = if reason == MoveReason::NONE {
             SpecificMove {
-                path_id: -1,
-                reason: -1,
+                path_id: MovePath::NONE,
+                reason: MoveReason::NONE,
                 ..SpecificMove::default()
             }
         } else {

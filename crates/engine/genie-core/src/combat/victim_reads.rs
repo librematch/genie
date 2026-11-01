@@ -60,7 +60,7 @@ pub(crate) fn victim_of(
     } else {
         ElevationBonus::default()
     };
-    let defense = if master.terrain_bonus < 0 || u.life.inside.is_some() {
+    let defense = if master.terrain_bonus.restriction().is_none() || u.life.inside.is_some() {
         Some(1.0)
     } else {
         terrain.and_then(|t| {
@@ -106,7 +106,7 @@ pub(crate) fn victim_of(
             class: master.class,
             master_id: master.id,
             ability: master.combat_ability,
-            missile: master.missile,
+            missile: master.missile.master(),
             weapon_range: master.weapon_range,
             area_effect: master.area_effect,
             blast_level: master.blast_level,

@@ -301,7 +301,7 @@ pub struct Armored {
     /// Its master's base armor for a class it does not list.
     pub base_armor: i16,
     /// Its master's `defense_terrain_bonus`.
-    pub terrain_bonus: i16,
+    pub terrain_bonus: crate::objects::masters::RestrictionField,
     /// Its master's `bonus_damage_resistance`.
     pub resistance: f32,
     /// Its master's `combat_ability`.

@@ -98,7 +98,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
         let missile = master
             .volley_missile
             .filter(|&id| in_table(masters, id))
-            .or(master.missile)
+            .or_else(|| master.missile.master())
             .and_then(|id| masters.get(id));
         if let Some(m) = missile {
             let extra = cvttss2si(master.volley_fire - ONE_MISSILE);

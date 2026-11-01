@@ -173,7 +173,7 @@ pub fn armor_damage(
         "the armor of an object without combat values",
     ))?;
     let (own_class, kind, state) = (v.class, v.kind, v.state);
-    let terrain = if a.terrain_bonus < 0 {
+    let terrain = if a.terrain_bonus.restriction().is_none() {
         1.0f32
     } else {
         a.terrain.ok_or(GenieError::unsupported(

@@ -3,6 +3,8 @@
 
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::SpecificMove;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
@@ -11,7 +13,6 @@ use crate::groups::steer::{ASIDE_TIMER, CLEARANCE, EPSILON, KEEPS_MOVING, MOST_F
 use crate::map::Distance;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{BVector, below_or_unordered};
-use crate::movement::ASIDE;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::master_type::ACTION;
@@ -110,8 +111,8 @@ impl World {
                     .members
                     .checked_mut(index)?
                     .specific_move = SpecificMove {
-                    path_id: -1,
-                    reason: -1,
+                    path_id: MovePath::NONE,
+                    reason: MoveReason::NONE,
                     ..SpecificMove::default()
                 };
             }
@@ -308,7 +309,12 @@ impl World {
                 .consecutive_move_failures
         {
             // A member's own move for being moved aside (`mReason`).
-            let _ = self.set_specific_move(group, id, (-1, ASIDE), (at, ASIDE_TIMER, 0.0))?;
+            let _ = self.set_specific_move(
+                group,
+                id,
+                (MovePath::NONE, MoveReason::ASIDE),
+                (at, ASIDE_TIMER, 0.0),
+            )?;
             self.stop_member(id)?;
             self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
             return Ok(());

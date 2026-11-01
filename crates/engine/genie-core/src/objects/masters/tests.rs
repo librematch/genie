@@ -47,7 +47,7 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
         object_flags: ObjectFlags::NONE,
-        combat_level: 0,
+        combat_level: CombatLevel::NONE,
         work_rate: WorkRate::new(1.0),
         hit_points: 25,
         build_time: 0,
@@ -69,7 +69,7 @@ fn house() -> Master {
         cost: costs(&[(player_attribute::WOOD, 25, true)]),
         obstruction_class: ObstructionClass::UNIT,
         object_flags: ObjectFlags::NONE,
-        combat_level: 0,
+        combat_level: CombatLevel::NONE,
         work_rate: WorkRate::ZERO,
         hit_points: 550,
         build_time: 25,
@@ -305,7 +305,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::COMBAT_LEVEL,
-            |m| f32::from(m.combat_level),
+            |m| f32::from(m.combat_level.get()),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -409,12 +409,12 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         (a::BASE_ARMOR, |m| f32::from(m.base_armor), [3.0, 5.0, 10.0]),
         (
             a::PROJECTILE_UNIT,
-            |m| f32::from(MasterId::field(m.missile)),
+            |m| f32::from(m.missile.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             a::TERRAIN_DEFENSE_BONUS,
-            |m| f32::from(m.terrain_bonus),
+            |m| f32::from(m.terrain_bonus.get()),
             [3.0, 5.0, 10.0],
         ),
         (a::MINIMUM_RANGE, |m| m.min_range.get(), [3.0, 5.0, 10.0]),
@@ -1082,6 +1082,35 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
     );
 }
 
+/// The missile, the trail's unit and the terrain bonus keep the short the effects leave: set
+/// to −3 and 5 added is 2, as in the game, where a field read as none from −1 would give 4; a
+/// multiply's negative result is kept as well.
+#[test]
+fn an_id_field_keeps_a_negative_value_through_an_add() {
+    let w = world(false);
+    let mut m = of_type(master_type::RGE_COMBAT);
+    for a in [attribute::PROJECTILE_UNIT, attribute::TERRAIN_DEFENSE_BONUS] {
+        m.set_attribute(a, -3.0, &w);
+    }
+    assert_eq!(
+        (m.missile.master(), m.terrain_bonus.restriction()),
+        (None, None)
+    );
+    for a in [attribute::PROJECTILE_UNIT, attribute::TERRAIN_DEFENSE_BONUS] {
+        m.add_attribute(a, 5.0, &w);
+    }
+    assert_eq!(m.missile.master(), Some(master_id(2)));
+    assert_eq!(m.terrain_bonus.restriction(), RestrictionId::of_data(2));
+    // 2 × −2 + 0.5 truncates to −3, kept: plus 4 is 1
+    m.multiply_attribute(attribute::PROJECTILE_UNIT, -2.0, &w);
+    m.add_attribute(attribute::PROJECTILE_UNIT, 4.0, &w);
+    assert_eq!(m.missile.get(), 1);
+    let mut t = of_type(master_type::MOVING);
+    t.set_attribute(attribute::TRAILING_UNIT, -3.0, &w);
+    t.add_attribute(attribute::TRAILING_UNIT, 5.0, &w);
+    assert_eq!(t.trail.unit.master(), Some(master_id(2)));
+}
+
 /// The action master's (`FUN_14109fbb0` and its add and multiply) work rate, search radius
 /// and run pattern; the moving master's (`FUN_1410e1c00` ...) turn speed and trail; the
 /// interface's sounds change nothing.
@@ -1114,7 +1143,7 @@ fn the_action_and_moving_setters_change_their_values() {
     assert_eq!(
         m.trail,
         Trail {
-            unit: Some(master_id(1302)),
+            unit: MasterField::of(Some(master_id(1302))),
             mode: 3,
             density: 3.0
         }
@@ -1393,24 +1422,24 @@ fn a_master_s_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     };
     // a building without a volley missile, with one (the tower's), and a boar's combat level
     assert_eq!(
-        master(class::BUILDING, None, 0).unit_ai_type(ids::HOUSE),
+        master(class::BUILDING, None, CombatLevel::NONE).unit_ai_type(ids::HOUSE),
         Some(UnitAiType::BUILDING)
     );
     assert_eq!(
-        master(class::BUILDING, Some(master_id(5)), 0).unit_ai_type(master_id(79)),
+        master(class::BUILDING, Some(master_id(5)), CombatLevel::NONE).unit_ai_type(master_id(79)),
         Some(UnitAiType::TOWER)
     );
     assert_eq!(
-        master(class::PREDATOR, None, 1).unit_ai_type(master_id(48)),
+        master(class::PREDATOR, None, CombatLevel::ANIMAL).unit_ai_type(master_id(48)),
         Some(UnitAiType::BOAR)
     );
     assert_eq!(
-        master(class::PREDATOR, None, 0).unit_ai_type(master_id(126)),
+        master(class::PREDATOR, None, CombatLevel::NONE).unit_ai_type(master_id(126)),
         Some(UnitAiType::LION)
     );
     // the factory's own ids first
     assert_eq!(
-        master(class::BUILDING, None, 0).unit_ai_type(ids::ID_1105),
+        master(class::BUILDING, None, CombatLevel::NONE).unit_ai_type(ids::ID_1105),
         Some(UnitAiType::SIEGE_TOWER)
     );
 }

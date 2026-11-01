@@ -5,7 +5,11 @@ use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SlotState;
+use crate::groups::TransformType;
+use crate::groups::UnitType;
 use crate::groups::{GroupTarget, Member, UnitGroup, UnitGroups};
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -1114,8 +1118,8 @@ fn a_member_moved_aside_waits_out_its_timer() {
     }
     let aside = crate::groups::SpecificMove {
         active: 1,
-        path_id: 4,
-        reason: 2,
+        path_id: MovePath::of_data(4),
+        reason: MoveReason::ASIDE,
         timer: Seconds::new(0.75),
         ..crate::groups::SpecificMove::default()
     };
@@ -1144,8 +1148,8 @@ fn a_member_moved_aside_waits_out_its_timer() {
     assert_eq!(
         g.members[0].specific_move,
         crate::groups::SpecificMove {
-            path_id: -1,
-            reason: -1,
+            path_id: MovePath::NONE,
+            reason: MoveReason::NONE,
             ..crate::groups::SpecificMove::default()
         }
     );
@@ -1166,7 +1170,7 @@ fn a_member_moved_aside_waits_out_its_timer() {
     // once, and the move goes
     t.groups.get_mut(group_id(1)).unwrap().members[0]
         .specific_move
-        .reason = 1;
+        .reason = MoveReason::of_data(1);
     t.specific_moves_step(group_id(1)).unwrap();
     assert_eq!(
         t.groups.get(group_id(1)).unwrap().members[0]
@@ -1213,8 +1217,8 @@ fn a_member_s_own_move_walks_its_path() {
     );
     t.groups.get_mut(group_id(1)).unwrap().members[0].specific_move = crate::groups::SpecificMove {
         active: 1,
-        path_id: -1,
-        reason: 0,
+        path_id: MovePath::NONE,
+        reason: MoveReason::DETOUR,
         timer: Seconds::new(3.0),
         distance: Distance::new(3.0),
         last_position: BVector::new(1.0, 0.0, 0.0),
@@ -1393,9 +1397,9 @@ fn a_group_steers_its_free_members_speeds_in_their_own_update() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.owner = Some(PlayerId::new(9));
     g.motion.maximum_velocity_forward = Speed::new(0.9);
-    g.members[0].specific_move.reason = 1;
-    g.members[1].specific_move.reason = -1;
-    g.members[2].specific_move.reason = 0;
+    g.members[0].specific_move.reason = MoveReason::of_data(1);
+    g.members[1].specific_move.reason = MoveReason::NONE;
+    g.members[2].specific_move.reason = MoveReason::DETOUR;
     let before: Vec<_> = object_id_list(10..=12)
         .into_iter()
         .map(|id| t.object(id).unwrap().1.position())
@@ -1442,9 +1446,9 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
         }],
         ..crate::groups::Formation::default()
     });
-    g.members[0].specific_move.reason = 2;
-    g.members[1].specific_move.reason = -1;
-    g.members[2].specific_move.reason = 4;
+    g.members[0].specific_move.reason = MoveReason::ASIDE;
+    g.members[1].specific_move.reason = MoveReason::NONE;
+    g.members[2].specific_move.reason = MoveReason::of_data(4);
     let groups = UnitGroups {
         groups: vec![g],
         ..UnitGroups::default()
@@ -1751,7 +1755,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
             offset: BVector::new(x - 2.0, 0.0, 0.0),
             transform_position: BVector::new(x + 2.0, 0.0, 4.0),
             desired_category: FormationCategory::named(1),
-            desired_sub_category: -1,
+            desired_sub_category: UnitType::NONE,
             active: 1,
             transformed: 1,
             ..crate::groups::Slot::default()
@@ -1759,7 +1763,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.current_formation = Some(crate::groups::Formation {
             kind: FormationKind::LINE,
-            transform_type: 1,
+            transform_type: TransformType::TURNED,
             transform_orientation: BVector::new(0.0, 0.0, 1.0),
             slots: vec![slot(1.0), slot(2.0), slot(3.0)],
             ..crate::groups::Formation::new()
@@ -1969,10 +1973,10 @@ fn an_attack_releases_a_category_in_reach_or_arrived() {
             .unwrap()
             .members
             .iter()
-            .all(|m| m.specific_move.reason == reason)
+            .all(|m| m.specific_move.reason == MoveReason::of_data(reason))
     };
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
-        m.specific_move.reason = 5;
+        m.specific_move.reason = MoveReason::of_data(5);
     }
     let mut relayout = false;
     // nothing in reach: not finished, arrived
@@ -1991,7 +1995,7 @@ fn an_attack_releases_a_category_in_reach_or_arrived() {
     assert!(reasons(&t, -1));
     // arrived and on its way: all are sent at the end
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
-        m.specific_move.reason = 5;
+        m.specific_move.reason = MoveReason::of_data(5);
     }
     t.groups.get_mut(group_id(1)).unwrap().unit_types.clear();
     t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::ATTACKING;
@@ -2014,7 +2018,7 @@ fn a_unit_in_contact_releases_its_category() {
     register(&mut t);
     light(&mut t, 1, 3, 3, true);
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
-        m.specific_move.reason = 5;
+        m.specific_move.reason = MoveReason::of_data(5);
     }
     let mut relayout = false;
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
@@ -2024,7 +2028,7 @@ fn a_unit_in_contact_releases_its_category() {
             .unwrap()
             .members
             .iter()
-            .all(|m| m.specific_move.reason == -1)
+            .all(|m| m.specific_move.reason == MoveReason::NONE)
     );
 }
 

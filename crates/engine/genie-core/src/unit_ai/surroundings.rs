@@ -14,6 +14,7 @@ use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
@@ -147,7 +148,7 @@ pub struct Surroundings {
     /// The unit's master's class (decoded).
     pub class: Option<ClassId>,
     /// The master's `combat_level` (`+0x62c`).
-    pub combat_level: u8,
+    pub combat_level: CombatLevel,
     /// The master's `attack_priority` (`+0x92c`, `FUN_141202220`).
     pub attack_priority: crate::objects::masters::AttackPriority,
     /// The master's radii (`+0x5d8`, `+0x5dc`), line of sight (`+0x5d0`) and search radius
@@ -308,7 +309,7 @@ pub struct UnitSeen {
     /// Its owner's id (`+0x138`, `player+0x718`); Gaia is 0.
     pub owner: PlayerId,
     /// Its master's `combat_level` (`+0x62c`).
-    pub combat_level: u8,
+    pub combat_level: CombatLevel,
     /// `+0x640`.
     pub state: ObjectState,
     /// Its unit AI's current target (`+0x48`); None without a unit AI or a target.

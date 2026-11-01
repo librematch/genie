@@ -9,6 +9,7 @@ use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
@@ -122,7 +123,7 @@ impl Unit {
                 }
                 None => None,
             },
-            combat_level: master.map_or(0, |m| m.combat_level),
+            combat_level: master.map_or(CombatLevel::NONE, |m| m.combat_level),
             attack_priority: master
                 .map_or(crate::objects::masters::AttackPriority::PRIORITY_0, |m| {
                     m.attack_priority
@@ -140,7 +141,7 @@ impl Unit {
             garrisoned: self.life.inside.is_some(),
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
-            ranged: master.is_some_and(|m| m.missile.is_some()),
+            ranged: master.is_some_and(|m| m.missile.master().is_some()),
             firepower: self.firepower,
             capture: self.capture_kind(c),
             master: self.life.master_id,

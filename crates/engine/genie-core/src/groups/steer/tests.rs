@@ -1,5 +1,7 @@
 use super::*;
 use crate::groups::GroupFlags;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::{Formation, Member, Slot, UnitGroup, UnitGroups};
 use crate::map::Footprint;
@@ -11,7 +13,6 @@ use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
 use crate::math::fmath::BVector;
-use crate::movement::ASIDE;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
@@ -224,7 +225,7 @@ fn a_member_s_own_move_is_set_or_ended() {
         t.set_specific_move(
             group_id(1),
             object_id(10),
-            (7, 0),
+            (MovePath::of_data(7), MoveReason::DETOUR),
             (BVector::new(1.0, 2.0, 3.0), 3.0, 2.5)
         )
         .unwrap()
@@ -234,8 +235,8 @@ fn a_member_s_own_move_is_set_or_ended() {
         own,
         SpecificMove {
             active: 1,
-            path_id: 7,
-            reason: 0,
+            path_id: MovePath::of_data(7),
+            reason: MoveReason::DETOUR,
             goal: BVector::new(1.0, 2.0, 3.0),
             timer: Seconds::new(3.0),
             consecutive_move_failures: 4,
@@ -247,7 +248,7 @@ fn a_member_s_own_move_is_set_or_ended() {
         t.set_specific_move(
             group_id(1),
             object_id(10),
-            (7, -1),
+            (MovePath::of_data(7), MoveReason::NONE),
             (BVector::from([1.0; 3]), 1.0, 1.0)
         )
         .unwrap()
@@ -256,8 +257,8 @@ fn a_member_s_own_move_is_set_or_ended() {
     assert_eq!(
         own,
         SpecificMove {
-            path_id: -1,
-            reason: -1,
+            path_id: MovePath::NONE,
+            reason: MoveReason::NONE,
             ..SpecificMove::default()
         }
     );
@@ -265,7 +266,7 @@ fn a_member_s_own_move_is_set_or_ended() {
         !t.set_specific_move(
             group_id(1),
             object_id(12),
-            (0, 0),
+            (MovePath::of_data(0), MoveReason::DETOUR),
             (BVector::ZERO, 0.0, 0.0)
         )
         .unwrap()
@@ -278,7 +279,7 @@ fn a_member_s_own_move_is_set_or_ended() {
         !t.set_specific_move(
             group_id(1),
             object_id(99),
-            (0, 0),
+            (MovePath::of_data(0), MoveReason::DETOUR),
             (BVector::ZERO, 0.0, 0.0)
         )
         .unwrap()
@@ -309,7 +310,10 @@ fn a_member_in_place_or_failing_too_often() {
     t.steer_to_slot(group_id(1), 0, 0, &[]).unwrap();
     let g = t.groups.get(group_id(1)).unwrap();
     let own = g.members[0].specific_move;
-    assert_eq!((own.active, own.path_id, own.reason), (1, -1, ASIDE));
+    assert_eq!(
+        (own.active, own.path_id, own.reason),
+        (1, MovePath::NONE, MoveReason::ASIDE)
+    );
     assert_eq!(
         (own.goal, own.timer, own.distance),
         (
@@ -340,7 +344,7 @@ fn a_member_in_place_or_failing_too_often() {
         t.groups.get(group_id(1)).unwrap().members[0]
             .specific_move
             .reason,
-        ASIDE
+        MoveReason::ASIDE
     );
 }
 
@@ -568,7 +572,13 @@ fn a_blocked_way_to_the_slot_goes_round() {
             own.distance,
             own.consecutive_move_failures
         ),
-        (1, 0, Seconds::new(3.0), Distance::new(3.0), 1)
+        (
+            1,
+            MoveReason::DETOUR,
+            Seconds::new(3.0),
+            Distance::new(3.0),
+            1
+        )
     );
     assert_eq!(state(&t, 0), SlotState::Steering);
     // the update's list ignored: clear
@@ -623,8 +633,8 @@ fn the_members_moves_end_wait_or_stop() {
     for m in &mut g.members[..2] {
         m.specific_move = SpecificMove {
             active: 1,
-            path_id: 3,
-            reason: 0,
+            path_id: MovePath::of_data(3),
+            reason: MoveReason::DETOUR,
             timer: Seconds::new(1.0),
             distance: Distance::new(2.0),
             ..SpecificMove::default()
@@ -635,8 +645,8 @@ fn the_members_moves_end_wait_or_stop() {
     assert_eq!(
         g.members[0].specific_move,
         SpecificMove {
-            path_id: -1,
-            reason: -1,
+            path_id: MovePath::NONE,
+            reason: MoveReason::NONE,
             ..SpecificMove::default()
         }
     );
@@ -645,7 +655,7 @@ fn the_members_moves_end_wait_or_stop() {
         Point::new(10.0, 5.0)
     );
     assert_eq!(g.members[1].specific_move.timer, Seconds::new(1.0 - DT));
-    assert_eq!(g.members[1].specific_move.reason, 0);
+    assert_eq!(g.members[1].specific_move.reason, MoveReason::DETOUR);
     assert_eq!(
         unit(&t, 11).ai.as_ref().unwrap().state_position,
         Point::ORIGIN
@@ -664,7 +674,10 @@ fn the_members_moves_end_wait_or_stop() {
     };
     assert_eq!(t2.members_to_slots(group_id(1), &[object_id(50)]), Ok(()));
     let own = t2.groups.get(group_id(1)).unwrap().members[1].specific_move;
-    assert_eq!((own.active, own.path_id, own.reason), (0, -1, -1));
+    assert_eq!(
+        (own.active, own.path_id, own.reason),
+        (0, MovePath::NONE, MoveReason::NONE)
+    );
     assert_eq!(mover(&t2, 11).animated.speed, 0.0);
     assert_eq!(
         unit(&t2, 11).ai.as_ref().unwrap().state_position,

@@ -22,6 +22,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
+use crate::objects::masters::TargetOwner;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -290,24 +291,24 @@ fn applies(task: &Task, actor: &Actor<'_>, target: &TaskTarget<'_>, dip: &impl D
     }
     let (me, them) = (actor.player, target.player);
     let ok = match task.owner_type {
-        1 => them == me,
-        2 => them != me && them != PlayerId::GAIA && !dip.allied(me, them, true),
-        3 => them == PlayerId::GAIA,
+        TargetOwner::OWN => them == me,
+        TargetOwner::ENEMY => them != me && them != PlayerId::GAIA && !dip.allied(me, them, true),
+        TargetOwner::GAIA => them == PlayerId::GAIA,
         // type 4 answers at once, the unit itself included
-        4 => {
+        TargetOwner::FRIENDLY => {
             return them == me
                 || them == PlayerId::GAIA
                 || (dip.allied(me, them, true) && dip.allied(them, me, true));
         }
         // of Gaia's targets only for a unit whose own master has a combat level
-        5 => {
+        TargetOwner::ENEMY_OR_GAIA => {
             if them == me || (them != PlayerId::GAIA && dip.allied(me, them, true)) {
                 false
             } else {
-                them != PlayerId::GAIA || actor.master.combat_level != 0
+                them != PlayerId::GAIA || actor.master.combat_level.is_some()
             }
         }
-        6 => them != me,
+        TargetOwner::OTHER => them != me,
         _ => true,
     };
     ok && actor.id != target.id
@@ -333,7 +334,7 @@ fn general<'m>(
             !special_type(task.action_type) && applies(task, actor, t, dip) && wanted(filter, task)
         };
         if t.state < ObjectState::Dying
-            && t.master.combat_level != 0
+            && t.master.combat_level.is_some()
             && let Some(task) = first(list, |task| task.combat_level != 0 && usable(task))
         {
             return Some(task);
@@ -350,7 +351,7 @@ fn general<'m>(
     let kind = terrain?;
     first(list, |task| {
         // the task's short against the terrain's byte
-        task.terrain as u16 == u16::from(kind.get()) && wanted(filter, task)
+        task.terrain.is(kind) && wanted(filter, task)
     })
 }
 
@@ -586,7 +587,9 @@ fn finder_tail<'m>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::masters::CombatLevel;
     use crate::objects::masters::MasterKind;
+    use crate::objects::masters::TaskTerrain;
     use crate::players::CivId;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
@@ -676,11 +679,11 @@ mod tests {
     #[test]
     fn a_task_applies_by_what_the_target_holds_and_whose_it_is() {
         let own = Master {
-            combat_level: 0,
+            combat_level: CombatLevel::NONE,
             ..Master::default()
         };
         let fighter = Master {
-            combat_level: 1,
+            combat_level: CombatLevel::ANIMAL,
             ..Master::default()
         };
         let me = |master| Actor {
@@ -705,7 +708,7 @@ mod tests {
             holding_attr: 1,
             attribute_type,
             attribute_type3,
-            ..of(0)
+            ..of(TargetOwner::ANY)
         };
         for (task, held, takes) in [
             (holder(kind(5), kind(-1)), carrying(kind(-1), 3.0), false),
@@ -731,7 +734,7 @@ mod tests {
         ] {
             let task = Task {
                 action_type,
-                ..of(0)
+                ..of(TargetOwner::ANY)
             };
             let target = TaskTarget {
                 attackable,
@@ -763,7 +766,7 @@ mod tests {
             (0, 1, &own, true),
         ] {
             let target = at(PlayerId::new(player), carrying(None, 0.0));
-            let got = applies_to(&of(owner_type), master, &target);
+            let got = applies_to(&of(TargetOwner::of_data(owner_type)), master, &target);
             assert_eq!(got, takes, "type {owner_type} on player {player}");
         }
         // the unit itself: only type 4 takes it
@@ -771,8 +774,8 @@ mod tests {
             id: object_id(9181),
             ..at(PlayerId::new(1), carrying(None, 0.0))
         };
-        assert!(applies_to(&of(4), &own, &itself));
-        assert!(!applies_to(&of(1), &own, &itself));
+        assert!(applies_to(&of(TargetOwner::FRIENDLY), &own, &itself));
+        assert!(!applies_to(&of(TargetOwner::OWN), &own, &itself));
     }
 
     fn find<'m>(
@@ -1113,7 +1116,7 @@ mod tests {
         // no task on its class: none with the garrison filter, and none with any filter (the
         // finder ends before the general search, which would give the militia's attack)
         let attack = Task {
-            owner_type: 0,
+            owner_type: TargetOwner::ANY,
             ..task(action_type::COMBAT, class::TRANSPORT.get(), -1, 0.0)
         };
         let militia = master(master_id(74), COMBAT, class::CLASS_6, vec![attack]);
@@ -1192,7 +1195,7 @@ mod tests {
     fn the_general_search_takes_a_task_for_the_target_s_class_whose_owner_type_fits() {
         let house = master(ids::HOUSE, BUILDING, class::BUILDING, vec![]);
         let attack = Task {
-            owner_type: 2,
+            owner_type: TargetOwner::ENEMY,
             ..task(action_type::COMBAT, class::BUILDING.get(), -1, 0.0)
         };
         let militia = master(master_id(74), COMBAT, class::CLASS_6, vec![attack]);
@@ -1308,7 +1311,7 @@ mod tests {
     #[test]
     fn a_point_on_a_terrain_takes_the_task_for_that_terrain() {
         let beach = Task {
-            terrain: 2,
+            terrain: TaskTerrain::of_data(2),
             ..task(crate::garrison::transport::TRANSPORT, -1, -1, 0.0)
         };
         let ship = master(

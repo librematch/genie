@@ -1,4 +1,5 @@
 use super::*;
+use crate::groups::MoveReason;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::RestrictionId;
@@ -2774,7 +2775,7 @@ fn a_group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gate
             members: vec![crate::groups::Member {
                 id: object_id(member),
                 specific_move: crate::groups::SpecificMove {
-                    reason,
+                    reason: MoveReason::of_data(reason),
                     ..crate::groups::SpecificMove::default()
                 },
                 ..crate::groups::Member::default()

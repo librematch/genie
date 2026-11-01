@@ -11,6 +11,7 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::TargetOwner;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{ClassId, class};
 use crate::objects::masters::{MasterId, ids};
@@ -103,10 +104,13 @@ fn a_member_s_reason_is_its_own_move_s() {
         },
         ..Member::default()
     };
-    group.members = vec![with_reason(object_id(10), 2), with_reason(object_id(11), 0)];
-    assert_eq!(group.member_reason(object_id(10)), 2);
-    assert_eq!(group.member_reason(object_id(11)), 0);
-    assert_eq!(group.member_reason(object_id(12)), -1);
+    group.members = vec![
+        with_reason(object_id(10), MoveReason::ASIDE),
+        with_reason(object_id(11), MoveReason::DETOUR),
+    ];
+    assert_eq!(group.member_reason(object_id(10)), MoveReason::ASIDE);
+    assert_eq!(group.member_reason(object_id(11)), MoveReason::DETOUR);
+    assert_eq!(group.member_reason(object_id(12)), MoveReason::NONE);
 }
 
 /// `FUN_1410177f0`: the first slot of the current formation (`+0x128`) that holds the unit
@@ -258,7 +262,11 @@ fn a_new_group_holds_the_constructor_s_values() {
     assert_eq!((g.id, g.owner, g.stance), (group_id(7), None, None));
     assert_eq!(
         (g.flags, g.current_command, g.differentiator_id),
-        (GroupFlags::TURN, GroupCommandKind::NONE, -1)
+        (
+            GroupFlags::TURN,
+            GroupCommandKind::NONE,
+            Differentiator::NONE
+        )
     );
     assert_eq!(g.current_target.target, GroupTarget::None);
     assert_eq!(
@@ -1078,7 +1086,7 @@ fn the_categories_attack_ranges_rise_to_their_members_ranges() {
 fn attack_task() -> crate::objects::masters::Task {
     crate::objects::masters::Task {
         action_type: crate::objects::masters::action_type::COMBAT,
-        owner_type: 2,
+        owner_type: TargetOwner::ENEMY,
         object_group: Some(class_id(3)),
         work_range: Distance::new(1.5),
         ..crate::objects::masters::Task::default()

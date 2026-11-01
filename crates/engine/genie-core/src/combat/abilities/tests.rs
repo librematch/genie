@@ -17,6 +17,7 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::SoundEvents;
 use crate::objects::masters::TaskFlags;
 use crate::objects::masters::TaskSprites;
+use crate::objects::masters::TaskTerrain;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -463,23 +464,38 @@ fn a_hit_below_1_hit_point_leaves_0_and_holds_nothing() {
 #[test]
 fn the_terrain_mask_is_a_bitset_of_8() {
     // the longboats' -32: the mask 32
-    assert_eq!(terrain_mask(-32), Some(TerrainFlags::LAND));
+    assert_eq!(
+        terrain_mask(TaskTerrain::of_data(-32)),
+        Some(TerrainFlags::LAND)
+    );
     let water = TerrainFlags::WATER | TerrainFlags::DEEP_WATER;
-    assert_eq!(terrain_mask(-3), Some(water));
+    assert_eq!(terrain_mask(TaskTerrain::of_data(-3)), Some(water));
     // the negation's low byte
-    assert_eq!(terrain_mask(-0x103), Some(water));
-    assert_eq!(terrain_mask(i16::MIN), Some(TerrainFlags::NONE));
-    assert_eq!(terrain_mask(1), Some(TerrainFlags::WATER));
-    assert_eq!(terrain_mask(8), Some(TerrainFlags::SNOW));
-    assert_eq!(terrain_mask(9), Some(TerrainFlags::NONE));
-    assert_eq!(terrain_mask(0), None);
+    assert_eq!(terrain_mask(TaskTerrain::of_data(-0x103)), Some(water));
+    assert_eq!(
+        terrain_mask(TaskTerrain::of_data(i16::MIN)),
+        Some(TerrainFlags::NONE)
+    );
+    assert_eq!(
+        terrain_mask(TaskTerrain::of_data(1)),
+        Some(TerrainFlags::WATER)
+    );
+    assert_eq!(
+        terrain_mask(TaskTerrain::of_data(8)),
+        Some(TerrainFlags::SNOW)
+    );
+    assert_eq!(
+        terrain_mask(TaskTerrain::of_data(9)),
+        Some(TerrainFlags::NONE)
+    );
+    assert_eq!(terrain_mask(TaskTerrain::of_data(0)), None);
 }
 
 /// The longboat's task 3 (250 in the current build): terrains of flag 32, sprites 19601,
 /// −1, 19599, 19599, the dying and undead sprites 19598 and 19600.
 fn longboat_look() -> Task {
     Task {
-        terrain: -32,
+        terrain: TaskTerrain::of_data(-32),
         work_val1: 0.35,
         work_val2: 1.0,
         sprites: TaskSprites::of_data([19601, -1, 19599, 19599]),

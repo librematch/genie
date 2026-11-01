@@ -25,6 +25,7 @@ use crate::unit_ai::UnitAiType;
 use crate::world::Seconds;
 use genie_diff::Diff;
 
+mod combat_level;
 mod combat_setters;
 mod conversion_adjust;
 mod cost_slot;
@@ -32,13 +33,20 @@ mod derived;
 mod dispatch;
 mod lookup;
 mod static_setters;
+mod target_owner;
 mod task_id;
+mod task_index;
+mod task_terrain;
 mod tribe_setters;
 mod values;
 
+pub use self::combat_level::CombatLevel;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
 pub use self::lookup::{PlayersMasters, player_master};
+pub use self::target_owner::TargetOwner;
 pub use self::task_id::TaskId;
+pub use self::task_index::TaskIndex;
+pub use self::task_terrain::TaskTerrain;
 pub use self::values::AttributeWorld;
 pub(crate) use self::values::cost_resource;
 use self::values::{
@@ -69,9 +77,9 @@ pub struct Task {
     /// flag pays the master's cost of its resource times the rate.
     pub combat_level_flag: TaskFlags,
     /// `+0x16`: the terrain the task is for, -1 for none.
-    pub terrain: i16,
+    pub terrain: TaskTerrain,
     /// `+0x18`, `owner_type` (`target_diplomacy`): whose targets.
-    pub owner_type: u8,
+    pub owner_type: TargetOwner,
     /// `+0x19`, `holding_attr` (`carry_check`): 1 wants a target holding the task's resource.
     pub holding_attr: u8,
     /// `+0x20` to `+0x26`, `attribute_type` to `attribute_type4` (`resource_in`,
@@ -124,8 +132,8 @@ impl Default for Task {
             object_id: None,
             combat_level: 0,
             combat_level_flag: TaskFlags::NONE,
-            terrain: -1,
-            owner_type: 0,
+            terrain: TaskTerrain::NONE,
+            owner_type: TargetOwner::ANY,
             holding_attr: 0,
             attribute_type: None,
             attribute_type2: None,
@@ -156,7 +164,7 @@ impl Master {
     /// `+0x788`), if it has one.
     #[must_use]
     pub fn default_task(&self) -> Option<&Task> {
-        self.tasks.get(usize::try_from(self.default_task?).ok()?)
+        self.tasks.get(self.default_task?.index())
     }
 
     /// What a new object of this master starts once its action list is empty in state 2
@@ -264,12 +272,12 @@ pub struct Master {
     /// `object_flags` (`+0x654`): its traits and the trait piece ([`ObjectFlags`]).
     pub object_flags: ObjectFlags,
     /// The `.dat`'s `combat_level` (`+0x62c`).
-    pub combat_level: u8,
+    pub combat_level: CombatLevel,
     /// Its task list.
     pub tasks: Vec<Task>,
     /// `+0x790`, `default_task`: the id of the task its object's empty action list starts in
     /// state 2 (`RGE_Action_Object::update`, slot 0x7f0); None for the game's −1.
-    pub default_task: Option<i16>,
+    pub default_task: Option<TaskIndex>,
     /// `+0x880`, the cost slots in their places (an empty one among them).
     pub cost: [CostSlot; COST_SLOTS],
     /// `work_rate` (`+0x798`): what a builder of this master adds to the work per second.
@@ -317,7 +325,7 @@ pub struct Master {
     pub clearance: Footprint,
     /// `+0x820`, the `.dat`'s `defense_terrain_bonus` (a terrain restriction): a completed
     /// building keeps to restore a tile's terrain whose value in it is neither 0 nor 1.
-    pub terrain_bonus: i16,
+    pub terrain_bonus: RestrictionField,
     /// What a building's completion reads (type 80), None for other masters.
     pub building: Option<BuildingMaster>,
     /// The resource storage (`attribute_type_held`, `attribute_amount_held`, `attribute_flag`:
@@ -430,8 +438,8 @@ pub struct Master {
     pub attack_sprite: Option<SpriteId>,
     /// A second attack sprite (`+0x878`).
     pub attack_sprite2: Option<SpriteId>,
-    /// `missile_id`, −1 for none.
-    pub missile: Option<MasterId>,
+    /// `missile_id`, −1 for none: every short the effects leave in it is kept.
+    pub missile: MasterField,
     /// `fire_missile_at_frame`.
     pub fire_frame: i16,
     /// `interrupt_frame`.
@@ -565,7 +573,7 @@ pub struct TrainLocation {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Trail {
     /// `+0x75e`: the master it leaves behind.
-    pub unit: Option<MasterId>,
+    pub unit: MasterField,
     /// `+0x760`.
     pub mode: u8,
     /// `+0x764`.
@@ -603,6 +611,7 @@ mod damage_class;
 mod garrison_kinds;
 mod gather_group;
 mod hero_flags;
+mod id_field;
 pub mod ids;
 mod master_id;
 mod master_kind;
@@ -628,6 +637,7 @@ pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::garrison_kinds::GarrisonKinds;
 pub use self::gather_group::GatherGroup;
 pub use self::hero_flags::HeroFlags;
+pub use self::id_field::{MasterField, RestrictionField};
 pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
 pub use self::object_flags::ObjectFlags;

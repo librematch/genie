@@ -6,6 +6,7 @@ use crate::forced_replay::{
 };
 use crate::setup::slice;
 use crate::test_ids::object_id;
+use genie_core::groups::Differentiator;
 use genie_core::groups::{UnitGroup, UnitGroups};
 use genie_core::map::Position;
 use genie_core::map::Tile;
@@ -133,7 +134,10 @@ fn the_groups_compare_with_the_globals_beside_the_save() {
     };
     assert_eq!(owned_group_differences(&turns, &mut game, None), []);
     let d = owned_group_differences(&turns, &mut game, Some("group_commands 4\n"));
-    assert_eq!(game.groups.as_ref().unwrap().commands, 4);
+    assert_eq!(
+        game.groups.as_ref().unwrap().commands,
+        Differentiator::of_data(4)
+    );
     assert_eq!(d.len(), 1);
     assert_eq!(d[0].0, 0);
     let mut other = GameState {

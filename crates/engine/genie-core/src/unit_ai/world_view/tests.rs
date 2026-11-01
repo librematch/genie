@@ -10,6 +10,7 @@ use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ObjectFlags;
+use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -311,7 +312,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         weapons,
         reload: Seconds::new(2.0),
         // no terrain defense bonus: the damage reads no terrain
-        terrain_bonus: -1,
+        terrain_bonus: RestrictionField::NONE,
         ..crate::objects::masters::Master::default()
     };
     let unit = |id, x, master_id| Unit {

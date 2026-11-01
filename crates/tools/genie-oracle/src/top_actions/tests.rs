@@ -17,9 +17,11 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TargetOwner;
 use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::TaskSprites;
+use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
@@ -43,8 +45,8 @@ fn task(id: i16, range: f32) -> Task {
         object_id: None,
         combat_level: 0,
         combat_level_flag: TaskFlags::NONE,
-        terrain: -1,
-        owner_type: 0,
+        terrain: TaskTerrain::NONE,
+        owner_type: TargetOwner::ANY,
         holding_attr: 0,
         attribute_type: Some(attribute::WOOD),
         attribute_type2: Some(attribute::STONE),

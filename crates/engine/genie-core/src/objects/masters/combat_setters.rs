@@ -5,12 +5,12 @@ use crate::map::Distance;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterAttribute;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::{
     AttributeWorld, Master, PERCENT, ROUND, add_sprite, attribute, class_amount, handicapped, low8,
     low16, set_sprite,
 };
 use crate::objects::masters::{ClassAmount, DamageClass};
+use crate::objects::masters::{MasterField, RestrictionField};
 use crate::world::Seconds;
 
 impl Master {
@@ -38,8 +38,8 @@ impl Master {
             a::ACCURACY_PERCENT => self.hit_chance = low16(v),
             a::MAXIMUM_RANGE => self.weapon_range = Distance::new(v),
             a::BASE_ARMOR => self.base_armor = low16(v),
-            a::PROJECTILE_UNIT => self.missile = MasterId::of_data(low16(v)),
-            a::TERRAIN_DEFENSE_BONUS => self.terrain_bonus = low16(v),
+            a::PROJECTILE_UNIT => self.missile = MasterField::of_data(low16(v)),
+            a::TERRAIN_DEFENSE_BONUS => self.terrain_bonus = RestrictionField::of_data(low16(v)),
             a::MINIMUM_RANGE => self.min_range = Distance::new(v),
             a::BLAST_WIDTH => self.area_effect = Distance::new(v),
             a::BONUS_DAMAGE_RESISTANCE => self.resistance = v,
@@ -109,11 +109,10 @@ impl Master {
             a::MAXIMUM_RANGE => self.weapon_range += Distance::new(v),
             a::BASE_ARMOR => self.base_armor = self.base_armor.wrapping_add(low16(v)),
             a::PROJECTILE_UNIT => {
-                self.missile =
-                    MasterId::of_data(MasterId::field(self.missile).wrapping_add(low16(v)));
+                self.missile = self.missile.plus(low16(v));
             }
             a::TERRAIN_DEFENSE_BONUS => {
-                self.terrain_bonus = self.terrain_bonus.wrapping_add(low16(v));
+                self.terrain_bonus = self.terrain_bonus.plus(low16(v));
             }
             a::MINIMUM_RANGE => self.min_range += Distance::new(v),
             a::BLAST_WIDTH => self.area_effect += Distance::new(v),
@@ -201,10 +200,12 @@ impl Master {
             a::BASE_ARMOR => self.base_armor = low16(f32::from(self.base_armor) * v + ROUND),
             a::PROJECTILE_UNIT => {
                 self.missile =
-                    MasterId::of_data(low16(f32::from(MasterId::field(self.missile)) * v + ROUND));
+                    MasterField::of_data(low16(f32::from(self.missile.get()) * v + ROUND));
             }
             a::TERRAIN_DEFENSE_BONUS => {
-                self.terrain_bonus = low16(f32::from(self.terrain_bonus) * v + ROUND);
+                self.terrain_bonus = RestrictionField::of_data(low16(
+                    f32::from(self.terrain_bonus.get()) * v + ROUND,
+                ));
             }
             a::MINIMUM_RANGE => self.min_range *= v,
             a::BLAST_WIDTH => self.area_effect *= v,

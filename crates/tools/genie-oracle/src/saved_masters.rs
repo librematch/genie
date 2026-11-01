@@ -21,10 +21,13 @@ use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::HeroFlags;
+use genie_core::objects::masters::MasterField;
 use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TargetOwner;
 use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskSprites;
+use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
@@ -157,8 +160,8 @@ pub(super) fn core_task(
         object_id: MasterId::of_data(t.object_id),
         combat_level: t.combat_level,
         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
-        terrain: t.terrain_id,
-        owner_type: t.owner_type,
+        terrain: TaskTerrain::of_data(t.terrain_id),
+        owner_type: TargetOwner::of_data(t.owner_type),
         holding_attr: t.holding_attr,
         attribute_type,
         attribute_type2,
@@ -255,7 +258,7 @@ pub(super) fn work_masters(
         if let Some(rc) = rge_combat {
             work.weapon_range = Distance::new(rc.weapon_range);
             work.min_range = Distance::new(rc.minimum_weapon_range);
-            work.missile = MasterId::of_data(rc.missile_id);
+            work.missile = MasterField::of_data(rc.missile_id);
             work.weapon_offset =
                 Offset::new(rc.weapon_offset_x, rc.weapon_offset_y, rc.weapon_offset_z);
             work.missed_spread = rc.missed_missile_spread;

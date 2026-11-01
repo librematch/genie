@@ -4,6 +4,8 @@
 
 use crate::GenieError;
 use crate::groups::GroupId;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SpecificMove;
 use crate::groups::group_list::member_gone;
 use crate::groups::update::send::Travel;
@@ -115,8 +117,8 @@ impl World {
                     .with("unit", id)
             })?;
         record.specific_move = SpecificMove {
-            path_id: -1,
-            reason: -1,
+            path_id: MovePath::NONE,
+            reason: MoveReason::NONE,
             ..SpecificMove::default()
         };
         Ok(())

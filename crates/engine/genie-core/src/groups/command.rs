@@ -8,6 +8,8 @@ use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::attack::AttackOrder;
 use crate::groups::group_list::member_gone;
 use crate::groups::{GroupCommand, GroupTarget, SpecificMove, UnitGroup};
@@ -586,8 +588,8 @@ impl World {
         }
         let g = self.groups.held_mut(group)?;
         g.members.checked_mut(k)?.specific_move = SpecificMove {
-            path_id: -1,
-            reason: -1,
+            path_id: MovePath::NONE,
+            reason: MoveReason::NONE,
             ..SpecificMove::default()
         };
         Ok(())

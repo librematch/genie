@@ -29,26 +29,34 @@ use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
 
 mod command_kind;
+mod differentiator;
 mod formation_category;
 mod formation_kind;
 mod group_flags;
 mod group_id;
 mod group_list;
 mod motion_flags;
+mod move_reason;
 mod objects;
 mod slot_state;
+mod transform_type;
+mod unit_type;
 
 pub use self::command_kind::GroupCommandKind;
+pub use self::differentiator::Differentiator;
 pub use self::formation_category::FormationCategory;
 pub use self::formation_kind::FormationKind;
 pub use self::group_flags::GroupFlags;
 pub use self::group_id::GroupId;
 pub use self::group_list::{GroupLink, UnitGroups, common_group};
 pub use self::motion_flags::MotionFlags;
+pub use self::move_reason::{MovePath, MoveReason};
 pub(crate) use self::objects::WorldObject;
 pub use self::objects::sub_formation;
 pub use self::slot_state::SlotState;
 pub use self::target::GroupTarget;
+pub use self::transform_type::TransformType;
+pub use self::unit_type::UnitType;
 
 mod attack;
 mod command;
@@ -116,9 +124,9 @@ pub struct SpecificMove {
     /// `mActive`.
     pub active: u32,
     /// `mPathID`.
-    pub path_id: i32,
+    pub path_id: MovePath,
     /// `mReason`.
-    pub reason: i32,
+    pub reason: MoveReason,
     /// `mGoal`.
     pub goal: BVector,
     /// `mTimer`.
@@ -165,8 +173,8 @@ pub struct Slot {
     pub desired_category: FormationCategory,
     /// `mActive`.
     pub active: u32,
-    /// `mDesiredSubCategory`.
-    pub desired_sub_category: i32,
+    /// `mDesiredSubCategory`: the unit type the slot takes, none for any.
+    pub desired_sub_category: UnitType,
     /// `+0x44` (not saved): the formation's transform took the slot.
     pub transformed: u32,
 }
@@ -202,7 +210,7 @@ pub struct Formation {
     /// The lines (`tempMaxLines` of them).
     pub lines: Vec<FormationLine>,
     /// `mTransformType`.
-    pub transform_type: i32,
+    pub transform_type: TransformType,
     /// `mNumberLines`.
     pub number_lines: i32,
     /// `mTransformOrientation`.
@@ -299,7 +307,7 @@ pub struct UnitTypeStatistic {
     /// `mNumberUnitTypes`.
     pub number_unit_types: i32,
     /// `mUnitTypes`: the 200 bytes the save writes (`+0x38`), as 50 words.
-    pub unit_types: Vec<u32>,
+    pub unit_types: Vec<UnitType>,
     /// `mUnitTypeCounts`: the 200 bytes the save writes (`+0x100`), as 50 words.
     pub unit_type_counts: Vec<u32>,
 }
@@ -427,7 +435,7 @@ pub struct UnitGroup {
     /// the game reads or writes it.
     pub sighted: Vec<ObjectId>,
     /// `mDifferentiatorID`.
-    pub differentiator_id: i32,
+    pub differentiator_id: Differentiator,
     /// `mSecondsNotUnderAttack`.
     pub seconds_not_under_attack: Seconds,
     /// `mDifferentiatorGroups`.
@@ -512,7 +520,7 @@ impl UnitGroup {
             flags: GroupFlags::TURN,
             current_command: GroupCommandKind::NONE,
             current_target: TargetData::default(),
-            differentiator_id: -1,
+            differentiator_id: Differentiator::NONE,
             replaces_queue: 1,
             ..Self::default()
         }
@@ -555,11 +563,11 @@ impl UnitGroup {
     /// `FUN_141017590`: unit `id`'s own move's reason (`mReason`, the `+8` of its record in
     /// `+0xf8`), −1 when it is not a member.
     #[must_use]
-    pub fn member_reason(&self, id: ObjectId) -> i32 {
+    pub fn member_reason(&self, id: ObjectId) -> MoveReason {
         self.members
             .iter()
             .find(|m| m.id == id)
-            .map_or(-1, |m| m.specific_move.reason)
+            .map_or(MoveReason::NONE, |m| m.specific_move.reason)
     }
 
     /// `FUN_1410177f0`: unit `id` is in its place, its first slot (`mUnitID`) in the current

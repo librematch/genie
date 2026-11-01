@@ -6,6 +6,9 @@ use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
+use crate::groups::UnitType;
 use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
 use crate::map::Distance;
@@ -116,7 +119,7 @@ impl UnitGroup {
         id: ObjectId,
         unit: FormationUnit,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
-        scratch: &mut Vec<u32>,
+        scratch: &mut Vec<UnitType>,
     ) -> Result<(), GenieError> {
         let at = self
             .unit_types
@@ -151,9 +154,9 @@ impl UnitGroup {
         id: ObjectId,
         category: Option<FormationCategory>,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
-        scratch: &mut Vec<u32>,
+        scratch: &mut Vec<UnitType>,
     ) -> bool {
-        let leave = |stat: &mut UnitTypeStatistic, scratch: &mut Vec<u32>| {
+        let leave = |stat: &mut UnitTypeStatistic, scratch: &mut Vec<UnitType>| {
             let Some(i) = stat.units.iter().position(|&u| u == id) else {
                 return false;
             };
@@ -291,16 +294,16 @@ impl World {
 pub(crate) fn count_unit_types(
     stat: &mut UnitTypeStatistic,
     masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
-    scratch: &mut Vec<u32>,
+    scratch: &mut Vec<UnitType>,
 ) {
-    scratch.resize(50, 0);
+    scratch.resize(50, UnitType::CLEARED);
     let mut counts = vec![0u32; 50];
     let mut n = 0usize;
     for &id in &stat.units {
         let Some(master) = masters_of(id) else {
             continue;
         };
-        let master = i32::from(master.get()) as u32;
+        let master = UnitType::of(master);
         if let Some(k) = scratch.iter().take(n).position(|&t| t == master) {
             // k < n <= 50, the counts' length
             if let Some(count) = counts.get_mut(k) {
@@ -408,8 +411,8 @@ impl World {
         g.members.push(Member {
             id,
             specific_move: SpecificMove {
-                path_id: -1,
-                reason: -1,
+                path_id: MovePath::NONE,
+                reason: MoveReason::NONE,
                 ..SpecificMove::default()
             },
             seconds_since_attacking: seconds,

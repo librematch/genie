@@ -13,6 +13,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -220,7 +221,7 @@ pub struct Target {
     /// Its master.
     pub master: MasterId,
     /// Its master's `combat_level`.
-    pub combat_level: u8,
+    pub combat_level: CombatLevel,
     /// The object's `+0x924`.
     pub capture: u8,
     /// It has a unit AI (`+0x6b0`).
@@ -383,7 +384,7 @@ pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
         return Ok(false);
     }
     if t.class == class::PREDATOR && me.attack_priority < AttackPriority::PRIORITY_3 {
-        return Ok(t.combat_level == 4);
+        return Ok(t.combat_level == CombatLevel::MILITARY);
     }
     if !matches!(me.class, Some(class::CLASS_51 | class::CLASS_54))
         && me.missile.is_none()

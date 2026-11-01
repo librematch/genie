@@ -216,7 +216,7 @@ pub struct Foundation {
     /// The master's class.
     pub class: ClassId,
     /// The master's `defense_terrain_bonus` (`+0x820`).
-    pub terrain_bonus: i16,
+    pub terrain_bonus: crate::objects::masters::RestrictionField,
     /// The game's setting `FUN_140ec0cd0` reads at `+0x680` ([`crate::world::World::mode_680`]):
     /// at 1 a foundation without a snow layer goes into the layer, not the terrain.
     pub mode_680: i32,
@@ -375,7 +375,11 @@ impl Terrain {
     /// to restore, else its terrain (the tile's `+0xa`, else `+0x9`); 0 counts as 1, and an
     /// object off the tiles has 1. None for a restriction or terrain the data has not got.
     #[must_use]
-    pub fn defense(&self, bonus: i16, tile: Tile) -> Option<f32> {
+    pub fn defense(
+        &self,
+        bonus: crate::objects::masters::RestrictionField,
+        tile: Tile,
+    ) -> Option<f32> {
         let Some(i) = self.size.index(tile) else {
             return Some(1.0);
         };
@@ -383,10 +387,7 @@ impl Terrain {
             None => *self.kinds.get(i)?,
             Some(t) => t,
         };
-        let v = self
-            .restrictions
-            .get(usize::try_from(bonus).ok()?)?
-            .value(t)?;
+        let v = self.restriction(bonus.restriction()?)?.value(t)?;
         Some(if v == 0.0 { 1.0 } else { v })
     }
 
@@ -530,10 +531,11 @@ impl Terrain {
         if f.terrain == FOUNDATION && f.snow {
             (wanted, kind, layer) = (SNOW_SKIPPED, SNOW_FOUNDATION, Some(SNOW_LAYER));
         }
-        let bonus = usize::try_from(f.terrain_bonus)
-            .ok()
+        let bonus = f
+            .terrain_bonus
+            .restriction()
             .map(|r| {
-                self.restrictions.get(r).ok_or(GenieError::unsupported(
+                self.restriction(r).ok_or(GenieError::unsupported(
                     "a terrain bonus the data file does not have",
                 ))
             })
@@ -581,6 +583,7 @@ impl Terrain {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::masters::RestrictionField;
     use crate::test_ids::master_id;
 
     /// Terrains of ids `k`.
@@ -627,12 +630,27 @@ mod tests {
         values[3] = 0.75;
         t.restrictions[2] = Restriction::new(values);
         t.restore[3] = Some(TerrainId::named(1));
-        assert_eq!(t.defense(2, Tile::new(1, 0)), Some(1.25));
-        assert_eq!(t.defense(2, Tile::new(0, 0)), Some(1.0));
-        assert_eq!(t.defense(2, Tile::new(1, 1)), Some(1.25));
-        assert_eq!(t.defense(2, Tile::new(5, 5)), Some(1.0));
-        assert_eq!(t.defense(9, Tile::new(1, 0)), None);
-        assert_eq!(t.defense(-1, Tile::new(1, 0)), None);
+        assert_eq!(
+            t.defense(RestrictionField::of_data(2), Tile::new(1, 0)),
+            Some(1.25)
+        );
+        assert_eq!(
+            t.defense(RestrictionField::of_data(2), Tile::new(0, 0)),
+            Some(1.0)
+        );
+        assert_eq!(
+            t.defense(RestrictionField::of_data(2), Tile::new(1, 1)),
+            Some(1.25)
+        );
+        assert_eq!(
+            t.defense(RestrictionField::of_data(2), Tile::new(5, 5)),
+            Some(1.0)
+        );
+        assert_eq!(
+            t.defense(RestrictionField::of_data(9), Tile::new(1, 0)),
+            None
+        );
+        assert_eq!(t.defense(RestrictionField::NONE, Tile::new(1, 0)), None);
     }
 
     /// `FUN_1411a8ba0`'s terrain at a point: x or y exactly −1 reads none, a NaN reads tile 0
@@ -775,7 +793,7 @@ mod tests {
             snow: true,
             master: ids::HOUSE,
             class: class::BUILDING,
-            terrain_bonus: 4,
+            terrain_bonus: RestrictionField::of_data(4),
             mode_680: 0,
         })
         .unwrap();
@@ -805,7 +823,7 @@ mod tests {
             snow: false,
             master: TOWN_CENTRE,
             class: class::BUILDING,
-            terrain_bonus: 4,
+            terrain_bonus: RestrictionField::of_data(4),
             mode_680: 0,
         })
         .unwrap();
@@ -831,7 +849,7 @@ mod tests {
             snow: false,
             master: ids::HOUSE,
             class: class::BUILDING,
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             mode_680: 0,
         })
         .unwrap();
@@ -851,7 +869,7 @@ mod tests {
             snow: false,
             master: ids::FARM,
             class: class::FARM,
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             mode_680: 1,
         };
         t.cover(&farm).unwrap();
@@ -879,7 +897,7 @@ mod tests {
             snow: false,
             master,
             class: class::BUILDING,
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             mode_680: 1,
         };
         for master in [master_id(357), master_id(1188)] {

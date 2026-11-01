@@ -236,7 +236,7 @@ impl Fly {
                 return Ok(self.set_state(FlyState::Resting, action));
             }
         };
-        if t.terrain != -1 {
+        if !t.terrain.is_none() {
             return Err(GenieError::unsupported(
                 "a flight to a terrain of its task's",
             ));
@@ -380,6 +380,7 @@ mod tests {
     use crate::objects::SpriteFlags;
     use crate::objects::layers::Body;
     use crate::objects::lifecycle::Lifecycle;
+    use crate::objects::masters::TaskTerrain;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::unit_ai::UnitAi;
@@ -583,7 +584,7 @@ mod tests {
         assert_eq!(fly.state, FlyState::Flying);
         for task in [
             Task {
-                terrain: 2,
+                terrain: TaskTerrain::of_data(2),
                 ..unsprited
             },
             Task {

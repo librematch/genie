@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::objects::ActionState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
@@ -217,7 +218,7 @@ pub const fn factory_type(
     class: ClassId,
     master: MasterId,
     missile: Option<MasterId>,
-    combat_level: u8,
+    combat_level: CombatLevel,
 ) -> Option<UnitAiType> {
     match master {
         ids::ID_1105 => return Some(UnitAiType::SIEGE_TOWER),
@@ -257,7 +258,7 @@ pub const fn factory_type(
         class::VILLAGER => CIVILIAN,
         class::PREY | class::KING => UnitAiType::HUNTED,
         // FUN_140fde4f0: the master's class (`+0x410`, 10 in this case) and its combat level 1
-        class::PREDATOR if combat_level == 1 => BOAR_AI,
+        class::PREDATOR if combat_level.get() == CombatLevel::ANIMAL.get() => BOAR_AI,
         class::PREDATOR => UnitAiType::LION,
         class::SIEGE | class::CLASS_51 | class::CLASS_54 | class::CLASS_55 => UnitAiType::SIEGE,
         class::MONK | class::CLASS_43 | class::CLASS_53 => UnitAiType::PRIEST,

@@ -3,6 +3,7 @@ use crate::commands::UnloadPick;
 use crate::construction::build::BuildState;
 use crate::gathering::gather::GatherState;
 use crate::gathering::hunt::HuntState;
+use crate::groups::Differentiator;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
@@ -26,6 +27,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::action_type;
@@ -3567,9 +3569,9 @@ fn a_formation_of_soldiers_makes_one_group_locked_to_its_type() {
         g[0].formation_locked_type,
         Some(FormationKind::USER_DEFINED)
     );
-    assert_eq!(g[0].differentiator_id, 0);
+    assert_eq!(g[0].differentiator_id, Differentiator::of_data(0));
     assert_eq!(g[0].differentiator_groups, [g[0].id]);
-    assert_eq!(t.groups.commands, 1);
+    assert_eq!(t.groups.commands, Differentiator::of_data(1));
     // the same units again: their group takes the command without a new one
     t.form_formation(
         player_id(1),
@@ -3582,8 +3584,11 @@ fn a_formation_of_soldiers_makes_one_group_locked_to_its_type() {
         t.groups.groups[0].formation_locked_type,
         Some(FormationKind::TYPE_6)
     );
-    assert_eq!(t.groups.groups[0].differentiator_id, 1);
-    assert_eq!(t.groups.commands, 2);
+    assert_eq!(
+        t.groups.groups[0].differentiator_id,
+        Differentiator::of_data(1)
+    );
+    assert_eq!(t.groups.commands, Differentiator::of_data(2));
 }
 
 /// A unit whose order is a defend or a follow stops first: its ignore list empties and its
@@ -3675,7 +3680,7 @@ fn a_lone_unit_patrols_to_its_waypoint() {
         (Millis::ZERO, Millis::new(750), Millis::new(750))
     );
     assert_eq!((ai.patrol_path.is_none(), ai.patrol_waypoint), (true, 0));
-    assert_eq!(t.groups.commands, 1);
+    assert_eq!(t.groups.commands, Differentiator::of_data(1));
 }
 
 /// A lone unit's waypoints but the last become its own (slot 0x448, a whole coordinate moved
@@ -4136,7 +4141,7 @@ fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
     );
     assert_eq!(
         (g.differentiator_id, g.current_command),
-        (0, GroupCommandKind::MOVE)
+        (Differentiator::of_data(0), GroupCommandKind::MOVE)
     );
     let top = g.motion.paths.last().unwrap();
     assert_eq!(
@@ -4148,7 +4153,7 @@ fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
         top.points[1..],
         [BVector::new(25.0, 0.0, 25.0), BVector::new(30.0, 0.0, 20.0)]
     );
-    assert_eq!(t.groups.commands, 1);
+    assert_eq!(t.groups.commands, Differentiator::of_data(1));
     let ai = t.players[1].objects[ListIndex::new(0)].ai.as_ref().unwrap();
     assert_eq!(
         (ai.adjusted_idle_timeout, ai.patrol_path.is_none()),
@@ -4184,7 +4189,7 @@ fn a_move_of_soldiers_in_no_group_forms_new_groups() {
     assert_eq!(g.len(), 1);
     let ids: Vec<ObjectId> = g[0].members.iter().map(|m| m.id).collect();
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
-    assert_eq!(t.groups.commands, 1);
+    assert_eq!(t.groups.commands, Differentiator::of_data(1));
     let mut t = world();
     let ctrl = MoveOrder {
         control: true,
@@ -4235,9 +4240,9 @@ fn a_move_of_a_whole_group_keeps_it() {
     // the keep sets flags bit 17, which the group's command then clears
     assert_eq!(
         (g.flags & GroupFlags::JOINED, g.differentiator_id),
-        (GroupFlags::NONE, 0)
+        (GroupFlags::NONE, Differentiator::of_data(0))
     );
-    assert_eq!(t.groups.commands, 1);
+    assert_eq!(t.groups.commands, Differentiator::of_data(1));
     let mut t = kept();
     // with a target the world holds the kept group takes the command on it (a unit of the
     // order itself, which has no task: the plain move to it)
@@ -4910,7 +4915,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_a_group_that_attacks_it() 
     let soldier = Master {
         tasks: vec![crate::objects::masters::Task {
             action_type: action_type::COMBAT,
-            owner_type: 2,
+            owner_type: TargetOwner::ENEMY,
             object_group: Some(class::BUILDING),
             ..crate::objects::masters::Task::default()
         }],
@@ -4941,5 +4946,5 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_a_group_that_attacks_it() 
         (g[0].current_command, g[0].current_target.target),
         (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
-    assert_eq!(t.groups.commands, 1);
+    assert_eq!(t.groups.commands, Differentiator::of_data(1));
 }

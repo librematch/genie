@@ -18,6 +18,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::unit::Unit;
@@ -787,7 +788,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     );
     // a house's cost: 25 wood paid; the unpaid entry does not count
     master.clearance = Footprint::new(1.0, 1.0);
-    master.terrain_bonus = 4;
+    master.terrain_bonus = RestrictionField::of_data(4);
     master.storage = vec![
         (Some(attribute::HEADROOM), Amount::new(5.0), 4),
         (None, Amount::ZERO, 0),

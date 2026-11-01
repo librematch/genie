@@ -5,6 +5,8 @@ use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
+use crate::groups::TransformType;
+use crate::groups::UnitType;
 use crate::groups::formation::{CATEGORIES, EPSILON, FLANK_SPACING, STAGGER_SHARE, TWO};
 use crate::groups::layout::{clear_line, reset_line};
 use crate::groups::{Formation, Slot, UnitGroup};
@@ -24,7 +26,7 @@ pub(super) struct Category {
     pub(super) count: i32,
     pub(super) spacing: Distance,
     pub(super) types: i32,
-    pub(super) unit_types: Vec<u32>,
+    pub(super) unit_types: Vec<UnitType>,
     pub(super) unit_type_counts: Vec<u32>,
 }
 
@@ -121,7 +123,7 @@ pub(crate) fn column_line_slots(
     } else {
         FormationKind::LINE
     };
-    formation.transform_type = 0;
+    formation.transform_type = TransformType::BY_LINES;
     formation.maximum_width = max_width;
     formation.maximum_depth = depth;
     formation.number_lines = depth;
@@ -384,9 +386,9 @@ fn lay_line(
     for col in 0..actual.max(0) {
         let i = at.used_slots + col as usize;
         let desired_sub_category = if subs.next < 0 {
-            -1
+            UnitType::NONE
         } else {
-            *cat.unit_types.checked(subs.next as usize)? as i32
+            *cat.unit_types.checked(subs.next as usize)?
         };
         *formation.slot_mut(i)? = Slot {
             unit_id: None,

@@ -4,8 +4,8 @@ use crate::map::Distance;
 use crate::movement::Speed;
 use crate::objects::WorkRate;
 use crate::objects::masters::BlastDefense;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterAttribute;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -14,6 +14,7 @@ use crate::objects::masters::{
     insert_damage_graphic, low8, low16, master_type, multiply_short, resize_damage_graphics,
     select_entry, set_sprite,
 };
+use crate::objects::masters::{MasterField, MasterId};
 use crate::players::Amount;
 use crate::world::Seconds;
 
@@ -93,7 +94,7 @@ impl Master {
             a::AVAILABLE_UNIT_FLAG => self.available = low8(v) != 0,
             a::DISABLED_UNIT_FLAG => self.disabled = low8(v) != 0,
             a::INTERFACE_KIND => self.unit_level = low8(v),
-            a::COMBAT_LEVEL => self.combat_level = low8(v),
+            a::COMBAT_LEVEL => self.combat_level = CombatLevel::of_data(low8(v)),
             a::INTERACTION_MODE => self.select_level = low8(v),
             a::MINIMAP_MODE => self.map_draw_level = low8(v),
             _ => {}
@@ -210,7 +211,7 @@ impl Master {
                 self.disabled = u8::from(self.disabled).wrapping_add(low8(v)) != 0;
             }
             a::INTERFACE_KIND => self.unit_level = self.unit_level.wrapping_add(low8(v)),
-            a::COMBAT_LEVEL => self.combat_level = self.combat_level.wrapping_add(low8(v)),
+            a::COMBAT_LEVEL => self.combat_level = self.combat_level.plus(low8(v)),
             a::INTERACTION_MODE => self.select_level = self.select_level.wrapping_add(low8(v)),
             a::MINIMAP_MODE => self.map_draw_level = self.map_draw_level.wrapping_add(low8(v)),
             // the sounds (92, 94, 96, 98, through slot 0x18) are the interface's
@@ -395,7 +396,7 @@ impl Master {
             a::ROTATION_SPEED => self.turn_speed = Seconds::new(v),
             a::WALKING_GRAPHIC => set_sprite(&mut self.move_sprite, cvttss2si(v), world),
             a::RUNNING_GRAPHIC => set_sprite(&mut self.run_sprite, cvttss2si(v), world),
-            a::TRAILING_UNIT => self.trail.unit = MasterId::of_data(low16(v)),
+            a::TRAILING_UNIT => self.trail.unit = MasterField::of_data(low16(v)),
             a::TRAIL_MODE => self.trail.mode = low8(v),
             a::TRAIL_DENSITY => self.trail.density = v,
             _ => self.set_animated(attribute, v, world),
@@ -415,8 +416,7 @@ impl Master {
             a::WALKING_GRAPHIC => add_sprite(&mut self.move_sprite, v, world),
             a::RUNNING_GRAPHIC => add_sprite(&mut self.run_sprite, v, world),
             a::TRAILING_UNIT => {
-                self.trail.unit =
-                    MasterId::of_data(MasterId::field(self.trail.unit).wrapping_add(low16(v)));
+                self.trail.unit = self.trail.unit.plus(low16(v));
             }
             a::TRAIL_MODE => self.trail.mode = self.trail.mode.wrapping_add(low8(v)),
             a::TRAIL_DENSITY => self.trail.density += v,

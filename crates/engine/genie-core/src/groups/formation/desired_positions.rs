@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::TransformType;
 use crate::groups::formation::EPSILON;
 use crate::groups::group_list::NO_FORMATION;
 use crate::groups::{Formation, UnitGroup};
@@ -266,7 +267,7 @@ pub(super) fn transform_slot(
     rotation: &Rotation,
     point: BVector,
     index: i32,
-    transform_type: i32,
+    transform_type: TransformType,
     (world_time, map): (WorldTime, GridSize),
 ) -> Result<bool, GenieError> {
     if index < 0 || formation.slots.len() as i32 <= index {
@@ -277,7 +278,7 @@ pub(super) fn transform_slot(
     }
     let slot = formation.slots.checked_mut(index as usize)?;
     if slot.transformed != 1 {
-        let offset = if matches!(transform_type, 2 | 3) {
+        let offset = if transform_type.unturned() {
             slot.offset
         } else {
             crate::math::fmath::rotate(rotation, slot.offset)

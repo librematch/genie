@@ -6,6 +6,8 @@ use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::command::MOVE_COMMAND;
 use crate::groups::group_list::member_gone;
@@ -340,7 +342,7 @@ impl World {
             let Some((_, u)) = self.object_mut(m.id) else {
                 continue;
             };
-            if m.specific_move.reason != 2 {
+            if m.specific_move.reason != MoveReason::ASIDE {
                 // slot 0x608 (FUN_1411581e0): the unit's own motion step (FUN_141150f00), then
                 // its facet from its angle (FUN_14114d8b0, not held)
                 if self.member_step(m.id)? {
@@ -349,8 +351,8 @@ impl World {
                         .members
                         .checked_mut(i - 1)?
                         .specific_move = SpecificMove {
-                        path_id: -1,
-                        reason: -1,
+                        path_id: MovePath::NONE,
+                        reason: MoveReason::NONE,
                         ..SpecificMove::default()
                     };
                     continue;
@@ -384,8 +386,8 @@ impl World {
             *timer -= dt;
             if !crate::math::fmath::below_or_unordered(0.0, timer.get()) {
                 g.members.checked_mut(i - 1)?.specific_move = SpecificMove {
-                    path_id: -1,
-                    reason: -1,
+                    path_id: MovePath::NONE,
+                    reason: MoveReason::NONE,
                     ..SpecificMove::default()
                 };
                 if let Some((_, u)) = self.object_mut(m.id)

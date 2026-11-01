@@ -13,6 +13,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
@@ -329,7 +330,7 @@ impl UnitSide for HelpSide {
             id,
             class: class::CLASS_35,
             owner: PlayerId::new(0),
-            combat_level: 0,
+            combat_level: CombatLevel::NONE,
             state: ObjectState::DyingSprite,
             target: None,
             gap_squared: DistanceSquared::ZERO,
@@ -1777,7 +1778,7 @@ fn a_unit_in_the_way_is_attacked_by_a_wolf_not_by_a_boar() {
     let r = boar.handle(
         n,
         Millis::ZERO,
-        &at(1),
+        &at(CombatLevel::ANIMAL),
         false,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
@@ -1791,7 +1792,7 @@ fn a_unit_in_the_way_is_attacked_by_a_wolf_not_by_a_boar() {
     let r = wolf.handle(
         n,
         Millis::ZERO,
-        &at(4),
+        &at(CombatLevel::MILITARY),
         false,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
@@ -1809,7 +1810,7 @@ fn a_unit_in_the_way_is_attacked_by_a_wolf_not_by_a_boar() {
     let _ = defensive.handle(
         n,
         Millis::ZERO,
-        &at(4),
+        &at(CombatLevel::MILITARY),
         false,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
@@ -6706,7 +6707,7 @@ const BOAR: Target = Target {
     class: class::PREDATOR,
     kind: master_type::COMBAT,
     master: MasterId::named(48),
-    combat_level: 0,
+    combat_level: CombatLevel::NONE,
     capture: 0,
     has_ai: true,
     inside: false,
@@ -6810,7 +6811,7 @@ fn each_unit_ai_type_has_its_own_attack_check() {
 fn a_tower_passes_a_boar_but_not_a_wolf() {
     assert_eq!(can_attack(&TC, &IDLE, &BOAR), Ok(false));
     let wolf = Target {
-        combat_level: 4,
+        combat_level: CombatLevel::MILITARY,
         ..BOAR
     };
     assert_eq!(can_attack(&TC, &IDLE, &wolf), Ok(true));
@@ -8581,15 +8582,15 @@ fn a_villager_on_the_attack_order_without_a_target_gives_it_up() {
 #[test]
 fn the_factory_picks_the_unit_ai_type_by_master_and_class() {
     assert_eq!(
-        factory_type(class::CLASS_6, master_id(1105), None, 0),
+        factory_type(class::CLASS_6, master_id(1105), None, CombatLevel::NONE),
         Some(UnitAiType::SIEGE_TOWER)
     );
     assert_eq!(
-        factory_type(class::CLASS_6, master_id(1744), None, 0),
+        factory_type(class::CLASS_6, master_id(1744), None, CombatLevel::NONE),
         Some(UnitAiType::SIEGE)
     );
     assert_eq!(
-        factory_type(class::CLASS_6, master_id(1746), None, 0),
+        factory_type(class::CLASS_6, master_id(1746), None, CombatLevel::NONE),
         Some(UnitAiType::SIEGE)
     );
     let by_class = [
@@ -8617,37 +8618,40 @@ fn the_factory_picks_the_unit_ai_type_by_master_and_class() {
     ];
     for (class, ai_type) in by_class {
         assert_eq!(
-            factory_type(class, master_id(83), None, 0),
+            factory_type(class, master_id(83), None, CombatLevel::NONE),
             Some(ai_type),
             "class {class}"
         );
     }
     for class in [3, 27, 39, 49, 60].map(ClassId::of_master) {
         assert_eq!(
-            factory_type(class, master_id(70), None, 0),
+            factory_type(class, master_id(70), None, CombatLevel::NONE),
             Some(UnitAiType::BUILDING)
         );
         assert_eq!(
-            factory_type(class, master_id(70), Some(master_id(5)), 0),
+            factory_type(class, master_id(70), Some(master_id(5)), CombatLevel::NONE),
             Some(UnitAiType::TOWER)
         );
     }
     for class in
         [5, 7, 8, 11, 14, 15, 16, 30, 31, 32, 33, 34, 38, 42, 48, 63].map(ClassId::of_master)
     {
-        assert_eq!(factory_type(class, master_id(83), None, 0), None);
+        assert_eq!(
+            factory_type(class, master_id(83), None, CombatLevel::NONE),
+            None
+        );
     }
     // class 10: the boar's for combat level 1, else the lion's
     assert_eq!(
-        factory_type(class::PREDATOR, master_id(48), None, 1),
+        factory_type(class::PREDATOR, master_id(48), None, CombatLevel::ANIMAL),
         Some(BOAR_AI)
     );
     assert_eq!(
-        factory_type(class::PREDATOR, master_id(126), None, 0),
+        factory_type(class::PREDATOR, master_id(126), None, CombatLevel::NONE),
         Some(UnitAiType::LION)
     );
     assert_eq!(
-        factory_type(class::PREDATOR, master_id(126), None, 4),
+        factory_type(class::PREDATOR, master_id(126), None, CombatLevel::MILITARY),
         Some(UnitAiType::LION)
     );
 }

@@ -7,6 +7,7 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::players::QueryRelation;
@@ -72,7 +73,8 @@ impl UnitAi {
             ));
         }
         let added = self.attackers.add(Some(caller));
-        let fierce = attacker.class == class::PREDATOR && attacker.combat_level == 1;
+        let fierce =
+            attacker.class == class::PREDATOR && attacker.combat_level == CombatLevel::ANIMAL;
         if added && self.current_target != Some(caller) && !fierce {
             self.ask_for_help(caller, at, computer, side)?;
         }

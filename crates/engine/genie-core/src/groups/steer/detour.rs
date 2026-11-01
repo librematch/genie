@@ -2,6 +2,8 @@
 //! tile planner.
 
 use crate::groups::GroupId;
+use crate::groups::MovePath;
+use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
 use crate::groups::steer::{
@@ -98,7 +100,8 @@ impl World {
                 m.take_record_path(way.record.points, way.record.length, now, way.planned);
             }
             let goal = (way.goal, ROUND_TIMER, ROUND_TIMER);
-            let _ = self.set_specific_move(group, id, (-1, 0), goal)?;
+            let _ =
+                self.set_specific_move(group, id, (MovePath::NONE, MoveReason::DETOUR), goal)?;
         }
         self.set_slot_state(group, slot, SlotState::Steering)?;
         self.stop_member(id)?;

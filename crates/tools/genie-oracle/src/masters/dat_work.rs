@@ -10,6 +10,7 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::CombatLevel;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::GatherGroup;
 use genie_core::objects::masters::MasterId;
@@ -17,9 +18,13 @@ use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::masters::PlacementTerrains;
+use genie_core::objects::masters::RestrictionField;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TargetOwner;
 use genie_core::objects::masters::TaskFlags;
+use genie_core::objects::masters::TaskIndex;
 use genie_core::objects::masters::TaskSprites;
+use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
@@ -73,8 +78,8 @@ fn dat_task(
         object_id: MasterId::of_data(t.unit_id),
         combat_level: t.enable_targeting,
         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
-        terrain: t.terrain_id,
-        owner_type: t.target_diplomacy,
+        terrain: TaskTerrain::of_data(t.terrain_id),
+        owner_type: TargetOwner::of_data(t.target_diplomacy),
         holding_attr: t.carry_check,
         attribute_type,
         attribute_type2,
@@ -142,13 +147,12 @@ pub(super) fn dat_work(
         buildable_on: unit.can_be_built_on,
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
         object_flags: ObjectFlags::NONE,
-        combat_level: unit.combat_level,
+        combat_level: CombatLevel::of_data(unit.combat_level),
         tasks: dat_tasks(unit, sounds)?,
         default_task: unit
             .bird
             .as_ref()
-            .map(|b| b.default_task_id)
-            .filter(|&t| 0 <= t),
+            .and_then(|b| TaskIndex::of_data(b.default_task_id)),
         cost: dat_cost(unit)?,
         work_rate: unit
             .bird
@@ -199,7 +203,9 @@ pub(super) fn dat_work(
         clearance: Footprint::from(unit.clearance_size),
         outline: Radii::from(unit.outline_size).ground(),
         outline_height: Radii::from(unit.outline_size).z(),
-        terrain_bonus: unit.type50.as_ref().map_or(-1, |t| t.defense_terrain_bonus),
+        terrain_bonus: RestrictionField::of_data(
+            unit.type50.as_ref().map_or(-1, |t| t.defense_terrain_bonus),
+        ),
         building: unit.building.as_ref().map(|b| work::BuildingMaster {
             adjacent_mode: b.adjacent_mode,
             disappears_when_built: b.disappears_when_built != 0,

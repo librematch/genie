@@ -53,6 +53,7 @@ use crate::combat::damage::armor::{OwnSlot, class_armor};
 use crate::map::Tile;
 use crate::objects::HpPowerup;
 use crate::objects::masters::ClassAmount;
+use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -78,7 +79,7 @@ fn sheep() -> Victim {
                 ClassAmount::new(3, 0),
                 ClassAmount::new(31, 0),
             ],
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             friendly_fire: 1.0,
             ..Armored::default()
         }),
@@ -113,7 +114,7 @@ fn hunter() -> Victim {
         master_hp: 25,
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             friendly_fire: 1.0,
             ..Armored::default()
         }),
@@ -542,7 +543,7 @@ fn a_terrain_defense_bonus_scales_the_damage() {
     let hunter = hunter();
     let mut sheep = sheep();
     let x = sheep.armored.as_mut().unwrap();
-    (x.terrain_bonus, x.terrain) = (4, Some(1.5));
+    (x.terrain_bonus, x.terrain) = (RestrictionField::of_data(4), Some(1.5));
     assert_eq!(
         armor_damage(&sheep, &[ClassAmount::new(4, 4)], 1.0, &hunter.source, 0.0),
         Ok(HitPoints::new(6.0))
@@ -954,7 +955,7 @@ fn house() -> Victim {
         master_hp: 550,
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 7)],
-            terrain_bonus: -1,
+            terrain_bonus: RestrictionField::NONE,
             friendly_fire: 1.0,
             ..Armored::default()
         }),

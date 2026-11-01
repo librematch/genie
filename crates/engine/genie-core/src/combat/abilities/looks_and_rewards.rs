@@ -6,6 +6,7 @@ use crate::objects::ListIndex;
 use crate::objects::SpriteId;
 use crate::objects::masters::CostSlot;
 use crate::objects::masters::Task;
+use crate::objects::masters::TaskTerrain;
 use crate::players::PlayerId;
 use crate::world::World;
 
@@ -14,7 +15,8 @@ use crate::world::World;
 /// None for 0: the bit's `set` throws (`out_of_range`, `FUN_14120b5d0`), which the game does not
 /// catch; no task of the `.dat` has terrain 0.
 #[must_use]
-pub const fn terrain_mask(terrain: i16) -> Option<TerrainFlags> {
+pub const fn terrain_mask(terrain: TaskTerrain) -> Option<TerrainFlags> {
+    let terrain = terrain.get();
     match terrain {
         t if t < 0 => Some(TerrainFlags::from_bits_retain(
             t.wrapping_neg().to_le_bytes()[0],

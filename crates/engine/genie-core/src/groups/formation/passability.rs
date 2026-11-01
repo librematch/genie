@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupId;
+use crate::groups::TransformType;
 use crate::groups::formation::{RIGHT_ANGLE, find_point_from_front, transform_slot};
 use crate::groups::{Formation, Slot};
 use crate::map::Distance;
@@ -104,7 +105,7 @@ impl World {
         formation.number_transformed_slots = 0;
         let capacity = formation.slot_capacity() as i32;
         match formation.transform_type {
-            0 => {
+            TransformType::BY_LINES => {
                 for i in 0..formation.number_lines.max(0) {
                     if capacity <= formation.number_transformed_slots {
                         break;
@@ -128,15 +129,22 @@ impl World {
                     let indices = line.indices.clone();
                     let width = indices.len() as i32;
                     for k in indices {
-                        let _ = transform_slot(formation, &rotation, point, k as i32, 0, world);
+                        let _ = transform_slot(
+                            formation,
+                            &rotation,
+                            point,
+                            k as i32,
+                            TransformType::BY_LINES,
+                            world,
+                        );
                     }
                     if width < 0x100 {
                         formation.number_transformed_slots += width;
                     }
                 }
             }
-            kind @ 1..=3 => {
-                let point = if kind == 2 {
+            kind @ (TransformType::TURNED | TransformType::AT_TARGET | TransformType::UNTURNED) => {
+                let point = if kind == TransformType::AT_TARGET {
                     g.current_target.original_position
                 } else {
                     position

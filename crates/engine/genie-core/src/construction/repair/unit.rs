@@ -119,7 +119,7 @@ impl Unit {
                 .map_or(crate::objects::masters::AttackPriority::PRIORITY_0, |m| {
                     m.attack_priority
                 }),
-            missile: master.and_then(|m| m.missile),
+            missile: master.and_then(|m| m.missile.master()),
             range: master.map_or(Distance::ZERO, |m| m.weapon_range),
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
             charge_type: master.map_or(0, |m| m.charge_type),

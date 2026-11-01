@@ -2,6 +2,7 @@ use super::*;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
+use crate::groups::TransformType;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -170,7 +171,7 @@ pub(crate) fn slot_at(at: BVector, category: i32) -> Slot {
         unit_id: None,
         transform_position: at,
         desired_category: FormationCategory::named(category),
-        desired_sub_category: -1,
+        desired_sub_category: UnitType::NONE,
         active: 1,
         transformed: 1,
         ..Slot::default()
@@ -308,17 +309,17 @@ fn the_closest_unit_matches_its_slots_category_and_type() {
     let g = t.groups.get(group_id(1)).unwrap();
     let o = BVector::ZERO;
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(-1), -1, &[])
+        t.closest_unit(g, o, FormationCategory::named(-1), UnitType::NONE, &[])
             .unwrap(),
         Some(object_id(12))
     );
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(1), -1, &[])
+        t.closest_unit(g, o, FormationCategory::named(1), UnitType::NONE, &[])
             .unwrap(),
         Some(object_id(11))
     );
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(1), 4, &[])
+        t.closest_unit(g, o, FormationCategory::named(1), UnitType::of_word(4), &[])
             .unwrap(),
         Some(object_id(10))
     );
@@ -327,14 +328,14 @@ fn the_closest_unit_matches_its_slots_category_and_type() {
             g,
             o,
             FormationCategory::named(1),
-            -1,
+            UnitType::NONE,
             &[Some(object_id(11))]
         )
         .unwrap(),
         Some(object_id(10))
     );
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(2), -1, &[])
+        t.closest_unit(g, o, FormationCategory::named(2), UnitType::NONE, &[])
             .unwrap(),
         None
     );
@@ -534,7 +535,7 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
     t.groups.groups[0].current_target.original_position = BVector::new(9.0, 0.0, 9.0);
     let mut run = |kind: i32| {
         let mut f = Formation::new();
-        f.transform_type = kind;
+        f.transform_type = TransformType::of_data(kind);
         f.transform_orientation = BVector::new(0.0, 0.0, 1.0);
         f.slots = vec![Slot {
             offset: BVector::new(1.0, 0.0, 0.0),
@@ -559,7 +560,7 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
     assert_eq!(run(2), (false, BVector::new(10.0, 0.0, 9.0), 2));
     // facing back: the slot takes its (only) unit anew
     let mut f = Formation::new();
-    f.transform_type = 3;
+    f.transform_type = TransformType::UNTURNED;
     f.transform_orientation = BVector::new(0.0, 0.0, -1.0);
     f.slots = vec![slot_at(BVector::ZERO, 1)];
     assert!(t.formation_transform(&mut f, group_id(1), false).unwrap());
@@ -785,7 +786,7 @@ fn a_nan_distance_back_takes_the_index_times_the_spacing() {
     t.groups.groups[0].motion.position[0] = BVector::new(9.0, 0.0, 5.0);
     t.groups.groups[0].desired_spacing = Distance::new(2.0);
     let mut f = Formation::new();
-    f.transform_type = 0;
+    f.transform_type = TransformType::BY_LINES;
     f.number_lines = 2;
     f.slots = vec![slot_at(BVector::ZERO, 1), slot_at(BVector::ZERO, 1)];
     f.lines = vec![
@@ -833,8 +834,8 @@ fn a_grid_cell_counts_its_slots_in_bits_1_to_5() {
 
 /// One statistic of category 1 holding `units`, all of master 4, spacing 1.
 fn one_statistic(t: &mut World, units: &[ObjectId]) {
-    let mut unit_types = vec![0u32; 50];
-    unit_types[0] = 4;
+    let mut unit_types = vec![UnitType::CLEARED; 50];
+    unit_types[0] = UnitType::of_word(4);
     let mut counts = vec![0u32; 50];
     counts[0] = units.len() as u32;
     let g = &mut t.groups.groups[0];
@@ -1086,10 +1087,10 @@ fn a_line_is_twice_as_wide_as_deep_and_a_column_the_reverse() {
 }
 
 fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> UnitGroup {
-    let mut unit_types = vec![0u32; 50];
+    let mut unit_types = vec![UnitType::CLEARED; 50];
     let mut counts = vec![0u32; 50];
     for (i, &(t, n)) in types.iter().enumerate() {
-        unit_types[i] = t;
+        unit_types[i] = UnitType::of_word(t);
         counts[i] = n;
     }
     UnitGroup {
@@ -1136,7 +1137,11 @@ fn a_line_of_two_unit_types_alternates_its_slots() {
     assert_eq!(f.slots.len(), 10);
     assert_eq!(f.slots[0].offset, BVector::new(0.0, 0.0, -2.0));
     assert_eq!(f.slots[4].offset, BVector::new(0.0, 0.0, 2.0));
-    let subs: Vec<i32> = f.slots.iter().map(|s| s.desired_sub_category).collect();
+    let subs: Vec<i32> = f
+        .slots
+        .iter()
+        .map(|s| s.desired_sub_category.get())
+        .collect();
     assert_eq!(subs, [4, 24, 4, 24, 4, 4, 24, 4, 24, 24]);
     assert_eq!(f.lines[1].distance_back, Distance::new(1.0));
     assert_eq!(f.lines[1].indices, [5, 6, 7, 8, 9]);

@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
+use crate::groups::UnitType;
 use crate::groups::{Formation, UnitGroup, sub_formation};
 use crate::map::Distance;
 use crate::objects::ObjectId;
@@ -72,7 +73,7 @@ impl World {
         g: &UnitGroup,
         point: BVector,
         category: FormationCategory,
-        sub_category: i32,
+        sub_category: UnitType,
         used: &[Option<ObjectId>],
     ) -> Result<Option<ObjectId>, GenieError> {
         let mut best = FARTHEST;
@@ -84,8 +85,8 @@ impl World {
             if category != FormationCategory::ANY && self.unit_category(Some(object))? != category {
                 continue;
             }
-            if sub_category != -1
-                && i32::from(self.master(object.player(), object.master_id())?.id.get())
+            if !sub_category.is_none()
+                && UnitType::of(self.master(object.player(), object.master_id())?.id)
                     != sub_category
             {
                 continue;
@@ -137,7 +138,7 @@ impl World {
         g: &UnitGroup,
     ) -> Result<(), GenieError> {
         // what the slots ask for (the assignments change only their units)
-        let asks: Vec<(BVector, FormationCategory, i32)> = formation
+        let asks: Vec<(BVector, FormationCategory, UnitType)> = formation
             .slots
             .iter()
             .map(|s| {
@@ -258,7 +259,7 @@ impl World {
                 continue;
             }
             let category = self.unit_category(Some(object))?;
-            let master = i32::from(object.master_id().get());
+            let master = UnitType::of(object.master_id());
             let at = object.moved_vector();
             for (j, slot) in formation.slots.iter().enumerate() {
                 let mut skip = slot.transformed == 0 || slot.active == 0;
@@ -268,7 +269,7 @@ impl World {
                     skip = true;
                 }
                 let other_master =
-                    slot.desired_sub_category != -1 && master != slot.desired_sub_category;
+                    !slot.desired_sub_category.is_none() && master != slot.desired_sub_category;
                 *costs.checked_mut(i * n + j)? = if other_master || skip {
                     FARTHEST
                 } else {
@@ -332,8 +333,8 @@ impl World {
                 {
                     continue;
                 }
-                if sub_category != -1
-                    && i32::from(self.master(object.player(), object.master_id())?.id.get())
+                if !sub_category.is_none()
+                    && UnitType::of(self.master(object.player(), object.master_id())?.id)
                         != sub_category
                 {
                     continue;

@@ -9,9 +9,10 @@ use genie_core::GenieError;
 use genie_core::groups::GroupFlags;
 use genie_core::groups::MotionFlags;
 use genie_core::groups::{
-    Formation, FormationCategory, FormationKind, FormationLine, GroupCommand, GroupCommandKind,
-    GroupId, GroupOrder, GroupTarget, LinePoint, Member, Motion, PointLine, Slot, SlotState,
-    SpecificMove, TargetData, UnitGroup, UnitGroups, UnitTypeStatistic,
+    Differentiator, Formation, FormationCategory, FormationKind, FormationLine, GroupCommand,
+    GroupCommandKind, GroupId, GroupOrder, GroupTarget, LinePoint, Member, Motion, MovePath,
+    MoveReason, PointLine, Slot, SlotState, SpecificMove, TargetData, TransformType, UnitGroup,
+    UnitGroups, UnitType, UnitTypeStatistic,
 };
 use genie_core::map::Distance;
 use genie_core::math::fmath::BVector;
@@ -45,6 +46,11 @@ fn words(b: &[u8; 200]) -> Vec<u32> {
         .iter()
         .map(|w| u32::from_le_bytes(*w))
         .collect()
+}
+
+/// The 200 bytes of a statistic's unit types (`mUnitTypes`) as 50 unit types.
+fn unit_types(b: &[u8; 200]) -> Vec<UnitType> {
+    words(b).into_iter().map(UnitType::of_word).collect()
 }
 
 fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError> {
@@ -94,7 +100,9 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
                     position_filled: s.slots_position_filled,
                     desired_category: FormationCategory::named(s.slots_desired_category),
                     active: s.slots_active,
-                    desired_sub_category: s.slots_desired_sub_category,
+                    desired_sub_category: UnitType::of_word(
+                        s.slots_desired_sub_category.cast_unsigned(),
+                    ),
                     transformed: 0,
                 })
             })
@@ -113,7 +121,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
                 distance_back: Distance::new(l.distance_back),
             })
             .collect(),
-        transform_type: f.transform_type,
+        transform_type: TransformType::of_data(f.transform_type),
         number_lines: f.number_lines,
         transform_orientation: vec3(&f.transform_orientation),
         // a load's array holds the saved slots alone
@@ -148,8 +156,8 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
                     id: ObjectId::try_from(u.units)?,
                     specific_move: SpecificMove {
                         active: u.specific_moves_active,
-                        path_id: u.specific_moves_path_id,
-                        reason: u.specific_moves_reason,
+                        path_id: MovePath::of_data(u.specific_moves_path_id),
+                        reason: MoveReason::of_data(u.specific_moves_reason),
                         goal: vec3(&u.specific_moves_goal),
                         timer: Seconds::new(u.specific_moves_timer),
                         consecutive_move_failures: u.specific_moves_consecutive_move_failures,
@@ -201,7 +209,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
                     attack_range: Distance::new(u.attack_range),
                     desired_spacing: Distance::new(u.desired_spacing),
                     number_unit_types: u.number_unit_types,
-                    unit_types: words(&u.unit_types),
+                    unit_types: unit_types(&u.unit_types),
                     unit_type_counts: words(&u.unit_type_counts),
                 })
             })
@@ -246,7 +254,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
         objects: object_ids(&g.obj_id)?,
         // unsaved: the next statistics fill it
         sighted: Vec::new(),
-        differentiator_id: g.differentiator_id,
+        differentiator_id: Differentiator::of_data(g.differentiator_id),
         seconds_not_under_attack: Seconds::new(g.seconds_not_under_attack),
         differentiator_groups: g
             .differentiator_groups
@@ -279,10 +287,10 @@ pub fn unit_groups(world: &saved::BaseWorld) -> Result<UnitGroups, GenieError> {
         .iter()
         .map(|u| group(u, &world.path))
         .collect::<Result<_, _>>()?;
-    let mut commands = 0;
+    let mut commands = Differentiator::default();
     for u in &groups {
         if commands < u.differentiator_id {
-            commands = u.differentiator_id + 1;
+            commands = u.differentiator_id.next();
         }
     }
     Ok(UnitGroups {
@@ -303,11 +311,14 @@ pub fn globals_from_dump(text: &str, groups: &mut UnitGroups) {
         match name {
             Some("group_commands") => {
                 if let Some(&v) = values.first() {
-                    groups.commands = v;
+                    groups.commands = Differentiator::of_data(v);
                 }
             }
             Some("unit_types_scratch") => {
-                groups.unit_types_scratch = values.iter().map(|&v| v as u32).collect();
+                groups.unit_types_scratch = values
+                    .iter()
+                    .map(|&v| UnitType::of_word(v.cast_unsigned()))
+                    .collect();
             }
             _ => {}
         }
@@ -326,12 +337,13 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
         if slice.commands != game.commands {
             out.push(format!(
                 "group commands slice {} game {}",
-                slice.commands, game.commands
+                slice.commands.get(),
+                game.commands.get()
             ));
         }
         let words = |g: &UnitGroups| {
             let mut w = g.unit_types_scratch.clone();
-            w.resize(50, 0);
+            w.resize(50, UnitType::CLEARED);
             w
         };
         if words(slice) != words(game) {
@@ -487,6 +499,40 @@ impl Flat for BVector {
 
 /// A player flattens as its number, as the save holds it.
 impl Flat for PlayerId {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A member's own move's path and reason flatten as their values, as the save holds them.
+impl Flat for MovePath {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+impl Flat for MoveReason {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A formation's transform type flattens as its value, as the save holds it.
+impl Flat for TransformType {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A differentiator flattens as its value, as the save holds it.
+impl Flat for Differentiator {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A unit type flattens as its signed word.
+impl Flat for UnitType {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }
@@ -681,10 +727,13 @@ mod tests {
             "group_commands 12\nunit_types_scratch 1 2 -1\nother 5\n",
             &mut groups,
         );
-        assert_eq!(groups.commands, 12);
-        assert_eq!(groups.unit_types_scratch, [1, 2, u32::MAX]);
+        assert_eq!(groups.commands, Differentiator::of_data(12));
+        assert_eq!(
+            groups.unit_types_scratch,
+            [UnitType::of_word(1), UnitType::of_word(2), UnitType::NONE]
+        );
         globals_from_dump("group_commands\n\n", &mut groups);
-        assert_eq!(groups.commands, 12);
+        assert_eq!(groups.commands, Differentiator::of_data(12));
     }
 
     #[test]

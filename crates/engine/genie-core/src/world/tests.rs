@@ -65,14 +65,18 @@ use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
+use crate::objects::masters::MasterField;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskIndex;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::VolleySpread;
 use crate::objects::masters::action_type;
@@ -465,7 +469,7 @@ pub(crate) fn builder_masters() -> Masters {
         cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
         object_flags: ObjectFlags::NONE,
-        combat_level: 0,
+        combat_level: CombatLevel::NONE,
         work_rate: WorkRate::new(1.0),
         hit_points: 25,
         build_time: 0,
@@ -524,7 +528,7 @@ pub(crate) fn builder_masters() -> Masters {
             cost: costs(&[(attribute::WOOD, 25, true)]),
             obstruction_class: ObstructionClass::UNIT,
             object_flags: ObjectFlags::NONE,
-            combat_level: 0,
+            combat_level: CombatLevel::NONE,
             work_rate: WorkRate::ZERO,
             hit_points: 550,
             build_time: 25,
@@ -7240,7 +7244,7 @@ fn farm_master() -> Master {
         class: class::FARM,
         work_rate: WorkRate::new(0.4),
         capacity: 15,
-        default_task: Some(0),
+        default_task: TaskIndex::of_data(0),
         tasks: vec![crate::objects::masters::Task {
             action_type: crate::gathering::make::MAKE,
             attribute_type: Some(attribute::FARM_FOOD),
@@ -12837,7 +12841,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         weapons: vec![ClassAmount::new(4, 100)],
         area_effect: Distance::new(2.0),
         area_damage: 1.0,
-        missile: None,
+        missile: MasterField::NONE,
         death_sprite: Some(SpriteId::named(1751)),
         ..Master::default()
     };
@@ -12847,7 +12851,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         class: class::WALL,
         hit_points: 1800,
         armors: vec![ClassAmount::new(4, 0)],
-        terrain_bonus: -1,
+        terrain_bonus: RestrictionField::NONE,
         ..Master::default()
     };
     let unit = |id, master, hp, position| Unit {
@@ -14439,7 +14443,7 @@ fn help_view<R>(
         id: master_id(126),
         kind: master_type::COMBAT,
         class: class::PREDATOR,
-        combat_level: 4,
+        combat_level: CombatLevel::MILITARY,
         ..Master::default()
     };
     let placed = |x: f32, class, player, master| Placed {
@@ -15651,7 +15655,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(300)),
         attack_sprite: Some(SpriteId::named(301)),
-        missile: Some(master_id(363)),
+        missile: MasterField::of(Some(master_id(363))),
         weapon_offset: Offset::new(0.0, 0.0, 1.0),
         weapon_range: Distance::new(4.0),
         reload: Seconds::new(2.0),
@@ -15695,7 +15699,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         hit_points: 5,
         radius: Footprint::new(0.2, 0.2),
         height: 1.5,
-        terrain_bonus: -1,
+        terrain_bonus: RestrictionField::NONE,
         ..Master::default()
     };
     Masters::new([archer, arrow, deer])
@@ -16051,7 +16055,7 @@ fn a_volley_s_own_missiles_hit_without_the_shooter() {
         let own = Master {
             id: master_id(364),
             // a missile master that names a missile of its own always hits (`a.missile` 0 or more)
-            missile: Some(master_id(0)),
+            missile: MasterField::of(Some(master_id(0))),
             ..m.get(master_id(363)).unwrap().clone()
         };
         all.push(own);

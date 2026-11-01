@@ -383,7 +383,7 @@ pub fn arms_looking(
         second_sprite: g(master.attack_sprite2),
         idle_sprite: g(master.standing_sprite),
         idle_attack_sprite: g(master.idle_attack_sprite),
-        missile: master.missile,
+        missile: master.missile.master(),
         fire_frame: master.fire_frame,
         interrupt_frame: master.interrupt_frame,
     }

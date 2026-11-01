@@ -33,12 +33,12 @@ pub struct UnitGroups {
     /// The commands that ran the order splitter so far (`DAT_143f10134`, a process global no
     /// save holds): each group a command forms or orders takes it as `mDifferentiatorID`, then it
     /// counts up. A group's load raises it past the group's (`FUN_14101d350`).
-    pub commands: i32,
+    pub commands: crate::groups::Differentiator,
     /// The scratch array of a group's unit types (`DAT_143f23b70`, 50 words, a process global):
     /// each count of a sub-formation's unit types (`FUN_1410116c0`) writes its types from the
     /// front and copies the whole array into the group's `mUnitTypes`, so the words past the
     /// types are an earlier count's. Empty is all zero, as the process starts.
-    pub unit_types_scratch: Vec<u32>,
+    pub unit_types_scratch: Vec<crate::groups::UnitType>,
 }
 
 impl UnitGroups {
@@ -82,7 +82,7 @@ impl UnitGroups {
     /// (`FUN_140f88750`) would, but returns at once while `DAT_143f01836` is 0, as nothing
     /// writes it.
     pub const fn count_command(&mut self) {
-        self.commands = self.commands.wrapping_add(1);
+        self.commands = self.commands.next();
     }
 
     /// The group of id `id` (`FUN_14152ff40`; a link's −1, which it finds none for, is none

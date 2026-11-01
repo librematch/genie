@@ -1,5 +1,6 @@
 //! The reach test, a `MoveTo`'s path end that follows its target, the top path and the pauses.
 
+use crate::groups::MoveReason;
 use crate::map::Distance;
 use crate::map::Tile;
 use crate::movement::LevelFlags;
@@ -512,7 +513,7 @@ impl Mover {
         // (FUN_141017590): a member on one of reason 0 keeps buildings, walls and gates alone
         let own_move = groups
             .and_then(|gs| gs.get(me.group?))
-            .is_some_and(|g| g.member_reason(me.id) == 0);
+            .is_some_and(|g| g.member_reason(me.id) == MoveReason::DETOUR);
         let mut target_hit = false;
         let mut kept = Vec::new();
         for &hit in hits {

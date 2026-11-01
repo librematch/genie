@@ -36,6 +36,7 @@ file for what the save does not hold.
 | [`class_id.rs`](class_id.rs) | A master's class as one type: the group of masters the game treats alike (villagers, siege weapons, gates, farms), the value the `.dat` names `unit_class`. |
 | [`class_mask.rs`](class_mask.rs) | A set of classes as the game tests one: a bit mask over the classes below a bound. |
 | [`combat_ability.rs`](combat_ability.rs) | A master's combat abilities (`CombatAbility`, `combat_ability`). |
+| [`combat_level.rs`](combat_level.rs) | A master's combat level (`+0x62c`): which of the unit AI's kinds of fighter it is. |
 | [`combat_setters.rs`](combat_setters.rs) | The RGE combat and missile masters' setters: the armor and attack amounts. |
 | [`conversion_adjust.rs`](conversion_adjust.rs) | A master's adjustments of a conversion (`ConversionAdjust`). |
 | [`cost_slot.rs`](cost_slot.rs) | A master's cost (`+0x880`): three slots in their places, an empty one among them. |
@@ -45,6 +46,7 @@ file for what the save does not hold.
 | [`garrison_kinds.rs`](garrison_kinds.rs) | The kinds of units a building takes in (`GarrisonKinds`, `garrison_type`). |
 | [`gather_group.rs`](gather_group.rs) | A master's gather group as one type: the kind of resource the unit AI's resource searches look for, the value the `.dat` names `resource_gather_group`. |
 | [`hero_flags.rs`](hero_flags.rs) | A master's hero flags (`HeroFlags`, `hero_flag`). |
+| [`id_field.rs`](id_field.rs) | A master's id fields as its data holds them: shorts the effects set, add to and scale, every value kept, which name a master (`MasterField`) or a terrain restriction (`RestrictionField`) when 0 or more. |
 | [`ids.rs`](ids.rs) | The master ids (`i16`, `crate::objects::masters::Master::id`): the one definition of the masters the engine names, by the `.dat`'s unit id. |
 | [`lookup.rs`](lookup.rs) | A player's masters by id (`Masters`) and the work command's choice of master and task. |
 | [`master_id.rs`](master_id.rs) | A master's id as one type: the master a command builds, trains or turns an object into, and a target's master. |
@@ -57,9 +59,12 @@ file for what the save does not hold.
 | [`placement_terrains.rs`](placement_terrains.rs) | A master's placement terrains (`PlacementTerrains`). |
 | [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`) and a sound event's id (`SoundEventId`). |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
+| [`target_owner.rs`](target_owner.rs) | A task's owner type (`+0x18`): whose targets the task is for. |
 | [`task_flags.rs`](task_flags.rs) | A task's flags (`TaskFlags`, `combat_level_flag`). |
 | [`task_id.rs`](task_id.rs) | A task's id as one type: the place of a task in its master's task list, which an action keeps to name the task it works on. |
+| [`task_index.rs`](task_index.rs) | A place in a master's task list: its default task (`+0x790`). |
 | [`task_sprites.rs`](task_sprites.rs) | A task's four sprites (`TaskSprites`). |
+| [`task_terrain.rs`](task_terrain.rs) | A task's terrain (`+0x16`): the terrain a task finder's task is for, or a terrain look task's flag mask. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tribe_setters.rs`](tribe_setters.rs) | The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the train locations. |
 | [`values.rs`](values.rs) | What the attribute setters share: the caps, the truncations, the sprite and class amounts, the damage sprites' and train locations' entries. |

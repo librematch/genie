@@ -8,6 +8,7 @@ use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::CombatLevel;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::MISSILE;
@@ -324,7 +325,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
-        let boar = at.class == Some(class::PREDATOR) && at.combat_level == 1;
+        let boar = at.class == Some(class::PREDATOR) && at.combat_level == CombatLevel::ANIMAL;
         // p1 the unit met (−1 names none the update holds)
         if !boar
             && let Some(met) = ObjectId::of_field(n.p[0])

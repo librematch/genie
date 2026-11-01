@@ -36,10 +36,12 @@ use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
+use crate::objects::masters::MasterField;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
+use crate::objects::masters::TaskTerrain;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{MasterId, ids};
@@ -1251,7 +1253,7 @@ fn a_volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
         kind: master_type::COMBAT,
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 4)],
-        missile: Some(ids::FARM),
+        missile: MasterField::of(Some(ids::FARM)),
         garrison_firepower: 1.0,
         volley_fire: 3.0,
         volley_missile,
@@ -2891,7 +2893,7 @@ fn transport_task_world() -> (World, ListIndex) {
                 action_type: transport::TRANSPORT,
                 object_group: None,
                 object_id: None,
-                terrain: 0,
+                terrain: TaskTerrain::of_data(0),
                 ..Task::default()
             });
         }

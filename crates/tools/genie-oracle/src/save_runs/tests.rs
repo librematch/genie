@@ -9,6 +9,7 @@ use crate::setup::slice;
 use crate::test_ids::object_id;
 use crate::{Decoder, Dumps, Error, TickReport, listed};
 use genie_core::GenieError;
+use genie_core::groups::Differentiator;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ListIndex;
 use genie_core::players::Amount;
@@ -246,7 +247,7 @@ fn the_dumps_go_into_the_slice() {
         [(object_id(102), false), (object_id(101), true)]
     );
     assert_eq!(turns.recycling.ghosts, [object_id(201)]);
-    assert_eq!(turns.groups.commands, 12);
+    assert_eq!(turns.groups.commands, Differentiator::of_data(12));
 }
 
 /// A dump out of shape is its error.
@@ -375,7 +376,7 @@ fn a_run_from_a_save_starts_after_its_update() {
         (3, WorldTime::from_millis(50))
     );
     let groups = crate::saved_groups(&save, Some("group_commands 3\n")).unwrap();
-    assert_eq!(groups.commands, 3);
+    assert_eq!(groups.commands, Differentiator::of_data(3));
     assert!(crate::spatial_from_save(&save).is_ok());
     assert!(crate::spatial_from_save(&[]).is_err());
 }

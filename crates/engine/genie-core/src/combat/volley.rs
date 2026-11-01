@@ -112,7 +112,7 @@ impl Unit {
                 "a charged hit (slot 0x2f8 with charge types 6 and 7)",
             ));
         }
-        let missile = master.missile.is_some();
+        let missile = master.missile.master().is_some();
         // what the rest reads of the master, before the notify changes the unit
         let notifies = matches!(master.id, ids::ID_73 | ids::ID_559);
         let (
@@ -214,7 +214,7 @@ impl Unit {
             .map(|m| m.angle)
             .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
         let shot = Shot {
-            made: master.missile.ok_or(GenieError::missing_data(
+            made: master.missile.master().ok_or(GenieError::missing_data(
                 "a ranged unit whose master has no missile",
             ))?,
             at: crate::combat::missile::spawn_point(self.position(), facing, master.weapon_offset),
@@ -285,21 +285,19 @@ impl Unit {
             building.then_some(aimed.position.ground()),
         );
         let volley = master.volley_missile.and_then(|id| masters.get(id));
-        let made =
-            match volley {
-                Some(v) => v,
-                None if master.missile.is_some() => master
-                    .missile
-                    .and_then(|m| masters.get(m))
-                    .ok_or(GenieError::unsupported(
-                        "a missile its player's masters do not have",
-                    ))?,
-                None => {
-                    return Err(GenieError::unsupported(
-                        "a volley's extra missile of a master without a missile",
-                    ));
-                }
-            };
+        let made = match volley {
+            Some(v) => v,
+            None if master.missile.master().is_some() => {
+                master.missile.master().and_then(|m| masters.get(m)).ok_or(
+                    GenieError::unsupported("a missile its player's masters do not have"),
+                )?
+            }
+            None => {
+                return Err(GenieError::unsupported(
+                    "a volley's extra missile of a master without a missile",
+                ));
+            }
+        };
         if matches!(made.id, ids::ID_527 | ids::ID_528) {
             return Err(GenieError::unsupported(
                 "a volley's extra missile of master 527 or 528 (its attack count)",
@@ -599,7 +597,7 @@ impl Aimed {
 pub(crate) fn armed(master: &Master, firepower: f32) -> bool {
     master.kind != BUILDING
         || matches!(master.class, class::CLASS_51 | class::CLASS_54)
-        || master.missile.is_some()
+        || master.missile.master().is_some()
         || ARMED_FIREPOWER < firepower
 }
 

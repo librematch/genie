@@ -2,8 +2,8 @@
 //! Explore and a bird's Fly.
 
 use crate::GenieError;
+use crate::groups::MoveReason;
 use crate::math::rng::Stream;
-use crate::movement::ASIDE;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
@@ -20,8 +20,6 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::SPEED_EPSILON;
 use crate::world::step::Step;
-
-const NO_OWN_MOVE: i32 = -1;
 
 impl Unit {
     /// `RGE_Moving_Object::update` (`0x14114dbb0`) before the actions: the last human order's time
@@ -97,8 +95,8 @@ impl Unit {
         Ok(Some(match g.member_reason(self.id) {
             // A group member's own move's reasons slot 0x5e0 tells apart (`FUN_141017590`): moved aside,
             // and none.
-            ASIDE => GroupSpeed::Aside,
-            NO_OWN_MOVE => GroupSpeed::Free,
+            MoveReason::ASIDE => GroupSpeed::Aside,
+            MoveReason::NONE => GroupSpeed::Free,
             _ => GroupSpeed::OwnMove(g.motion.maximum_velocity_forward),
         }))
     }

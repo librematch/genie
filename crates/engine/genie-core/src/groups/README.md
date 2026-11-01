@@ -35,6 +35,7 @@ The world runs the update of each group that a player owns, before the player's 
 | [`command.rs`](command.rs) | A group's orders (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), `commandMoveTo` (`FUN_141010a80`) and `stopAllUnits` (`FUN_14103a0d0`), the HD PDB's names. |
 | [`command_kind.rs`](command_kind.rs) | A group command's kind (`GroupCommandKind`): a move, a follow, or the action type of the task the group's members carry out. |
 | [`create.rs`](create.rs) | A group's members (FD-036): `AddUnit` (`FUN_1410083c0`) with its sub-formation statistics (`FUN_141008d90`, `FUN_1410116c0`) and a unit's radius in a formation (`FUN_141025920`). |
+| [`differentiator.rs`](differentiator.rs) | A group's differentiator (`mDifferentiatorID`): the order splitter's command count. |
 | [`formation_category.rs`](formation_category.rs) | A unit's formation category in its group (`FormationCategory`): the sub-formation its master's type, hero flag and formation category put it in. |
 | [`formation_kind.rs`](formation_kind.rs) | A formation's type as one type: `BFormation`'s `mType`, a group's lock, a unit AI's formation type and the `FORM_FORMATION` command's. |
 | [`group_flags.rs`](group_flags.rs) | A group's flags (`GroupFlags`, `mGroupFlags`). |
@@ -44,6 +45,7 @@ The world runs the update of each group that a player owns, before the player's 
 | [`lock.rs`](lock.rs) | A group's formation type (FD-036): `CalcFormationType` (`FUN_14100b940`), the members' vote after a change of members; `LockFormation` (`FUN_141024e70`), the lock to a type; and the members' stances as the group's state (`FUN_14100d140`). |
 | [`mod.rs`](mod.rs) | Unit groups and formations (FD-036): the game's `BUnitGroup` (`group.cpp`) with its motion (`BMotion`) and formations (`BFormation`). |
 | [`motion_flags.rs`](motion_flags.rs) | A group motion's flags (`MotionFlags`, `mMotionFlags`). |
+| [`move_reason.rs`](move_reason.rs) | Why a group member moves on its own (`mReason`), and the path of that move (`mPathID`). |
 | [`objects.rs`](objects.rs) | An object of the world's id table (`WorldObject`) as the groups read it, and a unit's sub-formation. |
 | [`order.rs`](order.rs) | A group's command (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), which chooses by the task a member has on the target how the group's order runs. |
 | [`place.rs`](place.rs) | A new group's place and facing (FD-036): `SetInitialPosition` (`FUN_141039990`) on the first clear point of a spiral round the centroid (`FUN_141007630`), `SetInitialOrientation` (`FUN_141039680`) and the motion's orientation (`FUN_141049e10`). |
@@ -52,6 +54,8 @@ The world runs the update of each group that a player owns, before the player's 
 | [`target.rs`](target.rs) | A group's target: an object, none, or a target of another kind. |
 | [`task.rs`](task.rs) | The task a group's member takes on a target (FD-036): the unit's slot 0x130 (`RGE_Action_Object::slot38`, `FUN_14106b8b0`), which `BUnitGroup::command` asks of its first member that can act to choose the command a group's order runs. |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`transform_type.rs`](transform_type.rs) | How a formation's transform places its slots (`mTransformType`). |
+| [`unit_type.rs`](unit_type.rs) | A group's unit type: a master's id as the statistics' and the slots' words hold it. |
 | [`formation/`](formation/) | A group's formation (FD-036): `BFormation`, its slots and lines, and the layouts that fill them (createColumnLine `FUN_141012280`, ...). |
 | [`motion/`](motion/) | A group's motion (FD-036): `BMotion`'s update (`FUN_14104a090`, motion.cpp): its path step (`FUN_14104a270`) over the path levels a unit's motion step keeps alike, planned for the group's lead from the group's place, the walk toward the walked level's waypoint with its turn (`FUN_141046270`, `FUN_14104c150`), then the velocity along the vectors. |
 | [`steer/`](steer/) | The members' moves to their slots (FD-036): the part of `BUnitGroup::update` (`FUN_14103d910`, `0x14103e8e8`..`0x14103efba`) that brings each member of a formation to its slot, with the member's steering (`FUN_141025fb0`) and the setter of a member's own move (`FUN_141039f60`). |
