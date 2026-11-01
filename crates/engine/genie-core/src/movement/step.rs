@@ -161,17 +161,20 @@ impl Mover {
 
     /// The moving setup (`FUN_1411580a0`) of a new object of `stats` at `at`: it faces x (its
     /// right −z), does not wait, has no path and moveForward's factor 1; the position setter
-    /// (`FUN_141161950`) makes its place a move at `now`. Its angle and its sprite's facets are
-    /// the caller's. Every moving object (types 30 and up) gets it, a building too, though it
-    /// never moves: the walk reads the last move time of a building it meets (slot 0x5e8,
-    /// `FUN_14106d2d0`).
-    pub(crate) const fn new_object(
-        stats: MoveStats,
+    /// (`FUN_141161950`) makes its place a move at `now`. Its top speed is the one of the sprite
+    /// it holds, `shown` (its standing one, slot 0x798: [`MoveStats::show`]), not the master's
+    /// speed with its running sprite. Its angle and its sprite's facets are the caller's. Every
+    /// moving object (types 30 and up) gets it, a building too, though it never moves: the walk
+    /// reads the last move time of a building it meets (slot 0x5e8, `FUN_14106d2d0`).
+    pub(crate) fn new_object(
+        mut stats: MoveStats,
+        shown: Option<&crate::objects::sprite::Graphic>,
         at: Position,
         now: WorldTime,
         angle: Angle,
         sprite_facets: Option<crate::objects::facing::SpriteFacets>,
     ) -> Self {
+        stats.show(shown);
         Self {
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             animated: crate::objects::layers::Animated::at(Speed::ZERO, at),

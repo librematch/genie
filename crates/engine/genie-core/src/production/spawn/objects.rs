@@ -318,7 +318,9 @@ impl World {
             body: crate::objects::layers::Body::new(
                 at,
                 (ANIMATED <= made.kind).then(crate::objects::layers::Animated::default),
-                moving.map(|stats| Mover::new_object(stats, at, self.world_time, angle, facets)),
+                moving.map(|stats| {
+                    Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)
+                }),
             ),
             attackable: true,
             pasture: None,

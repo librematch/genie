@@ -602,6 +602,44 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     );
 }
 
+/// A new unit's top speed (slot 65, `FUN_14114d1d0`) is the one of the sprite it holds, its
+/// standing one: its master's speed times that sprite's factor, not the master's speed with its
+/// running sprite (the deer 9655 of MarvinBlue/426048731 ran at the running speed).
+#[test]
+fn a_made_unit_moves_at_the_speed_of_its_standing_sprite() {
+    let mut t = crate::world::tests::forage_world();
+    for masters in &mut t.masters {
+        let villager = masters.get_mut(ids::VILLAGER_MALE).unwrap();
+        villager.standing_sprite = Some(SpriteId::named(300));
+        let moving = villager.moving.as_mut().unwrap();
+        moving.base = Speed::new(0.8);
+        moving.speed = Speed::new(1.6);
+    }
+    let _ = t.graphics.insert(
+        SpriteId::named(300),
+        crate::objects::sprite::Graphic {
+            id: SpriteId::named(300),
+            frames: crate::objects::Frame::of_data(10),
+            facets: crate::objects::FacetCount::of_data(8),
+            speed_multiplier: SpeedMultiplier::of_data(0.5),
+            frame_duration: Seconds::new(0.1),
+            replay_delay: Seconds::ZERO,
+            flags: SpriteFlags::ANIMATED,
+        },
+    );
+    t.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
+    t.spawn(
+        PlayerId::new(1),
+        ListIndex::new(2),
+        ids::VILLAGER_MALE,
+        Amount::new(1.0),
+    )
+    .unwrap();
+    let made = t.players[1].objects.last().unwrap();
+    assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
+    assert_eq!(made.body.mover().unwrap().stats.speed, Speed::new(0.4));
+}
+
 /// `FUN_140ace9c0` sends the new unit to its building's gather point only for a state of 1
 /// (`+0xc30`); a state of 0xff (SET GATHER STATE's) leaves it standing, which the unit's wait
 /// to move (`+0x7f9`) shows.

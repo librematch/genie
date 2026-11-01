@@ -406,6 +406,7 @@ impl World {
             // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             body: crate::objects::layers::Body::Moving(Mover::new_object(
                 moving,
+                Some(&standing),
                 position,
                 self.world_time,
                 angle,

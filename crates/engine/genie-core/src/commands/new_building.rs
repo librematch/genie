@@ -200,7 +200,16 @@ impl World {
         // moves (a mule cart does): the walk reads its last move time
         let mut mover = player_master(&self.masters, player, master)
             .and_then(|m| m.moving)
-            .map(|stats| Mover::new_object(stats, position, self.world_time, angle, None));
+            .map(|stats| {
+                Mover::new_object(
+                    stats,
+                    standing.as_ref(),
+                    position,
+                    self.world_time,
+                    angle,
+                    None,
+                )
+            });
         // the constructor (FUN_1411de5f0)
         let (x, y) = (position.x(), position.y());
         let (tx, ty) = (
