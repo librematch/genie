@@ -2,7 +2,7 @@
 //! goal.
 
 use crate::math::fmath::BVector;
-use crate::pathing::tile_path::{E, HALF, N, PlanTile, Planner, S, W};
+use crate::pathing::tile_path::{Cell, CellEdges, CellKind, HALF, PlanTile, Planner};
 
 impl Planner {
     /// `FUN_140f7b9e0`: the steps from a child cell to the goal's tile at that level (`to`),
@@ -11,8 +11,8 @@ impl Planner {
     pub(super) fn steps_to(&self, to: PlanTile, level: u8, cell: PlanTile) -> u16 {
         let dy = (to.y() - cell.y()).max(0);
         let dx = (to.x() - cell.x()).max(0);
-        let [b0, b1] = self.cell(level, cell);
-        if b1 & 0xf != 0xf && b0 != 0 {
+        let c = self.cell(level, cell);
+        if !c.kind.contains(CellKind::OFF_MAP) && !c.edges.is_empty() {
             (dy + dx) as u16
         } else {
             0xffff
@@ -64,14 +64,14 @@ impl Planner {
         at: i16,
         lo: i16,
         hi: i16,
-        dir: u8,
-        tile_at: impl Fn(i16) -> [u8; 2],
+        dir: CellEdges,
+        tile_at: impl Fn(i16) -> Cell,
     ) -> Option<i16> {
         let mut off: i16 = 9999;
         let mut found = None;
         let mut s = at;
         while s <= hi {
-            if tile_at(s)[0] & dir != 0 {
+            if tile_at(s).edges.intersects(dir) {
                 off = s - at;
                 found = Some(s);
                 break;
@@ -80,7 +80,7 @@ impl Planner {
         }
         let mut s = at;
         while lo <= s && 0 < off {
-            if tile_at(s)[0] & dir != 0 {
+            if tile_at(s).edges.intersects(dir) {
                 return Some(s);
             }
             s -= 1;
@@ -110,42 +110,36 @@ impl Planner {
                 (lo, lo, lo)
             }
         };
-        let (mut ox, mut oy) = match dir {
-            N | S => {
-                let (lo, mid, hi) = span(x);
-                let row = if dir == N {
-                    ny << node.level
-                } else {
-                    ((ny + 1) << node.level) - 1
-                };
-                let x = if 0 < l {
-                    self.nearest_on_boundary(mid, lo, hi, dir, |s| {
-                        self.cell(0, PlanTile::new(s, row))
-                    })
+        let (mut ox, mut oy) = if dir == CellEdges::N || dir == CellEdges::S {
+            let (lo, mid, hi) = span(x);
+            let row = if dir == CellEdges::N {
+                ny << node.level
+            } else {
+                ((ny + 1) << node.level) - 1
+            };
+            let x = if 0 < l {
+                self.nearest_on_boundary(mid, lo, hi, dir, |s| self.cell(0, PlanTile::new(s, row)))
                     .unwrap_or(mid)
-                } else {
-                    mid
-                };
-                (x, row)
-            }
-            W | E => {
-                let (lo, mid, hi) = span(y);
-                let col = if dir == W {
-                    nx << node.level
-                } else {
-                    ((nx + 1) << node.level) - 1
-                };
-                let y = if 0 < l {
-                    self.nearest_on_boundary(mid, lo, hi, dir, |s| {
-                        self.cell(0, PlanTile::new(col, s))
-                    })
+            } else {
+                mid
+            };
+            (x, row)
+        } else if dir == CellEdges::W || dir == CellEdges::E {
+            let (lo, mid, hi) = span(y);
+            let col = if dir == CellEdges::W {
+                nx << node.level
+            } else {
+                ((nx + 1) << node.level) - 1
+            };
+            let y = if 0 < l {
+                self.nearest_on_boundary(mid, lo, hi, dir, |s| self.cell(0, PlanTile::new(col, s)))
                     .unwrap_or(mid)
-                } else {
-                    mid
-                };
-                (col, y)
-            }
-            _ => return None,
+            } else {
+                mid
+            };
+            (col, y)
+        } else {
+            return None;
         };
         let last = self.last_tile();
         if last.x() < ox {
@@ -181,7 +175,7 @@ impl Planner {
                 (i32::from(base) + (i32::from(d) * i32::from(num)) / i32::from(den)) as i16
             }
         };
-        let (lo, hi, at, fixed) = if dir == N || dir == S {
+        let (lo, hi, at, fixed) = if dir == CellEdges::N || dir == CellEdges::S {
             let lo = bx << bl;
             let hi = ((bx + 1) << bl) - 1;
             let bottom = ((ny + 1) << node.level) - 1;
@@ -189,7 +183,7 @@ impl Planner {
             let last = self.last_tile();
             let hi = hi.min(last.x());
             let bottom = bottom.min(last.y());
-            if dir == N {
+            if dir == CellEdges::N {
                 let d = if top <= ly { top - ly } else { 0 };
                 (lo, hi, along(lx, d, dxl, dyl), top)
             } else if ly <= bottom {
@@ -202,7 +196,7 @@ impl Planner {
             let right = ((nx + 1) << node.level) - 1;
             let lo = by << bl;
             let hi = ((by + 1) << bl) - 1;
-            if dir == W {
+            if dir == CellEdges::W {
                 let d = if left <= lx { left - lx } else { 0 };
                 (lo, hi, along(ly, d, dyl, dxl), left)
             } else if lx <= right {
@@ -212,12 +206,12 @@ impl Planner {
             }
         };
         let passes = |s: i16| {
-            let c = if dir == N || dir == S {
+            let c = if dir == CellEdges::N || dir == CellEdges::S {
                 self.cell(0, PlanTile::new(s, fixed))
             } else {
                 self.cell(0, PlanTile::new(fixed, s))
             };
-            c[0] & dir != 0
+            c.edges.intersects(dir)
         };
         let result = if lo < at {
             if at < hi {
@@ -252,7 +246,7 @@ impl Planner {
         } else {
             (lo..=hi).find(|&s| passes(s)).unwrap_or(-1)
         };
-        Some(if dir == N || dir == S {
+        Some(if dir == CellEdges::N || dir == CellEdges::S {
             PlanTile::new(result, fixed)
         } else {
             PlanTile::new(fixed, result)
@@ -292,10 +286,12 @@ impl Planner {
         }
     }
 
-    /// The searched cells' flags cleared and the pool emptied, after the goal's marks.
+    /// The searched cells' open and closed marks cleared and the pool emptied, after the goal's
+    /// marks.
     pub(super) fn clear_nodes(&mut self) {
         for node in &self.nodes {
-            self.cells[node.cell][0] &= 0xf;
+            // the game keeps the byte's low nibble, the four edges
+            self.cells[node.cell].edges &= CellEdges::EDGES;
         }
         self.nodes.clear();
     }

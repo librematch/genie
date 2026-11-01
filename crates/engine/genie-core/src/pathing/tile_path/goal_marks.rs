@@ -3,7 +3,7 @@
 use crate::map::Distance;
 use crate::map::Point;
 use crate::pathing::tile_path::{
-    CLOSED, FAR_SIDE, GOAL, HALF, LONE, NODE, ONE, PlanRect, PlanTile, Planner,
+    CellEdges, CellKind, FAR_SIDE, HALF, ONE, PlanRect, PlanTile, Planner,
 };
 
 /// A search's request: from a point to a goal with its ranges, as the planner's entry passes
@@ -73,8 +73,8 @@ impl Planner {
         let (x0, y0) = (first.x(), first.y());
         for tx in x0..=step - 1 + x0 {
             for ty in y0..=step - 1 + y0 {
-                let [b0, b1] = self.cell(0, PlanTile::new(tx, ty));
-                if b0 == 0 && b1 & LONE == 0 {
+                let c = self.cell(0, PlanTile::new(tx, ty));
+                if c.edges.is_empty() && !c.kind.contains(CellKind::LONE) {
                     continue;
                 }
                 let ex = off(f32::from(tx), x);
@@ -115,11 +115,15 @@ impl Planner {
 
     /// Toggle a cell's goal mark; true when it changed.
     pub(super) fn toggle_goal(&mut self, i: usize, set: bool) -> bool {
-        let b1 = self.cells[i][1];
-        if set == (b1 & GOAL != 0) {
+        let b1 = self.cells[i].kind;
+        if set == b1.contains(CellKind::GOAL) {
             return false;
         }
-        self.cells[i][1] = if set { b1 + GOAL } else { b1 - GOAL };
+        self.cells[i].kind = if set {
+            b1.plus(CellKind::GOAL)
+        } else {
+            b1.minus(CellKind::GOAL)
+        };
         true
     }
 
@@ -141,7 +145,7 @@ impl Planner {
         }
         let Some(i) = (0..=3u8).rev().find_map(|l| {
             let i = self.index(l, self.goal.up(l));
-            (self.cells[i][1] & NODE != 0).then_some(i)
+            self.cells[i].kind.contains(CellKind::NODE).then_some(i)
         }) else {
             return;
         };
@@ -157,7 +161,7 @@ impl Planner {
             return 0;
         }
         let i = self.index(level, cell);
-        if self.cells[i][1] & NODE == 0 {
+        if !self.cells[i].kind.contains(CellKind::NODE) {
             if level == 0 {
                 return 0;
             }
@@ -213,7 +217,7 @@ impl Planner {
     /// `FUN_140f7e070`: the node cells under `cell` of `level` within the region closed or
     /// reopened; the last child is walked by the loop, the others by recursion.
     pub(super) fn close_cells(&mut self, mut level: u8, mut cell: PlanTile, set: bool) {
-        while self.cell(level, cell)[1] & NODE == 0 {
+        while !self.cell(level, cell).kind.contains(CellKind::NODE) {
             if level == 0 {
                 return;
             }
@@ -226,9 +230,13 @@ impl Planner {
         }
         if self.region.holds_at(level, cell) {
             let i = self.index(level, cell);
-            let b0 = self.cells[i][0];
-            if set != (b0 & CLOSED != 0) {
-                self.cells[i][0] = if set { b0 + CLOSED } else { b0 - CLOSED };
+            let b0 = self.cells[i].edges;
+            if set != b0.contains(CellEdges::CLOSED) {
+                self.cells[i].edges = if set {
+                    b0.plus(CellEdges::CLOSED)
+                } else {
+                    b0.minus(CellEdges::CLOSED)
+                };
             }
         }
     }

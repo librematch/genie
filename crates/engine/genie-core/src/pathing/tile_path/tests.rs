@@ -66,29 +66,43 @@ fn the_last_open_point_walks_the_path_back_to_a_tile_with_an_edge() {
 #[test]
 fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
     let p = Planner::new(GridSize::new(8, 8), vec![0; 64], vec![1.0], &open_map);
-    let edges = |bits: [u8; 8]| move |s: i16| [bits[s as usize], 0];
+    // the tiles at the places `with` have the edge N
+    let edges = |with: &'static [i16]| {
+        move |s: i16| Cell {
+            edges: if with.contains(&s) {
+                CellEdges::N
+            } else {
+                CellEdges::NONE
+            },
+            kind: CellKind::NONE,
+        }
+    };
     // above at 7 (2 off), below at 4 (1 off): the nearer below
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, N, edges([0, 0, 0, 0, N, 0, 0, N])),
+        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[4, 7])),
         Some(4)
     );
     // one off either way: a tie goes up
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, N, edges([0, 0, 0, 0, N, 0, N, 0])),
+        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[4, 6])),
         Some(6)
     );
     // above at 6 only
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, N, edges([0, 0, 0, 0, 0, 0, N, 0])),
+        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[6])),
         Some(6)
     );
     // below at 1 only, beyond nothing found above
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, N, edges([0, N, 0, 0, 0, 0, 0, 0])),
+        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[1])),
         Some(1)
     );
     // another edge only: none
-    assert_eq!(p.nearest_on_boundary(5, 0, 7, N, edges([S; 8])), None);
+    let south = |_: i16| Cell {
+        edges: CellEdges::S,
+        kind: CellKind::NONE,
+    };
+    assert_eq!(p.nearest_on_boundary(5, 0, 7, CellEdges::N, south), None);
 }
 
 /// `FUN_140f78ba0` on an open map: the tiles' A* (`FUN_140f79250`, its neighbours by
@@ -162,11 +176,15 @@ fn an_open_map_is_one_node_cell_per_eight_tiles() {
     let levels = [(16, 8), (8, 4), (4, 2), (2, 1)].map(|(w, h)| GridSize::new(w, h));
     assert_eq!([0, 1, 2, 3].map(|l| p.level_size(l)), levels);
     // level 3: two uniform node cells, joined across their shared edge only
-    assert_eq!(p.level(3), &[[E, NODE], [W, NODE]]);
+    let node = |edges| Cell {
+        edges,
+        kind: CellKind::NODE,
+    };
+    assert_eq!(p.level(3), &[node(CellEdges::E), node(CellEdges::W)]);
     // an inner tile has all four edges; a corner tile two
-    let tile = |x: usize, y: usize| p.level(0)[y * 16 + x];
-    assert_eq!(tile(3, 3), [N | W | E | S, 0]);
-    assert_eq!(tile(0, 0), [E | S, 0]);
+    let tile = |x: usize, y: usize| p.level(0)[y * 16 + x].bytes();
+    assert_eq!(tile(3, 3), [CellEdges::EDGES.bits(), 0]);
+    assert_eq!(tile(0, 0), [(CellEdges::E | CellEdges::S).bits(), 0]);
 }
 
 #[test]
@@ -174,11 +192,11 @@ fn padding_tiles_of_a_map_that_is_not_a_multiple_of_eight_lie_off_the_map() {
     let p = Planner::new(GridSize::new(6, 6), vec![0; 36], vec![1.0], &open_map);
     let levels = [8, 4, 2, 1].map(|s| GridSize::new(s, s));
     assert_eq!([0, 1, 2, 3].map(|l| p.level_size(l)), levels);
-    let tile = |x: usize, y: usize| p.level(0)[y * 8 + x];
+    let tile = |x: usize, y: usize| p.level(0)[y * 8 + x].bytes();
     assert_eq!(tile(6, 0), [0, 0xf]);
-    assert_eq!(tile(5, 5), [N | W, 0]);
+    assert_eq!(tile(5, 5), [(CellEdges::N | CellEdges::W).bits(), 0]);
     // the level-1 cell (3, 0) covers tiles 6 and 7: off the map, both of its children
-    assert_eq!(p.level(1)[3][1] & 0xf, 0b1111);
+    assert_eq!(p.level(1)[3].kind.off_map(), CellKind::OFF_MAP);
 }
 
 #[test]
@@ -186,9 +204,10 @@ fn a_wall_splits_its_level_three_cell_into_its_children() {
     // a blocked column at x = 3 cuts the first 8 × 8 cell in two
     let wall = |t: Tile| t.x() == 3;
     let p = Planner::new(GridSize::new(8, 8), vec![0; 64], vec![1.0], &wall);
-    assert_eq!(p.level(3)[0][1] & (NODE | MIXED), MIXED);
-    assert_eq!(p.level(0)[3], [0, 0]);
-    assert_eq!(p.level(0)[2][0], W | S);
+    let node_or_mixed = CellKind::NODE | CellKind::MIXED;
+    assert_eq!(p.level(3)[0].kind & node_or_mixed, CellKind::MIXED);
+    assert_eq!(p.level(0)[3], Cell::EMPTY);
+    assert_eq!(p.level(0)[2].edges, CellEdges::W | CellEdges::S);
 }
 
 #[test]
@@ -325,14 +344,15 @@ fn a_closed_rectangle_closes_the_node_cells_under_it() {
     let walls = |t: Tile| t == Tile::new(1, 0) || t == Tile::new(0, 1);
     let mut p = Planner::new(GridSize::new(16, 8), vec![0; 128], vec![1.0], &walls);
     let open = p.clone();
-    assert_eq!(p.level(1)[0][1] & (NODE | MIXED), MIXED);
-    assert_eq!(p.level(0)[0][1] & NODE, NODE);
+    let node_or_mixed = CellKind::NODE | CellKind::MIXED;
+    assert_eq!(p.level(1)[0].kind & node_or_mixed, CellKind::MIXED);
+    assert!(p.level(0)[0].kind.contains(CellKind::NODE));
     // the corners swapped and the low y off the map
     p.close_rect(PlanRect::new(5, 3, 1, -2), true);
     assert_eq!(p.region, PlanRect::new(1, 0, 5, 3));
     let closed = |p: &Planner, l: usize, x: usize, y: usize| {
         let w = p.level_size(l).width() as usize;
-        p.level(l)[y * w + x][0] & CLOSED != 0
+        p.level(l)[y * w + x].edges.contains(CellEdges::CLOSED)
     };
     let expected: [(usize, usize, usize, bool); 14] = [
         (0, 0, 0, false),
@@ -357,7 +377,7 @@ fn a_closed_rectangle_closes_the_node_cells_under_it() {
     let once = p.clone();
     p.close_rect(PlanRect::new(1, 0, 5, 3), true);
     assert_eq!(p, once);
-    assert_eq!(p.level(0)[1][0], CLOSED);
+    assert_eq!(p.level(0)[1].edges, CellEdges::CLOSED);
     // the high corner past the map's size holds at its last tile: everything reopens
     p.close_rect(PlanRect::new(0, 0, 20, 9), false);
     assert_eq!(p.region, PlanRect::new(0, 0, 15, 7));
@@ -374,7 +394,7 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
         f,
         g: 0.0,
         level: 0,
-        dir: 0,
+        dir: CellEdges::NONE,
         shortcut: false,
         parent: None,
     };
@@ -396,4 +416,33 @@ fn a_search_result_reads_by_the_game_s_code() {
     assert_eq!(all.map(Found::code), [0, 1, 2, 3]);
     assert_eq!(all.map(Found::reaches), [true, true, false, false]);
     assert_eq!(all.map(Found::leads), [false, true, true, false]);
+}
+
+/// A cell is the grid's two bytes: they read back as they were written, the low nibble of byte
+/// 1 holds a bit per child off the map, and a mark is added and subtracted as the game's byte
+/// arithmetic does (an added mark that is set already carries into the next bit).
+#[test]
+fn a_cell_keeps_the_game_s_two_bytes_and_byte_arithmetic() {
+    let cell = Cell::from_bytes([0x3f, 0xf5]);
+    assert_eq!(cell.bytes(), [0x3f, 0xf5]);
+    assert!(
+        cell.edges
+            .contains(CellEdges::EDGES | CellEdges::OPEN | CellEdges::CLOSED)
+    );
+    assert_eq!(cell.kind.off_map(), CellKind::from_bits_retain(5));
+    assert_eq!(
+        CellKind::child_off_map(0) | CellKind::child_off_map(2),
+        CellKind::from_bits_retain(5)
+    );
+    assert_eq!(CellEdges::EDGES.bits(), 0xf);
+    let open = CellEdges::W.plus(CellEdges::OPEN);
+    assert_eq!(open, CellEdges::W | CellEdges::OPEN);
+    assert_eq!(open.minus(CellEdges::OPEN), CellEdges::W);
+    // the game's add on a set mark: OPEN twice is CLOSED
+    assert_eq!(open.plus(CellEdges::OPEN), CellEdges::W | CellEdges::CLOSED);
+    assert_eq!(
+        CellKind::NODE.plus(CellKind::GOAL).minus(CellKind::NODE),
+        CellKind::GOAL
+    );
+    assert_eq!(Cell::default(), Cell::EMPTY);
 }

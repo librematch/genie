@@ -5,10 +5,10 @@
 //!
 //! The grid (`+0x3d8`, two bytes per cell) holds level 0, one cell per tile, rounded up to whole
 //! level-3 cells of 8 × 8 tiles, and three coarser levels, each cell covering 2 × 2 cells of the
-//! level below. Byte 0 of a cell holds the edges a unit can cross ([`N`], [`W`], [`E`], [`S`]) and,
-//! during a search, [`OPEN`] and [`CLOSED`]; byte 1 the children that lie off the map (its low
-//! nibble), [`GOAL`], [`NODE`] (the cell is uniform and searched as one node), [`MIXED`] (its
-//! children are searched instead) and [`LONE`] (a passable tile with no passable neighbour).
+//! level below. A [`Cell`]'s byte 0 holds the edges a unit can cross and, during a search, its
+//! open and closed marks ([`CellEdges`]); byte 1 the children that lie off the map, the goal's
+//! mark and whether the cell is searched as one node, through its children, or is a lone tile
+//! ([`CellKind`]).
 //!
 //! A search runs A* over the coarsest node cells, from the start's cell to any cell marked as
 //! the goal, with the open nodes in buckets by their whole cost ([`OpenList`]). The planner lives
@@ -19,6 +19,7 @@ use crate::map::Distance;
 use crate::math::fmath::{self, BVector};
 use genie_diff::Diff;
 
+mod cell;
 mod goal_marks;
 mod grid;
 mod path_trace;
@@ -27,6 +28,7 @@ mod planning;
 mod search;
 mod smoothing;
 
+pub use self::cell::{Cell, CellEdges, CellKind};
 pub use self::goal_marks::Request;
 pub use self::grid::{Blocked, Planner};
 pub use self::plan_tile::{PlanRect, PlanTile};
@@ -35,27 +37,6 @@ use self::search::{Node, OpenList};
 use self::smoothing::straighten;
 use self::smoothing::{SHORTCUT_REACH, TILE_SEARCH_LENGTH};
 pub use self::smoothing::{SegmentTest, smooth};
-
-/// Byte 0: the edges to the cells above (y − 1), left, right and below (y + 1).
-pub const N: u8 = 1;
-/// The edge to the cell left.
-pub const W: u8 = 2;
-/// The edge to the cell right.
-pub const E: u8 = 4;
-/// The edge to the cell below (y + 1).
-pub const S: u8 = 8;
-/// Byte 0 during a search: a node of the cell was opened, or closed.
-pub const OPEN: u8 = 0x10;
-/// A node of the cell was closed.
-pub const CLOSED: u8 = 0x20;
-/// Byte 1: the goal's cell.
-pub const GOAL: u8 = 0x10;
-/// Byte 1: the cell is uniform and searched as one node.
-pub const NODE: u8 = 0x20;
-/// Byte 1: the cell's children are searched instead of it.
-pub const MIXED: u8 = 0x40;
-/// Byte 1: a passable tile with no passable neighbour.
-pub const LONE: u8 = 0x80;
 
 /// The cost the best node starts from in each search (`0x497423f0`).
 const NO_COST: f32 = 999_999.0;

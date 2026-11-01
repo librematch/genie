@@ -3,10 +3,18 @@
 
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{
-    CLOSED, E, EARLY_LEFT, EARLY_START, GOAL, LONE, MIXED, N, NO_COST, NODE, OPEN, Planner, S,
-    SHORTCUT_COST, W,
+    CellEdges, CellKind, EARLY_LEFT, EARLY_START, NO_COST, Planner, SHORTCUT_COST,
 };
 use crate::{math::fmath, math::msvc};
+
+/// The searches' four steps from a node, in their order: the edge, the step and the neighbour's
+/// edge back.
+const STEPS: [(CellEdges, i16, i16, CellEdges); 4] = [
+    (CellEdges::W, -1, 0, CellEdges::E),
+    (CellEdges::E, 1, 0, CellEdges::W),
+    (CellEdges::N, 0, -1, CellEdges::S),
+    (CellEdges::S, 0, 1, CellEdges::N),
+];
 
 /// A search node (`0x28` bytes, from the planner's pool `+0x428`, `FUN_140f79c90`).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -22,8 +30,8 @@ pub(super) struct Node {
     pub(super) g: f32,
     /// `+0x18`.
     pub(super) level: u8,
-    /// `+0x19`: the edge back to the parent.
-    pub(super) dir: u8,
+    /// `+0x19`: the edge back to the parent (none for the start).
+    pub(super) dir: CellEdges,
     /// `+0x1a`: the cost was measured from the grandparent.
     pub(super) shortcut: bool,
     /// `+0x20`.
@@ -117,8 +125,8 @@ pub(super) struct TileNode {
     pub(super) estimate: f32,
     /// The node it comes from.
     pub(super) parent: Option<usize>,
-    /// The edge it was entered by.
-    pub(super) dir: u8,
+    /// The edge it was entered by (none for the start).
+    pub(super) dir: CellEdges,
     /// The tile its cost is measured from.
     pub(super) entry: PlanTile,
 }
@@ -167,13 +175,13 @@ impl Planner {
     /// Where a new node's cost is measured from (`FUN_140f764c0`, `FUN_140f76840`): a turn
     /// (a move across the parent's own move) measures from the grandparent, unless the parent
     /// already did; returns that node's cost so far, its tile and whether it was the grandparent.
-    pub(super) fn measured_from(&self, parent: usize, dir: u8) -> (f32, PlanTile, bool) {
+    pub(super) fn measured_from(&self, parent: usize, dir: CellEdges) -> (f32, PlanTile, bool) {
         let p = &self.nodes[parent];
         if let (Some(gp), false) = (p.parent, p.shortcut) {
-            let turn = if dir == W || dir == E {
-                p.dir == N || p.dir == S
+            let turn = if dir == CellEdges::W || dir == CellEdges::E {
+                p.dir == CellEdges::N || p.dir == CellEdges::S
             } else {
-                p.dir == W || p.dir == E
+                p.dir == CellEdges::W || p.dir == CellEdges::E
             };
             if turn {
                 let gp = &self.nodes[gp];
@@ -191,39 +199,42 @@ impl Planner {
         at: PlanTile,
         g: f32,
         parent: usize,
-        dir: u8,
+        dir: CellEdges,
     ) -> Option<usize> {
+        use CellEdges as Ed;
         let i = self.index(level, at);
-        let [b0, b1] = self.cells[i];
-        if dir & b0 == 0 {
+        let cell = self.cells[i];
+        if !cell.edges.intersects(dir) {
             return None;
         }
-        if b1 & NODE == 0 {
-            if b1 & MIXED == 0 {
+        if !cell.kind.contains(CellKind::NODE) {
+            if !cell.kind.contains(CellKind::MIXED) {
                 return self.expand(level + 1, at.up(1), g, parent, dir);
             }
+            // the children on the edge `dir`: (2x, 2y) above and left, (2x + 1, 2y) above and
+            // right, (2x, 2y + 1) left and below, (2x + 1, 2y + 1) right and below
             let ([c0, c1, c2, c3], l) = (at.children(), level - 1);
-            if dir & 3 != 0
+            if dir.intersects(Ed::N | Ed::W)
                 && let Some(n) = self.expand(l, c0, g, parent, dir)
             {
                 return Some(n);
             }
-            if dir & 5 != 0
+            if dir.intersects(Ed::N | Ed::E)
                 && let Some(n) = self.expand(l, c1, g, parent, dir)
             {
                 return Some(n);
             }
-            if dir & 0b1010 != 0
+            if dir.intersects(Ed::W | Ed::S)
                 && let Some(n) = self.expand(l, c2, g, parent, dir)
             {
                 return Some(n);
             }
-            if dir & 0xc == 0 {
+            if !dir.intersects(Ed::E | Ed::S) {
                 return None;
             }
             return self.expand(l, c3, g, parent, dir);
         }
-        if b0 & CLOSED != 0 {
+        if cell.edges.contains(CellEdges::CLOSED) {
             return None;
         }
         let centre = at.centre_at(level);
@@ -246,10 +257,10 @@ impl Planner {
         });
         self.open.push(n, &self.nodes);
         self.nodes[n].shortcut = shortcut;
-        if self.cells[i][0] & OPEN == 0 {
-            self.cells[i][0] += OPEN;
+        if !self.cells[i].edges.contains(CellEdges::OPEN) {
+            self.cells[i].edges = self.cells[i].edges.plus(CellEdges::OPEN);
         }
-        (self.cells[i][1] & GOAL != 0).then_some(n)
+        self.cells[i].kind.contains(CellKind::GOAL).then_some(n)
     }
 
     /// `FUN_140f76840`: the level-0 neighbour across edge `dir`; a turn's cost from the
@@ -259,11 +270,11 @@ impl Planner {
         at: PlanTile,
         g: f32,
         parent: usize,
-        dir: u8,
+        dir: CellEdges,
     ) -> Option<usize> {
         let i = self.index(0, at);
-        let b0 = self.cells[i][0];
-        if dir & b0 == 0 || b0 & CLOSED != 0 {
+        let b0 = self.cells[i].edges;
+        if !b0.intersects(dir) || b0.contains(CellEdges::CLOSED) {
             return None;
         }
         let (g0, entry, shortcut) = match self.measured_from(parent, dir) {
@@ -285,20 +296,21 @@ impl Planner {
         });
         self.open.push(n, &self.nodes);
         self.nodes[n].shortcut = shortcut;
-        if self.cells[i][0] & OPEN == 0 {
-            self.cells[i][0] += OPEN;
+        if !self.cells[i].edges.contains(CellEdges::OPEN) {
+            self.cells[i].edges = self.cells[i].edges.plus(CellEdges::OPEN);
         }
-        (self.cells[i][1] & GOAL != 0).then_some(n)
+        self.cells[i].kind.contains(CellKind::GOAL).then_some(n)
     }
 
-    /// Close a popped node and keep it as the best when its estimate is the lowest yet.
-    pub(super) fn close(&mut self, n: usize) -> Option<u8> {
+    /// Close a popped node and keep it as the best when its estimate is the lowest yet; its
+    /// cell's edges before the close, None for a cell closed already.
+    pub(super) fn close(&mut self, n: usize) -> Option<CellEdges> {
         let cell = self.nodes[n].cell;
-        let b = self.cells[cell][0];
-        if b & CLOSED != 0 {
+        let b = self.cells[cell].edges;
+        if b.contains(CellEdges::CLOSED) {
             return None;
         }
-        self.cells[cell][0] = b + CLOSED;
+        self.cells[cell].edges = b.plus(CellEdges::CLOSED);
         let h = self.nodes[n].f - self.nodes[n].g;
         if h < self.best_cost {
             self.best_cost = h;
@@ -317,8 +329,8 @@ impl Planner {
         start: PlanTile,
         full: bool,
     ) -> Option<usize> {
-        let [b0, b1] = self.cell(level, cell);
-        if b1 & LONE == 0 && b0 == 0 {
+        let start_cell = self.cell(level, cell);
+        if !start_cell.kind.contains(CellKind::LONE) && start_cell.edges.is_empty() {
             return None;
         }
         let h0 = self.start_estimate(start);
@@ -329,14 +341,15 @@ impl Planner {
             cost: 0.0,
             estimate: h0,
             parent: None,
-            dir: 0,
+            dir: CellEdges::NONE,
             entry: start,
         });
         let cell = self.nodes[n].cell;
-        if self.cells[cell][1] & GOAL != 0 {
+        if self.cells[cell].kind.contains(CellKind::GOAL) {
             return Some(n);
         }
-        self.cells[cell][0] += OPEN;
+        // the start's open mark, added without a test
+        self.cells[cell].edges = self.cells[cell].edges.plus(CellEdges::OPEN);
         self.open.push(n, &self.nodes);
         self.best_cost = NO_COST;
         while !self.open.is_empty() {
@@ -349,9 +362,8 @@ impl Planner {
                 self.best = Some(n);
                 return None;
             }
-            let steps = [(W, -1, 0, E), (E, 1, 0, W), (N, 0, -1, S), (S, 0, 1, N)];
-            for (edge, dx, dy, back) in steps {
-                if b & edge != 0
+            for (edge, dx, dy, back) in STEPS {
+                if b.intersects(edge)
                     && let Some(found) =
                         self.expand(node.level, node.at.stepped(dx, dy), node.g, n, back)
                 {
@@ -364,7 +376,7 @@ impl Planner {
 
     /// `FUN_140f79250`: A* over the tiles from the start's tile.
     pub(super) fn search_tiles(&mut self, start: PlanTile) -> Option<usize> {
-        if self.cell(0, start)[0] == 0 {
+        if self.cell(0, start).edges.is_empty() {
             return None;
         }
         let h0 = self.start_estimate(start);
@@ -374,24 +386,24 @@ impl Planner {
             cost: 0.0,
             estimate: h0,
             parent: None,
-            dir: 0,
+            dir: CellEdges::NONE,
             entry: start,
         });
         let cell = self.nodes[n].cell;
-        if self.cells[cell][1] & GOAL != 0 {
+        if self.cells[cell].kind.contains(CellKind::GOAL) {
             return Some(n);
         }
         self.open.clear();
-        self.cells[cell][0] += OPEN;
+        // the start's open mark, added without a test
+        self.cells[cell].edges = self.cells[cell].edges.plus(CellEdges::OPEN);
         self.open.push(n, &self.nodes);
         self.best_cost = NO_COST;
         while !self.open.is_empty() {
             let n = self.open.pop(&self.nodes)?;
             let Some(b) = self.close(n) else { continue };
             let node = self.nodes[n];
-            let steps = [(W, -1, 0, E), (E, 1, 0, W), (N, 0, -1, S), (S, 0, 1, N)];
-            for (edge, dx, dy, back) in steps {
-                if b & edge != 0
+            for (edge, dx, dy, back) in STEPS {
+                if b.intersects(edge)
                     && let Some(found) = self.expand0(node.at.stepped(dx, dy), node.g, n, back)
                 {
                     return Some(found);

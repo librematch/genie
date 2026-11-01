@@ -6,7 +6,7 @@ use crate::map::Point;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::{
-    Found, GOAL_GAP, NODE, Path, PlanTile, Planner, Request, SHORTCUT_REACH, SegmentTest,
+    CellKind, Found, GOAL_GAP, Path, PlanTile, Planner, Request, SHORTCUT_REACH, SegmentTest,
     TILE_SEARCH_LENGTH, smooth,
 };
 
@@ -29,7 +29,7 @@ impl Planner {
         let mut found = (None, Found::Nearest);
         for level in (0..=3u8).rev() {
             let cell = start.up(level);
-            if level == 0 || self.cell(level, cell)[1] & NODE != 0 {
+            if level == 0 || self.cell(level, cell).kind.contains(CellKind::NODE) {
                 found = match self.search_levels(level, cell, start, req.full) {
                     None => (self.best, Found::Nearest),
                     Some(n) if self.goal_marked => (Some(n), Found::Goal),
@@ -46,7 +46,7 @@ impl Planner {
                 self.last = goal;
                 let (to_x, to_y) = (req.to.x(), req.to.y());
                 let mut end = BVector::new(to_x, 0.0, to_y);
-                let toward = result != Found::Goal || self.cell(0, goal)[0] == 0;
+                let toward = result != Found::Goal || self.cell(0, goal).edges.is_empty();
                 if toward {
                     let c = self.tile_toward(n, goal);
                     let dy = f32::from(goal.y()) - f32::from(c.y());
@@ -78,7 +78,7 @@ impl Planner {
     /// `FUN_140f7d160`: the tile or one of its four neighbours (right, below, left, above) has an
     /// edge.
     pub(super) fn near_passable(&self, t: PlanTile) -> bool {
-        let edges = |t: PlanTile| self.on_map(t) && self.cell(0, t)[0] != 0;
+        let edges = |t: PlanTile| self.on_map(t) && !self.cell(0, t).edges.is_empty();
         edges(t)
             || edges(t.stepped(1, 0))
             || edges(t.stepped(0, 1))
@@ -112,8 +112,8 @@ impl Planner {
         if req.range == Distance::ZERO
             && req.full
             && first == Found::Goal
-            && self.cell(0, PlanTile::of_point(req.from))[0] != 0
-            && (self.cell(0, goal)[0] != 0 || (target_box && self.near_passable(goal)))
+            && !self.cell(0, PlanTile::of_point(req.from)).edges.is_empty()
+            && (!self.cell(0, goal).edges.is_empty() || (target_box && self.near_passable(goal)))
             && {
                 levels.measure();
                 levels.length < TILE_SEARCH_LENGTH
@@ -170,7 +170,12 @@ impl Planner {
         path.points
             .iter()
             .rev()
-            .find(|p| self.cell(0, PlanTile::of_point(p.ground()))[0] != 0)
+            .find(|p| {
+                !self
+                    .cell(0, PlanTile::of_point(p.ground()))
+                    .edges
+                    .is_empty()
+            })
             .map(|p| p.ground())
     }
 
@@ -246,7 +251,7 @@ impl Planner {
             (None, _) => Found::Nothing,
             (Some(n), result) => {
                 self.last = goal;
-                let end = if result == Found::Goal && self.cell(0, goal)[0] != 0 {
+                let end = if result == Found::Goal && !self.cell(0, goal).edges.is_empty() {
                     let (to_x, to_y) = (req.to.x(), req.to.y());
                     BVector::new(to_x, 0.0, to_y)
                 } else {

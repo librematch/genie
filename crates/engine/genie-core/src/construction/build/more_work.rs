@@ -113,7 +113,9 @@ impl Unit {
             let width = i64::from(planner.level_size(0).width());
             let cells = planner.level(0);
             let blocked = move |t: Tile| {
-                cells[(width * i64::from(t.y()) + i64::from(t.x())) as usize][0] == 0
+                cells[(width * i64::from(t.y()) + i64::from(t.x())) as usize]
+                    .edges
+                    .is_empty()
             };
             gather_search::more_work(entry, &builder, spatial.map, Some(&blocked), &objects)?
         };
