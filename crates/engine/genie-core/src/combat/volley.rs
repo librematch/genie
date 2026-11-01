@@ -489,8 +489,8 @@ impl Unit {
                 crate::combat::missile::Origin {
                     position: self.position(),
                     radius: made.radius,
-                    master: i32::from(self.life.master_id.get()),
-                    owner: c.player.index() as i32,
+                    master: Some(self.life.master_id),
+                    owner: Some(c.player),
                 }
             } else {
                 crate::combat::missile::Origin::NONE

@@ -244,7 +244,7 @@ pub fn registry_from_dump(text: &str) -> Result<genie_core::vision::registry::Re
                 out.lists[p][c].push(Record {
                     id: object(w[1])?,
                     distance: Distance::new(bits(w[2])?),
-                    owner: number(w[3])? as u8,
+                    owner: genie_core::players::PlayerId::new(number(w[3])? as u8),
                     x: bits(w[4])?,
                     y: bits(w[5])?,
                     rx: bits(w[6])?,

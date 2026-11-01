@@ -25,6 +25,7 @@ use crate::objects::masters::class;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
+use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -92,7 +93,13 @@ impl Attack {
             ));
         }
         let mut posted = Vec::new();
-        let begun = a.begin((e, e.gap.get()), (true, 0), mover, &mut posted, reads)?;
+        let begun = a.begin(
+            (e, e.gap.get()),
+            (true, PlayerId::GAIA),
+            mover,
+            &mut posted,
+            reads,
+        )?;
         if begun.ready {
             return Err(GenieError::unsupported(
                 "an attack that starts in reach and cannot move (set_state 6)",
@@ -234,7 +241,7 @@ impl Attack {
     pub(super) fn begin(
         &mut self,
         (e, reach_gap): (&Engagement, f32),
-        (visible, target_owner): (bool, usize),
+        (visible, target_owner): (bool, PlayerId),
         mover: &mut Mover,
         posted: &mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>,
         reads: &MoveToReads<'_>,
@@ -242,7 +249,7 @@ impl Attack {
         let movable = e.speed != Speed::ZERO && e.can_move;
         let mut failed_first = false;
         let mut ready_end = false;
-        if 0 < target_owner && !visible {
+        if target_owner != PlayerId::GAIA && !visible {
             if e.stance == UnitStance::AGGRESSIVE && Speed::ZERO < e.speed && e.can_move {
                 self.state = AttackState::GotoSeen;
                 self.range = e.range;

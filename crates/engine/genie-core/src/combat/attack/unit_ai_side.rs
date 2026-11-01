@@ -130,7 +130,7 @@ impl UnitView<'_, '_> {
             engagement: &e,
             arms,
             visible,
-            target_owner: t.player.index(),
+            target_owner: t.player,
             ready: self.ready_reads(target, master, ai)?,
         };
         let unit = &mut *self.unit;

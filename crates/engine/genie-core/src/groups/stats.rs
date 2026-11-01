@@ -716,7 +716,7 @@ mod tests {
         ] {
             r.update_unit(UnitUpdate {
                 id: object_id(id),
-                owner,
+                owner: PlayerId::new(owner),
                 position: at,
                 radii: Footprint::new(0.2, 0.2),
                 class,
@@ -800,7 +800,7 @@ mod tests {
                 .unwrap()
                 .update_unit(UnitUpdate {
                     id: object_id(22),
-                    owner: 2,
+                    owner: PlayerId::new(2),
                     position: Point::new(13.0, 5.0),
                     radii: Footprint::new(0.2, 0.2),
                     class: class::CLASS_6,

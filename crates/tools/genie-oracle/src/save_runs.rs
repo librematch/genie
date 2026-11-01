@@ -336,7 +336,8 @@ pub(super) fn primed(turns: &mut World, all: &[Frame<'_>], updates: usize) -> De
         if turns.last_commanded.len() <= p {
             turns.last_commanded.resize(p + 1, Vec::new());
         }
-        turns.last_commanded[p] = units[..units.len().min(turns.most_units(p))].to_vec();
+        let most = genie_core::players::PlayerId::try_from(p).map_or(0, |q| turns.most_units(q));
+        turns.last_commanded[p] = units[..units.len().min(most)].to_vec();
     }
     decoder
 }

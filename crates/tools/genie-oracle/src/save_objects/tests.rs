@@ -68,7 +68,10 @@ fn a_registry_dump_reads_its_lists_and_masks() {
     let registry = registry_from_dump(&text).unwrap();
     assert_eq!((registry.players, registry.classes), (2, 3));
     let record = registry.lists[1][2][0];
-    assert_eq!((record.id, record.owner), (object_id(77), 1));
+    assert_eq!(
+        (record.id, record.owner),
+        (object_id(77), genie_core::players::PlayerId::new(1))
+    );
     assert_eq!(record.distance.get().to_bits(), one);
     assert_eq!(record.y.to_bits(), 2.0_f32.to_bits());
     let entry = &registry.entries[&object_id(77)];

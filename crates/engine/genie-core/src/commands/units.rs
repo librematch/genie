@@ -86,8 +86,7 @@ impl World {
         player: PlayerId,
         units: &'u UnitList,
     ) -> Option<&'u [Option<ObjectId>]> {
-        let player = player.index();
-        (player < self.players.len() && !units.overruns())
+        (player.index() < self.players.len() && !units.overruns())
             .then(|| units.first(self.most_units(player)))
     }
 }

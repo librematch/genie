@@ -78,7 +78,7 @@ pub(super) fn damage(
         }
         t.killed = Some(Kill {
             attacker: src.id,
-            attacker_player: src.player.index(),
+            attacker_player: src.player,
             attacker_class: src.class,
             // The livestock class, which goes to Gaia when killed.
             // The artifact class (1), which no blast reaches.
@@ -425,7 +425,7 @@ pub(super) fn fixed_blast(
         if HitPoints::new(1.0) <= before && t.player != PlayerId::GAIA && t.kind == COMBAT {
             t.killed = Some(Kill {
                 attacker: attacker.id,
-                attacker_player: attacker.player.index(),
+                attacker_player: attacker.player,
                 attacker_class: attacker.class,
                 to_gaia: false,
             });

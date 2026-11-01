@@ -256,7 +256,7 @@ pub struct Building {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Razed {
     /// The attacker's player (`param_5`), whose history takes the event.
-    pub attacker_player: usize,
+    pub attacker_player: PlayerId,
     /// The building's owner (`+0x718`), the event's `data1`.
     pub owner: PlayerId,
     /// A castle's (master 82) or a wonder's (276) destruction
@@ -273,7 +273,7 @@ pub struct Kill {
     /// The object that killed it.
     pub attacker: ObjectId,
     /// That object's player.
-    pub attacker_player: usize,
+    pub attacker_player: PlayerId,
     /// That object's master's class as the hit saw it (`FUN_141082e80` reads it of the
     /// attacker it gets: an animal's 9 or 10 counts a villager's loss).
     pub attacker_class: ClassId,

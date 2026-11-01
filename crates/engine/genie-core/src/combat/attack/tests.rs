@@ -1804,7 +1804,7 @@ fn own_start(
         engagement: e,
         arms,
         visible,
-        target_owner: owner.index(),
+        target_owner: owner,
         ready: None,
     };
     let reads = walking_reads(

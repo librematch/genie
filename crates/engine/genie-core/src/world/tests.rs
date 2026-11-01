@@ -9341,7 +9341,7 @@ fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Dist
     r.entries.entry(object_id(id)).or_default().mask = VisionBits::from_bits_retain(1 << p.get());
     r.update_unit(UnitUpdate {
         id: object_id(id),
-        owner: p.index() as u8,
+        owner: PlayerId::new(p.index() as u8),
         position: Point::new(10.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class,
@@ -9442,7 +9442,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
     );
     let v = s.sight.as_ref().unwrap();
     let r = v.registry.as_ref().unwrap();
-    assert_eq!(r.lists[0][0][0].owner, 1);
+    assert_eq!(r.lists[0][0][0].owner, PlayerId::new(1));
     let seer = v.seer(object_id(21712)).copied().unwrap();
     assert_eq!(
         (seer.player, seer.los),
@@ -9840,7 +9840,10 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
         Ok(false)
     );
     let v = s.sight.as_ref().unwrap();
-    assert_eq!(v.registry.as_ref().unwrap().lists[0][0][0].owner, 2);
+    assert_eq!(
+        v.registry.as_ref().unwrap().lists[0][0][0].owner,
+        PlayerId::new(2)
+    );
     assert_eq!(v.maps, before);
     assert_eq!(
         v.seer(object_id(21712)).map(|s| s.player),
@@ -11375,7 +11378,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
     r.entries.entry(object_id(500)).or_default().mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(500),
-        owner: 1,
+        owner: PlayerId::new(1),
         position: Point::new(11.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
@@ -11525,7 +11528,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
     r.entries.entry(object_id(500)).or_default().mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(500),
-        owner: 1,
+        owner: PlayerId::new(1),
         position: Point::new(11.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
@@ -11804,7 +11807,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
     t.killed(
         PlayerId::new(1),
         ListIndex::new(0),
-        by(object_id(50), 0, class::PREY),
+        by(object_id(50), PlayerId::new(0), class::PREY),
     )
     .unwrap();
     assert_eq!(counts(&t), crate::test_ids::amounts([1.0, 1.0, 0.0, 0.0]));
@@ -11818,7 +11821,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
         t.killed(
             PlayerId::new(1),
             ListIndex::new(1),
-            by(object_id(60), 2, class::CLASS_0),
+            by(object_id(60), PlayerId::new(2), class::CLASS_0),
         )
         .unwrap();
         assert_eq!(counts(&t), crate::test_ids::amounts(seen));
@@ -11827,7 +11830,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
     t.killed(
         PlayerId::new(1),
         ListIndex::new(0),
-        by(object_id(99), 2, class::PREDATOR),
+        by(object_id(99), PlayerId::new(2), class::PREDATOR),
     )
     .unwrap();
     assert_eq!(counts(&t), crate::test_ids::amounts([0.0, 1.0, 0.0, 1.0]));
@@ -11836,7 +11839,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
         t.killed(
             PlayerId::new(1),
             ListIndex::new(0),
-            by(object_id(60), 2, class::CLASS_0)
+            by(object_id(60), PlayerId::new(2), class::CLASS_0)
         )
         .is_err()
     );
@@ -11910,7 +11913,7 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
     v.damaged = vec![(Some(object_id(10029)), [10029, -10, 14])];
     v.killed = Some(crate::combat::damage::Kill {
         attacker: object_id(10029),
-        attacker_player: 1,
+        attacker_player: PlayerId::new(1),
         attacker_class: ClassId::of_master(80),
         to_gaia: true,
     });
@@ -12026,7 +12029,7 @@ fn a_hit_s_kill_reaches_the_world_where_the_hit_runs() {
         let counted = c.w.players[1].attributes[301];
         let kill = crate::combat::damage::Kill {
             attacker: object_id(9520),
-            attacker_player: 0,
+            attacker_player: PlayerId::new(0),
             attacker_class: class::LIVESTOCK,
             to_gaia: false,
         };
@@ -12050,7 +12053,7 @@ fn an_own_kill_gives_the_livestock_to_gaia_at_once() {
     let seen = in_update(&mut t, (PlayerId::new(1), ListIndex::new(1)), 0, |u, c| {
         let kill = crate::combat::damage::Kill {
             attacker: object_id(10029),
-            attacker_player: 1,
+            attacker_player: PlayerId::new(1),
             attacker_class: class::CLASS_0,
             to_gaia: true,
         };
@@ -12210,14 +12213,14 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     v.hp = HitPoints::ZERO;
     v.killed = Some(crate::combat::damage::Kill {
         attacker: object_id(9),
-        attacker_player: 1,
+        attacker_player: PlayerId::new(1),
         attacker_class: class::CLASS_0,
         to_gaia: false,
     });
     let b = v.building.as_mut().unwrap();
     (b.struck, b.damaged_lately) = (true, 60);
     b.razed.push(crate::combat::damage::Razed {
-        attacker_player: 1,
+        attacker_player: PlayerId::new(1),
         owner: PlayerId::new(2),
         event: Some(crate::players::history::EventKind::CASTLE_DESTROYED),
         adds: vec![
@@ -17252,7 +17255,7 @@ fn hunted_without_a_deer(setup: impl FnOnce(&mut Unit)) -> World {
         r.entries.entry(object_id(id)).or_default().mask = VisionBits::from_bits_retain(1 << 1);
         r.update_unit(UnitUpdate {
             id: object_id(id),
-            owner: 0,
+            owner: PlayerId::new(0),
             position: Point::new(x, 89.5),
             radii: Footprint::new(0.2, 0.2),
             class: class::PREY,
@@ -18839,7 +18842,7 @@ fn own_razing(adds: &[(AttributeId, f32)]) -> crate::combat::victims::KillLeft {
         id: object_id(9175),
         kill: None,
         razed: vec![crate::combat::damage::Razed {
-            attacker_player: 1,
+            attacker_player: PlayerId::new(1),
             owner: PlayerId::new(1),
             event: None,
             adds: adds
@@ -19456,7 +19459,7 @@ fn the_command_phase_runs_an_order_after_its_check() {
         &order(v.clone(), Order::Move(walk)),
         PlayerId::new(1),
         |w| {
-            w.set_last_commanded(1, v.clone());
+            w.set_last_commanded(PlayerId::new(1), v.clone());
             w.reset_order_units(&v).unwrap();
             w.human_order(&v);
             w.move_order(PlayerId::new(1), &v, &walk)
@@ -19484,7 +19487,7 @@ fn the_command_phase_runs_an_order_after_its_check() {
         ),
         PlayerId::new(1),
         |w| {
-            w.set_last_commanded(1, v.clone());
+            w.set_last_commanded(PlayerId::new(1), v.clone());
             w.reset_order_units(&v).unwrap();
             Err(GenieError::unsupported("an order moves its units"))
         }
@@ -19520,23 +19523,23 @@ fn an_order_of_the_last_commanded_units_reads_what_the_last_run_order_left() {
     assert_eq!(t.last_commanded.get(1), Some(&object_ids([9175, -1])));
 
     let mut cached = forage_world();
-    cached.set_last_commanded(1, object_ids([600, 9175]));
+    cached.set_last_commanded(PlayerId::new(1), object_ids([600, 9175]));
     let checked = object_ids([-1, 9175]);
     assert!(routes(
         &cached,
         &order(UnitList::last_commanded()),
         PlayerId::new(1),
         |w| {
-            w.set_last_commanded(1, checked.clone());
+            w.set_last_commanded(PlayerId::new(1), checked.clone());
             w.reset_order_units(&checked).unwrap();
             w.human_order(&checked);
             w.move_order(PlayerId::new(1), &checked, &walk)
         }
     ));
-    cached.set_last_commanded(1, object_ids([600]));
+    cached.set_last_commanded(PlayerId::new(1), object_ids([600]));
     let mut refused = cached.clone();
     refused.run(&order(UnitList::last_commanded()));
-    cached.set_last_commanded(1, vec![None]);
+    cached.set_last_commanded(PlayerId::new(1), vec![None]);
     assert_eq!(refused, cached);
 }
 
@@ -19549,26 +19552,27 @@ fn an_order_s_units_are_capped_unless_its_comm_player_is_outside_the_world() {
     let many = object_ids(0..600);
     let mut t = forage_world();
     let listed = unit_list(many.clone());
-    assert_eq!(t.command_units(0, &listed), many);
-    assert_eq!(t.command_units(t.players.len(), &listed), many);
-    assert_eq!(t.command_units(1, &listed), many[..60]);
+    assert_eq!(t.command_units(PlayerId::new(0), &listed), many);
+    let outside = PlayerId::try_from(t.players.len()).unwrap();
+    assert_eq!(t.command_units(outside, &listed), many);
+    assert_eq!(t.command_units(PlayerId::new(1), &listed), many[..60]);
     assert_eq!(
-        t.command_units(1, &UnitList::last_commanded()),
+        t.command_units(PlayerId::new(1), &UnitList::last_commanded()),
         Vec::<Option<ObjectId>>::new()
     );
     t.players[1].computer = true;
-    assert_eq!(t.command_units(1, &listed), many[..500]);
-    assert_eq!(t.most_units(t.players.len()), 0);
-    t.set_last_commanded(0, object_ids([5]));
-    t.set_last_commanded(t.players.len(), object_ids([6]));
-    t.set_last_commanded(1, object_ids([7]));
+    assert_eq!(t.command_units(PlayerId::new(1), &listed), many[..500]);
+    assert_eq!(t.most_units(outside), 0);
+    t.set_last_commanded(PlayerId::new(0), object_ids([5]));
+    t.set_last_commanded(outside, object_ids([6]));
+    t.set_last_commanded(PlayerId::new(1), object_ids([7]));
     assert_eq!(t.last_commanded, [vec![], object_ids([7])]);
     assert_eq!(
-        t.command_units(0, &UnitList::last_commanded()),
+        t.command_units(PlayerId::new(0), &UnitList::last_commanded()),
         Vec::<Option<ObjectId>>::new()
     );
     assert_eq!(
-        t.command_units(1, &UnitList::last_commanded()),
+        t.command_units(PlayerId::new(1), &UnitList::last_commanded()),
         object_ids([7])
     );
 }
@@ -19720,7 +19724,7 @@ fn a_call_for_help_walks_the_lists_for_a_free_helper_in_reach() {
     let record = |id, x| Record {
         id,
         distance: Distance::MAX,
-        owner: 1,
+        owner: PlayerId::new(1),
         x,
         y: 10.0,
         rx: 0.2,

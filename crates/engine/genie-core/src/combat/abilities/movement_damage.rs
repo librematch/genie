@@ -298,7 +298,7 @@ impl World {
             u.hp_powerup = a.hp_powerup;
         }
         if killed && b.kind == COMBAT {
-            self.count_kill(b.id, owner.index())?;
+            self.count_kill(b.id, owner)?;
         }
         Ok(())
     }

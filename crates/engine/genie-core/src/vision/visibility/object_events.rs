@@ -107,7 +107,7 @@ impl Visibility {
         registry.entries.entry(id).or_default().mask = mask;
         registry.update_unit(UnitUpdate {
             id,
-            owner: owner.index() as u8,
+            owner,
             position: Point::new(x, y),
             radii: radius,
             class,
@@ -144,7 +144,7 @@ impl Visibility {
         let place = at.ground();
         r.update_unit(UnitUpdate {
             id,
-            owner: owner.index() as u8,
+            owner,
             position: place,
             radii: old.0,
             class: old.1,
@@ -153,7 +153,7 @@ impl Visibility {
         })?;
         r.update_unit(UnitUpdate {
             id,
-            owner: owner.index() as u8,
+            owner,
             position: place,
             radii: new.0,
             class: new.1,
@@ -177,7 +177,7 @@ impl Visibility {
         let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
         r.update_unit(UnitUpdate {
             id,
-            owner: owner.index() as u8,
+            owner,
             position: at.ground(),
             radii: radius,
             class,

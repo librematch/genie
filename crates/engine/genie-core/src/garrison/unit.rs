@@ -521,7 +521,7 @@ impl Unit {
             let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
             r.update_unit(UnitUpdate {
                 id,
-                owner: c.player.index() as u8,
+                owner: c.player,
                 position: self.position().ground(),
                 radii: placed.radius,
                 class: placed.class,

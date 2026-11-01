@@ -218,7 +218,7 @@ fn an_ownership_change_writes_the_new_owner_into_the_object_s_records() {
     r.entries.entry(object_id(7)).or_default().mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(7),
-        owner: 0,
+        owner: PlayerId::new(0),
         position: Point::new(10.5, 10.5),
         radii: Footprint::new(0.2, 0.2),
         class: class::CLASS_6,
@@ -230,7 +230,10 @@ fn an_ownership_change_writes_the_new_owner_into_the_object_s_records() {
     v.records_owner(object_id(7), PlayerId::new(2)).unwrap();
     v.records_owner(object_id(-5), PlayerId::new(2)).unwrap();
     let r = v.registry.as_ref().unwrap();
-    assert_eq!([r.lists[0][6][0].owner, r.lists[1][6][0].owner], [2, 2]);
+    assert_eq!(
+        [r.lists[0][6][0].owner, r.lists[1][6][0].owner],
+        [PlayerId::new(2); 2]
+    );
     assert_eq!(r.lists[2][6].len(), 0);
 }
 

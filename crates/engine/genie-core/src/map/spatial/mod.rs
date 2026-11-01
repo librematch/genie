@@ -154,7 +154,7 @@ struct Filter {
 fn players_seen(found: &ByRelation<Vec<Record>>) -> u32 {
     let mut seen = [false; 9];
     for record in found.values().iter().flatten() {
-        if let Some(s) = seen.get_mut(usize::from(record.owner)) {
+        if let Some(s) = seen.get_mut(record.owner.index()) {
             *s = true;
         }
     }

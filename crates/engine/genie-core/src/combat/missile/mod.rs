@@ -22,6 +22,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
+use crate::players::PlayerId;
 use crate::world::Seconds;
 use genie_diff::Diff;
 
@@ -94,10 +95,10 @@ pub struct Origin {
     pub position: Position,
     /// The missile master's radii on the ground.
     pub radius: Footprint,
-    /// The firing object's master, −1 without one.
-    pub master: i32,
-    /// Its owner, −1 without one.
-    pub owner: i32,
+    /// The firing object's master (−1 without one).
+    pub master: Option<MasterId>,
+    /// Its owner (−1 without one).
+    pub owner: Option<PlayerId>,
 }
 
 impl Origin {
@@ -105,8 +106,8 @@ impl Origin {
     pub const NONE: Self = Self {
         position: Position::ORIGIN,
         radius: Footprint::ZERO,
-        master: -1,
-        owner: -1,
+        master: None,
+        owner: None,
     };
 
     /// The save's 28 bytes: seven 32-bit words.
@@ -117,8 +118,11 @@ impl Origin {
         Self {
             position: Position::new(f(0), f(1), f(2)),
             radius: Footprint::new(f(3), f(4)),
-            master: w(5) as i32,
-            owner: w(6) as i32,
+            // −1 (all 32 bits) for none; a master's id is a short, a player's a byte
+            master: i16::try_from(w(5).cast_signed())
+                .ok()
+                .and_then(MasterId::of_data),
+            owner: u8::try_from(w(6)).ok().map(PlayerId::from),
         }
     }
 }

@@ -296,21 +296,29 @@ impl World {
     /// past the packet (no units here). Any other takes its first [`World::most_units`], or
     /// for a count of `0xffff` its last commanded units ([`World::last_commanded`], none before
     /// its first).
-    pub(crate) fn command_units(&self, player: usize, units: &UnitList) -> Vec<Option<ObjectId>> {
-        let inside = player == 0 || self.players.len() <= player;
+    pub(crate) fn command_units(
+        &self,
+        player: PlayerId,
+        units: &UnitList,
+    ) -> Vec<Option<ObjectId>> {
+        let inside = player == PlayerId::GAIA || self.players.len() <= player.index();
         match units.names_last_commanded() {
             false if inside => units.first(usize::MAX).to_vec(),
             false => units.first(self.most_units(player)).to_vec(),
             true if inside => Vec::new(),
-            true => self.last_commanded.get(player).cloned().unwrap_or_default(),
+            true => self
+                .last_commanded
+                .get(player.index())
+                .cloned()
+                .unwrap_or_default(),
         }
     }
 
     /// The units a command of `player` names at most: 60, 500 for a computer
     /// (`FUN_141659cf0`); none for a player the world lacks.
     #[must_use]
-    pub fn most_units(&self, player: usize) -> usize {
-        match self.players.get(player) {
+    pub fn most_units(&self, player: PlayerId) -> usize {
+        match self.players.get(player.index()) {
             Some(p) if p.computer => COMPUTER_UNITS,
             Some(_) => HUMAN_UNITS,
             None => 0,
@@ -320,13 +328,13 @@ impl World {
     /// Comm player `player`'s last commanded units become `units` (`FUN_140e6d140` and the
     /// copy after it, `FUN_140e6b290` with 0); nothing for comm player 0 or one past the
     /// world's.
-    pub(crate) fn set_last_commanded(&mut self, player: usize, units: Vec<Option<ObjectId>>) {
-        if player == 0 || self.players.len() <= player {
+    pub(crate) fn set_last_commanded(&mut self, player: PlayerId, units: Vec<Option<ObjectId>>) {
+        if player == PlayerId::GAIA || self.players.len() <= player.index() {
             return;
         }
-        if self.last_commanded.len() <= player {
-            self.last_commanded.resize(player + 1, Vec::new());
+        if self.last_commanded.len() <= player.index() {
+            self.last_commanded.resize(player.index() + 1, Vec::new());
         }
-        self.last_commanded[player] = units;
+        self.last_commanded[player.index()] = units;
     }
 }

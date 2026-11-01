@@ -31,6 +31,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
+use crate::players::PlayerId;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{OrderKind, UnitAi};
@@ -192,7 +193,7 @@ pub(crate) struct AttackCommand<'a> {
     /// master's fog flag).
     pub(crate) visible: bool,
     /// The target's owner.
-    pub(crate) target_owner: usize,
+    pub(crate) target_owner: PlayerId,
     /// What the start's `set_state(6)` reads ([`ReadyReads`]); None when the world does not hold
     /// the target live.
     pub(crate) ready: Option<ReadyReads>,

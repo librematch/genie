@@ -190,7 +190,7 @@ pub(super) fn take_building(
             ]);
         }
         b.razed.push(Razed {
-            attacker_player: ap.index(),
+            attacker_player: ap,
             owner: q,
             event,
             adds,

@@ -47,7 +47,7 @@ pub struct Record {
     /// Its distance (`FLT_MAX` in the lists; a query's copy holds its own).
     pub distance: Distance,
     /// The owner's id (`player+0x718`).
-    pub owner: u8,
+    pub owner: PlayerId,
     /// Its x.
     pub x: f32,
     /// Its y.
@@ -75,7 +75,7 @@ pub struct UnitUpdate {
     /// The object.
     pub id: ObjectId,
     /// The owner's id (`player+0x718`).
-    pub owner: u8,
+    pub owner: PlayerId,
     /// Its place (x, y).
     pub position: Point,
     /// Its master's radii (x, y).
@@ -240,7 +240,7 @@ impl Registry {
                 .ok_or(GenieError::unsupported(
                     "an object's registry slot without its record",
                 ))?;
-            record.owner = owner.index() as u8;
+            record.owner = owner;
         }
         Ok(())
     }
@@ -307,12 +307,9 @@ impl Registry {
                     "a query of a class beyond the registry's",
                 ))?;
             for r in list {
-                let relation =
-                    *relations
-                        .get(PlayerId::new(r.owner))
-                        .ok_or(GenieError::unsupported(
-                            "a record of an owner without a relation",
-                        ))?;
+                let relation = *relations.get(r.owner).ok_or(GenieError::unsupported(
+                    "a record of an owner without a relation",
+                ))?;
                 let Some(relation) = relation.filter(|r| wanted & r.bit() != 0) else {
                     continue;
                 };
@@ -368,7 +365,7 @@ mod tests {
         for id in [1, 2, 3] {
             r.update_unit(UnitUpdate {
                 id: object_id(id),
-                owner: 1,
+                owner: PlayerId::new(1),
                 position: Point::new(id as f32, 5.0),
                 radii: Footprint::new(0.2, 0.2),
                 class: class::VILLAGER,
@@ -386,7 +383,7 @@ mod tests {
         // 1 leaves player 0's sight: 3 takes its place
         r.update_unit(UnitUpdate {
             id: object_id(1),
-            owner: 1,
+            owner: PlayerId::new(1),
             position: Point::new(1.0, 5.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -410,7 +407,7 @@ mod tests {
         let mut r = registry();
         r.update_unit(UnitUpdate {
             id: object_id(1),
-            owner: 1,
+            owner: PlayerId::new(1),
             position: Point::new(12.0, 10.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -420,7 +417,7 @@ mod tests {
         .unwrap();
         r.update_unit(UnitUpdate {
             id: object_id(2),
-            owner: 2,
+            owner: PlayerId::new(2),
             position: Point::new(10.0, 13.5),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -430,7 +427,7 @@ mod tests {
         .unwrap();
         r.update_unit(UnitUpdate {
             id: object_id(3),
-            owner: 2,
+            owner: PlayerId::new(2),
             position: Point::new(13.0, 13.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -440,7 +437,7 @@ mod tests {
         .unwrap();
         r.update_unit(UnitUpdate {
             id: object_id(4),
-            owner: 0,
+            owner: PlayerId::new(0),
             position: Point::new(10.5, 10.5),
             radii: Footprint::new(0.2, 0.2),
             class: class::PREY,
@@ -506,7 +503,7 @@ mod tests {
         let mut r = registry();
         r.update_unit(UnitUpdate {
             id: object_id(1),
-            owner: 1,
+            owner: PlayerId::new(1),
             position: Point::new(53.5, 10.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -516,7 +513,7 @@ mod tests {
         .unwrap();
         r.update_unit(UnitUpdate {
             id: object_id(2),
-            owner: 1,
+            owner: PlayerId::new(1),
             position: Point::new(60.0, 10.0),
             radii: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -556,7 +553,7 @@ mod tests {
         let mut r = registry();
         r.update_unit(UnitUpdate {
             id: object_id(1),
-            owner: 1,
+            owner: PlayerId::new(1),
             position: Point::new(15.0, 10.0),
             radii: Footprint::new(2.0, 2.0),
             class: class::VILLAGER,

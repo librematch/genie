@@ -405,13 +405,10 @@ impl World {
         for r in razed {
             if let Some(kind) = r.event {
                 let now = self.world_time;
-                self.players[r.attacker_player].history.add_event(
-                    kind,
-                    r.owner.index() as f32,
-                    0.0,
-                    0,
-                    now,
-                );
+                self.players
+                    .player_mut(r.attacker_player)?
+                    .history
+                    .add_event(kind, r.owner.index() as f32, 0.0, 0, now);
             }
             for &(p, attribute, amount) in &r.adds {
                 self.players
@@ -476,7 +473,7 @@ impl World {
                     .player_mut(q)?
                     .add_attribute(attribute::VILLAGER_KILLED_BY_ANIMAL, Amount::new(1.0))?;
             }
-            let by_kind = match self.players[ap].kind {
+            let by_kind = match self.players.player(ap)?.kind {
                 PlayerType::HUMAN => Some(attribute::VILLAGER_KILLED_BY_TYPE_1),
                 PlayerType::GAIA => Some(attribute::VILLAGER_KILLED_BY_TYPE_2),
                 PlayerType::COMPUTER => Some(attribute::VILLAGER_KILLED_BY_TYPE_3),
@@ -499,7 +496,7 @@ impl World {
     ///
     /// An object the slice does not hold, and an attribute whose change the slice does not
     /// model.
-    pub(crate) fn count_kill(&mut self, id: ObjectId, killer: usize) -> Result<(), GenieError> {
+    pub(crate) fn count_kill(&mut self, id: ObjectId, killer: PlayerId) -> Result<(), GenieError> {
         let (q, u) = self
             .object(id)
             .ok_or(crate::construction::build::NOT_HELD)?;
@@ -515,7 +512,7 @@ impl World {
         &mut self,
         q: PlayerId,
         master: &Master,
-        ap: usize,
+        ap: PlayerId,
     ) -> Result<(), GenieError> {
         const PEACEFUL: [ClassId; 26] = [
             class::ARTIFACT,
@@ -546,21 +543,27 @@ impl World {
             class::CLASS_63,
         ];
         if !PEACEFUL.contains(&master.class) {
-            self.players[ap].add_attribute(attribute::KILLS, Amount::new(1.0))?;
+            self.players
+                .player_mut(ap)?
+                .add_attribute(attribute::KILLS, Amount::new(1.0))?;
             self.players
                 .player_mut(q)?
                 .add_attribute(attribute::KILLS_OTHER, Amount::new(1.0))?;
         }
-        self.players[ap].add_attribute(attribute::KILLS_OF.offset(q.index())?, Amount::new(1.0))?;
+        self.players
+            .player_mut(ap)?
+            .add_attribute(attribute::KILLS_OF.offset(q.index())?, Amount::new(1.0))?;
         self.players
             .player_mut(q)?
-            .add_attribute(attribute::KILLED_BY.offset(ap)?, Amount::new(1.0))?;
+            .add_attribute(attribute::KILLED_BY.offset(ap.index())?, Amount::new(1.0))?;
         let cost = paid_cost(master);
-        self.players[ap].add_attribute(attribute::KILLS_VALUE, Amount::new(cost))?;
+        self.players
+            .player_mut(ap)?
+            .add_attribute(attribute::KILLS_VALUE, Amount::new(cost))?;
         self.players
             .player_mut(q)?
             .add_attribute(attribute::KILLS_VALUE_OTHER, Amount::new(cost))?;
-        self.players[ap].add_attribute(
+        self.players.player_mut(ap)?.add_attribute(
             attribute::KILLS_VALUE_OF.offset(q.index())?,
             Amount::new(cost),
         )?;

@@ -289,7 +289,7 @@ fn a_hunter_strikes_its_sheep_for_twelve() {
         sheep.killed,
         Some(Kill {
             attacker: object_id(10029),
-            attacker_player: 1,
+            attacker_player: PlayerId::new(1),
             attacker_class: class::VILLAGER,
             to_gaia: true
         })
@@ -1183,7 +1183,7 @@ fn a_player_s_building_below_one_hit_point_is_razed() {
     assert_eq!(
         razed,
         &[Razed {
-            attacker_player: 1,
+            attacker_player: PlayerId::new(1),
             owner: PlayerId::new(2),
             event: Some(crate::players::history::EventKind::CASTLE_DESTROYED),
             adds: vec![
@@ -1758,7 +1758,7 @@ fn a_fixed_blast_damage_takes_its_size_and_kills_below_one() {
     assert_eq!((t.hp, t.amount), (HitPoints::ZERO, Amount::ZERO));
     assert_eq!(
         t.killed.map(|k| (k.attacker, k.attacker_player)),
-        Some((object_id(10029), 1))
+        Some((object_id(10029), PlayerId::new(1)))
     );
     let mut gaia = Victim {
         player: PlayerId::new(0),

@@ -286,7 +286,7 @@ fn a_search_near_the_last_reads_its_answer_until_a_unit_ai_lets_it_go() {
     // a villager of player 1 at (12, 10), which player 2 sees
     r.update_unit(UnitUpdate {
         id: object_id(1),
-        owner: 1,
+        owner: PlayerId::new(1),
         position: Point::new(12.0, 10.0),
         radii: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
@@ -2076,7 +2076,7 @@ fn closest_object_keeps_the_nearest_record_and_on_a_tie_the_lower_id() {
     let record = |id, distance| Record {
         id,
         distance,
-        owner: 1,
+        owner: PlayerId::new(1),
         x: 0.0,
         y: 0.0,
         rx: 0.5,

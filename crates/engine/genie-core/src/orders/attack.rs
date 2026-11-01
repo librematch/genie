@@ -156,7 +156,7 @@ impl World {
             engagement: &e,
             arms,
             visible,
-            target_owner: aim.owner.index(),
+            target_owner: aim.owner,
             ready,
         };
         let (mut attack, posted) =

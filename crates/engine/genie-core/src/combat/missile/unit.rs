@@ -399,7 +399,7 @@ impl Unit {
         fired_from: Option<ObjectId>,
         c: &mut Step<'_>,
     ) -> Result<u8, GenieError> {
-        if action.origin.owner != -1 {
+        if action.origin.owner.is_some() {
             return Err(GenieError::unsupported(
                 "a shooterless missile with an origin (its elevation, FUN_14113e550)",
             ));
