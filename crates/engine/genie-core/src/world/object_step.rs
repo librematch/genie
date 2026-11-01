@@ -40,12 +40,11 @@ impl World {
             }
             None => Vec::new(),
         };
-        let (tick, me) = (self.ticks, unit.id);
+        let me = unit.id;
         let mut c = Step {
             w: self,
             me,
             dt,
-            tick,
             turn,
             blasted,
             player: p,
@@ -55,7 +54,7 @@ impl World {
         };
         let mut result = f(&mut unit, &mut c);
         if let Some(w) = watch {
-            w.report(&unit, c.tick, p);
+            w.report(&unit, c.w.ticks, p);
         }
         if let Some(e) = self.take_sight_unsupported()
             && result.is_ok()

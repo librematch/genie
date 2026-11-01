@@ -79,42 +79,47 @@ impl World {
         });
     }
 
-    /// Tell the world which objects move now and how the players stand to each other, for the
-    /// walk's query ([`Spatial::walk_hits`]), as each update does first: for a look at the
-    /// world between updates.
+    /// The spatial index's view of a world made from its parts (a load, a test's world): the
+    /// annexes' main buildings (their one writer after it: the routines that link and unlink an
+    /// annex), how the players stand to each other (after it: the diplomacy change,
+    /// [`World::set_relation`]), each player's masters with a task of action type 0x99, and the
+    /// objects' gaits ([`World::sync_moving`]), for the walk's query ([`Spatial::walk_hits`]).
     ///
     /// [`Spatial::walk_hits`]: crate::map::spatial::Spatial::walk_hits
     pub fn sync_world(&mut self) {
+        for p in &self.players {
+            for u in p.objects.iter().chain(&p.sleeping) {
+                self.spatial.set_annex(u.id, u.annex_of);
+            }
+        }
+        self.spatial.relations = self.players.iter().map(|p| p.relations.clone()).collect();
+        self.spatial.task_0x99 = self
+            .masters
+            .iter()
+            .map(|m| {
+                m.iter()
+                    .filter(|m| {
+                        m.tasks
+                            .iter()
+                            .any(|t| t.action_type == crate::construction::build::CART_TASK)
+                    })
+                    .map(|m| m.id)
+                    .collect()
+            })
+            .collect();
         self.sync_moving();
     }
 
-    /// Tell the world which objects move now and how the players stand to each other, for the
-    /// walk's query ([`Spatial::walk_hits`]).
+    /// Tell the walk's query which objects move now ([`Spatial::walk_hits`]): every object's
+    /// gait, as each update does first and after its commands. A copy until the objects are in
+    /// tables by id (T4), which the walk then reads.
     ///
     /// [`Spatial::walk_hits`]: crate::map::spatial::Spatial::walk_hits
     pub(super) fn sync_moving(&mut self) {
         for p in &self.players {
             for u in p.objects.iter().chain(&p.sleeping) {
                 self.spatial.set_gait(u.id, u.gait());
-                self.spatial.set_annex(u.id, u.annex_of);
             }
-        }
-        if self.spatial.relations.is_empty() {
-            self.spatial.relations = self.players.iter().map(|p| p.relations.clone()).collect();
-            self.spatial.task_0x99 = self
-                .masters
-                .iter()
-                .map(|m| {
-                    m.iter()
-                        .filter(|m| {
-                            m.tasks
-                                .iter()
-                                .any(|t| t.action_type == crate::construction::build::CART_TASK)
-                        })
-                        .map(|m| m.id)
-                        .collect()
-                })
-                .collect();
         }
     }
 

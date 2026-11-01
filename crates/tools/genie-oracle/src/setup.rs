@@ -449,6 +449,8 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     {
         stop_all(&mut turns, &e);
     }
+    // the spatial index's views of the loaded annexes, relations and task 0x99 masters
+    turns.sync_world();
     turns
 }
 

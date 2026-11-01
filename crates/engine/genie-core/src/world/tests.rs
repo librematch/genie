@@ -13648,6 +13648,8 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         Masters::new([gate(master_id(88)), gate(master_id(95))]),
     ];
     t.graphics = Graphics::from([(SpriteId::named(1751), g)]);
+    // the spatial index's view of the annex, as a load fills it
+    t.sync_world();
     t.tick(Millis::new(100));
     assert_eq!(t.players[1].unsupported, None);
     let states: Vec<(i32, ObjectState)> = t.players[1]
@@ -20597,4 +20599,24 @@ fn a_frozen_unit_may_have_moved_its_master_s_speed() {
     t.masters[1] = Masters::new([]);
     t.grow_unknown(Seconds::new(0.05));
     assert_eq!(t.spatial.get(id).unwrap().unknown, Some(f32::INFINITY));
+}
+
+/// A world made from its parts (a load, a test's world) gets the spatial index's views once
+/// ([`World::sync_world`]): each annex's main building and how the players stand to each
+/// other; after it the routines that change them write them.
+#[test]
+fn a_world_s_sync_fills_the_annex_index_and_the_relations() {
+    let mut t = forage_world();
+    let id = t.players[1].objects[ListIndex::new(0)].id;
+    t.players[1].objects[ListIndex::new(0)].annex_of = Some(MainBuildingId::new(object_id(10028)));
+    t.spatial.relations = ByPlayer::default();
+    t.sync_world();
+    assert_eq!(
+        t.spatial.annex_of(id),
+        Some(MainBuildingId::new(object_id(10028)))
+    );
+    assert_eq!(t.spatial.relations.len(), t.players.len());
+    for (p, row) in t.spatial.relations.iter() {
+        assert_eq!(row, &t.players[p.index()].relations);
+    }
 }
