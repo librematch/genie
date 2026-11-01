@@ -1,4 +1,6 @@
 use super::*;
+use crate::combat::missile::ArcRatio;
+use crate::combat::missile::HitMode;
 use crate::combat::missile::SmartMode;
 use crate::combat::missile::VanishMode;
 use crate::map::Radii;
@@ -826,11 +828,11 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
 fn a_missile_s_smart_mode_multiply_sets_it() {
     let mut m = of_type(master_type::MISSILE);
     m.missile_stats = Some(crate::combat::missile::MissileStats {
-        projectile_type: 0,
+        projectile_type: crate::combat::missile::ProjectileType::STRAIGHT,
         smart_mode: SmartMode::LEADS_TARGET,
-        hit_mode: 0,
+        hit_mode: HitMode::TARGET_ALONE,
         vanish_mode: VanishMode::NONE,
-        arc: 0.5,
+        arc: ArcRatio::new(0.5),
         speed: Speed::new(7.0),
         radius: Radii::ZERO,
         fly_mode: FlyMode::GROUND,
@@ -842,7 +844,11 @@ fn a_missile_s_smart_mode_multiply_sets_it() {
     let s = m.missile_stats.unwrap();
     assert_eq!(
         (s.smart_mode, s.arc, m.reload),
-        (SmartMode::from_bits_retain(3), 0.25, Seconds::new(1.0))
+        (
+            SmartMode::from_bits_retain(3),
+            ArcRatio::new(0.25),
+            Seconds::new(1.0)
+        )
     );
 }
 
@@ -1270,11 +1276,11 @@ fn the_combat_master_s_own_values_change() {
 fn the_missile_building_and_animated_setters() {
     let mut m = of_type(master_type::MISSILE);
     m.missile_stats = Some(crate::combat::missile::MissileStats {
-        projectile_type: 0,
+        projectile_type: crate::combat::missile::ProjectileType::STRAIGHT,
         smart_mode: SmartMode::NONE,
-        hit_mode: 1,
+        hit_mode: HitMode::of_data(1),
         vanish_mode: VanishMode::NONE,
-        arc: 0.25,
+        arc: ArcRatio::new(0.25),
         speed: Speed::new(7.0),
         radius: Radii::ZERO,
         fly_mode: FlyMode::GROUND,
@@ -1286,7 +1292,11 @@ fn the_missile_building_and_animated_setters() {
     let s = m.missile_stats.unwrap();
     assert_eq!(
         (s.smart_mode, s.hit_mode, s.arc),
-        (SmartMode::LEADS_TARGET, 2, 0.5)
+        (
+            SmartMode::LEADS_TARGET,
+            HitMode::of_data(2),
+            ArcRatio::new(0.5)
+        )
     );
     assert_eq!(m.weapon_range, Distance::new(5.0));
     let mut b = of_type(master_type::BUILDING);

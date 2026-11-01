@@ -84,7 +84,7 @@ pub(super) fn after_hit(
 /// target of the executed action the attacker posts to its unit AI (notify 0x200 with 600).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Struck {
-    pub result: u8,
+    pub result: crate::combat::missile::StrikeResult,
     pub executed: Option<ObjectId>,
 }
 
@@ -111,13 +111,13 @@ pub(crate) fn strike(
             .damaged
             .push((Some(own.id), [own.id.get(), own.hp.get() as i32, master_hp]));
         return Ok(Struck {
-            result: 2,
+            result: crate::combat::missile::StrikeResult::SHIELDED,
             executed: None,
         });
     }
     let a = own.source;
     let mut struck = Struck {
-        result: 1,
+        result: crate::combat::missile::StrikeResult::HIT,
         executed: None,
     };
     if MISSILE <= a.kind

@@ -16262,7 +16262,10 @@ fn a_ranged_swing_fires_its_missile_which_flies_to_the_target_and_hits_it() {
         .map(|a| (a.state, a.result));
     assert_eq!(
         action,
-        Some((crate::combat::missile::MissileState::Done, 1))
+        Some((
+            crate::combat::missile::MissileState::Done,
+            crate::combat::missile::StrikeResult::HIT
+        ))
     );
     for _ in 0..3 {
         t.tick(Millis::new(100));
@@ -16537,7 +16540,7 @@ fn the_missile_chain_s_unmodelled_cases_stop_the_player_with_their_reason() {
             |t| {
                 for m in &mut t.masters {
                     if let Some(s) = m.get_mut(master_id(363)).unwrap().missile_stats.as_mut() {
-                        s.projectile_type = 1;
+                        s.projectile_type = crate::combat::missile::ProjectileType::of_data(1);
                     }
                 }
             },

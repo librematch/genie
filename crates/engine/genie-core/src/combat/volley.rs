@@ -480,13 +480,13 @@ impl Unit {
             target: aimed.target,
             fired_from: shot.shooter.then_some(self.id),
             point: shot.point,
-            timer: 0.0,
+            timer: Distance::ZERO,
             direction: Offset::ZERO,
-            ballistic_velocity: 0.0,
-            ballistic_acceleration: 0.0,
+            ballistic_velocity: crate::movement::Speed::ZERO,
+            ballistic_acceleration: crate::movement::Acceleration::ZERO,
             distance: Distance::ZERO,
             hit_mode: stats.hit_mode,
-            result: 0,
+            result: crate::combat::missile::StrikeResult::NONE,
             origin: if shot.shooter {
                 crate::combat::missile::Origin {
                     position: self.position(),

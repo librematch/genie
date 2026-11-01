@@ -47,6 +47,7 @@ If the object's action walks, the action runs the motion step. The planners that
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`acceleration.rs`](acceleration.rs) | An acceleration in tiles per second squared. |
 | [`ai_moves.rs`](ai_moves.rs) | A unit's moves its unit AI asks: to a point (slot 0x340, the head action's slot 0x40 may take the point) and to an object (slot 0x348), a move that gave up, and the standing sprite of a `MoveTo` that ends at its start. |
 | [`explore.rs`](explore.rs) | The Explore action (`RGE_Action_Explore`, type 4, made by `FUN_140a87d30`) and the auto scout's search for a point to explore (`FUN_140c65490`, the unit AI's "unexploredArea"). |
 | [`explore_state.rs`](explore_state.rs) | An Explore's state: waiting for a point or walking to it. |

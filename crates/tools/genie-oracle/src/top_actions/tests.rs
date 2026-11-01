@@ -544,10 +544,10 @@ fn a_missile_flies_with_its_actions_course() {
         (
             genie_core::combat::missile::MissileState::Flying,
             Some(object_id(900)),
-            0
+            genie_core::combat::missile::HitMode::TARGET_ALONE
         )
     );
-    assert_eq!(action.ballistic_velocity.to_bits(), 3.0_f32.to_bits());
+    assert_eq!(action.ballistic_velocity.get().to_bits(), 3.0_f32.to_bits());
     assert_eq!(
         imported(genie_core::combat::missile::MISSILE, explore(base(2))).unwrap_err(),
         GenieError::unsupported("a saved missile action without its part")

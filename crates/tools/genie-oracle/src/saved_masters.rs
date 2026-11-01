@@ -345,11 +345,13 @@ pub(super) fn work_masters(
             .and_then(|r| r.rge_master_missile_object.as_deref())
         {
             work.missile_stats = Some(genie_core::combat::missile::MissileStats {
-                projectile_type: table.projectile_type(civ, s.copy_id()).unwrap_or(0),
+                projectile_type: genie_core::combat::missile::ProjectileType::of_data(
+                    table.projectile_type(civ, s.copy_id()).unwrap_or(0),
+                ),
                 smart_mode: SmartMode::from_bits_retain(mm.targetting_type),
-                hit_mode: mm.missile_hit_info,
+                hit_mode: genie_core::combat::missile::HitMode::of_data(mm.missile_hit_info),
                 vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
-                arc: mm.ballistics_ratio,
+                arc: genie_core::combat::missile::ArcRatio::new(mm.ballistics_ratio),
                 speed: animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed)),
                 radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
                 fly_mode: FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0)),

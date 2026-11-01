@@ -834,7 +834,10 @@ fn a_strike_on_an_annex_hits_its_main_building() {
         &mut Well512::default(),
     )
     .unwrap();
-    assert_eq!(struck.result, 1);
+    assert_eq!(
+        struck.result,
+        crate::combat::missile::StrikeResult::of_data(1)
+    );
     assert_eq!(
         (blasted[0].hp, annex.hp),
         (HitPoints::new(96.0), HitPoints::new(96.0))

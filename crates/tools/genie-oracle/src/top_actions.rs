@@ -305,7 +305,9 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
         .master(saved.s.master_obj)
         .and_then(|m| m.rge_master.as_deref())
         .and_then(|r| r.rge_master_missile_object.as_deref())
-        .map_or(0, |m| m.missile_hit_info);
+        .map_or(genie_core::combat::missile::HitMode::TARGET_ALONE, |m| {
+            genie_core::combat::missile::HitMode::of_data(m.missile_hit_info)
+        });
     unit.missile = Some(genie_core::combat::missile::Missile {
         max_range: Distance::new(mo.max_range),
         fired_from: ObjectId::of_field(mo.fired_from_id),
@@ -319,13 +321,15 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
             target: ObjectId::of_field(base.target_id),
             fired_from: ObjectId::of_field(base.target2_id),
             point: saved.point(),
-            timer: base.timer,
+            timer: Distance::new(base.timer),
             direction: Offset::new(ma.velocity_x, ma.velocity_y, ma.velocity_z),
-            ballistic_velocity: ma.ballistic_velocity,
-            ballistic_acceleration: ma.ballistic_acceleration,
+            ballistic_velocity: genie_core::movement::Speed::new(ma.ballistic_velocity),
+            ballistic_acceleration: genie_core::movement::Acceleration::new(
+                ma.ballistic_acceleration,
+            ),
             distance: Distance::new(ma.distance),
             hit_mode,
-            result: ma.interacted_with_agility,
+            result: genie_core::combat::missile::StrikeResult::of_data(ma.interacted_with_agility),
             origin: genie_core::combat::missile::Origin::from_bytes(&ma.projectile_data),
             met: Vec::new(),
         }));

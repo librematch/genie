@@ -28,12 +28,20 @@ use crate::players::PlayerId;
 use crate::world::Seconds;
 use genie_diff::Diff;
 
+mod arc_ratio;
+mod hit_mode;
 mod missile_modes;
 mod missile_state;
+mod projectile_type;
+mod strike_result;
 pub(crate) mod unit;
 
+pub use self::arc_ratio::ArcRatio;
+pub use self::hit_mode::HitMode;
 pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
+pub use self::projectile_type::ProjectileType;
+pub use self::strike_result::StrikeResult;
 
 /// The missile action's type, which word 9 adds when it is the top action.
 pub const MISSILE: ActionType = ActionType::named(8);
@@ -71,15 +79,15 @@ const VOLLEY_REACH_MARGIN: f32 = crate::math::image::missile::VOLLEY_REACH_MARGI
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct MissileStats {
     /// `projectile_type` (`+0x880`).
-    pub projectile_type: u8,
+    pub projectile_type: ProjectileType,
     /// `smart_mode`.
     pub smart_mode: SmartMode,
     /// `hit_mode` (`missile_hit_info`).
-    pub hit_mode: u8,
+    pub hit_mode: HitMode,
     /// `vanish_mode` (`missile_die_info`).
     pub vanish_mode: VanishMode,
     /// `projectile_arc` (`ballistics_ratio`).
-    pub arc: f32,
+    pub arc: ArcRatio,
     /// Its master's speed (slot 0xe8).
     pub speed: Speed,
     /// Its master's radii (`+0x5d8`..`+0x5e0`).
@@ -142,19 +150,19 @@ pub struct MissileAction {
     /// `+0x38`..`+0x40`: the target's place when fired.
     pub point: Position,
     /// `+0x44`: the way flown so far (a straight missile's).
-    pub timer: f32,
+    pub timer: Distance,
     /// `+0x68`..`+0x70`: the direction, a unit vector for a straight missile.
     pub direction: Offset,
     /// `+0x74`, `+0x78`: the arc's vertical speed and acceleration.
-    pub ballistic_velocity: f32,
+    pub ballistic_velocity: Speed,
     /// `+0x78`: the arc's vertical acceleration.
-    pub ballistic_acceleration: f32,
+    pub ballistic_acceleration: crate::movement::Acceleration,
     /// `+0x7c`: the way left to the aimed point.
     pub distance: Distance,
     /// `+0x80`: the master's hit mode, 1 after a miss.
-    pub hit_mode: u8,
+    pub hit_mode: HitMode,
     /// `+0x98`: the last hit's result.
-    pub result: u8,
+    pub result: StrikeResult,
     /// `+0x9c`.
     pub origin: Origin,
     /// `+0x88`: the objects the last step met (not saved: none after a load).
@@ -296,7 +304,7 @@ pub struct AimAt<'a> {
     /// The missile's attack count (`+0x900`).
     pub attack_count: crate::combat::AttackCount,
     /// The hit mode, which a miss sets to 1.
-    pub hit_mode: &'a mut u8,
+    pub hit_mode: &'a mut HitMode,
 }
 
 /// `FUN_140a9c600`: where a missile at `from` aims for its `point`: a target's height rises by a
@@ -333,8 +341,8 @@ pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, Gen
     }
     let r = draw();
     if i32::from(chance.get()) < (r as i32 * 100) / 0x7fff {
-        if *hit_mode == 0 {
-            *hit_mode = 1;
+        if *hit_mode == HitMode::TARGET_ALONE {
+            *hit_mode = HitMode::MISSED;
         }
         gap *= aimer.spread;
         // the missile's attack count (`+0x900`, its firer's when fired): master 528 strays by its
@@ -381,19 +389,19 @@ impl MissileAction {
             ));
         }
         let angle = match stats.projectile_type {
-            0 => {
+            ProjectileType::STRAIGHT => {
                 self.direction = if way <= 0.0 {
                     Offset::ZERO
                 } else {
                     Offset::new(dx / way, dy / way, dz / way)
                 };
-                self.timer = 0.0;
+                self.timer = Distance::ZERO;
                 Some(Angle::new(fmath::atan2(
                     self.direction.y(),
                     self.direction.x(),
                 )))
             }
-            3 => {
+            ProjectileType::WHOLE_WAY => {
                 self.direction = Offset::new(dx, dy, dz);
                 Some(Angle::new(fmath::atan2(dy, dx)))
             }
@@ -403,7 +411,7 @@ impl MissileAction {
                 ));
             }
         };
-        let (acceleration, velocity) = if way <= 0.0 || stats.arc == 0.0 {
+        let (acceleration, velocity) = if way <= 0.0 || stats.arc.is_flat() {
             (0.0, 0.0)
         } else {
             let t = if stats.speed <= Speed::ZERO {
@@ -412,16 +420,16 @@ impl MissileAction {
                 way / stats.speed.get()
             };
             let t = t * HALF;
-            let rise = if stats.arc <= 0.0 {
-                way * stats.arc * way
+            let rise = if stats.arc <= ArcRatio::FLAT {
+                way * stats.arc.get() * way
             } else {
-                -(way * stats.arc)
+                -(way * stats.arc.get())
             };
             let a = (rise + rise) / (t * t);
             (a, -a * t)
         };
-        self.ballistic_acceleration = acceleration;
-        self.ballistic_velocity = velocity;
+        self.ballistic_acceleration = crate::movement::Acceleration::new(acceleration);
+        self.ballistic_velocity = Speed::new(velocity);
         self.state = MissileState::Flying;
         Ok(angle)
     }
@@ -439,18 +447,18 @@ impl MissileAction {
         stats: &MissileStats,
     ) -> Result<(Offset, bool), GenieError> {
         let mut step = match stats.projectile_type {
-            0 => {
+            ProjectileType::STRAIGHT => {
                 let way = stats.speed * dt;
                 let d = self.direction.scaled(way.get());
-                self.timer += way.get();
+                self.timer += way;
                 self.distance -= way;
-                if max_range <= Distance::new(self.timer) && self.distance < BEYOND {
+                if max_range <= self.timer && self.distance < BEYOND {
                     // State 1: the missile ends.
                     self.state = MissileState::Done;
                 }
                 d
             }
-            3 => {
+            ProjectileType::WHOLE_WAY => {
                 self.distance = Distance::ZERO;
                 self.direction
             }
@@ -460,13 +468,13 @@ impl MissileAction {
                 ));
             }
         };
-        if stats.arc != 0.0 {
+        if !stats.arc.is_flat() {
             step = step.with_z(
                 step.z()
-                    + (dt.get() * self.ballistic_acceleration * HALF + self.ballistic_velocity)
+                    + ((dt * self.ballistic_acceleration) * HALF + self.ballistic_velocity).get()
                         * dt.get(),
             );
-            self.ballistic_velocity += dt.get() * self.ballistic_acceleration;
+            self.ballistic_velocity += dt * self.ballistic_acceleration;
         }
         Ok((step, LANDING < self.distance.get()))
     }
@@ -521,8 +529,8 @@ mod tests {
     #[test]
     fn a_spear_arcs_to_its_point() {
         let stats = MissileStats {
-            projectile_type: 0,
-            arc: -0.06,
+            projectile_type: ProjectileType::STRAIGHT,
+            arc: ArcRatio::new(-0.06),
             speed: Speed::new(7.0),
             radius: Radii::new(0.1, 0.1, 0.0),
             ..MissileStats::default()
@@ -532,13 +540,13 @@ mod tests {
             target: Some(object_id(9655)),
             fired_from: Some(object_id(9171)),
             point: Position::ORIGIN,
-            timer: 0.0,
+            timer: Distance::ZERO,
             direction: Offset::ZERO,
-            ballistic_velocity: 0.0,
-            ballistic_acceleration: 0.0,
+            ballistic_velocity: Speed::ZERO,
+            ballistic_acceleration: crate::movement::Acceleration::ZERO,
             distance: Distance::ZERO,
-            hit_mode: 0,
-            result: 0,
+            hit_mode: HitMode::TARGET_ALONE,
+            result: StrikeResult::NONE,
             origin: Origin::NONE,
             met: Vec::new(),
         };
@@ -552,13 +560,13 @@ mod tests {
             .unwrap();
         assert_eq!(angle, Some(Angle::ZERO));
         assert_eq!(a.state, MissileState::Flying);
-        assert!((a.ballistic_acceleration - -23.52).abs() < 1e-3);
-        assert!((a.ballistic_velocity - 4.71503).abs() < 1e-4);
+        assert!((a.ballistic_acceleration.get() - -23.52).abs() < 1e-3);
+        assert!((a.ballistic_velocity.get() - 4.71503).abs() < 1e-4);
         // one update of 52 ms: 0.364 of the way
         let (step, flying) = a
             .fly(Seconds::new(0.052), Distance::new(5.282_842_6), &stats)
             .unwrap();
-        assert!((a.timer - 0.364).abs() < 1e-6);
+        assert!((a.timer.get() - 0.364).abs() < 1e-6);
         assert!((a.distance - Distance::new(2.44257)).get().abs() < 1e-5);
         assert!((step.x() - 0.364).abs() < 1e-6);
         assert!(flying);
@@ -579,7 +587,7 @@ mod tests {
         let point = Position::new(13.0, 14.0, 0.0);
         let from = Position::new(10.0, 10.0, 1.0);
         let target = Some((Radii::new(0.2, 0.2, 1.5), class::CLASS_6));
-        let aim_with = |draws: [u32; 3], master: MasterId, count: i32, mode: &mut u8| {
+        let aim_with = |draws: [u32; 3], master: MasterId, count: i32, mode: &mut HitMode| {
             let mut d = draws.into_iter();
             aim(
                 AimAt {
@@ -595,23 +603,23 @@ mod tests {
             )
         };
         // a draw of 70% or less hits: the target's height rises by 1.5 / 3
-        let mut mode = 0;
+        let mut mode = HitMode::TARGET_ALONE;
         assert_eq!(
             aim_with([22937, 0, 0], master_id(4), 0, &mut mode),
             Ok(Position::new(13.0, 14.0, 0.5))
         );
-        assert_eq!(mode, 0);
+        assert_eq!(mode, HitMode::TARGET_ALONE);
         // a miss: 5 × 0.5 = 2.5; the draws 32767 and 0 stray 1.25 one way and the other
         let missed = aim_with([32767, 32767, 0], master_id(4), 3, &mut mode).unwrap();
-        assert_eq!(mode, 1);
+        assert_eq!(mode, HitMode::MISSED);
         assert_eq!(missed, Position::new(13.0 + 1.25, 14.0 - 1.25, 0.5));
         // master 527 keeps the distance with an attack count; 528 divides it by the count
-        let mut mode = 2;
+        let mut mode = HitMode::of_data(2);
         assert_eq!(
             aim_with([32767, 32767, 0], ids::ID_527, 3, &mut mode),
             Ok(missed)
         );
-        assert_eq!(mode, 2);
+        assert_eq!(mode, HitMode::of_data(2));
         let share = 2.5f32 / 3.0 + 0.0;
         let expected = Position::new(
             (32767.0 * share) / 32767.0 - share * 0.5 + 13.0,

@@ -1,6 +1,6 @@
 //! The RGE combat and missile masters' setters: the armor and attack amounts.
 
-use crate::combat::missile::{SmartMode, VanishMode};
+use crate::combat::missile::{ArcRatio, HitMode, SmartMode, VanishMode};
 use crate::map::Distance;
 use crate::objects::Frame;
 use crate::objects::masters::BlastLevel;
@@ -300,11 +300,11 @@ impl Master {
                 attribute::PROJECTILE_SMART_MODE => {
                     m.smart_mode = SmartMode::from_bits_retain(low8(v));
                 }
-                attribute::PROJECTILE_HIT_MODE => m.hit_mode = low8(v),
+                attribute::PROJECTILE_HIT_MODE => m.hit_mode = HitMode::of_data(low8(v)),
                 attribute::PROJECTILE_VANISH_MODE => {
                     m.vanish_mode = VanishMode::from_bits_retain(low8(v));
                 }
-                attribute::PROJECTILE_ARC => m.arc = v,
+                attribute::PROJECTILE_ARC => m.arc = ArcRatio::new(v),
                 _ => {}
             }
         }
@@ -324,12 +324,12 @@ impl Master {
                     m.smart_mode =
                         SmartMode::from_bits_retain(m.smart_mode.bits().wrapping_add(low8(v)));
                 }
-                attribute::PROJECTILE_HIT_MODE => m.hit_mode = m.hit_mode.wrapping_add(low8(v)),
+                attribute::PROJECTILE_HIT_MODE => m.hit_mode = m.hit_mode.plus(low8(v)),
                 attribute::PROJECTILE_VANISH_MODE => {
                     m.vanish_mode =
                         VanishMode::from_bits_retain(m.vanish_mode.bits().wrapping_add(low8(v)));
                 }
-                attribute::PROJECTILE_ARC => m.arc += v,
+                attribute::PROJECTILE_ARC => m.arc += ArcRatio::new(v),
                 _ => {}
             }
         }

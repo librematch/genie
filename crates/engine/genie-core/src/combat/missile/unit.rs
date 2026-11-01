@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::missile::MissileState;
+use crate::combat::missile::StrikeResult;
 use crate::combat::missile::VanishMode;
 use crate::combat::victims::{readable, victim, victim_of, write_strike_back};
 use crate::combat::volley::Fired;
@@ -157,7 +158,7 @@ impl Unit {
         ));
         mover.mark_move(at, c.w.world_time);
         mover.new_position(self.id, at, (&mut c.w.spatial, Some(&mut c.w.pathing)))?;
-        if matches!(stats.projectile_type, 0..=2) {
+        if stats.projectile_type.meets_on_the_way() {
             let fired = Fired {
                 charge: missile.charge,
                 by: missile.fired_from,
@@ -204,17 +205,19 @@ impl Unit {
                 continue;
             }
             match action.hit_mode {
-                0 => {
+                crate::combat::missile::HitMode::TARGET_ALONE => {
                     if Some(id) != action.target {
                         continue;
                     }
                     let result = self.missile_strike(action, fired, c)?;
                     action.result = result;
-                    if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH) && result != 2 {
+                    if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
+                        && result != StrikeResult::SHIELDED
+                    {
                         self.end_missile(action);
                     }
                 }
-                1 => {
+                crate::combat::missile::HitMode::MISSED => {
                     if missed_passes(c, (id, player, kind, level), action.target, blast_level) {
                         continue;
                     }
@@ -226,7 +229,8 @@ impl Unit {
                     let result = self.missile_strike(action, fired, c)?;
                     action.result = result;
                     // the master's dying sprite plays there (a sprite of its own, not held)
-                    if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH) || result == 2)
+                    if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
+                        || result == StrikeResult::SHIELDED)
                         && blast_level.reaches(level)
                     {
                         continue;
@@ -328,7 +332,7 @@ impl Unit {
         action: &crate::combat::missile::MissileAction,
         fired: Fired,
         c: &mut Step<'_>,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<StrikeResult, GenieError> {
         if fired.charge {
             return Err(GenieError::unsupported("a charge projectile's own hit"));
         }
@@ -398,7 +402,7 @@ impl Unit {
         action: &crate::combat::missile::MissileAction,
         fired_from: Option<ObjectId>,
         c: &mut Step<'_>,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<StrikeResult, GenieError> {
         if action.origin.owner.is_some() {
             return Err(GenieError::unsupported(
                 "a shooterless missile with an origin (its elevation, FUN_14113e550)",
@@ -469,7 +473,7 @@ impl Unit {
         if action.state == MissileState::Done {
             return Ok(());
         }
-        if action.result != 2 {
+        if action.result != StrikeResult::SHIELDED {
             let blaster = if !charge && action.fired_from.is_some() {
                 OthersRef::of(&c.w.players, c.player)?
                     .own(action.fired_from)
@@ -513,8 +517,7 @@ impl Unit {
         let v = victim(c, action.target)?.ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
-        let mode = stats.hit_mode;
-        if (matches!(mode, 0 | 2) || (mode == 1 && c.player != v.player))
+        if stats.hit_mode.strikes_on_landing(c.player != v.player)
             && crate::combat::missile::on_target(
                 self.position(),
                 stats.radius,
@@ -524,7 +527,7 @@ impl Unit {
         {
             let result = self.missile_strike(action, fired, c)?;
             action.result = result;
-            if result != 2 {
+            if result != StrikeResult::SHIELDED {
                 self.end_missile(action);
             }
         }

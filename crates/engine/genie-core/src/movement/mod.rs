@@ -37,6 +37,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
 
+mod acceleration;
 pub(crate) mod ai_moves;
 pub mod explore;
 mod explore_state;
@@ -57,6 +58,7 @@ mod request;
 mod request_plans;
 mod speed;
 mod turn_rate;
+pub use self::acceleration::Acceleration;
 pub use self::speed::Speed;
 pub use self::turn_rate::TurnRate;
 mod step;
