@@ -4,7 +4,9 @@
 //! from the `.dat` of the recording's game, never from constants.
 
 use genie_core::GenieError;
+use genie_core::combat::missile::ProjectileType;
 use genie_core::map::TerrainFlags;
+use genie_core::movement::MoveAlgorithm;
 use genie_core::objects::FacetCount;
 use genie_core::objects::Frame;
 use genie_core::objects::SpeedMultiplier;
@@ -12,8 +14,10 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::CostAmount;
+use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::players::AmountRate;
+use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::technology::CostPaid;
 use genie_core::technology::EffectId;
@@ -21,6 +25,7 @@ use genie_core::technology::TechId;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_dat::de::DatFile;
+use genie_save::generated::world::PlayerObjects;
 use std::collections::HashMap;
 
 mod dat_work;
@@ -57,8 +62,14 @@ pub fn default_action(
         })
 }
 
+/// The master a save's raw id `id` names in the data file ([`PlayerObjects::dat_master`]: the
+/// master an upgraded one copies); none for a negative id, which no row has.
+pub(crate) fn dat_id(objects: &PlayerObjects, id: i16) -> Option<MasterId> {
+    MasterId::of_data(objects.dat_master(id))
+}
+
 /// A row under its civ and master id.
-type KeyedRow = ((u8, i16), Row);
+type KeyedRow = ((CivId, MasterId), Row);
 
 /// The rows of every unit every civ of `dat` has ([`dat_row`]), by civ and master id.
 ///
@@ -67,35 +78,30 @@ type KeyedRow = ((u8, i16), Row);
 /// A task or a cost slot that holds no type or attribute.
 fn dat_rows(dat: &DatFile) -> Result<Vec<KeyedRow>, GenieError> {
     let units = dat.civs.iter().enumerate().flat_map(|(c, civ)| {
-        civ.units
-            .iter()
-            .enumerate()
-            .filter_map(move |(m, unit)| Some((c as u8, m as i16, unit.as_ref()?)))
+        civ.units.iter().enumerate().filter_map(move |(m, unit)| {
+            Some((
+                CivId::new(c as u8),
+                MasterId::of_data(m as i16)?,
+                unit.as_ref()?,
+            ))
+        })
     });
     units
-        .filter_map(|(c, m, unit)| {
-            dat_row(m, unit, &dat.sounds)
-                .transpose()
-                .map(|row| row.map(|r| ((c, m), r)))
-        })
+        .map(|(c, m, unit)| dat_row(m, unit, &dat.sounds).map(|r| ((c, m), r)))
         .collect()
 }
 
-/// A `.dat` unit's row (`m`, its slot and master id): its dead-object values (decay, undead),
-/// its default action, its work-command values, turning and flight; none for a slot past the
-/// masters' ids.
+/// A `.dat` unit's row (`id`, its slot and master id): its dead-object values (decay, undead),
+/// its default action, its work-command values, turning and flight.
 ///
 /// # Errors
 ///
 /// A task or a cost slot that holds no type or attribute.
 fn dat_row(
-    m: i16,
+    id: MasterId,
     unit: &genie_dat::de::Unit,
     sounds: &[genie_dat::de::Sound],
-) -> Result<Option<Row>, GenieError> {
-    let Some(id) = MasterId::of_data(m) else {
-        return Ok(None);
-    };
+) -> Result<Row, GenieError> {
     let default_action = match unit.bird.as_ref() {
         None => DefaultAction::None,
         Some(b) => {
@@ -107,7 +113,7 @@ fn dat_row(
             default_action(b.default_task_id, tasks.into_iter())
         }
     };
-    Ok(Some(Row {
+    Ok(Row {
         data: MasterData {
             decay: AmountRate::new(unit.resource_decay),
             undead: unit.undead_mode != 0,
@@ -115,12 +121,15 @@ fn dat_row(
         default_action,
         work: Some(dat_work(id, unit, sounds)?),
         turning: unit.dead_fish.as_ref().map(|d| Turning {
-            move_algorithm: d.old_move_algorithm,
+            move_algorithm: MoveAlgorithm::from_bits_retain(d.old_move_algorithm),
             min_collision_size_multiplier: d.min_collision_size_multiplier,
         }),
-        projectile_type: unit.projectile.as_ref().map(|p| p.projectile_type),
-        fly_mode: unit.fly_mode,
-    }))
+        projectile_type: unit
+            .projectile
+            .as_ref()
+            .map(|p| ProjectileType::of_data(p.projectile_type)),
+        fly_mode: FlyMode::of_data(unit.fly_mode),
+    })
 }
 
 /// One master's row.
@@ -133,8 +142,8 @@ struct Row {
     turning: Option<Turning>,
     /// A missile master's `projectile_type` (`+0x880`) and every master's `fly_mode` (`+0x608`),
     /// which the save does not hold.
-    projectile_type: Option<u8>,
-    fly_mode: u8,
+    projectile_type: Option<ProjectileType>,
+    fly_mode: FlyMode,
 }
 
 /// What the save does not hold of a moving master's movement (the `.dat` unit's moving part).
@@ -143,7 +152,7 @@ struct Row {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Turning {
     /// Master `+0x768`, `old_move_algorithm`: bit 0 has a stop reset the unit's sprite.
-    pub move_algorithm: u8,
+    pub move_algorithm: MoveAlgorithm,
     /// Master `+0x780`.
     pub min_collision_size_multiplier: f32,
 }
@@ -257,7 +266,7 @@ impl TerrainTable {
 /// Every master of every civ of a data file.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MasterTable {
-    rows: HashMap<(u8, i16), Row>,
+    rows: HashMap<(CivId, MasterId), Row>,
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
     sprite_speed: HashMap<SpriteId, SpeedMultiplier>,
     /// What the sprite clock reads of each graphic.
@@ -299,7 +308,7 @@ fn tech_def(
         effect,
         required: t.required_techs.map(TechId::of_data),
         required_count: t.required_tech_count,
-        civ: genie_core::players::CivId::of_tech(t.civ)?,
+        civ: CivId::of_tech(t.civ)?,
         mode: genie_core::technology::TechMode::of_data(t.full_tech_mode),
         locations: t
             .research_locations
@@ -476,7 +485,7 @@ impl MasterTable {
 
     /// A table of the given `((civ, master), data, default action)` rows.
     pub fn from_rows(
-        rows: impl IntoIterator<Item = ((u8, i16), MasterData, DefaultAction)>,
+        rows: impl IntoIterator<Item = ((CivId, MasterId), MasterData, DefaultAction)>,
     ) -> Self {
         Self {
             rows: rows
@@ -490,7 +499,7 @@ impl MasterTable {
                             work: None,
                             turning: None,
                             projectile_type: None,
-                            fly_mode: 0,
+                            fly_mode: FlyMode::default(),
                         },
                     )
                 })
@@ -509,32 +518,32 @@ impl MasterTable {
 
     /// The dead-object values of `master` for `civ`; None if the data file has no such master.
     #[must_use]
-    pub fn get(&self, civ: u8, master: i16) -> Option<MasterData> {
+    pub fn get(&self, civ: CivId, master: MasterId) -> Option<MasterData> {
         self.rows.get(&(civ, master)).map(|r| r.data)
     }
 
     /// The default action of `master` for `civ`; None if the data file has no such master.
     #[must_use]
-    pub fn default_action(&self, civ: u8, master: i16) -> Option<DefaultAction> {
+    pub fn default_action(&self, civ: CivId, master: MasterId) -> Option<DefaultAction> {
         self.rows.get(&(civ, master)).map(|r| r.default_action)
     }
 
     /// The `.dat`'s work-command values of a civ's master: the task swap group the save lacks, and
     /// the tasks a master without saved ones has.
     #[must_use]
-    pub fn work(&self, civ: u8, master: i16) -> Option<&work::Master> {
+    pub fn work(&self, civ: CivId, master: MasterId) -> Option<&work::Master> {
         self.rows.get(&(civ, master)).and_then(|r| r.work.as_ref())
     }
 
     /// How a civ's moving master turns; None for a master without a moving part.
     #[must_use]
-    pub fn turning(&self, civ: u8, master: i16) -> Option<Turning> {
+    pub fn turning(&self, civ: CivId, master: MasterId) -> Option<Turning> {
         self.rows.get(&(civ, master)).and_then(|r| r.turning)
     }
 
     /// A missile master's `projectile_type` (`+0x880`).
     #[must_use]
-    pub fn projectile_type(&self, civ: u8, master: i16) -> Option<u8> {
+    pub fn projectile_type(&self, civ: CivId, master: MasterId) -> Option<ProjectileType> {
         self.rows
             .get(&(civ, master))
             .and_then(|r| r.projectile_type)
@@ -542,7 +551,7 @@ impl MasterTable {
 
     /// A master's `fly_mode` (`+0x608`): 0 keeps its objects on the ground, 1 above it.
     #[must_use]
-    pub fn fly_mode(&self, civ: u8, master: i16) -> Option<u8> {
+    pub fn fly_mode(&self, civ: CivId, master: MasterId) -> Option<FlyMode> {
         self.rows.get(&(civ, master)).map(|r| r.fly_mode)
     }
 
@@ -558,7 +567,12 @@ impl MasterTable {
 #[cfg(test)]
 impl MasterTable {
     /// A table of the master `master` of `civ`, turning as `turning` and flying as `fly_mode`.
-    pub(crate) fn of_master(civ: u8, master: i16, turning: Option<Turning>, fly_mode: u8) -> Self {
+    pub(crate) fn of_master(
+        civ: CivId,
+        master: MasterId,
+        turning: Option<Turning>,
+        fly_mode: FlyMode,
+    ) -> Self {
         let row = Row {
             data: MasterData::default(),
             default_action: DefaultAction::None,
@@ -602,8 +616,8 @@ impl MasterTable {
     /// For a master the table does not have.
     pub(crate) fn with_default_action(
         mut self,
-        civ: u8,
-        master: i16,
+        civ: CivId,
+        master: MasterId,
         action: DefaultAction,
     ) -> Self {
         self.rows
@@ -763,7 +777,7 @@ mod tests {
     fn rows_are_found_by_civ_and_master() {
         let t = MasterTable::from_rows([
             (
-                (1, 332),
+                (CivId::new(1), MasterId::of_data(332).unwrap()),
                 MasterData {
                     decay: AmountRate::new(1.0),
                     undead: false,
@@ -771,7 +785,7 @@ mod tests {
                 DefaultAction::None,
             ),
             (
-                (2, 705),
+                (CivId::new(2), MasterId::of_data(705).unwrap()),
                 MasterData {
                     decay: AmountRate::new(0.25),
                     undead: false,
@@ -779,14 +793,24 @@ mod tests {
                 DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE),
             ),
         ]);
-        assert_eq!(t.get(1, 332).map(|d| d.decay), Some(AmountRate::new(1.0)));
         assert_eq!(
-            t.default_action(2, 705),
+            t.get(CivId::new(1), MasterId::of_data(332).unwrap())
+                .map(|d| d.decay),
+            Some(AmountRate::new(1.0))
+        );
+        assert_eq!(
+            t.default_action(CivId::new(2), MasterId::of_data(705).unwrap()),
             Some(DefaultAction::Type(
                 genie_core::ownership::artifact::ARTIFACT_TYPE
             ))
         );
-        assert_eq!((t.get(2, 332), t.default_action(1, 705)), (None, None));
+        assert_eq!(
+            (
+                t.get(CivId::new(2), MasterId::of_data(332).unwrap()),
+                t.default_action(CivId::new(1), MasterId::of_data(705).unwrap())
+            ),
+            (None, None)
+        );
     }
 
     #[test]

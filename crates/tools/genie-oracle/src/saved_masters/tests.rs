@@ -7,6 +7,8 @@ use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::facing::SpriteFacets;
 use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::MasterId;
+use genie_core::players::CivId;
 use genie_save::generated::world::Master;
 
 /// A walker: master 83 standing as sprite 10, walking as 11 and running as 12.
@@ -27,29 +29,34 @@ fn walker() -> Master {
 
 fn table(facets: [i16; 3]) -> MasterTable {
     let turning = Turning {
-        move_algorithm: 1,
+        move_algorithm: MoveAlgorithm::from_bits_retain(1),
         min_collision_size_multiplier: 0.75,
     };
-    MasterTable::of_master(1, 83, Some(turning), 2)
-        .with_sprite(
-            SpriteId::named(10),
-            genie_core::objects::SpeedMultiplier::ZERO,
-            FacetCount::of_data(facets[0]),
-            SpriteFlags::TURNS,
-        )
-        .with_sprite(
-            SpriteId::named(11),
-            genie_core::objects::SpeedMultiplier::of_data(2.0),
-            FacetCount::of_data(facets[1]),
-            SpriteFlags::TURNS,
-        )
-        .with_sprite(
-            SpriteId::named(12),
-            genie_core::objects::SpeedMultiplier::of_data(3.0),
-            FacetCount::of_data(facets[2]),
-            SpriteFlags::TURNS,
-        )
-        .with_masks(vec![0, 0b101])
+    MasterTable::of_master(
+        CivId::new(1),
+        MasterId::of_data(83).unwrap(),
+        Some(turning),
+        FlyMode::of_data(2),
+    )
+    .with_sprite(
+        SpriteId::named(10),
+        genie_core::objects::SpeedMultiplier::ZERO,
+        FacetCount::of_data(facets[0]),
+        SpriteFlags::TURNS,
+    )
+    .with_sprite(
+        SpriteId::named(11),
+        genie_core::objects::SpeedMultiplier::of_data(2.0),
+        FacetCount::of_data(facets[1]),
+        SpriteFlags::TURNS,
+    )
+    .with_sprite(
+        SpriteId::named(12),
+        genie_core::objects::SpeedMultiplier::of_data(3.0),
+        FacetCount::of_data(facets[2]),
+        SpriteFlags::TURNS,
+    )
+    .with_masks(vec![0, 0b101])
 }
 
 /// The facets of the sprites the master shows, when they are all of one count; the data
@@ -87,7 +94,7 @@ fn a_walker_moves_by_its_sprites_speed_factors() {
             .rge_master_animated_object
             .rge_master_static_object
     };
-    let stats = moving_stats(&master, s, 1, &table([8; 3])).unwrap();
+    let stats = moving_stats(&master, s, CivId::new(1), &table([8; 3])).unwrap();
     assert_eq!(stats.speed.get().to_bits(), 3.0_f32.to_bits());
     assert_eq!(
         (stats.fly_mode, stats.move_algorithm),
@@ -105,12 +112,17 @@ fn a_walker_moves_by_its_sprites_speed_factors() {
     // without a run sprite, the move sprite's factor
     let mut no_run = walker();
     master_moving_mut(&mut no_run).run_sprite_id = -1;
-    let stats = moving_stats(&no_run, s, 1, &table([8; 3])).unwrap();
+    let stats = moving_stats(&no_run, s, CivId::new(1), &table([8; 3])).unwrap();
     assert_eq!(stats.speed.get().to_bits(), 2.0_f32.to_bits());
     // no factor at all: the top speed
-    let plain =
-        MasterTable::of_master(1, 83, table([8; 3]).turning(1, 83), 0).with_masks(vec![0, 1]);
-    let stats = moving_stats(&master, s, 1, &plain).unwrap();
+    let plain = MasterTable::of_master(
+        CivId::new(1),
+        MasterId::of_data(83).unwrap(),
+        table([8; 3]).turning(CivId::new(1), MasterId::of_data(83).unwrap()),
+        FlyMode::of_data(0),
+    )
+    .with_masks(vec![0, 1]);
+    let stats = moving_stats(&master, s, CivId::new(1), &plain).unwrap();
     assert_eq!(stats.speed.get().to_bits(), 1.0_f32.to_bits());
 }
 
@@ -127,10 +139,18 @@ fn a_master_without_its_movement_has_no_stats() {
             .rge_master_static_object
             .clone()
     };
-    assert!(moving_stats(&Master::default(), &s, 1, &table([8; 3])).is_none());
-    assert!(moving_stats(&master, &s, 2, &table([8; 3])).is_none());
-    assert!(moving_stats(&master, &s, 1, &table([8; 3]).with_masks(vec![0])).is_none());
+    assert!(moving_stats(&Master::default(), &s, CivId::new(1), &table([8; 3])).is_none());
+    assert!(moving_stats(&master, &s, CivId::new(2), &table([8; 3])).is_none());
+    assert!(
+        moving_stats(
+            &master,
+            &s,
+            CivId::new(1),
+            &table([8; 3]).with_masks(vec![0])
+        )
+        .is_none()
+    );
     let mut negative = s;
     negative.terrain_restriction_mask_id = -1;
-    assert!(moving_stats(&master, &negative, 1, &table([8; 3])).is_none());
+    assert!(moving_stats(&master, &negative, CivId::new(1), &table([8; 3])).is_none());
 }

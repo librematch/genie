@@ -44,7 +44,7 @@ fn a_survey_counts_each_field_over_the_window_s_saves() {
         (row.field.as_str(), row.count, row.first),
         (ONLY_IN_THE_GAME, 3, 2)
     );
-    assert_eq!((row.player, row.example.id), (1, 7));
+    assert_eq!((row.player, row.example.id.get()), (1, 7));
     let mut games = |_: usize| Some(recording(&game, &[]));
     let sparse =
         header_survey(&rec, None, &[1], (1, 5), every(2), Scope::Saved, &mut games).unwrap();

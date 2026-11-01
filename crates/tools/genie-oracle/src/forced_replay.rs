@@ -12,6 +12,7 @@ use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::objects::ObjectId;
 use genie_core::players::Amount;
+use genie_core::players::CivId;
 use genie_core::players::game_status::GameStatus;
 use genie_core::world::FrameSeed;
 use genie_core::world::PlayState;
@@ -530,7 +531,7 @@ pub(super) fn game_state(
         ..Default::default()
     };
     for p in header.players() {
-        let civ = p.world_player().base.civ_id;
+        let civ = CivId::new(p.world_player().base.civ_id);
         game.players.push(
             p.live_objects()
                 .map(|o| {

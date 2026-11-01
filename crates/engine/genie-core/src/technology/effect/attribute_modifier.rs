@@ -106,7 +106,7 @@ impl World {
             return Ok(());
         }
         let rate = crate::garrison::attack_rate(master, masters, u.reload_powerup);
-        if at_most_or_unordered(rate, 0.0) {
+        if at_most_or_unordered(rate.get(), 0.0) {
             return Ok(());
         }
         let mut shares = Vec::new();

@@ -1,5 +1,6 @@
 use crate::task_finder::{FinderObject, FinderWorld, finder_objects};
 use crate::test_ids::object_id;
+use genie_core::map::Position;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
@@ -7,6 +8,7 @@ use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::ids;
 use genie_core::objects::masters::{Master, Masters};
 use genie_core::players::Amount;
+use genie_core::players::CivId;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute;
 use genie_core::players::{ByPlayer, Relations};
@@ -22,13 +24,13 @@ fn object(annex_of: Option<ObjectId>) -> FinderObject {
             kind: Some(attribute::FOOD),
             amount: Amount::new(5.0),
         },
-        hp: 25.0,
-        max_hp: 30.0,
+        hp: HitPoints::new(25.0),
+        max_hp: HitPoints::new(30.0),
         attackable: true,
         pasture: None,
         annex_of,
         top_action: Some(genie_core::gathering::gather::GATHER),
-        position: [1.0, 2.0, 0.0],
+        position: Position::new(1.0, 2.0, 0.0),
     }
 }
 
@@ -53,7 +55,7 @@ fn world(relation: u8) -> FinderWorld {
             Relations::default(),
         ]),
         attribute_95: vec![Amount::ZERO, Amount::new(1.5)],
-        civs: vec![0, 4],
+        civs: vec![CivId::GAIA, CivId::new(4)],
         drop_sites: vec![],
     }
 }
@@ -107,11 +109,7 @@ fn the_actor_reads_its_player_s_attribute_95_and_civ() {
     let actor = w.actor(object_id(10)).unwrap();
     assert_eq!(
         (actor.id, actor.player, actor.civ),
-        (
-            object_id(10),
-            PlayerId::new(1),
-            genie_core::players::CivId::new(4)
-        )
+        (object_id(10), PlayerId::new(1), CivId::new(4))
     );
     assert_eq!(actor.attribute_95.get().to_bits(), 1.5_f32.to_bits());
     assert!(w.actor(object_id(99)).is_none());
@@ -130,7 +128,10 @@ fn the_finder_s_objects_are_every_player_s_by_id() {
     ids.sort_unstable();
     assert_eq!(ids, [object_id(3), object_id(10)]);
     let (gaia_deer, villager) = (&objects[&object_id(3)], &objects[&object_id(10)]);
-    assert_eq!((gaia_deer.player, gaia_deer.hp), (PlayerId::GAIA, 7.0));
+    assert_eq!(
+        (gaia_deer.player, gaia_deer.hp),
+        (PlayerId::GAIA, HitPoints::new(7.0))
+    );
     assert_eq!(villager.player, PlayerId::new(1));
     let none = header(vec![gaia(Vec::new()), human(vec![combat_object(-1, 83)])]);
     assert!(matches!(

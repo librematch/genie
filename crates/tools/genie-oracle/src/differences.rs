@@ -2,6 +2,8 @@
 //! field the game's save holds, each named by its path in genie's object (`life.hp`,
 //! `body.mover.paths[0].points[2]`), compared by genie-diff (FD-045-D14).
 
+use genie_core::objects::ObjectId;
+use genie_core::objects::masters::MasterId;
 use genie_core::objects::unit::Unit;
 use genie_diff::Scope;
 
@@ -10,9 +12,9 @@ use genie_diff::Scope;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Difference {
     /// The object's id.
-    pub id: i32,
+    pub id: ObjectId,
     /// Its master: the game's, or the slice's for an object only the slice holds.
-    pub master: i16,
+    pub master: MasterId,
     /// The field's path in the object, or [`ONLY_IN_THE_GAME`], [`ONLY_IN_THE_SLICE`].
     pub field: String,
     /// The slice's value (its summary for an object only the slice holds).
@@ -84,8 +86,8 @@ pub fn object_field_differences_in<'a>(
         let master = g.life.master_id;
         let Some(&s) = by_id.get(&g.id) else {
             out.push(Difference {
-                id: g.id.get(),
-                master: master.get(),
+                id: g.id,
+                master,
                 field: ONLY_IN_THE_GAME.to_owned(),
                 slice: String::new(),
                 game: summary(g),
@@ -96,8 +98,8 @@ pub fn object_field_differences_in<'a>(
             genie_diff::differences(s, g, scope)
                 .into_iter()
                 .map(|d| Difference {
-                    id: g.id.get(),
-                    master: master.get(),
+                    id: g.id,
+                    master,
                     field: d.path,
                     slice: d.left,
                     game: d.right,
@@ -106,8 +108,8 @@ pub fn object_field_differences_in<'a>(
     }
     for s in slice.iter().filter(|s| !game.iter().any(|g| g.id == s.id)) {
         out.push(Difference {
-            id: s.id.get(),
-            master: s.life.master_id.get(),
+            id: s.id,
+            master: s.life.master_id,
             field: ONLY_IN_THE_SLICE.to_owned(),
             slice: summary(s),
             game: String::new(),

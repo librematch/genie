@@ -1,6 +1,9 @@
 use crate::Error;
 use crate::fixtures::{combat_mut, combat_object, gaia, header, moving_mut, static_mut};
 use crate::views::{checkpoint_lines, groups_of, movement_of, objects_of, unit_ais_of};
+use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::MasterId;
+use genie_core::players::CivId;
 use genie_rec::de::{Chapter, Checkpoint, Op};
 use genie_save::generated::world::{
     Action, ActionListEntry1, Formation, FormationEntry1, Path, PathData, RgeAction,
@@ -314,7 +317,12 @@ fn the_checkpoint_view_runs_the_recording() {
             },
         ],
     );
-    let table = crate::masters::MasterTable::of_master(0, 83, None, 0);
+    let table = crate::masters::MasterTable::of_master(
+        CivId::GAIA,
+        MasterId::of_data(83).unwrap(),
+        None,
+        FlyMode::of_data(0),
+    );
     let text = crate::views::checkpoints(&rec, &table, 2).unwrap();
     assert!(text.starts_with("checkpoint at 1: p1 [(0, "), "{text}");
 }

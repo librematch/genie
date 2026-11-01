@@ -2,6 +2,7 @@
 //! combat part.
 
 use crate::Error;
+use genie_core::world::Millis;
 use genie_core::world::Seconds;
 use genie_rec::de;
 use genie_rec::de::Op;
@@ -10,7 +11,7 @@ use genie_save::generated::world::Master;
 /// One frame of the body (FD-007's per-frame record order): the op-2 record that starts a tick, its
 /// dt and, every interval, a checkpoint, then the op-1 commands the tick runs after its `SeedAll`.
 pub(super) struct Frame<'a> {
-    pub(super) dt: u32,
+    pub(super) dt: Millis,
     pub(super) checkpoint: Option<Box<de::Checkpoint>>,
     pub(super) commands: Vec<&'a [u8]>,
 }
@@ -35,7 +36,7 @@ pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<
             break;
         }
         out.push(Frame {
-            dt,
+            dt: Millis::new(dt),
             checkpoint,
             commands: Vec::new(),
         });

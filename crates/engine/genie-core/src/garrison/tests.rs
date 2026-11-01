@@ -1156,15 +1156,18 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
     };
     let masters = Masters::new([arrow, tc.clone(), villager.clone()]);
     let rate = attack_rate(&tc, &masters, Seconds::ZERO);
-    assert_eq!(rate, 2.5);
+    assert_eq!(rate, DamageRate::new(2.5));
     // a garrison firepower at most 0 is its magnitude
-    assert_eq!(firepower(&villager, &masters, Seconds::ZERO), 2.5);
+    assert_eq!(
+        firepower(&villager, &masters, Seconds::ZERO),
+        DamageRate::new(2.5)
+    );
     assert_eq!(
         share(&villager, &masters, Seconds::ZERO, rate),
         Ok(Firepower::new(1.0))
     );
     assert_eq!(
-        share(&villager, &masters, Seconds::ZERO, 0.0),
+        share(&villager, &masters, Seconds::ZERO, DamageRate::new(0.0)),
         Ok(Firepower::new(0.0))
     );
     // one above 0 times the melee, pierce, class 31 and 38 amounts over the reload
@@ -1172,7 +1175,10 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
         garrison_firepower: Firepower::new(0.5),
         ..villager
     };
-    assert_eq!(firepower(&armed, &masters, Seconds::ZERO), 0.75);
+    assert_eq!(
+        firepower(&armed, &masters, Seconds::ZERO),
+        DamageRate::new(0.75)
+    );
 }
 
 /// A town centre's master as `a_villager_inside_a_town_center_adds_one_missile_to_its_volleys`
@@ -1206,7 +1212,10 @@ fn an_attack_rate_needs_a_reload_and_a_range_that_compare_above_their_limits() {
         ..Master::default()
     };
     let masters = Masters::new([arrow, town_center()]);
-    assert_eq!(attack_rate(&town_center(), &masters, Seconds::ZERO), 3.5);
+    assert_eq!(
+        attack_rate(&town_center(), &masters, Seconds::ZERO),
+        DamageRate::new(3.5)
+    );
     for (reload, range) in [(f32::NAN, 6.0), (2.0, f32::NAN), (0.0, 6.0), (2.0, 1.0)] {
         let tc = Master {
             reload: Seconds::new(reload),
@@ -1214,7 +1223,7 @@ fn an_attack_rate_needs_a_reload_and_a_range_that_compare_above_their_limits() {
             ..town_center()
         };
         assert_eq!(
-            attack_rate(&tc, &masters, Seconds::ZERO).to_bits(),
+            attack_rate(&tc, &masters, Seconds::ZERO).get().to_bits(),
             0.0f32.to_bits()
         );
     }
@@ -1232,7 +1241,7 @@ fn an_attack_rate_needs_a_reload_and_a_range_that_compare_above_their_limits() {
     };
     assert_eq!(
         attack_rate(&infantry, &masters, Seconds::new(0.5)),
-        8.0 / 1.5
+        DamageRate::new(8.0 / 1.5)
     );
 }
 
@@ -1276,22 +1285,28 @@ fn a_volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
     // (2 + 1) * 2 extra missiles, plus its own 4, over its reload 2
     assert_eq!(
         firepower(&archer(Some(master_id(54))), &masters, Seconds::ZERO),
-        5.0
+        DamageRate::new(5.0)
     );
     // no volley missile: the missile's (6 * 2 + 4) / 2
-    assert_eq!(firepower(&archer(None), &masters, Seconds::ZERO), 8.0);
+    assert_eq!(
+        firepower(&archer(None), &masters, Seconds::ZERO),
+        DamageRate::new(8.0)
+    );
     // a volley missile without weapons adds nothing
     assert_eq!(
         firepower(&archer(Some(master_id(55))), &masters, Seconds::ZERO),
-        2.0
+        DamageRate::new(2.0)
     );
     // a null slot of the player's table (id 52 below its last master) adds nothing either
     assert_eq!(
         firepower(&archer(Some(master_id(52))), &masters, Seconds::ZERO),
-        2.0
+        DamageRate::new(2.0)
     );
     // no missile: the weapons' own
-    assert_eq!(firepower(&archer(None), &masters, Seconds::ZERO), 8.0);
+    assert_eq!(
+        firepower(&archer(None), &masters, Seconds::ZERO),
+        DamageRate::new(8.0)
+    );
 }
 
 #[test]
@@ -1314,16 +1329,25 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
         ..Master::default()
     };
     let masters = Masters::new([volley(1)]);
-    assert_eq!(firepower(&tower, &masters, Seconds::ZERO), -2_147_483_648.0);
+    assert_eq!(
+        firepower(&tower, &masters, Seconds::ZERO),
+        DamageRate::new(-2_147_483_648.0)
+    );
     let masters = Masters::new([volley(2)]);
-    assert_eq!(firepower(&tower, &masters, Seconds::ZERO), 0.0);
+    assert_eq!(
+        firepower(&tower, &masters, Seconds::ZERO),
+        DamageRate::new(0.0)
+    );
     // the f32 truncation toward zero: 3.9 - 1 gives 2 extra missiles
     let masters = Masters::new([volley(3)]);
     let three = Master {
         volley_fire: Firepower::new(3.9),
         ..tower
     };
-    assert_eq!(firepower(&three, &masters, Seconds::ZERO), 6.0);
+    assert_eq!(
+        firepower(&three, &masters, Seconds::ZERO),
+        DamageRate::new(6.0)
+    );
 }
 
 #[test]
@@ -1352,12 +1376,12 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
     let masters = Masters::new([foot.clone(), mounted.clone()]);
     // its own 1.0 against the other form's 3.0, over a rate of 2
     assert_eq!(
-        share(&foot, &masters, Seconds::ZERO, 2.0),
+        share(&foot, &masters, Seconds::ZERO, DamageRate::new(2.0)),
         Ok(Firepower::new(1.5))
     );
     // the other form's lower share leaves its own
     assert_eq!(
-        share(&mounted, &masters, Seconds::ZERO, 2.0),
+        share(&mounted, &masters, Seconds::ZERO, DamageRate::new(2.0)),
         Ok(Firepower::new(1.5))
     );
     let reversed = Master {
@@ -1365,7 +1389,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
         ..mounted.clone()
     };
     assert_eq!(
-        share(&reversed, &masters, Seconds::ZERO, 2.0),
+        share(&reversed, &masters, Seconds::ZERO, DamageRate::new(2.0)),
         Ok(Firepower::new(1.5))
     );
     // a named master not of type 70, or none, gives the floor 0.0; flag 3 clear names none
@@ -1375,7 +1399,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
     };
     let masters_80 = Masters::new([foot.clone(), building]);
     assert_eq!(
-        share(&foot, &masters_80, Seconds::ZERO, 2.0),
+        share(&foot, &masters_80, Seconds::ZERO, DamageRate::new(2.0)),
         Ok(Firepower::new(0.5))
     );
     let unflagged = Master {
@@ -1383,21 +1407,26 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
         ..foot.clone()
     };
     assert_eq!(
-        share(&unflagged, &masters, Seconds::ZERO, 2.0),
+        share(&unflagged, &masters, Seconds::ZERO, DamageRate::new(2.0)),
         Ok(Firepower::new(0.5))
     );
     // a negative quotient and a NaN one give the floor 0.0
     assert_eq!(
-        share(&unflagged, &masters, Seconds::ZERO, -2.0),
+        share(&unflagged, &masters, Seconds::ZERO, DamageRate::new(-2.0)),
         Ok(Firepower::new(0.0))
     );
     assert_eq!(
-        share(&unflagged, &masters, Seconds::ZERO, f32::NAN),
+        share(
+            &unflagged,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(f32::NAN)
+        ),
         Ok(Firepower::new(0.0))
     );
     // _fdclass: a rate of ±0 gives +0.0; class 42 gives 1.0 whatever the rate
     assert_eq!(
-        share(&foot, &masters, Seconds::ZERO, -0.0).map(|f| f.get().to_bits()),
+        share(&foot, &masters, Seconds::ZERO, DamageRate::new(-0.0)).map(|f| f.get().to_bits()),
         Ok(0)
     );
     let relic_like = Master {
@@ -1405,7 +1434,12 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
         ..foot
     };
     assert_eq!(
-        share(&relic_like, &masters, Seconds::ZERO, f32::NAN),
+        share(
+            &relic_like,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(f32::NAN)
+        ),
         Ok(Firepower::new(1.0))
     );
 }

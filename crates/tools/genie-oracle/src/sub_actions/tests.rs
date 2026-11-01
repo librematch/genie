@@ -5,6 +5,9 @@ use crate::test_ids::object_id;
 use genie_core::combat::attack::AttackState;
 use genie_core::movement::move_to::MoveTo;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::MasterId;
+use genie_core::players::CivId;
 use genie_core::players::attribute;
 use genie_core::production::{MakeObjState, MakeTechState, Making};
 use genie_save::generated::world::{
@@ -195,14 +198,28 @@ fn livestock() -> genie_save::Object {
 fn start(table: &MasterTable) -> Result<Option<DefaultStart>, genie_core::GenieError> {
     let mut object = livestock();
     let s = static_mut(&mut object).clone();
-    default_task(&object, &s, &PlayerObjects::default(), 0, Some(table))
+    default_task(
+        &object,
+        &s,
+        &PlayerObjects::default(),
+        CivId::GAIA,
+        Some(table),
+    )
 }
 
 /// The table's default action: livestock's Artifact, a farm's Make, none, a type no factory
 /// makes (an animal's Explore, 6); any other is reported.
 #[test]
 fn the_default_task_starts_what_the_table_names() {
-    let table = |action| MasterTable::of_master(0, 83, None, 0).with_default_action(0, 83, action);
+    let table = |action| {
+        MasterTable::of_master(
+            CivId::GAIA,
+            MasterId::of_data(83).unwrap(),
+            None,
+            FlyMode::of_data(0),
+        )
+        .with_default_action(CivId::GAIA, MasterId::of_data(83).unwrap(), action)
+    };
     let artifact = genie_core::ownership::artifact::ARTIFACT_TYPE;
     assert!(matches!(
         start(&table(DefaultAction::Type(artifact))),
@@ -242,12 +259,12 @@ fn a_static_object_has_no_default_task() {
     let s = tree.static_part().unwrap().clone();
     let objects = PlayerObjects::default();
     assert!(matches!(
-        default_task(&tree, &s, &objects, 0, None),
+        default_task(&tree, &s, &objects, CivId::GAIA, None),
         Ok(None)
     ));
     let object = livestock();
     let s = object.static_part().unwrap().clone();
-    assert!(default_task(&object, &s, &objects, 0, None).is_err());
+    assert!(default_task(&object, &s, &objects, CivId::GAIA, None).is_err());
 }
 
 /// An Attack (type 9) of range 5 in state `state`, its sub-actions `subs`.

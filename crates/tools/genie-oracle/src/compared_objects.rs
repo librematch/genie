@@ -3,6 +3,7 @@
 //! ([`saved_objects`]), so that both are genie's objects and compare field by field.
 
 use genie_core::objects::unit::Unit;
+use genie_core::players::CivId;
 use genie_core::world::World;
 use genie_rec::de;
 use genie_save::Header;
@@ -39,7 +40,7 @@ pub(crate) fn header_objects(
 ) -> Result<Vec<Unit>, Error> {
     let sections = header.players();
     let section = sections.get(id as usize).ok_or(Error::NoSuchPlayer(id))?;
-    let civ = section.world_player().base.civ_id;
+    let civ = CivId::new(section.world_player().base.civ_id);
     let paths = &header.world.base_world.path;
     Ok(section
         .live_objects()

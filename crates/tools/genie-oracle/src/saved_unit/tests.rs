@@ -3,6 +3,9 @@ use crate::masters::{DefaultAction, MasterTable};
 use crate::saved_unit::unit;
 use crate::test_ids::object_id;
 use genie_core::objects::ObjectId;
+use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::MasterId;
+use genie_core::players::CivId;
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionByType, RgeMissileObject, RgeObject,
 };
@@ -17,7 +20,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
         &genie_save::Object::default(),
         &PlayerObjects::default(),
         &[],
-        0,
+        CivId::GAIA,
         None,
         PLAYERS,
     );
@@ -29,9 +32,15 @@ fn an_object_without_its_static_part_is_unmodelled() {
 /// load on and starts again when its action list empties.
 #[test]
 fn livestock_starts_with_its_artifact() {
-    let table = MasterTable::of_master(0, 83, None, 0).with_default_action(
-        0,
-        83,
+    let table = MasterTable::of_master(
+        CivId::GAIA,
+        MasterId::of_data(83).unwrap(),
+        None,
+        FlyMode::of_data(0),
+    )
+    .with_default_action(
+        CivId::GAIA,
+        MasterId::of_data(83).unwrap(),
         DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE),
     );
     let sheep = combat_object(5, 83);
@@ -39,7 +48,7 @@ fn livestock_starts_with_its_artifact() {
         &sheep,
         &PlayerObjects::default(),
         &[],
-        0,
+        CivId::GAIA,
         Some(&table),
         PLAYERS,
     );
@@ -57,7 +66,7 @@ fn without_a_table_the_default_task_is_reported() {
         &combat_object(5, 83),
         &PlayerObjects::default(),
         &[],
-        0,
+        CivId::GAIA,
         None,
         PLAYERS,
     );
@@ -80,7 +89,14 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         .rge_combat_object
         .rge_action_object
         .actions = action_list(vec![(genie_core::movement::explore::EXPLORE, explore)]);
-    let u = unit(&scout, &PlayerObjects::default(), &[], 0, None, PLAYERS);
+    let u = unit(
+        &scout,
+        &PlayerObjects::default(),
+        &[],
+        CivId::GAIA,
+        None,
+        PLAYERS,
+    );
     assert!(u.unmodelled_action.is_some());
     assert!(u.default_fly.is_none());
 }
@@ -113,7 +129,14 @@ fn a_missile_without_its_action_keeps_flying() {
         })),
         ..genie_save::Object::default()
     };
-    let u = unit(&arrow, &PlayerObjects::default(), &[], 0, None, PLAYERS);
+    let u = unit(
+        &arrow,
+        &PlayerObjects::default(),
+        &[],
+        CivId::GAIA,
+        None,
+        PLAYERS,
+    );
     let flying = u.missile.unwrap();
     assert_eq!(flying.fired_from, Some(object_id(900)));
     assert!(flying.flying);
@@ -130,14 +153,28 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     let c = combat_mut(&mut object);
     c.town_bell_flag = 1;
     c.back_to_work1_town_bell_action = 0x261;
-    let u = unit(&object, &PlayerObjects::default(), &[], 0, None, PLAYERS);
+    let u = unit(
+        &object,
+        &PlayerObjects::default(),
+        &[],
+        CivId::GAIA,
+        None,
+        PLAYERS,
+    );
     assert!(u.town_bell.flag);
     assert_eq!(
         (u.town_bell.work.action, u.town_bell.before_building.action),
         (Some(ActionKind::Gather), None)
     );
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
-    let u = unit(&object, &PlayerObjects::default(), &[], 0, None, PLAYERS);
+    let u = unit(
+        &object,
+        &PlayerObjects::default(),
+        &[],
+        CivId::GAIA,
+        None,
+        PLAYERS,
+    );
     assert_eq!(
         u.unmodelled_action.map(|e| e.kind()),
         Some(genie_core::ErrorKind::InvalidInput)

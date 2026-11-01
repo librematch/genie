@@ -1,6 +1,7 @@
 //! A saved unit's reload, sprite and Attack, its Build and Fly tasks, a building's production
 //! and gather point, and the default task an object's first update starts.
 
+use crate::masters::dat_id;
 use crate::masters::{DefaultAction, MasterTable};
 use crate::top_actions::{first_action, saved_move_to};
 use crate::{combat_master, core_task};
@@ -17,6 +18,7 @@ use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::Amount;
+use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::production::EntrySerial;
 use genie_core::production::QueueButton;
@@ -26,6 +28,9 @@ use genie_core::production::QueuedUnits;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
+
+/// A master the table does not have (the save names one the data file lacks).
+const NOT_IN_TABLE: GenieError = GenieError::unsupported("a master the table does not have");
 
 /// A saved unit's reload (the Strike's): its `mReloadStinger` plus its master's
 /// `speed_of_attack` less its `mReloadPowerup`; None without a combat master.
@@ -163,7 +168,7 @@ pub(super) fn saved_attack(
 /// and work value (`+0x28`), with the master's work rate (its action part's `work_rate`).
 pub(super) fn build_task(
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
     master: i16,
 ) -> Result<genie_core::construction::build::BuildTask, GenieError> {
@@ -185,7 +190,7 @@ pub(super) fn build_task(
 /// A bird master's Fly task: its saved task list's, else the `.dat`'s.
 pub(super) fn fly_task(
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
     master: i16,
 ) -> Result<genie_core::objects::masters::Task, GenieError> {
@@ -206,7 +211,7 @@ pub(super) fn fly_task(
         return core_task(&entry.task);
     }
     masters
-        .and_then(|t| t.work(civ, objects.dat_master(master)))
+        .and_then(|t| t.work(civ, dat_id(objects, master)?))
         .and_then(|w| w.tasks.iter().find(|t| t.action_type == fly))
         .copied()
         .ok_or(GenieError::unsupported(
@@ -217,7 +222,7 @@ pub(super) fn fly_task(
 /// A builder master's Build task: its saved task list's, else the `.dat`'s.
 pub(super) fn master_build_task(
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
     m: &Master,
     master: i16,
@@ -240,7 +245,7 @@ pub(super) fn master_build_task(
         return core_task(&entry.task);
     }
     masters
-        .and_then(|t| t.work(civ, objects.dat_master(master)))
+        .and_then(|t| t.work(civ, dat_id(objects, master)?))
         .and_then(|w| w.tasks.iter().find(|t| t.action_type == build))
         .copied()
         .ok_or(GenieError::unsupported(
@@ -418,7 +423,7 @@ pub(super) fn default_task(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
 ) -> Result<Option<DefaultStart>, GenieError> {
     if !is_action_object(object) {
@@ -437,15 +442,15 @@ pub(super) fn default_task(
             .ok_or(GenieError::unsupported(
                 "no master table: the default task is unknown",
             ))?
-            .default_action(civ, objects.dat_master(s.master_obj))
-            .ok_or(GenieError::unsupported("a master the table does not have"))?,
+            .default_action(civ, dat_id(objects, s.master_obj).ok_or(NOT_IN_TABLE)?)
+            .ok_or(NOT_IN_TABLE)?,
     };
     match action {
         DefaultAction::None => Ok(None),
         DefaultAction::Type(ARTIFACT_TYPE) => {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
             let moving = masters
-                .and_then(|t| t.work(civ, objects.dat_master(s.master_obj)))
+                .and_then(|t| t.work(civ, dat_id(objects, s.master_obj)?))
                 .and_then(genie_core::objects::masters::Master::default_task)
                 .and_then(|t| t.sprites.moving);
             Ok(Some(DefaultStart::Artifact(

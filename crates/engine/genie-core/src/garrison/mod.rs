@@ -11,6 +11,7 @@ use crate::GenieError;
 use crate::vision::SightTiles;
 
 mod class_flags;
+mod damage_rate;
 mod enter;
 mod enter_state;
 mod firepower;
@@ -26,6 +27,7 @@ mod unload;
 mod walk_in;
 
 pub use self::class_flags::ClassFlags;
+pub use self::damage_rate::DamageRate;
 pub use self::enter_state::EnterState;
 use self::firepower::WHOLE_SHARE_CLASS;
 pub use self::firepower::{attack_rate, firepower, share};

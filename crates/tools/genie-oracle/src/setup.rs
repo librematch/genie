@@ -10,6 +10,7 @@ use genie_core::objects::ListIndex;
 use genie_core::objects::masters::CostAmount;
 use genie_core::players::Amount;
 use genie_core::players::Chance;
+use genie_core::players::CivId;
 use genie_core::players::EscrowShare;
 use genie_core::players::LotVolume;
 use genie_core::players::Team;
@@ -129,7 +130,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            let civ = p.world_player().base.civ_id;
+            let civ = CivId::new(p.world_player().base.civ_id);
             let attributes = &p.world_player().base.attributes;
             Player {
                 objects: p
@@ -169,7 +170,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     .iter()
                     .map(|&b| Amount::new(f32::from_bits(b)))
                     .collect(),
-                civ: genie_core::players::CivId::new(civ),
+                civ,
                 relations: genie_core::players::Relations::of_bytes(
                     p.world_player().base.relation.iter().copied(),
                 ),
@@ -407,7 +408,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         let masters = header
             .players()
             .iter()
-            .map(|p| work_masters(p.objects(), p.world_player().base.civ_id, table))
+            .map(|p| work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table))
             .collect::<Result<_, _>>();
         match masters {
             Ok(m) => turns.masters = m,

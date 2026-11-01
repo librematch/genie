@@ -14,6 +14,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::ListIndex;
 use genie_core::players::Amount;
 use genie_core::players::game_status::GameStatus;
+use genie_core::world::Millis;
 use genie_core::world::WorldTime;
 use genie_core::world::{GameState, World};
 use genie_save::Header;
@@ -315,7 +316,7 @@ fn priming_sets_the_update_count_and_the_last_commanded_units() {
     .encode()
     .unwrap();
     let frames = [Frame {
-        dt: 40,
+        dt: Millis::new(40),
         checkpoint: None,
         commands: vec![&moved[..]],
     }];
@@ -333,7 +334,7 @@ fn a_frames_command_phase_moves_the_time_on() {
     frame_commands(&mut turns, &mut decoder, None);
     assert_eq!((turns.ticks.get(), turns.world_time), (0, WorldTime::ZERO));
     let frame = Frame {
-        dt: 40,
+        dt: Millis::new(40),
         checkpoint: None,
         commands: Vec::new(),
     };

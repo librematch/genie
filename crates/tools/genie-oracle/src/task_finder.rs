@@ -2,12 +2,14 @@
 
 use crate::masters::MasterTable;
 use crate::{Error, work_masters};
+use genie_core::map::Position;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::PlayersMasters;
 use genie_core::players::Amount;
+use genie_core::players::CivId;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::players::{ByPlayer, Relations};
@@ -27,7 +29,7 @@ pub struct FinderWorld {
     /// Every player's attribute 95.
     pub attribute_95: Vec<Amount>,
     /// Every player's civ.
-    pub civs: Vec<u8>,
+    pub civs: Vec<CivId>,
     /// The drop-site table.
     pub drop_sites: Vec<genie_core::unit_ai::task_finder::DropSite>,
 }
@@ -44,9 +46,9 @@ pub struct FinderObject {
     /// What it holds: the attribute and the amount.
     pub held: Held,
     /// Its hit points.
-    pub hp: f32,
+    pub hp: HitPoints,
     /// Its most hit points.
-    pub max_hp: f32,
+    pub max_hp: HitPoints,
     /// It may be attacked.
     pub attackable: bool,
     /// The pasture it is in.
@@ -56,7 +58,7 @@ pub struct FinderObject {
     /// Its top action's type, if it has one.
     pub top_action: Option<ActionType>,
     /// Its place.
-    pub position: [f32; 3],
+    pub position: Position,
 }
 
 impl genie_core::unit_ai::task_finder::Diplomacy for FinderWorld {
@@ -100,8 +102,8 @@ impl FinderWorld {
             player: o.player,
             state: o.state,
             held: o.held,
-            hp: HitPoints::new(o.hp),
-            max_hp: HitPoints::new(o.max_hp),
+            hp: o.hp,
+            max_hp: o.max_hp,
             attackable: o.attackable,
             pasture: o.pasture,
             top_action: o.top_action,
@@ -128,9 +130,11 @@ impl FinderWorld {
                 .get(o.player.index())
                 .copied()
                 .unwrap_or(Amount::ZERO),
-            civ: genie_core::players::CivId::new(
-                self.civs.get(o.player.index()).copied().unwrap_or(0),
-            ),
+            civ: self
+                .civs
+                .get(o.player.index())
+                .copied()
+                .unwrap_or(CivId::GAIA),
         })
     }
 }
@@ -145,7 +149,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
     let sections = header.players();
     let masters = sections
         .iter()
-        .map(|p| work_masters(p.objects(), p.world_player().base.civ_id, table))
+        .map(|p| work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table))
         .collect::<Result<_, _>>()?;
     let objects = finder_objects(&sections)?;
     Ok(FinderWorld {
@@ -168,7 +172,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
             .collect(),
         civs: sections
             .iter()
-            .map(|p| p.world_player().base.civ_id)
+            .map(|p| CivId::new(p.world_player().base.civ_id))
             .collect(),
         drop_sites: table.drop_sites.clone(),
     })
@@ -215,8 +219,10 @@ fn finder_object(
             kind: AttributeId::of_field(s.attribute_type_held)?,
             amount: Amount::new(s.attribute_amount_held),
         },
-        hp: s.hp + (powerup(|c| c.hitpoints_max_powerup) - powerup(|c| c.hitpoints_powerup)),
-        max_hp: master_hp + powerup(|c| c.hitpoints_max_powerup),
+        hp: HitPoints::new(
+            s.hp + (powerup(|c| c.hitpoints_max_powerup) - powerup(|c| c.hitpoints_powerup)),
+        ),
+        max_hp: HitPoints::new(master_hp + powerup(|c| c.hitpoints_max_powerup)),
         attackable: s.unit_attackable_flag != 0,
         pasture: ObjectId::of_field(s.parent_pasture_id),
         annex_of: o
@@ -228,7 +234,7 @@ fn finder_object(
             .and_then(|a| a.entries().next())
             .map(|(kind, _)| ActionType::try_from(kind))
             .transpose()?,
-        position: [s.t_x, s.t_y, s.t_z],
+        position: Position::new(s.t_x, s.t_y, s.t_z),
     })
 }
 

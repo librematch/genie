@@ -1,6 +1,7 @@
 //! A saved object's lifecycle fields and its unit AI.
 
 use crate::masters::MasterTable;
+use crate::masters::dat_id;
 use crate::vec3;
 use genie_core::GenieError;
 use genie_core::map::Distance;
@@ -17,6 +18,7 @@ use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::Amount;
 use genie_core::players::AmountRate;
+use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::OrderPriority;
 use genie_core::unit_ai::best_target::AttackCategory;
@@ -39,7 +41,7 @@ pub(super) fn lifecycle(
     object: &genie_save::Object,
     (s, master_id): (&RgeStaticObject, MasterId),
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
 ) -> Result<Lifecycle, GenieError> {
     let pure_static = object
@@ -70,7 +72,7 @@ pub(super) fn lifecycle(
             (
                 player.and_then(|m| SpriteId::of_data(m.death_sprite_id)),
                 player.map_or([-1, -1], |m| [m.death_spawn_obj_id, m.death_spawn_obj_id2]),
-                masters.and_then(|t| t.get(civ, objects.dat_master(s.master_obj))),
+                masters.and_then(|t| t.get(civ, dat_id(objects, s.master_obj)?)),
             )
         },
         |own| {

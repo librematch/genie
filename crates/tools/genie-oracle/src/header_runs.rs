@@ -8,7 +8,6 @@ use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
 use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
-use genie_core::world::Millis;
 use genie_core::world::Tick;
 use genie_core::world::checkpoint::{ActionTerm, CheckpointObject, TopAction, player_block};
 use genie_core::world::{Player, World};
@@ -74,7 +73,7 @@ pub(super) fn run(turns: &mut World, decoder: &mut Decoder, frames: &[Frame<'_>]
                 eprintln!("update {}: {c:?}", turns.ticks.get() + 1);
             }
         }
-        turns.tick_with(Millis::new(frame.dt), &commands);
+        turns.tick_with(frame.dt, &commands);
     }
 }
 

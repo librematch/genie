@@ -5,6 +5,9 @@ use crate::masters::MasterTable;
 use crate::setup::{slice, wonder_time};
 use crate::test_ids::action_type;
 use crate::test_ids::object_id;
+use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::MasterId;
+use genie_core::players::CivId;
 use genie_core::players::PlayerId;
 use genie_core::technology::ResearchState;
 use genie_core::world::WorldTime;
@@ -98,10 +101,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
     let p = &turns.players[1];
     assert_eq!(
         (p.civ, p.kind),
-        (
-            genie_core::players::CivId::new(3),
-            genie_core::players::PlayerType::HUMAN
-        )
+        (CivId::new(3), genie_core::players::PlayerType::HUMAN)
     );
     assert_eq!(
         p.resources().map(|r| r.get().to_bits()),
@@ -162,7 +162,12 @@ fn a_technology_state_of_none_stops_every_player() {
 /// With the master table, the slice takes its tables and builds every player's masters.
 #[test]
 fn the_slice_takes_the_master_tables() {
-    let mut table = MasterTable::of_master(0, 83, None, 0);
+    let mut table = MasterTable::of_master(
+        CivId::GAIA,
+        MasterId::of_data(83).unwrap(),
+        None,
+        FlyMode::of_data(0),
+    );
     table.time_slice = genie_core::players::history::HistoryUpdates::of_data(9);
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let turns = slice(&save, Some(&table));

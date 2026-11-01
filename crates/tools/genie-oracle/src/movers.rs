@@ -2,6 +2,7 @@
 //! its movement state and its `MoveTo`'s point.
 
 use crate::masters::MasterTable;
+use crate::masters::dat_id;
 use crate::object_ids;
 use crate::{combat_master, master_facets};
 use genie_core::GenieError;
@@ -11,7 +12,6 @@ use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::LevelFlags;
 use genie_core::movement::LinkedPathType;
-use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::PathFlags;
 use genie_core::movement::PlanTries;
 use genie_core::movement::Speed;
@@ -21,7 +21,7 @@ use genie_core::movement::WaypointIndex;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteId;
-use genie_core::objects::masters::FlyMode;
+use genie_core::players::CivId;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
 use genie_save::generated::world::{
@@ -175,7 +175,7 @@ pub(super) fn mover(
     s: &RgeStaticObject,
     objects: &PlayerObjects,
     paths: &[Path],
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
 ) -> Result<Option<genie_core::movement::Mover>, GenieError> {
     use genie_core::movement::{MoveStats, Mover, Velocity};
@@ -242,12 +242,11 @@ pub(super) fn mover(
             ))?
     };
     let speed = factor.applied_to(Speed::new(base));
-    let turning =
-        table
-            .turning(civ, objects.dat_master(s.master_obj))
-            .ok_or(GenieError::unsupported(
-                "a moving master the data file does not have",
-            ))?;
+    let turning = dat_id(objects, s.master_obj)
+        .and_then(|m| table.turning(civ, m))
+        .ok_or(GenieError::unsupported(
+            "a moving master the data file does not have",
+        ))?;
     let (turn_speed, walking) = turn.ok_or(GenieError::unsupported(
         "a moving master without a moving part",
     ))?;
@@ -276,11 +275,9 @@ pub(super) fn mover(
         paths: levels,
         factor: 1.0,
         stats: MoveStats {
-            fly_mode: FlyMode::of_data(
-                table
-                    .fly_mode(civ, objects.dat_master(s.master_obj))
-                    .unwrap_or(0),
-            ),
+            fly_mode: dat_id(objects, s.master_obj)
+                .and_then(|m| table.fly_mode(civ, m))
+                .unwrap_or_default(),
             speed,
             base: Speed::new(base),
             turn_rate: genie_core::movement::turn_rate(Seconds::new(turn_speed), facets),
@@ -296,7 +293,7 @@ pub(super) fn mover(
                     "a terrain restriction the data file does not have",
                 ))?,
             turn_time: Seconds::new(turn_speed),
-            move_algorithm: MoveAlgorithm::from_bits_retain(turning.move_algorithm),
+            move_algorithm: turning.move_algorithm,
             min_collision: turning.min_collision_size_multiplier,
             fast_turn: flags & 2 != 0,
             facets: sprite_facets,

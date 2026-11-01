@@ -111,7 +111,7 @@ fn differences_name_the_object_its_master_and_the_field() {
     let d = object_field_differences(&slice, &game);
     let fields: Vec<(i32, i16, &str)> = d
         .iter()
-        .map(|d| (d.id, d.master, d.field.as_str()))
+        .map(|d| (d.id.get(), d.master.get(), d.field.as_str()))
         .collect();
     assert_eq!(
         fields,

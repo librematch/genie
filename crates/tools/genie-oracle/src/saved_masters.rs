@@ -2,6 +2,7 @@
 //! tasks, the work command's masters, the movement and the placement.
 
 use crate::masters::MasterTable;
+use crate::masters::dat_id;
 use crate::{animated_master, combat_master, moving_master};
 use genie_core::GenieError;
 use genie_core::combat::Charge;
@@ -15,7 +16,6 @@ use genie_core::map::Footprint;
 use genie_core::map::Offset;
 use genie_core::map::Radii;
 use genie_core::map::TerrainId;
-use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::Speed;
 use genie_core::objects::Frame;
 use genie_core::objects::HitPoints;
@@ -30,7 +30,6 @@ use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
 use genie_core::objects::masters::CostAmount;
 use genie_core::objects::masters::DamageShare;
-use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::FormationClass;
 use genie_core::objects::masters::GarrisonCapacity;
 use genie_core::objects::masters::GarrisonKinds;
@@ -53,6 +52,7 @@ use genie_core::objects::masters::{
 use genie_core::objects::masters::{BlastDefense, BlastLevel};
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::Amount;
+use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::production::LocationButton;
 use genie_core::world::Seconds;
@@ -126,7 +126,7 @@ pub(super) fn action_part(
 /// at `0x140a7b5e8`).
 pub(super) fn task_at(
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
     master: i16,
     index: i16,
@@ -144,7 +144,7 @@ pub(super) fn task_at(
         return core_task(&entry.task);
     }
     masters
-        .and_then(|t| t.work(civ, objects.dat_master(master)))
+        .and_then(|t| t.work(civ, dat_id(objects, master)?))
         .and_then(|w| w.tasks.get(i))
         .copied()
         .ok_or(GenieError::unsupported(
@@ -206,7 +206,7 @@ pub(super) fn core_task(
 /// the save does not carry (the game copies them from the `.dat` master).
 pub(super) fn work_masters(
     objects: &PlayerObjects,
-    civ: u8,
+    civ: CivId,
     table: &MasterTable,
 ) -> Result<genie_core::objects::masters::Masters, GenieError> {
     let task = core_task;
@@ -214,7 +214,7 @@ pub(super) fn work_masters(
     let masters = saved.filter_map(|m| {
         let s = m.static_part()?;
         // the `.dat` values of the master it copies (an upgraded one's), under its own id
-        let mut work = table.work(civ, s.copy_id())?.clone();
+        let mut work = table.work(civ, MasterId::of_data(s.copy_id())?)?.clone();
         work.id = MasterId::of_data(s.id())?;
         work.class = ClassId::of_master(s.read_temp_5);
         work.radius = Footprint::new(s.radius_x, s.radius_y);
@@ -348,16 +348,18 @@ pub(super) fn work_masters(
             .and_then(|r| r.rge_master_missile_object.as_deref())
         {
             work.missile_stats = Some(genie_core::combat::missile::MissileStats {
-                projectile_type: genie_core::combat::missile::ProjectileType::of_data(
-                    table.projectile_type(civ, s.copy_id()).unwrap_or(0),
-                ),
+                projectile_type: MasterId::of_data(s.copy_id())
+                    .and_then(|m| table.projectile_type(civ, m))
+                    .unwrap_or_default(),
                 smart_mode: SmartMode::from_bits_retain(mm.targetting_type),
                 hit_mode: genie_core::combat::missile::HitMode::of_data(mm.missile_hit_info),
                 vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
                 arc: genie_core::combat::missile::ArcRatio::new(mm.ballistics_ratio),
                 speed: animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed)),
                 radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
-                fly_mode: FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0)),
+                fly_mode: MasterId::of_data(s.copy_id())
+                    .and_then(|m| table.fly_mode(civ, m))
+                    .unwrap_or_default(),
             });
         }
         work.damage_sprites = !s.damage_sprite.is_empty();
@@ -395,7 +397,9 @@ pub(super) fn work_masters(
             .iter()
             .filter_map(|t| t.location)
             .collect();
-        work.fly_mode = FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0));
+        work.fly_mode = MasterId::of_data(s.copy_id())
+            .and_then(|m| table.fly_mode(civ, m))
+            .unwrap_or_default();
         work.standing_sprite = SpriteId::of_data(s.idle_sprite_id);
         work.standing_sprite_2 = SpriteId::of_data(s.idle2_sprite_id);
         (work.move_sprite, work.run_sprite) = moving_master(m).map_or((None, None), |mv| {
@@ -412,7 +416,7 @@ pub(super) fn work_masters(
         ];
         work.terrain_restriction =
             genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id);
-        work.life = table.get(civ, s.copy_id());
+        work.life = MasterId::of_data(s.copy_id()).and_then(|m| table.get(civ, m));
         work.moving = moving_stats(m, s, civ, table);
         Some(Ok(work))
     });
@@ -428,7 +432,7 @@ pub(super) fn work_masters(
 pub(super) fn moving_stats(
     m: &Master,
     s: &genie_save::generated::world::RgeMasterStaticObject,
-    civ: u8,
+    civ: CivId,
     table: &MasterTable,
 ) -> Option<genie_core::movement::MoveStats> {
     let moving = moving_master(m)?;
@@ -438,13 +442,15 @@ pub(super) fn moving_stats(
     let factor = sprite
         .and_then(|sprite| table.sprite_speed(sprite))
         .unwrap_or(SpeedMultiplier::ZERO);
-    let turning = table.turning(civ, s.copy_id())?;
+    let turning = table.turning(civ, MasterId::of_data(s.copy_id())?)?;
     let restriction = genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id)?;
     let facets = SpriteId::of_data(moving.move_sprite_id)
         .and_then(|w| table.graphics.get(&w))
         .map(|g| g.facets);
     Some(genie_core::movement::MoveStats {
-        fly_mode: FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0)),
+        fly_mode: MasterId::of_data(s.copy_id())
+            .and_then(|m| table.fly_mode(civ, m))
+            .unwrap_or_default(),
         speed: factor.applied_to(Speed::new(base)),
         base: Speed::new(base),
         turn_rate: genie_core::movement::turn_rate(Seconds::new(moving.turn_speed), facets),
@@ -454,7 +460,7 @@ pub(super) fn moving_stats(
         restriction,
         restriction_mask: *table.terrain.masks().get(restriction.index())?,
         turn_time: Seconds::new(moving.turn_speed),
-        move_algorithm: MoveAlgorithm::from_bits_retain(turning.move_algorithm),
+        move_algorithm: turning.move_algorithm,
         min_collision: turning.min_collision_size_multiplier,
         fast_turn: ObjectFlags::from_bits_retain(s.object_flags).contains(ObjectFlags::SHIP),
         facets: master_facets(m, s, table),
@@ -520,7 +526,7 @@ pub(super) struct Placement {
     pub(super) obstruction_type: ObstructionType,
     pub(super) obstruction_class: ObstructionClass,
     pub(super) buildable_on: genie_core::objects::masters::BuildableOn,
-    pub(super) los: f32,
+    pub(super) los: Distance,
 }
 
 pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placement> {
@@ -533,7 +539,7 @@ pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<
             obstruction_type: ObstructionType::from(own.obstruction_type),
             obstruction_class: ObstructionClass::from(own.obstruction_class),
             buildable_on: genie_core::objects::masters::BuildableOn::of_data(own.can_be_built_on),
-            los: own.los,
+            los: Distance::new(own.los),
         });
     }
     let m = objects.master(s.master_obj)?.static_part()?;
@@ -543,7 +549,7 @@ pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<
         obstruction_type: ObstructionType::from(m.obstruction_type),
         obstruction_class: ObstructionClass::from(m.obstruction_class),
         buildable_on: genie_core::objects::masters::BuildableOn::of_data(m.can_be_built_on),
-        los: m.los,
+        los: Distance::new(m.los),
     })
 }
 

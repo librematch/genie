@@ -36,6 +36,7 @@ use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::unit::Unit;
 use genie_core::orders::town_bell::TownBell;
 use genie_core::players::Amount;
+use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::{ActionKind, UnitAi};
 use genie_core::world::Seconds;
@@ -51,7 +52,7 @@ pub(super) fn unit(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     paths: &[Path],
-    civ: u8,
+    civ: CivId,
     masters: Option<&MasterTable>,
     players: usize,
 ) -> Unit {

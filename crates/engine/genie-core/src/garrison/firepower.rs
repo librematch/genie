@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::Firepower;
+use crate::garrison::DamageRate;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::objects::masters::ClassId;
@@ -37,12 +38,12 @@ pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) 
 /// else the pierce and class 38 amounts of its volley missile (a master its player has; not for
 /// classes 4 and 6), else its own melee, pierce, class 31 and 38 amounts, over the reload.
 #[must_use]
-pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: Seconds) -> f32 {
+pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: Seconds) -> DamageRate {
     // COMISS reload, 0 and COMISS range, 1.0, each with JBE
     if at_most_or_unordered(master.reload.get(), 0.0)
         || at_most_or_unordered(master.weapon_range.get(), RATE_RANGE)
     {
-        return 0.0;
+        return DamageRate::ZERO;
     }
     // the game reads the slot of an id below the player's master count without testing it: a
     // null slot there would crash it, so a master the player has is the only case it runs
@@ -68,7 +69,7 @@ pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: Seconds) 
             })
         },
     );
-    sum / (master.reload - reload_powerup).get()
+    DamageRate::new(sum / (master.reload - reload_powerup).get())
 }
 
 /// Whether the player's master table has a slot for `id` (`0 <= id < player+0x20`), as far as
@@ -85,11 +86,11 @@ pub(super) fn in_table(masters: &Masters, id: MasterId) -> bool {
 /// whole missiles, `CVTTSS2SI`, the products wrapping), plus its own melee, pierce, class 31 and
 /// 38 amounts, over its reload (none at most 1e-7).
 #[must_use]
-pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) -> f32 {
+pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) -> DamageRate {
     let g = master.garrison_firepower.get();
     // COMISS 0, g; JC: an unordered firepower goes on
     if g <= 0.0 {
-        return g.abs();
+        return DamageRate::new(g.abs());
     }
     let mut sum = 0.0f32;
     // COMISS volley, 1.0; JBE: an unordered volley fire adds no missiles
@@ -125,9 +126,9 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
     }
     let reload = (master.reload - reload_powerup).get();
     if reload <= EPSILON {
-        return 0.0;
+        return DamageRate::ZERO;
     }
-    sum / reload * g
+    DamageRate::new(sum / reload * g)
 }
 
 /// `FUN_141213520`: the share of a building's volleys a unit of `master` inside it adds, against
@@ -139,9 +140,9 @@ pub fn share(
     master: &Master,
     masters: &Masters,
     reload_powerup: Seconds,
-    rate: f32,
+    rate: DamageRate,
 ) -> Result<Firepower, GenieError> {
-    if rate == 0.0 {
+    if rate.get() == 0.0 {
         return Ok(Firepower::ZERO);
     }
     if master.class == WHOLE_SHARE_CLASS {
@@ -160,11 +161,11 @@ pub fn share(
             // transport takes in (`FUN_14120eb10`).
             && m.kind == COMBAT
         {
-            floor = firepower(m, masters, reload_powerup) / rate;
+            floor = firepower(m, masters, reload_powerup).over(rate);
         }
     }
     Ok(Firepower::new(maxss(
-        firepower(master, masters, reload_powerup) / rate,
+        firepower(master, masters, reload_powerup).over(rate),
         floor,
     )))
 }

@@ -220,7 +220,7 @@ pub(super) fn spatial(
                 Seer {
                     player,
                     master,
-                    los: Distance::new(m.los),
+                    los: m.los,
                     state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
                     // a foundation made in the game explores first when its construction starts
                     explored: building.is_none_or(|b| b.built != 0 || b.build_pts != 0.0),

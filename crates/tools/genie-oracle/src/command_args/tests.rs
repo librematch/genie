@@ -47,7 +47,10 @@ fn the_frames_hold_their_dt_checkpoint_and_commands() {
         Op::Sync { dt: 70 },
     ]);
     let all = frames(&chapter(&bytes), 10).unwrap();
-    assert_eq!(all.iter().map(|f| f.dt).collect::<Vec<_>>(), [50, 60, 70]);
+    assert_eq!(
+        all.iter().map(|f| f.dt.get()).collect::<Vec<_>>(),
+        [50, 60, 70]
+    );
     assert_eq!(all[0].commands, [&[3, 1, 0, 0][..], &[3, 2, 0, 0][..]]);
     assert!(all[0].checkpoint.is_none());
     assert_eq!(all[1].checkpoint.as_ref().map(|c| c.world_time), Some(1000));

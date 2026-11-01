@@ -4,9 +4,13 @@ use crate::fixtures::{
 };
 use crate::masters::{MasterTable, Turning};
 use crate::movers::mover;
+use genie_core::movement::MoveAlgorithm;
 use genie_core::objects::FacetCount;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
+use genie_core::objects::masters::FlyMode;
+use genie_core::objects::masters::MasterId;
+use genie_core::players::CivId;
 use genie_save::generated::world::{Master, PathData, PlayerObjects};
 
 /// Master 83: restriction 1, top speed 1, turning 0.5, walking as sprite 11 and running as 12.
@@ -26,29 +30,34 @@ fn master() -> Master {
 
 fn table() -> MasterTable {
     let turning = Turning {
-        move_algorithm: 0,
+        move_algorithm: MoveAlgorithm::NONE,
         min_collision_size_multiplier: 1.0,
     };
-    MasterTable::of_master(0, 83, Some(turning), 0)
-        .with_sprite(
-            SpriteId::named(10),
-            genie_core::objects::SpeedMultiplier::ZERO,
-            FacetCount::of_data(8),
-            SpriteFlags::NONE,
-        )
-        .with_sprite(
-            SpriteId::named(11),
-            genie_core::objects::SpeedMultiplier::of_data(2.0),
-            FacetCount::of_data(8),
-            SpriteFlags::NONE,
-        )
-        .with_sprite(
-            SpriteId::named(12),
-            genie_core::objects::SpeedMultiplier::of_data(3.0),
-            FacetCount::of_data(8),
-            SpriteFlags::NONE,
-        )
-        .with_masks(vec![0, 0b11])
+    MasterTable::of_master(
+        CivId::GAIA,
+        MasterId::of_data(83).unwrap(),
+        Some(turning),
+        FlyMode::of_data(0),
+    )
+    .with_sprite(
+        SpriteId::named(10),
+        genie_core::objects::SpeedMultiplier::ZERO,
+        FacetCount::of_data(8),
+        SpriteFlags::NONE,
+    )
+    .with_sprite(
+        SpriteId::named(11),
+        genie_core::objects::SpeedMultiplier::of_data(2.0),
+        FacetCount::of_data(8),
+        SpriteFlags::NONE,
+    )
+    .with_sprite(
+        SpriteId::named(12),
+        genie_core::objects::SpeedMultiplier::of_data(3.0),
+        FacetCount::of_data(8),
+        SpriteFlags::NONE,
+    )
+    .with_masks(vec![0, 0b11])
 }
 
 /// A walker of master 83 showing sprite `sprite`.
@@ -65,7 +74,7 @@ fn run(
     table: Option<&MasterTable>,
 ) -> Result<Option<genie_core::movement::Mover>, genie_core::GenieError> {
     let s = object.static_part().unwrap().clone();
-    mover(object, &s, objects, &[], 0, table)
+    mover(object, &s, objects, &[], CivId::GAIA, table)
 }
 
 /// The speed is the master's times the shown sprite's factor; walking and running by their
