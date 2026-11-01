@@ -171,7 +171,7 @@ impl Search<'_> {
             let next_side;
             if let Some(k) = self.nearest_contact(contacts, side, u) {
                 let c = *contacts.checked(k)?;
-                let q = contact_point(c.at, c.side, d, c.flag);
+                let q = contact_point(c.at, c.side, d, c.at_side_start);
                 pos = q;
                 if steps == 0 {
                     first = q;
@@ -270,16 +270,16 @@ impl Search<'_> {
         let mut chosen = None;
         let mut best_key = 0x7fc0_0000_i32;
         for (k, c) in contacts.iter().enumerate() {
-            if (d.get() >= c.half) || self.ctx.ignored(c.other) {
+            if (d >= c.half) || self.ctx.ignored(c.other) {
                 continue;
             }
-            let q = contact_point(c.at, c.side, d, c.flag);
+            let q = contact_point(c.at, c.side, d, c.at_side_start);
             if !in_box(q, self.bounds) {
                 continue;
             }
             // the sides 0 and 1 measure forward (the game's `side < 2`, and any side past 3)
             let forward = matches!(side, ShapeSide::LowY | ShapeSide::HighX);
-            let off = if side == c.side && c.flag != 0 {
+            let off = if side == c.side && c.at_side_start {
                 d.get().wrapping_neg()
             } else {
                 d.get()

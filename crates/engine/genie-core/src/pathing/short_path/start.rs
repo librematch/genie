@@ -259,10 +259,10 @@ impl Search<'_> {
         let d = self.ctx.d;
         let b = self.bounds;
         for &c in mesh.sides.checked(id.index())?.checked(side.index())? {
-            if (d.get() >= c.half) || self.ctx.ignored(c.other) {
+            if (d >= c.half) || self.ctx.ignored(c.other) {
                 continue;
             }
-            let q = contact_point(c.at, c.side, d, c.flag);
+            let q = contact_point(c.at, c.side, d, c.at_side_start);
             if !in_box(q, b) {
                 continue;
             }

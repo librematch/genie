@@ -1,6 +1,6 @@
 use crate::pathing_inputs::{mesh_from_dump, mesh_owners_from_dump};
 use crate::test_ids::object_id;
-use genie_core::pathing::{FixedPoint, FixedRect};
+use genie_core::pathing::{FixedDistance, FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
 
 /// A mesh 2 tiles wide with one shape, its side 1's contact and the tile (1, 0) holding it.
@@ -23,7 +23,10 @@ fn a_mesh_dump_reads_its_shapes_contacts_and_tiles() {
         (ShapeId::new(5), ShapeSide::HighY)
     );
     assert_eq!((contact.at, contact.along), (FixedPoint::new(10, 11), 12));
-    assert_eq!((contact.flag, contact.half), (1, 13));
+    assert_eq!(
+        (contact.at_side_start, contact.half),
+        (true, FixedDistance::new(13))
+    );
     assert_eq!(mesh.tiles[1], [ShapeId::new(0)]);
     assert_eq!(
         mesh_owners_from_dump(MESH),
@@ -33,6 +36,10 @@ fn a_mesh_dump_reads_its_shapes_contacts_and_tiles() {
     assert_eq!(none.free, None);
     // a contact's side past 3 is a broken dump
     assert!(mesh_from_dump(&MESH.replace("side 1 5 2", "side 1 5 4")).is_none());
+    // the flag is its word's byte (the upper bytes the stack's), 0 or 1
+    let stacked = mesh_from_dump(&MESH.replace(" c 1 d", " c 7f01 d")).unwrap();
+    assert!(stacked.sides[0][1][0].at_side_start);
+    assert!(mesh_from_dump(&MESH.replace(" c 1 d", " c 2 d")).is_none());
 }
 
 /// Without its mesh line, or with a header out of shape, a dump holds no mesh.

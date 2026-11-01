@@ -18,16 +18,17 @@ pub(super) const fn shrunk_corner(r: FixedRect, k: u32, d: FixedDistance) -> Fix
     }
 }
 
-/// `FUN_140fa8350`: a contact's junction moved by `d` into the free space beside its side.
+/// `FUN_140fa8350`: a contact's junction moved by `d` into the free space beside its side (the
+/// other way along it for a contact at its side's start).
 pub(super) const fn contact_point(
     p: FixedPoint,
     side: ShapeSide,
     d: FixedDistance,
-    flag: u8,
+    at_side_start: bool,
 ) -> FixedPoint {
     let [x, y] = p.get();
     let d = d.get();
-    let f = flag == 1;
+    let f = at_side_start;
     match side {
         ShapeSide::HighX => {
             if f {

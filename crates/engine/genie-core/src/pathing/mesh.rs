@@ -11,7 +11,7 @@
 //! exactly: a freed slot links the next free one through its first word, last in first out; the
 //! tile lists and contact lists keep their order of insertion.
 
-use crate::pathing::{FixedPoint, FixedRect, ShapeId, ShapeSide};
+use crate::pathing::{FixedDistance, FixedPoint, FixedRect, ShapeId, ShapeSide};
 use std::collections::HashSet;
 
 /// One tile in fixed point.
@@ -29,11 +29,12 @@ pub struct Contact {
     pub at: FixedPoint,
     /// w4: the junction along the owner side's axis (x for sides 0 and 2, y for 1 and 3).
     pub along: i32,
-    /// w5: a collinear contact at the start of its side in one of the two shapes.
-    pub flag: u8,
+    /// w5 (its byte, 0 or 1): a collinear contact at the start of its side in one of the two
+    /// shapes.
+    pub at_side_start: bool,
     /// w6: half the overlap's smaller extent; the contact counts for a unit only while the
     /// shrinking of the shapes for it stays below this.
-    pub half: i32,
+    pub half: FixedDistance,
 }
 
 /// The mesh.
@@ -170,10 +171,10 @@ const fn overlap(a: FixedRect, b: FixedRect) -> FixedRect {
 }
 
 /// Half of `v`, truncated: the game's `(v << 22 + bias) >> 23`.
-fn half(v: i32) -> i32 {
+fn half(v: i32) -> FixedDistance {
     let wide = i64::from(v) << 22;
     let bias = (wide >> 63) & 0x7f_ffff;
-    ((wide + bias) >> 23) as i32
+    FixedDistance::new(((wide + bias) >> 23) as i32)
 }
 
 impl Mesh {
@@ -295,7 +296,7 @@ impl Mesh {
                         side: hi,
                         at: c,
                         along: along(lo),
-                        flag: u8::from(flag),
+                        at_side_start: flag,
                         half,
                     },
                 );
@@ -307,7 +308,7 @@ impl Mesh {
                         side: hi,
                         at: c,
                         along: along(lo),
-                        flag: 0,
+                        at_side_start: false,
                         half,
                     },
                 );
@@ -319,7 +320,7 @@ impl Mesh {
                         side: lo,
                         at: c,
                         along: along(hi),
-                        flag: 0,
+                        at_side_start: false,
                         half,
                     },
                 );
@@ -432,8 +433,8 @@ mod tests {
                 side: ShapeSide::LowX,
                 at: FixedPoint::new(0x17a0_0000, 0x0b20_0000),
                 along: 0x17a0_0000,
-                flag: 0,
-                half: 0x20_0000,
+                at_side_start: false,
+                half: FixedDistance::new(0x20_0000),
             }]
         );
         // removing the second shape clears every contact with it

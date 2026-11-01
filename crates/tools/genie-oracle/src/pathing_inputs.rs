@@ -4,7 +4,7 @@
 use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::objects::ObjectId;
-use genie_core::pathing::{FixedPoint, FixedRect};
+use genie_core::pathing::{FixedDistance, FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
 
 use crate::masters::TerrainTable;
@@ -21,7 +21,7 @@ use genie_rec::de;
 /// When a contact line of the dump does not hold numbers (the dump's own format).
 #[must_use]
 pub fn mesh_from_dump(text: &str) -> Option<genie_core::pathing::mesh::Mesh> {
-    use genie_core::pathing::mesh::{Contact, Mesh};
+    use genie_core::pathing::mesh::Mesh;
     let mut mesh: Option<Mesh> = None;
     for line in text.lines() {
         let words: Vec<&str> = line.split_whitespace().collect();
@@ -51,14 +51,7 @@ pub fn mesh_from_dump(text: &str) -> Option<genie_core::pathing::mesh::Mesh> {
                     .iter()
                     .map(|w| u32::from_str_radix(w, 16).ok())
                     .collect::<Option<_>>()?;
-                m.sides.last_mut()?[side].push(Contact {
-                    other: ShapeId::new(w[0]),
-                    side: ShapeSide::of_word(w[1]).ok()?,
-                    at: FixedPoint::new(w[2] as i32, w[3] as i32),
-                    along: w[4] as i32,
-                    flag: w[5] as u8,
-                    half: w[6] as i32,
-                });
+                m.sides.last_mut()?[side].push(contact_from_words(&w)?);
             }
             Some("tile") => {
                 let m = mesh.as_mut()?;
@@ -74,6 +67,26 @@ pub fn mesh_from_dump(text: &str) -> Option<genie_core::pathing::mesh::Mesh> {
         }
     }
     mesh
+}
+
+/// A contact line's seven words: the other shape, its side, the junction, the junction along
+/// the side's axis, the start flag (its byte, 0 or 1: the game writes the byte and leaves the
+/// word's upper bytes as the stack held them) and the half overlap; None for a side past 3 or
+/// another flag.
+fn contact_from_words(w: &[u32]) -> Option<genie_core::pathing::mesh::Contact> {
+    let at_side_start = match w.get(5)? & 0xff {
+        0 => false,
+        1 => true,
+        _ => return None,
+    };
+    Some(genie_core::pathing::mesh::Contact {
+        other: ShapeId::new(*w.first()?),
+        side: ShapeSide::of_word(*w.get(1)?).ok()?,
+        at: FixedPoint::new(*w.get(2)? as i32, *w.get(3)? as i32),
+        along: *w.get(4)? as i32,
+        at_side_start,
+        half: FixedDistance::new(*w.get(6)? as i32),
+    })
 }
 
 /// The owner of each shape in a mesh dump (its `owner ID SHAPE` lines): the objects' `+0x64c`.

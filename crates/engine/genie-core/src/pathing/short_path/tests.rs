@@ -204,14 +204,16 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
     );
 }
 
-/// `FUN_140fa8350`: a junction moved `d` into the free space beside each side, the flag
-/// turning it along the side.
+/// `FUN_140fa8350`: a junction moved `d` into the free space beside each side, a contact at its
+/// side's start turning it along the side.
 #[test]
 fn a_contact_point_moves_off_its_side() {
     let p = FixedPoint::new(100, 200);
     let moved: Vec<FixedPoint> = ShapeSide::ALL
         .into_iter()
-        .flat_map(|side| [0, 1].map(|flag| contact_point(p, side, FixedDistance::new(3), flag)))
+        .flat_map(|side| {
+            [false, true].map(|start| contact_point(p, side, FixedDistance::new(3), start))
+        })
         .collect();
     assert_eq!(
         moved,
@@ -1314,8 +1316,8 @@ fn a_side_s_contacts_become_candidates_when_wide_free_and_near() {
         side: ShapeSide::ALL[side],
         at,
         along: at.x(),
-        flag: 0,
-        half,
+        at_side_start: false,
+        half: FixedDistance::new(half),
     };
     let near = FixedPoint::new(19 * ONE / 4, 2 * ONE);
     mesh.sides[0][0] = vec![
