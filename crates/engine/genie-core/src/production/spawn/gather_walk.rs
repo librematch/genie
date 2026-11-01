@@ -58,7 +58,7 @@ impl World {
             // The gate class, whose own walls BUILD's placement scan passes over (`FUN_14123aee0`).
             // The relic's master, which always stays (`FUN_141194e80`).
             // The villager class, whose new units count in attribute 248.
-            self.players.live(p, new)?.master(&self.masters, p)?.class == class::VILLAGER;
+            self.players.live(p, new)?.master(self.master_tables(), p)?.class == class::VILLAGER;
         let unit = self.players.live_mut(p, new)?;
         if let Some(m) = unit.body.mover_mut() {
             m.waiting = 1;
@@ -138,7 +138,7 @@ impl World {
         let los = self
             .players
             .live(p, new)?
-            .master(&self.masters, p)?
+            .master(self.master_tables(), p)?
             .line_of_sight;
         let (x, y) = (g.point.x(), g.point.y());
         let gaia = self
@@ -148,7 +148,7 @@ impl World {
         let closest = |list: &[Unit]| -> Result<Option<ObjectId>, GenieError> {
             let mut best: Option<(&Unit, f32)> = None;
             for u in list {
-                if Some(u.master(&self.masters, PlayerId::GAIA)?.class) != class {
+                if Some(u.master(self.master_tables(), PlayerId::GAIA)?.class) != class {
                     continue;
                 }
                 let (dx, dy) = (x - u.position().x(), y - u.position().y());
@@ -160,7 +160,7 @@ impl World {
             let Some((u, _)) = best else {
                 return Ok(None);
             };
-            let radius = u.master(&self.masters, PlayerId::GAIA)?.radius;
+            let radius = u.master(self.master_tables(), PlayerId::GAIA)?.radius;
             let gap = |d: f32, r: f32| {
                 let g = d.abs() - r;
                 if 0.0 <= g { g } else { 0.0 }
@@ -214,7 +214,7 @@ impl World {
         if g.target == Some(building)
             && let Some((bp, b)) = self.object(building)
         {
-            let room = b.master(&self.masters, bp)?.garrison;
+            let room = b.master(self.master_tables(), bp)?.garrison;
             let held = self.garrisoned(b.id)?;
             if held < FORCED_ENTRY_BELOW || held.below(room) {
                 return self.enter_forced(p, new, ContainerId::new(building));
@@ -230,7 +230,7 @@ impl World {
         let (owner, t) = self.object(target).ok_or(GenieError::unreachable(
             "unreachable: a gather point's target found",
         ))?;
-        let on_building = t.master(&self.masters, owner)?.kind == BUILDING;
+        let on_building = t.master(self.master_tables(), owner)?.kind == BUILDING;
         if let Some(m) = self.players.live_mut(p, new)?.body.mover_mut() {
             m.waiting = 1;
         }

@@ -264,7 +264,7 @@ impl World {
                 i += 1;
                 continue;
             };
-            let master = u.master(&self.masters, p)?;
+            let master = u.master(self.master_tables(), p)?;
             if master.kind < COMBAT
                 || !master.formation_category.grouped()
                 || split.far.contains(&id)
@@ -355,7 +355,7 @@ impl World {
         {
             return Err(ATTACK_MOVE_QUEUED);
         }
-        let kind = u.master(&self.masters, p)?.kind;
+        let kind = u.master(self.master_tables(), p)?.kind;
         self.leave_group_of(id, None)?;
         let (_, u) = self.object_mut(id).ok_or_else(|| object_gone(id))?;
         if let Some(m) = u.body.mover_mut() {

@@ -40,7 +40,7 @@ impl World {
         let Some((p, u, _)) = self.locate(id) else {
             return Ok(None);
         };
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let world = TaskWorld {
             players: &self.players,
             drop_sites: &self.drop_sites,
@@ -82,7 +82,7 @@ impl World {
         p: PlayerId,
         viewer: PlayerId,
     ) -> Result<crate::unit_ai::Seen, GenieError> {
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let (x, y) = (u.position().x(), u.position().y());
         Ok(crate::unit_ai::Seen {
             state: u.life.state,
@@ -118,7 +118,7 @@ impl World {
         p: PlayerId,
         target: Option<ObjectId>,
     ) -> Result<Vec<Victim>, GenieError> {
-        let reach = Some(unit.master(&self.masters, p)?.area_effect)
+        let reach = Some(unit.master(self.master_tables(), p)?.area_effect)
             .filter(|&r| Distance::ZERO < r)
             .map(|r| r + Distance::new(6.0) + Distance::new(2.0));
         let mut near: Vec<Victim> = Vec::new();
@@ -198,7 +198,7 @@ pub(crate) fn readable<'o>(
     let Some((p, u, _)) = c.w.locate(id) else {
         return Ok(None);
     };
-    let master = u.master(&c.w.masters, p)?;
+    let master = u.master(c.w.master_tables(), p)?;
     Ok(Some((p, u, master)))
 }
 
@@ -319,7 +319,7 @@ pub(crate) fn file_kill(c: &mut Step<'_>, me: &mut Unit, k: KillLeft) -> Result<
         return c.w.kill_left(&k);
     }
     if let Some(kill) = k.kill {
-        let master = me.master(&c.w.masters, c.player)?.clone();
+        let master = me.master(c.w.master_tables(), c.player)?.clone();
         c.w.count_killed(c.player, &master, kill)?;
         if kill.to_gaia {
             me.ai_change_owner(PlayerId::GAIA, c)?;
@@ -429,7 +429,7 @@ impl World {
         kill: Kill,
     ) -> Result<(), GenieError> {
         let u = &self.players.live(q, j)?;
-        let master = u.master(&self.masters, q)?.clone();
+        let master = u.master(self.master_tables(), q)?.clone();
         self.count_killed(q, &master, kill)?;
         if kill.to_gaia {
             self.give_gaia(q, j)?;
@@ -490,7 +490,7 @@ impl World {
         let (q, u) = self
             .object(id)
             .ok_or(crate::construction::build::NOT_HELD)?;
-        let master = u.master(&self.masters, q)?.clone();
+        let master = u.master(self.master_tables(), q)?.clone();
         self.count_kill_of(q, &master, killer)
     }
 

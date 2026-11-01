@@ -72,7 +72,7 @@ impl Unit {
                 return Ok(false);
             }
         }
-        let t_master = t.master(&c.w.masters, tp)?;
+        let t_master = t.master(c.w.master_tables(), tp)?;
         let own =
             c.w.spatial
                 .relations
@@ -93,7 +93,7 @@ impl Unit {
             drop_site: false,
         };
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
@@ -113,7 +113,11 @@ impl Unit {
             them,
             c.w.world_time,
         )?;
-        let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
+        let walks = self.move_walks(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let hunt = self
             .actions
             .list

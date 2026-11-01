@@ -51,7 +51,8 @@ use genie_core::world::parts::{Object, ObjectParts};
 use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
-/// point, the production lists; the dead master is the import's gap, MISSING.md).
+/// point, the production lists, the missile's own fields; the dead and own masters are the
+/// import's gaps, MISSING.md).
 pub(super) fn object(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -67,6 +68,7 @@ pub(super) fn object(
             gather_point: gather_point(object).ok().flatten(),
             production: production(object).ok().flatten(),
             missile: saved_missile(object),
+            own_master: None,
         },
     }
 }

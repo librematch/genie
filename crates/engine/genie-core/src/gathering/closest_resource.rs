@@ -12,7 +12,6 @@ use crate::movement::Planning;
 use crate::objects::ObjectId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -28,8 +27,8 @@ pub(crate) struct ResourceWorld<'a, 'b> {
     pub(crate) spatial: &'a mut Spatial,
     pub(crate) zones: &'a mut crate::pathing::zones::Zones,
     pub(crate) foreign: Foreign<'a>,
-    pub(crate) every: &'a [Masters],
-    pub(crate) masters: Option<&'a Masters>,
+    pub(crate) every: crate::objects::masters::MasterTables<'a>,
+    pub(crate) masters: crate::objects::masters::OwnerMasters<'a>,
     pub(crate) plan: Planning<'b>,
 }
 
@@ -108,10 +107,12 @@ pub(crate) fn closest_resource_of(
             })
         }
     };
-    let masters = c.masters.ok_or(GenieError::unsupported(
-        "a resource search without its player's masters",
-    ))?;
-    let master = unit.master_in(Some(masters))?;
+    if c.masters.table.is_none() {
+        return Err(GenieError::unsupported(
+            "a resource search without its player's masters",
+        ));
+    }
+    let master = unit.master_in(c.masters)?;
     let mover = unit.body.mover().ok_or(GenieError::unsupported(
         "a resource search without movement state",
     ))?;
@@ -211,7 +212,10 @@ impl UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
         );
         let mut w = ResourceWorld {
             player: self.player,
@@ -224,8 +228,14 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: &self.c.w.masters,
-            masters: self.c.w.masters.of(self.player),
+            every: crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
+            masters: crate::objects::masters::OwnerMasters::new(
+                &self.c.w.parts.own_master,
+                self.c.w.masters.of(self.player),
+            ),
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
                 now: self.c.w.world_time,
@@ -260,7 +270,7 @@ impl UnitView<'_, '_> {
         .ok_or(GenieError::unsupported(
             "a resource found that the slice does not hold",
         ))?;
-        let class = u.master(&self.c.w.masters, owner)?.class;
+        let class = u.master(self.c.w.master_tables(), owner)?.class;
         Ok(Some(crate::unit_ai::Gatherable {
             id,
             position: u.position(),
@@ -295,7 +305,11 @@ impl Unit {
         cap: crate::objects::WorkerCount,
         site: Option<crate::gathering::DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current = self
             .combat
@@ -310,8 +324,11 @@ impl Unit {
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             foreign: others.players(),
-            every: &c.w.masters,
-            masters: c.w.masters.of(c.player),
+            every: crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            masters: crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
             plan: Planning {
                 pathing: &mut c.w.pathing,
                 now: c.w.world_time,

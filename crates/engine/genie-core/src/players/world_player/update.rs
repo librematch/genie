@@ -188,7 +188,7 @@ impl World {
         p: PlayerId,
         unit: &crate::objects::unit::Unit,
     ) -> Result<bool, GenieError> {
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         let state = unit.life.state;
         if (ObjectState::Unfinished..=ObjectState::DyingSprite).contains(&state)
             && master.storage.iter().any(|&(kind, _, mode)| {

@@ -16,7 +16,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
@@ -119,7 +118,7 @@ impl Unit {
     /// A gatherer whose master the table lacks.
     pub(crate) fn move_walks<'g>(
         &self,
-        every: &[Masters],
+        every: crate::objects::masters::MasterTables<'_>,
         player: PlayerId,
         graphics: &'g crate::objects::Graphics,
     ) -> Result<Walks<'g>, GenieError> {
@@ -145,7 +144,7 @@ impl Unit {
         c: &Step<'_>,
         gather: &crate::gathering::gather::GatherAction,
     ) -> Result<crate::gathering::gather::GatherReads, GenieError> {
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
@@ -233,7 +232,7 @@ impl Unit {
         let Some(s) = c.w.spatial.get_known(site)? else {
             return Ok(None);
         };
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let actor = Actor {
             id: self.id,
             master,
@@ -274,7 +273,11 @@ impl Unit {
         }
         crate::world::lets::release(c, self, gather.carry_to, by)?;
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
-        let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
+        let walks = self.move_walks(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let gather = self.actions.list.gather_mut().ok_or(NO_GATHER)?;
         gather.carry_to = None;
         let t =
@@ -383,16 +386,23 @@ impl Unit {
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
     /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
     pub(crate) fn gather_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let site = if let Some(carry) = carry_to {
             carry.id().get()
         } else if !master.drop_sites.is_empty() {
             let mut w = DropWorld {
-                masters: c.w.masters.of(c.player),
+                masters: crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
                 spatial: &mut c.w.spatial,
                 zones: &mut c.w.zones,
                 pathing: &mut c.w.pathing,

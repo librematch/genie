@@ -80,7 +80,13 @@ impl Unit {
                 } else {
                     continue;
                 };
-                let l = clear_look_of(u, c.w.masters.of(owner))?;
+                let l = clear_look_of(
+                    u,
+                    crate::objects::masters::OwnerMasters::new(
+                        &c.w.parts.own_master,
+                        c.w.masters.of(owner),
+                    ),
+                )?;
                 let _ = looks.insert(id, l);
             }
         }
@@ -120,7 +126,7 @@ impl Unit {
         } else {
             (None, Vec::new())
         };
-        let master = self.master(&c.w.masters, c.player);
+        let master = self.master(c.w.master_tables(), c.player);
         // FUN_140aadc50 drops only a kind the player has (FUN_140efe5b0)
         let attributes = c.w.players.player(c.player)?.attributes.len();
         let has_kind = (self.life.attribute_type).is_some_and(|k| k.index() < attributes);
@@ -153,7 +159,7 @@ impl Unit {
             c.w.spatial
                 .get_known(self.id)?
                 .ok_or(GenieError::unsupported("a builder without a place"))?;
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let actor = Actor {
             id: self.id,
             master,

@@ -8,6 +8,7 @@ use crate::objects::masters::ids;
 use crate::objects::masters::{Master, MasterId, Masters, Task};
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
+use crate::world::parts::PartTable;
 
 /// Player `player`'s master `id` in `every`, the world's masters: one table per player, as the
 /// game's player holds its masters' pointers (`player+0x28`); none where the player has no
@@ -17,6 +18,53 @@ use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
 #[must_use]
 pub fn player_master(every: &[Masters], player: PlayerId, id: MasterId) -> Option<&Master> {
     every.of(player)?.get(id)
+}
+
+/// The masters an object's master pointer (`+0xa0`) reads: its own copy by its id
+/// ([`crate::world::parts::Parts::own_master`]) when it has one, else its player's table of
+/// `players`. [`crate::world::World::master_tables`] gives the world's.
+#[derive(Clone, Copy, Debug)]
+pub struct MasterTables<'a> {
+    /// The world's masters, one table per player.
+    pub players: &'a [Masters],
+    /// The objects' own masters by id.
+    pub own: &'a PartTable<Master>,
+}
+
+impl<'a> MasterTables<'a> {
+    /// The world's players' tables `players` and the objects' own masters `own`.
+    #[must_use]
+    pub const fn new(players: &'a [Masters], own: &'a PartTable<Master>) -> Self {
+        Self { players, own }
+    }
+
+    /// Player `player`'s objects' masters ([`OwnerMasters`]).
+    #[must_use]
+    pub fn of(self, player: PlayerId) -> OwnerMasters<'a> {
+        OwnerMasters {
+            own: self.own,
+            table: self.players.of(player),
+        }
+    }
+}
+
+/// The masters one owner's objects read through their master pointers (`+0xa0`): an object's
+/// own copy by its id first ([`crate::world::parts::Parts::own_master`]), else the owner's
+/// table (none for an owner without one).
+#[derive(Clone, Copy, Debug)]
+pub struct OwnerMasters<'a> {
+    /// The objects' own masters by id.
+    pub own: &'a PartTable<Master>,
+    /// The owner's table.
+    pub table: Option<&'a Masters>,
+}
+
+impl<'a> OwnerMasters<'a> {
+    /// The own masters `own` and the owner's table `table`.
+    #[must_use]
+    pub const fn new(own: &'a PartTable<Master>, table: Option<&'a Masters>) -> Self {
+        Self { own, table }
+    }
 }
 
 /// The world's masters, one table per player (the game's player holds its masters' pointers,

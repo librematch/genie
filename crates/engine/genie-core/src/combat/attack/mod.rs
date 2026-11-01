@@ -26,9 +26,9 @@ use crate::objects::layers::Body;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HitChance;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
-use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -310,7 +310,10 @@ impl AttackReads {
     pub(crate) fn of(
         unit: &Unit,
         master: &Master,
-        (masters, graphics): (Option<&Masters>, &crate::objects::Graphics),
+        (masters, graphics): (
+            crate::objects::masters::OwnerMasters<'_>,
+            &crate::objects::Graphics,
+        ),
         ai: Option<&UnitAi>,
         (computer, now): (bool, WorldTime),
     ) -> Self {
@@ -319,7 +322,7 @@ impl AttackReads {
                 .standing_sprite
                 .and_then(|s| graphics.get(s))
                 .copied(),
-            volleys: masters.is_some_and(|m| volleys(master, m)),
+            volleys: masters.table.is_some_and(|m| volleys(master, m)),
             reload: unit.combat.reload_stinger + (master.reload - unit.combat.reload_powerup),
             hit_chance: master.hit_chance,
             armed: crate::combat::volley::armed(master, unit.combat.firepower),
@@ -433,6 +436,7 @@ impl World {
             players,
             index,
             masters,
+            parts,
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();
@@ -442,7 +446,11 @@ impl World {
             object_rng: Some(object),
             buffer: None,
             graphics,
-            by_id: crate::world::index::ObjectsRef::new(players, index, masters),
+            by_id: crate::world::index::ObjectsRef::new(
+                players,
+                index,
+                crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+            ),
         }
     }
 }

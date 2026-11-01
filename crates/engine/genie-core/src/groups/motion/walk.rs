@@ -321,7 +321,10 @@ impl World {
                 by_id: crate::world::index::ObjectsRef::new(
                     &self.players,
                     &self.index,
-                    &self.masters,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
                 ),
             };
             path_step(&mut motion, &view, &lead, &mut world, budget)

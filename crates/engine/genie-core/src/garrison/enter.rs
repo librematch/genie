@@ -168,13 +168,13 @@ impl World {
         let (tp, t) = self
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
-        let target = ContainerId::new(if t.master(&self.masters, tp)?.kind == BUILDING {
+        let target = ContainerId::new(if t.master(self.master_tables(), tp)?.kind == BUILDING {
             t.building.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         });
         let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let (class, height) = (tm.class, t.position().z());
         let (at, _) = self.enter_meeting(player, idx, target)?;
         let action = EnterAction::new(target, at.with_height(height), task);
@@ -247,7 +247,10 @@ impl World {
             // `+0x470`) and, its `+0x60` 0 in a new Enter, posts notify 0x1f9 with the enter's
             // action value to its unit AI; the update returns 3 then
             action.state = EnterState::Failed;
-            let masters = self.masters.of(player);
+            let masters = crate::objects::masters::OwnerMasters::new(
+                &self.parts.own_master,
+                self.masters.of(player),
+            );
             let unit = self.players.live_mut(player, idx)?;
             unit.place_enter(action, sub);
             unit.shows_standing_sprite(
@@ -308,10 +311,14 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
-        let tm = t.master(&self.masters, tp)?.clone();
+        let tm = t.master(self.master_tables(), tp)?.clone();
         let room = self.has_room(tp, t, Some(id))?;
         let t = placed_object(&self.players, self.place(target))?;
         enter_view(
@@ -340,12 +347,20 @@ impl World {
         t: &EnterTarget,
         start: WalkStart,
     ) -> Result<Walking, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
-        let master = target.master(&self.masters, tp)?.clone();
+        let master = target.master(self.master_tables(), tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
         let unit = self.players.live(player, idx)?;
-        let reads = MoveToReads::of(unit, unit.master(&self.masters, player)?, &self.graphics);
+        let reads = MoveToReads::of(
+            unit,
+            unit.master(self.master_tables(), player)?,
+            &self.graphics,
+        );
         let meeting = Meeting {
             spatial: &mut self.spatial,
             zones: &mut self.zones,
@@ -371,10 +386,14 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
-        let master = t.master(&self.masters, tp)?.clone();
+        let master = t.master(self.master_tables(), tp)?.clone();
         let room = self.has_room(tp, t, Some(id))?;
         let target = placed_object(&self.players, self.place(target))?;
         Meeting {
@@ -398,7 +417,11 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let Some(crate::world::index::Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };
@@ -479,12 +502,12 @@ impl World {
         let me = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .clone();
         let bm = self
             .players
             .live(tp, ti)?
-            .master(&self.masters, tp)?
+            .master(self.master_tables(), tp)?
             .clone();
         self.run_on_step(player, idx, |unit, c| unit.go_inside(c, target, &me, &bm))
     }

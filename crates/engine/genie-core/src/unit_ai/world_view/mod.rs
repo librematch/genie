@@ -6,7 +6,6 @@ use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::Masters;
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
@@ -35,7 +34,7 @@ use crate::world::step::Step;
 /// the world with its zone maps and planners, the world's time, the Object stream (the drop-site
 /// search's plans) and the owner's type.
 pub(crate) struct DropWorld<'a> {
-    pub masters: Option<&'a Masters>,
+    pub masters: crate::objects::masters::OwnerMasters<'a>,
     pub spatial: &'a mut Spatial,
     pub zones: &'a mut crate::pathing::zones::Zones,
     pub pathing: &'a mut Pathing,

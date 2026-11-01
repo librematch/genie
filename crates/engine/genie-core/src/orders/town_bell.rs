@@ -261,7 +261,7 @@ impl World {
                 continue;
             }
             let id = o.id;
-            let m = o.master(&self.masters, owner)?;
+            let m = o.master(self.master_tables(), owner)?;
             let (kind, class, master) = (m.kind, m.class, m.id);
             let takes_villagers = m
                 .building
@@ -311,7 +311,7 @@ impl World {
             let idx = k;
             k = k.next();
             let b = &self.players.live(owner, idx)?;
-            let m = b.master(&self.masters, owner)?;
+            let m = b.master(self.master_tables(), owner)?;
             let takes_villagers = m
                 .building
                 .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
@@ -362,7 +362,7 @@ impl World {
             let idx = k;
             k = k.next();
             let b = &self.players.live(owner, idx)?;
-            let m = b.master(&self.masters, owner)?;
+            let m = b.master(self.master_tables(), owner)?;
             let takes_villagers = m
                 .building
                 .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
@@ -398,7 +398,7 @@ impl World {
             let Some((up, u)) = self.object(inside) else {
                 continue;
             };
-            let um = u.master(&self.masters, up)?;
+            let um = u.master(self.master_tables(), up)?;
             if COMBAT <= um.kind && (um.class == class::VILLAGER || um.id == MASTER_1808) {
                 let _ = self.back_to_work(Some((owner, idx)), inside)?;
             }
@@ -493,7 +493,7 @@ impl World {
         filter: Option<ActionType>,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         if !(master.class == class::VILLAGER || master.id == MASTER_1808) {
             return Ok(());
         }
@@ -501,7 +501,7 @@ impl World {
             return Ok(());
         };
         let takes = if filter == Some(GARRISON) {
-            let tm = t.master(&self.masters, tp)?;
+            let tm = t.master(self.master_tables(), tp)?;
             let world = TaskWorld {
                 players: &self.players,
                 drop_sites: &self.drop_sites,

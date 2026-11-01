@@ -122,7 +122,7 @@ impl MakeAction {
         farm: &mut Unit,
     ) -> Result<HeadCode, GenieError> {
         let master = object_master(
-            farm.own_master.as_deref(),
+            c.w.parts.own_master.get(farm.id),
             (farm.id, farm.life.master_id),
             c.w.masters.of(c.player),
         )?;

@@ -235,7 +235,7 @@ impl World {
         let relations = &self.players.player(owner)?.relations;
         let allied = |q: PlayerId| crate::unit_ai::task_finder::allied(relations, owner, q, true);
         if let Some((q, u)) = self.object(id) {
-            let m = u.master(&self.masters, q)?;
+            let m = u.master(self.master_tables(), q)?;
             return Ok(Some(Bystander {
                 id,
                 player: q,
@@ -281,7 +281,7 @@ impl World {
         let Some((q, u)) = self.object(b.id) else {
             return Err(crate::construction::build::NOT_HELD);
         };
-        let m = u.master(&self.masters, q)?;
+        let m = u.master(self.master_tables(), q)?;
         let mut v = crate::combat::victims::victim_of(
             u,
             m,

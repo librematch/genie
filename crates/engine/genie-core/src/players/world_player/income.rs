@@ -53,7 +53,7 @@ impl World {
                 continue;
             };
             let building = unit
-                .master(&self.masters, owner)
+                .master(self.master_tables(), owner)
                 // The buildings' type (the object's `+0xf`, `'P'`).
                 .is_ok_and(|m| m.kind == BUILDING);
             if building {

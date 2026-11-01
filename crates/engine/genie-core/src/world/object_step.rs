@@ -34,7 +34,7 @@ impl World {
         };
         let blasted = match target {
             Some(t) => self.blasted(&unit, p, Some(t))?,
-            None if blasts_at_death(unit.master(&self.masters, p)?, &unit.life) => {
+            None if blasts_at_death(unit.master(self.master_tables(), p)?, &unit.life) => {
                 self.blasted(&unit, p, None)?
             }
             None => Vec::new(),

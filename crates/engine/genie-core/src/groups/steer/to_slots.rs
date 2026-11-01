@@ -158,7 +158,7 @@ impl World {
         p: PlayerId,
         u: &crate::objects::unit::Unit,
     ) -> Result<(bool, ActionState), GenieError> {
-        if u.master(&self.masters, p)?.kind < ACTION {
+        if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
         if let Some(e) = u.actions.unmodelled_action.clone() {

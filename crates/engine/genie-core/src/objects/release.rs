@@ -96,7 +96,10 @@ impl World {
     ) -> Result<(), GenieError> {
         let (missile, gone) = (gone.parts.missile, &gone.unit);
         self.track_remove(p, gone.id, gone.life.master_id)?;
-        let master = gone.master(&self.masters, p)?;
+        let master = gone.master(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            p,
+        )?;
         forget_resource(&mut self.spatial, Some(master), gone.id, gone.position())?;
         if COMBAT <= master.kind {
             count_class(&mut self.players.player_mut(p)?.attributes, master, -1.0);
@@ -128,7 +131,7 @@ impl World {
             return Ok(());
         };
         let unit = self.players.live(p, i)?;
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         if !matches!(master.kind, COMBAT | BUILDING) {
             return Ok(());
         }
@@ -151,7 +154,10 @@ impl World {
             return Ok(());
         };
         let unit = self.players.live(p, i)?;
-        let combat = matches!(unit.master(&self.masters, p)?.kind, COMBAT | BUILDING);
+        let combat = matches!(
+            unit.master(self.master_tables(), p)?.kind,
+            COMBAT | BUILDING
+        );
         if combat {
             self.players.live_mut(p, i)?.clamp_hp_powerup();
         }
@@ -182,7 +188,7 @@ impl Unit {
     pub(crate) fn releaser(&self, c: &Step<'_>) -> Result<Releaser, GenieError> {
         Ok(Releaser {
             id: self.id,
-            class: Some(self.master(&c.w.masters, c.player)?.class),
+            class: Some(self.master(c.w.master_tables(), c.player)?.class),
             player: c.player,
         })
     }

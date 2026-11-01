@@ -70,7 +70,7 @@ impl World {
         let u = self.players.live(player, idx)?;
         Ok(Releaser {
             id: u.id,
-            class: Some(u.master(&self.masters, player)?.class),
+            class: Some(u.master(self.master_tables(), player)?.class),
             player,
         })
     }
@@ -103,10 +103,7 @@ impl World {
         let Some((q, t)) = self.object(target) else {
             return Ok(());
         };
-        let class = match t.own_master.as_deref() {
-            Some(m) => m.class,
-            None => t.master(&self.masters, q)?.class,
-        };
+        let class = t.master(self.master_tables(), q)?.class;
         let record = crate::unit_ai::OrderRecord {
             order,
             action,
@@ -210,7 +207,7 @@ impl World {
             ));
         }
         let Some(new) = unit
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .building
             .as_ref()
             .and_then(|b| b.transform_unit)
@@ -227,7 +224,14 @@ impl World {
                 &mut self.spatial,
                 id,
                 &annexes,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                ),
             )?;
             for u in units {
                 self.shut_in_gate(u)?;
@@ -258,7 +262,7 @@ impl World {
         let Some((p, u)) = self.object(id) else {
             return Ok(());
         };
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let spared = TRIBE_COMBAT <= master.kind
             && (master.class == SPARED
                 // The class `FUN_140c89760` lets scout without the master's flag when a game setting allows it
@@ -302,7 +306,7 @@ impl World {
     ) -> Result<(), GenieError> {
         self.clear_actions(player, idx)?;
         let unit = &self.players.live(player, idx)?;
-        let old = unit.master(&self.masters, player)?.clone();
+        let old = unit.master(self.master_tables(), player)?.clone();
         let next = self.master(player, new)?.clone();
         let world = SwitchWorld {
             spatial: &mut self.spatial,

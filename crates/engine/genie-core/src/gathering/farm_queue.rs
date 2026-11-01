@@ -251,7 +251,7 @@ impl World {
         if farm.x() == NO_FARM {
             return Ok(false);
         }
-        let class = unit.master(&self.masters, p)?.class;
+        let class = unit.master(self.master_tables(), p)?.class;
         let Some((master, auto, queue)) = self.reseed_choice(p, class)? else {
             return Ok(false);
         };
@@ -264,7 +264,7 @@ impl World {
             own.push(target);
             let is_building = match self.object(target) {
                 Some((q, t)) => {
-                    t.master(&self.masters, q)?.kind
+                    t.master(self.master_tables(), q)?.kind
                         == crate::objects::masters::master_type::BUILDING
                 }
                 None => false,

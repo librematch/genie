@@ -48,7 +48,7 @@ mod values;
 pub use self::combat_level::CombatLevel;
 pub use self::cost_amount::CostAmount;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
-pub use self::lookup::{PlayersMasters, player_master};
+pub use self::lookup::{MasterTables, OwnerMasters, PlayersMasters, player_master};
 pub use self::spacing_modifier::SpacingModifier;
 pub use self::target_owner::TargetOwner;
 pub use self::task_id::TaskId;

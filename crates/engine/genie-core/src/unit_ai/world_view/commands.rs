@@ -71,14 +71,30 @@ impl UnitView<'_, '_> {
             .masters
             .get(self.player.index())
             .ok_or(crate::world::UNIT_AI_MASTER)?;
-        let own = unit.master(&self.c.w.masters, self.player)?;
+        let own = unit.master(self.c.w.master_tables(), self.player)?;
         let switch = crate::construction::repair::REPAIRERS
             .iter()
             .find(|&&(group, _)| group == own.task_by_group)
             .and_then(|&(_, id)| masters.get(id));
         let (Some(t), Some(general)) = (
-            task_target_with(target, 1, &find, &self.c.w.masters)?,
-            task_target_with(target, 2, &find, &self.c.w.masters)?,
+            task_target_with(
+                target,
+                1,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
+            task_target_with(
+                target,
+                2,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
         ) else {
             return Err(GenieError::unreachable(
                 "a repair command's target the world holds without its task target",
@@ -174,10 +190,26 @@ impl UnitView<'_, '_> {
             .masters
             .get(self.player.index())
             .ok_or(crate::world::UNIT_AI_MASTER)?;
-        let own = unit.master(&self.c.w.masters, self.player)?;
+        let own = unit.master(self.c.w.master_tables(), self.player)?;
         let (Some(t), Some(general)) = (
-            task_target_with(target, 1, &find, &self.c.w.masters)?,
-            task_target_with(target, 2, &find, &self.c.w.masters)?,
+            task_target_with(
+                target,
+                1,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
+            task_target_with(
+                target,
+                2,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
         ) else {
             return Err(GenieError::unreachable(
                 "an enter command's target the world holds without its task target",
@@ -237,7 +269,13 @@ impl UnitView<'_, '_> {
     /// What an explorer's searches ask of the world, the map's size and the unit's line of sight.
     pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, Distance), GenieError> {
         let unit = &*self.unit;
-        let master = unit.master(&self.c.w.masters, self.player)?;
+        let master = unit.master(
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
+            self.player,
+        )?;
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
             "an auto scout without movement state",
         ))?;
@@ -261,7 +299,10 @@ impl UnitView<'_, '_> {
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                &self.c.w.masters,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
             ),
             zones,
             plan: Planning {

@@ -7,6 +7,7 @@ use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::class;
@@ -15,7 +16,6 @@ use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -267,7 +267,7 @@ pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId,
 /// An object of a master its owner lacks.
 pub(crate) fn clear_look_of(
     u: &Unit,
-    masters: Option<&Masters>,
+    masters: crate::objects::masters::OwnerMasters<'_>,
 ) -> Result<crate::construction::build::ClearLook, GenieError> {
     let m = u.master_in(masters)?;
     Ok(crate::construction::build::ClearLook {

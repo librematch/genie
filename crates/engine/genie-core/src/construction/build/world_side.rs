@@ -99,7 +99,10 @@ impl crate::world::World {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let (Place::Live(p, _) | Place::Sleeping(p, _)) = place;
         let volley = held(&mut self.players, place)?
-            .master(&self.masters, p)?
+            .master(
+                crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+                p,
+            )?
             .volley_fire;
         let now = self.world_time;
         let u = held(&mut self.players, place)?;
@@ -177,7 +180,7 @@ impl crate::world::World {
                     continue;
                 };
                 let desolid = a.building.construction.is_some_and(|c| c.desolid);
-                if a.master(&self.masters, q)?.kind < BUILDING || !desolid {
+                if a.master(self.master_tables(), q)?.kind < BUILDING || !desolid {
                     continue;
                 }
                 self.clear_foundations_under(annex)?;
@@ -247,7 +250,7 @@ impl crate::world::World {
                 .unwrap_or_default(),
             self.parts.gather_point.get(building).copied(),
         );
-        let old_class = old.master(&self.masters, p)?.class;
+        let old_class = old.master(self.master_tables(), p)?.class;
         let old_lock = old.building.gate.map(|g| g.locked);
         // its attacking units (+0xce0) the world still holds each hear of the new object (their
         // slot 0x140), which is not modelled
@@ -269,7 +272,7 @@ impl crate::world::World {
             b.building.stack_made = Some(new);
         }
         let (q, nu) = self.object(new).ok_or(NOT_HELD)?;
-        let new_master = nu.master(&self.masters, q)?;
+        let new_master = nu.master(self.master_tables(), q)?;
         let mut point = None;
         let building_made = new_master.kind == BUILDING;
         let gate_lock =

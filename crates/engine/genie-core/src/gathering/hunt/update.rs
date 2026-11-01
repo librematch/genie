@@ -249,7 +249,11 @@ impl HuntAction {
         unit: &mut Unit,
         herd: &Herd,
     ) -> Result<(), GenieError> {
-        let reads = unit.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let reads = unit.move_to_reads(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
         self.move_to = None;
         self.state = HuntState::Attack;

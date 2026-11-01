@@ -96,7 +96,7 @@ impl Unit {
     /// (`FUN_140a4ba80`).
     pub(crate) fn volley(&mut self, c: &mut Step<'_>, aimed: Aimed) -> Result<(), GenieError> {
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
@@ -209,7 +209,7 @@ impl Unit {
     /// (`+0x683`).
     pub(crate) fn fire(&mut self, c: &mut Step<'_>, aimed: &Aimed) -> Result<(), GenieError> {
         self.combat.attack_count = self.combat.attack_count.next();
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if master.charge_type.ranged() {
             return Err(GenieError::unsupported(
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
@@ -276,7 +276,10 @@ impl Unit {
             c.w.masters
                 .get(c.player.index())
                 .ok_or(GenieError::unsupported("a volley without the masters"))?;
-        let master = self.master_in(Some(masters))?;
+        let master = self.master_in(crate::objects::masters::OwnerMasters::new(
+            &c.w.parts.own_master,
+            Some(masters),
+        ))?;
         let facing = self
             .body
             .mover()

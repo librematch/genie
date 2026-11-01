@@ -40,7 +40,7 @@ impl World {
                 let Some((owner, unit)) = self.object(id) else {
                     continue;
                 };
-                let master = unit.master(&self.masters, owner)?;
+                let master = unit.master(self.master_tables(), owner)?;
                 if master.auto_gather {
                     found.push((id, master.gather_group, unit.position()));
                 }
@@ -76,7 +76,7 @@ impl World {
         };
         let (id, at) = (u.id, u.position());
         let (x, y) = (at.x(), at.y());
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         if !master.auto_gather {
             return Ok(());
         }

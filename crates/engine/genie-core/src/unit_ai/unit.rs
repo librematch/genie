@@ -48,7 +48,7 @@ impl Unit {
         // sees it ([`crate::vision::visibility::sight_taker`]) when that one has its master
         let mut captured = captured;
         let combat = crate::objects::masters::master_type::COMBAT
-            <= self.master(&c.w.masters, c.player)?.kind;
+            <= self.master(c.w.master_tables(), c.player)?.kind;
         if combat
             && let Some(mask) = c.w.spatial.combat_sight(self.id, self.building.annex_of)?
             && let Some(q) = crate::vision::visibility::sight_taker(
@@ -291,7 +291,7 @@ impl Unit {
             ));
         };
         let busy = self.top_action_kind().is_some() || self.actions.unmodelled_action.is_some();
-        let master = Some(self.master(&c.w.masters, c.player)?);
+        let master = Some(self.master(c.w.master_tables(), c.player)?);
         let class = master.map(|ms| ms.class);
         let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
         let view = OwnerView::of(c, None)?;
@@ -331,7 +331,7 @@ impl Unit {
                 "a unit AI's run of a unit without one",
             ));
         };
-        let master = Some(self.master(&c.w.masters, c.player)?);
+        let master = Some(self.master(c.w.master_tables(), c.player)?);
         let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
         let view = OwnerView::of(c, None)?;
         let attacker = self.attacker_of(
@@ -373,7 +373,7 @@ impl Unit {
         let busy = self.top_action_kind().is_some() || self.actions.unmodelled_action.is_some();
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )
@@ -511,7 +511,7 @@ impl Unit {
             let (Some((owner, u)), Some(p)) = (found, c.w.spatial.get(id)) else {
                 continue;
             };
-            let m = u.master(&c.w.masters, owner)?;
+            let m = u.master(c.w.master_tables(), owner)?;
             let me = master.ok_or(crate::world::UNIT_AI_MASTER)?;
             seen.push(crate::unit_ai::UnitSeen {
                 id,

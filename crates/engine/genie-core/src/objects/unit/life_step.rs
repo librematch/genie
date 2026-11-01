@@ -58,7 +58,10 @@ impl Unit {
         if !(self.life.is_alive() && self.life.hp < HitPoints::new(1.0)) {
             return Ok(());
         }
-        let m = self.master(&c.w.masters, c.player)?;
+        let m = self.master(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+        )?;
         for &(attribute, amount, kind) in &m.storage {
             if let Some(attribute) = attribute
                 && matches!(kind, 2 | 16)
@@ -85,7 +88,7 @@ impl Unit {
         let after = self.life.state;
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
             self.died(c, before)?;
-            if self.master(&c.w.masters, c.player)?.ghost_on_death == GhostMode::LEAVES
+            if self.master(c.w.master_tables(), c.player)?.ghost_on_death == GhostMode::LEAVES
                 && c.w.game_state.leaves_ghosts()
             {
                 // the ghosts of the death (FUN_14118e990), the object lent to the world
@@ -125,7 +128,7 @@ impl Unit {
         if ObjectState::Dying < after
             && after != before
             && !(before == ObjectState::DyingSprite && after == ObjectState::Dead)
-            && self.master(&c.w.masters, c.player)?.kind == BUILDING
+            && self.master(c.w.master_tables(), c.player)?.kind == BUILDING
         {
             let annexes = self.building.annexes;
             for annex in annexes.ids() {
@@ -156,7 +159,10 @@ impl Unit {
             c.w.spatial.sight_state(self.id, after)?;
         }
         if before < ObjectState::DyingSprite && ObjectState::Undead < after {
-            let master = self.master(&c.w.masters, c.player)?;
+            let master = self.master(
+                crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                c.player,
+            )?;
             forget_resource(&mut c.w.spatial, Some(master), self.id, self.position())?;
         }
         Ok(())
@@ -168,7 +174,7 @@ impl Unit {
     /// left it ([`crate::objects::facing::facet_of_angle`]).
     pub(crate) fn dying_sprite_ended(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         self.body.set_anim_speed(Speed::ZERO);
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind < BUILDING
             && let Some(remains) = master.death_spawns[1]
         {
@@ -187,7 +193,7 @@ impl Unit {
     /// moving object's override gives it the dead object's facet and that facet's angle). The
     /// spawn's sprite from slot 0x7a8 (the master's undead sprite) is not held.
     pub(crate) fn death_spawn_comes(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let spawn = self.master(&c.w.masters, c.player)?.death_spawns[0];
+        let spawn = self.master(c.w.master_tables(), c.player)?.death_spawns[0];
         let spawn = spawn.ok_or(GenieError::missing_data(
             "a death spawn the dead object's master no longer names",
         ))?;

@@ -182,7 +182,11 @@ impl Attack {
         unit: &mut Unit,
         cmd: &AttackCommand<'_>,
     ) -> Result<(Self, Vec<Posted>), GenieError> {
-        let reads = unit.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let reads = unit.move_to_reads(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let mover = unit
             .body
             .mover_mut()
@@ -209,13 +213,20 @@ impl Attack {
                 object_rng: None,
                 buffer: Some(&mut posted),
                 graphics: &c.w.graphics,
-                by_id: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters),
+                by_id: crate::world::index::ObjectsRef::new(
+                    &c.w.players,
+                    &c.w.index,
+                    crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                ),
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }
         if begun.arrived {
             unit.shows_standing_sprite(
-                c.w.masters.of(c.player),
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;

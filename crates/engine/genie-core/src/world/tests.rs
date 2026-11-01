@@ -106,7 +106,7 @@ use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::{Master, Masters};
+use crate::objects::masters::{Master, MasterTables, Masters, OwnerMasters};
 use crate::objects::object_list::ObjectList;
 use crate::objects::release::{Releaser, released};
 use crate::objects::sprite::Graphic;
@@ -171,7 +171,7 @@ use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::checkpoint::TopAction;
 use crate::world::others::OthersRef;
-use crate::world::parts::Part;
+use crate::world::parts::{Part, PartTable, no_own_masters};
 use crate::world::player::Player;
 use ids::FISH_TRAP;
 
@@ -2249,7 +2249,7 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
     let t = sent_off_world(vec![]);
     let masters = &t.masters[1];
     let find = |id: ObjectId| t.object(id);
-    let site = task_target_with(object_id(10028), 1, &find, &t.masters)
+    let site = task_target_with(object_id(10028), 1, &find, t.master_tables())
         .unwrap()
         .unwrap();
     let world = TaskWorld {
@@ -2300,7 +2300,7 @@ fn a_task_target_reads_an_annex_as_its_main_building() {
         Some(MainBuildingId::new(object_id(10028)));
     let find = |id: ObjectId| t.object(id);
     let at = |steps| {
-        task_target_with(object_id(9175), steps, &find, &t.masters)
+        task_target_with(object_id(9175), steps, &find, t.master_tables())
             .unwrap()
             .map(|x| (x.id.get(), x.master.id.get(), x.state))
     };
@@ -2308,7 +2308,7 @@ fn a_task_target_reads_an_annex_as_its_main_building() {
     assert_eq!(at(1), Some((10028, 70, ObjectState::Foundation)));
     assert_eq!(at(2), Some((10028, 70, ObjectState::Foundation)));
     assert!(
-        task_target_with(object_id(77), 1, &find, &t.masters)
+        task_target_with(object_id(77), 1, &find, t.master_tables())
             .unwrap()
             .is_none()
     );
@@ -2819,7 +2819,8 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         move_sprite: Some(SpriteId::named(7)),
         ..t.masters[1].get(ids::BUILDER).unwrap().clone()
     };
-    t.players[1].objects[ListIndex::new(0)].own_master = Some(Box::new(own));
+    let id = t.players[1].objects[ListIndex::new(0)].id;
+    t.set_part(id, Part::OwnMaster(Box::new(own))).unwrap();
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
     assert_eq!(shown_after_update(&mut t), Some(SpriteId::named(7)));
@@ -7239,7 +7240,7 @@ fn the_unit_ai_reads_the_target_its_unit_s_update_left() {
     t.run_on_step(PlayerId::new(1), ListIndex::new(0), |unit, c| {
         for target in [10028, 9175, -1] {
             unit.combat.ai.as_mut().unwrap().current_target = ObjectId::of_field(target);
-            let master = unit.master(&c.w.masters, PlayerId::new(1)).ok();
+            let master = unit.master(c.w.master_tables(), PlayerId::new(1)).ok();
             let at = unit.surroundings(
                 c,
                 &OwnerView::of(c, None).unwrap(),
@@ -10192,6 +10193,23 @@ fn hands_unit(id: i32, master: MasterId) -> Unit {
     }
 }
 
+/// [`change_hands`] of `u` with the players' tables `masters` and the own masters `own`: the own
+/// master it answers goes into `own`; whether it changed hands.
+fn hands(
+    u: &mut Unit,
+    owners: (usize, PlayerId),
+    (masters, own): (&[Masters], &mut PartTable<Master>),
+    s: &mut Spatial,
+    now: WorldTime,
+) -> Result<bool, GenieError> {
+    let answer = change_hands(u, owners, MasterTables::new(masters, own), s, now)?;
+    Ok(answer
+        .map(|m| {
+            let _ = own.insert(u.id, *m);
+        })
+        .is_some())
+}
+
 /// `FUN_14120f800` on MarvinBlue/426048681's Gaia archer 21712 (master 4) that player 1
 /// takes over: its records and place take player 1, its sight moves from Gaia's map to
 /// player 1's with Gaia's line of sight, it takes a master of its own (a copy of Gaia's,
@@ -10200,6 +10218,7 @@ fn hands_unit(id: i32, master: MasterId) -> Unit {
 #[test]
 fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() {
     let masters = hands_masters();
+    let mut own = PartTable::default();
     let mut s = hands_world(
         21712,
         PlayerId::new(0),
@@ -10208,20 +10227,21 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
         Distance::new(6.0),
     );
     let mut u = hands_unit(21712, master_id(4));
-    let dead = crate::ownership::change::dead_master_of(&u, 0, &masters, false);
+    let dead =
+        crate::ownership::change::dead_master_of(&u, 0, MasterTables::new(&masters, &own), false);
     assert_eq!(
-        change_hands(
+        hands(
             &mut u,
             (0, PlayerId::new(1)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::from_millis(1250)
         ),
         Ok(true)
     );
-    let own = u.own_master.as_deref().unwrap();
+    let mine = own.get(u.id).unwrap();
     assert_eq!(
-        (own.hit_points, own.line_of_sight, own.fog_visibility),
+        (mine.hit_points, mine.line_of_sight, mine.fog_visibility),
         (
             MasterHitPoints::of_data(30),
             Distance::new(6.0),
@@ -10266,6 +10286,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
 #[test]
 fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     let masters = hands_masters();
+    let mut own = PartTable::default();
     let mut s = hands_world(
         9520,
         PlayerId::new(1),
@@ -10275,22 +10296,22 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     );
     let mut u = hands_unit(9520, master_id(705));
     assert_eq!(
-        crate::ownership::change::dead_master_of(&u, 1, &masters, false),
+        crate::ownership::change::dead_master_of(&u, 1, MasterTables::new(&masters, &own), false),
         None
     );
     assert_eq!(
-        change_hands(
+        hands(
             &mut u,
             (1, PlayerId::new(2)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::ZERO
         ),
         Ok(true)
     );
-    let own = u.own_master.as_deref().unwrap();
+    let mine = own.get(u.id).unwrap();
     assert_eq!(
-        (own.line_of_sight, own.fog_visibility),
+        (mine.line_of_sight, mine.fog_visibility),
         (Distance::new(4.0), FogVisibility::VISIBLE_IF_ALIVE)
     );
     let v = s.sight.as_ref().unwrap();
@@ -10301,18 +10322,18 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     assert_eq!(v.maps[2].counts[10 * 40 + 14], 1);
     // back to player 1: the copy stays, with player 1's fog and line of sight
     assert_eq!(
-        change_hands(
+        hands(
             &mut u,
             (2, PlayerId::new(1)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::ZERO
         ),
         Ok(true)
     );
-    let own = u.own_master.as_deref().unwrap();
+    let mine = own.get(u.id).unwrap();
     assert_eq!(
-        (own.line_of_sight, own.fog_visibility),
+        (mine.line_of_sight, mine.fog_visibility),
         (Distance::new(3.0), FogVisibility::VISIBLE)
     );
     // player 1's archer: its dead archer is of type 25, and none is copied
@@ -10325,14 +10346,14 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     );
     let mut a = hands_unit(7, master_id(4));
     assert_eq!(
-        crate::ownership::change::dead_master_of(&a, 1, &masters, false),
+        crate::ownership::change::dead_master_of(&a, 1, MasterTables::new(&masters, &own), false),
         None
     );
     assert_eq!(
-        change_hands(
+        hands(
             &mut a,
             (1, PlayerId::new(0)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::ZERO
         ),
@@ -10340,21 +10361,21 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     );
     // a dead master it holds stays: none is made
     assert_eq!(
-        crate::ownership::change::dead_master_of(&a, 0, &masters, true),
+        crate::ownership::change::dead_master_of(&a, 0, MasterTables::new(&masters, &own), true),
         None
     );
     assert_eq!(
-        change_hands(
+        hands(
             &mut a,
             (0, PlayerId::new(1)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::ZERO
         ),
         Ok(true)
     );
     assert_eq!(
-        a.own_master.as_deref().map(|m| m.hit_points),
+        own.get(a.id).map(|m| m.hit_points),
         Some(MasterHitPoints::of_data(35))
     );
 }
@@ -10747,6 +10768,7 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
 #[test]
 fn an_ownership_change_without_the_master_writes_the_records_alone() {
     let mut masters = hands_masters();
+    let mut own = PartTable::default();
     masters[2] = Masters::new([]);
     let mut s = hands_world(
         21712,
@@ -10758,10 +10780,10 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
     let before = s.sight.as_ref().unwrap().maps.clone();
     let mut u = hands_unit(21712, master_id(4));
     assert_eq!(
-        change_hands(
+        hands(
             &mut u,
             (0, PlayerId::new(2)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::from_millis(9)
         ),
@@ -10781,14 +10803,14 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
         s.get(object_id(21712)).map(|p| p.player),
         Some(PlayerId::new(0))
     );
-    assert!(u.own_master.is_none());
+    assert!(!own.contains(u.id));
     assert_eq!(u.combat.ai.as_ref().unwrap().notifies.len(), 1);
     u.life.inside = Some(ContainerId::new(object_id(100)));
     assert_eq!(
-        change_hands(
+        hands(
             &mut u,
             (0, PlayerId::new(1)),
-            &masters,
+            (&masters, &mut own),
             &mut s,
             WorldTime::from_millis(9)
         ),
@@ -10872,7 +10894,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     let archer = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(archer.combat.capture_flag, CaptureKind::NONE);
     assert_eq!(
-        archer.own_master.as_deref().map(|m| m.fog_visibility),
+        t.parts.own_master.get(archer.id).map(|m| m.fog_visibility),
         Some(FogVisibility::VISIBLE)
     );
     let v = t.spatial.sight.as_ref().unwrap();
@@ -11809,7 +11831,7 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
     let others = ObjectList::from(vec![tc]);
     let drop_off = |hunter: &mut Unit, t: &mut World| {
         let world = DropWorld {
-            masters: Some(&masters),
+            masters: OwnerMasters::new(no_own_masters(), Some(&masters)),
             spatial: &mut t.spatial,
             zones: &mut t.zones,
             pathing: &mut t.pathing,
@@ -12479,7 +12501,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
     let shop = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(t.parts.gather_point.get(shop.id), None);
     assert_eq!(
-        shop.own_master.as_deref().map(|m| m.id),
+        t.parts.own_master.get(shop.id).map(|m| m.id),
         Some(master_id(1378))
     );
     assert!(
@@ -12622,7 +12644,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
     );
     let torch = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
-        torch.own_master.as_deref().map(|m| m.id),
+        t.parts.own_master.get(torch.id).map(|m| m.id),
         Some(master_id(854))
     );
     let ai = torch.combat.ai.as_ref().unwrap();
@@ -12750,7 +12772,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
     assert_eq!(ids, [object_id(500), object_id(9520)]);
     let sheep = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
-        sheep.own_master.as_deref().map(|m| m.line_of_sight),
+        t.parts.own_master.get(sheep.id).map(|m| m.line_of_sight),
         Some(Distance::new(3.0))
     );
     // its standing sprite has no factor: the top speed
@@ -12799,12 +12821,11 @@ fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
     );
     t.players[0].attributes[4] = Amount::new(5.0);
     t.players[0].attributes[40] = Amount::new(2.0);
-    let mut u = hands_unit(1, master_id(4));
-    t.hand_over_attributes(PlayerId::GAIA, PlayerId::new(1), &u)
+    t.hand_over_attributes(PlayerId::GAIA, PlayerId::new(1), None)
         .unwrap();
     assert_eq!(t.players[0].attributes[4], Amount::new(5.0));
-    u.own_master = hands_masters()[0].get(master_id(4)).cloned().map(Box::new);
-    t.hand_over_attributes(PlayerId::GAIA, PlayerId::new(1), &u)
+    let own = hands_masters()[0].get(master_id(4)).cloned();
+    t.hand_over_attributes(PlayerId::GAIA, PlayerId::new(1), own.as_ref())
         .unwrap();
     assert_eq!(
         [t.players[0].attributes[4], t.players[0].attributes[40]],
@@ -14825,7 +14846,11 @@ fn ai_move_of(
         m,
         (class, PlayerId::new(1)),
         (&mut releases, &mut leaves, by),
-        (Some(&masters), &graphics, &mut rng),
+        (
+            OwnerMasters::new(no_own_masters(), Some(&masters)),
+            &graphics,
+            &mut rng,
+        ),
     )?;
     assert!(releases.iter().all(|&(_, b)| b == by));
     Ok(releases.into_iter().map(|(t, _)| t).collect())
@@ -15072,7 +15097,12 @@ fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
         )));
     let none = Graphics::new();
     assert_eq!(
-        u.head_takes_point(AI_POINT, PlayerId::new(1), None, &none),
+        u.head_takes_point(
+            AI_POINT,
+            PlayerId::new(1),
+            OwnerMasters::new(no_own_masters(), None),
+            &none
+        ),
         Ok(PointMove::Declined)
     );
     let mut u = mover_unit(7);
@@ -15151,7 +15181,11 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
     u.own_move_gave_up(
         false,
         UnitStance::AGGRESSIVE,
-        (Some(&masters), &graphics, &mut rng),
+        (
+            OwnerMasters::new(no_own_masters(), Some(&masters)),
+            &graphics,
+            &mut rng,
+        ),
     )
     .unwrap();
     assert_eq!(
@@ -15168,7 +15202,11 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
     v.own_move_gave_up(
         true,
         UnitStance::AGGRESSIVE,
-        (Some(&masters), &graphics, &mut rng),
+        (
+            OwnerMasters::new(no_own_masters(), Some(&masters)),
+            &graphics,
+            &mut rng,
+        ),
     )
     .unwrap();
     assert_eq!(
@@ -18150,7 +18188,7 @@ fn drop_site_sought(
     t.build_mesh().unwrap();
     setup(&mut t);
     let mut world = DropWorld {
-        masters: t.masters.get(1),
+        masters: OwnerMasters::new(&t.parts.own_master, t.masters.get(1)),
         spatial: &mut t.spatial,
         zones: &mut t.zones,
         pathing: &mut t.pathing,

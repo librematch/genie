@@ -45,7 +45,10 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a builder without its player's masters",
                 ))?;
-        let master = self.master_in(Some(masters))?;
+        let master = self.master_in(crate::objects::masters::OwnerMasters::new(
+            &c.w.parts.own_master,
+            Some(masters),
+        ))?;
         let site = masters.get(built).ok_or(GenieError::unsupported(
             "a building of a master the slice does not have",
         ))?;
@@ -72,7 +75,11 @@ impl Unit {
             .mover()
             .ok_or(GenieError::unsupported("a builder without movement state"))?;
         let restriction = mover.stats.restriction;
-        let (player, me_id, every) = (c.player, self.id, &c.w.masters);
+        let (player, me_id, every) = (
+            c.player,
+            self.id,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let candidate = |id: ObjectId, owner: PlayerId, u: &Self, position: Position| {
             let m = u.master(every, owner)?;
             Ok(Candidate {

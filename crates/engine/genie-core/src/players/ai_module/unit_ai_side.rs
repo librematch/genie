@@ -87,7 +87,7 @@ impl UnitView<'_, '_> {
         if !explore.contains(&n.p[0]) {
             return Ok(Heard::Nothing);
         }
-        let own = self.unit.master(&self.c.w.masters, self.player)?;
+        let own = self.unit.master(self.c.w.master_tables(), self.player)?;
         let (class_id, sight, flags) = (own.class, own.line_of_sight, own.object_flags);
         let id = self.unit.id;
         let unit = SearchUnit {
@@ -110,7 +110,9 @@ impl UnitView<'_, '_> {
                 .is_some_and(|e| e == id || view.find(e).is_some());
             let centre = match town_centre_unit(view)? {
                 Some(u) => {
-                    let sight = u.master(&self.c.w.masters, self.player)?.line_of_sight;
+                    let sight = u
+                        .master(self.c.w.master_tables(), self.player)?
+                        .line_of_sight;
                     Some((u.position().ground(), sight))
                 }
                 None => None,

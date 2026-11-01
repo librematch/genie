@@ -326,7 +326,7 @@ impl World {
             let Some((owner, u)) = self.object(id) else {
                 continue;
             };
-            let r = u.master(&self.masters, owner)?.radius;
+            let r = u.master(self.master_tables(), owner)?.radius;
             // the packet's word converted (`CVTSI2SS` of a word: exact)
             let gap = |end: i32, at: f32, r: f32| {
                 let g = ((end as f32 + HALF) - at).abs() - r;
@@ -405,7 +405,7 @@ impl World {
         let Some((owner, u)) = self.object(id) else {
             return Ok(false);
         };
-        let m = u.master(&self.masters, owner)?;
+        let m = u.master(self.master_tables(), owner)?;
         if m.kind <= BUILDER_TYPE {
             return Ok(false);
         }

@@ -11,7 +11,6 @@
 use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::objects::lines::UnitLines;
-use crate::objects::masters::Masters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::release::{Releaser, released, released_fields};
 use crate::objects::unit::Unit;
@@ -32,7 +31,7 @@ use crate::world::{Player, World};
 pub(crate) struct Lets<'l> {
     pub(crate) player: PlayerId,
     pub(crate) relations: &'l crate::players::Relations,
-    pub(crate) masters: &'l [Masters],
+    pub(crate) masters: crate::objects::masters::MasterTables<'l>,
     pub(crate) lines: &'l UnitLines,
     pub(crate) tracker: &'l mut Tracker,
     pub(crate) own_notifies: &'l mut Vec<(Notify, crate::objects::ObjectState)>,
@@ -86,7 +85,10 @@ impl World {
         let mut lets = Lets {
             player,
             relations,
-            masters: &self.masters,
+            masters: crate::objects::masters::MasterTables::new(
+                &self.masters,
+                &self.parts.own_master,
+            ),
             lines: &self.lines,
             tracker,
             own_notifies,
@@ -227,7 +229,7 @@ impl Lets<'_> {
             if u.workers < crate::objects::WorkerCount::MOST {
                 u.workers = u.workers.plus(1);
             }
-            let _ = others.wake(id, self.tracker, (self.masters, self.lines));
+            let _ = others.wake(id, self.tracker, (self.masters.players, self.lines));
             return Ok(());
         }
         let allied = self.allied(others.view(), by.player, p);

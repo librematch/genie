@@ -103,7 +103,7 @@ pub(crate) fn task_target_with<'a>(
     id: ObjectId,
     steps: usize,
     find: &impl Fn(ObjectId) -> Option<(PlayerId, &'a Unit)>,
-    every: &'a [Masters],
+    every: crate::objects::masters::MasterTables<'a>,
 ) -> Result<Option<TaskTarget<'a>>, GenieError> {
     let mut id = id;
     for _ in 0..steps {

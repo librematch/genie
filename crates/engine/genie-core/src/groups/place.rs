@@ -176,7 +176,14 @@ impl World {
                 grow,
                 &members,
                 true,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                ),
             )? {
                 return Ok(at);
             }
@@ -256,7 +263,11 @@ impl World {
         group: GroupId,
         ahead: Distance,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
@@ -343,7 +354,7 @@ impl World {
                 if !in_front.is_empty()
                     || ground_squared(u.moved_vector(), front) <= nearest_d
                     || {
-                        let r = u.master(&self.masters, p)?.radius.x();
+                        let r = u.master(self.master_tables(), p)?.radius.x();
                         beside <= (r + r) * (r + r)
                     } =>
             {

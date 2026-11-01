@@ -38,11 +38,11 @@ impl World {
     ) -> Result<(), GenieError> {
         let by = self.releaser(player, idx)?;
         let unit = &self.players.live(player, idx)?;
-        let livestock = unit.master(&self.masters, player)?.class == class::LIVESTOCK;
+        let livestock = unit.master(self.master_tables(), player)?.class == class::LIVESTOCK;
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "an Artifact's move to an object the slice does not hold",
         ))?;
-        let t_master = t.master(&self.masters, tp)?;
+        let t_master = t.master(self.master_tables(), tp)?;
         let to_building = livestock && t_master.kind == BUILDING;
         let to_town_centre = livestock && t_master.id == TOWN_CENTRE;
         let at = self
@@ -54,7 +54,11 @@ impl World {
             ))?;
         let unit = &self.players.live(player, idx)?;
         // what its MoveTo's constructor (FUN_140aa0df0) reads of the unit and the target
-        let reads = unit.move_to_reads(&self.masters, player, &self.graphics)?;
+        let reads = unit.move_to_reads(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let to = reads
             .walk_to(self, Some(target))?
             .ok_or(crate::construction::build::NOT_HELD)?;
@@ -146,7 +150,7 @@ impl World {
                     let u = &self.players.live(q, i)?;
                     if q != p
                         || u.life.state != ObjectState::Alive
-                        || u.master(&self.masters, q)?.class != class::LIVESTOCK
+                        || u.master(self.master_tables(), q)?.class != class::LIVESTOCK
                         || !u.top_action_idle()?
                         || listed.contains(&id)
                     {
@@ -204,7 +208,7 @@ impl World {
             };
             let unit = &self.players.live(p, idx)?;
             if unit.life.state != ObjectState::Alive
-                || unit.master(&self.masters, p)?.kind < BUILDING
+                || unit.master(self.master_tables(), p)?.kind < BUILDING
             {
                 continue;
             }
@@ -253,7 +257,7 @@ impl World {
             // any player's unit the world holds: the command's list (`FUN_140e6b750`) and the
             // order filter none by owner
             let unit = &self.players.live(p, idx)?;
-            let kind = unit.master(&self.masters, p)?.kind;
+            let kind = unit.master(self.master_tables(), p)?.kind;
             if unit.life.state != ObjectState::Alive
                 || kind < ACTION
                 || unit.life.amount <= Amount::ZERO
@@ -359,7 +363,10 @@ impl World {
         let mut unit = self.take_out(p, idx)?;
         let player = &self.players.player(p)?;
         let world = crate::unit_ai::world_view::DropWorld {
-            masters: self.masters.of(p),
+            masters: crate::objects::masters::OwnerMasters::new(
+                &self.parts.own_master,
+                self.masters.of(p),
+            ),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
@@ -374,14 +381,28 @@ impl World {
                 world,
                 others,
                 &self.graphics,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                ),
             )
         } else {
             unit.gather_drop_off_in(
                 world,
                 others,
                 &self.graphics,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                ),
             )
         };
         let idx = self.put_back_own(p, unit)?;

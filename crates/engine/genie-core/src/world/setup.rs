@@ -121,7 +121,13 @@ impl World {
                 if u.life.inside.is_some() || ObjectState::Removed <= u.life.state {
                     continue;
                 }
-                let m = u.master(&self.masters, q)?;
+                let m = u.master(
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                    q,
+                )?;
                 let Some(placed) = self.spatial.get(u.id) else {
                     continue;
                 };

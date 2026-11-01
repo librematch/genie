@@ -162,7 +162,7 @@ impl World {
         differentiators: &'d [ObjectId],
     ) -> Result<Rounder<'d>, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let mover = u.body.mover().ok_or(NO_MOVER)?;
         let grow = master.radius.x() * ROUND_RADIUS;
         Ok(Rounder {
@@ -189,7 +189,11 @@ impl World {
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
     fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> Result<bool, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         self.spatial
             .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
     }
@@ -360,7 +364,11 @@ impl World {
         ignore: &[ObjectId],
         record: &mut Path,
     ) -> Result<ShortFound, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -410,7 +418,11 @@ impl World {
             computer,
             (to, 0.0),
             None,
-            crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+            crate::world::index::ObjectsRef::new(
+                &self.players,
+                &self.index,
+                crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            ),
         )
     }
 

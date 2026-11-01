@@ -6,7 +6,6 @@ use crate::math::rng::{Stream, Well512};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
@@ -24,7 +23,10 @@ impl Unit {
         self.stop_with(
             (&mut releases, &mut leaves),
             by,
-            c.w.masters.of(c.player),
+            crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
             &c.w.graphics,
             sprite,
         )?;
@@ -38,7 +40,7 @@ impl Unit {
         &mut self,
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
-        masters: Option<&Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
@@ -74,7 +76,7 @@ impl Unit {
     /// [`Mover::shows_standing`]: crate::movement::Mover::shows_standing
     pub(crate) fn show_standing(
         &mut self,
-        masters: Option<&Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {

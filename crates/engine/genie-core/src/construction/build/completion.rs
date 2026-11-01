@@ -47,7 +47,7 @@ impl crate::world::World {
             return Err(crate::players::diplomacy::REVEAL_UNITS);
         }
         let (p, u) = self.object(id).ok_or(NOT_HELD)?;
-        let master = u.master(&self.masters, p)?.clone();
+        let master = u.master(self.master_tables(), p)?.clone();
         let building = master.building.ok_or(GenieError::unsupported(
             "a completion of a master that is no building",
         ))?;

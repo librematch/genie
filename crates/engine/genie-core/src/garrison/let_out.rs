@@ -68,7 +68,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         let b = self.players.live(player, building)?;
         let bid = b.id;
-        let bm = b.master(&self.masters, player)?.clone();
+        let bm = b.master(self.master_tables(), player)?.clone();
         let gather = self.parts.gather_point.get(bid).copied();
         // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
         // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
@@ -92,7 +92,7 @@ impl World {
         // the unit is any player's (an ally's too): its own player's masters and orders
         let (up, ui) = self.live_inside(id)?;
         let unit = self.players.live(up, ui)?;
-        let made = unit.master(&self.masters, up)?.clone();
+        let made = unit.master(self.master_tables(), up)?.clone();
         // The class of siege weapons, whose own place an Enter's point keeps (`FUN_140a85f30`, the
         // short `0xd`).
         if bm.class == class::SIEGE {
@@ -149,7 +149,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let b = self.players.live(player, container)?;
         let (bid, id) = (b.id, self.players.live(up, ui)?.id);
-        let bm = b.master(&self.masters, player)?.clone();
+        let bm = b.master(self.master_tables(), player)?.clone();
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
         let b = self.players.live_mut(player, container)?;
         if let Some(share) = share {

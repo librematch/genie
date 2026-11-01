@@ -40,11 +40,17 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: &self.c.w.masters,
+            every: crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                &self.c.w.masters,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
             ),
             restriction: None,
             unit: &*self.unit,
@@ -127,7 +133,7 @@ impl UnitView<'_, '_> {
             Some(_) => return Ok(false),
         };
         if let Some((tq, t)) = u.top_target().and_then(find) {
-            let tm = t.master(&self.c.w.masters, tq)?;
+            let tm = t.master(self.c.w.master_tables(), tq)?;
             let gap = footprint_gap_squared(u.position(), m.radius, t.position(), tm.radius);
             let in_range = gap <= m.weapon_range.squared() && m.min_range.squared() <= gap;
             let spared = patrolling && tm.kind == BUILDING && tm.weapons.is_empty();
@@ -164,7 +170,7 @@ impl UnitView<'_, '_> {
             capture,
         );
         let target_kind = match ai.current_target.and_then(find) {
-            Some((q, o)) => Some(o.master(&self.c.w.masters, q)?.kind),
+            Some((q, o)) => Some(o.master(self.c.w.master_tables(), q)?.kind),
             None => None,
         };
         let picker = self.picker(None)?;

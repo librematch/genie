@@ -116,7 +116,7 @@ impl World {
                 "a mule cart's search without its movement state (a moving building's setup)",
             ));
         }
-        let master = self.players.live(p, idx)?.master(&self.masters, p)?;
+        let master = self.players.live(p, idx)?.master(self.master_tables(), p)?;
         let mut kinds = Vec::new();
         let mut cart_class = None;
         for t in &master.tasks {
@@ -147,8 +147,14 @@ impl World {
                     after,
                     left: None,
                 },
-                every: &self.masters,
-                masters: self.masters.of(p),
+                every: crate::objects::masters::MasterTables::new(
+                    &self.masters,
+                    &self.parts.own_master,
+                ),
+                masters: crate::objects::masters::OwnerMasters::new(
+                    &self.parts.own_master,
+                    self.masters.of(p),
+                ),
                 plan: Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,
@@ -170,7 +176,14 @@ impl World {
                         Some(crate::gathering::DropSiteId::new(id)),
                     ),
                     (current, ObjectState::Foundation, crate::unit_ai::NO_POINT),
-                    crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                    crate::world::index::ObjectsRef::new(
+                        &self.players,
+                        &self.index,
+                        crate::objects::masters::MasterTables::new(
+                            &self.masters,
+                            &self.parts.own_master,
+                        ),
+                    ),
                 )?;
                 if let Some(f) = f {
                     found.push(f);
@@ -180,7 +193,7 @@ impl World {
         })();
         let idx = self.put_back_own(p, cart)?;
         let found = result?;
-        let cart_master = self.players.live(p, idx)?.master(&self.masters, p)?;
+        let cart_master = self.players.live(p, idx)?.master(self.master_tables(), p)?;
         let at = self.players.live(p, idx)?.position();
         let mut best: Option<(ObjectId, Position)> = None;
         let mut best_d = CART_REACH;

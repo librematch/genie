@@ -33,7 +33,7 @@ impl World {
     pub(super) fn stop_everything(&mut self, p: PlayerId) -> Result<(), GenieError> {
         for idx in self.players.player(p)?.objects.places() {
             let unit = &self.players.live(p, idx)?;
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             let (class, id) = (master.class, master.id);
             let explorer = unit.combat.ai.as_ref().is_some_and(|ai| {
                 matches!(
@@ -73,7 +73,7 @@ impl World {
     /// and forgets its target and its last target (`FUN_140c4dcb0`).
     pub(crate) fn object_stop(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
         let unit = &self.players.live(p, idx)?;
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         let class = master.class;
         if unit
             .top_action_kind()

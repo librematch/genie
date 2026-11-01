@@ -1048,9 +1048,9 @@ mod tests {
             house.sprite.map(|s| s.graphic.id),
             Some(SpriteId::named(1464))
         );
-        assert!(house.own_master.is_none());
+        assert!(!t.parts.own_master.contains(house.id));
         assert_eq!(
-            dead.own_master.as_deref().map(|m| m.hit_points),
+            t.parts.own_master.get(dead.id).map(|m| m.hit_points),
             Some(MasterHitPoints::of_data(550))
         );
         assert_eq!(
@@ -1058,7 +1058,7 @@ mod tests {
             Some(master_id(1403))
         );
         assert_eq!(
-            rubble.own_master.as_deref().map(|m| m.id),
+            t.parts.own_master.get(rubble.id).map(|m| m.id),
             Some(master_id(1403))
         );
         let master = t.masters[0].get(ids::HOUSE).unwrap();
@@ -1304,11 +1304,7 @@ mod tests {
             hit_points,
             ..Master::default()
         };
-        let mut own = object(11, master_id(4), ObjectState::Alive, HitPoints::new(20.0));
-        own.own_master = Some(Box::new(soldier(
-            master_id(4),
-            MasterHitPoints::of_data(40),
-        )));
+        let own = object(11, master_id(4), ObjectState::Alive, HitPoints::new(20.0));
         let player = crate::world::Player {
             objects: vec![
                 object(10, master_id(4), ObjectState::Alive, HitPoints::new(20.0)),
@@ -1337,6 +1333,14 @@ mod tests {
             soldier(master_id(5), MasterHitPoints::of_data(60)),
             soldier(master_id(0x67f), MasterHitPoints::of_data(60)),
         ])];
+        t.set_part(
+            object_id(11),
+            crate::world::parts::Part::OwnMaster(Box::new(soldier(
+                master_id(4),
+                MasterHitPoints::of_data(40),
+            ))),
+        )
+        .unwrap();
         t.track_add(PlayerId::new(0), object_id(10), master_id(4))
             .unwrap();
         t
@@ -1365,9 +1369,10 @@ mod tests {
             Some(object_id(10)),
         )
         .unwrap();
-        let own = t.players[0].objects[ListIndex::new(0)]
+        let own = t
+            .parts
             .own_master
-            .as_deref()
+            .get(t.players[0].objects[ListIndex::new(0)].id)
             .unwrap();
         assert_eq!(
             (own.id, own.hit_points),
@@ -1388,9 +1393,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(hp(&t), [30.0, 30.0, 30.0]);
-        let own = t.players[0].objects[ListIndex::new(1)]
+        let own = t
+            .parts
             .own_master
-            .as_deref()
+            .get(t.players[0].objects[ListIndex::new(1)].id)
             .unwrap();
         assert_eq!(
             (own.id, own.hit_points),

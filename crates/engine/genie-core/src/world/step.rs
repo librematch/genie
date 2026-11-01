@@ -84,6 +84,7 @@ impl World {
             players,
             index,
             masters,
+            parts,
             ..
         } = self;
         let (object, sprite_rng) = streams.object_and_sprite();
@@ -99,7 +100,11 @@ impl World {
                 object,
                 groups,
             }),
-            by_id: ObjectsRef::new(players, index, masters),
+            by_id: ObjectsRef::new(
+                players,
+                index,
+                crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+            ),
         };
         let beside = Beside { sprite_rng };
         (walk, beside)
@@ -255,7 +260,14 @@ impl Step<'_> {
                     object,
                     groups: &self.w.groups,
                 }),
-                by_id: ObjectsRef::new(&self.w.players, &self.w.index, &self.w.masters),
+                by_id: ObjectsRef::new(
+                    &self.w.players,
+                    &self.w.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.w.masters,
+                        &self.w.parts.own_master,
+                    ),
+                ),
             },
             sprite,
         ))

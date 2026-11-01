@@ -22,7 +22,7 @@ impl Unit {
             return Ok(false);
         }
         if self.actions.default_fly {
-            let task = Master::default_task(self.master(&c.w.masters, c.player)?)
+            let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
                 .copied()
                 .ok_or(GenieError::missing_data(
                     "a bird's default Fly whose master has no default task",
@@ -31,7 +31,7 @@ impl Unit {
             return Ok(true);
         }
         if std::mem::take(&mut self.actions.default_make) {
-            let task = Master::default_task(self.master(&c.w.masters, c.player)?)
+            let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
                 .copied()
                 .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
             self.actions
@@ -45,7 +45,7 @@ impl Unit {
         }
         if self.actions.default_artifact {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
-            let moving = Master::default_task(self.master(&c.w.masters, c.player)?)
+            let moving = Master::default_task(self.master(c.w.master_tables(), c.player)?)
                 .and_then(|t| t.sprites.moving);
             self.actions
                 .list

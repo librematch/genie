@@ -17,7 +17,7 @@ use genie_diff::Diff;
 use crate::GenieError;
 use crate::objects::layers::Body;
 use crate::objects::lifecycle::Lifecycle;
-use crate::objects::masters::{Master, Masters};
+use crate::objects::masters::{Master, MasterTables, Masters, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
 use crate::ownership::capture::Captured;
 use crate::world::step::Step;
@@ -110,49 +110,40 @@ pub struct Unit {
     /// `FUN_14121cc40`, a footprint clearing's `FUN_141189670`, a construction start's clearing
     /// `FUN_1411cd0d0`, a stack unit's completion); later ones leave it alone.
     pub roo_called: bool,
-    /// `+0x6c0` (`FUN_141185010`): the master of its own its master pointer (`+0xa0`) reads, a
-    /// copy (`FUN_141186d10`, the master's slot 0x48) of the one it read when it took it; None
-    /// while it reads its player's. An ownership change gives it one ([`change_hands`]).
-    ///
-    /// [`change_hands`]: crate::ownership::change::change_hands
-    #[diff(
-        gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
-    )]
-    pub own_master: Option<Box<Master>>,
 }
 
 impl Unit {
     /// The master the object reads through its master pointer (`+0xa0`): its own (`+0x6c0`,
-    /// [`Unit::own_master`]) when it has one, else player `player`'s master of its id in
-    /// `every`, the world's masters ([`crate::objects::masters::player_master`]).
+    /// [`crate::world::parts::Parts::own_master`]) when it has one, else player `player`'s
+    /// master of its id ([`crate::objects::masters::player_master`]), both of `tables`.
     ///
     /// # Errors
     ///
     /// No master of its own and none of its id in the player's table, which the game's object
     /// always has ([`crate::world::OBJECT_MASTER`], with the object, its master and the player).
     pub fn master<'a>(
-        &'a self,
-        every: &'a [Masters],
+        &self,
+        tables: MasterTables<'a>,
         player: PlayerId,
     ) -> Result<&'a Master, GenieError> {
-        self.master_in(every.get(player.index()))
+        self.master_in(tables.of(player))
             .map_err(|e| e.with("player", player))
     }
 
-    /// [`Unit::master`] for a caller that holds its owner's table of masters (`table`, none for
-    /// an owner without one) rather than the world's.
+    /// [`Unit::master`] for a caller that holds its owner's masters ([`OwnerMasters`]) rather
+    /// than the world's.
     ///
     /// # Errors
     ///
-    /// No master of its own and none of its id in `table`.
+    /// No master of its own and none of its id in the owner's table.
     pub(crate) fn master_in<'a>(
-        &'a self,
-        table: Option<&'a Masters>,
+        &self,
+        masters: OwnerMasters<'a>,
     ) -> Result<&'a Master, GenieError> {
         object_master(
-            self.own_master.as_deref(),
+            masters.own.get(self.id),
             (self.id, self.life.master_id),
-            table,
+            masters.table,
         )
     }
 

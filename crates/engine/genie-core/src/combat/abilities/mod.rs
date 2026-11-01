@@ -211,7 +211,7 @@ impl World {
             },
         };
         let unit = &self.players.live(p, i)?;
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         // The object types the routine runs on: a combat unit (`'F'`) and a building (`'P'`).
         if !matches!(master.kind, COMBAT | BUILDING) {
             return Ok(Vec::new());

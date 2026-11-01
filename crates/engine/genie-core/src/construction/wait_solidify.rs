@@ -104,8 +104,24 @@ impl UnitView<'_, '_> {
             others.find(id)
         };
         let (Some(t), Some(general)) = (
-            task_target_with(target, 1, &find, &self.c.w.masters)?,
-            task_target_with(target, 2, &find, &self.c.w.masters)?,
+            task_target_with(
+                target,
+                1,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
+            task_target_with(
+                target,
+                2,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
         ) else {
             return Ok(false);
         };
@@ -115,7 +131,7 @@ impl UnitView<'_, '_> {
             .masters
             .get(self.player.index())
             .ok_or(crate::world::UNIT_AI_MASTER)?;
-        let own = unit.master(&self.c.w.masters, self.player)?;
+        let own = unit.master(self.c.w.master_tables(), self.player)?;
         let actor = Actor {
             id: unit.id,
             master: own,

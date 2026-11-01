@@ -122,9 +122,12 @@ impl World {
             let u = self.object_at(place)?;
             let reads = self.master_read(p, u)?;
             if upgradable(reads.kind, u.life.state) {
-                self.object_at_mut(place)?.own_master = Some(Box::new(reads.clone()));
+                self.set_part(
+                    id,
+                    crate::world::parts::Part::OwnMaster(Box::new(reads.clone())),
+                )?;
                 self.upgrade_object(p, place, (&reads, new), true)?;
-                if let Some(own) = self.object_at_mut(place)?.own_master.as_mut() {
+                if let Some(own) = self.parts.own_master.get_mut(id) {
                     own.copy_from(new);
                 }
             }
@@ -145,31 +148,36 @@ impl World {
         use crate::world::index::Place;
         for i in self.players.player(p)?.objects.places() {
             let place = Place::Live(p, i);
-            let u = &self.players.live(p, i)?;
-            let table = u.own_master.is_none();
-            if table && u.life.master_id == from {
-                if upgradable(old.kind, u.life.state) {
+            let (id, master_id, state) = {
+                let u = self.players.live(p, i)?;
+                (u.id, u.life.master_id, u.life.state)
+            };
+            let table = !self.parts.own_master.contains(id);
+            if table && master_id == from {
+                if upgradable(old.kind, state) {
                     self.upgrade_object(p, place, (old, new), keep)?;
                 } else {
                     self.own_and_dead_master(p, i, old)?;
                 }
-            } else if table && let Some(d) = dead.filter(|d| d.id == u.life.master_id) {
-                let d = d.clone();
-                self.players.live_mut(p, i)?.own_master = Some(Box::new(d));
+            } else if table && let Some(d) = dead.filter(|d| d.id == master_id) {
+                self.set_part(
+                    id,
+                    crate::world::parts::Part::OwnMaster(Box::new(d.clone())),
+                )?;
             } else if mode.own_masters()
-                && let Some(own) = u.own_master.as_deref().filter(|m| m.id == from)
-                && upgradable(own.kind, u.life.state)
+                && let Some(own) = self.parts.own_master.get(id).filter(|m| m.id == from)
+                && upgradable(own.kind, state)
             {
                 let own = own.clone();
                 self.upgrade_object(p, place, (&own, new), true)?;
-                if let Some(m) = self.players.live_mut(p, i)?.own_master.as_mut() {
+                if let Some(m) = self.parts.own_master.get_mut(id) {
                     m.copy_from(new);
                 }
             }
         }
         for i in self.players.player(p)?.sleeping.places() {
             let u = &self.players.asleep(p, i)?;
-            if u.own_master.is_none() && u.life.master_id == from {
+            if !self.parts.own_master.contains(u.id) && u.life.master_id == from {
                 self.upgrade_object(p, Place::Sleeping(p, i), (old, new), keep)?;
             }
         }
@@ -191,9 +199,7 @@ impl World {
 
     /// The master object `u` of player `p` reads: its own, else its player's.
     pub(super) fn master_read(&self, p: PlayerId, u: &Unit) -> Result<Master, GenieError> {
-        u.own_master
-            .as_deref()
-            .map_or_else(|| u.master(&self.masters, p).cloned(), |m| Ok(m.clone()))
+        u.master(self.master_tables(), p).cloned()
     }
 
     /// An object of master `old` past its use (slot 0xa8 false) in an upgrade: a master of its own
@@ -209,11 +215,13 @@ impl World {
         let dead = old.death_spawns[0]
             .and_then(|id| player_master(&self.masters, p, id))
             .cloned();
-        let u = self.players.live_mut(p, i)?;
-        if u.own_master.is_none() {
-            u.own_master = Some(Box::new(old.clone()));
+        let id = self.players.live(p, i)?.id;
+        if !self.parts.own_master.contains(id) {
+            self.set_part(
+                id,
+                crate::world::parts::Part::OwnMaster(Box::new(old.clone())),
+            )?;
         }
-        let id = u.id;
         if !self.parts.dead_master.contains(id)
             && old.death_spawns[0].is_some()
             && let Some(d) =

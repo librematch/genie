@@ -102,7 +102,7 @@ impl World {
             "an attack's target the slice does not hold",
         ))?;
         let target = t.id;
-        let class = t.master(&self.masters, tp)?.class;
+        let class = t.master(self.master_tables(), tp)?.class;
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = unit.combat.ai.as_mut() {
@@ -134,7 +134,7 @@ impl World {
         let unit = owner.live(idx)?;
         Ok(Actor {
             id: unit.id,
-            master: unit.master(&self.masters, player)?,
+            master: unit.master(self.master_tables(), player)?,
             player,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
@@ -188,7 +188,7 @@ impl World {
         let class = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .class;
         let unit = self.players.live_mut(player, idx)?;
         if matches!(task.action_type, GATHER | HUNT) {
@@ -231,7 +231,7 @@ impl World {
             return Ok(());
         }
         // FUN_140c64e50: a unit of a type below 70 always clears its AI's notifies
-        let clears = notified || unit.master(&self.masters, player)?.kind < COMBAT;
+        let clears = notified || unit.master(self.master_tables(), player)?.kind < COMBAT;
         let found = self.work_task(player, idx, (target, point), filter)?;
         let Some((with, task)) = found else {
             if filter.is_some() {
@@ -294,7 +294,7 @@ impl World {
         let owner = &self.players.player(player)?;
         let actor = Actor {
             id: unit.id,
-            master: unit.master(&self.masters, player)?,
+            master: unit.master(self.master_tables(), player)?,
             player,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
@@ -562,7 +562,7 @@ impl World {
         (clears, notified): (bool, bool),
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         if !master.moving.is_some_and(|m| Speed::ZERO < m.speed) {
             return Ok(());
         }
@@ -576,7 +576,7 @@ impl World {
                 let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
                     "a work command's target the slice does not hold",
                 ))?;
-                Some((target, t.master(&self.masters, tp)?.class))
+                Some((target, t.master(self.master_tables(), tp)?.class))
             }
         };
         let (order, action) = if alive {
@@ -626,7 +626,7 @@ impl World {
         change: bool,
     ) -> Result<Option<crate::objects::masters::Task>, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let own = unit.master(&self.masters, player)?;
+        let own = unit.master(self.master_tables(), player)?;
         let owner = &self.players.player(player)?;
         let actor = Actor {
             id: unit.id,

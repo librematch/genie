@@ -121,7 +121,11 @@ impl Unit {
             self.life.master_id,
             self.actions.list.gather().and_then(|g| g.target_class),
         );
-        let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
+        let walks = self.move_walks(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let gather = self
             .actions
             .list
@@ -183,7 +187,7 @@ impl Unit {
             .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let standing = master
             .standing_sprite
             .and_then(|s| c.w.graphics.get(s).copied());
@@ -215,12 +219,16 @@ impl Unit {
     ) -> Result<(), GenieError> {
         let (owner, resource) =
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let (computer, farm_stops) = (
             c.w.players.player(c.player)?.computer,
             c.w.settings.walkable_farms,
         );
-        let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
+        let walks = self.move_walks(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let rate = crate::gathering::gather::StopRate {
             work_rate: self.combat.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
@@ -289,8 +297,8 @@ impl Unit {
         let (owner, t) = others.find(found).ok_or(GenieError::unsupported(
             "a gather's new target the slice does not hold",
         ))?;
-        let master = self.master(&c.w.masters, c.player)?;
-        let t_master = t.master(&c.w.masters, owner)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
+        let t_master = t.master(c.w.master_tables(), owner)?;
         Ok((
             owner.index(),
             crate::gathering::gather::Resource {
@@ -319,9 +327,16 @@ impl Unit {
     /// `MoveTo` walks there ([`crate::gathering::gather::GatherAction::set_drop`]). Without one the unit AI's
     /// part (notify 0x203) is not modelled.
     pub(crate) fn gather_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let w = DropWorld {
-            masters: c.w.masters.of(c.player),
+            masters: crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             pathing: &mut c.w.pathing,
@@ -459,7 +474,7 @@ impl Unit {
             .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut site = carry_to;
         if site.is_none() && !master.drop_sites.is_empty() {
-            let masters = c.masters.ok_or(GenieError::unsupported(
+            let masters = c.masters.table.ok_or(GenieError::unsupported(
                 "a drop-off of a player without masters",
             ))?;
             let sites = &master.drop_sites;
@@ -467,7 +482,7 @@ impl Unit {
                 Some(s) => Some(s),
                 None => drop_site_search(
                     others.own_iter(),
-                    masters,
+                    crate::objects::masters::OwnerMasters::new(c.masters.own, Some(masters)),
                     sites,
                     self.position(),
                     None,
@@ -522,10 +537,10 @@ impl Unit {
         (outside, by_path, at_work): (bool, bool, Option<ActionType>),
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
-        let masters = c.masters.ok_or(GenieError::unsupported(
+        let masters = c.masters.table.ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;
-        let master = self.master_in(Some(masters))?;
+        let master = self.master_in(c.masters)?;
         let mover = self
             .body
             .mover()
@@ -560,7 +575,7 @@ impl Unit {
         };
         drop_site_search(
             others.own_iter(),
-            masters,
+            crate::objects::masters::OwnerMasters::new(c.masters.own, Some(masters)),
             &master.drop_sites,
             self.position(),
             Some(seeker),

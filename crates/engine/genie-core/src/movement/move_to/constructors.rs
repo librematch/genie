@@ -14,7 +14,7 @@ use crate::movement::move_to::{
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
-use crate::objects::masters::{Master, Masters};
+use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -126,7 +126,7 @@ impl<'g> MoveToReads<'g> {
             return Ok(None);
         };
         let at = t.position();
-        let radius = t.master(&w.masters, player)?.radius;
+        let radius = t.master(w.master_tables(), player)?.radius;
         Ok(Some(WalkTo {
             id,
             at,
@@ -241,7 +241,7 @@ impl Unit {
     /// A unit whose master the table lacks.
     pub(crate) fn move_to_reads<'g>(
         &self,
-        every: &[Masters],
+        every: crate::objects::masters::MasterTables<'_>,
         player: PlayerId,
         graphics: &'g crate::objects::Graphics,
     ) -> Result<MoveToReads<'g>, GenieError> {

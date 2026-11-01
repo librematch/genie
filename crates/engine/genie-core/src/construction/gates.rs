@@ -119,7 +119,14 @@ impl World {
         let owner = self.players.player(q)?;
         let mut gates = Vec::new();
         for i in owner.objects.places().rev() {
-            let m = owner.objects.checked(i)?.master_in(masters)?;
+            let m =
+                owner
+                    .objects
+                    .checked(i)?
+                    .master_in(crate::objects::masters::OwnerMasters::new(
+                        &self.parts.own_master,
+                        masters,
+                    ))?;
             if m.class == class::GATE
                 && m.building
                     .as_ref()
@@ -139,7 +146,7 @@ impl World {
         p: PlayerId,
     ) -> Result<bool, GenieError> {
         let gate = self.players.live(q, i)?;
-        let m = gate.master(&self.masters, q)?;
+        let m = gate.master(self.master_tables(), q)?;
         Ok(lets_pass((gate, m), q, p, &self.spatial))
     }
 

@@ -45,7 +45,7 @@ impl World {
         way_back: bool,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(p, idx)?;
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         let (kind, class, at) = (master.kind, master.class, unit.position().ground());
         let held = unit.life.attribute_type;
         let mut site = None;
@@ -90,9 +90,13 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let unit = &self.players.live(p, idx)?;
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         let seeks = master.kind < COMBAT
             || (!master
                 .drop_sites
@@ -105,7 +109,7 @@ impl World {
         if !seeks {
             return crate::gathering::drop_sites::drop_site_search(
                 &self.players.player(p)?.objects,
-                masters,
+                crate::objects::masters::OwnerMasters::new(&self.parts.own_master, Some(masters)),
                 &master.drop_sites,
                 unit.position(),
                 None,
@@ -118,7 +122,10 @@ impl World {
             .map_or(ActionState::NO_ACTION, |a| a.state);
         let player = &self.players.player(p)?;
         let mut world = crate::unit_ai::world_view::DropWorld {
-            masters: self.masters.of(p),
+            masters: crate::objects::masters::OwnerMasters::new(
+                &self.parts.own_master,
+                self.masters.of(p),
+            ),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
@@ -187,7 +194,7 @@ impl World {
             unit.life.attribute_type,
             unit.position().ground(),
         );
-        let class = unit.master(&self.masters, p)?.class;
+        let class = unit.master(self.master_tables(), p)?.class;
         let search = if Amount::ZERO < amount {
             match self.table_drop_site(p, at, held, class)? {
                 None => DropSearch::Nothing,
@@ -305,7 +312,7 @@ impl World {
             let Some((op, o)) = self.object(t) else {
                 return Ok(None);
             };
-            let m = o.master(&self.masters, op)?;
+            let m = o.master(self.master_tables(), op)?;
             Ok(Some(RecordTarget {
                 id: t,
                 building: m.kind == BUILDING,
@@ -320,7 +327,7 @@ impl World {
         let target = match found {
             Some(f) => {
                 let (op, o) = self.object(f.id).ok_or_else(|| object_gone(f.id))?;
-                let master = o.master(&self.masters, op)?.id;
+                let master = o.master(self.master_tables(), op)?.id;
                 (
                     Some(f.id),
                     Some(OrderTargetType::of_master(master)),

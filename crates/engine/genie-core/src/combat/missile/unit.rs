@@ -110,7 +110,7 @@ impl Unit {
         slot: &mut Option<crate::combat::missile::MissileAction>,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let stats = master.missile_stats.ok_or(GenieError::unsupported(
             "a missile whose master has no flight",
         ))?;
@@ -198,7 +198,7 @@ impl Unit {
         if !(0.0 < stats.radius.x() && 0.0 < stats.radius.y()) {
             return Ok(());
         }
-        let blast_level = self.master(&c.w.masters, c.player)?.blast_level;
+        let blast_level = self.master(c.w.master_tables(), c.player)?.blast_level;
         let met = self.missile_meets(stats, old, c)?;
         for &(id, player, kind, level) in &met {
             if action.state == MissileState::Done {
@@ -289,7 +289,11 @@ impl Unit {
             ally_factor: 1.0,
             player: Some(c.player),
             ignore: &[RecordId::from(self.id)],
-            objects: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters),
+            objects: crate::world::index::ObjectsRef::new(
+                &c.w.players,
+                &c.w.index,
+                crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            ),
         })?;
         let mut met = Vec::new();
         for record in crossed {
@@ -351,6 +355,7 @@ impl Unit {
             masters,
             spatial,
             streams,
+            parts,
             ..
         } = &mut *c.w;
         let Player {
@@ -364,7 +369,10 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a missile's shooter outside its list",
                 ))?;
-        let master = shooter.master(masters, p)?;
+        let master = shooter.master(
+            crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+            p,
+        )?;
         if Distance::ZERO < master.area_effect {
             return Err(GenieError::unsupported(
                 "a missile of a shooter with an area effect",
@@ -414,7 +422,7 @@ impl Unit {
                 "a shooterless missile with an origin (its elevation, FUN_14113e550)",
             ));
         }
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if Distance::ZERO < master.area_effect {
             return Err(GenieError::unsupported(
                 "a shooterless missile with an area effect",
@@ -570,7 +578,10 @@ impl Unit {
             self.life.state = ObjectState::Removed;
             c.w.spatial.sight_state(self.id, ObjectState::Removed)?;
             if before < ObjectState::DyingSprite {
-                let master = self.master(&c.w.masters, c.player)?;
+                let master = self.master(
+                    crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                    c.player,
+                )?;
                 forget_resource(&mut c.w.spatial, Some(master), self.id, self.position())?;
             }
         }

@@ -226,7 +226,7 @@ impl World {
             let Some((q, u)) = self.object(id) else {
                 continue;
             };
-            if u.master(&self.masters, q)?.kind < master_type::ACTION {
+            if u.master(self.master_tables(), q)?.kind < master_type::ACTION {
                 continue;
             }
             let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;

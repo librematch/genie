@@ -159,7 +159,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let (kind, class, master_id) = (master.kind, master.class, master.id);
         if kind != master_type::COMBAT && kind != master_type::BUILDING {
             return Ok(());
@@ -211,7 +211,7 @@ impl World {
         if hp != q {
             return Ok(());
         }
-        let holder_master = h.master(&self.masters, hp)?;
+        let holder_master = h.master(self.master_tables(), hp)?;
         if holder_master.kind == master_type::BUILDING {
             let hi = self.housed_index(hp, holder.id())?;
             if !self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? {

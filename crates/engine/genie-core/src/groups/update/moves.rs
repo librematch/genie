@@ -432,8 +432,14 @@ impl World {
                     object: self.streams.get(crate::math::rng::Stream::Object),
                     groups: &self.groups,
                 };
-                let by_id =
-                    crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+                let by_id = crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                );
                 mover
                     .motion(
                         &me,

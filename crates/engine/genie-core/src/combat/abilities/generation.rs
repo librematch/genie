@@ -200,7 +200,7 @@ impl World {
         let Some((q, u)) = self.object(id) else {
             return Ok(None);
         };
-        let m = u.master(&self.masters, q)?;
+        let m = u.master(self.master_tables(), q)?;
         Ok(Some(WorkTarget {
             hp: u.life.hp,
             storage: m.storage.first().map_or(Amount::ZERO, |s| s.1),

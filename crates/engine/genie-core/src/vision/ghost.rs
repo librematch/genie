@@ -189,7 +189,7 @@ impl World {
             return Ok(false);
         };
         let bits = self.tile_bits(at)?;
-        let kind = u.master(&self.masters, p)?.kind;
+        let kind = u.master(self.master_tables(), p)?.kind;
         let umv = self
             .spatial
             .sight
@@ -240,7 +240,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(false);
         };
-        let m = u.master(&self.masters, p)?;
+        let m = u.master(self.master_tables(), p)?;
         let annex = linked && u.building.annex_of.is_some();
         Ok(!UNWATCHED_CLASSES.contains(&m.class)
             && !u.building.construction.is_some_and(|c| c.desolid)
@@ -300,7 +300,7 @@ impl World {
                 } else {
                     &self.players.live(q, k)?
                 };
-                let m = u.master(&self.masters, p)?;
+                let m = u.master(self.master_tables(), p)?;
                 let (state, kind, ghosts, position) =
                     (u.life.state, m.kind, m.ghost_on_death, u.position());
                 let tile = Self::tile_at(position);
@@ -319,7 +319,7 @@ impl World {
                 let objects = if list { &held.sleeping } else { &held.objects };
                 let mut annexes: Vec<ObjectId> = Vec::new();
                 for u in objects.iter().filter(|u| u.building.annex_of.is_some()) {
-                    if u.master(&self.masters, p)?.class != class::GATE {
+                    if u.master(self.master_tables(), p)?.class != class::GATE {
                         annexes.push(u.id);
                     }
                 }
@@ -351,7 +351,9 @@ impl World {
             master: u.life.master_id,
         };
         let position = u.position();
-        if id.is_recyclable() || u.master(&self.masters, p)?.ghost_on_death != GhostMode::LEAVES {
+        if id.is_recyclable()
+            || u.master(self.master_tables(), p)?.ghost_on_death != GhostMode::LEAVES
+        {
             return Ok(());
         }
         let tile = Self::tile_at(position);

@@ -261,7 +261,10 @@ impl EnterAction {
         self.state = EnterState::Wait;
         self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
-            c.w.masters.of(c.player),
+            crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )
@@ -455,7 +458,10 @@ impl EnterAction {
                 .ok_or(GenieError::unreachable(
                     "an Enter's held target gone in its update",
                 ))?;
-            let master = target.master(&w.masters, tp)?;
+            let master = target.master(
+                crate::objects::masters::MasterTables::new(&w.masters, &w.parts.own_master),
+                tp,
+            )?;
             let meeting = Meeting {
                 spatial: &mut w.spatial,
                 zones: &mut w.zones,
@@ -474,7 +480,11 @@ impl EnterAction {
                 reads.start,
                 meeting,
                 &moves,
-                crate::world::index::ObjectsRef::new(&w.players, &w.index, &w.masters),
+                crate::world::index::ObjectsRef::new(
+                    &w.players,
+                    &w.index,
+                    crate::objects::masters::MasterTables::new(&w.masters, &w.parts.own_master),
+                ),
             )?
         };
         match walking {

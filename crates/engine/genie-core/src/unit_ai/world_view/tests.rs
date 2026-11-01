@@ -11,6 +11,7 @@ use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
+use crate::objects::masters::Masters;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
@@ -129,7 +130,10 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
             crate::world::index::ObjectIndex::scanning(),
         ),
         foreign,
-        every: &every,
+        every: crate::objects::masters::MasterTables::new(
+            &every,
+            crate::world::parts::no_own_masters(),
+        ),
         restriction: None,
         unit: &me,
         attributes: &[],
@@ -248,7 +252,10 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
             crate::world::index::ObjectIndex::scanning(),
         ),
         foreign,
-        every: &every,
+        every: crate::objects::masters::MasterTables::new(
+            &every,
+            crate::world::parts::no_own_masters(),
+        ),
         restriction: None,
         unit: &me,
         attributes: &[],
@@ -407,7 +414,10 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
             crate::world::index::ObjectIndex::scanning(),
         ),
         foreign,
-        every: &every,
+        every: crate::objects::masters::MasterTables::new(
+            &every,
+            crate::world::parts::no_own_masters(),
+        ),
         restriction: None,
         unit: &me,
         attributes: &[],

@@ -236,7 +236,7 @@ impl World {
                 "a hibernating repair of a ghost (its hit points, +0x278)",
             ));
         };
-        let most = HitPoints::of_master(u.master(&self.masters, p)?.hit_points).get();
+        let most = HitPoints::of_master(u.master(self.master_tables(), p)?.hit_points).get();
         Ok(
             crate::math::fmath::below_or_unordered(u.life.hp.get(), most)
                 && self.spatial.allied_with(owner, p)

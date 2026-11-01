@@ -188,9 +188,13 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
         let level = bush.body.mover().unwrap().paths[0].pause_time;
         Ok((
             level,
-            crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters)
-                .gait(object_id(600))
-                .and_then(|g| g.pause),
+            crate::world::index::ObjectsRef::new(
+                &c.w.players,
+                &c.w.index,
+                crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            )
+            .gait(object_id(600))
+            .and_then(|g| g.pause),
         ))
     })
     .unwrap();
@@ -570,14 +574,15 @@ fn every_kind_of_top_action_shows_its_sub_action() {
 /// id; an error with neither.
 #[test]
 fn a_unit_reads_its_own_master_before_its_player_s() {
-    use crate::objects::masters::{Master, Masters};
+    use crate::objects::masters::{Master, MasterTables, Masters};
+    use crate::world::parts::PartTable;
     let shared = Master {
         id: master_id(4),
         hit_points: MasterHitPoints::of_data(25),
         ..Master::default()
     };
     let every = vec![Masters::default(), Masters::new([shared])];
-    let mut u = Unit {
+    let u = Unit {
         id: object_id(7),
         life: Lifecycle {
             master_id: master_id(4),
@@ -585,30 +590,36 @@ fn a_unit_reads_its_own_master_before_its_player_s() {
         },
         ..Unit::default()
     };
+    let none = PartTable::default();
+    let tables = MasterTables::new(&every, &none);
     assert_eq!(
-        u.master(&every, PlayerId::new(1)).map(|m| m.hit_points),
+        u.master(tables, PlayerId::new(1)).map(|m| m.hit_points),
         Ok(MasterHitPoints::of_data(25))
     );
-    u.own_master = Some(Box::new(Master {
-        id: master_id(4),
-        hit_points: MasterHitPoints::of_data(40),
-        ..Master::default()
-    }));
+    let own: PartTable<Master> = std::iter::once((
+        object_id(7),
+        Master {
+            id: master_id(4),
+            hit_points: MasterHitPoints::of_data(40),
+            ..Master::default()
+        },
+    ))
+    .collect();
+    let with_own = MasterTables::new(&every, &own);
     assert_eq!(
-        u.master(&every, PlayerId::new(1)).map(|m| m.hit_points),
+        u.master(with_own, PlayerId::new(1)).map(|m| m.hit_points),
         Ok(MasterHitPoints::of_data(40))
     );
     assert_eq!(
-        u.master(&every, PlayerId::new(0)).map(|m| m.hit_points),
+        u.master(with_own, PlayerId::new(0)).map(|m| m.hit_points),
         Ok(MasterHitPoints::of_data(40))
     );
-    u.own_master = None;
     let missing = u
-        .master(&every, PlayerId::new(0))
+        .master(tables, PlayerId::new(0))
         .expect_err("player 0 has no master 4");
     assert_eq!(missing, crate::world::OBJECT_MASTER);
     assert!(
-        u.master(&every, PlayerId::new(2)).is_err(),
+        u.master(tables, PlayerId::new(2)).is_err(),
         "no table for player 2"
     );
 }

@@ -205,7 +205,7 @@ impl Unit {
         if let (Some(sprite), Some(speed)) = (self.sprite.as_mut(), self.body.anim_speed()) {
             sprite.update(c.dt.seconds(), speed);
             if let Ok(master) = object_master(
-                self.own_master.as_deref(),
+                c.w.parts.own_master.get(self.id),
                 (self.id, self.life.master_id),
                 c.w.masters.of(c.player),
             ) {
@@ -265,7 +265,7 @@ impl Unit {
     /// [`Unit::ai_part`]'s first step: the pathing grid takes a unit of a master of kind 40 or
     /// more where it stands, moving or not.
     pub(crate) fn refresh_pathing(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let m = self.master(&c.w.masters, c.player)?;
+        let m = self.master(c.w.master_tables(), c.player)?;
         if ACTION <= m.kind
             && let Some(p) = c.w.spatial.get(self.id).copied()
         {

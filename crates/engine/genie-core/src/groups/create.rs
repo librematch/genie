@@ -360,7 +360,7 @@ impl World {
         if sub == FormationCategory::ANY {
             return Ok(false);
         }
-        let unit = FormationUnit::of(u.master(&self.masters, p)?);
+        let unit = FormationUnit::of(u.master(self.master_tables(), p)?);
         let old = u.group.id;
         let g = self.groups.held(group)?;
         if g.has(id) {

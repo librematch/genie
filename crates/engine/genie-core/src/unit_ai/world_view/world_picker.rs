@@ -12,7 +12,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::RGE_COMBAT;
-use crate::objects::masters::{Masters, player_master};
+use crate::objects::masters::player_master;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -60,7 +60,7 @@ pub(crate) struct WorldPicker<'a> {
     /// The other players' lists.
     pub(crate) foreign: Foreign<'a>,
     /// Every player's masters.
-    pub(crate) every: &'a [Masters],
+    pub(crate) every: crate::objects::masters::MasterTables<'a>,
     /// The unit's master's terrain restriction (`+0x606`).
     pub(crate) restriction: Option<crate::map::RestrictionId>,
     /// The unit itself.
@@ -102,10 +102,7 @@ impl WorldPicker<'_> {
             };
             (q, u, &foreign.attributes[..])
         };
-        let master = match u.own_master.as_deref() {
-            Some(m) => m,
-            None => u.master(self.every, q)?,
-        };
+        let master = u.master(self.every, q)?;
         Ok(Some((q, u, attributes, master)))
     }
 
@@ -226,7 +223,7 @@ impl WorldPicker<'_> {
             target: target.as_ref(),
             projectile: om
                 .charge_projectile
-                .and_then(|id| player_master(self.every, q, id))
+                .and_then(|id| player_master(self.every.players, q, id))
                 .map(|m| &m.weapons[..]),
             charge_event: om.charge_event,
             range_powerup: o.combat.range_powerup,

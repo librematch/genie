@@ -316,7 +316,7 @@ impl World {
             MakeObjState::Making => {}
             MakeObjState::New | MakeObjState::NoSpot => return Ok(UpdateCode::UNDER_WAY),
         }
-        let site = building.master(&self.masters, p)?;
+        let site = building.master(self.master_tables(), p)?;
         let rate = building.combat.work_rate_powerup + site.work_rate;
         let made = make.master.and_then(|m| player_master(&self.masters, p, m));
         let time = Seconds::of_master(make.time(made, building.life.master_id)).get();

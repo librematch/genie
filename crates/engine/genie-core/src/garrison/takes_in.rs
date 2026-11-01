@@ -118,7 +118,7 @@ impl World {
         b: &crate::objects::unit::Unit,
         unit: Option<ObjectId>,
     ) -> Result<bool, GenieError> {
-        let capacity = b.master(&self.masters, bp)?.garrison;
+        let capacity = b.master(self.master_tables(), bp)?.garrison;
         let with = match unit {
             Some(u) => self.garrisoned(u)?.plus(InsideCount::ONE),
             None => InsideCount::ONE,
@@ -177,7 +177,7 @@ impl World {
         if b.life.state != ObjectState::Alive {
             return Ok(false);
         }
-        let own = b.master(&self.masters, bp)?;
+        let own = b.master(self.master_tables(), bp)?;
         if own.object_flags.contains(ObjectFlags::GARRISON)
             && (unit.kind == COMBAT || class_has_flags(unit.class, ClassFlags::TRANSPORTED))
         {
@@ -195,7 +195,7 @@ impl World {
             ))?,
             None => (bp, b),
         };
-        let bm = b.master(&self.masters, bp)?;
+        let bm = b.master(self.master_tables(), bp)?;
         // CVTPS2PD, CVTDQ2PD, MULSD, then COMISD with JBE: an unordered hit point count takes
         // nothing
         let max_hp = f64::from(HitPoints::of_master(bm.hit_points).get());
@@ -230,7 +230,10 @@ impl World {
         };
         let is_building = self
             .object(building)
-            .map(|(bp, b)| b.master(&self.masters, bp).map(|m| m.kind == BUILDING))
+            .map(|(bp, b)| {
+                b.master(self.master_tables(), bp)
+                    .map(|m| m.kind == BUILDING)
+            })
             .transpose()?
             .unwrap_or(false);
         let mut count = 0;
@@ -239,7 +242,7 @@ impl World {
                 if u.life.inside.key() != Some(building) {
                     continue;
                 }
-                let kind = u.master(&self.masters, p)?.kind;
+                let kind = u.master(self.master_tables(), p)?.kind;
                 if is_building && kind == COMBAT && u.combat.raider_countdown.is_set() {
                     return Err(GenieError::unsupported(
                         "a unit inside a building with its raider_build_countdown (+0xc2c)",

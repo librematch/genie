@@ -57,7 +57,7 @@ impl Unit {
     ///
     /// A link to an object the world does not file.
     pub(crate) fn let_removed_links_go(&mut self, c: &Step<'_>) -> Result<(), GenieError> {
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind != BUILDING || walls_branch(master) {
             return Ok(());
         }
@@ -92,8 +92,12 @@ impl Unit {
     /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
     /// of at most 0).
     pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
-        let master = self.master(&c.w.masters, c.player)?;
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
+        let master = self.master(c.w.master_tables(), c.player)?;
         let transforms = master
             .building
             .as_ref()
@@ -181,7 +185,7 @@ impl Unit {
         }) else {
             return Ok(());
         };
-        let m = self.master(&c.w.masters, c.player)?;
+        let m = self.master(c.w.master_tables(), c.player)?;
         let foundation = m.building.as_ref().and_then(|b| b.foundation_terrain);
         let Some(terrain) = farm_stage_terrain(
             m.id,
@@ -237,7 +241,7 @@ impl Unit {
         if !due {
             return Ok(());
         }
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if !walls_branch(master) && self.building.annex_of.is_some() {
             return Ok(());
         }
@@ -261,7 +265,7 @@ impl Unit {
             return Ok(());
         }
         let Ok(master) = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         ) else {
@@ -316,7 +320,7 @@ impl Unit {
             let Some(u) = OthersRef::of(&c.w.players, &c.w.index, c.player)?.own(id) else {
                 continue;
             };
-            let kind = u.master(&c.w.masters, c.player)?.kind;
+            let kind = u.master(c.w.master_tables(), c.player)?.kind;
             if kind == COMBAT && u.combat.raider_countdown.runs() {
                 return Err(GenieError::unsupported(
                     "a unit inside whose raider_build_countdown runs (FUN_1411e7220)",
@@ -332,7 +336,7 @@ impl Unit {
             };
             let u = c.w.players.live_mut(c.player, i)?;
             let m = object_master(
-                u.own_master.as_deref(),
+                c.w.parts.own_master.get(u.id),
                 (u.id, u.life.master_id),
                 c.w.masters.of(c.player),
             )?;
@@ -424,7 +428,7 @@ impl Unit {
     ///
     /// What the blast does not model.
     pub(crate) fn death_blast(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if !blasts_at_death(master, &self.life) {
             return Ok(());
         }

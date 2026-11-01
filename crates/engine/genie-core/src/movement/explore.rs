@@ -218,7 +218,7 @@ impl ExploreAction {
     /// wait once and fails any other unit's `MoveTo` (`LAB_140aa320c`).
     fn walk(&mut self, c: &mut Step<'_>, explorer: &mut Unit, me: Me) -> Result<(), GenieError> {
         let master = object_master(
-            explorer.own_master.as_deref(),
+            c.w.parts.own_master.get(explorer.id),
             (explorer.id, explorer.life.master_id),
             c.w.masters.of(c.player),
         )
@@ -560,7 +560,7 @@ impl Unit {
     /// lacks reads no sprite defaults and gives none.
     fn explore_move<'g>(&self, c: &'g Step<'_>) -> ExploreMove<'g> {
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         );
@@ -603,7 +603,7 @@ impl Unit {
             Owner::Standing => {}
         }
         let standing = self
-            .master(&c.w.masters, c.player)?
+            .master(c.w.master_tables(), c.player)?
             .standing_sprite
             .and_then(|s| c.w.graphics.get(s))
             .copied();

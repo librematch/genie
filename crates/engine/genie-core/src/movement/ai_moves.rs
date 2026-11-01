@@ -18,7 +18,6 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveToReads, SpriteReads, ai_sprite, object_sprite, point_sprite,
 };
-use crate::objects::masters::Masters;
 use crate::objects::masters::class;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
@@ -45,7 +44,14 @@ impl Unit {
             m,
             (class, c.player),
             (&mut releases, &mut leaves, by),
-            (c.w.masters.of(c.player), &c.w.graphics, sprite_rng),
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
+                &c.w.graphics,
+                sprite_rng,
+            ),
         )?;
         crate::world::lets::torn_down(c, self, (leaves, releases))?;
         if sails {
@@ -53,7 +59,14 @@ impl Unit {
             self.transport_sail(
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
-                (c.w.masters.of(c.player), &c.w.graphics, sprite_rng),
+                (
+                    crate::objects::masters::OwnerMasters::new(
+                        &c.w.parts.own_master,
+                        c.w.masters.of(c.player),
+                    ),
+                    &c.w.graphics,
+                    sprite_rng,
+                ),
             )?;
         }
         Ok(())
@@ -87,7 +100,7 @@ impl Unit {
             Releaser,
         ),
         (masters, graphics, sprite_rng): (
-            Option<&Masters>,
+            crate::objects::masters::OwnerMasters<'_>,
             &crate::objects::Graphics,
             &mut Well512,
         ),
@@ -160,7 +173,7 @@ impl Unit {
         &mut self,
         point: Position,
         player: PlayerId,
-        masters: Option<&Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
     ) -> Result<PointMove, GenieError> {
         if self.actions.unmodelled_action.is_some() {
@@ -210,7 +223,7 @@ impl Unit {
     /// (`FUN_140aa0d30`'s default from the unit's master and terrain look).
     fn point_sprites<'g>(
         &self,
-        masters: Option<&Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &'g crate::objects::Graphics,
     ) -> Result<SpriteReads<'g>, GenieError> {
         Ok(SpriteReads::of(
@@ -342,7 +355,7 @@ impl Unit {
                 "an AI move to an object of a unit that does not move",
             ));
         }
-        let livestock = self.master(&c.w.masters, c.player)?.class == class::LIVESTOCK;
+        let livestock = self.master(c.w.master_tables(), c.player)?.class == class::LIVESTOCK;
         let master =
             c.w.spatial
                 .get_known(target)?
@@ -355,7 +368,7 @@ impl Unit {
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.clear_own_actions(&mut releases, &mut leaves, by)?;
         crate::world::lets::torn_down(c, self, (leaves, releases))?;
-        let own = self.master(&c.w.masters, c.player)?;
+        let own = self.master(c.w.master_tables(), c.player)?;
         let range = crate::movement::move_to::object_range(range, Some(own));
         let sprite = ai_sprite(own, false)
             .or_else(|| object_sprite(own))
@@ -374,7 +387,10 @@ impl Unit {
         )?;
         if move_to.shows_standing() {
             self.shows_standing_sprite(
-                c.w.masters.of(c.player),
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -398,7 +414,7 @@ impl Unit {
         waits: bool,
         stance: crate::unit_ai::UnitStance,
         (masters, graphics, sprite_rng): (
-            Option<&Masters>,
+            crate::objects::masters::OwnerMasters<'_>,
             &crate::objects::Graphics,
             &mut Well512,
         ),
@@ -418,7 +434,7 @@ impl Unit {
     /// Sprite stream), and its animation speed (`+0x7b8`) cleared where known.
     pub(crate) fn shows_standing_sprite(
         &mut self,
-        masters: Option<&Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {

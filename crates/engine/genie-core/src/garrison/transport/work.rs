@@ -105,8 +105,12 @@ impl crate::world::World {
             return Ok(false);
         };
         // The market (`0x60f0` raw), whose own trade units the work command never retakes.
-        let market = tp == p && t.master(&self.masters, tp)?.id == MARKET;
-        let class = self.players.live(p, i)?.master(&self.masters, p)?.class;
+        let market = tp == p && t.master(self.master_tables(), tp)?.id == MARKET;
+        let class = self
+            .players
+            .live(p, i)?
+            .master(self.master_tables(), p)?
+            .class;
         Ok(market && TRADE_CLASSES.contains(&class))
     }
 
@@ -120,7 +124,7 @@ impl crate::world::World {
         clears: bool,
     ) -> Result<(), GenieError> {
         let named = match target.and_then(|id| Some((id, self.object(id)?))) {
-            Some((target, (tp, t))) => Some((target, t.master(&self.masters, tp)?.class)),
+            Some((target, (tp, t))) => Some((target, t.master(self.master_tables(), tp)?.class)),
             None => None,
         };
         let unit = self.players.live_mut(p, i)?;
@@ -155,13 +159,13 @@ impl crate::world::World {
     ) -> Result<Changed, GenieError> {
         let ship = {
             let unit = self.players.live(p, i)?;
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             Ship::of_unit(unit, master, self.spatial.map, &self.graphics, task)?
         };
         let restriction = self
             .players
             .live(p, i)?
-            .master(&self.masters, p)?
+            .master(self.master_tables(), p)?
             .terrain_restriction;
         let mut shore = MapShore::new(
             &self.spatial,

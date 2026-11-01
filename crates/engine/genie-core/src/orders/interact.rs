@@ -80,7 +80,7 @@ impl World {
         let master = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?;
+            .master(self.master_tables(), player)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
         let still =
             master.kind < MOVING || (master.class != class::CLASS_54 && speed <= Speed::ZERO);
@@ -258,7 +258,7 @@ impl World {
         let class = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .class;
         let ai = self
             .players

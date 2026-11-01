@@ -93,7 +93,7 @@ impl World {
             let Some((p, u)) = self.object(id) else {
                 continue;
             };
-            if COMBAT <= u.master(&self.masters, p)?.kind {
+            if COMBAT <= u.master(self.master_tables(), p)?.kind {
                 units.push(id);
             }
         }
@@ -156,7 +156,7 @@ impl World {
             let Some((p, u)) = self.object(id) else {
                 continue;
             };
-            let m = u.master(&self.masters, p)?;
+            let m = u.master(self.master_tables(), p)?;
             if m.class == class::VILLAGER && m.kind == COMBAT {
                 units.push(id);
             }
@@ -166,7 +166,7 @@ impl World {
         }
         let mut buildings = Vec::new();
         for b in &self.players.player(player)?.objects {
-            let m = b.master(&self.masters, player)?;
+            let m = b.master(self.master_tables(), player)?;
             let takes_villagers = m
                 .building
                 .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
@@ -216,7 +216,7 @@ impl World {
             if crate::math::fmath::below_or_unordered(NEARBY, gap.get()) {
                 continue;
             }
-            let om = o.master(&self.masters, op)?;
+            let om = o.master(self.master_tables(), op)?;
             if om.kind < BUILDING {
                 shelters.transports.push(ContainerId::new(id));
             } else if om.class != class::GATE && o.building.annex_of.is_none() {
@@ -273,7 +273,7 @@ impl World {
             let (bp, b) = self
                 .object(building)
                 .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
-            let bm = b.master(&self.masters, bp)?;
+            let bm = b.master(self.master_tables(), bp)?;
             capacities.push((bm.kind == BUILDING, bm.garrison, bm.class));
         }
         let first_transport = shelters.buildings.len();
@@ -281,7 +281,7 @@ impl World {
             let (p, u) = self
                 .object(id)
                 .ok_or(GenieError::unsupported("a garrison's unit is gone"))?;
-            let own = u.master(&self.masters, p)?;
+            let own = u.master(self.master_tables(), p)?;
             let (copy, master, class) = (own.copy_id, own.id, own.class);
             // COMISS reach, gap; JBE: a gap at the reach or past it, or a NaN, pairs nothing
             let gap_to = |shelter: ObjectId| -> Result<f32, GenieError> {
@@ -341,7 +341,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
     ) -> Result<bool, GenieError> {
-        if b.master(&self.masters, bp)?.kind < COMBAT {
+        if b.master(self.master_tables(), bp)?.kind < COMBAT {
             return Ok(false);
         }
         self.takes_in(ContainerId::new(b.id), player, Some(master))
@@ -388,7 +388,7 @@ impl World {
                 ));
             };
             let unit = self.players.live(p, idx)?;
-            let kind = unit.master(&self.masters, p)?.kind;
+            let kind = unit.master(self.master_tables(), p)?.kind;
             if (ObjectState::Alive < unit.life.state && unit.life.state != ObjectState::Undead)
                 || kind < COMBAT
             {

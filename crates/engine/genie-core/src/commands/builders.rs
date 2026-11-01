@@ -67,7 +67,7 @@ impl World {
             let Some((q, unit)) = self.object(id) else {
                 continue;
             };
-            let m = unit.master(&self.masters, q)?;
+            let m = unit.master(self.master_tables(), q)?;
             let speed = m.moving.map_or(Speed::ZERO, |s| s.speed);
             let kind = m.kind;
             let moves = MOVING <= kind && crate::math::fmath::below_or_unordered(0.0, speed.get());
@@ -208,7 +208,10 @@ impl World {
         }
         let actor = Actor {
             id,
-            master: unit.master_in(Some(masters))?,
+            master: unit.master_in(crate::objects::masters::OwnerMasters::new(
+                &self.parts.own_master,
+                Some(masters),
+            ))?,
             player: q,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
@@ -392,12 +395,22 @@ impl World {
         }
         let gone = FOUNDATION_GONE;
         let (fp, f) = self.object(foundation).ok_or_else(|| gone.clone())?;
-        let (site, f_at) = (f.master(&self.masters, fp)?, f.position());
+        let (site, f_at) = (f.master(self.master_tables(), fp)?, f.position());
         let find = |id: ObjectId| self.object(id);
-        let t = task_target_with(foundation.id(), 1, &find, &self.masters)?
-            .ok_or_else(|| gone.clone())?;
-        let general = task_target_with(foundation.id(), 2, &find, &self.masters)?
-            .ok_or_else(|| gone.clone())?;
+        let t = task_target_with(
+            foundation.id(),
+            1,
+            &find,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        )?
+        .ok_or_else(|| gone.clone())?;
+        let general = task_target_with(
+            foundation.id(),
+            2,
+            &find,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        )?
+        .ok_or_else(|| gone.clone())?;
         let masters = self
             .masters
             .get(player.index())
@@ -410,7 +423,10 @@ impl World {
         let unit = owner.objects.checked(idx)?;
         let actor = Actor {
             id: unit.id,
-            master: unit.master_in(Some(masters))?,
+            master: unit.master_in(crate::objects::masters::OwnerMasters::new(
+                &self.parts.own_master,
+                Some(masters),
+            ))?,
             player,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),

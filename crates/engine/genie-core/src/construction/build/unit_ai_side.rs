@@ -68,8 +68,24 @@ impl UnitView<'_, '_> {
             return Ok(false);
         };
         let (Some(t), Some(general)) = (
-            task_target_with(foundation.id(), 1, &find, &self.c.w.masters)?,
-            task_target_with(foundation.id(), 2, &find, &self.c.w.masters)?,
+            task_target_with(
+                foundation.id(),
+                1,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
+            task_target_with(
+                foundation.id(),
+                2,
+                &find,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
+            )?,
         ) else {
             return Err(crate::commands::FOUNDATION_GONE);
         };
@@ -80,7 +96,7 @@ impl UnitView<'_, '_> {
             .get(self.player.index())
             .ok_or(crate::world::UNIT_AI_MASTER)?;
         let unit = &*self.unit;
-        let own = unit.master(&self.c.w.masters, self.player)?;
+        let own = unit.master(self.c.w.master_tables(), self.player)?;
         let actor = Actor {
             id: unit.id,
             master: own,
@@ -120,7 +136,7 @@ impl UnitView<'_, '_> {
     /// more in state 0 of the unit's player), if any.
     pub(crate) fn own_foundation_near(&self) -> Result<Option<ObjectId>, GenieError> {
         let unit = &*self.unit;
-        let master = unit.master(&self.c.w.masters, self.player)?;
+        let master = unit.master(self.c.w.master_tables(), self.player)?;
         let r = (if master.search_radius <= master.line_of_sight {
             master.line_of_sight
         } else {
@@ -136,7 +152,10 @@ impl UnitView<'_, '_> {
                 self.c.player,
                 self.new_owner,
             )?,
-            &self.c.w.masters,
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
             &self.c.w.spatial,
         );
         let foundation_on = |tile: Tile| -> Result<Option<ObjectId>, GenieError> {
@@ -170,10 +189,19 @@ impl UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
         );
         let unit = &*self.unit;
-        let master = unit.master(&self.c.w.masters, self.player)?;
+        let master = unit.master(
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
+            self.player,
+        )?;
         let (player, others) = (
             self.player,
             owner_view(

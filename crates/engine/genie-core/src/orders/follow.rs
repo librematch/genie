@@ -46,7 +46,7 @@ impl World {
         let Some((tp, t)) = self.object(target) else {
             return Ok(());
         };
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let followed = Followed {
             id: target,
             place: t.position().ground(),
@@ -105,7 +105,7 @@ impl World {
         let Some((tp, t)) = self.object(target) else {
             return Ok(());
         };
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let (x, y, z) = (t.position().x(), t.position().y(), t.position().z());
         let order = crate::unit_ai::QueuedOrder {
             issuer: None,
@@ -174,7 +174,7 @@ impl World {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
         let moves =
             MOVING <= master.kind && crate::math::fmath::below_or_unordered(0.0, speed.get());
@@ -331,7 +331,7 @@ impl World {
         let class = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .class;
         let villager = class == class::VILLAGER;
         let unit = self.players.live_mut(player, idx)?;
@@ -367,12 +367,12 @@ impl World {
         }
         // FUN_140aa0df0 makes the MoveTo first, which takes its target (slot 0x178, quiet 0);
         // slot 0x808 then clears the list (the old actions' teardowns) and starts it
-        let livestock = unit.master(&self.masters, player)?.class == class::LIVESTOCK;
+        let livestock = unit.master(self.master_tables(), player)?.class == class::LIVESTOCK;
         let (tp, t) = self
             .object(target)
             .ok_or(crate::movement::move_to::TARGET_LACKING)?;
         let t_state = t.life.state;
-        let t_master = t.master(&self.masters, tp)?.id;
+        let t_master = t.master(self.master_tables(), tp)?.id;
         if crate::movement::move_to::holds_object(livestock, t_master, t_state) {
             self.take(target, self.releaser(player, idx)?)?;
         }
@@ -397,7 +397,7 @@ impl World {
         let master = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?;
+            .master(self.master_tables(), player)?;
         let range = crate::movement::move_to::object_range(Distance::ZERO, Some(master));
         let sprite = crate::movement::move_to::object_sprite(master)
             .and_then(|id| self.graphics.get(id).copied());
@@ -416,7 +416,10 @@ impl World {
         )?;
         if move_to.shows_standing() {
             unit.shows_standing_sprite(
-                self.masters.of(player),
+                crate::objects::masters::OwnerMasters::new(
+                    &self.parts.own_master,
+                    self.masters.of(player),
+                ),
                 &self.graphics,
                 self.streams.get(Stream::Sprite),
             )?;
@@ -495,7 +498,10 @@ impl World {
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
             point,
             player,
-            self.masters.of(player),
+            crate::objects::masters::OwnerMasters::new(
+                &self.parts.own_master,
+                self.masters.of(player),
+            ),
             &self.graphics,
         )? {
             crate::movement::ai_moves::PointMove::Declined => return Ok(false),

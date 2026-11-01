@@ -92,7 +92,10 @@ impl Unit {
                 crate::world::lets::release(c, self, t, by)?;
             }
             self.show_standing(
-                c.w.masters.of(c.player),
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -157,7 +160,7 @@ impl Unit {
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<(), GenieError> {
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         if master.class == class::SIEGE && !self.garrison.is_empty() {
             return Err(HANDS_LEFT);
         }
@@ -178,7 +181,7 @@ impl Unit {
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<bool, GenieError> {
-        let master = self.master(&c.w.masters, c.player);
+        let master = self.master(c.w.master_tables(), c.player);
         if master.is_ok_and(|m| m.kind == crate::objects::masters::master_type::BUILDING) {
             c.building_handover = true;
             return Ok(c
@@ -188,19 +191,24 @@ impl Unit {
                 .is_some_and(|m| m.get(self.life.master_id).is_some()));
         }
         let had = c.w.parts.dead_master.contains(self.id);
-        let dead =
-            crate::ownership::change::dead_master_of(self, c.player.index(), &c.w.masters, had);
+        let tables =
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master);
+        let dead = crate::ownership::change::dead_master_of(self, c.player.index(), tables, had);
         let changed = change_hands(
             self,
             (c.player.index(), new),
-            &c.w.masters,
+            tables,
             &mut c.w.spatial,
             c.w.world_time,
         )?;
-        if changed && let Some(d) = dead {
+        let Some(own) = changed else {
+            return Ok(false);
+        };
+        c.w.set_part(self.id, crate::world::parts::Part::OwnMaster(own))?;
+        if let Some(d) = dead {
             c.w.set_part(self.id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
         }
-        Ok(changed)
+        Ok(true)
     }
 }
 

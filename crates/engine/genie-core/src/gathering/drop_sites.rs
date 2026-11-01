@@ -18,7 +18,7 @@ use crate::pathing::tile_path::Found;
 
 use crate::map::spatial::Spatial;
 use crate::movement::{Me, Mover, Planning, footprint_gap_squared};
-use crate::objects::masters::{Master, Masters};
+use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::world::others::OthersRef;
 
@@ -161,7 +161,7 @@ pub(crate) fn counted(
 /// of equals wins.
 pub(crate) fn drop_site_search<'u>(
     units: impl IntoIterator<Item = &'u Unit>,
-    masters: &Masters,
+    masters: crate::objects::masters::OwnerMasters<'_>,
     sites: &[MasterId],
     at: Position,
     mut seeker: Option<Seeker<'_, '_>>,
@@ -186,7 +186,7 @@ pub(crate) fn drop_site_search<'u>(
         if x == NO_POINT && y == NO_POINT {
             return Ok(Some(DropSiteId::new(o.id)));
         }
-        let master = o.master_in(Some(masters))?;
+        let master = o.master_in(masters)?;
         if let (Some(s), Some(zone)) = (seeker.as_ref(), own_zone)
             && s.zones
                 .zone(Tile::new(o.position().x() as i32, o.position().y() as i32))
@@ -276,6 +276,7 @@ mod tests {
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::Master;
+    use crate::objects::masters::Masters;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskId;
     use crate::objects::masters::ids;
@@ -420,7 +421,10 @@ mod tests {
         };
         drop_site_search(
             units,
-            &masters(),
+            crate::objects::masters::OwnerMasters::new(
+                crate::world::parts::no_own_masters(),
+                Some(&masters()),
+            ),
             &SITES,
             at,
             Some(seeker),

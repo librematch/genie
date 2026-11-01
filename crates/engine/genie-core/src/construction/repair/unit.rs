@@ -15,12 +15,12 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeType;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
-use crate::objects::masters::{Master, Masters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
@@ -61,7 +61,11 @@ impl Unit {
         c: &Step<'_>,
         target: Option<ObjectId>,
     ) -> Result<RepairReads, GenieError> {
-        let own = repair_master(&c.w.masters, c.player, self)?;
+        let own = repair_master(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            self,
+        )?;
         let (repairee, counted_in) = repairee_of(
             c,
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
@@ -155,7 +159,7 @@ impl Unit {
         let Some((owner, u)) = others.find(id) else {
             return Ok(None);
         };
-        let m = u.master(&c.w.masters, owner)?;
+        let m = u.master(c.w.master_tables(), owner)?;
         Ok(Some(crate::unit_ai::TopTarget {
             id,
             kind: m.kind,
@@ -195,7 +199,11 @@ impl Unit {
 }
 
 /// Object `u`'s master: its own (`+0x6c0`), else player `q`'s of its id.
-fn repair_master(every: &[Masters], q: PlayerId, u: &Unit) -> Result<Master, GenieError> {
+fn repair_master(
+    every: crate::objects::masters::MasterTables<'_>,
+    q: PlayerId,
+    u: &Unit,
+) -> Result<Master, GenieError> {
     Ok(u.master(every, q)?.clone())
 }
 
@@ -211,7 +219,11 @@ fn repairee_of(
     let Some((target, (q, t))) = target.and_then(|id| Some((id, held(id)?))) else {
         return Ok((None, None));
     };
-    let tm = repair_master(&c.w.masters, q, t)?;
+    let tm = repair_master(
+        crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        q,
+        t,
+    )?;
     let repairee = Repairee {
         state: t.life.state,
         hp: t.life.hp,
@@ -260,7 +272,11 @@ pub(crate) fn repair_target(
     if let Some(target) = target
         && let Some((q, t)) = others.find(target)
     {
-        let tm = repair_master(&c.w.masters, q, t)?;
+        let tm = repair_master(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            q,
+            t,
+        )?;
         for id in reached_ids(c.w.objects(), t, target, tm.kind == BUILDING) {
             let Some(o) = others.find(id) else {
                 continue;
@@ -342,7 +358,11 @@ fn repaired(
     (oq, o): (PlayerId, &Unit),
     id: ObjectId,
 ) -> Result<crate::construction::repair::Repaired, GenieError> {
-    let om = repair_master(&c.w.masters, oq, o)?;
+    let om = repair_master(
+        crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        oq,
+        o,
+    )?;
     let attributes: &[Amount] = if oq == c.player {
         &c.w.players.player(c.player)?.attributes
     } else {

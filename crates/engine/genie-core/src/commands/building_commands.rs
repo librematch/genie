@@ -45,7 +45,7 @@ impl World {
         let master = self
             .players
             .live(player, i)?
-            .master(&self.masters, player)?;
+            .master(self.master_tables(), player)?;
         Ok(master.garrison.holds() || self.trainable_count(player, master.id) > 0)
     }
 
@@ -184,7 +184,9 @@ impl World {
                 Some((tp, u)) => (
                     t,
                     Some(tp),
-                    crate::unit_ai::OrderTargetType::of_class(u.master(&turns.masters, tp)?.class),
+                    crate::unit_ai::OrderTargetType::of_class(
+                        u.master(turns.master_tables(), tp)?.class,
+                    ),
                 ),
                 None => (None, None, None),
             };
@@ -219,7 +221,7 @@ impl World {
             let Some(ai) = unit.combat.ai.as_ref() else {
                 continue;
             };
-            let building = unit.master(&self.masters, p)?.kind == BUILDING;
+            let building = unit.master(self.master_tables(), p)?.kind == BUILDING;
             let mut queued = Vec::new();
             if building
                 && let Some(g) = self.parts.gather_point.get(unit.id).copied()
@@ -387,7 +389,7 @@ impl World {
             };
         };
         let building = owner.objects.checked(i)?;
-        let master = building.master(&self.masters, player)?;
+        let master = building.master(self.master_tables(), player)?;
         let at = state
             .locations
             .iter()

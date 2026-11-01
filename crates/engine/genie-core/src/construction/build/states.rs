@@ -182,7 +182,7 @@ impl BuildAction {
             .ok_or(GenieError::unsupported(
                 "the end of a Build on a foundation the slice does not read",
             ))?
-            .master(&c.w.masters, c.player)?;
+            .master(c.w.master_tables(), c.player)?;
         // LAB_140ab09af: a villager works the farm it built (FUN_141194b20, FUN_141195750), a
         // fishing ship its fish trap (FUN_141194640, FUN_1411945a0): its unit AI drops its build
         // orders (FUN_140c5e020 with 0x2be), then slot 0x7e8 on the building
@@ -283,7 +283,10 @@ impl BuildAction {
     /// [`Unit::show_standing`]'s.
     pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
         builder.show_standing(
-            c.w.masters.of(c.player),
+            crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )

@@ -146,7 +146,7 @@ impl BuildAction {
         let computer = c.w.players.player(c.player)?.computer;
         let site = Self::site_unit(c, reads)?;
         let pasture = match site {
-            Some(u) => u.master(&c.w.masters, c.player)?.id == PASTURE_1889,
+            Some(u) => u.master(c.w.master_tables(), c.player)?.id == PASTURE_1889,
             None => false,
         };
         let built = site.is_some_and(|u| u.life.state != ObjectState::Foundation);
@@ -208,7 +208,7 @@ impl BuildAction {
         {
             return Ok(());
         }
-        let master = site.master(&c.w.masters, c.player)?;
+        let master = site.master(c.w.master_tables(), c.player)?;
         let special = master.id == TOWN_CENTRE_621 || master.class == class::GATE;
         let unbuilt = site
             .building

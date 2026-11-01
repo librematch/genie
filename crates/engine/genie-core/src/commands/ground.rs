@@ -54,7 +54,7 @@ impl World {
         let (site_owner, site) = self.object(foundation).ok_or(GenieError::unsupported(
             "a footprint's foundation the slice does not hold",
         ))?;
-        let radius = site.master(&self.masters, site_owner)?.radius;
+        let radius = site.master(self.master_tables(), site_owner)?.radius;
         let p = [
             (radius.x() * RADIUS_SCALE) as i32,
             (radius.y() * RADIUS_SCALE) as i32,
@@ -65,7 +65,7 @@ impl World {
             let Some((owner, u)) = self.object(id) else {
                 continue;
             };
-            let master = u.master(&self.masters, owner)?;
+            let master = u.master(self.master_tables(), owner)?;
             if master.kind < MOVING
                 || u.life.state != ObjectState::Alive
                 || u.top_target() == Some(foundation.id())
@@ -128,7 +128,11 @@ impl World {
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        );
         let site_at = self
             .spatial
             .get(foundation)
@@ -293,7 +297,10 @@ impl World {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
-        Ok(Some(clear_look_of(u, self.masters.of(p))?))
+        Ok(Some(clear_look_of(
+            u,
+            crate::objects::masters::OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
+        )?))
     }
 
     /// An object the footprint clearing deletes ([`crate::construction::build::Cleared`]): a wall first goes

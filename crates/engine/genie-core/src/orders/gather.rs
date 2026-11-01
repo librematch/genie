@@ -65,14 +65,14 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         if !self.gatherable_building(player, (tp, t), tm)? {
             return Ok(false);
         }
         let (t_at, t_radius) = (t.position(), tm.radius);
         let owner = self.players.player(player)?;
         let unit = owner.live(idx)?;
-        let me = unit.master(&self.masters, player)?;
+        let me = unit.master(self.master_tables(), player)?;
         let resource = crate::gathering::gather::Resource {
             id: target,
             position: t_at,
@@ -100,7 +100,11 @@ impl World {
             ),
         };
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
-        let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
+        let walks = unit.move_walks(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let unit = self.players.live_mut(player, idx)?;
         let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
         else {
@@ -168,10 +172,10 @@ impl World {
         let (tp, o) = self.object(target).ok_or(GenieError::unsupported(
             "a move to an object the slice does not hold",
         ))?;
-        let tm = o.master(&self.masters, tp)?;
+        let tm = o.master(self.master_tables(), tp)?;
         let (at, radius) = (o.position(), tm.radius);
         let unit = &self.players.live(player, idx)?;
-        let me = unit.master(&self.masters, player)?;
+        let me = unit.master(self.master_tables(), player)?;
         let moved_to = Some(crate::gathering::gather::MoveTarget {
             id: target,
             player: tp,
@@ -180,7 +184,11 @@ impl World {
             gap: crate::movement::footprint_gap(unit.position(), me.radius, at, radius),
         });
         let by = self.releaser(player, idx)?;
-        let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
+        let walks = unit.move_walks(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let unit = self.players.live_mut(player, idx)?;
         let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
         else {
@@ -206,19 +214,19 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let main = if tm.kind == BUILDING {
             t.building.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         };
         let main_master = match self.object(main) {
-            Some((mp, m)) => m.master(&self.masters, mp)?.id,
+            Some((mp, m)) => m.master(self.master_tables(), mp)?.id,
             None => tm.id,
         };
         let unit = &self.players.live(player, idx)?;
         Ok(unit
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .drop_sites
             .contains(&main_master))
     }
@@ -242,7 +250,11 @@ impl World {
         let gap = self.engagement(player, idx, target)?.gap;
         let by = self.releaser(player, idx)?;
         let unit = self.players.live_mut(player, idx)?;
-        let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
+        let walks = unit.move_walks(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let my_pasture = unit.my_pasture;
         let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
         else {
@@ -287,7 +299,7 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
-        let t_master = t.master(&self.masters, tp)?;
+        let t_master = t.master(self.master_tables(), tp)?;
         let world = TaskWorld {
             players: &self.players,
             drop_sites: &self.drop_sites,
@@ -324,10 +336,10 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let (t_at, t_radius) = (t.position(), tm.radius);
         let unit = &self.players.live(player, idx)?;
-        let me = unit.master(&self.masters, player)?;
+        let me = unit.master(self.master_tables(), player)?;
         let resource = crate::gathering::gather::Resource {
             id: target,
             position: t_at,
@@ -386,7 +398,11 @@ impl World {
         let computer = self.players.player(player)?.computer;
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
-        let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
+        let walks = unit.move_walks(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let mover = unit
             .body
             .mover_mut()
@@ -432,7 +448,7 @@ impl World {
         task: &HuntTask,
     ) -> Result<Arms, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         let moving = task.walk_sprite_id(unit.life.held());
         Ok(crate::combat::attack::arms(
             master,
@@ -450,7 +466,7 @@ impl World {
         target: ObjectId,
     ) -> Result<Engagement, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         let me = self
             .spatial
             .get(unit.id)
@@ -500,7 +516,7 @@ impl World {
                     ))?,
                     None => (tp, t),
                 };
-                let main_master = main.master(&self.masters, mp)?.id;
+                let main_master = main.master(self.master_tables(), mp)?.id;
                 if (main.life.state < ObjectState::Alive
                     || matches!(main_master, PASTURE_MANGROVE | PASTURE))
                     && mp == player
@@ -568,7 +584,11 @@ impl World {
         let computer = self.players.player(player)?.computer;
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
-        let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
+        let walks = unit.move_walks(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
         let mut held = unit.life.held();
         let (hunt, arrived) = HuntAction::start(

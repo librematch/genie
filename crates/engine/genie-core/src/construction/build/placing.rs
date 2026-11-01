@@ -361,7 +361,11 @@ impl BuildAction {
     ///
     /// [`MoveToReads::to_point`]: crate::movement::move_to::MoveToReads::to_point
     pub(super) fn clear(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let mover = builder.body.mover().ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
@@ -379,7 +383,11 @@ impl BuildAction {
                     "no free tile beside the footprint (set_state 2)",
                 ))?;
         self.state = BuildState::Clear;
-        let move_reads = builder.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let move_reads = builder.move_to_reads(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         self.move_to =
             move_reads.to_point(spot.with_height(at.z()), Distance::ZERO, self.task.moving)?;
         Ok(())

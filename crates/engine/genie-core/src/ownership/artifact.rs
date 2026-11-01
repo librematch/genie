@@ -528,7 +528,7 @@ impl Unit {
                 .and_then(|v| v.seer(self.id))
                 .map(|s| s.capture);
         let combat = crate::objects::masters::master_type::COMBAT
-            <= self.master(&c.w.masters, c.player)?.kind;
+            <= self.master(c.w.master_tables(), c.player)?.kind;
         let r = ArtifactReads {
             searches: !(combat && capture == Some(CaptureKind::NONE)),
             by,

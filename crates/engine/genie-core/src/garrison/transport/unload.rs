@@ -60,13 +60,13 @@ impl crate::world::World {
             .and_then(|t| t.task);
         let ship = {
             let unit = self.players.live(p, i)?;
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             Ship::of_unit(unit, master, self.spatial.map, &self.graphics, task)?
         };
         let restriction = self
             .players
             .live(p, i)?
-            .master(&self.masters, p)?
+            .master(self.master_tables(), p)?
             .terrain_restriction;
         let mut shore = MapShore::new(
             &self.spatial,
@@ -107,7 +107,14 @@ impl crate::world::World {
         self.players.live_mut(p, i)?.transport_sail(
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
-            (self.masters.of(p), &self.graphics, rng),
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &self.parts.own_master,
+                    self.masters.of(p),
+                ),
+                &self.graphics,
+                rng,
+            ),
         )
     }
 
@@ -128,7 +135,14 @@ impl crate::world::World {
         }
         if c.stands {
             let rng = self.streams.get(crate::math::rng::Stream::Sprite);
-            unit.show_standing(self.masters.of(p), &self.graphics, rng)?;
+            unit.show_standing(
+                crate::objects::masters::OwnerMasters::new(
+                    &self.parts.own_master,
+                    self.masters.of(p),
+                ),
+                &self.graphics,
+                rng,
+            )?;
         }
         Ok(())
     }
@@ -157,7 +171,7 @@ impl crate::world::World {
             .transport()
             .copied()
             .ok_or(GenieError::unreachable("an unload without its Transport"))?;
-        let restriction = unit.master(&self.masters, p)?.terrain_restriction;
+        let restriction = unit.master(self.master_tables(), p)?.terrain_restriction;
         let (x, y) = (t.point.x(), t.point.y());
         let zone = if x == NONE {
             None
@@ -175,7 +189,7 @@ impl crate::world::World {
         let computer = self.players.player(p)?.computer;
         let ship = {
             let unit = self.players.live(p, i)?;
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             Ship::of_unit(unit, master, self.spatial.map, &self.graphics, t.task)?
         };
         let mut changes = Vec::new();
@@ -248,7 +262,7 @@ impl crate::world::World {
     ) -> Result<u8, GenieError> {
         const SPOTS: usize = 0x1d;
         let ship = self.players.live(p, i)?;
-        let radius = ship.master(&self.masters, p)?.radius;
+        let radius = ship.master(self.master_tables(), p)?.radius;
         let mut spots = [Around {
             center: Point::ORIGIN,
             radius: Footprint::ZERO,
@@ -271,7 +285,7 @@ impl crate::world::World {
             let Some((up, u)) = self.object(id) else {
                 continue;
             };
-            let made = u.master(&self.masters, up)?.clone();
+            let made = u.master(self.master_tables(), up)?.clone();
             while 0 < k {
                 if let Some(spot) =
                     self.drop_location((p, i), id, &made, *spots.checked(k)?, zone, &mut last)?
@@ -311,7 +325,7 @@ impl crate::world::World {
         last: &mut Option<Point>,
     ) -> Result<Option<Point>, GenieError> {
         let ship = self.players.live(p, i)?;
-        let restriction = ship.master(&self.masters, p)?.terrain_restriction;
+        let restriction = ship.master(self.master_tables(), p)?.terrain_restriction;
         let terrain = self
             .spatial
             .terrain
@@ -393,7 +407,14 @@ impl crate::world::World {
                     spot,
                     Distance::new(grow),
                     mask,
-                    crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                    crate::world::index::ObjectsRef::new(
+                        &self.players,
+                        &self.index,
+                        crate::objects::masters::MasterTables::new(
+                            &self.masters,
+                            &self.parts.own_master,
+                        ),
+                    ),
                 )?
             {
                 found = Some(spot);
@@ -419,7 +440,7 @@ impl crate::world::World {
     ) -> Result<(), GenieError> {
         let ship = self.players.live(p, i)?;
         let at = ship.position();
-        if ship.master(&self.masters, p)?.class == class::SIEGE {
+        if ship.master(self.master_tables(), p)?.class == class::SIEGE {
             return Err(crate::garrison::SIEGE_UNLOAD);
         }
         let (up, ui) = self.live_inside(id)?;

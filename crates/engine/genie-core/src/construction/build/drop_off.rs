@@ -79,7 +79,10 @@ impl BuildAction {
             c.w.masters
                 .get(c.player.index())
                 .ok_or(crate::world::OBJECT_MASTER)?;
-        let own = builder.master_in(Some(masters))?;
+        let own = builder.master_in(crate::objects::masters::OwnerMasters::new(
+            &c.w.parts.own_master,
+            Some(masters),
+        ))?;
         let at = builder.position().ground();
         let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
         let found = crate::orders::nearest_table_site(
@@ -101,7 +104,7 @@ impl BuildAction {
             }
             view.find(t)
         };
-        let every = &c.w.masters;
+        let every = crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master);
         let task = match (
             crate::unit_ai::task_finder::world::task_target_with(id.id(), 1, &find, every)?,
             crate::unit_ai::task_finder::world::task_target_with(id.id(), 2, &find, every)?,
@@ -185,7 +188,11 @@ impl BuildAction {
             )?;
             return self.restart(c, builder);
         };
-        let move_reads = builder.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let move_reads = builder.move_to_reads(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let to = move_reads
             .walk_to(c.w, Some(id.id()))?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;

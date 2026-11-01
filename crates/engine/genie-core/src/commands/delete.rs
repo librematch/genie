@@ -90,7 +90,7 @@ impl World {
         if owner != player && !self.settings.cheats_enabled && !lost_ally {
             return Ok(());
         }
-        let master = unit.master(&self.masters, owner)?;
+        let master = unit.master(self.master_tables(), owner)?;
         if unit.undeletable
             || master.kind < DELETABLE_TYPE
             || UNDELETABLE.contains(&master.class)
@@ -143,7 +143,7 @@ impl World {
                     let Some((owner, u)) = self.object(oid) else {
                         continue;
                     };
-                    let kind = u.master(&self.masters, owner)?.kind;
+                    let kind = u.master(self.master_tables(), owner)?.kind;
                     let desolid = u.building.construction.is_some_and(|c| c.desolid);
                     if kind != BUILDING
                         || !desolid
@@ -176,7 +176,7 @@ impl World {
     /// (`+0x690`, its owner) and the special-object list (`+0x30c` bit 0).
     fn delete_unit(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
-        let class = unit.master(&self.masters, owner)?.class;
+        let class = unit.master(self.master_tables(), owner)?.class;
         if UNDELETABLE.contains(&class) {
             return Ok(());
         }
@@ -202,7 +202,7 @@ impl World {
     /// 0x380).
     fn delete_building(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
-        let master = unit.master(&self.masters, owner)?;
+        let master = unit.master(self.master_tables(), owner)?;
         if master.id == TOWN_CENTRE_621 {
             self.clear_treaty_zones()?;
         }
@@ -221,7 +221,7 @@ impl World {
         let (_, unit) = self.object(id).ok_or(GenieError::unsupported(
             "a removed building the slice does not hold",
         ))?;
-        let master = unit.master(&self.masters, owner)?;
+        let master = unit.master(self.master_tables(), owner)?;
         let cost = master.cost;
         let (state, hp) = (unit.life.state, unit.life.hp);
         let site = unit.building.construction;
@@ -279,7 +279,7 @@ impl World {
             .object(id)
             .ok_or(crate::construction::build::NOT_HELD)?;
         let state = u.life.state;
-        let master = u.master(&self.masters, owner)?.clone();
+        let master = u.master(self.master_tables(), owner)?.clone();
         if master.kind == BUILDING {
             if state == ObjectState::Alive {
                 self.storage_leaves(owner, id, &master)?;
@@ -364,7 +364,7 @@ impl World {
         let (_, u) = self.object(id).ok_or(GenieError::unsupported(
             "a set_state of an object the slice does not hold",
         ))?;
-        let master = u.master(&self.masters, owner)?.clone();
+        let master = u.master(self.master_tables(), owner)?.clone();
         match master.kind {
             BUILDING => self.building_set_state(owner, id, new, &master),
             COMBAT => self.combat_set_state(owner, id, new, &master),
@@ -389,7 +389,7 @@ impl World {
         let annexes = self.objects().annexes(id);
         for annex in annexes.ids() {
             if let Some((q, a)) = self.object(annex)
-                && a.master(&self.masters, q)?.kind == BUILDING
+                && a.master(self.master_tables(), q)?.kind == BUILDING
             {
                 // the annexes come from the spatial index's raw ids yet (T9's spatial keys)
                 self.set_state(q, annex, new)?;

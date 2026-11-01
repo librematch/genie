@@ -46,7 +46,7 @@ impl Unit {
         tree_lost: bool,
     ) -> Result<(), GenieError> {
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
@@ -105,7 +105,13 @@ impl Unit {
             attack: AttackReads::of(
                 self,
                 master,
-                (c.w.masters.of(c.player), &c.w.graphics),
+                (
+                    crate::objects::masters::OwnerMasters::new(
+                        &c.w.parts.own_master,
+                        c.w.masters.of(c.player),
+                    ),
+                    &c.w.graphics,
+                ),
                 self.combat.ai.as_ref(),
                 (owner.computer, c.w.world_time),
             ),

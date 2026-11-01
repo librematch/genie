@@ -34,6 +34,7 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
+use crate::objects::masters::Masters;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskSprites;
@@ -713,11 +714,16 @@ impl Rig {
             players,
             index,
             masters,
+            parts,
             ..
         } = &mut self.t;
         let (object, sprite) = streams.object_and_sprite();
         let mut g = Ground {
-            by_id: crate::world::index::ObjectsRef::new(players, index, masters),
+            by_id: crate::world::index::ObjectsRef::new(
+                players,
+                index,
+                crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+            ),
             map: spatial,
             sprite_rng: sprite,
             object_rng: Some(object),

@@ -62,7 +62,7 @@ impl Unit {
     /// master's dying sprite. Not held: the particles and the sounds.
     pub(crate) fn died(&mut self, c: &mut Step<'_>, before: ObjectState) -> Result<(), GenieError> {
         // its master as the death starts: the world's calls below change other objects
-        let master = &self.master(&c.w.masters, c.player)?.clone();
+        let master = &self.master(c.w.master_tables(), c.player)?.clone();
         // the last building of a master with a technology withdraws it, after the combat part
         let mut tech = None;
         if master.kind == BUILDING {

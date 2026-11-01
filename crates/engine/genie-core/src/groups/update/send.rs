@@ -235,7 +235,7 @@ impl World {
         if speed == Speed::ZERO {
             return Ok(speed.get());
         }
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         if master.kind != CHARGER
             || master.max_charge <= Charge::ZERO
             || master.special_attack != SpecialAttack::CHARGE

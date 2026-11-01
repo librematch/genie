@@ -239,7 +239,7 @@ impl World {
         };
         let is_building = |id: Option<ObjectId>| -> Result<bool, GenieError> {
             match self.object(id) {
-                Some((q, u)) => Ok(u.master(&self.masters, q)?.kind == BUILDING),
+                Some((q, u)) => Ok(u.master(self.master_tables(), q)?.kind == BUILDING),
                 None => Ok(false),
             }
         };

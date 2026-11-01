@@ -107,7 +107,7 @@ impl BuildAction {
         // the foundation's place and its master's radius, read before the planner's borrow
         let known = c.w.spatial.get_known(self.target).map(Option::<&_>::copied);
         let master_radius = match Self::site_unit(c, reads)? {
-            Some(s) => Some(s.master(&c.w.masters, c.player)?.radius.x()),
+            Some(s) => Some(s.master(c.w.master_tables(), c.player)?.radius.x()),
             None => None,
         };
         if self.target.is_some()
@@ -188,7 +188,11 @@ impl BuildAction {
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         self.state = BuildState::WalkPoint;
-        let move_reads = builder.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let move_reads = builder.move_to_reads(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         self.move_to = move_reads.to_point(self.point, Distance::ZERO, self.task.moving)?;
         Ok(())
     }

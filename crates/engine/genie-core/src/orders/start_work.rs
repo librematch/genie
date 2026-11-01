@@ -82,7 +82,7 @@ impl World {
         let mut i = ListIndex::FIRST;
         while self.players.player(p)?.objects.holds(i) {
             let unit = &self.players.live(p, i)?;
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             let class = master.class;
             let building = master.kind == crate::objects::masters::master_type::BUILDING;
             let cart_task = building
@@ -161,7 +161,7 @@ impl World {
             let (owner, o) = self.object(id).ok_or(GenieError::unsupported(
                 "an object on a tile the slice does not hold",
             ))?;
-            let m = o.master(&self.masters, owner)?;
+            let m = o.master(self.master_tables(), owner)?;
             if m.class == class::FARM && (class != class::FISHING_SHIP || m.id == FISH_TRAP) {
                 return Ok(Some(id));
             }
@@ -197,7 +197,7 @@ impl World {
         p: PlayerId,
         unit: &crate::objects::unit::Unit,
     ) -> Result<(gather_search::Seeker, Me), GenieError> {
-        let master = unit.master(&self.masters, p)?;
+        let master = unit.master(self.master_tables(), p)?;
         let ai = unit.combat.ai.as_ref().ok_or(GenieError::unsupported(
             "a resource search without a unit AI",
         ))?;
@@ -230,7 +230,11 @@ impl World {
         ))?;
         let (seeker, me_walk) = self.search_seeker(p, unit)?;
         let (mask, master_id) = (mover.stats.restriction_mask, unit.life.master_id);
-        let (players, masters, index) = (&self.players, &self.masters, &self.index);
+        let (players, masters, index) = (
+            &self.players,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.index,
+        );
         let by_id = crate::world::index::ObjectsRef::new(players, index, masters);
         let candidate = |spatial: &crate::map::spatial::Spatial,
                          id: ObjectId|

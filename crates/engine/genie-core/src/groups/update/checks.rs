@@ -72,7 +72,7 @@ impl World {
                     .as_ref()
                     .is_some_and(|ai| ai.current_action == Some(ActionKind::Attack))
             {
-                let master = u.master(&self.masters, p)?;
+                let master = u.master(self.master_tables(), p)?;
                 // The relics' master class (`FUN_141017c70`'s test of the target's class).
                 // The monastery's master id (`FUN_141017850`'s test of the target's master).
                 // The master types from which an object moves (`RGE_Moving_Object`), acts
@@ -133,7 +133,7 @@ impl World {
         let WorldObject::Unit(p, u) = object else {
             return Ok(false);
         };
-        if u.master(&self.masters, p)?.kind < ACTION {
+        if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok(false);
         }
         if let Some(group) = u.group.id
@@ -181,7 +181,7 @@ impl World {
         let WorldObject::Unit(p, u) = object else {
             return Ok(None);
         };
-        if u.master(&self.masters, p)?.kind < ACTION {
+        if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok(None);
         }
         if let Some(e) = u.actions.unmodelled_action.clone() {
@@ -403,7 +403,7 @@ impl World {
         let WorldObject::Unit(p, u) = object else {
             return Ok(true);
         };
-        u.free_for_group(u.master(&self.masters, p)?)
+        u.free_for_group(u.master(self.master_tables(), p)?)
     }
 
     /// Slot 0x660 of object `id`: it shows its standing sprite. Nothing for an object below type
@@ -464,7 +464,7 @@ impl World {
         let Some((p, u)) = self.object(id) else {
             return Ok(None);
         };
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         if master.kind < MOVING {
             return Ok(None);
         }

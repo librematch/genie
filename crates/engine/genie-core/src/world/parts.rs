@@ -16,6 +16,7 @@ use crate::commands::GatherPoint;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::production::Production;
 use crate::world::World;
@@ -105,6 +106,26 @@ impl<T> PartTable<T> {
     }
 }
 
+/// No own masters: a test's master lookups without a world.
+#[cfg(test)]
+pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
+    static NONE: std::sync::LazyLock<PartTable<Master>> =
+        std::sync::LazyLock::new(PartTable::default);
+    &NONE
+}
+
+/// A test's table of the parts it lists, in their order.
+#[cfg(test)]
+impl<T> FromIterator<(ObjectId, T)> for PartTable<T> {
+    fn from_iter<I: IntoIterator<Item = (ObjectId, T)>>(parts: I) -> Self {
+        let mut t = Self::default();
+        for (id, part) in parts {
+            let _ = t.insert(id, part);
+        }
+        t
+    }
+}
+
 impl<T: PartialEq> PartialEq for PartTable<T> {
     /// Two tables are equal when the same objects hold equal parts, in any order.
     fn eq(&self, other: &Self) -> bool {
@@ -127,6 +148,11 @@ pub struct Parts {
     pub production: PartTable<Production>,
     /// A missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`): its volley makes them.
     pub missile: PartTable<Missile>,
+    /// `+0x6c0` (`FUN_141185010`): the master of its own an object's master pointer (`+0xa0`)
+    /// reads, a copy (`FUN_141186d10`, the master's slot 0x48) of the one it read when it took
+    /// it; an object without one reads its player's. An ownership change gives it one
+    /// ([`crate::ownership::change::change_hands`]), an upgrade of its own masters changes it.
+    pub own_master: PartTable<Master>,
 }
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
@@ -145,6 +171,11 @@ pub struct ObjectParts {
     /// Its missile's own fields ([`Parts::missile`]).
     #[diff(path = "missile")]
     pub missile: Option<Missile>,
+    /// Its own master ([`Parts::own_master`]).
+    #[diff(
+        gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
+    )]
+    pub own_master: Option<Master>,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -216,6 +247,7 @@ impl Parts {
             gather_point,
             production,
             missile,
+            own_master,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -229,6 +261,9 @@ impl Parts {
         if let Some(m) = missile {
             let _ = self.missile.insert(id, m);
         }
+        if let Some(m) = own_master {
+            let _ = self.own_master.insert(id, m);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -238,6 +273,7 @@ impl Parts {
             gather_point: self.gather_point.remove(id),
             production: self.production.remove(id),
             missile: self.missile.remove(id),
+            own_master: self.own_master.remove(id),
         }
     }
 
@@ -249,6 +285,7 @@ impl Parts {
             gather_point: self.gather_point.get(id).copied(),
             production: self.production.get(id).cloned(),
             missile: self.missile.get(id).copied(),
+            own_master: self.own_master.get(id).cloned(),
         }
     }
 
@@ -260,6 +297,7 @@ impl Parts {
             .chain(self.gather_point.iter().map(|(id, _)| id))
             .chain(self.production.iter().map(|(id, _)| id))
             .chain(self.missile.iter().map(|(id, _)| id))
+            .chain(self.own_master.iter().map(|(id, _)| id))
     }
 }
 
@@ -274,6 +312,8 @@ pub enum Part {
     Production(Option<Box<Production>>),
     /// The missile's own fields ([`Parts::missile`]), none clearing them.
     Missile(Option<Missile>),
+    /// The own master ([`Parts::own_master`]), boxed: a master is about 700 bytes.
+    OwnMaster(Box<Master>),
 }
 
 impl World {
@@ -312,8 +352,21 @@ impl World {
             Part::Missile(None) => {
                 let _ = self.parts.missile.remove(id);
             }
+            Part::OwnMaster(m) => {
+                let _ = self.parts.own_master.insert(id, *m);
+            }
         }
         Ok(())
+    }
+
+    /// The masters an object's master pointer reads: the players' tables and the objects' own
+    /// ([`MasterTables`]).
+    #[must_use]
+    pub fn master_tables(&self) -> MasterTables<'_> {
+        MasterTables {
+            players: &self.masters,
+            own: &self.parts.own_master,
+        }
     }
 
     /// Object `id`'s production lists, made empty when it has none (QUEUE's first entry at a
@@ -568,6 +621,58 @@ mod tests {
         t.check_parts().unwrap();
     }
 
+    /// An object's own master is a part the world's master lookups read before its player's
+    /// table ([`World::master_tables`], [`MasterTables::of`]); an object without one reads its
+    /// player's, and its removal from the lists carries the part.
+    #[test]
+    fn an_object_reads_its_own_master_from_the_world_s_table() {
+        use crate::objects::ListIndex;
+        use crate::objects::MasterHitPoints;
+        use crate::objects::masters::Masters;
+        use crate::players::PlayerId;
+        use crate::test_ids::master_id;
+        let (id, other) = (object_id(5), object_id(6));
+        let unit = |id| Unit {
+            id,
+            life: crate::objects::lifecycle::Lifecycle {
+                master_id: master_id(4),
+                ..Default::default()
+            },
+            ..Unit::default()
+        };
+        let mut t = World::new(
+            crate::world::WorldTime::ZERO,
+            crate::world::FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![crate::world::Millis::ZERO],
+            vec![crate::world::player::Player {
+                objects: vec![unit(id), unit(other)].into(),
+                ..Default::default()
+            }],
+        );
+        let master = |hp| Master {
+            id: master_id(4),
+            hit_points: MasterHitPoints::of_data(hp),
+            ..Master::default()
+        };
+        t.masters = vec![Masters::new([master(25)])];
+        t.set_part(id, Part::OwnMaster(Box::new(master(40))))
+            .unwrap();
+        let hp = |t: &World, i: usize| {
+            let u = &t.players[0].objects[ListIndex::new(i)];
+            let own = u.master(t.master_tables(), PlayerId::new(0)).unwrap();
+            let in_owner = u.master_in(t.master_tables().of(PlayerId::new(0))).unwrap();
+            assert_eq!(own, in_owner);
+            own.hit_points.get()
+        };
+        assert_eq!((hp(&t, 0), hp(&t, 1)), (40, 25));
+        let gone = t
+            .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
+            .unwrap();
+        assert_eq!(gone.parts.own_master.map(|m| m.hit_points.get()), Some(40));
+        assert!(t.parts.own_master.is_empty());
+    }
+
     /// A gather point at `x` on no target.
     fn gather_point(x: f32) -> GatherPoint {
         GatherPoint {
@@ -579,9 +684,9 @@ mod tests {
     }
 
     /// A whole object compares its row's fields and its parts' at the paths they had on the
-    /// object: the dead master is a known gap (left out of the saved scope), the gather point
-    /// and the production compare at the building layer's paths, the missile at its own, a
-    /// row's field keeps its own path.
+    /// object: the dead and own masters are known gaps (left out of the saved scope), the
+    /// gather point and the production compare at the building layer's paths, the missile at
+    /// its own, a row's field keeps its own path.
     #[test]
     fn a_whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
@@ -594,6 +699,7 @@ mod tests {
         b.unit.life.hp = crate::objects::HitPoints::new(7.0);
         b.parts.gather_point = Some(gather_point(2.0));
         b.parts.production = Some(Production::default());
+        b.parts.own_master = Some(Master::default());
         b.parts.missile = Some(Missile {
             max_range: crate::map::Distance::ZERO,
             fired_from: None,
@@ -623,7 +729,8 @@ mod tests {
                 "dead_master",
                 "building.gather_point",
                 "building.production",
-                "missile"
+                "missile",
+                "own_master"
             ]
         );
     }

@@ -128,7 +128,7 @@ impl World {
             GenieError::unreachable("a member the group's task search found is not live")
                 .with("member", member.get())
         })?;
-        let own = unit.master(&self.masters, player)?;
+        let own = unit.master(self.master_tables(), player)?;
         let owner = &self.players.player(player)?;
         let actor = Actor {
             id: unit.id,

@@ -94,7 +94,7 @@ impl World {
                 break;
             }
             if let Some((p, u)) = self.object(m.id) {
-                let unit = FormationUnit::of(u.master(&self.masters, p)?);
+                let unit = FormationUnit::of(u.master(self.master_tables(), p)?);
                 let s = unit.radius * crate::math::image::group::SPACING_FACTOR;
                 if spacing <= s && s != spacing {
                     spacing = s;

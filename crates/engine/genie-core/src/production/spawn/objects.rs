@@ -48,7 +48,7 @@ impl World {
         toward: Option<Point>,
     ) -> Result<Point, GenieError> {
         let building = &self.players.live(p, i)?;
-        let site_master = building.master(&self.masters, p)?;
+        let site_master = building.master(self.master_tables(), p)?;
         let position = building.position();
         let mut walls = [false; 4];
         for (wall, tiles) in

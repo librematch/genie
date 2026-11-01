@@ -74,7 +74,7 @@ impl World {
         let master = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?;
+            .master(self.master_tables(), player)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
         if master.kind < MOVING || speed <= Speed::ZERO {
             if order.queued {
@@ -178,7 +178,7 @@ impl World {
         let class = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .class;
         let unit = self.players.live_mut(player, idx)?;
         let place = (unit.position().ground(), Some(class));
@@ -208,7 +208,10 @@ impl World {
             );
             if move_to.shows_standing() {
                 unit.shows_standing_sprite(
-                    self.masters.of(player),
+                    crate::objects::masters::OwnerMasters::new(
+                        &self.parts.own_master,
+                        self.masters.of(player),
+                    ),
                     &self.graphics,
                     self.streams.get(Stream::Sprite),
                 )?;
@@ -229,7 +232,7 @@ impl World {
         idx: ListIndex,
     ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         let look = unit.combat.abilities.look.as_ref();
         Ok(crate::movement::move_to::point_sprite(master, look, false)
             .and_then(|id| self.graphics.get(id).copied()))
@@ -245,7 +248,7 @@ impl World {
         m: crate::unit_ai::AiMove,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let class = unit.master(&self.masters, player)?.class;
+        let class = unit.master(self.master_tables(), player)?.class;
         let by = self.releaser(player, idx)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let sails = self.players.live_mut(player, idx)?.ai_move_with(
@@ -253,7 +256,10 @@ impl World {
             (class, player),
             (&mut releases, &mut builder_leaves, by),
             (
-                self.masters.of(player),
+                crate::objects::masters::OwnerMasters::new(
+                    &self.parts.own_master,
+                    self.masters.of(player),
+                ),
                 &self.graphics,
                 self.streams.get(Stream::Sprite),
             ),
@@ -292,7 +298,7 @@ impl World {
         order: &Work,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         // the class-54 test of its top action comes first in the game, but either way the order
         // is ignored
         if ObjectState::Alive < unit.life.state {
@@ -348,7 +354,7 @@ impl World {
         let master = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?;
+            .master(self.master_tables(), player)?;
         let mut order = *order;
         if master.class == class::LIVESTOCK
             && let Some(target) = order.target
@@ -416,7 +422,7 @@ impl World {
     ) -> Result<PastureAfter, GenieError> {
         use crate::technology::Attributes;
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         let Some(on) = order.target else {
             return Ok(PastureAfter::Tends(None));
         };
@@ -488,7 +494,7 @@ impl World {
         let villager = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .class
             == class::VILLAGER;
         let unit = self.players.live_mut(player, idx)?;

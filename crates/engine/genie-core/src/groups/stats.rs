@@ -185,7 +185,7 @@ impl World {
                 i += 1;
                 continue;
             };
-            let master = u.master(&self.masters, p)?;
+            let master = u.master(self.master_tables(), p)?;
             let unit = FormationUnit::of(master);
             let ai = u
                 .combat
@@ -248,7 +248,7 @@ impl World {
                 }
                 let radius = match object {
                     crate::groups::WorldObject::Unit(p, u) => {
-                        FormationUnit::of(u.master(&self.masters, p)?).radius
+                        FormationUnit::of(u.master(self.master_tables(), p)?).radius
                     }
                     crate::groups::WorldObject::Ghost(p, _) => {
                         FormationUnit::of(self.master(p, object.master_id())?).radius
@@ -307,7 +307,7 @@ impl World {
                 "a computer player's group member's search (its cared classes)",
             ));
         }
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let attack_priority = master.attack_priority;
         let (classes, radius) = crate::unit_ai::search_area(
             ai_type,
@@ -437,7 +437,7 @@ impl World {
         }
         let (p, u) = self.object(view.id).ok_or_else(|| member_gone(view.id))?;
         // The types of action objects (`RGE_Action_Object`), whose action list slot 0x538 reads.
-        if u.master(&self.masters, p)?.kind >= ACTION {
+        if u.master(self.master_tables(), p)?.kind >= ACTION {
             if let Some(e) = u.actions.unmodelled_action.clone() {
                 return Err(e);
             }

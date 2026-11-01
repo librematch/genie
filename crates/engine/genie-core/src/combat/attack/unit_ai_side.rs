@@ -52,7 +52,10 @@ impl UnitView<'_, '_> {
         ai: &UnitAi,
     ) -> Result<crate::unit_ai::Attacked, GenieError> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
-        let own = self.unit.master(&self.c.w.masters, self.player)?.clone();
+        let own = self
+            .unit
+            .master(self.c.w.master_tables(), self.player)?
+            .clone();
         let master = &own;
         let unit = &mut *self.unit;
         if matches!(master.class, class::CLASS_51 | class::CLASS_54) {
@@ -303,7 +306,7 @@ impl UnitView<'_, '_> {
             };
             &owner.attributes[..]
         };
-        let master = t.master(&self.c.w.masters, q)?;
+        let master = t.master(self.c.w.master_tables(), q)?;
         let dip = SideWorld {
             player: self.player,
             relations: &self.c.w.players.player(self.player)?.relations,
@@ -345,7 +348,13 @@ impl UnitView<'_, '_> {
         let reads = AttackReads::of(
             unit,
             master,
-            (self.c.w.masters.of(self.player), &self.c.w.graphics),
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &self.c.w.parts.own_master,
+                    self.c.w.masters.of(self.player),
+                ),
+                &self.c.w.graphics,
+            ),
             Some(ai),
             (self.computer, self.c.w.world_time),
         );

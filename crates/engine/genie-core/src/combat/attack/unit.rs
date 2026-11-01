@@ -48,7 +48,7 @@ impl Unit {
     /// ([`crate::combat::attack::Attack::lost`]): its update without a target, the notify its
     /// disarm posts to the unit AI; codes 1 and 3 delete it.
     fn attack_lost_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let armed = armed(master, self.combat.firepower);
         let master_class = master.class;
         let walking = self
@@ -83,7 +83,7 @@ impl Unit {
         master_class: ClassId,
     ) -> Result<HeadCode, GenieError> {
         let mut attack = *self.actions.list.attack().ok_or(NO_ATTACK)?;
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let computer =
             c.w.players
                 .get(c.player.index())
@@ -91,7 +91,13 @@ impl Unit {
         let r = AttackReads::of(
             self,
             master,
-            (c.w.masters.of(c.player), &c.w.graphics),
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
+                &c.w.graphics,
+            ),
             self.combat.ai.as_ref(),
             (computer, c.w.world_time),
         );
@@ -114,7 +120,7 @@ impl Unit {
     ) -> Result<HeadCode, GenieError> {
         let mut attack = *self.actions.list.attack().ok_or(NO_ATTACK)?;
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
@@ -125,7 +131,13 @@ impl Unit {
         let r = AttackReads::of(
             self,
             master,
-            (c.w.masters.of(c.player), &c.w.graphics),
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
+                &c.w.graphics,
+            ),
             self.combat.ai.as_ref(),
             (computer, c.w.world_time),
         );
@@ -175,7 +187,7 @@ impl Unit {
         if self.actions.list.hunt().is_none() && self.actions.list.attack().is_none() {
             return Ok(None);
         }
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let terrain = c.w.spatial.terrain.as_ref();
         Ok(Some(victim_of(
             self,

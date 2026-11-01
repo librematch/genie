@@ -93,7 +93,10 @@ pub fn old_pather_paths(
                 genie_core::world::index::ObjectsRef::new(
                     &turns.players,
                     &turns.index,
-                    &turns.masters,
+                    genie_core::objects::masters::MasterTables::new(
+                        &turns.masters,
+                        &turns.parts.own_master,
+                    ),
                 ),
             ),
             id,

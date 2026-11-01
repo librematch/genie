@@ -431,7 +431,7 @@ impl crate::world::World {
                         }
                     }
                 }
-                let building = u.master(&self.masters, p)?.kind == BUILDING;
+                let building = u.master(self.master_tables(), p)?.kind == BUILDING;
                 if building
                     && u.building
                         .construction
@@ -528,7 +528,7 @@ impl crate::world::World {
             let Some((q, u)) = self.object(id) else {
                 return Ok(None);
             };
-            Ok(Some(u.master(&self.masters, q)?.class))
+            Ok(Some(u.master(self.master_tables(), q)?.class))
         };
         let moved = tracker.move_all(
             ListKey::master(from),

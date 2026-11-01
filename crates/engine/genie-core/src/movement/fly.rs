@@ -138,7 +138,7 @@ impl Fly {
             FlyState::Choosing => {
                 let mover = bird.body.mover().ok_or(NO_MOVER)?;
                 let sprites = FlightSprites {
-                    walking: bird.master(&c.w.masters, c.player)?.move_sprite,
+                    walking: bird.master(c.w.master_tables(), c.player)?.move_sprite,
                     graphics: &c.w.graphics,
                 };
                 let action = c.w.streams.get(Stream::Action);
@@ -344,7 +344,7 @@ impl Unit {
                 "a player's bird's default Fly (its task's +0x15)",
             ));
         }
-        let fly_mode = self.master(&c.w.masters, c.player)?.fly_mode;
+        let fly_mode = self.master(c.w.master_tables(), c.player)?.fly_mode;
         self.actions.list.set_fly(Some(Fly::start(
             task,
             self.position(),

@@ -198,13 +198,13 @@ impl World {
             return Ok(None);
         }
         let unit = &self.players.live(p, idx)?;
-        let reach = unit.master(&self.masters, p)?.radius;
+        let reach = unit.master(self.master_tables(), p)?.radius;
         let mut tended = Vec::new();
         for &id in &b.building.livestock {
             let Some((r, l)) = self.object(id) else {
                 continue;
             };
-            let radius = l.master(&self.masters, r)?.radius;
+            let radius = l.master(self.master_tables(), r)?.radius;
             let gap = crate::movement::footprint_gap_squared(
                 l.position(),
                 radius,
@@ -249,7 +249,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
         let building = match self.object(named) {
-            Some((q, b)) => b.master(&self.masters, q)?.kind == BUILDING,
+            Some((q, b)) => b.master(self.master_tables(), q)?.kind == BUILDING,
             None => false,
         };
         if building && let Some((_, b)) = self.object_mut(named) {

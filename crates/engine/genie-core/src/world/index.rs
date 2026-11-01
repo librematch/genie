@@ -14,7 +14,7 @@ use crate::objects::IdTable;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
-use crate::objects::masters::{Master, Masters};
+use crate::objects::masters::Master;
 use crate::objects::object_list::ObjectList;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
@@ -260,17 +260,17 @@ impl ObjectIndex {
 pub struct ObjectsRef<'a> {
     players: &'a [Player],
     index: &'a ObjectIndex,
-    masters: &'a [Masters],
+    masters: crate::objects::masters::MasterTables<'a>,
 }
 
 impl<'a> ObjectsRef<'a> {
-    /// The objects of `players`, which the world's table `index` finds, with the players'
-    /// `masters`.
+    /// The objects of `players`, which the world's table `index` finds, with the world's
+    /// `masters` (the players' and the objects' own).
     #[must_use]
     pub const fn new(
         players: &'a [Player],
         index: &'a ObjectIndex,
-        masters: &'a [Masters],
+        masters: crate::objects::masters::MasterTables<'a>,
     ) -> Self {
         Self {
             players,
@@ -282,7 +282,11 @@ impl<'a> ObjectsRef<'a> {
     /// No objects: a test's walk that meets none by id.
     #[cfg(test)]
     pub(crate) fn empty() -> ObjectsRef<'static> {
-        ObjectsRef::new(&[], ObjectIndex::scanning(), &[])
+        ObjectsRef::new(
+            &[],
+            ObjectIndex::scanning(),
+            crate::objects::masters::MasterTables::new(&[], crate::world::parts::no_own_masters()),
+        )
     }
 
     /// Object `id`, live or sleeping.
@@ -359,7 +363,8 @@ impl<'a> ObjectsRef<'a> {
 pub(crate) struct TestObjects {
     players: Vec<Player>,
     index: ObjectIndex,
-    masters: Vec<Masters>,
+    masters: Vec<crate::objects::masters::Masters>,
+    own: crate::world::parts::PartTable<Master>,
 }
 
 #[cfg(test)]
@@ -426,7 +431,11 @@ impl TestObjects {
 
     /// The units by id.
     pub(crate) fn view(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index, &self.masters)
+        ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.own),
+        )
     }
 }
 
@@ -471,7 +480,11 @@ impl World {
     /// The objects by id, to read ([`ObjectsRef`]).
     #[must_use]
     pub fn objects(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index, &self.masters)
+        ObjectsRef::new(
+            &self.players,
+            &self.index,
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+        )
     }
 
     /// The table by id again from the players' lists (after a list changed in place).

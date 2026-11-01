@@ -126,11 +126,11 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a Build's foundation the slice does not hold",
         ))?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let (t_at, t_radius, class) = (t.position(), tm.radius, tm.class);
         let t_state = Some(t.life.state);
         let unit = &self.players.live(player, idx)?;
-        let builder = unit.master(&self.masters, player)?;
+        let builder = unit.master(self.master_tables(), player)?;
         let to = crate::movement::move_to::WalkTo {
             id: Some(target),
             at: t_at,
@@ -184,13 +184,13 @@ impl World {
         task: &crate::objects::masters::Task,
     ) -> Result<(crate::construction::repair::RepairAction, ClassId), GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         if crate::construction::repair::SHIPS.contains(&tm.class) {
             return Err(crate::construction::repair::SHIP_REPAIR);
         }
         let class = tm.class;
         let unit = &self.players.live(player, idx)?;
-        let master = unit.master(&self.masters, player)?;
+        let master = unit.master(self.master_tables(), player)?;
         let move_reads = crate::movement::move_to::MoveToReads::of(unit, master, &self.graphics);
         let to = move_reads
             .walk_to(self, Some(target))?
@@ -332,7 +332,7 @@ impl World {
         target: ObjectId,
     ) -> Result<ClassId, GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let (class, ship) = (
             tm.class,
             crate::construction::repair::SHIPS.contains(&tm.class),
@@ -361,7 +361,7 @@ impl World {
             let unit = &self.players.live(player, idx)?;
             let move_reads = crate::movement::move_to::MoveToReads::of(
                 unit,
-                unit.master(&self.masters, player)?,
+                unit.master(self.master_tables(), player)?,
                 &self.graphics,
             );
             let to = move_reads
@@ -435,7 +435,7 @@ impl World {
                 "a Build retargeted to another player's object (set_state 11)",
             ));
         }
-        let tm = t.master(&self.masters, tp)?;
+        let tm = t.master(self.master_tables(), tp)?;
         let (t_at, t_radius, class) = (t.position(), tm.radius, tm.class);
         let t_state = Some(t.life.state);
         let unit = &self.players.live(player, idx)?;
@@ -447,7 +447,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a Build's retarget without its Build",
             ))?;
-        let builder = unit.master(&self.masters, player)?;
+        let builder = unit.master(self.master_tables(), player)?;
         let to = crate::movement::move_to::WalkTo {
             id: Some(target),
             at: t_at,
@@ -532,7 +532,7 @@ impl World {
         let Some((id, (p, f))) = id.key().and_then(|id| Some((id, self.object(id)?))) else {
             return Ok(None);
         };
-        let kind = f.master(&self.masters, p)?.kind;
+        let kind = f.master(self.master_tables(), p)?.kind;
         Ok(Some(if kind == BUILDING {
             f.building.annex_of.map_or(id, MainBuildingId::id)
         } else {

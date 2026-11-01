@@ -71,7 +71,7 @@ impl World {
             let Some((_, u)) = self.object(id) else {
                 continue;
             };
-            let master = u.master(&self.masters, p)?;
+            let master = u.master(self.master_tables(), p)?;
             let (kind, master_id, master_class) = (master.kind, master.id, master.class);
             if matches!(kind, master_type::COMBAT | master_type::BUILDING) {
                 self.garrison_volleys(p, id, after)?;
@@ -101,7 +101,7 @@ impl World {
             return Ok(());
         };
         let masters = self.masters.checked(p.index())?;
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
             return Ok(());
         }
@@ -114,7 +114,7 @@ impl World {
             let Some((q, unit)) = self.object(inside) else {
                 continue;
             };
-            let m = unit.master(&self.masters, q)?;
+            let m = unit.master(self.master_tables(), q)?;
             if m.kind == master_type::COMBAT {
                 shares.push(crate::garrison::share(
                     m,
@@ -154,7 +154,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
-        let master = u.master(&self.masters, p)?.clone();
+        let master = u.master(self.master_tables(), p)?.clone();
         let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(id)).copied();
         if master.kind < master_type::ACTION
             || !has_actions(
@@ -247,7 +247,9 @@ impl World {
                 continue;
             }
             let annexes = match self.object(id) {
-                Some((_, u)) if u.master(&self.masters, p)?.kind == master_type::BUILDING => {
+                Some((_, u))
+                    if u.master(self.master_tables(), p)?.kind == master_type::BUILDING =>
+                {
                     u.building.annexes
                 }
                 _ => continue,
@@ -256,7 +258,7 @@ impl World {
                 let Some((_, a)) = self.object(annex) else {
                     continue;
                 };
-                let am = a.master(&self.masters, p)?;
+                let am = a.master(self.master_tables(), p)?;
                 let own_annexes =
                     am.kind == master_type::BUILDING && a.building.annexes.ids().next().is_some();
                 if !own_annexes && am.class == class {

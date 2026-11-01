@@ -110,7 +110,14 @@ impl World {
                 at.ground(),
                 (
                     &mut self.spatial,
-                    crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                    crate::world::index::ObjectsRef::new(
+                        &self.players,
+                        &self.index,
+                        crate::objects::masters::MasterTables::new(
+                            &self.masters,
+                            &self.parts.own_master,
+                        ),
+                    ),
                 ),
                 &mut plan,
                 (to, Distance::ZERO, None),
@@ -136,7 +143,14 @@ impl World {
                 computer,
                 (to, 0.0),
                 None,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
+                crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    crate::objects::masters::MasterTables::new(
+                        &self.masters,
+                        &self.parts.own_master,
+                    ),
+                ),
             )?
             .0
         };

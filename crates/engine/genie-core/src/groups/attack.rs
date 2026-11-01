@@ -184,7 +184,7 @@ impl World {
     /// the object itself.
     fn main_object(&self, target: ObjectId) -> Result<ObjectId, GenieError> {
         let (player, unit) = self.object(target).ok_or_else(|| member_gone(target))?;
-        let building = unit.master(&self.masters, player)?.kind == BUILDING;
+        let building = unit.master(self.master_tables(), player)?.kind == BUILDING;
         Ok(unit
             .building
             .annex_of
@@ -201,7 +201,7 @@ impl World {
     /// The target master's two radii as one length (`+0xb57`, `+0xb5b`: `sqrt(x² + y²)`).
     pub(super) fn target_radius(&self, id: ObjectId) -> Result<Distance, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let r = u.master(&self.masters, p)?.radius;
+        let r = u.master(self.master_tables(), p)?.radius;
         Ok(Distance::new(fmath::sqrt(r.x() * r.x() + r.y() * r.y())))
     }
 
@@ -266,7 +266,7 @@ impl World {
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
         let t_master = self.master(t.player(), t.master_id())?;
-        let master = u.master(&self.masters, p)?;
+        let master = u.master(self.master_tables(), p)?;
         let gap = crate::movement::footprint_gap_squared(
             u.position(),
             master.radius,

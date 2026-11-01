@@ -44,7 +44,11 @@ impl BuildAction {
         c: &Step<'_>,
         builder: &Unit,
     ) -> Result<(Option<WalkTo>, Option<MoveToAction>), GenieError> {
-        let move_reads = builder.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let move_reads = builder.move_to_reads(
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            c.player,
+            &c.w.graphics,
+        )?;
         let to = if self.target.is_none() {
             None
         } else {

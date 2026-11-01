@@ -137,7 +137,7 @@ impl World {
         let Some((owner, u)) = self.object(id) else {
             return Ok(false);
         };
-        let master = u.master(&self.masters, owner)?.clone();
+        let master = u.master(self.master_tables(), owner)?.clone();
         match master.kind {
             master_type::BUILDING => {
                 self.change_building(owner, id, &master, change, v, attribute)?;

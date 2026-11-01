@@ -36,7 +36,10 @@ use crate::world::slots::PlayerSlots;
 
 impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
-        let class = self.unit.master(&self.c.w.masters, self.player)?.class;
+        let class = self
+            .unit
+            .master(self.c.w.master_tables(), self.player)?
+            .class;
         let at = self.unit.position().ground();
         let view = owner_view(
             &self.c.w.players,
@@ -74,7 +77,10 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
         );
         self.c.w.spatial.point_clear(
             unit.id,
@@ -117,7 +123,10 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let find = |id: ObjectId| others.find(id);
         let gaia_attacker = find(attacker).is_some_and(|(owner, _)| owner == PlayerId::GAIA);
         let me = self.unit.id;
-        let my_radius = self.unit.master(&self.c.w.masters, self.player)?.radius;
+        let my_radius = self
+            .unit
+            .master(self.c.w.master_tables(), self.player)?
+            .radius;
         for r in lists[UnitRelation::OWN]
             .iter()
             .chain(&lists[UnitRelation::ALLY])
@@ -131,7 +140,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             if u.combat.ai.is_none() || ObjectState::Dying <= u.life.state {
                 continue;
             }
-            let m = u.master(&self.c.w.masters, owner)?;
+            let m = u.master(self.c.w.master_tables(), owner)?;
             let no_help = NO_HELP_CLASSES.contains(m.class);
             if no_help || m.id == SIEGE_TOWER {
                 continue;
@@ -178,8 +187,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             crate::world::others::OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
                 .find(id)
                 .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
-        let m = u.master(&self.c.w.masters, owner)?;
-        let me = self.unit.master(&self.c.w.masters, self.player)?;
+        let m = u.master(self.c.w.master_tables(), owner)?;
+        let me = self.unit.master(self.c.w.master_tables(), self.player)?;
         Ok(Some(crate::unit_ai::UnitSeen {
             id,
             class: m.class,
@@ -247,7 +256,10 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
         );
         mover.reaches_object(
             &walker,
@@ -282,15 +294,21 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: &self.c.w.masters,
+            every: crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                &self.c.w.masters,
+                crate::objects::masters::MasterTables::new(
+                    &self.c.w.masters,
+                    &self.c.w.parts.own_master,
+                ),
             ),
             restriction: self
                 .unit
-                .master(&self.c.w.masters, self.player)?
+                .master(self.c.w.master_tables(), self.player)?
                 .terrain_restriction,
             unit: &*self.unit,
             attributes: &self.c.w.players.player(self.player)?.attributes,
@@ -322,7 +340,10 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            crate::objects::masters::MasterTables::new(
+                &self.c.w.masters,
+                &self.c.w.parts.own_master,
+            ),
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             let m = mover.ok_or(GenieError::unsupported(
@@ -395,7 +416,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
         let class = self
             .unit
-            .master(&self.c.w.masters, self.c.player)
+            .master(self.c.w.master_tables(), self.c.player)
             .map(|m| m.class);
         let done = class
             .and_then(|class| posted.and_then(|()| self.unit.run_effect(e, Some(class), self.c)));
@@ -564,7 +585,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         )?
         .get(id)
         .ok_or_else(|| object_gone(id))?;
-        let kind = u.master(&self.c.w.masters, seen.owner)?.kind;
+        let kind = u.master(self.c.w.master_tables(), seen.owner)?.kind;
         Ok(Some(crate::unit_ai::TargetFlags {
             owner: seen.owner,
             kind,

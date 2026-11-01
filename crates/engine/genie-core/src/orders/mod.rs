@@ -380,7 +380,7 @@ impl World {
         let (player, u) = self
             .object(id)
             .ok_or(GenieError::unsupported("a target the slice does not hold"))?;
-        let master = u.master(&self.masters, player)?;
+        let master = u.master(self.master_tables(), player)?;
         Ok(TaskTarget {
             id: u.id,
             master,

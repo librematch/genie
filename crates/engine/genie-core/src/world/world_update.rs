@@ -244,7 +244,7 @@ impl World {
         }
         let mut failed = None;
         for u in &moved {
-            if let Err(e) = self.hand_over_attributes(p, new, &u.unit) {
+            if let Err(e) = self.hand_over_attributes(p, new, u.parts.own_master.as_ref()) {
                 let _ = failed.get_or_insert(e);
             }
         }

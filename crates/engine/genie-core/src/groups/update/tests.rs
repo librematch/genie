@@ -1472,7 +1472,8 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
         groups: vec![g],
         ..UnitGroups::default()
     };
-    let masters = Some(&t.masters[1]);
+    let masters =
+        crate::objects::masters::OwnerMasters::new(&t.parts.own_master, Some(&t.masters[1]));
     let of = |groups: &UnitGroups, id| {
         let u = t.object(object_id(id)).unwrap().1;
         u.group_speed(groups, masters)
@@ -1496,7 +1497,10 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     assert_eq!(gone.group_speed(&groups, masters), Ok(None));
     let lost = t.object(object_id(11)).unwrap().1;
     assert_eq!(
-        lost.group_speed(&groups, None),
+        lost.group_speed(
+            &groups,
+            crate::objects::masters::OwnerMasters::new(&t.parts.own_master, None)
+        ),
         Err(crate::world::OBJECT_MASTER)
     );
 }

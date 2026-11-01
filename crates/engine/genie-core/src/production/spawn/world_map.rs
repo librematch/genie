@@ -97,7 +97,7 @@ impl PlaceMap for WorldMap<'_> {
                 let (owner, unit) = t.object(id).ok_or(GenieError::unsupported(
                     "an object near a spawn point the slice does not update",
                 ))?;
-                let master = unit.master(&t.masters, owner)?;
+                let master = unit.master(t.master_tables(), owner)?;
                 Ok(Near {
                     id,
                     position: placed.position,

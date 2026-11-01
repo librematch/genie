@@ -53,7 +53,13 @@ impl World {
         let reads = AttackReads::of(
             u,
             master,
-            (self.masters.of(player), &self.graphics),
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &self.parts.own_master,
+                    self.masters.of(player),
+                ),
+                &self.graphics,
+            ),
             u.combat.ai.as_ref(),
             (held.computer, world_time),
         );
@@ -107,7 +113,7 @@ impl World {
         let master = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?;
+            .master(self.master_tables(), player)?;
         // the task factory (`FUN_140a97e00` case 7) gives the Attack the task's moving sprite
         let arms =
             crate::combat::attack::arms(master, &self.graphics, task.sprites, task.sprites.moving);
@@ -185,7 +191,7 @@ impl World {
         let (owner, t) = self.object(target).ok_or(GenieError::unsupported(
             "an attack task's target the slice does not hold",
         ))?;
-        let tm = t.master(&self.masters, owner)?;
+        let tm = t.master(self.master_tables(), owner)?;
         // A building's master type (`'P'`); types below 30 do not move.
         let aimed = if tm.kind == BUILDING {
             t.building.annex_of.map_or(target, MainBuildingId::id)
@@ -201,7 +207,7 @@ impl World {
             fog_visibility: tm.fog_visibility,
             aimed,
             at: a.position(),
-            aimed_class: a.master(&self.masters, ap)?.class,
+            aimed_class: a.master(self.master_tables(), ap)?.class,
         })
     }
 
@@ -272,7 +278,7 @@ impl World {
         let drops_here = self
             .players
             .live(player, idx)?
-            .master(&self.masters, player)?
+            .master(self.master_tables(), player)?
             .drop_sites
             .iter()
             .any(|&d| Some(d) == target_master);
@@ -283,7 +289,11 @@ impl World {
             .hunt()
             .map(|h| h.target)
             .filter(|&t| t.is_some());
-        let walks = unit.move_walks(&self.masters, player, &self.graphics)?;
+        let walks = unit.move_walks(
+            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            player,
+            &self.graphics,
+        )?;
         let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
         else {
             return Err(GenieError::unsupported(

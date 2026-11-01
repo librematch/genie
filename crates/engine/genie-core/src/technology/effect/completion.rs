@@ -393,7 +393,7 @@ impl World {
                 .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
         }) {
             let building = match object.and_then(|id| self.object(id)) {
-                Some((q, u)) => u.master(&self.masters, q)?.kind == master_type::BUILDING,
+                Some((q, u)) => u.master(self.master_tables(), q)?.kind == master_type::BUILDING,
                 None => false,
             };
             if building {
@@ -462,7 +462,7 @@ impl World {
         }
         if let (true, Some(id)) = (one, object) {
             let building = match self.object(id) {
-                Some((q, u)) => u.master(&self.masters, q)?.kind == master_type::BUILDING,
+                Some((q, u)) => u.master(self.master_tables(), q)?.kind == master_type::BUILDING,
                 None => false,
             };
             if building {

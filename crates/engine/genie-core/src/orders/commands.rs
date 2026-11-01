@@ -59,7 +59,7 @@ impl World {
             if unit.combat.ai.is_none() {
                 continue;
             }
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             if state.leashed()
                 && (matches!(master.class, class::CLASS_51 | class::CLASS_54)
                     || matches!(master.id, ids::ID_42 | ids::ID_331))
@@ -90,7 +90,7 @@ impl World {
         if p != player && !self.settings.cheats_enabled {
             return Ok(());
         }
-        if unit.master(&self.masters, p)?.kind != BUILDING {
+        if unit.master(self.master_tables(), p)?.kind != BUILDING {
             return Ok(());
         }
         let now = self.world_time;
@@ -140,7 +140,7 @@ impl World {
             if unit.combat.ai.is_none() {
                 continue;
             }
-            let master = unit.master(&self.masters, p)?;
+            let master = unit.master(self.master_tables(), p)?;
             if !master.object_flags.contains(ObjectFlags::SCOUT) {
                 if master.class == class::LIVESTOCK {
                     return Err(GenieError::unsupported(

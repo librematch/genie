@@ -41,7 +41,13 @@ impl Unit {
         }
         // the velocity step (FUN_140f9ba80) runs for a unit with velocity data (+0x868)
         let group = match self.body.mover().and_then(|m| m.velocity.as_ref()) {
-            Some(_) => self.group_speed(&c.w.groups, c.w.masters.of(c.player))?,
+            Some(_) => self.group_speed(
+                &c.w.groups,
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
+            )?,
             None => None,
         };
         if let Some(mover) = self.body.mover_mut() {
@@ -83,7 +89,7 @@ impl Unit {
     pub(crate) fn group_speed(
         &self,
         groups: &crate::groups::UnitGroups,
-        masters: Option<&crate::objects::masters::Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
     ) -> Result<Option<GroupSpeed>, GenieError> {
         let Some(g) = self.group.id.and_then(|id| groups.get(id)) else {
             return Ok(None);
@@ -117,21 +123,7 @@ impl Unit {
         }
         let step = self.own_move_step(c, me)?;
         if step.gave_up {
-            let villager = self.master(&c.w.masters, c.player)?.class == class::VILLAGER;
-            let stance = self
-                .combat
-                .ai
-                .as_ref()
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
-            self.own_move_gave_up(
-                villager && !c.w.players.player(c.player)?.computer,
-                stance,
-                (
-                    c.w.masters.of(c.player),
-                    &c.w.graphics,
-                    c.w.streams.get(Stream::Sprite),
-                ),
-            )?;
+            self.own_move_give_up(c)?;
         }
         if step.target_moved {
             self.post_own(NotifyKind::TARGET_MOVED, [0, 0, 0])?;
@@ -141,6 +133,29 @@ impl Unit {
             self.own_move_end(step.failed)?;
         }
         Ok(HeadCode::ended(ended))
+    }
+
+    /// [`Unit::move_to_part`]'s give-up ([`Unit::own_move_gave_up`]): a human player's villager
+    /// waits, with its unit AI's stance (aggressive without one).
+    fn own_move_give_up(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let villager = self.master(c.w.master_tables(), c.player)?.class == class::VILLAGER;
+        let stance = self
+            .combat
+            .ai
+            .as_ref()
+            .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
+        self.own_move_gave_up(
+            villager && !c.w.players.player(c.player)?.computer,
+            stance,
+            (
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
+                &c.w.graphics,
+                c.w.streams.get(Stream::Sprite),
+            ),
+        )
     }
 
     /// The own `MoveTo`'s first check of its target (`0x140aa2a70`, [`MoveToAction::check_held`])
@@ -189,7 +204,7 @@ impl Unit {
                 // its set_state 1 and 13 show slot 0x798's sprite; slot 0x68 takes the master's
                 // standing sprite for a null one
                 let master = object_master(
-                    self.own_master.as_deref(),
+                    c.w.parts.own_master.get(self.id),
                     (self.id, self.life.master_id),
                     c.w.masters.of(c.player),
                 )

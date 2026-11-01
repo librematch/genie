@@ -16,12 +16,12 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::GarrisonKinds;
+use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::{Master, Masters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -84,11 +84,18 @@ impl Unit {
         c: &mut Step<'_>,
         enter: &crate::garrison::EnterAction,
     ) -> Result<crate::garrison::EnterReads, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {
-                let master = t.master(&c.w.masters, tp)?;
+                let master = t.master(
+                    crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                    tp,
+                )?;
                 let room = units_inside(others, t.id) < master.garrison.units();
                 let (mut view, start) = crate::garrison::enter_view(
                     &mut c.w.spatial,
@@ -115,7 +122,7 @@ impl Unit {
                 },
             ),
         };
-        let master = self.master(&c.w.masters, c.player)?;
+        let master = self.master(c.w.master_tables(), c.player)?;
         let villager = master.class == class::VILLAGER;
         Ok(crate::garrison::EnterReads {
             target,
@@ -167,7 +174,10 @@ impl Unit {
         )?;
         for _ in 0..2 {
             self.set_entered(
-                c.w.masters.of(c.player),
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -190,7 +200,7 @@ impl Unit {
             .transport()
             .ok_or(crate::garrison::transport::NO_TRANSPORT)?;
         let master = object_master(
-            self.own_master.as_deref(),
+            c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
@@ -221,7 +231,7 @@ impl Unit {
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
         (masters, graphics, sprite_rng): (
-            Option<&Masters>,
+            crate::objects::masters::OwnerMasters<'_>,
             &crate::objects::Graphics,
             &mut Well512,
         ),
@@ -274,7 +284,10 @@ impl Unit {
     /// notify 0x1f9 with the enter action value.
     pub(crate) fn entered(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         self.set_entered(
-            c.w.masters.of(c.player),
+            crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )
@@ -288,7 +301,7 @@ impl Unit {
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
     pub(crate) fn set_entered(
         &mut self,
-        masters: Option<&Masters>,
+        masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
@@ -340,9 +353,19 @@ impl Unit {
         let own = c.w.masters.of(c.player);
         let masters = own.ok_or(crate::garrison::NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
-        let bm = building.master_in(c.w.masters.of(tp).or(own))?.clone();
+        let bm = building
+            .master_in(crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(tp).or(own),
+            ))?
+            .clone();
         let hp = building.life.hp;
-        let me = self.master_in(Some(masters))?.clone();
+        let me = self
+            .master_in(crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                Some(masters),
+            ))?
+            .clone();
         let owner = c.w.players.player(c.player)?;
         let actor = Actor {
             id: self.id,

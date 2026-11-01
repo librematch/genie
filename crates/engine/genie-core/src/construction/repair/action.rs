@@ -299,7 +299,11 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
     ) -> Result<bool, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        );
         let spatial = &mut c.w.spatial;
         let terrain = spatial
             .terrain
@@ -477,7 +481,10 @@ impl RepairAction {
     ) -> Result<(), GenieError> {
         let standing = |c: &mut Step<'_>, repairer: &mut Unit| {
             repairer.show_standing(
-                c.w.masters.of(c.player),
+                crate::objects::masters::OwnerMasters::new(
+                    &c.w.parts.own_master,
+                    c.w.masters.of(c.player),
+                ),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )
@@ -517,7 +524,8 @@ impl RepairAction {
                 }
             }
             RepairState::WalkPoint => {
-                let move_reads = repairer.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+                let move_reads =
+                    repairer.move_to_reads(c.w.master_tables(), c.player, &c.w.graphics)?;
                 self.move_to = self.to_point(self.point, &move_reads)?;
             }
             // 13 has no case in set_state
@@ -542,7 +550,7 @@ impl RepairAction {
         if let Some(t) = reads.target {
             self.point = t.position;
         }
-        let move_reads = repairer.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
+        let move_reads = repairer.move_to_reads(c.w.master_tables(), c.player, &c.w.graphics)?;
         let to = move_reads.walk_to(c.w, self.target)?;
         self.move_to = self.walk(&move_reads, to)?;
         Ok(())
