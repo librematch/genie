@@ -15,6 +15,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -1295,13 +1296,16 @@ fn a_technology_change_reaches_its_costs_locations_and_state() {
     let mut t = barracks_tech();
     t.techs[0].costs[0] = Cost {
         attribute: Some(attribute::STONE),
-        amount: 100,
+        amount: CostAmount::of_data(100),
         paid: CostPaid::PLAYER,
     };
     t.masters = vec![Masters::new([combat(master_id(87), class::BUILDING, 1000)])];
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 0x4002, -1, 25.0)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[0].cost_adj, [25, 0, 0]);
+    assert_eq!(
+        t.players[0].techs[0].cost_adj.map(CostAmount::get),
+        [25, 0, 0]
+    );
     // a building the player lacks leaves the location
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 4, -1, 88.0)], None)
         .unwrap();
@@ -1316,7 +1320,7 @@ fn a_technology_change_reaches_its_costs_locations_and_state() {
         (s.locations[0].building, s.locations[0].button),
         (Some(master_id(87)), LocationButton::of_data(7))
     );
-    assert_eq!(s.research_cap, 2);
+    assert_eq!(s.research_cap, crate::technology::ResearchCap::of_data(2));
     // a location past the list adds a copy of the last, without a building
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 5, 3, 9.0)], None)
         .unwrap();
@@ -1487,7 +1491,7 @@ fn spawns_and_cost_entries() {
         t.masters[0].get(master_id(1658)).unwrap().cost,
         [
             CostSlot::default(),
-            CostSlot::new(attribute::STONE, 35, true),
+            CostSlot::new(attribute::STONE, CostAmount::of_data(35), true),
             CostSlot::default()
         ]
     );
@@ -1796,12 +1800,12 @@ fn the_technology_commands_disable_and_adjust_costs() {
         costs: [
             Cost {
                 attribute: Some(attribute::FOOD),
-                amount: 150,
+                amount: CostAmount::of_data(150),
                 paid: CostPaid::PLAYER,
             },
             Cost {
                 attribute: Some(attribute::GOLD),
-                amount: 50,
+                amount: CostAmount::of_data(50),
                 paid: CostPaid::PLAYER,
             },
             Cost::default(),
@@ -1830,13 +1834,22 @@ fn the_technology_commands_disable_and_adjust_costs() {
     // gold of technology 0 costs 10 more; food set to 100; every paid cost scaled by 0.5
     t.do_effect(PlayerId::new(0), &[command(b'e', 0, 3, 1, 10.0)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[0].cost_adj, [0, 10, 0]);
+    assert_eq!(
+        t.players[0].techs[0].cost_adj.map(CostAmount::get),
+        [0, 10, 0]
+    );
     t.do_effect(PlayerId::new(0), &[command(b'e', 0, 0, 0, 100.0)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[0].cost_adj, [-50, 10, 0]);
+    assert_eq!(
+        t.players[0].techs[0].cost_adj.map(CostAmount::get),
+        [-50, 10, 0]
+    );
     t.do_effect(PlayerId::new(0), &[command(b'e', 1, -1, 2, 0.5)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[1].cost_adj, [-75, -25, 0]);
+    assert_eq!(
+        t.players[0].techs[1].cost_adj.map(CostAmount::get),
+        [-75, -25, 0]
+    );
     // the research time modifier changes a location's adjustment; a technology without
     // locations has none to change
     t.do_effect(PlayerId::new(0), &[command(b'g', 0, -1, 1, 5.0)], None)
@@ -1899,7 +1912,7 @@ fn a_cost_change_past_the_i32_range_adds_nothing() {
         costs: [
             Cost {
                 attribute: Some(attribute::FOOD),
-                amount: 150,
+                amount: CostAmount::of_data(150),
                 paid: CostPaid::PLAYER,
             },
             Cost::default(),
@@ -1909,11 +1922,17 @@ fn a_cost_change_past_the_i32_range_adds_nothing() {
     }];
     let change = EffectCommand::of_data(b'e', 0, 0, 1, 3.0e9).unwrap();
     t.do_effect(PlayerId::new(0), &[change], None).unwrap();
-    assert_eq!(t.players[0].techs[0].cost_adj, [0, 0, 0]);
+    assert_eq!(
+        t.players[0].techs[0].cost_adj.map(CostAmount::get),
+        [0, 0, 0]
+    );
     // mode 2 at 1.5: (1.5 − 1) × 150 + 0.5 = 75.5, truncated to 75
     let scale = EffectCommand::of_data(b'e', 0, 0, 2, 1.5).unwrap();
     t.do_effect(PlayerId::new(0), &[scale], None).unwrap();
-    assert_eq!(t.players[0].techs[0].cost_adj, [75, 0, 0]);
+    assert_eq!(
+        t.players[0].techs[0].cost_adj.map(CostAmount::get),
+        [75, 0, 0]
+    );
 }
 
 /// A dead building's master technology goes back to 0 (`FUN_1413d4ec0`) when no other

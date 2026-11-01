@@ -17,6 +17,7 @@ use genie_core::objects::masters::MasterId;
 use genie_core::players::Amount;
 use genie_core::players::AmountRate;
 use genie_core::players::attribute::AttributeId;
+use genie_core::unit_ai::OrderPriority;
 use genie_core::unit_ai::best_target::AttackCategory;
 use genie_core::unit_ai::{ActionKind, OrderKind};
 use genie_core::world::Millis;
@@ -120,7 +121,7 @@ pub(super) fn unit_ai(
     Ok(Some(genie_core::unit_ai::UnitAi {
         ai_type: genie_core::unit_ai::UnitAiType::of_value(combat.need_unit_ai as u32),
         current_order: OrderKind::of_field(ai.current_order_value)?,
-        order_priority: ai.current_order_priority_value,
+        order_priority: OrderPriority::of_data(ai.current_order_priority_value),
         current_action: ActionKind::of_field(ai.current_action_value)?,
         current_target: ObjectId::of_field(ai.current_target_value),
         target_class: ClassId::of_param(ai.current_target_type_value)?,

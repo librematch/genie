@@ -148,7 +148,7 @@ impl World {
         let queued = crate::unit_ai::QueuedOrder {
             issuer: Some(crate::unit_ai::Issuer::Player(issuer)),
             order: OrderKind::OnTarget,
-            priority: 100,
+            priority: crate::unit_ai::OrderPriority::COMMAND,
             target: if target.is_some() { order.target } else { None },
             target_owner,
             point: point.with_height(0.0),

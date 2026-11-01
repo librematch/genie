@@ -10,6 +10,7 @@ use crate::{
     tile_lists_from_dump, visibility_differences, watch_at_load,
 };
 use genie_core::commands::Command;
+use genie_core::map::Distance;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::action_type;
 use genie_core::players::Amount;
@@ -394,7 +395,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
                         .rev()
                         .find(|t| t.action_type == action_type::HUNT_RANGE)
                 })
-                .map_or(0.0, |t| t.work_range.get());
+                .map_or(Distance::ZERO, |t| t.work_range);
             ai.hunted = Some(genie_core::unit_ai::Hunted { origin, leash });
         }
     }

@@ -118,10 +118,10 @@ impl World {
                 // a cost entry of the building's own store names an attribute
                 let attribute = c.attribute.ok_or(crate::world::NO_ATTRIBUTE)?;
                 match building.store.iter_mut().find(|s| s.0 == attribute) {
-                    Some(s) => s.1 += Amount::new(f32::from(c.amount)),
+                    Some(s) => s.1 += Amount::new(c.amount.as_f32()),
                     None => building
                         .store
-                        .push((attribute, Amount::new(f32::from(c.amount) + 0.0))),
+                        .push((attribute, Amount::new(c.amount.as_f32() + 0.0))),
                 }
             }
         }
@@ -129,7 +129,7 @@ impl World {
             production.enable_tech(tech);
         }
         let pending = &mut owner.techs.checked_mut(t)?.pending;
-        *pending = pending.wrapping_sub(count);
+        *pending = pending.minus(count);
         Ok(())
     }
 

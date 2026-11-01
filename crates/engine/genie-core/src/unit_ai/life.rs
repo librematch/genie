@@ -13,6 +13,7 @@ use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderPriority;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -81,7 +82,7 @@ impl UnitAi {
                 made.set_idle_timeout(HUNTED_IDLE_TIMEOUT, ai);
                 made.hunted = Some(Hunted {
                     origin: new.position,
-                    leash: new.hunt_range.get(),
+                    leash: new.hunt_range,
                 });
                 if new.class == class::KING {
                     made.stance = UnitStance::AGGRESSIVE;
@@ -147,7 +148,7 @@ impl UnitAi {
         Self {
             ai_type,
             current_order: None,
-            order_priority: -1,
+            order_priority: OrderPriority::NONE,
             current_action: None,
             current_target: None,
             target_class: None,

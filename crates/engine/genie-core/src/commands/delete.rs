@@ -246,7 +246,7 @@ impl World {
                 if paid {
                     self.players
                         .player_mut(owner)?
-                        .add_attribute(resource, Amount::new(f32::from(amount) * share))?;
+                        .add_attribute(resource, Amount::new(amount.as_f32() * share))?;
                 }
             }
         }

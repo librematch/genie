@@ -30,6 +30,7 @@ use genie_diff::Diff;
 mod combat_level;
 mod combat_setters;
 mod conversion_adjust;
+mod cost_amount;
 mod cost_slot;
 mod derived;
 mod dispatch;
@@ -45,6 +46,7 @@ mod tribe_setters;
 mod values;
 
 pub use self::combat_level::CombatLevel;
+pub use self::cost_amount::CostAmount;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
 pub use self::lookup::{PlayersMasters, player_master};
 pub use self::spacing_modifier::SpacingModifier;

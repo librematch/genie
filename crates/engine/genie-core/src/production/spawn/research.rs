@@ -105,7 +105,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a research at a technology without locations",
             ))?;
-        let times = state.times_researched;
+        let times = state.times_researched.get();
         let owner = self.players.player_mut(p)?;
         let state = &mut owner.techs[t];
         if state.state != ResearchState::Researching && (repeatable || shared) {
@@ -278,16 +278,12 @@ impl World {
         if def.kind == crate::technology::TechType::SHARED {
             let state = &mut self.players.player_mut(p)?.techs[t];
             state.state = ResearchState::Available;
-            state.times_researched = 0;
-            state.pending = 0;
+            state.times_researched = crate::technology::ResearchCount::ZERO;
+            state.pending = crate::technology::ResearchCount::ZERO;
             return Ok(());
         }
-        let cap = if 0x7fff < state.research_cap as u16 {
-            0x100
-        } else {
-            state.research_cap
-        };
-        if !(state.stack && state.times_researched < cap) {
+        let cap = state.research_cap.limit();
+        if !(state.stack && state.times_researched.get() < cap) {
             return Ok(());
         }
         let once = !state.allow_multiple || def.upgrades();
@@ -308,9 +304,9 @@ impl World {
         let state = &mut self.players.player_mut(p)?.techs[t];
         state.research_done = r.progress;
         if done {
-            state.times_researched = state.times_researched.wrapping_add(1);
-            state.pending = state.pending.wrapping_sub(1);
-            state.state = if i32::from(state.times_researched) < i32::from(cap) && !once {
+            state.times_researched = state.times_researched.plus(1);
+            state.pending = state.pending.minus(1);
+            state.state = if i32::from(state.times_researched.get()) < i32::from(cap) && !once {
                 ResearchState::Available
             } else {
                 ResearchState::Researched

@@ -9,6 +9,7 @@ use crate::objects::Regeneration;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeType;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::DamageAmount;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::InvulnerabilityLevel;
@@ -33,7 +34,7 @@ impl Master {
     pub(super) fn costs_of(
         &mut self,
         attribute: MasterAttribute,
-    ) -> impl Iterator<Item = &mut i16> {
+    ) -> impl Iterator<Item = &mut CostAmount> {
         let resource = cost_resource(attribute);
         self.cost
             .iter_mut()
@@ -75,7 +76,7 @@ impl Master {
             a::SPECIAL_ABILITY => self.special_attack = SpecialAttack::of_data(low8(v)),
             a::RESOURCE_COSTS | a::FOOD_COSTS | a::WOOD_COSTS | a::GOLD_COSTS | a::STONE_COSTS => {
                 for c in self.costs_of(attribute) {
-                    *c = low16(v);
+                    *c = CostAmount::of_data(low16(v));
                 }
             }
             a::TOTAL_MISSILES => self.volley_fire = crate::combat::Firepower::new(v),
@@ -92,7 +93,7 @@ impl Master {
                     .iter_mut()
                     .filter(|c| c.attribute.is_some() && !c.paid)
                 {
-                    c.amount = low16(negated);
+                    c.amount = CostAmount::of_data(low16(negated));
                 }
                 for s in &mut self.storage {
                     match s.0 {
@@ -239,7 +240,7 @@ impl Master {
             a::GARRISON_GRAPHIC => add_sprite(&mut self.garrison_sprite, v, world),
             a::RESOURCE_COSTS | a::FOOD_COSTS | a::WOOD_COSTS | a::GOLD_COSTS | a::STONE_COSTS => {
                 for c in self.costs_of(attribute) {
-                    *c = c.wrapping_add(low16(v));
+                    *c = c.plus(low16(v));
                 }
             }
             a::TRAIN_TIME => {
@@ -304,7 +305,7 @@ impl Master {
             a::RECHARGE_RATE => self.recharge_rate *= v,
             a::RESOURCE_COSTS | a::FOOD_COSTS | a::WOOD_COSTS | a::GOLD_COSTS | a::STONE_COSTS => {
                 for c in self.costs_of(attribute) {
-                    *c = low16(f32::from(*c) * v + ROUND);
+                    *c = CostAmount::of_data(low16(c.as_f32() * v + ROUND));
                 }
             }
             a::TRAIN_TIME => {

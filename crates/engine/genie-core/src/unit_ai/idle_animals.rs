@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::map::Distance;
+use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Well512;
@@ -179,10 +180,10 @@ impl UnitAi {
             force: true,
             walk: true,
         };
-        let leash = h.leash * h.leash;
-        if 0.0 < leash {
+        let leash = h.leash.squared();
+        if DistanceSquared::ZERO < leash {
             let gap = point_gap_squared(h.origin.ground(), at.position, at.size);
-            if leash < gap.get() {
+            if leash < gap {
                 if let Some(m) = self.move_to(go_home) {
                     side.effect_now(Effect::Move(m), self, ai)?;
                 }

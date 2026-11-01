@@ -39,6 +39,7 @@ mod notifies;
 mod notify_kind;
 mod order_kind;
 mod order_kinds;
+mod order_priority;
 mod process_order;
 mod retarget;
 mod side;
@@ -107,6 +108,7 @@ pub use self::issuer::Issuer;
 pub use self::notifies::Inbox;
 pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;
+pub use self::order_priority::OrderPriority;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{
     Gatherable, NO_POINT, Named, NearestAttacker, OffFootprint, ResourceSearch, TargetFlags,
@@ -261,7 +263,7 @@ pub struct QueuedOrder {
     /// `+0x4`: the order (a move, an order on a target, …).
     pub order: OrderKind,
     /// `+0x8`: below 100 it waits while the unit AI has an action.
-    pub priority: i32,
+    pub priority: OrderPriority,
     /// `+0xc`, `+0x10`: the target and its owner (−1 for none; "T", "`TOwner`" in the log line of
     /// `FUN_140c55c90`).
     pub target: Option<ObjectId>,
@@ -306,7 +308,7 @@ impl QueuedOrder {
         Ok(Self {
             issuer: Issuer::of_saved(w(0)?, own, players),
             order: OrderKind::try_from(w(4)?)?,
-            priority: w(8)?,
+            priority: OrderPriority::of_data(w(8)?),
             target: ObjectId::of_field(w(12)?),
             target_owner: PlayerId::of_field(w(16)?)?,
             point: Position::new(f(20)?, f(24)?, f(28)?),
@@ -434,7 +436,7 @@ pub struct UnitAi {
     /// `+0x3c`, −1 for none.
     pub current_order: Option<OrderKind>,
     /// `+0x40`, the current order's priority (−1 for none): a queued order sets it.
-    pub order_priority: i32,
+    pub order_priority: OrderPriority,
     /// `+0x44`, −1 for none.
     pub current_action: Option<ActionKind>,
     /// `+0x48`.
@@ -577,7 +579,7 @@ pub struct Hunted {
     pub origin: Position,
     /// `+0x1fc`: the unit's slot 0x7b0 then (`+0xb74`, the work range of its master's last task
     /// of action type 6, `FUN_141206d50`): beyond it the animal goes home.
-    pub leash: f32,
+    pub leash: Distance,
 }
 
 /// The engine's error ([`genie_error::GenieError`]), here for the modules' imports.

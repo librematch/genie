@@ -269,7 +269,7 @@ impl World {
         let order = crate::unit_ai::QueuedOrder {
             issuer: Some(crate::unit_ai::Issuer::Player(q)),
             order: OrderKind::Build,
-            priority: 100,
+            priority: crate::unit_ai::OrderPriority::COMMAND,
             target: Some(foundation),
             target_owner: Some(fp),
             point: Position::new(position.x(), position.y(), 0.0),

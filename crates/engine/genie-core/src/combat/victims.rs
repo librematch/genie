@@ -584,7 +584,7 @@ pub(crate) fn paid_cost(master: &Master) -> Amount {
     let mut cost = Amount::ZERO;
     for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
         if paid {
-            cost += Amount::new(f32::from(amount));
+            cost += Amount::new(amount.as_f32());
         }
     }
     cost

@@ -7,6 +7,7 @@ use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::map::WholeDistance;
 use genie_core::objects::ListIndex;
+use genie_core::objects::masters::CostAmount;
 use genie_core::players::Amount;
 use genie_core::players::Chance;
 use genie_core::players::EscrowShare;
@@ -14,7 +15,11 @@ use genie_core::players::game_status::Fealty;
 use genie_core::players::game_status::GameStatus;
 use genie_core::players::game_status::VictoryState;
 use genie_core::production::LocationButton;
+use genie_core::technology::CostOverride;
 use genie_core::technology::EffectId;
+use genie_core::technology::OverrideUse;
+use genie_core::technology::ResearchCap;
+use genie_core::technology::ResearchCount;
 use genie_core::world::Millis;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
@@ -45,24 +50,26 @@ pub(super) fn tech_state(
     t: &genie_save::generated::world::TechPlayerTree,
 ) -> Result<genie_core::technology::TechState, genie_core::GenieError> {
     let o = |j: usize| {
-        t.cost_override.get(j).map_or((-1, None, -2), |e| {
-            (
-                e.tech_player_tree_cost_amount_override as i16,
-                AttributeId::of_data(e.tech_player_tree_cost_attribute_type_override as i16),
-                e.tech_player_tree_cost_attribute_used_override as i16,
-            )
-        })
+        t.cost_override
+            .get(j)
+            .map_or(CostOverride::UNSET, |e| CostOverride {
+                amount: CostAmount::of_data(e.tech_player_tree_cost_amount_override as i16),
+                attribute: AttributeId::of_data(
+                    e.tech_player_tree_cost_attribute_type_override as i16,
+                ),
+                used: OverrideUse::of_data(e.tech_player_tree_cost_attribute_used_override as i16),
+            })
     };
     Ok(genie_core::technology::TechState {
         research_done: Seconds::new(t.research_done),
         state: genie_core::technology::ResearchState::of_int(t.state)?,
-        cost_adj: [0, 1, 2].map(|j| t.cost_adj.get(j).copied().unwrap_or(0)),
-        times_researched: t.tech_player_tree_times_researched as i16,
+        cost_adj: [0, 1, 2].map(|j| CostAmount::of_data(t.cost_adj.get(j).copied().unwrap_or(0))),
+        times_researched: ResearchCount::of_data(t.tech_player_tree_times_researched as i16),
         allow_multiple: t.tech_player_tree_allow_multiple_research != 0,
         stack: t.tech_player_tree_stack_tech != 0,
         overrides: [o(0), o(1), o(2)],
-        research_cap: t.tech_player_tree_research_cap as i16,
-        pending: t.tech_player_tree_pending_count as i16,
+        research_cap: ResearchCap::of_data(t.tech_player_tree_research_cap as i16),
+        pending: ResearchCount::of_data(t.tech_player_tree_pending_count as i16),
         enabled: t.tech_player_tree_enabled_tech != 0,
         effect_override: EffectId::of_data(t.tech_player_tree_effect_override as i16),
         building_master: MasterId::of_data(t.tech_player_tree_research_building_master_id as i16),

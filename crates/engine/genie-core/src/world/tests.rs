@@ -70,6 +70,7 @@ use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
@@ -1887,7 +1888,7 @@ fn a_direct_build_empties_its_builder_s_order_queue() {
     let queued_move = crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(19.760_416, 101.677_086, 0.0),
@@ -2830,7 +2831,7 @@ fn a_queued_order_on_a_target_works_on_it_with_the_order_s_priority() {
     let order = |target| QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::OnTarget,
-        priority: 3,
+        priority: crate::unit_ai::OrderPriority::of_data(3),
         target,
         target_owner: owner(1),
         point: Position::ORIGIN,
@@ -2854,7 +2855,7 @@ fn a_queued_order_on_a_target_works_on_it_with_the_order_s_priority() {
     );
     let ai = v.ai.as_ref().unwrap();
     assert_eq!(
-        (ai.current_order, ai.order_priority, ai.current_target),
+        (ai.current_order, ai.order_priority.get(), ai.current_target),
         (Some(OrderKind::Build), 3, Some(object_id(10028)))
     );
     let mut t = sent_off_world(vec![]);
@@ -2868,7 +2869,7 @@ fn a_queued_order_on_a_target_works_on_it_with_the_order_s_priority() {
     assert_eq!(v.actions.build().copied(), None);
     assert_eq!(
         v.ai.as_ref()
-            .map(|ai| (ai.current_order, ai.order_priority)),
+            .map(|ai| (ai.current_order, ai.order_priority.get())),
         Some((None, 3))
     );
     assert!(
@@ -3616,7 +3617,7 @@ fn the_empire_wars_start_puts_a_villager_on_its_farm_to_work() {
         .push(crate::unit_ai::QueuedOrder {
             issuer: Some(Issuer::Player(player_id(1))),
             order: OrderKind::Move,
-            priority: 100,
+            priority: crate::unit_ai::OrderPriority::of_data(100),
             target: None,
             target_owner: None,
             point: Position::new(10.0, 10.0, 0.0),
@@ -3799,7 +3800,7 @@ fn the_unit_ai_s_hunt_build_and_target_orders_apply_after_its_run() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::OnTarget,
-        priority: 3,
+        priority: crate::unit_ai::OrderPriority::of_data(3),
         target: Some(object_id(10028)),
         target_owner: owner(1),
         point: Position::ORIGIN,
@@ -3814,7 +3815,7 @@ fn the_unit_ai_s_hunt_build_and_target_orders_apply_after_its_run() {
         v.actions.build().map(|b| b.target),
         Some(Some(object_id(10028)))
     );
-    assert_eq!(v.ai.as_ref().map(|ai| ai.order_priority), Some(3));
+    assert_eq!(v.ai.as_ref().map(|ai| ai.order_priority.get()), Some(3));
     let mut t = sent_off_world(vec![]);
     let twice = vec![Effect::OrderOnTarget(order), Effect::OrderOnTarget(order)];
     assert_eq!(with_effects(&mut t, twice), Ok(()));
@@ -3849,7 +3850,7 @@ fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::OnTarget,
-        priority: 3,
+        priority: crate::unit_ai::OrderPriority::of_data(3),
         target: Some(object_id(10028)),
         target_owner: owner(1),
         point: Position::ORIGIN,
@@ -3897,7 +3898,11 @@ fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
         (
             v.regen_timer,
             v.actions.build().map(|b| b.target),
-            (ai.order_priority, ai.orders.len(), ai.look_around_timer),
+            (
+                ai.order_priority.get(),
+                ai.orders.len(),
+                ai.look_around_timer,
+            ),
         )
     };
     let (idle_regen, idle_build, _) = run(vec![]);
@@ -5945,7 +5950,7 @@ fn the_unit_ai_s_repair_order_switches_a_villager_to_the_repairer() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Repair,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: Some(object_id(10028)),
         target_owner: owner(1),
         point: Position::new(30.0, 88.0, 0.0),
@@ -6618,7 +6623,7 @@ fn the_unit_ai_s_enter_order_gives_the_unit_an_enter() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Enter,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: Some(object_id(10028)),
         target_owner: owner(1),
         point: Position::new(30.0, 88.0, 0.0),
@@ -6667,7 +6672,7 @@ fn a_villager_sent_off_a_foundation_waits_for_it_as_a_builder() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Foundation,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: Some(object_id(10028)),
         target_owner: owner(1),
         point: Position::new(30.0, 0.0, 0.0),
@@ -6727,7 +6732,7 @@ fn a_queued_build_order_builds_and_leaves_a_patrol_order() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Build,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: Some(object_id(10028)),
         target_owner: owner(1),
         point: Position::new(30.0, 88.0, 0.0),
@@ -6762,7 +6767,7 @@ fn a_queued_build_order_builds_and_leaves_a_patrol_order() {
     assert_eq!(
         (
             ai.current_order,
-            ai.order_priority,
+            ai.order_priority.get(),
             ai.current_action,
             ai.current_target
         ),
@@ -6980,7 +6985,7 @@ fn the_way_back_after_a_drop_off_queues_the_order_on_the_recorded_work() {
         [crate::unit_ai::QueuedOrder {
             issuer: Some(Issuer::Player(player_id(1))),
             order: OrderKind::OnTarget2,
-            priority: 100,
+            priority: crate::unit_ai::OrderPriority::of_data(100),
             target: Some(object_id(10028)),
             target_owner: owner(1),
             point: Position::new(30.0, 88.0, 0.0),
@@ -9046,7 +9051,7 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
         let mut techs = vec![TechState::default(); 0x67];
         techs[0x66] = TechState {
             state: ResearchState::Available,
-            research_cap: -1,
+            research_cap: crate::technology::ResearchCap::of_data(-1),
             building_master: None,
             locations: vec![Location {
                 building: Some(ids::TOWN_CENTRE),
@@ -9087,15 +9092,23 @@ fn research_world() -> World {
     t.techs = vec![TechDef::default(); 6];
     t.techs[5].costs[0] = Cost {
         attribute: Some(attribute::FOOD),
-        amount: 50,
+        amount: CostAmount::of_data(50),
         paid: CostPaid::PLAYER,
     };
     let mut techs = vec![TechState::default(); 6];
     techs[5] = TechState {
         state: ResearchState::Available,
-        research_cap: -1,
+        research_cap: crate::technology::ResearchCap::of_data(-1),
         building_master: None,
-        overrides: [(0, None, -2), (0, None, 0), (0, None, 0)],
+        overrides: [
+            crate::technology::CostOverride {
+                amount: CostAmount::ZERO,
+                attribute: None,
+                used: crate::technology::OverrideUse::DAT,
+            },
+            crate::technology::CostOverride::default(),
+            crate::technology::CostOverride::default(),
+        ],
         locations: vec![Location {
             building: Some(ids::TOWN_CENTRE),
             time: WholeSeconds::of_data(30),
@@ -13024,7 +13037,7 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
         .unwrap()
         .building_orders
         .iter()
-        .map(|o| (o.order, o.target, o.point, o.priority, o.ready))
+        .map(|o| (o.order, o.target, o.point, o.priority.get(), o.ready))
         .collect();
     let at = |x, y| (OrderKind::Move, None, Position::new(x, y, -1.0), -1, false);
     assert_eq!(steps, vec![at(30.5, 40.5), at(50.0, 60.0), at(70.0, 80.0)]);
@@ -16894,7 +16907,7 @@ fn a_forager_with_nothing_found_after_the_drop_idles_or_is_done() {
     let order = |target| crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Gather,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target,
         target_owner: owner(0),
         point: Position::new(36.5, 89.5, 0.0),
@@ -17737,7 +17750,7 @@ fn a_hunter_with_a_queued_order_after_the_drop_ends_its_hunt() {
     let order = |target: i32| crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Hunt,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: ObjectId::of_field(target),
         target_owner: owner(0),
         point: Position::new(36.5, 89.5, 0.0),
@@ -19390,7 +19403,7 @@ fn a_completion_s_parts_reach_their_owner() {
         t.techs = vec![TechDef::default()];
         t.players[1].techs = vec![TechState {
             state: ResearchState::Available,
-            research_cap: -1,
+            research_cap: crate::technology::ResearchCap::of_data(-1),
             building_master: None,
             ..TechState::default()
         }];

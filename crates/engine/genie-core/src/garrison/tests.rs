@@ -2349,7 +2349,7 @@ fn a_garrison_through_the_unit_ais_queues_their_enter_orders() {
         [crate::unit_ai::QueuedOrder {
             issuer: Some(Issuer::Object(object_id(1000))),
             order: OrderKind::Enter,
-            priority: 100,
+            priority: crate::unit_ai::OrderPriority::of_data(100),
             target: Some(object_id(100)),
             target_owner: owner(1),
             point: Position::new(10.0, 10.0, 0.0),

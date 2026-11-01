@@ -733,10 +733,10 @@ fn researching(progress: f32) -> World {
     techs[22] = TechState {
         state: ResearchState::Researching,
         allow_multiple: true,
-        pending: 3,
+        pending: crate::technology::ResearchCount::of_data(3),
         research_done: Seconds::new(progress),
-        research_cap: -1,
-        overrides: [(-1, None, -2); 3],
+        research_cap: crate::technology::ResearchCap::of_data(-1),
+        overrides: [crate::technology::CostOverride::UNSET; 3],
         locations: vec![Location {
             building: Some(ids::TOWN_CENTRE),
             time: WholeSeconds::of_data(25),
@@ -754,9 +754,21 @@ fn researching(progress: f32) -> World {
     };
     defs[22] = TechDef {
         costs: [
-            cost(Some(attribute::GOLD), 50, CostPaid::PLAYER),
-            cost(Some(attribute::WOOD), 20, CostPaid::BUILDING),
-            cost(None, 0, CostPaid::UNPAID),
+            cost(
+                Some(attribute::GOLD),
+                crate::objects::masters::CostAmount::of_data(50),
+                CostPaid::PLAYER,
+            ),
+            cost(
+                Some(attribute::WOOD),
+                crate::objects::masters::CostAmount::of_data(20),
+                CostPaid::BUILDING,
+            ),
+            cost(
+                None,
+                crate::objects::masters::CostAmount::of_data(0),
+                CostPaid::UNPAID,
+            ),
         ],
         locations: vec![(MasterId::of_data(109), WholeSeconds::of_data(25))],
         ..TechDef::default()
@@ -779,7 +791,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     assert_eq!(p.attributes[3], Amount::new(150.0));
     let s = &p.techs[22];
     assert_eq!(
-        (s.state, s.pending, s.research_done),
+        (s.state, s.pending.get(), s.research_done),
         (ResearchState::Available, 0, Seconds::ZERO)
     );
     let tc = &p.objects[ListIndex::new(0)];
@@ -795,7 +807,11 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     t.cancel_order(&object_ids([9]), 1, false).unwrap();
     let p = &t.players[1];
     assert_eq!(
-        (p.attributes[3], p.techs[22].state, p.techs[22].pending),
+        (
+            p.attributes[3],
+            p.techs[22].state,
+            p.techs[22].pending.get()
+        ),
         (Amount::new(50.0), ResearchState::Available, 2)
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
@@ -810,13 +826,18 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
 fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_one() {
     let mut t = researching(30.0);
     let s = &mut t.players[1].techs[22];
-    (s.stack, s.research_cap) = (true, 5);
+    (s.stack, s.research_cap) = (true, crate::technology::ResearchCap::of_data(5));
     t.cancel_queue(PlayerId::new(1), ListIndex::new(0)).unwrap();
     let p = &t.players[1];
     assert_eq!(p.attributes[3], Amount::new(150.0));
     let s = &p.techs[22];
     assert_eq!(
-        (s.state, s.times_researched, s.pending, s.research_done),
+        (
+            s.state,
+            s.times_researched.get(),
+            s.pending.get(),
+            s.research_done
+        ),
         (ResearchState::Available, 1, -1, Seconds::new(30.0))
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
@@ -824,11 +845,11 @@ fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_o
     // not done: state 1, nothing counted
     let mut t = researching(10.0);
     let s = &mut t.players[1].techs[22];
-    (s.stack, s.research_cap) = (true, 5);
+    (s.stack, s.research_cap) = (true, crate::technology::ResearchCap::of_data(5));
     t.cancel_queue(PlayerId::new(1), ListIndex::new(0)).unwrap();
     let s = &t.players[1].techs[22];
     assert_eq!(
-        (s.state, s.times_researched, s.pending),
+        (s.state, s.times_researched.get(), s.pending.get()),
         (ResearchState::Available, 0, 0)
     );
 }

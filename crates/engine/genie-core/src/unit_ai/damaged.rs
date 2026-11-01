@@ -16,6 +16,7 @@ use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, FOUNDATION_REACH, GO_ON,
@@ -103,7 +104,7 @@ impl UnitAi {
         if self.current_order.is_some() && Some(caller) != self.current_target {
             self.requeue_current(at, side, computer, ai_rng)?;
             self.set_order_with(Some(OrderKind::Attack), false, ai_rng);
-            self.order_priority = 100;
+            self.order_priority = OrderPriority::COMMAND;
         }
         // slot 0xb8 forced, the civilian's
         let _ = self.civilian_attack(caller, at, side, ai_rng)?;

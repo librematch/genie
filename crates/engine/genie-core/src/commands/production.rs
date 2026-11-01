@@ -112,7 +112,7 @@ impl World {
                         continue;
                     }
                     let held = crate::technology::Attributes::get(owner, attribute)?;
-                    if held < Amount::new(f32::from(each) * count as f32) {
+                    if held < Amount::new(each.as_f32() * count as f32) {
                         return Ok(true);
                     }
                 }
@@ -446,12 +446,11 @@ impl World {
         ))?;
         let owner = self.players.player_mut(player)?;
         let state = &owner.techs[t];
-        let done = state.pending.wrapping_add(state.times_researched);
-        let cap = if 0 <= state.research_cap {
-            state.research_cap
-        } else {
-            0x100
-        };
+        let done = state
+            .pending
+            .get()
+            .wrapping_add(state.times_researched.get());
+        let cap = state.research_cap.limit();
         let mut n = count;
         if state.stack && i32::from(cap) - i32::from(done) < i32::from(n) {
             n = cap.wrapping_sub(done);
@@ -490,12 +489,12 @@ impl World {
             queue.slots[k].count = queue.slots[k].count.wrapping_add(n);
             queue.total = queue.total.wrapping_add(n);
             queue.changes = queue.changes.wrapping_add(1);
-            owner.techs[t].pending = owner.techs[t].pending.wrapping_add(n);
+            owner.techs[t].pending = owner.techs[t].pending.plus(n);
             return Ok(true);
         }
         self.new_entry(player, i, (master, Some(tech)), n, button, None)?;
         let pending = &mut self.players.player_mut(player)?.techs[t].pending;
-        *pending = pending.wrapping_add(n);
+        *pending = pending.plus(n);
         Ok(true)
     }
 

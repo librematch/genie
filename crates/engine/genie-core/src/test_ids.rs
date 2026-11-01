@@ -6,6 +6,7 @@ use crate::groups::GroupId;
 use crate::objects::ObjectId;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{COST_SLOTS, CostSlot};
 use crate::players::Amount;
@@ -129,7 +130,7 @@ pub(crate) fn costs(entries: &[(AttributeId, i16, bool)]) -> [CostSlot; COST_SLO
     assert!(entries.len() <= COST_SLOTS, "a master has three cost slots");
     let mut slots = [CostSlot::default(); COST_SLOTS];
     for (slot, &(attribute, amount, paid)) in slots.iter_mut().zip(entries) {
-        *slot = CostSlot::new(attribute, amount, paid);
+        *slot = CostSlot::new(attribute, CostAmount::of_data(amount), paid);
     }
     slots
 }

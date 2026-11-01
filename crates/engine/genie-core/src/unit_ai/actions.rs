@@ -10,6 +10,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderPriority;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, ENDED_ACTIONS, Effect, GO_ON, Notify, PRODUCED, QueuedOrder, Surroundings, UnitAi,
@@ -270,7 +271,7 @@ impl UnitAi {
             self.cap_patrol_secondary();
             self.last_order = order;
             self.current_order = None;
-            self.order_priority = -1;
+            self.order_priority = OrderPriority::NONE;
             let (position, class) = place.ok_or(GenieError::unsupported(
                 "a stop ending an order without the unit's place",
             ))?;
@@ -505,7 +506,7 @@ impl UnitAi {
     ) -> Result<(), GenieError> {
         let mut k = 0;
         while k < self.orders.len() {
-            if self.current_action.is_some() && self.orders.checked(k)?.priority < 100 {
+            if self.current_action.is_some() && self.orders.checked(k)?.priority.waits() {
                 return Ok(());
             }
             let order = *self.orders.checked(k)?;

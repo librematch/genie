@@ -1241,7 +1241,7 @@ fn a_stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
     let order = crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(1.0, 1.0, 0.0),
@@ -1850,7 +1850,7 @@ fn a_move_inside_a_work_command_with_0_keeps_the_order_queue() {
     let order = crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(1.0, 1.0, 0.0),
@@ -2587,7 +2587,7 @@ fn a_guard_gives_its_units_the_defend_order_at_once() {
             .unwrap();
         let ai = t.players[1].objects[ListIndex::new(0)].ai.as_ref().unwrap();
         assert_eq!(
-            (ai.current_order, ai.current_action, ai.order_priority),
+            (ai.current_order, ai.current_action, ai.order_priority.get()),
             (Some(OrderKind::Defend), Some(ActionKind::Defend), 100)
         );
         assert_eq!(
@@ -2738,7 +2738,7 @@ fn a_unit_s_own_queued_order_names_its_target() {
     let order = |issuer, target| crate::unit_ai::QueuedOrder {
         issuer,
         order: OrderKind::Move,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target,
         target_owner: None,
         point: Position::new(1.0, 1.0, 0.0),
@@ -3946,7 +3946,7 @@ fn an_attack_move_through_the_unit_ai_s_queue_is_not_modelled() {
     let unready = crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 100,
+        priority: crate::unit_ai::OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(25.0, 20.0, 0.0),

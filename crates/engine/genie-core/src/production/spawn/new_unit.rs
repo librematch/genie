@@ -187,7 +187,7 @@ impl World {
             let state = unit.life.state;
             if let Some(ai) = unit.ai.as_mut() {
                 let order = crate::unit_ai::QueuedOrder {
-                    priority: 100,
+                    priority: crate::unit_ai::OrderPriority::COMMAND,
                     point: o.point.with_z(z),
                     range: Distance::ZERO,
                     ready: true,
@@ -372,7 +372,7 @@ impl World {
             .iter()
             .filter_map(|slot| slot.entry())
             .filter(|&(_, _, paid)| paid)
-            .map(|(_, amount, _)| i32::from(amount))
+            .map(|(_, amount, _)| i32::from(amount.get()))
             .sum();
         owner.add_attribute(attribute::TOTAL_VALUE, Amount::new(cost as f32))?;
         owner.add_attribute(attribute::UNITS_VALUE, Amount::new(cost as f32))?;

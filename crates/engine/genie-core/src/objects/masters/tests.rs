@@ -562,7 +562,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::FOOD_COSTS,
-            |m| f32::from(m.cost[0].amount),
+            |m| m.cost[0].amount.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -889,7 +889,10 @@ fn the_cost_attributes_change_their_resource_s_entries() {
         ])
     );
     m.set_attribute(attribute::GOLD_COSTS, 50.0, &world(false));
-    assert_eq!(m.cost[0].entry(), Some((player_attribute::WOOD, 17, true)));
+    assert_eq!(
+        m.cost[0].entry(),
+        Some((player_attribute::WOOD, CostAmount::of_data(17), true))
+    );
     m.set_attribute(attribute::POPULATION, 2.0, &world(false));
     assert_eq!(
         m.cost,

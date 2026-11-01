@@ -10,6 +10,7 @@ use genie_core::objects::Frame;
 use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
+use genie_core::objects::masters::CostAmount;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::players::AmountRate;
 use genie_core::players::attribute::AttributeId;
@@ -317,7 +318,7 @@ fn tech_costs(t: &genie_dat::de::Tech) -> Result<[genie_core::technology::Cost; 
     let cost = |c: &genie_dat::de::ResearchResourceCost| -> Result<_, GenieError> {
         Ok(genie_core::technology::Cost {
             attribute: AttributeId::of_field(c.kind)?,
-            amount: c.amount,
+            amount: CostAmount::of_data(c.amount),
             paid: CostPaid::of_data(c.flag),
         })
     };

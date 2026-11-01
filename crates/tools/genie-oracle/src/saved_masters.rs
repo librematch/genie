@@ -27,6 +27,7 @@ use genie_core::objects::masters::ChargeTarget;
 use genie_core::objects::masters::ChargeType;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
+use genie_core::objects::masters::CostAmount;
 use genie_core::objects::masters::DamageShare;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::FormationClass;
@@ -471,7 +472,7 @@ pub(super) fn build_cost(inventory: &[[u8; 6]]) -> [CostSlot; COST_SLOTS] {
     for (slot, (kind, amount, paid)) in slots.iter_mut().zip(build_entries(inventory)) {
         *slot = CostSlot {
             attribute: AttributeId::of_data(kind),
-            amount,
+            amount: CostAmount::of_data(amount),
             paid,
         };
     }

@@ -109,7 +109,7 @@ impl World {
         let order = crate::unit_ai::QueuedOrder {
             issuer: None,
             order: OrderKind::Defend,
-            priority: 100,
+            priority: crate::unit_ai::OrderPriority::COMMAND,
             target: Some(target),
             target_owner: Some(tp),
             point: Position::new(x, y, z),

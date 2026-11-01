@@ -367,7 +367,11 @@ impl World {
             if let Some(slot) = m.cost.iter_mut().find(|c| c.attribute == wanted) {
                 *slot = match edit {
                     CostEdit::Remove => CostSlot::default(),
-                    CostEdit::Add => CostSlot::new(resource, -1, true),
+                    CostEdit::Add => CostSlot::new(
+                        resource,
+                        crate::objects::masters::CostAmount::of_data(-1),
+                        true,
+                    ),
                 };
             }
         }

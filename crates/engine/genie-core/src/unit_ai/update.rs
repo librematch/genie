@@ -15,6 +15,7 @@ use crate::players::QueryRelation;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderPriority;
 use crate::unit_ai::{
     AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
     LIVE_TARGET_ACTIONS, Memory, NO_POINT, Notify, Pick, ResourceSearch, Retarget, Search,
@@ -597,7 +598,7 @@ impl UnitAi {
         self.leave_patrol_timers(ai);
         self.last_order = self.current_order;
         self.current_order = None;
-        self.order_priority = -1;
+        self.order_priority = OrderPriority::NONE;
         Ok(())
     }
 }

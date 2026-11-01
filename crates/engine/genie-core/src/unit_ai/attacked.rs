@@ -384,7 +384,7 @@ impl UnitAi {
             let order = |o: &Named, order: OrderKind| QueuedOrder {
                 issuer: Some(Issuer::Player(off.player)),
                 order,
-                priority: 100,
+                priority: crate::unit_ai::OrderPriority::COMMAND,
                 target: Some(o.id),
                 target_owner: Some(o.owner),
                 point: o.vector.with_height(0.0),

@@ -523,7 +523,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     let order = crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 5,
+        priority: crate::unit_ai::OrderPriority::of_data(5),
         target: None,
         target_owner: None,
         point: Position::new(40.0, 80.0, 7.0),
@@ -554,7 +554,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     assert_eq!(
         queued
             .iter()
-            .map(|o| (o.order, o.priority, o.point, o.range, o.ready))
+            .map(|o| (o.order, o.priority.get(), o.point, o.range, o.ready))
             .collect::<Vec<_>>(),
         [(
             OrderKind::Move,
@@ -768,7 +768,7 @@ fn queued_move() -> crate::unit_ai::QueuedOrder {
     crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 5,
+        priority: crate::unit_ai::OrderPriority::of_data(5),
         target: None,
         target_owner: None,
         point: Position::new(40.0, 80.0, 7.0),

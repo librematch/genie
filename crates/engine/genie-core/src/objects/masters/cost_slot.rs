@@ -1,5 +1,6 @@
 //! A master's cost (`+0x880`): three slots in their places, an empty one among them.
 
+use crate::objects::masters::CostAmount;
 use crate::players::attribute::AttributeId;
 use genie_diff::Diff;
 
@@ -15,7 +16,7 @@ pub struct CostSlot {
     /// The attribute it costs, none for an empty slot (−1).
     pub attribute: Option<AttributeId>,
     /// How much.
-    pub amount: i16,
+    pub amount: CostAmount,
     /// The paid flag (`+0x884`): the payment takes it; an unpaid entry (the population) is
     /// only tested.
     pub paid: bool,
@@ -24,7 +25,7 @@ pub struct CostSlot {
 impl CostSlot {
     /// A slot of `attribute`, `amount` and the paid flag.
     #[must_use]
-    pub const fn new(attribute: AttributeId, amount: i16, paid: bool) -> Self {
+    pub const fn new(attribute: AttributeId, amount: CostAmount, paid: bool) -> Self {
         Self {
             attribute: Some(attribute),
             amount,
@@ -34,7 +35,7 @@ impl CostSlot {
 
     /// The slot's entry `(attribute, amount, paid)`, none for an empty slot.
     #[must_use]
-    pub const fn entry(self) -> Option<(AttributeId, i16, bool)> {
+    pub const fn entry(self) -> Option<(AttributeId, CostAmount, bool)> {
         match self.attribute {
             Some(attribute) => Some((attribute, self.amount, self.paid)),
             None => None,
@@ -44,7 +45,7 @@ impl CostSlot {
 
 /// The entries of `slots` with an attribute, in their order (the readers that pass over the
 /// empty ones).
-pub fn entries(slots: &[CostSlot]) -> impl Iterator<Item = (AttributeId, i16, bool)> + '_ {
+pub fn entries(slots: &[CostSlot]) -> impl Iterator<Item = (AttributeId, CostAmount, bool)> + '_ {
     slots.iter().filter_map(|s| s.entry())
 }
 
@@ -58,19 +59,33 @@ mod tests {
     #[test]
     fn an_empty_slot_keeps_its_place_and_the_entries_pass_over_it() {
         let villager = [
-            CostSlot::new(attribute::FOOD, 50, true),
+            CostSlot::new(
+                attribute::FOOD,
+                crate::objects::masters::CostAmount::of_data(50),
+                true,
+            ),
             CostSlot::default(),
-            CostSlot::new(attribute::HEADROOM, 1, false),
+            CostSlot::new(
+                attribute::HEADROOM,
+                crate::objects::masters::CostAmount::of_data(1),
+                false,
+            ),
         ];
         assert_eq!(villager[1].entry(), None);
         assert_eq!(
-            entries(&villager).collect::<Vec<_>>(),
+            entries(&villager)
+                .map(|(a, n, p)| (a, n.get(), p))
+                .collect::<Vec<_>>(),
             [(attribute::FOOD, 50, true), (attribute::HEADROOM, 1, false)]
         );
         assert_eq!(
             costs(&[(attribute::WOOD, 25, true)]),
             [
-                CostSlot::new(attribute::WOOD, 25, true),
+                CostSlot::new(
+                    attribute::WOOD,
+                    crate::objects::masters::CostAmount::of_data(25),
+                    true
+                ),
                 CostSlot::default(),
                 CostSlot::default()
             ]

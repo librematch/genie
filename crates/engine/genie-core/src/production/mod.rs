@@ -751,17 +751,17 @@ mod tests {
             costs: [
                 Cost {
                     attribute: Some(attribute::FOOD),
-                    amount: 100,
+                    amount: crate::objects::masters::CostAmount::of_data(100),
                     paid: CostPaid::PLAYER,
                 },
                 Cost {
                     attribute: Some(attribute::WOOD),
-                    amount: 50,
+                    amount: crate::objects::masters::CostAmount::of_data(50),
                     paid: CostPaid::UNPAID,
                 },
                 Cost {
                     attribute: None,
-                    amount: 5,
+                    amount: crate::objects::masters::CostAmount::of_data(5),
                     paid: CostPaid::PLAYER,
                 },
             ],
@@ -770,7 +770,11 @@ mod tests {
         let state = |state| TechState {
             state,
             research_done: Seconds::new(7.5),
-            cost_adj: [-10, 0, 0],
+            cost_adj: [
+                crate::objects::masters::CostAmount::of_data(-10),
+                crate::objects::masters::CostAmount::ZERO,
+                crate::objects::masters::CostAmount::ZERO,
+            ],
             ..TechState::default()
         };
         let refunded = |state: &mut TechState, tech, modifier| {
@@ -800,7 +804,11 @@ mod tests {
         );
         // the scaled amount wraps at 16 bits: 40000 is -25536
         let mut s = TechState {
-            cost_adj: [19_900, 0, 0],
+            cost_adj: [
+                crate::objects::masters::CostAmount::of_data(19_900),
+                crate::objects::masters::CostAmount::ZERO,
+                crate::objects::masters::CostAmount::ZERO,
+            ],
             ..state(ResearchState::Researching)
         };
         assert_eq!(
@@ -904,9 +912,17 @@ mod tests {
     fn a_queue_entry_keeps_the_empty_cost_slot_in_its_place() {
         let mut m = villager(&[]);
         m.cost = [
-            CostSlot::new(attribute::FOOD, 50, true),
+            CostSlot::new(
+                attribute::FOOD,
+                crate::objects::masters::CostAmount::of_data(50),
+                true,
+            ),
             CostSlot::default(),
-            CostSlot::new(attribute::HEADROOM, 1, false),
+            CostSlot::new(
+                attribute::HEADROOM,
+                crate::objects::masters::CostAmount::of_data(1),
+                false,
+            ),
         ];
         let ms = Masters::new([m]);
         assert_eq!(

@@ -16,6 +16,7 @@ use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::AdjacentMode;
 use genie_core::objects::masters::CarryCapacity;
 use genie_core::objects::masters::CombatLevel;
+use genie_core::objects::masters::CostAmount;
 use genie_core::objects::masters::FogVisibility;
 use genie_core::objects::masters::GarrisonCapacity;
 use genie_core::objects::masters::GarrisonKinds;
@@ -332,7 +333,7 @@ fn dat_cost(unit: &genie_dat::de::Unit) -> Result<[CostSlot; COST_SLOTS], GenieE
         for (slot, r) in cost.iter_mut().zip(&c.resource_costs) {
             *slot = CostSlot {
                 attribute: AttributeId::of_field(r.kind)?,
-                amount: r.amount,
+                amount: CostAmount::of_data(r.amount),
                 paid: r.flag != 0,
             };
         }

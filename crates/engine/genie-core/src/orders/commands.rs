@@ -165,7 +165,7 @@ impl World {
                 } else {
                     OrderKind::AutoScout
                 },
-                priority: 100,
+                priority: crate::unit_ai::OrderPriority::COMMAND,
                 target: None,
                 target_owner: None,
                 point: Position::new(-1.0, -1.0, position.z()),

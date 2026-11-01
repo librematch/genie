@@ -670,7 +670,7 @@ fn a_unit_sent_off_a_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
     let orders: Vec<_> = ai
         .orders
         .iter()
-        .map(|o| (o.order, o.target, o.point, o.priority, o.ready))
+        .map(|o| (o.order, o.target, o.point, o.priority.get(), o.ready))
         .collect();
     assert_eq!(
         orders,
@@ -817,7 +817,7 @@ fn sent_off_queue() -> UnitAi {
     let order = |order: OrderKind, target: i32, x: f32| QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order,
-        priority: 100,
+        priority: OrderPriority::of_data(100),
         target: ObjectId::of_field(target),
         target_owner: owner(1),
         point: Position::new(x, 2.0, 0.0),
@@ -830,7 +830,7 @@ fn sent_off_queue() -> UnitAi {
         current_action: None,
         last_action: Some(ActionKind::MoveAside),
         current_order: None,
-        order_priority: -1,
+        order_priority: OrderPriority::of_data(-1),
         current_target: None,
         orders: vec![
             order(OrderKind::Foundation, 10028, 30.0),
@@ -855,7 +855,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
         orders: vec![QueuedOrder {
             issuer: Some(Issuer::Player(player_id(1))),
             order: OrderKind::Build,
-            priority: -1,
+            priority: OrderPriority::of_data(-1),
             target: Some(object_id(10028)),
             target_owner: owner(1),
             point: Position::new(30.0, 88.0, 0.0),
@@ -913,7 +913,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
         (Some(object_id(7)), class_of(10))
     );
     assert_eq!(
-        (ai.current_order, ai.order_priority),
+        (ai.current_order, ai.order_priority.get()),
         (Some(OrderKind::Build), -1)
     );
 }
@@ -939,7 +939,7 @@ fn a_foundation_order_waits_for_the_foundation_and_ends_the_queue_s_turn() {
         )
     );
     assert_eq!(
-        (ai.current_order, ai.order_priority),
+        (ai.current_order, ai.order_priority.get()),
         (Some(OrderKind::Foundation), 100)
     );
     let left: Vec<_> = ai.orders.iter().map(|o| (o.order, o.target)).collect();
@@ -967,7 +967,7 @@ fn a_foundation_order_without_a_wait_goes_and_the_work_runs() {
         (ai.current_action, ai.last_action),
         (Some(ActionKind::WaitSolidify), None)
     );
-    assert_eq!((ai.current_order, ai.order_priority), (None, -1));
+    assert_eq!((ai.current_order, ai.order_priority.get()), (None, -1));
     assert_eq!(ai.orders, vec![]);
     let [Effect::OrderOnTarget(work)] = fx.as_slice() else {
         panic!("the work on its target: {fx:?}");
@@ -2108,7 +2108,7 @@ fn hit_villager() -> (UnitAi, Surroundings, Notify) {
         current_order: Some(OrderKind::Gather),
         current_action: Some(ActionKind::Gather),
         current_target: Some(object_id(40)),
-        order_priority: 3,
+        order_priority: OrderPriority::of_data(3),
         ..idle(CIVILIAN)
     };
     let at = Surroundings {
@@ -3494,7 +3494,7 @@ fn a_scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
         ),
         (Some(ActionKind::Attack), Some(object_id(26000)), None)
     );
-    assert_eq!((scout.last_order, scout.order_priority), (None, -1));
+    assert_eq!((scout.last_order, scout.order_priority.get()), (None, -1));
     let (scout, attacks, fx) = run(-1);
     assert_eq!(attacks, vec![]);
     assert!(
@@ -4227,7 +4227,7 @@ fn a_new_building_unit_ai_draws_its_three_timers() {
             stop_after_kill: false,
             home: None,
             hunted: None,
-            order_priority: -1,
+            order_priority: OrderPriority::of_data(-1),
             last_update_time: Millis::ZERO,
             orders: Vec::new(),
             building_orders: Vec::new(),
@@ -4835,7 +4835,7 @@ fn a_new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
         (
             Some(Hunted {
                 origin: Position::new(20.0, 30.0, 2.0),
-                leash: 7.5,
+                leash: Distance::new(7.5),
             }),
             3,
             None
@@ -5371,7 +5371,7 @@ fn deer() -> UnitAi {
         last_target_class: None,
         hunted: Some(Hunted {
             origin: Position::new(31.5, 106.5, 0.0),
-            leash: 0.0,
+            leash: Distance::new(0.0),
         }),
         ..idle(UnitAiType::HUNTED)
     }
@@ -5479,7 +5479,7 @@ fn a_deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
     // a fox's leash of 2.5: 3 tiles off (2.8 from its footprint) it goes home without a
     // search or a draw
     let mut u = deer();
-    u.hunted.as_mut().unwrap().leash = 2.5;
+    u.hunted.as_mut().unwrap().leash = Distance::new(2.5);
     let mut r = wander_seed(false);
     let moved = u
         .update_idle(
@@ -5602,7 +5602,7 @@ fn scout() -> UnitAi {
     let order = |x: f32, y: f32| QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 100,
+        priority: OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(x, y, 0.0),
@@ -5613,7 +5613,7 @@ fn scout() -> UnitAi {
     };
     UnitAi {
         current_order: Some(OrderKind::Move),
-        order_priority: -1,
+        order_priority: OrderPriority::of_data(-1),
         current_action: Some(ActionKind::Move),
         target_class: None,
         target_point: Position::new(93.583_336, 57.791_668, 0.0),
@@ -5657,7 +5657,7 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
         })]
     );
     assert_eq!(
-        (u.current_order, u.order_priority, u.current_action),
+        (u.current_order, u.order_priority.get(), u.current_action),
         (Some(OrderKind::Move), 100, Some(ActionKind::Move))
     );
     assert_eq!(u.target_point, Position::new(89.09375, 60.677_082, 0.0));
@@ -5725,7 +5725,7 @@ fn a_completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
         .unwrap();
     assert_eq!(fx, vec![Effect::Stop]);
     assert_eq!(
-        (u.current_order, u.order_priority, u.current_action),
+        (u.current_order, u.order_priority.get(), u.current_action),
         (None, -1, None)
     );
     assert_eq!(
@@ -6051,7 +6051,7 @@ fn a_saved_order_and_notify_read_as_the_game_wrote_them() {
         (
             o.issuer,
             o.order,
-            o.priority,
+            o.priority.get(),
             o.point,
             o.range,
             o.ready,
@@ -7158,7 +7158,7 @@ fn an_inserted_order_goes_in_front_only_of_a_queue_that_holds_one() {
 fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Build),
-        order_priority: 2,
+        order_priority: OrderPriority::of_data(2),
         current_action: Some(ActionKind::Build),
         current_target: Some(object_id(50)),
         target_class: class_of(3),
@@ -7169,7 +7169,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 7,
+        priority: OrderPriority::of_data(7),
         target: None,
         target_owner: None,
         point: Position::new(10.0, 11.0, 0.0),
@@ -7191,7 +7191,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
     let kept = QueuedOrder {
         issuer: Some(Issuer::Object(object_id(9))),
         order: OrderKind::Build,
-        priority: 2,
+        priority: OrderPriority::of_data(2),
         target: Some(object_id(50)),
         target_owner: None,
         point: Position::new(20.0, 21.0, 0.0),
@@ -7214,7 +7214,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
         ]
     );
     assert_eq!(
-        (u.current_order, u.order_priority),
+        (u.current_order, u.order_priority.get()),
         (Some(OrderKind::Move), 7)
     );
     // the stop ended the build order; the move's FUN_140c64c10 made the forgotten -1 the
@@ -7242,7 +7242,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
     };
     let roundup = QueuedOrder {
         order: OrderKind::AttackRoundup,
-        priority: 100,
+        priority: OrderPriority::of_data(100),
         target: Some(object_id(51)),
         ready: true,
         ..QueuedOrder::default()
@@ -7297,7 +7297,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
         )
     );
     assert_eq!(
-        (u.current_order, u.order_priority),
+        (u.current_order, u.order_priority.get()),
         (Some(OrderKind::Attack), 100)
     );
     assert_eq!((u.notifies.len(), u.orders.len()), (0, 0));
@@ -7483,7 +7483,7 @@ fn a_grouped_unit_s_full_update_reads_its_group() {
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: 100,
+        priority: OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(9.0, 9.0, 0.0),
@@ -7626,7 +7626,7 @@ fn an_idle_transport_ship_s_check_caps_its_human_order_time_and_does_nothing() {
 fn a_villager_whose_attack_target_died_walks_to_its_point() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Attack),
-        order_priority: 100,
+        order_priority: OrderPriority::of_data(100),
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(50)),
         target_point: Position::new(5.0, 6.0, 0.0),
@@ -7657,7 +7657,7 @@ fn a_villager_whose_attack_target_died_walks_to_its_point() {
         ]
     );
     assert_eq!(
-        (u.current_order, u.order_priority, u.last_order),
+        (u.current_order, u.order_priority.get(), u.last_order),
         (None, -1, Some(OrderKind::Attack))
     );
 }
@@ -8546,7 +8546,7 @@ fn a_villager_on_the_attack_order_without_a_target_gives_it_up() {
     };
     let mut u = UnitAi {
         current_order: Some(OrderKind::Attack),
-        order_priority: 100,
+        order_priority: OrderPriority::of_data(100),
         current_action: Some(ActionKind::Attack),
         ..idle(UnitAiType::CIVILIAN)
     };
@@ -8556,7 +8556,7 @@ fn a_villager_on_the_attack_order_without_a_target_gives_it_up() {
     assert_eq!(
         (
             u.current_order,
-            u.order_priority,
+            u.order_priority.get(),
             u.last_order,
             u.current_action
         ),
@@ -9424,7 +9424,7 @@ fn a_stop_ends_a_patrol_order_with_its_secondary_timer_capped() {
 fn leaving_a_patrol_order_caps_its_secondary_timer() {
     let order = |order| QueuedOrder {
         order,
-        priority: 100,
+        priority: OrderPriority::of_data(100),
         ..QueuedOrder::default()
     };
     let patrolling = || UnitAi {
@@ -9465,7 +9465,7 @@ fn ordered(ai_type: UnitAiType) -> UnitAi {
     UnitAi {
         orders: vec![QueuedOrder {
             order: OrderKind::OnTarget,
-            priority: 100,
+            priority: OrderPriority::of_data(100),
             target: Some(object_id(77)),
             ready: true,
             ..QueuedOrder::default()
@@ -11684,7 +11684,7 @@ fn queued(order: OrderKind, target: i32) -> QueuedOrder {
     QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order,
-        priority: 40,
+        priority: OrderPriority::of_data(40),
         target: ObjectId::of_field(target),
         target_owner: None,
         point: Position::new(12.7, 30.2, 0.5),
@@ -11778,7 +11778,7 @@ fn the_attack_order_attacks_by_the_unit_ai_s_type_and_becomes_the_ai_s() {
     assert_eq!(side.attacks, [(object_id(70), true)]);
     assert_eq!(side.group_stops, 0);
     assert_eq!(
-        (u.current_order, u.order_priority, u.current_action),
+        (u.current_order, u.order_priority.get(), u.current_action),
         (Some(OrderKind::Attack), 40, Some(ActionKind::Attack))
     );
     assert_eq!(
@@ -11849,7 +11849,7 @@ fn the_attack_order_attacks_by_the_unit_ai_s_type_and_becomes_the_ai_s() {
     assert_eq!(
         (
             u.current_order,
-            u.order_priority,
+            u.order_priority.get(),
             u.current_target,
             u.target_class
         ),
@@ -12073,7 +12073,7 @@ fn the_stop_order_stops_and_ends_the_order() {
     let mut side = OrderSide::default();
     let mut u = UnitAi {
         current_order: Some(OrderKind::Move),
-        order_priority: 100,
+        order_priority: OrderPriority::of_data(100),
         current_action: Some(ActionKind::Move),
         current_target: Some(object_id(70)),
         ..idle(SOLDIER_AI)
@@ -12088,7 +12088,7 @@ fn the_stop_order_stops_and_ends_the_order() {
     assert_eq!(
         (
             u.current_order,
-            u.order_priority,
+            u.order_priority.get(),
             u.current_action,
             u.current_target
         ),
@@ -12494,7 +12494,7 @@ fn the_wait_order_waits_and_leaves_a_patrol_order() {
     assert_eq!(
         (
             u.current_order,
-            u.order_priority,
+            u.order_priority.get(),
             u.current_action,
             u.last_action
         ),
@@ -12573,7 +12573,7 @@ fn the_order_on_a_target_goes_to_the_caller_or_moves_to_a_gone_one_s_point() {
                 walk: true,
             })]
         );
-        assert_eq!((u.current_order, u.order_priority), (Some(order), 40));
+        assert_eq!((u.current_order, u.order_priority.get()), (Some(order), 40));
     }
 }
 
@@ -12716,7 +12716,7 @@ fn the_attack_move_attacks_with_a_trebuchet_and_moves_otherwise() {
 fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
     let patrolling = |order| UnitAi {
         current_order: order,
-        order_priority: 7,
+        order_priority: OrderPriority::of_data(7),
         adjusted_idle_timeout: Millis::new(750),
         idle_timeout: Millis::new(3000),
         secondary_timer: Millis::new(2000),
@@ -12730,7 +12730,7 @@ fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
     assert_eq!(
         u.order_tail(
             Some(OrderKind::Move),
-            40,
+            OrderPriority::of_data(40),
             Some(class::CLASS_6),
             false,
             &mut r
@@ -12740,7 +12740,7 @@ fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
     assert_eq!(
         (
             u.current_order,
-            u.order_priority,
+            u.order_priority.get(),
             u.secondary_timer,
             r.draws
         ),
@@ -12751,7 +12751,7 @@ fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
     let mut r = rng();
     let _ = u.order_tail(
         Some(OrderKind::AttackMove),
-        40,
+        OrderPriority::of_data(40),
         Some(class::CLASS_6),
         false,
         &mut r,
@@ -12764,20 +12764,20 @@ fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
     let mut u = patrolling(Some(OrderKind::Patrol));
     let _ = u.order_tail(
         Some(OrderKind::Stop),
-        40,
+        OrderPriority::of_data(40),
         Some(class::CLASS_6),
         false,
         &mut rng(),
     );
     assert_eq!(
-        (u.current_order, u.order_priority, u.secondary_timer),
+        (u.current_order, u.order_priority.get(), u.secondary_timer),
         (None, -1, Millis::new(750))
     );
     // the attack move's attack and the roundup become the attack order
     let mut u = patrolling(Some(OrderKind::AttackMove));
     let _ = u.order_tail(
         Some(OrderKind::AttackMove),
-        40,
+        OrderPriority::of_data(40),
         Some(class::CLASS_51),
         true,
         &mut rng(),
@@ -12790,13 +12790,13 @@ fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
     let mut u = patrolling(None);
     let _ = u.order_tail(
         Some(OrderKind::Attack),
-        40,
+        OrderPriority::of_data(40),
         Some(class::MONK),
         false,
         &mut rng(),
     );
     assert_eq!(
-        (u.current_order, u.order_priority, u.current_target),
+        (u.current_order, u.order_priority.get(), u.current_target),
         (None, 40, None)
     );
 }
@@ -12954,7 +12954,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
     // a transport ship's processIdle only caps its last human order time (5)
     let mut u = UnitAi {
         current_order: Some(OrderKind::Attack),
-        order_priority: 100,
+        order_priority: OrderPriority::of_data(100),
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(70)),
         ..idle(UnitAiType::TRANSPORT)
@@ -12968,7 +12968,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
     assert_eq!(r, Ok(GO_ON));
     assert_eq!(fx, [Effect::CapHumanOrder(HUMAN_ORDER_CAP), Effect::Stop]);
     assert_eq!(
-        (u.current_order, u.order_priority, u.last_order),
+        (u.current_order, u.order_priority.get(), u.last_order),
         (None, -1, Some(OrderKind::Attack))
     );
     assert_eq!(

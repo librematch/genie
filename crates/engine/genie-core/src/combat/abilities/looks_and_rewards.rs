@@ -83,7 +83,7 @@ pub fn reward(task: &Task, player: PlayerId, multiplier: Option<f32>, cost: &[Co
         amount = 0.0;
         for (resource, count, paid) in crate::objects::masters::cost_entries(cost) {
             if Some(resource) == out && paid {
-                amount = f32::from(count) * rate;
+                amount = count.as_f32() * rate;
             }
         }
     }

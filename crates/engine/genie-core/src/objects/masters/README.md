@@ -44,6 +44,7 @@ file for what the save does not hold.
 | [`combat_level.rs`](combat_level.rs) | A master's combat level (`+0x62c`): which of the unit AI's kinds of fighter it is. |
 | [`combat_setters.rs`](combat_setters.rs) | The RGE combat and missile masters' setters: the armor and attack amounts. |
 | [`conversion_adjust.rs`](conversion_adjust.rs) | A master's adjustments of a conversion (`ConversionAdjust`). |
+| [`cost_amount.rs`](cost_amount.rs) | A cost's whole amount. |
 | [`cost_slot.rs`](cost_slot.rs) | A master's cost (`+0x880`): three slots in their places, an empty one among them. |
 | [`damage_amount.rs`](damage_amount.rs) | An attack's or an armor's amount. |
 | [`damage_class.rs`](damage_class.rs) | An armor or attack entry's class as one type, and the entry: the `.dat`'s armor and attack classes. |

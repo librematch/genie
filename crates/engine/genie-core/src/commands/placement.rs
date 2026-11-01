@@ -47,7 +47,7 @@ impl World {
         let mut listed = [0i16; 4];
         for (resource, amount, _) in crate::objects::masters::cost_entries(&site.cost) {
             if let Some(r) = resource.is_resource().then(|| resource.index()) {
-                listed[r] = listed[r].wrapping_add(amount);
+                listed[r] = listed[r].wrapping_add(amount.get());
             }
         }
         for (debit, amount) in self
@@ -216,7 +216,7 @@ impl World {
                 ));
             }
             let held = owner.attributes.get(r).copied().unwrap_or(Amount::ZERO);
-            if held < Amount::new(f32::from(amount)) {
+            if held < Amount::new(amount.as_f32()) {
                 return Ok(false);
             }
         }

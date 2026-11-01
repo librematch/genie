@@ -2,6 +2,7 @@
 //! their refunds when an entry is cancelled (`FUN_141630530` and the cancels' calls).
 
 use crate::GenieError;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -76,7 +77,7 @@ pub fn refund_master(
         let held = attributes.get(attribute)?;
         attributes.set(
             attribute,
-            Amount::new((i32::from(amount) * n) as f32 + held.get()),
+            Amount::new((i32::from(amount.get()) * n) as f32 + held.get()),
         )?;
     }
     Ok(())
@@ -111,7 +112,7 @@ pub fn refund_tech(
         let Some(attribute) = c.attribute.filter(|_| c.paid.is_paid()) else {
             continue;
         };
-        let mut v = (i32::from(state.cost_adj[j]) + i32::from(c.amount)) as f32;
+        let mut v = (i32::from(state.cost_adj[j].get()) + i32::from(c.amount.get())) as f32;
         if 0.0 < modifier {
             v = f32::from(cvttss2si(v * modifier) as i16);
         }
@@ -127,7 +128,7 @@ pub fn refund_tech(
 const ONE: f32 = 1.0;
 
 /// A master's cost entry `j` `(attribute, amount, paid)`, none for an entry it lacks.
-fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, i16, bool)> {
+fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, bool)> {
     master.cost.get(j).and_then(|slot| slot.entry())
 }
 
@@ -182,7 +183,7 @@ pub fn cost_test(
         if annex && !paid {
             continue;
         }
-        let need = f32::from(amount) * count;
+        let need = amount.as_f32() * count;
         if attribute == attribute::HEADROOM {
             if !population {
                 continue;
@@ -230,7 +231,7 @@ pub fn pay(
         let Some((attribute, amount, true)) = cost_entry(m, j) else {
             continue;
         };
-        attributes.subtract(attribute, Amount::new(f32::from(amount) * count))?;
+        attributes.subtract(attribute, Amount::new(amount.as_f32() * count))?;
     }
     Ok(true)
 }
@@ -259,7 +260,7 @@ pub fn master_costs(
             continue;
         };
         slot.0 = Some(attribute);
-        slot.1 = cvttss2si(f32::from(amount) * ONE) as i16;
+        slot.1 = cvttss2si(amount.as_f32() * ONE) as i16;
         let held = attributes.get(attribute)?;
         if held < Amount::new(f32::from(slot.1)) && can {
             let have = cvttss2si(held.get()) as i16;

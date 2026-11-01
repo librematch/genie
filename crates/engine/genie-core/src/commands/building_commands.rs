@@ -192,7 +192,7 @@ impl World {
                 } else {
                     OrderKind::OnTarget
                 },
-                priority: -1,
+                priority: crate::unit_ai::OrderPriority::NONE,
                 target,
                 target_owner: owner,
                 point: at.with_height(-1.0),

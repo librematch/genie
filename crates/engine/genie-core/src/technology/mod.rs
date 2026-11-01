@@ -16,21 +16,25 @@ use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
 mod command_args;
+mod cost_override;
 mod cost_paid;
 pub mod effect;
 mod effect_command;
 mod effect_id;
+mod research_count;
 mod research_state;
 mod tech_id;
 mod tech_type;
 pub mod upgrade;
 
 pub use self::command_args::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode};
+pub use self::cost_override::{CostOverride, OverrideUse};
 pub use self::cost_paid::CostPaid;
 pub use self::effect_command::{
     CostEdit, CostUnits, EffectCommand, ObjectsKind, Party, ResourceChange,
 };
 pub use self::effect_id::EffectId;
+pub use self::research_count::{ResearchCap, ResearchCount};
 pub use self::research_state::ResearchState;
 pub use self::tech_id::TechId;
 pub use self::tech_type::TechType;
@@ -82,7 +86,7 @@ pub struct Cost {
     /// The attribute it takes, none for −1.
     pub attribute: Option<AttributeId>,
     /// How much.
-    pub amount: i16,
+    pub amount: crate::objects::masters::CostAmount,
     /// 0 not paid, 1 paid from the player's attribute, 2 from the building (`FUN_141204310`).
     pub paid: CostPaid,
 }
@@ -160,20 +164,20 @@ pub struct TechState {
     /// `+0x4`: its state.
     pub state: ResearchState,
     /// `+0x6`: added to the `.dat`'s amounts.
-    pub cost_adj: [i16; 3],
+    pub cost_adj: [crate::objects::masters::CostAmount; 3],
     /// `+0xc`.
-    pub times_researched: i16,
+    pub times_researched: ResearchCount,
     /// `+0xe`.
     pub allow_multiple: bool,
     /// `+0x40`: its researches queued and done are held to its cap.
     pub stack: bool,
     /// `+0x42`, `+0x48`, `+0x4e`: the cost overrides' amounts, attributes and use (−2 the `.dat`'s
     /// entry where it is paid, 0 none, else the override).
-    pub overrides: [(i16, Option<AttributeId>, i16); 3],
+    pub overrides: [CostOverride; 3],
     /// `+0x56`: the cap of its researches queued and done (below 0: 0x100).
-    pub research_cap: i16,
+    pub research_cap: ResearchCap,
     /// `+0x58`: its researches queued.
-    pub pending: i16,
+    pub pending: ResearchCount,
     /// `+0x60` (`mEnabledTech`): the dependents' update leaves it alone.
     pub enabled: bool,
     /// `+0x62`: the effect it gives instead of its own (−1 none).
@@ -236,18 +240,18 @@ impl TechState {
             return Ok(out);
         }
         for (j, slot) in out.iter_mut().enumerate() {
-            let (amount, attribute, used) = *self.overrides.checked(j)?;
+            let o = *self.overrides.checked(j)?;
             let c = *def.costs.checked(j)?;
-            let (attribute, base) = match used {
-                0 => continue,
-                -2 if c.attribute.is_some() => (c.attribute, c.amount),
-                _ => (attribute, amount),
+            let (attribute, base) = match o.used {
+                OverrideUse::NONE => continue,
+                OverrideUse::DAT if c.attribute.is_some() => (c.attribute, c.amount),
+                _ => (o.attribute, o.amount),
             };
             let Some(attribute) = attribute else {
                 continue;
             };
-            let mut v =
-                (i32::from(*self.cost_adj.checked(j)?) * i32::from(scale) + i32::from(base)) as f32;
+            let adj = self.cost_adj.checked(j)?.get();
+            let mut v = (i32::from(adj) * i32::from(scale) + i32::from(base.get())) as f32;
             if 0.0 < modifier {
                 v *= modifier;
             }
@@ -269,17 +273,21 @@ impl TechState {
     ) -> Result<bool, GenieError> {
         let (modifier, scale) = factors;
         for j in 0..3 {
-            let (amount, attr, used) = *self.overrides.checked(j)?;
+            let o = *self.overrides.checked(j)?;
             let c = *def.costs.checked(j)?;
-            let attr = if used == 1 { attr } else { c.attribute };
+            let attr = if o.used == OverrideUse::OVERRIDE {
+                o.attribute
+            } else {
+                c.attribute
+            };
             let Some(attr) = attr.filter(|_| c.paid.is_paid()) else {
                 continue;
             };
-            let mut v = if used == 1 {
-                f32::from(amount)
+            let mut v = if o.used == OverrideUse::OVERRIDE {
+                o.amount.as_f32()
             } else {
-                (i32::from(*self.cost_adj.checked(j)?) * i32::from(scale)) as f32
-                    + f32::from(c.amount)
+                (i32::from(self.cost_adj.checked(j)?.get()) * i32::from(scale)) as f32
+                    + c.amount.as_f32()
             };
             if 0.0 < modifier {
                 v = f32::from((v * modifier) as i32 as i16);
@@ -318,12 +326,12 @@ impl TechState {
     ) -> Result<[(Option<AttributeId>, i16); 3], GenieError> {
         let mut out = [(None, 0); 3];
         for (j, slot) in out.iter_mut().enumerate() {
-            let (amount, attribute, used) = *self.overrides.checked(j)?;
+            let o = *self.overrides.checked(j)?;
             let c = *def.costs.checked(j)?;
-            let (attribute, base) = match used {
-                0 => continue,
-                -2 if c.paid.is_paid() => (c.attribute, c.amount),
-                _ => (attribute, amount),
+            let (attribute, base) = match o.used {
+                OverrideUse::NONE => continue,
+                OverrideUse::DAT if c.paid.is_paid() => (c.attribute, c.amount),
+                _ => (o.attribute, o.amount),
             };
             slot.0 = attribute;
             if attribute.is_none() {
@@ -332,8 +340,9 @@ impl TechState {
             let mut v = self
                 .cost_adj
                 .checked(j)?
+                .get()
                 .wrapping_mul(scale)
-                .wrapping_add(base);
+                .wrapping_add(base.get());
             if 0.0 < modifier {
                 v = (f32::from(v) * modifier) as i32 as i16;
             }
@@ -357,14 +366,18 @@ impl TechState {
         j: usize,
         (modifier, scale): (f32, i16),
     ) -> Option<(AttributeId, f32, CostPaid)> {
-        let (amount, attribute, used) = *self.overrides.get(j)?;
+        let o = *self.overrides.get(j)?;
         let c = *def.costs.get(j)?;
-        let attribute = if used == 1 { attribute } else { c.attribute };
-        let attribute = attribute.filter(|_| c.paid.is_paid() || used != 0)?;
-        let mut v = if used == 1 {
-            f32::from(amount)
+        let attribute = if o.used == OverrideUse::OVERRIDE {
+            o.attribute
         } else {
-            (i32::from(*self.cost_adj.get(j)?) * i32::from(scale)) as f32 + f32::from(c.amount)
+            c.attribute
+        };
+        let attribute = attribute.filter(|_| c.paid.is_paid() || o.used != OverrideUse::NONE)?;
+        let mut v = if o.used == OverrideUse::OVERRIDE {
+            o.amount.as_f32()
+        } else {
+            (i32::from(self.cost_adj.get(j)?.get()) * i32::from(scale)) as f32 + c.amount.as_f32()
         };
         if 0.0 < modifier {
             v = f32::from((v * modifier) as i32 as i16);
@@ -464,12 +477,8 @@ impl TechState {
         if def.kind == TechType::SHARED || !self.allow_multiple {
             return false;
         }
-        let done = i32::from(self.pending) + i32::from(self.times_researched);
-        let capped = if (self.research_cap as u16) > 0x7fff {
-            done < 0x100
-        } else {
-            done < i32::from(self.research_cap)
-        };
+        let done = i32::from(self.pending.get()) + i32::from(self.times_researched.get());
+        let capped = done < i32::from(self.research_cap.limit());
         (self.stack && capped) || (many && done < 0x100)
     }
 }
@@ -506,8 +515,8 @@ mod tests {
         let state = TechState {
             state: ResearchState::Available,
             allow_multiple: true,
-            overrides: [(-1, None, -2); 3],
-            research_cap: -1,
+            overrides: [CostOverride::UNSET; 3],
+            research_cap: ResearchCap::of_data(-1),
             building_master: None,
             locations: vec![Location {
                 building: Some(ids::TOWN_CENTRE),
@@ -519,12 +528,12 @@ mod tests {
         };
         let none = Cost {
             attribute: None,
-            amount: 0,
+            amount: crate::objects::masters::CostAmount::of_data(0),
             paid: CostPaid::UNPAID,
         };
         let gold = Cost {
             attribute: Some(attribute::GOLD),
-            amount: 50,
+            amount: crate::objects::masters::CostAmount::of_data(50),
             paid: CostPaid::PLAYER,
         };
         let def = TechDef {

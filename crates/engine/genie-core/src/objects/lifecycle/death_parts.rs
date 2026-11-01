@@ -139,7 +139,7 @@ pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(Attribu
     let mut cost = 0.0f32;
     for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
         if paid {
-            cost += f32::from(amount);
+            cost += amount.as_f32();
         }
     }
     if master.kind != BUILDING {

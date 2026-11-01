@@ -62,7 +62,7 @@ impl World {
                 .get_mut(resource.index())
                 .ok_or(crate::world::NO_ATTRIBUTE)?;
             if paid {
-                *slot -= Amount::new(f32::from(amount));
+                *slot -= Amount::new(amount.as_f32());
             }
         }
         Ok(made)
@@ -86,7 +86,7 @@ impl World {
         {
             let paid: i32 = crate::objects::masters::cost_entries(&m.cost)
                 .filter(|&(_, _, paid)| paid)
-                .map(|(_, amount, _)| i32::from(amount))
+                .map(|(_, amount, _)| i32::from(amount.get()))
                 .sum();
             self.players
                 .player_mut(player)?

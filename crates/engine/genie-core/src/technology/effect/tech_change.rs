@@ -155,7 +155,7 @@ impl World {
                     .player_mut(p)?
                     .techs
                     .checked_mut(t)?
-                    .research_cap = short;
+                    .research_cap = crate::technology::ResearchCap::of_data(short);
             }
             ModifyMode::STATE => self.set_tech_state(p, tech, v)?,
             ModifyMode::EFFECT_OVERRIDE => {

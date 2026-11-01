@@ -9,6 +9,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderPriority;
 use crate::unit_ai::{
     CIVILIAN, DEFENDLESS_MASTER, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI,
     Surroundings, TREBUCHET_CLASS, TREBUCHET_PACKED_CLASS, UnitAi, UnitCommand, UnitSeen, UnitSide,
@@ -281,7 +282,7 @@ impl UnitAi {
     pub(crate) fn order_tail(
         &mut self,
         order: Option<OrderKind>,
-        priority: i32,
+        priority: OrderPriority,
         class: Option<ClassId>,
         attack_move: bool,
         ai: &mut Well512,
@@ -289,7 +290,7 @@ impl UnitAi {
         if order == Some(OrderKind::Stop) {
             self.leave_patrol_timers(ai);
             self.current_order = None;
-            self.order_priority = -1;
+            self.order_priority = OrderPriority::NONE;
             return 1;
         }
         let new = if order == Some(OrderKind::AttackRoundup) || attack_move {
