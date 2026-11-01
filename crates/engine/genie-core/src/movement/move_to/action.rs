@@ -510,6 +510,7 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::movement::move_to::MoveWaitState;
     use crate::movement::move_to::tests::sheep;
+    use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::test_ids::object_id;
 
@@ -519,7 +520,7 @@ mod tests {
             id: SpriteId::named(id),
             frames: crate::objects::Frame::of_data(10),
             facets: crate::objects::FacetCount::of_data(16),
-            speed_multiplier: factor,
+            speed_multiplier: SpeedMultiplier::of_data(factor),
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::ANIMATED,

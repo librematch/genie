@@ -331,7 +331,7 @@ fn queue(c: &QueueCommand) -> Result<Packet, GenieError> {
         gap_0x06: [0; 4],
         b_id: c.building_master.get(),
         t_id: c.unit.get(),
-        count: c.amount,
+        count: c.amount.get(),
         button_location_id: c.button.get(),
         ids: ids(&c.buildings.ids, packets::MultiQueue::FIXED)?,
     }))
@@ -438,7 +438,7 @@ fn unit_order(c: &UnitOrderCommand) -> Result<Packet, GenieError> {
         x: c.point.x(),
         y: c.point.y(),
         q_id: c.q_id.get(),
-        param: c.param.cast_signed(),
+        param: c.param.get().cast_signed(),
         action: c.action.byte(),
         field_0x1d: u8::from(c.through_ai),
         field_0x1e: u8::from(c.nearby),
@@ -525,7 +525,7 @@ fn flare(c: &FlareCommand) -> Result<Packet, GenieError> {
 fn game(c: &GameCommand) -> Packet {
     Packet::Game(packets::Game {
         commp_id: c.issuer.get(),
-        field_0x04: c.sub,
+        field_0x04: c.sub.get(),
         gap_0x06: [0; 2],
         field_0x08: c.player,
         field_0x0a: c.a,

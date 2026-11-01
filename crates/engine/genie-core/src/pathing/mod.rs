@@ -31,6 +31,7 @@ use std::collections::BTreeMap;
 pub use self::fixed_distance::{FixedDistance, FixedDistanceSquared};
 pub use self::fixed_point::FixedPoint;
 pub use self::fixed_rect::FixedRect;
+pub use self::plan_budget_values::{DelayCount, PlanCap, PlanCount};
 pub use self::shape_id::ShapeId;
 pub use self::shape_side::ShapeSide;
 pub use self::short_found::ShortFound;
@@ -41,6 +42,7 @@ mod fixed_rect;
 pub mod hull_path;
 pub mod long_path;
 pub mod mesh;
+mod plan_budget_values;
 mod shape_id;
 mod shape_side;
 mod short_found;
@@ -88,21 +90,20 @@ pub struct Pathing {
 /// (`+0x67c`: `FUN_141663c50` counts one, `WorldPlayerBase::update` resets it, not saved).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PlanBudget {
-    /// `pathingAttemptCapValue`: -1 for no cap.
-    pub attempt_cap: i32,
-    /// `pathingDelayCapValue`: -1 for no cap.
-    pub delay_cap: i32,
+    /// `pathingAttemptCapValue`: −1 for no cap.
+    pub attempt_cap: PlanCap,
+    /// `pathingDelayCapValue`: −1 for no cap.
+    pub delay_cap: PlanCap,
     /// The plans since the player's last update.
-    pub plans: i32,
+    pub plans: PlanCount,
 }
 
 impl PlanBudget {
     /// `FUN_14165d6f0` for a walker that waited `delays` times: no budget left (false) once the
     /// plans reached a set attempt cap, unless a set delay cap is below the delays.
     #[must_use]
-    pub const fn allows(&self, delays: i32) -> bool {
-        let delay_ok = self.delay_cap == -1 || delays <= self.delay_cap;
-        !(delay_ok && self.attempt_cap != -1 && self.attempt_cap <= self.plans)
+    pub const fn allows(&self, delays: DelayCount) -> bool {
+        !(delays.within(self.delay_cap) && self.plans.reached(self.attempt_cap))
     }
 }
 
@@ -114,23 +115,23 @@ impl Pathing {
             .get(player.index())
             .copied()
             .unwrap_or(PlanBudget {
-                attempt_cap: -1,
-                delay_cap: -1,
-                plans: 0,
+                attempt_cap: PlanCap::NONE,
+                delay_cap: PlanCap::NONE,
+                plans: PlanCount::ZERO,
             })
     }
 
     /// `FUN_141663c50`: player `player` made a plan.
     pub fn count_plan(&mut self, player: PlayerId) {
         if let Some(b) = self.budgets.get_mut(player.index()) {
-            b.plans += 1;
+            b.plans = b.plans.plus_one();
         }
     }
 
     /// `WorldPlayerBase::update` (`0x141677450`): the player's plans start over.
     pub fn reset_plans(&mut self, player: PlayerId) {
         if let Some(b) = self.budgets.get_mut(player.index()) {
-            b.plans = 0;
+            b.plans = PlanCount::ZERO;
         }
     }
 }
@@ -492,32 +493,44 @@ mod tests {
     #[test]
     fn a_players_budget_ends_at_its_attempt_cap() {
         let b = PlanBudget {
-            attempt_cap: 6,
-            delay_cap: 2,
-            plans: 6,
+            attempt_cap: PlanCap::of_data(6),
+            delay_cap: PlanCap::of_data(2),
+            plans: PlanCount::of_data(6),
         };
-        assert!(!b.allows(0));
-        assert!(!b.allows(2));
-        assert!(b.allows(3));
-        assert!(PlanBudget { plans: 5, ..b }.allows(0));
+        assert!(!b.allows(DelayCount::ZERO));
+        assert!(!b.allows(DelayCount::of_data(2)));
+        assert!(b.allows(DelayCount::of_data(3)));
         assert!(
             PlanBudget {
-                attempt_cap: -1,
+                plans: PlanCount::of_data(5),
                 ..b
             }
-            .allows(0)
+            .allows(DelayCount::ZERO)
         );
-        assert!(!PlanBudget { delay_cap: -1, ..b }.allows(9));
+        assert!(
+            PlanBudget {
+                attempt_cap: PlanCap::NONE,
+                ..b
+            }
+            .allows(DelayCount::ZERO)
+        );
+        assert!(
+            !PlanBudget {
+                delay_cap: PlanCap::NONE,
+                ..b
+            }
+            .allows(DelayCount::of_data(9))
+        );
         let mut p = Pathing {
             budgets: vec![PlanBudget::default(), b],
             ..Pathing::default()
         };
         p.count_plan(PlayerId::new(1));
-        assert_eq!(p.budget(PlayerId::new(1)).plans, 7);
+        assert_eq!(p.budget(PlayerId::new(1)).plans, PlanCount::of_data(7));
         p.reset_plans(PlayerId::new(1));
-        assert_eq!(p.budget(PlayerId::new(1)).plans, 0);
+        assert_eq!(p.budget(PlayerId::new(1)).plans, PlanCount::ZERO);
         // a player the slice holds no budget of: no caps
-        assert!(p.budget(PlayerId::new(5)).allows(0));
+        assert!(p.budget(PlayerId::new(5)).allows(DelayCount::ZERO));
         p.count_plan(PlayerId::new(5));
     }
 

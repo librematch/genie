@@ -13,6 +13,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Walk;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::BuildableOn;
@@ -23,6 +24,8 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::ID_45;
+use crate::pathing::PlanCap;
+use crate::pathing::PlanCount;
 use crate::pathing::ShortFound;
 use crate::players::ByPlayer;
 use crate::players::relation_row;
@@ -1620,9 +1623,9 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
 #[test]
 fn a_trade_cart_plans_within_its_owners_budget() {
     let spent = PlanBudget {
-        attempt_cap: 6,
-        delay_cap: 2,
-        plans: 6,
+        attempt_cap: PlanCap::of_data(6),
+        delay_cap: PlanCap::of_data(2),
+        plans: PlanCount::of_data(6),
     };
     assert!(!may_plan(true, Some(spent), WaitDelays::of_data(0), 0));
     // a villager is not held to the budget
@@ -1631,7 +1634,10 @@ fn a_trade_cart_plans_within_its_owners_budget() {
     assert!(may_plan(true, Some(spent), WaitDelays::of_data(3), 0));
     assert!(may_plan(
         true,
-        Some(PlanBudget { plans: 5, ..spent }),
+        Some(PlanBudget {
+            plans: PlanCount::of_data(5),
+            ..spent
+        }),
         WaitDelays::of_data(0),
         0
     ));
@@ -3219,7 +3225,7 @@ fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
         id: SpriteId::named(1),
         frames: crate::objects::Frame::of_data(1),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: factor,
+        speed_multiplier: SpeedMultiplier::of_data(factor),
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,

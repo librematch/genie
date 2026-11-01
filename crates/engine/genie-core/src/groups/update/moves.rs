@@ -20,6 +20,7 @@ use crate::math::fmath::BVector;
 use crate::movement::PathFlags;
 use crate::objects::ActionState;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::pathing::DelayCount;
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -156,7 +157,7 @@ impl World {
             self.groups.held_mut(group)?.current_command = FOLLOW;
             return Ok(false);
         }
-        if g.motion.number_wait_delays != 0 || g.motion.waits_to_move() {
+        if g.motion.number_wait_delays != DelayCount::ZERO || g.motion.waits_to_move() {
             return Ok(false);
         }
         let patrol = crate::groups::formation::top_path(&g.motion.paths)

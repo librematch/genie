@@ -308,6 +308,7 @@ pub(crate) fn show_built(
 #[cfg(test)]
 mod built_sprite_tests {
     use super::*;
+    use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
 
     use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -321,7 +322,7 @@ mod built_sprite_tests {
             id,
             frames: crate::objects::Frame::of_data(4),
             facets: crate::objects::FacetCount::of_data(1),
-            speed_multiplier: 1.0,
+            speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
             flags,

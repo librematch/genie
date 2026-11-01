@@ -32,19 +32,19 @@ fn table() -> MasterTable {
     MasterTable::of_master(0, 83, Some(turning), 0)
         .with_sprite(
             SpriteId::named(10),
-            0.0,
+            genie_core::objects::SpeedMultiplier::ZERO,
             FacetCount::of_data(8),
             SpriteFlags::NONE,
         )
         .with_sprite(
             SpriteId::named(11),
-            2.0,
+            genie_core::objects::SpeedMultiplier::of_data(2.0),
             FacetCount::of_data(8),
             SpriteFlags::NONE,
         )
         .with_sprite(
             SpriteId::named(12),
-            3.0,
+            genie_core::objects::SpeedMultiplier::of_data(3.0),
             FacetCount::of_data(8),
             SpriteFlags::NONE,
         )
@@ -124,7 +124,7 @@ fn what_the_mover_cannot_read_is_unsupported() {
     assert!(run(&walker(99), &objects, Some(&table())).is_err());
     let unturned = MasterTable::default().with_sprite(
         SpriteId::named(11),
-        1.0,
+        genie_core::objects::SpeedMultiplier::ONE,
         FacetCount::of_data(8),
         SpriteFlags::NONE,
     );

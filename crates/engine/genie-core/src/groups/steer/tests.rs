@@ -20,6 +20,7 @@ use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::BuildableOn;
@@ -54,7 +55,7 @@ const fn graphic(id: i16, factor: f32) -> Graphic {
         id: SpriteId::named(id),
         frames: crate::objects::Frame::of_data(1),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: factor,
+        speed_multiplier: SpeedMultiplier::of_data(factor),
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,

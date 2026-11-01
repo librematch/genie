@@ -18,6 +18,9 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
+use crate::pathing::DelayCount;
+use crate::pathing::PlanCap;
+use crate::pathing::PlanCount;
 use crate::test_ids::object_id;
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -601,22 +604,25 @@ fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     use crate::pathing::PlanBudget;
     let mut fx = Fixture::new();
     let budget = |plans| PlanBudget {
-        attempt_cap: 1,
-        delay_cap: -1,
+        attempt_cap: PlanCap::of_data(1),
+        delay_cap: PlanCap::NONE,
         plans,
     };
-    fx.pathing.budgets = vec![budget(0), budget(1)];
+    fx.pathing.budgets = vec![budget(PlanCount::ZERO), budget(PlanCount::of_data(1))];
     let mut m = requesting(0, 30.0);
     m.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(matches!(
         fx.request(&mut m, &lead(), true, None, DistanceSquared::new(f32::MAX)),
         Some(Pass::Done(false))
     ));
-    assert_eq!((m.number_wait_delays, m.velocity.y()), (1, 0.0));
-    assert_eq!(fx.pathing.budgets[1].plans, 1);
+    assert_eq!(
+        (m.number_wait_delays, m.velocity.y()),
+        (DelayCount::of_data(1), 0.0)
+    );
+    assert_eq!(fx.pathing.budgets[1].plans, PlanCount::of_data(1));
     let mut m = requesting(0, 6.0);
     m.paths[0].continue_counter = crate::movement::PlanTries::of_data(1);
-    m.number_wait_delays = 4;
+    m.number_wait_delays = DelayCount::of_data(4);
     let p = fx.request(
         &mut m,
         &grouped(0),
@@ -625,10 +631,10 @@ fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
         DistanceSquared::new(f32::MAX),
     );
     assert!(matches!(p, Some(Pass::Done(false))));
-    assert_eq!(fx.pathing.budgets[1].plans, 2);
+    assert_eq!(fx.pathing.budgets[1].plans, PlanCount::of_data(2));
     assert_eq!(
         (m.number_wait_delays, m.paths.clone()),
-        (0, vec![PathData::without_path()])
+        (DelayCount::ZERO, vec![PathData::without_path()])
     );
     // (a lead the short pather does not serve: the near waypoint counts as reached)
     for lead in [grouped(0x800), lead()] {

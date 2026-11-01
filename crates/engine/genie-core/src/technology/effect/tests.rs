@@ -11,6 +11,7 @@ use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::BuildableOn;
@@ -107,7 +108,7 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -320,7 +321,7 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
         id: SpriteId::named(300),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -867,7 +868,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         id: SpriteId::named(7),
         frames: crate::objects::Frame::of_data(1),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 2.0,
+        speed_multiplier: SpeedMultiplier::of_data(2.0),
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -1994,7 +1995,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,

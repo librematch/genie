@@ -21,6 +21,7 @@ use crate::movement::{
     LongWalker, PathData, TileAsk, long_path_for, short_path_for, tile_plan_for,
 };
 use crate::objects::ObjectId;
+use crate::pathing::DelayCount;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Path;
 use crate::world::WorldTime;
@@ -141,12 +142,12 @@ fn take_turn(
             .budget(lead.player)
             .allows(motion.number_wait_delays)
     {
-        motion.number_wait_delays += 1;
+        motion.number_wait_delays = motion.number_wait_delays.plus_one();
         motion.stand();
         return Ok(Some(Pass::Done(false)));
     }
     world.plan.pathing.count_plan(lead.player);
-    motion.number_wait_delays = 0;
+    motion.number_wait_delays = DelayCount::ZERO;
     let top_loops = motion
         .paths
         .last()

@@ -3,6 +3,7 @@
 use crate::encode::encode;
 use crate::names::unmodelled_command;
 use genie_core::GenieError;
+use genie_core::commands::GameSub;
 use genie_core::commands::QueueId;
 use genie_core::commands::ResourceWord;
 use genie_core::commands::SpriteOverride;
@@ -212,7 +213,7 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             through_ai: c.field_0x1d != 0,
             nearby: c.field_0x1e != 0,
             action: UnitOrderAction::of(c.action),
-            param: c.param.cast_unsigned(),
+            param: genie_core::production::UnitIndex::of_data(c.param.cast_unsigned()),
             human: c.field_0x20 == 1,
         }),
         Packet::GoBackToWork2(c) => {
@@ -330,7 +331,7 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             buildings: listed(c.num, &c.ids),
             building_master: MasterId::try_from(c.b_id)?,
             unit: MasterId::try_from(c.t_id)?,
-            amount: c.count,
+            amount: genie_core::production::QueuedUnits::of_data(c.count),
             button: genie_core::production::QueueButton::of_data(c.button_location_id),
         }),
         Packet::Research(c) => Command::Research(ResearchCommand {
@@ -409,7 +410,7 @@ fn single_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         }),
         Packet::Game(g) => Command::Game(GameCommand {
             issuer: PlayerId::from(g.commp_id),
-            sub: g.field_0x04,
+            sub: GameSub::of_data(g.field_0x04),
             player: g.field_0x08,
             a: g.field_0x0a,
             speed: g.field_0x0c,

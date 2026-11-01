@@ -27,6 +27,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::IN_PRODUCTION;
+use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
 use crate::world::slots::PlayerSlots;
 
@@ -103,9 +104,7 @@ impl World {
         let owner = self.players.player_mut(p)?;
         owner.add_attribute(IN_PRODUCTION, -pop)?;
         // its queue place goes (FUN_14104fb00 with -1, FUN_14104f330)
-        owner
-            .tracker
-            .count_queued(crate::production::QueuedUnits::ONE.negated());
+        owner.tracker.count_queued(QueuedUnits::ONE.negated());
         owner.tracker.unplace(Some(master), class);
         let (building_id, state) = (owner.objects[i].id, owner.objects[i].life.state);
         if let Some(ai) = owner.objects[i].ai.as_mut() {

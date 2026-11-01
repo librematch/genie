@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::commands::UnitList;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
+use crate::production::QueuedUnits;
 use crate::world::World;
 
 /// QUEUE (0x81, the player's queue `FUN_141614450`, the building's `FUN_1411cbc40`): `amount`
@@ -19,7 +20,7 @@ pub struct QueueCommand {
     /// The master to train (`+0xc`; 0x712 for the villager).
     pub unit: MasterId,
     /// How many (`+0xe`, which the handler takes as an int).
-    pub amount: i16,
+    pub amount: QueuedUnits,
     /// `button_location_id`: the train button, −1 for none.
     pub button: crate::production::QueueButton,
 }

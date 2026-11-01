@@ -7,6 +7,7 @@ use genie_core::GenieError;
 use genie_core::map::TerrainFlags;
 use genie_core::objects::FacetCount;
 use genie_core::objects::Frame;
+use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
@@ -257,7 +258,7 @@ impl TerrainTable {
 pub struct MasterTable {
     rows: HashMap<(u8, i16), Row>,
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
-    sprite_speed: HashMap<SpriteId, f32>,
+    sprite_speed: HashMap<SpriteId, SpeedMultiplier>,
     /// What the sprite clock reads of each graphic.
     pub graphics: std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>,
     /// The terrain table.
@@ -443,7 +444,7 @@ impl MasterTable {
             .enumerate()
             .filter_map(|(id, g)| {
                 let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
-                Some((id, g.as_ref()?.speed_multiplier))
+                Some((id, SpeedMultiplier::of_data(g.as_ref()?.speed_multiplier)))
             })
             .collect();
         table.graphics = dat
@@ -459,7 +460,7 @@ impl MasterTable {
                         id,
                         frames: Frame::of_data(g.frame_count),
                         facets: FacetCount::of_data(g.angle_count),
-                        speed_multiplier: g.speed_multiplier,
+                        speed_multiplier: SpeedMultiplier::of_data(g.speed_multiplier),
                         frame_duration: Seconds::new(g.frame_duration),
                         replay_delay: Seconds::new(g.replay_delay),
                         flags: genie_core::objects::SpriteFlags::from_bits_retain(g.sequence_type),
@@ -546,7 +547,7 @@ impl MasterTable {
 
     /// A sprite's speed factor; None for a sprite the data file does not have.
     #[must_use]
-    pub fn sprite_speed(&self, sprite: SpriteId) -> Option<f32> {
+    pub fn sprite_speed(&self, sprite: SpriteId) -> Option<SpeedMultiplier> {
         self.sprite_speed.get(&sprite).copied()
     }
 }
@@ -575,7 +576,7 @@ impl MasterTable {
     pub(crate) fn with_sprite(
         mut self,
         sprite: SpriteId,
-        speed: f32,
+        speed: SpeedMultiplier,
         facets: FacetCount,
         flags: genie_core::objects::SpriteFlags,
     ) -> Self {

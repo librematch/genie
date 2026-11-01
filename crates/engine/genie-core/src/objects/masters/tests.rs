@@ -11,6 +11,7 @@ use crate::movement::TurnRate;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Regeneration;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::players::CivId;
@@ -1067,7 +1068,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
             SpriteId::named(1),
             graphic(
                 SpriteId::named(1),
-                0.0,
+                SpeedMultiplier::ZERO,
                 crate::objects::FacetCount::of_data(8),
             ),
         ),
@@ -1075,7 +1076,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
             SpriteId::named(2),
             graphic(
                 SpriteId::named(2),
-                1.5,
+                SpeedMultiplier::of_data(1.5),
                 crate::objects::FacetCount::of_data(8),
             ),
         ),
@@ -1083,7 +1084,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
             SpriteId::named(3),
             graphic(
                 SpriteId::named(3),
-                0.5,
+                SpeedMultiplier::of_data(0.5),
                 crate::objects::FacetCount::of_data(16),
             ),
         ),

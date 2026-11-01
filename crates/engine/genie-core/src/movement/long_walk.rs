@@ -264,7 +264,7 @@ pub(super) fn may_plan(
     wait_delays: crate::movement::WaitDelays,
     plans: u32,
 ) -> bool {
-    let allowed = !trade_cart || budget.is_none_or(|b| b.allows(i32::from(wait_delays.get())));
+    let allowed = !trade_cart || budget.is_none_or(|b| b.allows(wait_delays.count()));
     allowed && plans < PLANS
 }
 

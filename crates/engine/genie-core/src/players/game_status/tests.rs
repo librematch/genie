@@ -12,6 +12,7 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
@@ -32,6 +33,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
+use crate::production::QueuedUnits;
 use crate::production::UnitIndex;
 use crate::production::{
     Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
@@ -56,7 +58,7 @@ use crate::world::WholeSeconds;
 fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
     Entry {
         master,
-        count: crate::production::QueuedUnits::of_data(count),
+        count: QueuedUnits::of_data(count),
         tech: None,
         costs: [
             (Some(attribute::FOOD), food),
@@ -301,7 +303,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         id: SpriteId::named(1),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -855,10 +857,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
         (Amount::new(50.0), ResearchState::Available, 2)
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
-    assert_eq!(
-        production.queue.slots[0].count,
-        crate::production::QueuedUnits::of_data(2)
-    );
+    assert_eq!(production.queue.slots[0].count, QueuedUnits::of_data(2));
     assert!(production.action.is_some());
 }
 

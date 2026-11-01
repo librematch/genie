@@ -12,6 +12,7 @@ use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToReads, SpriteReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::AdjacentMode;
@@ -454,7 +455,7 @@ pub(crate) fn graphics() -> BTreeMap<SpriteId, crate::objects::sprite::Graphic> 
                 id: SpriteId::named(id),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(16),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,

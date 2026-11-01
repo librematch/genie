@@ -18,6 +18,7 @@ use crate::math::fmath;
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::Master;
@@ -38,7 +39,7 @@ pub struct Graphic {
     /// `+0xa`, `angle_count`: the facets.
     pub facets: FacetCount,
     /// `+0xc`, `speed_multiplier`: at least 1e-7, it scales the frame duration.
-    pub speed_multiplier: f32,
+    pub speed_multiplier: SpeedMultiplier,
     /// `+0x10`, `frame_duration`.
     pub frame_duration: Seconds,
     /// `+0x14`, `replay_delay`.
@@ -77,11 +78,8 @@ const EPSILON: f32 = crate::math::image::sprite::EPSILON;
 /// each time; genie derives [`MoveStats::speed`] from it where the sprite or the base changes
 /// ([`new_sprite`]).
 #[must_use]
-pub(crate) fn top_speed(base: f32, shown: Option<&Graphic>) -> f32 {
-    match shown {
-        Some(g) if 0.0 < g.speed_multiplier => base * g.speed_multiplier,
-        _ => base,
-    }
+pub(crate) fn top_speed(base: Speed, shown: Option<&Graphic>) -> Speed {
+    shown.map_or(base, |g| g.speed_multiplier.applied_to(base))
 }
 
 /// Slot 0x68, `new_sprite` (a combat object's `FUN_141217000`, the moving object's
@@ -248,8 +246,8 @@ impl ActiveSprite {
         let g = &self.graphic;
         let mut i = g.frame_duration.get();
         // COMISS/JA: only an ordered 1e-7 above the multiplier skips it
-        if fmath::at_most_or_unordered(EPSILON, g.speed_multiplier) {
-            i *= g.speed_multiplier;
+        if fmath::at_most_or_unordered(EPSILON, g.speed_multiplier.get()) {
+            i *= g.speed_multiplier.get();
         }
         if Speed::ZERO < speed {
             i /= speed.get();
@@ -302,7 +300,7 @@ impl ActiveSprite {
         let steps =
             Frame::of_data(crate::math::conversions::cvttss2si(time.get() / interval.get()) as i16);
         self.last = time - Seconds::new(steps.as_f32() * interval.get());
-        if Speed::ZERO < speed || g.speed_multiplier == 0.0 {
+        if Speed::ZERO < speed || g.speed_multiplier == SpeedMultiplier::ZERO {
             let f = start + if forward { steps } else { -steps };
             self.frame = f;
             self.looped = f < Frame::ZERO || last < f;
@@ -460,7 +458,7 @@ mod tests {
         id: SpriteId::named(1239),
         frames: Frame::of_data(45),
         facets: FacetCount::of_data(8),
-        speed_multiplier: 0.0,
+        speed_multiplier: SpeedMultiplier::ZERO,
         frame_duration: Seconds::new(0.044_444_446),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),
@@ -493,7 +491,7 @@ mod tests {
     fn a_new_sprite_starts_its_instance_and_the_top_speed_follows_it() {
         let walking = Graphic {
             id: SpriteId::named(1),
-            speed_multiplier: 1.25,
+            speed_multiplier: SpeedMultiplier::of_data(1.25),
             flags: SpriteFlags::ANIMATED | SpriteFlags::RANDOM_FIRST_FRAME,
             ..CHOP
         };
@@ -523,7 +521,7 @@ mod tests {
         assert_eq!(stats.speed, Speed::new(0.8));
         let nan = Graphic {
             id: SpriteId::named(2),
-            speed_multiplier: f32::NAN,
+            speed_multiplier: SpeedMultiplier::of_data(f32::NAN),
             ..CHOP
         };
         new_sprite(&mut sprite, Some(&mut stats), nan, &mut rng);
@@ -540,7 +538,7 @@ mod tests {
     #[test]
     fn a_nan_speed_multiplier_holds_the_frame() {
         let g = Graphic {
-            speed_multiplier: f32::NAN,
+            speed_multiplier: SpeedMultiplier::of_data(f32::NAN),
             ..CHOP
         };
         let mut s = ActiveSprite::start(g, &mut Well512::default());
@@ -572,7 +570,7 @@ mod tests {
             id: SpriteId::named(1),
             frames: Frame::of_data(4),
             facets: FacetCount::of_data(1),
-            speed_multiplier: 0.0,
+            speed_multiplier: SpeedMultiplier::ZERO,
             frame_duration: Seconds::new(0.25),
             replay_delay,
             flags,
@@ -683,7 +681,7 @@ mod tests {
             id: SpriteId::named(3241),
             frames: Frame::of_data(1),
             facets: FacetCount::of_data(1),
-            speed_multiplier: 0.0,
+            speed_multiplier: SpeedMultiplier::ZERO,
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::NONE,

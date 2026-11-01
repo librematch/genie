@@ -10,6 +10,7 @@ use crate::objects::ActionState;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -45,7 +46,7 @@ fn graphics() -> std::collections::BTreeMap<SpriteId, crate::objects::sprite::Gr
                 id: SpriteId::named(id),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(16),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,

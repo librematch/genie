@@ -33,19 +33,19 @@ fn table(facets: [i16; 3]) -> MasterTable {
     MasterTable::of_master(1, 83, Some(turning), 2)
         .with_sprite(
             SpriteId::named(10),
-            0.0,
+            genie_core::objects::SpeedMultiplier::ZERO,
             FacetCount::of_data(facets[0]),
             SpriteFlags::TURNS,
         )
         .with_sprite(
             SpriteId::named(11),
-            2.0,
+            genie_core::objects::SpeedMultiplier::of_data(2.0),
             FacetCount::of_data(facets[1]),
             SpriteFlags::TURNS,
         )
         .with_sprite(
             SpriteId::named(12),
-            3.0,
+            genie_core::objects::SpeedMultiplier::of_data(3.0),
             FacetCount::of_data(facets[2]),
             SpriteFlags::TURNS,
         )

@@ -236,7 +236,7 @@ impl MoveStats {
     /// [`MoveStats::speed`] for a unit: a new sprite ([`crate::objects::sprite::new_sprite`]), a
     /// standing show ([`Mover::shows`]) and a change of the base call it.
     pub(crate) fn show(&mut self, shown: Option<&crate::objects::sprite::Graphic>) {
-        self.speed = Speed::new(crate::objects::sprite::top_speed(self.base.get(), shown));
+        self.speed = crate::objects::sprite::top_speed(self.base, shown);
     }
 }
 

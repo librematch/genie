@@ -38,6 +38,7 @@ building commands, the unit commands and the players' each have their own dispat
 | [`flare.rs`](flare.rs) | FLARE (0x73): a flare for the player's allies. |
 | [`form_formation.rs`](form_formation.rs) | `FORM_FORMATION` (0x17): the player's units form a formation. |
 | [`game.rs`](game.rs) | GAME (0x67): `TRIBE_Command::do_command`'s case (`0x140e77b00`), which lets a player's sub-command for another player through only with the game's cheats, and its switch on the sub-command (`FUN_140e7c330`, `World::game`). |
+| [`game_sub.rs`](game_sub.rs) | GAME's sub-commands. |
 | [`gate.rs`](gate.rs) | GATE (0x72): a player's gate lock. |
 | [`gather_point.rs`](gather_point.rs) | SET GATHER POINT (0x78): the gather point of the player's buildings. |
 | [`gather_point_state.rs`](gather_point_state.rs) | A gather point's state: a point SET GATHER POINT made, or a byte SET GATHER STATE gave. |

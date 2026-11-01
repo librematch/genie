@@ -6,6 +6,7 @@
 //! handlers are named at each.
 
 use crate::GenieError;
+use crate::commands::GameSub;
 use crate::gathering::farm_queue::PASTURE;
 use crate::map::Distance;
 use crate::map::WholeDistance;
@@ -24,8 +25,8 @@ pub struct GameCommand {
     /// Byte 1, the comm player who sent it (`FUN_140e6b210` maps it to a world player; the
     /// slice takes the two as equal).
     pub issuer: PlayerId,
-    /// `+4`: the sub-command ([`sub`]).
-    pub sub: u16,
+    /// `+4`: the sub-command.
+    pub sub: GameSub,
     /// `+8`: the world player it is for.
     pub player: i16,
     /// `+0xa`: a second player, a count, a code or a flag (its low byte).
@@ -34,47 +35,6 @@ pub struct GameCommand {
     pub speed: f32,
     /// `+0x10`: a relation, or an AI setting's value (its low byte for some).
     pub value: u32,
-}
-
-/// GAME's sub-commands (`+4`), named as aoc-mgz's `GameActionModeEnum` and by their handlers.
-/// The switch has no case for the others (2, 3, 7, 8, 0xc, 0xf, 0x17 and up): they do nothing.
-pub mod sub {
-    /// The player at `+8` changes its relation to the player at `+0xa` (slot 0x30).
-    pub const DIPLOMACY: u16 = 0;
-    /// The game speed (`+0xc`).
-    pub const SPEED: u16 = 1;
-    /// The quick-build cheat (`FUN_140c91630`).
-    pub const QUICK_BUILD: u16 = 4;
-    /// The allied victory flag (`FUN_1416765b0`).
-    pub const ALLIED_VICTORY: u16 = 5;
-    /// A cheat code (`FUN_1415c92c0`).
-    pub const CHEAT: u16 = 6;
-    /// The production queue's flag (`+0x1358`).
-    pub const PRODUCTION_QUEUE: u16 = 9;
-    /// Treason, the old Spies (`FUN_141620400`).
-    pub const TREASON: u16 = 0xa;
-    /// One of a computer player's AI settings.
-    pub const AI_SETTING: u16 = 0xb;
-    /// The mill's queue buys farms (`FUN_141617130` with master 0x32).
-    pub const FARM_QUEUE: u16 = 0xd;
-    /// The mill's queue gives farms back (`FUN_141630f10` with master 0x32).
-    pub const FARM_UNQUEUE: u16 = 0xe;
-    /// The automatic farm queue flips (`FUN_14163a5f0`).
-    pub const AUTO_FARM_QUEUE: u16 = 0x10;
-    /// The dock's queue buys fish traps (`FUN_141616540`).
-    pub const FISH_TRAP_QUEUE: u16 = 0x11;
-    /// The dock's queue gives fish traps back (`FUN_1416308f0`).
-    pub const FISH_TRAP_UNQUEUE: u16 = 0x12;
-    /// The automatic fish trap queue flips (`FUN_14163a610`).
-    pub const AUTO_FISH_TRAP_QUEUE: u16 = 0x13;
-    /// The offensive posture flips (slot 0xa0, `FUN_14163a630`).
-    pub const POSTURE: u16 = 0x14;
-    /// The mill's queue buys pastures (`FUN_141617130` with master 0x761).
-    pub const PASTURE_QUEUE: u16 = 0x15;
-    /// The mill's queue gives pastures back (`FUN_141630f10` with master 0x761).
-    pub const PASTURE_UNQUEUE: u16 = 0x16;
-    /// A sub-command `do_command` lets through for any player (with 1 and 4).
-    pub const OPEN_0XF: u16 = 0xf;
 }
 
 /// A cheat with the game's cheats on: the cheat code's handler (`FUN_1415c62c0`) and the
@@ -108,13 +68,15 @@ impl World {
         if self.players.get(g.issuer.index()).is_none() {
             return false;
         }
-        matches!(g.sub, sub::SPEED | sub::QUICK_BUILD | sub::OPEN_0XF)
-            || g.player == i16::from(g.issuer.get())
+        matches!(
+            g.sub,
+            GameSub::SPEED | GameSub::QUICK_BUILD | GameSub::OPEN_0XF
+        ) || g.player == i16::from(g.issuer.get())
             || self.settings.cheats_enabled
     }
 
     /// GAME (0x67): `do_command`'s gate ([`World::game_allowed`]), then `FUN_140e7c330`'s switch
-    /// on the sub-command ([`sub`]). Each case of a player looks it up first (`FUN_14152fe40`);
+    /// on the sub-command ([`GameSub`]). Each case of a player looks it up first (`FUN_14152fe40`);
     /// one outside the world would be a null the game dereferences, which a recording that
     /// played on never holds: the case does nothing.
     ///
@@ -155,52 +117,52 @@ impl World {
         let n = self.players.len();
         let target = g.target(n);
         match g.sub {
-            sub::DIPLOMACY if self.alliance_locked == 0 => {
+            GameSub::DIPLOMACY if self.alliance_locked == 0 => {
                 if let Some(p) = target {
                     self.set_diplomacy(p, i32::from(g.a), g.value)?;
                 }
             }
-            sub::QUICK_BUILD if self.settings.cheats_enabled => {
+            GameSub::QUICK_BUILD if self.settings.cheats_enabled => {
                 self.instant_work = i32::from(g.player);
                 if self.instant_work != 0 {
                     return Err(CHEAT);
                 }
             }
-            sub::ALLIED_VICTORY if self.alliance_locked == 0 => {
+            GameSub::ALLIED_VICTORY if self.alliance_locked == 0 => {
                 if let Some(p) = target {
                     self.players.player_mut(p)?.allied_victory = g.a as u8;
                     self.resolve_teams();
                 }
             }
-            sub::CHEAT if self.settings.cheats_enabled => return Err(CHEAT),
-            sub::PRODUCTION_QUEUE => {
+            GameSub::CHEAT if self.settings.cheats_enabled => return Err(CHEAT),
+            GameSub::PRODUCTION_QUEUE => {
                 if let Some(p) = target {
                     self.players.player_mut(p)?.production_queue_on = g.a as u8;
                 }
             }
-            sub::TREASON => {
+            GameSub::TREASON => {
                 if let Some(p) = target {
                     self.game_treason(p)?;
                 }
             }
-            sub::AI_SETTING => {
+            GameSub::AI_SETTING => {
                 if let Some(p) = target {
                     self.game_ai_setting(p, g)?;
                 }
             }
-            sub::FARM_QUEUE
-            | sub::PASTURE_QUEUE
-            | sub::FARM_UNQUEUE
-            | sub::PASTURE_UNQUEUE
-            | sub::AUTO_FARM_QUEUE
-            | sub::FISH_TRAP_QUEUE
-            | sub::FISH_TRAP_UNQUEUE
-            | sub::AUTO_FISH_TRAP_QUEUE => {
+            GameSub::FARM_QUEUE
+            | GameSub::PASTURE_QUEUE
+            | GameSub::FARM_UNQUEUE
+            | GameSub::PASTURE_UNQUEUE
+            | GameSub::AUTO_FARM_QUEUE
+            | GameSub::FISH_TRAP_QUEUE
+            | GameSub::FISH_TRAP_UNQUEUE
+            | GameSub::AUTO_FISH_TRAP_QUEUE => {
                 if let Some(p) = target {
                     self.game_queue(p, g)?;
                 }
             }
-            sub::POSTURE => {
+            GameSub::POSTURE => {
                 if let Some(p) = target {
                     let owner = self.players.player_mut(p)?;
                     owner.posture = owner.posture.flipped();
@@ -244,29 +206,29 @@ impl World {
     fn game_queue(&mut self, p: PlayerId, g: &GameCommand) -> Result<(), GenieError> {
         let count = crate::gathering::QueueCount::of_data(i32::from(g.a));
         match g.sub {
-            sub::FARM_QUEUE => {
+            GameSub::FARM_QUEUE => {
                 let _ = self.queue_farms(p, count, FARM)?;
             }
-            sub::PASTURE_QUEUE => {
+            GameSub::PASTURE_QUEUE => {
                 let _ = self.queue_farms(p, count, PASTURE)?;
             }
-            sub::FARM_UNQUEUE => {
+            GameSub::FARM_UNQUEUE => {
                 let _ = self.unqueue_farms(p, count, FARM)?;
             }
-            sub::PASTURE_UNQUEUE => {
+            GameSub::PASTURE_UNQUEUE => {
                 let _ = self.unqueue_farms(p, count, PASTURE)?;
             }
-            sub::AUTO_FARM_QUEUE => {
+            GameSub::AUTO_FARM_QUEUE => {
                 let owner = self.players.player_mut(p)?;
                 owner.auto_farm_queue = !owner.auto_farm_queue;
             }
-            sub::FISH_TRAP_QUEUE => {
+            GameSub::FISH_TRAP_QUEUE => {
                 let _ = self.queue_fish_traps(p, count)?;
             }
-            sub::FISH_TRAP_UNQUEUE => {
+            GameSub::FISH_TRAP_UNQUEUE => {
                 let _ = self.unqueue_fish_traps(p, count)?;
             }
-            sub::AUTO_FISH_TRAP_QUEUE => {
+            GameSub::AUTO_FISH_TRAP_QUEUE => {
                 let owner = self.players.player_mut(p)?;
                 owner.auto_fishtrap_queue = !owner.auto_fishtrap_queue;
             }
@@ -359,7 +321,7 @@ mod tests {
         )
     }
 
-    fn game(issuer: u8, sub: u16, player: i16, a: i16, value: u32) -> GameCommand {
+    fn game(issuer: u8, sub: GameSub, player: i16, a: i16, value: u32) -> GameCommand {
         GameCommand {
             issuer: player_id(issuer),
             sub,
@@ -378,8 +340,8 @@ mod tests {
         use crate::objects::masters::{Master, Masters};
         let mut t = world();
         t.alliance_locked = 1;
-        t.game(&game(1, sub::DIPLOMACY, 1, 2, 0)).unwrap();
-        t.game(&game(1, sub::ALLIED_VICTORY, 1, 1, 0)).unwrap();
+        t.game(&game(1, GameSub::DIPLOMACY, 1, 2, 0)).unwrap();
+        t.game(&game(1, GameSub::ALLIED_VICTORY, 1, 1, 0)).unwrap();
         assert_eq!(
             (
                 t.players[1].diplomacy.get(PlayerId::new(2)).copied(),
@@ -389,8 +351,8 @@ mod tests {
         );
         t.alliance_locked = 0;
         // relation 0: the ally's stance (4)
-        t.game(&game(1, sub::DIPLOMACY, 1, 2, 0)).unwrap();
-        t.game(&game(1, sub::ALLIED_VICTORY, 1, 1, 0)).unwrap();
+        t.game(&game(1, GameSub::DIPLOMACY, 1, 2, 0)).unwrap();
+        t.game(&game(1, GameSub::ALLIED_VICTORY, 1, 1, 0)).unwrap();
         assert_eq!(
             (
                 t.players[1].diplomacy.get(PlayerId::new(2)).copied(),
@@ -399,7 +361,7 @@ mod tests {
             (Some(crate::players::Stance::ALLY), 1)
         );
         // no castle: no treason
-        t.game(&game(1, sub::TREASON, 1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::TREASON, 1, 0, 0)).unwrap();
         assert_eq!(
             t.players[1].pending_debit[attribute::GOLD.index()],
             Amount::ZERO
@@ -414,7 +376,7 @@ mod tests {
             .unwrap();
         t.track_complete(PlayerId::new(1), object_id(500), CASTLE)
             .unwrap();
-        t.game(&game(1, sub::TREASON, 1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::TREASON, 1, 0, 0)).unwrap();
         assert_eq!(
             t.players[1].pending_debit[attribute::GOLD.index()],
             -TREASON_COST
@@ -447,39 +409,40 @@ mod tests {
         ]);
         t.masters = vec![Masters::new([]), masters];
         let wood = |t: &World| t.players[1].attributes[1];
-        t.game(&game(1, sub::FARM_QUEUE, 1, 2, 0)).unwrap();
+        t.game(&game(1, GameSub::FARM_QUEUE, 1, 2, 0)).unwrap();
         assert_eq!(
             (t.players[1].farm_queue, wood(&t)),
             (QueueCount::of_data(2), Amount::new(880.0))
         );
-        t.game(&game(1, sub::PASTURE_QUEUE, 1, 1, 0)).unwrap();
+        t.game(&game(1, GameSub::PASTURE_QUEUE, 1, 1, 0)).unwrap();
         assert_eq!(
             (t.players[1].farm_queue, wood(&t)),
             (QueueCount::of_data(3), Amount::new(780.0))
         );
-        t.game(&game(1, sub::PASTURE_UNQUEUE, 1, 1, 0)).unwrap();
+        t.game(&game(1, GameSub::PASTURE_UNQUEUE, 1, 1, 0)).unwrap();
         assert_eq!(
             (t.players[1].farm_queue, wood(&t)),
             (QueueCount::of_data(2), Amount::new(880.0))
         );
-        t.game(&game(1, sub::FARM_UNQUEUE, 1, 1, 0)).unwrap();
+        t.game(&game(1, GameSub::FARM_UNQUEUE, 1, 1, 0)).unwrap();
         assert_eq!(
             (t.players[1].farm_queue, wood(&t)),
             (QueueCount::of_data(1), Amount::new(940.0))
         );
-        t.game(&game(1, sub::FISH_TRAP_QUEUE, 1, 3, 0)).unwrap();
+        t.game(&game(1, GameSub::FISH_TRAP_QUEUE, 1, 3, 0)).unwrap();
         assert_eq!(
             (t.players[1].fish_trap_queue, wood(&t)),
             (QueueCount::of_data(3), Amount::new(640.0))
         );
-        t.game(&game(1, sub::FISH_TRAP_UNQUEUE, 1, 2, 0)).unwrap();
+        t.game(&game(1, GameSub::FISH_TRAP_UNQUEUE, 1, 2, 0))
+            .unwrap();
         assert_eq!(
             (t.players[1].fish_trap_queue, wood(&t)),
             (QueueCount::of_data(1), Amount::new(840.0))
         );
         // player 9 is outside the world: nothing
         t.settings.cheats_enabled = true;
-        t.game(&game(1, sub::FARM_QUEUE, 9, 2, 0)).unwrap();
+        t.game(&game(1, GameSub::FARM_QUEUE, 9, 2, 0)).unwrap();
         assert_eq!(
             (t.players[1].farm_queue, wood(&t)),
             (QueueCount::of_data(1), Amount::new(840.0))
@@ -491,17 +454,17 @@ mod tests {
     #[test]
     fn a_sub_command_for_another_player_needs_the_game_s_cheats() {
         let mut t = world();
-        assert!(t.game_allowed(&game(1, sub::POSTURE, 1, 0, 0)));
-        assert!(!t.game_allowed(&game(1, sub::POSTURE, 2, 0, 0)));
-        assert!(t.game_allowed(&game(1, sub::SPEED, 2, 0, 0)));
-        assert!(t.game_allowed(&game(1, sub::QUICK_BUILD, 2, 0, 0)));
-        assert!(t.game_allowed(&game(1, sub::OPEN_0XF, 2, 0, 0)));
-        assert!(!t.game_allowed(&game(9, sub::POSTURE, 9, 0, 0)));
+        assert!(t.game_allowed(&game(1, GameSub::POSTURE, 1, 0, 0)));
+        assert!(!t.game_allowed(&game(1, GameSub::POSTURE, 2, 0, 0)));
+        assert!(t.game_allowed(&game(1, GameSub::SPEED, 2, 0, 0)));
+        assert!(t.game_allowed(&game(1, GameSub::QUICK_BUILD, 2, 0, 0)));
+        assert!(t.game_allowed(&game(1, GameSub::OPEN_0XF, 2, 0, 0)));
+        assert!(!t.game_allowed(&game(9, GameSub::POSTURE, 9, 0, 0)));
         t.settings.cheats_enabled = true;
-        assert!(t.game_allowed(&game(1, sub::POSTURE, 2, 0, 0)));
+        assert!(t.game_allowed(&game(1, GameSub::POSTURE, 2, 0, 0)));
         // refused: nothing changes
         let mut t = world();
-        t.game(&game(1, sub::POSTURE, 2, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::POSTURE, 2, 0, 0)).unwrap();
         assert_eq!(t.players[2].posture, Posture::AGGRESSIVE);
     }
 
@@ -509,19 +472,19 @@ mod tests {
     #[test]
     fn the_toggles_flip_the_player_s_flags() {
         let mut t = world();
-        t.game(&game(1, sub::AUTO_FARM_QUEUE, 1, 0, 0)).unwrap();
-        t.game(&game(1, sub::AUTO_FISH_TRAP_QUEUE, 1, 0, 0))
+        t.game(&game(1, GameSub::AUTO_FARM_QUEUE, 1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::AUTO_FISH_TRAP_QUEUE, 1, 0, 0))
             .unwrap();
-        t.game(&game(1, sub::POSTURE, 1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::POSTURE, 1, 0, 0)).unwrap();
         let p = &t.players[1];
         assert!(p.auto_farm_queue && p.auto_fishtrap_queue);
         assert_eq!(p.posture, Posture::DEFENSIVE);
-        t.game(&game(1, sub::POSTURE, 1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::POSTURE, 1, 0, 0)).unwrap();
         assert_eq!(t.players[1].posture, Posture::AGGRESSIVE);
         t.settings.cheats_enabled = true;
         let before = t.players.clone();
-        t.game(&game(1, sub::POSTURE, 7, 0, 0)).unwrap();
-        t.game(&game(1, sub::POSTURE, -1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::POSTURE, 7, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::POSTURE, -1, 0, 0)).unwrap();
         assert_eq!(t.players, before);
     }
 
@@ -531,15 +494,15 @@ mod tests {
     fn a_cheat_does_nothing_without_the_game_s_cheats() {
         let mut t = world();
         let before = t.players.clone();
-        t.game(&game(1, sub::CHEAT, 1, 4, 0)).unwrap();
-        t.game(&game(1, sub::QUICK_BUILD, 1, 0, 0)).unwrap();
+        t.game(&game(1, GameSub::CHEAT, 1, 4, 0)).unwrap();
+        t.game(&game(1, GameSub::QUICK_BUILD, 1, 0, 0)).unwrap();
         assert_eq!(t.players, before);
         assert_eq!(t.instant_work, 0);
         t.settings.cheats_enabled = true;
-        assert_eq!(t.game(&game(1, sub::CHEAT, 1, 4, 0)), Err(CHEAT));
-        assert_eq!(t.game(&game(1, sub::QUICK_BUILD, 2, 0, 0)), Err(CHEAT));
+        assert_eq!(t.game(&game(1, GameSub::CHEAT, 1, 4, 0)), Err(CHEAT));
+        assert_eq!(t.game(&game(1, GameSub::QUICK_BUILD, 2, 0, 0)), Err(CHEAT));
         assert_eq!(t.instant_work, 2);
-        assert_eq!(t.game(&game(1, sub::QUICK_BUILD, 0, 0, 0)), Ok(()));
+        assert_eq!(t.game(&game(1, GameSub::QUICK_BUILD, 0, 0, 0)), Ok(()));
         assert_eq!(t.instant_work, 0);
     }
 
@@ -548,11 +511,11 @@ mod tests {
     fn the_speed_changes_nothing_and_9_sets_the_production_queue_flag() {
         let mut t = world();
         let before = t.players.clone();
-        let mut speed = game(1, sub::SPEED, 1, 0, 0);
+        let mut speed = game(1, GameSub::SPEED, 1, 0, 0);
         speed.speed = 2.0;
         t.game(&speed).unwrap();
         assert_eq!(t.players, before);
-        t.game(&game(1, sub::PRODUCTION_QUEUE, 1, 0x101, 0))
+        t.game(&game(1, GameSub::PRODUCTION_QUEUE, 1, 0x101, 0))
             .unwrap();
         assert_eq!(t.players[1].production_queue_on, 1);
     }
@@ -564,10 +527,10 @@ mod tests {
         let mut t = world();
         t.players[2].computer = true;
         t.settings.cheats_enabled = true;
-        t.game(&game(1, sub::AI_SETTING, 1, 1, 30)).unwrap();
+        t.game(&game(1, GameSub::AI_SETTING, 1, 1, 30)).unwrap();
         assert_eq!(t.players[1].dodge_chance, Chance::NONE);
         let set = |t: &mut World, setting: i16, value: u32| {
-            t.game(&game(1, sub::AI_SETTING, 2, setting, value))
+            t.game(&game(1, GameSub::AI_SETTING, 2, setting, value))
                 .unwrap();
         };
         set(&mut t, 1, 0x1_1e);

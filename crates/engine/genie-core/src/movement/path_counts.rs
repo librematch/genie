@@ -1,6 +1,8 @@
 //! A path level's link to its parent and the plans it may still try; a mover's wait delays and
 //! substitute count.
 
+use crate::pathing::DelayCount;
+
 /// What an arrived level hands its parent (`+0x10`, `mLinkedPathType`): 1 marks the parent's
 /// waypoint reached, 2 has the parent ask again (a looping parent moves on first), 3 has it ask
 /// again; any other value hands nothing over.
@@ -94,6 +96,12 @@ impl WaitDelays {
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0
+    }
+
+    /// The delays as a path budget's delay count (the byte widened).
+    #[must_use]
+    pub const fn count(self) -> DelayCount {
+        DelayCount::of_data(self.0 as i32)
     }
 
     /// One delay more (wrapping as a byte).

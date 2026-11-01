@@ -11,6 +11,7 @@ use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
@@ -330,7 +331,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
         id: SpriteId::named(4),
         frames: crate::objects::Frame::of_data(1),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -993,7 +994,7 @@ fn a_gatherer_facing_its_target_works_it() {
         id: SpriteId::named(7),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,

@@ -90,7 +90,7 @@ pub struct UnitOrderCommand {
     /// The order's action.
     pub action: UnitOrderAction,
     /// `+0x18`: a cancel's unit index in the queue.
-    pub param: u32,
+    pub param: UnitIndex,
     /// `+0x20`: it sets their last human order time.
     pub human: bool,
 }
@@ -112,9 +112,7 @@ impl UnitOrderCommand {
             UnitOrderAction::Garrison => {
                 w.garrison_order(self.player, ids, self.target, self.through_ai, self.nearby)
             }
-            UnitOrderAction::Cancel => {
-                w.cancel_order(ids, UnitIndex::of_data(self.param), self.through_ai)
-            }
+            UnitOrderAction::Cancel => w.cancel_order(ids, self.param, self.through_ai),
             action => w.unit_order(self.player, ids, action.byte()),
         }
     }

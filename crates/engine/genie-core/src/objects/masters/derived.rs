@@ -14,10 +14,10 @@ use crate::world::WholeSeconds;
 /// it when above 0, else the master's speed (as the masters' loader derives
 /// [`MoveStats`]' speeds).
 pub(super) fn sprite_speed(
-    base: f32,
+    base: Speed,
     sprite: Option<SpriteId>,
     graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
-) -> f32 {
+) -> Speed {
     crate::objects::sprite::top_speed(base, sprite.and_then(|s| graphics.get(&s)))
 }
 
@@ -72,7 +72,7 @@ impl Master {
             a::MOVEMENT_SPEED | a::STANDING_GRAPHIC | a::WALKING_GRAPHIC | a::RUNNING_GRAPHIC => {
                 stats.base = self.max_speed;
                 let run = self.run_sprite.or(self.move_sprite);
-                stats.speed = Speed::new(sprite_speed(self.max_speed.get(), run, graphics));
+                stats.speed = sprite_speed(self.max_speed, run, graphics);
             }
             a::ROTATION_SPEED => stats.turn_time = self.turn_speed,
             a::TERRAIN_RESTRICTION_ID => {

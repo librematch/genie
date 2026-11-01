@@ -374,9 +374,9 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         .map(|p| {
             let b = &p.world_player().base;
             genie_core::pathing::PlanBudget {
-                attempt_cap: b.pathing_attempt_cap_value,
-                delay_cap: b.pathing_delay_cap_value,
-                plans: 0,
+                attempt_cap: genie_core::pathing::PlanCap::of_data(b.pathing_attempt_cap_value),
+                delay_cap: genie_core::pathing::PlanCap::of_data(b.pathing_delay_cap_value),
+                plans: genie_core::pathing::PlanCount::ZERO,
             }
         })
         .collect();

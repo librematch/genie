@@ -17,6 +17,7 @@ use crate::movement::move_to::{
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
@@ -770,7 +771,7 @@ fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
         id: SpriteId::named(1880),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),
@@ -1381,7 +1382,7 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
             id: SpriteId::named(1),
             frames: crate::objects::Frame::of_data(10),
             facets: crate::objects::FacetCount::of_data(8),
-            speed_multiplier: 1.0,
+            speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::NONE,
@@ -1689,7 +1690,7 @@ fn a_hunt_s_walk_starts_toward_its_target() {
         id: SpriteId::named(1880),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),

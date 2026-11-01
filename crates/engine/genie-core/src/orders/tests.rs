@@ -19,6 +19,7 @@ use crate::math::fmath::BVector;
 use crate::movement::PathFlags;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::actions::ActionList;
@@ -846,7 +847,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         id: SpriteId::named(300),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -865,7 +866,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
             SpriteId::named(302),
             Graphic {
                 id: SpriteId::named(302),
-                speed_multiplier: 1.5,
+                speed_multiplier: SpeedMultiplier::of_data(1.5),
                 ..standing
             },
         ),
@@ -2165,7 +2166,7 @@ fn switched_in_the_open(
                 id: SpriteId::named(id),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(8),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
@@ -2249,7 +2250,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
                 id: SpriteId::named(10),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(8),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,

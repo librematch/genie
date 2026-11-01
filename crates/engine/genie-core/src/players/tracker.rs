@@ -40,6 +40,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{ClassId, class};
 use crate::players::PlayerId;
+use crate::production::QueuedUnits;
 use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
@@ -308,7 +309,7 @@ impl Tracker {
     }
 
     /// `FUN_14104fb00`: the counter of queued units (`+0x60`) changes by `n`.
-    pub fn count_queued(&mut self, n: crate::production::QueuedUnits) {
+    pub fn count_queued(&mut self, n: QueuedUnits) {
         self.queued += i32::from(n.get());
     }
 
@@ -420,12 +421,12 @@ impl crate::world::World {
                 tracker.add(u.id, k);
                 for e in u.production.iter().flat_map(|q| q.queue.entries()) {
                     if let Some(master) = e.master.filter(|m| 0 < m.get())
-                        && crate::production::QueuedUnits::ZERO < e.count
+                        && QueuedUnits::ZERO < e.count
                     {
                         let class = self.tracker_key(p, master).class;
                         for _ in 0..e.count.get() {
                             tracker.place(Some(master), class);
-                            tracker.count_queued(crate::production::QueuedUnits::ONE);
+                            tracker.count_queued(QueuedUnits::ONE);
                         }
                     }
                 }

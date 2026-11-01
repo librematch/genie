@@ -21,6 +21,7 @@ use crate::movement::TurnRate;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::masters::ActionType;
+use crate::pathing::DelayCount;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
 use crate::world::Millis;
@@ -112,7 +113,7 @@ pub struct Motion {
     /// `mMaximumVelocityForward`.
     pub maximum_velocity_forward: Speed,
     /// `mNumberWaitDelays`.
-    pub number_wait_delays: i32,
+    pub number_wait_delays: DelayCount,
     /// `+0xc4` (not saved): the group's lead unit (-1 from the constructor), which a formation's
     /// transform tests the slots' places with (`FUN_1410465d0`).
     pub lead: Option<ObjectId>,

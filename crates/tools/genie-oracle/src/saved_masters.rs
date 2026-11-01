@@ -20,6 +20,7 @@ use genie_core::movement::Speed;
 use genie_core::objects::Frame;
 use genie_core::objects::HitPoints;
 use genie_core::objects::MasterHitPoints;
+use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::CarryCapacity;
@@ -436,7 +437,7 @@ pub(super) fn moving_stats(
     let base = moving.rge_master_animated_object.max_speed;
     let factor = sprite
         .and_then(|sprite| table.sprite_speed(sprite))
-        .unwrap_or(0.0);
+        .unwrap_or(SpeedMultiplier::ZERO);
     let turning = table.turning(civ, s.copy_id())?;
     let restriction = genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id)?;
     let facets = SpriteId::of_data(moving.move_sprite_id)
@@ -444,11 +445,7 @@ pub(super) fn moving_stats(
         .map(|g| g.facets);
     Some(genie_core::movement::MoveStats {
         fly_mode: FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0)),
-        speed: if 0.0 < factor {
-            Speed::new(base * factor)
-        } else {
-            Speed::new(base)
-        },
+        speed: factor.applied_to(Speed::new(base)),
         base: Speed::new(base),
         turn_rate: genie_core::movement::turn_rate(Seconds::new(moving.turn_speed), facets),
         turn_radius: Distance::ZERO,

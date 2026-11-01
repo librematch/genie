@@ -555,7 +555,7 @@ fn unload_and_unit_order_keep_their_lists_and_counts() {
             through_ai: true,
             nearby: false,
             action: UnitOrderAction::Garrison,
-            param: u32::MAX,
+            param: genie_core::production::UnitIndex::of_data(u32::MAX),
             human: true,
         })
     );
@@ -687,7 +687,7 @@ fn queue_and_research_keep_their_fields() {
             buildings: unit_list(object_ids([9])),
             building_master: master_id(109),
             unit: master_id(83),
-            amount: 5,
+            amount: genie_core::production::QueuedUnits::of_data(5),
             button: QueueButton::of_data(2),
         })
     );
@@ -888,7 +888,7 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Game(GameCommand {
                 issuer: player_id(2),
-                sub: 1,
+                sub: genie_core::commands::GameSub::SPEED,
                 player: 3,
                 a: -1,
                 speed: 1.7,

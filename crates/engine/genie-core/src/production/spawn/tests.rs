@@ -16,6 +16,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::BuildableOn;
@@ -477,7 +478,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
                 id: SpriteId::named(300),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(8),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
@@ -616,7 +617,7 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
                 id: SpriteId::named(300),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(8),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
@@ -894,7 +895,7 @@ fn remains_world() -> World {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags,

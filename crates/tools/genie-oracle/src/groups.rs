@@ -76,7 +76,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
             .collect::<Result<_, _>>()?,
         flags: MotionFlags::from_bits_retain(m.motion_flags_m_bits),
         maximum_velocity_forward: Speed::new(m.maximum_velocity_forward),
-        number_wait_delays: m.number_wait_delays,
+        number_wait_delays: genie_core::pathing::DelayCount::of_data(m.number_wait_delays),
         // not saved: the constructor's
         lead: None,
     })
@@ -478,6 +478,13 @@ impl Flat for Distance {
 
 /// A speed flattens as its f32, as the save holds it.
 impl Flat for Speed {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A wait count flattens as its int, as the save holds it.
+impl Flat for genie_core::pathing::DelayCount {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }

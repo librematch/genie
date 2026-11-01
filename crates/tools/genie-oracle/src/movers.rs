@@ -19,6 +19,7 @@ use genie_core::movement::SubstituteCount;
 use genie_core::movement::WaitDelays;
 use genie_core::movement::WaypointIndex;
 use genie_core::objects::ObjectId;
+use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteId;
 use genie_core::objects::masters::FlyMode;
 use genie_core::world::Seconds;
@@ -232,7 +233,7 @@ pub(super) fn mover(
     ))?;
     // without a sprite (−1: the empty town-centre annex 890, say) no factor
     let factor = if s.sprite == -1 {
-        0.0
+        SpeedMultiplier::ZERO
     } else {
         SpriteId::of_data(s.sprite)
             .and_then(|sprite| table.sprite_speed(sprite))
@@ -240,7 +241,7 @@ pub(super) fn mover(
                 "a sprite the data file does not have",
             ))?
     };
-    let speed = if 0.0 < factor { base * factor } else { base };
+    let speed = factor.applied_to(Speed::new(base));
     let turning =
         table
             .turning(civ, objects.dat_master(s.master_obj))
@@ -280,7 +281,7 @@ pub(super) fn mover(
                     .fly_mode(civ, objects.dat_master(s.master_obj))
                     .unwrap_or(0),
             ),
-            speed: Speed::new(speed),
+            speed,
             base: Speed::new(base),
             turn_rate: genie_core::movement::turn_rate(Seconds::new(turn_speed), facets),
             turn_radius: Distance::ZERO,

@@ -10,6 +10,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionType;
@@ -72,7 +73,7 @@ const fn graphic(id: SpriteId) -> Graphic {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,

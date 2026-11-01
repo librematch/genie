@@ -24,6 +24,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::QUEUED;
 use crate::production::Production;
 use crate::production::QueueButton;
+use crate::production::QueuedUnits;
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -100,7 +101,7 @@ impl World {
             QUEUE_LIMIT
         } as i32;
         let (mut rooms, mut loads, total_room) = self.rooms_and_loads(&found, unit, per)?;
-        let mut amount = i32::from(q.amount).min(i32::from(total_room as i16));
+        let mut amount = i32::from(q.amount.get()).min(i32::from(total_room as i16));
         if 0 < amount {
             if unit.kind < COMBAT {
                 return Ok(());
@@ -398,9 +399,7 @@ impl World {
         let owner = self.players.player_mut(player)?;
         owner.add_attribute(QUEUED, pop * f32::from(n))?;
         let costs = as_entry_costs(master_costs(masters, master, &*owner)?);
-        owner
-            .tracker
-            .count_queued(crate::production::QueuedUnits::of_data(n));
+        owner.tracker.count_queued(QueuedUnits::of_data(n));
         for _ in 0..n {
             owner.tracker.place(Some(master), class);
         }
@@ -415,10 +414,8 @@ impl World {
         {
             let queue = &mut production.queue;
             let k = (queue.count.get() - 1) as usize;
-            queue.slots[k].count = queue.slots[k]
-                .count
-                .plus(crate::production::QueuedUnits::of_data(n));
-            queue.total = queue.total.plus(crate::production::QueuedUnits::of_data(n));
+            queue.slots[k].count = queue.slots[k].count.plus(QueuedUnits::of_data(n));
+            queue.total = queue.total.plus(QueuedUnits::of_data(n));
             queue.changes = queue.changes.bumped();
             return Ok(true);
         }
@@ -429,7 +426,7 @@ impl World {
             player,
             i,
             (Some(master), None),
-            crate::production::QueuedUnits::of_data(n),
+            QueuedUnits::of_data(n),
             button,
             time,
         )?;
@@ -498,10 +495,8 @@ impl World {
         {
             let queue = &mut production.queue;
             let k = (queue.count.get() - 1) as usize;
-            queue.slots[k].count = queue.slots[k]
-                .count
-                .plus(crate::production::QueuedUnits::of_data(n));
-            queue.total = queue.total.plus(crate::production::QueuedUnits::of_data(n));
+            queue.slots[k].count = queue.slots[k].count.plus(QueuedUnits::of_data(n));
+            queue.total = queue.total.plus(QueuedUnits::of_data(n));
             queue.changes = queue.changes.bumped();
             owner.techs[t].pending = owner.techs[t].pending.plus(n);
             return Ok(true);
@@ -510,7 +505,7 @@ impl World {
             player,
             i,
             (master, Some(tech)),
-            crate::production::QueuedUnits::of_data(n),
+            QueuedUnits::of_data(n),
             button,
             None,
         )?;
@@ -530,7 +525,7 @@ impl World {
         player: PlayerId,
         i: ListIndex,
         (master, tech): (Option<MasterId>, Option<TechId>),
-        n: crate::production::QueuedUnits,
+        n: QueuedUnits,
         button: QueueButton,
         time: Option<WholeSeconds>,
     ) -> Result<(), GenieError> {

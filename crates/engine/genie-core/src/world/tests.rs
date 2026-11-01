@@ -3,6 +3,7 @@ use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::damage::ArmorPair;
 use crate::combat::missile::SmartMode;
+use crate::commands::GameSub;
 use crate::commands::GatherPointState;
 use crate::commands::ResourceWord;
 use crate::commands::UnloadPick;
@@ -59,6 +60,7 @@ use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
@@ -120,6 +122,7 @@ use crate::players::relations;
 use crate::players::tracker::ListKey;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
+use crate::production::QueuedUnits;
 use crate::production::UnitIndex;
 use crate::technology::CostPaid;
 use crate::technology::ResearchState;
@@ -822,7 +825,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         id,
         frames: crate::objects::Frame::of_data(60),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: 0.0,
+        speed_multiplier: SpeedMultiplier::ZERO,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
@@ -1066,7 +1069,7 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Unit {
         id: SpriteId::named(13171),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: factor,
+        speed_multiplier: SpeedMultiplier::of_data(factor),
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
@@ -1649,7 +1652,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -2650,7 +2653,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         id: SpriteId::named(7),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -6378,7 +6381,7 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
                 id: SpriteId::named(id),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(16),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
@@ -7810,7 +7813,7 @@ fn queue(building: i32, unit: i16, amount: i16) -> Command {
         buildings: unit_list(vec![Some(object_id(building))]),
         building_master: master_id(109),
         unit: master_id(unit),
-        amount,
+        amount: QueuedUnits::of_data(amount),
         button: QueueButton::NONE,
     })
 }
@@ -8794,7 +8797,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
             .map_or(0, |p| p.queue.total.get())
     };
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
-    t.tick_with(Millis::new(104), &[several(5)]);
+    t.tick_with(Millis::new(104), &[several(QueuedUnits::of_data(5))]);
     assert_eq!(
         (total(&t, ListIndex::new(0)), total(&t, ListIndex::new(1))),
         (3, 2)
@@ -8820,7 +8823,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
         Seconds::ZERO
     );
     // the empty one takes the first, then the loaded one the second (25 above its load)
-    t.tick_with(Millis::new(104), &[several(2)]);
+    t.tick_with(Millis::new(104), &[several(QueuedUnits::of_data(2))]);
     assert_eq!(
         (total(&t, ListIndex::new(0)), total(&t, ListIndex::new(1))),
         (2, 1)
@@ -8860,7 +8863,7 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
         buildings: unit_list(object_ids([9, 10])),
         building_master: master_id(109),
         unit: master_id(99),
-        amount: 3,
+        amount: QueuedUnits::of_data(3),
         button: QueueButton::NONE,
     });
     let mut t = with_trophy(vec![trophy(9), centre(10)]);
@@ -8919,10 +8922,7 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
         .production
         .as_ref()
         .unwrap();
-    assert_eq!(
-        production.queue.total,
-        crate::production::QueuedUnits::of_data(1)
-    );
+    assert_eq!(production.queue.total, QueuedUnits::ONE);
     let mut t = two(false);
     t.tick_with(Millis::new(104), &[queue(10, 83, 1)]);
     assert_eq!(t.players[1].attributes[0], Amount::new(100.0));
@@ -8942,7 +8942,7 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
         buildings: unit_list(object_ids([11, 9])),
         building_master: master_id(109),
         unit: master_id(99),
-        amount: 2,
+        amount: QueuedUnits::of_data(2),
         button: QueueButton::NONE,
     });
     t.tick_with(Millis::new(104), &[both]);
@@ -8951,10 +8951,7 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
         .production
         .as_ref()
         .unwrap();
-    assert_eq!(
-        production.queue.total,
-        crate::production::QueuedUnits::of_data(2)
-    );
+    assert_eq!(production.queue.total, QueuedUnits::of_data(2));
     assert!(
         t.players[0].sleeping[ListIndex::new(0)]
             .production
@@ -9333,7 +9330,7 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
             .queue
             .total
     };
-    assert_eq!(queued(&two), crate::production::QueuedUnits::of_data(2));
+    assert_eq!(queued(&two), QueuedUnits::of_data(2));
     assert_eq!(
         two.players[0].attributes[0],
         Amount::new(100.0 - 2.0 * 46.0)
@@ -9345,15 +9342,12 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
     // 14 queued: room for one of five
     let mut full = one_player(vec![centre(9)], [1000.0; 4]);
     full.tick_with(Millis::new(104), &[queue(9, 99, 14), queue(9, 99, 5)]);
-    assert_eq!(queued(&full), crate::production::QueuedUnits::of_data(15));
+    assert_eq!(queued(&full), QueuedUnits::of_data(15));
     // a computer player fills to 2
     let mut computer = one_player(vec![centre(9)], [1000.0; 4]);
     computer.players[0].computer = true;
     computer.tick_with(Millis::new(104), &[queue(9, 99, 5)]);
-    assert_eq!(
-        queued(&computer),
-        crate::production::QueuedUnits::of_data(2)
-    );
+    assert_eq!(queued(&computer), QueuedUnits::of_data(2));
 }
 
 /// `FUN_1411cbc40` joins units of the last entry's master and button whose costs are the same;
@@ -9375,9 +9369,9 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
     t.tick_with(
         Millis::new(104),
         &[
-            with(2, QueueButton::NONE),
-            with(3, QueueButton::NONE),
-            with(1, QueueButton::of_data(1)),
+            with(QueuedUnits::of_data(2), QueueButton::NONE),
+            with(QueuedUnits::of_data(3), QueueButton::NONE),
+            with(QueuedUnits::ONE, QueueButton::of_data(1)),
         ],
     );
     let q = &t.players[0].objects[ListIndex::new(0)]
@@ -9409,7 +9403,7 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
     assert_eq!(t.players[0].tracker.queued, 6);
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     let alternating: Vec<_> = (0..11)
-        .map(|k| with(1, QueueButton::of_data(k % 2)))
+        .map(|k| with(QueuedUnits::ONE, QueueButton::of_data(k % 2)))
         .collect();
     t.tick_with(Millis::new(104), &alternating);
     let q = &t.players[0].objects[ListIndex::new(0)]
@@ -9479,7 +9473,7 @@ fn game_mode_16_queues_one_military_unit_at_a_time() {
         .as_ref()
         .unwrap()
         .queue;
-    assert_eq!(q.total, crate::production::QueuedUnits::of_data(1));
+    assert_eq!(q.total, QueuedUnits::ONE);
     assert!(t.players[0].one_military_queued);
 }
 
@@ -13350,7 +13344,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
             id: SpriteId::named(1751),
             frames: crate::objects::Frame::of_data(10),
             facets: crate::objects::FacetCount::of_data(1),
-            speed_multiplier: 1.0,
+            speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::ANIMATED,
@@ -13432,7 +13426,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         id: SpriteId::named(1751),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -13544,7 +13538,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags,
@@ -13932,7 +13926,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -14018,7 +14012,7 @@ fn a_cheat_code_does_nothing_without_the_game_s_cheats() {
     let before = t.players.clone();
     let cheat = Command::Game(GameCommand {
         issuer: player_id(1),
-        sub: 6,
+        sub: GameSub::CHEAT,
         player: 1,
         a: 4,
         speed: 0.0,
@@ -14123,7 +14117,7 @@ fn scout_sprites() -> (Masters, std::collections::BTreeMap<SpriteId, Graphic>) {
                 id: SpriteId::named(id),
                 frames: crate::objects::Frame::of_data(10),
                 facets: crate::objects::FacetCount::of_data(16),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
@@ -14380,7 +14374,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         id: SpriteId::named(764),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -14543,7 +14537,7 @@ fn scout_attack_on(
         id: SpriteId::named(300),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -14673,7 +14667,7 @@ fn attack_by(
         id: SpriteId::named(300),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -15299,7 +15293,7 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
                 id: SpriteId::named(588),
                 frames: crate::objects::Frame::of_data(1),
                 facets: crate::objects::FacetCount::of_data(5),
-                speed_multiplier: 1.0,
+                speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::ZERO,
                 replay_delay: Seconds::ZERO,
                 flags,
@@ -16185,7 +16179,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -16557,7 +16551,7 @@ fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
         id: SpriteId::named(302),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
@@ -17623,7 +17617,7 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
         id: SpriteId::named(31),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(16),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -19165,7 +19159,7 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -19675,7 +19669,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             through_ai: true,
             nearby: false,
             action: UnitOrderAction::of(action),
-            param: 0,
+            param: UnitIndex::FIRST,
             human,
         })
     };
@@ -19903,9 +19897,12 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
                 Ok(())
             },
         ),
-        routes(&t, &Command::Game(game(0)), PlayerId::new(0), |w| {
-            w.game(&game(0))
-        }),
+        routes(
+            &t,
+            &Command::Game(game(GameSub::DIPLOMACY)),
+            PlayerId::new(0),
+            |w| w.game(&game(GameSub::DIPLOMACY)),
+        ),
         routes(
             &t,
             &Command::Unmodelled(UnmodelledCommand {
@@ -19924,9 +19921,9 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
     cheats.settings.cheats_enabled = true;
     let cheat = |player| GameCommand {
         issuer: player_id(1),
-        sub: crate::commands::game::sub::CHEAT,
+        sub: GameSub::CHEAT,
         player,
-        ..game(0)
+        ..game(GameSub::DIPLOMACY)
     };
     assert!(routes(
         &cheats,
@@ -20111,7 +20108,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
         buildings: unit_list(tc.clone()),
         building_master: master_id(109),
         unit: master_id(83),
-        amount: 1,
+        amount: QueuedUnits::ONE,
         button: QueueButton::of_data(0),
     };
     let changed = [
@@ -20122,7 +20119,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
                 buildings: unit_list(tc.clone()),
                 building_master: master_id(109),
                 unit: master_id(83),
-                amount: 1,
+                amount: QueuedUnits::ONE,
                 button: QueueButton::of_data(0),
             }),
             PlayerId::new(1),

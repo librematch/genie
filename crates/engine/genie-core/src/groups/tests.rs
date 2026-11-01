@@ -20,6 +20,7 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::{ClassId, class};
 use crate::objects::masters::{MasterId, ids};
 use crate::objects::unit::Unit;
+use crate::pathing::DelayCount;
 use crate::players::Amount;
 use crate::test_ids::class_id;
 use crate::test_ids::group_id;
@@ -44,7 +45,11 @@ fn a_new_motion_holds_the_constructor_s_values() {
     );
     assert_eq!(
         (m.flags, m.lead, m.number_wait_delays),
-        ((MotionFlags::MOVED | MotionFlags::NEW), None, 0)
+        (
+            (MotionFlags::MOVED | MotionFlags::NEW),
+            None,
+            DelayCount::ZERO
+        )
     );
     assert_eq!((m.velocity, m.acceleration), (BVector::ZERO, BVector::ZERO));
     let frame = [

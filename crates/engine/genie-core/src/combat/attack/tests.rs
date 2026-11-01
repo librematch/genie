@@ -20,6 +20,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::layers::Animated;
 use crate::objects::masters::BlastDefense;
@@ -164,7 +165,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
         id: SpriteId::named(1),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -455,7 +456,7 @@ fn a_sprite_resets_only_for_its_own_graphic() {
         id: SpriteId::named(224),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -539,7 +540,7 @@ const STANDING: Graphic = Graphic {
     id: SpriteId::named(300),
     frames: crate::objects::Frame::of_data(10),
     facets: crate::objects::FacetCount::of_data(8),
-    speed_multiplier: 1.0,
+    speed_multiplier: SpeedMultiplier::ONE,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
     flags: SpriteFlags::ANIMATED,
@@ -1701,7 +1702,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         id: SpriteId::named(418),
         frames: crate::objects::Frame::of_data(1),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -1767,7 +1768,7 @@ fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
         id,
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -2310,7 +2311,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
         id: SpriteId::named(9),
         frames: crate::objects::Frame::of_data(10),
         facets: crate::objects::FacetCount::of_data(1),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
@@ -2614,7 +2615,7 @@ fn walk_to_house(state: MoveTo, wait: MoveWait) -> MoveToAction {
 fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
     let walking = Graphic {
         id: SpriteId::named(301),
-        speed_multiplier: 1.5,
+        speed_multiplier: SpeedMultiplier::of_data(1.5),
         ..STANDING
     };
     let start = |range| {

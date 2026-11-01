@@ -1,6 +1,7 @@
 //! The command enum's issuing player and the lane a failed run stops.
 
 use crate::GenieError;
+use crate::commands::GameSub;
 use crate::commands::ResourceWord;
 use crate::commands::UnloadPick;
 use crate::commands::{
@@ -16,6 +17,8 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::TributeFee;
 use crate::production::QueueButton;
+use crate::production::QueuedUnits;
+use crate::production::UnitIndex;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
@@ -29,7 +32,7 @@ use crate::world::WorldTime;
 fn game_of(issuer: u8) -> GameCommand {
     GameCommand {
         issuer: player_id(issuer),
-        sub: 0,
+        sub: GameSub::DIPLOMACY,
         player: 0,
         a: 0,
         speed: 0.0,
@@ -80,7 +83,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             buildings: unit_list(object_ids(ids.clone())),
             building_master: master_id(109),
             unit: master_id(83),
-            amount: 1,
+            amount: QueuedUnits::ONE,
             button: QueueButton::NONE,
         }),
         Command::Research(ResearchCommand {
@@ -209,7 +212,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             through_ai: false,
             nearby: false,
             action: UnitOrderAction::DropOff,
-            param: 0,
+            param: UnitIndex::FIRST,
             human: false,
         }),
         Command::Order(OrderCommand {

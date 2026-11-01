@@ -41,6 +41,7 @@ members' steering (`groups/steer/`) ask the same planners.
 | [`fixed_rect.rs`](fixed_rect.rs) | A rectangle in the pathing's fixed point (`FixedRect`). |
 | [`mesh.rs`](mesh.rs) | The obstruction manager's shape mesh (`*(*(DAT_143f0a088 + 8))`): the rectangles the short pather searches around, in fixed point (2^22 units per tile). |
 | [`mod.rs`](mod.rs) | Finding a way: the planners of the paths that units walk, from the tile pathfinder over the whole map to the short pathers around the obstructions near a unit. |
+| [`plan_budget_values.rs`](plan_budget_values.rs) | A player's path budget's values: its caps, its plans and a walker's waits. |
 | [`shape_id.rs`](shape_id.rs) | A shape's id in the obstruction manager's mesh. |
 | [`shape_side.rs`](shape_side.rs) | A side of a shape in the obstruction manager's mesh. |
 | [`short_found.rs`](short_found.rs) | What a short path search returns (`ShortFound`). |

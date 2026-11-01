@@ -53,6 +53,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`release.rs`](release.rs) | An object's leave of the world and its release by the action that held it (slot 0x180); the update's regeneration and hit point check, and a walk's pause. |
 | [`relic_count.rs`](relic_count.rs) | A count of relics. |
 | [`relics.rs`](relics.rs) | A building's relic counts (`Relics`). |
+| [`speed_multiplier.rs`](speed_multiplier.rs) | A sprite's speed factor. |
 | [`sprite.rs`](sprite.rs) | An object's active sprite: the frame of its sprite (a `.dat` graphic) and, for a graphic that animates, the clock that advances it. |
 | [`sprite_flags.rs`](sprite_flags.rs) | A sprite's sequence flags (`SpriteFlags`, the `.dat`'s `sequence_type`). |
 | [`sprite_id.rs`](sprite_id.rs) | A sprite's id (`SpriteId`): the `.dat`'s graphic a master or a task shows. |

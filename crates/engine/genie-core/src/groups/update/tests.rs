@@ -27,6 +27,7 @@ use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::BuildableOn;
@@ -43,6 +44,7 @@ use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::objects::unit::Unit;
+use crate::pathing::DelayCount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::relation_row;
@@ -640,7 +642,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
             id: SpriteId::named(id),
             frames: crate::objects::Frame::of_data(1),
             facets: crate::objects::FacetCount::of_data(8),
-            speed_multiplier: factor,
+            speed_multiplier: SpeedMultiplier::of_data(factor),
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::NONE,
@@ -659,7 +661,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
         id: SpriteId::named(1),
         frames: crate::objects::Frame::of_data(1),
         facets: crate::objects::FacetCount::of_data(8),
-        speed_multiplier: 1.0,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
@@ -965,10 +967,10 @@ fn a_moving_group_s_move_waits_or_follows() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::MOVE;
     g.flags = GroupFlags::NONE;
-    g.motion.number_wait_delays = 1;
+    g.motion.number_wait_delays = DelayCount::of_data(1);
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.motion.number_wait_delays = 0;
+    g.motion.number_wait_delays = DelayCount::ZERO;
     g.motion.paths[0].state = PathState::WantsPath;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(
