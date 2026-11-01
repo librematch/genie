@@ -630,7 +630,7 @@ fn build_and_build_wall_keep_their_fields() {
             builders: unit_list(object_ids([9])),
             queued: true,
             commits: false,
-            frame: 3,
+            frame: genie_core::objects::Frame::of_data(3),
         })
     );
     let wall = packets::BuildWall {

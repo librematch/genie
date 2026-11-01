@@ -811,8 +811,8 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
     t.players[1].attributes[288] = Amount::new(300.0);
     let idle = |id| Graphic {
         id,
-        frames: 60,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(60),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 0.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1055,8 +1055,8 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Unit {
     );
     let dying = Graphic {
         id: SpriteId::named(13171),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: factor,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1633,8 +1633,8 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
     use crate::objects::sprite::{ActiveSprite, Graphic};
     let g = |id| Graphic {
         id,
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1652,9 +1652,9 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         ..Master::default()
     };
     let shown = |id, looped| ActiveSprite {
-        frame: 4,
+        frame: crate::objects::Frame::of_data(4),
         looped,
-        ..ActiveSprite::at_rest(g(id), 4)
+        ..ActiveSprite::at_rest(g(id), crate::objects::Frame::of_data(4))
     };
     // a seed whose first draw is above 0x3fff, another whose first is not
     let rng = |seed| {
@@ -1681,7 +1681,10 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
     );
     assert_eq!(u.idle_variant, 1);
     let s = u.sprite.unwrap();
-    assert_eq!((s.graphic.id, s.frame), (SpriteId::named(101), 0));
+    assert_eq!(
+        (s.graphic.id, s.frame),
+        (SpriteId::named(101), crate::objects::Frame::of_data(0))
+    );
     assert_eq!(r.draws, 1 + rng(high).draws);
     // a low draw keeps the sprite
     let mut u = Unit {
@@ -1782,7 +1785,7 @@ fn a_human_build_with_a_target_places_nothing_and_a_house_keeps_its_sprite_overr
             builders: unit_list(object_ids([9175, 9181])),
             queued: false,
             commits: false,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         })
     };
     let mut t = build_world();
@@ -1816,7 +1819,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
             builders: unit_list(object_ids([9175, 9181])),
             queued: false,
             commits: false,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         })],
     );
     let p = &t.players[1];
@@ -1901,7 +1904,7 @@ fn a_direct_build_empties_its_builder_s_order_queue() {
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: false,
-        frame: 0,
+        frame: crate::objects::Frame::of_data(0),
     }));
     let unit = |id: ObjectId| t.object(id).map(|(_, u)| u).unwrap();
     let orders = |id: i32| {
@@ -1976,12 +1979,12 @@ fn a_queued_build_queues_its_order_for_another_player_s_villager() {
         builders: unit_list(object_ids([9618, 9175])),
         queued: true,
         commits: false,
-        frame: 2,
+        frame: crate::objects::Frame::of_data(2),
     }));
     // the foundation keeps the command's frame (+0xc54)
     assert_eq!(
         t.object(object_id(10028)).map(|(_, u)| u.build_frame),
-        Some(2)
+        Some(crate::objects::Frame::of_data(2))
     );
     let order = |p: PlayerId| {
         t.players[p.index()].objects[ListIndex::new(0)]
@@ -2595,7 +2598,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
     for table in &mut t.masters {
         if let Some(m) = table.get_mut(ids::BUILDER).and_then(|m| m.moving.as_mut()) {
             m.facets = Some(crate::objects::facing::SpriteFacets {
-                count: 16,
+                count: crate::objects::FacetCount::of_data(16),
                 turns: true,
             });
         }
@@ -2610,8 +2613,8 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
     };
     let walking = Graphic {
         id: SpriteId::named(7),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -6238,8 +6241,8 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
         for id in [30, 31] {
             let g = Graphic {
                 id: SpriteId::named(id),
-                frames: 10,
-                facets: 16,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(16),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -7113,7 +7116,7 @@ fn a_build_creates_a_foundation_whose_unit_ai_draws_before_the_turn_players_unit
             builders: unit_list(vec![]),
             queued: false,
             commits: false,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         })],
     );
     let foundation = &built.players[0].objects[ListIndex::new(0)];
@@ -13111,8 +13114,8 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         SpriteId::named(1751),
         Graphic {
             id: SpriteId::named(1751),
-            frames: 10,
-            facets: 1,
+            frames: crate::objects::Frame::of_data(10),
+            facets: crate::objects::FacetCount::of_data(1),
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -13193,8 +13196,8 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
 fn an_annex_follows_its_dying_main_building_into_state_4() {
     let g = Graphic {
         id: SpriteId::named(1751),
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -13305,8 +13308,8 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
 fn annexes_before_their_dying_foundation_die_in_the_next_update() {
     let g = |id, flags| Graphic {
         id,
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -13339,7 +13342,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         annex_of,
         sprite: Some(crate::objects::sprite::ActiveSprite::at_rest(
             g(SpriteId::named(1751), SpriteFlags::NONE),
-            0,
+            crate::objects::Frame::of_data(0),
         )),
         body: crate::objects::layers::Body::new(
             Position::new(150.0, 46.0, 0.0),
@@ -13693,8 +13696,8 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
     use crate::objects::sprite::{ActiveSprite, Graphic};
     let g = |id| Graphic {
         id,
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -13739,7 +13742,10 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             snow: false,
             sprite_override: false,
         }),
-        sprite: Some(ActiveSprite::at_rest(g(SpriteId::named(207)), 0)),
+        sprite: Some(ActiveSprite::at_rest(
+            g(SpriteId::named(207)),
+            crate::objects::Frame::of_data(0),
+        )),
         pasture: None,
         my_pasture: None,
         ..Unit::default()
@@ -13832,8 +13838,8 @@ fn own_attack(target: i32, target2: i32, state: AttackState) -> crate::combat::a
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: -1,
-            interrupt_frame: -1,
+            fire_frame: crate::objects::Frame::of_data(-1),
+            interrupt_frame: crate::objects::Frame::of_data(-1),
         },
         sub_action: false,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
@@ -13881,8 +13887,8 @@ fn scout_sprites() -> (Masters, std::collections::BTreeMap<SpriteId, Graphic>) {
         .map(|id| {
             let g = Graphic {
                 id: SpriteId::named(id),
-                frames: 10,
-                facets: 16,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(16),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -14138,8 +14144,8 @@ fn an_ai_move_of_a_unit_without_speed_fails_at_its_start_standing() {
 fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
     let standing = Graphic {
         id: SpriteId::named(764),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -14302,8 +14308,8 @@ fn scout_attack_on(
     use crate::unit_ai::UnitSide;
     let standing = Graphic {
         id: SpriteId::named(300),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -14432,8 +14438,8 @@ fn attack_by(
     let attacker_master = who.id;
     let standing = Graphic {
         id: SpriteId::named(300),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -14975,7 +14981,7 @@ fn a_build_command_s_foundation_holds_its_movement_state() {
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: false,
-        frame: 0,
+        frame: crate::objects::Frame::of_data(0),
     }));
     assert_eq!(t.players[1].unsupported, None);
     let foundation = t.players[1].objects.last().unwrap();
@@ -15058,8 +15064,8 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
             SpriteId::named(588),
             Graphic {
                 id: SpriteId::named(588),
-                frames: 1,
-                facets: 5,
+                frames: crate::objects::Frame::of_data(1),
+                facets: crate::objects::FacetCount::of_data(5),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::ZERO,
                 replay_delay: Seconds::ZERO,
@@ -15077,7 +15083,7 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
             builders: unit_list(object_ids([9175])),
             queued: false,
             commits: false,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         }));
         assert_eq!(t.players[1].unsupported, None);
         (t, before)
@@ -15088,7 +15094,7 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
     let _ = before.rand15();
     assert_eq!(t.streams.get(Stream::Object), &before);
     let facets = crate::objects::facing::SpriteFacets {
-        count: 5,
+        count: crate::objects::FacetCount::of_data(5),
         turns: true,
     };
     let foundation = t.players[1].objects.last().unwrap();
@@ -15473,7 +15479,7 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: true,
-        frame: 0,
+        frame: crate::objects::Frame::of_data(0),
     }));
     assert_eq!(t.players[1].unsupported, None);
     let ai = t.players[1].objects[ListIndex::new(0)].ai.as_ref().unwrap();
@@ -15819,7 +15825,7 @@ fn a_build_of_another_player_s_builders_is_refused_and_theirs_are_left_out() {
             builders: unit_list(object_ids(builders)),
             queued: false,
             commits: false,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         })
     };
     t.tick_with(Millis::new(50), &[build(vec![9181])]);
@@ -15944,8 +15950,8 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
     t.spatial.terrain = Some(terrain);
     let sprite = |id| Graphic {
         id,
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -15967,7 +15973,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
     let archer = &mut t.players[1].objects[ListIndex::new(0)];
     if let Some(m) = archer.body.mover_mut() {
         m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
-            count: 8,
+            count: crate::objects::FacetCount::of_data(8),
             turns: false,
         });
     }
@@ -15975,7 +15981,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
     let mut attack = own_attack(50, -1, AttackState::Ready);
     attack.range = Distance::new(4.0);
     attack.arms.missile = Some(master_id(363));
-    attack.arms.fire_frame = 5;
+    attack.arms.fire_frame = crate::objects::Frame::of_data(5);
     attack.arms.sprite = Some(sprite(SpriteId::named(301)));
     attack.arms.idle_sprite = Some(sprite(SpriteId::named(300)));
     archer.actions.set_attack(Some(attack));
@@ -16306,8 +16312,8 @@ fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
     let mut drawn = archer_world(100, 0, 0.0);
     let sprite = Graphic {
         id: SpriteId::named(302),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -17355,8 +17361,8 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
     t.build_mesh().unwrap();
     let walking = Graphic {
         id: SpriteId::named(31),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -18710,7 +18716,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
     let m = v.body.mover_mut().unwrap();
     m.moved_at = here;
     m.stats.facets = Some(crate::objects::facing::SpriteFacets {
-        count: 8,
+        count: crate::objects::FacetCount::of_data(8),
         turns: false,
     });
     v.actions.build_mut().unwrap().task.work_value = 1.0;
@@ -18793,7 +18799,7 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
     let m = v.body.mover_mut().unwrap();
     m.moved_at = here;
     m.stats.facets = Some(crate::objects::facing::SpriteFacets {
-        count: 8,
+        count: crate::objects::FacetCount::of_data(8),
         turns: false,
     });
     in_update(
@@ -18879,8 +18885,8 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
     let id = building_death(master, None, progress).unwrap();
     let shown = Graphic {
         id,
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -19300,7 +19306,7 @@ fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
     let m = v.body.mover_mut().unwrap();
     m.moved_at = here;
     m.stats.facets = Some(crate::objects::facing::SpriteFacets {
-        count: 8,
+        count: crate::objects::FacetCount::of_data(8),
         turns: false,
     });
     v.actions.build_mut().unwrap().task.work_value = 1.0;

@@ -4,6 +4,7 @@ use crate::fixtures::{
 };
 use crate::masters::{MasterTable, Turning};
 use crate::movers::mover;
+use genie_core::objects::FacetCount;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_save::generated::world::{Master, PathData, PlayerObjects};
@@ -29,9 +30,24 @@ fn table() -> MasterTable {
         min_collision_size_multiplier: 1.0,
     };
     MasterTable::of_master(0, 83, Some(turning), 0)
-        .with_sprite(SpriteId::named(10), 0.0, 8, SpriteFlags::NONE)
-        .with_sprite(SpriteId::named(11), 2.0, 8, SpriteFlags::NONE)
-        .with_sprite(SpriteId::named(12), 3.0, 8, SpriteFlags::NONE)
+        .with_sprite(
+            SpriteId::named(10),
+            0.0,
+            FacetCount::of_data(8),
+            SpriteFlags::NONE,
+        )
+        .with_sprite(
+            SpriteId::named(11),
+            2.0,
+            FacetCount::of_data(8),
+            SpriteFlags::NONE,
+        )
+        .with_sprite(
+            SpriteId::named(12),
+            3.0,
+            FacetCount::of_data(8),
+            SpriteFlags::NONE,
+        )
         .with_masks(vec![0, 0b11])
 }
 
@@ -106,8 +122,12 @@ fn what_the_mover_cannot_read_is_unsupported() {
     assert!(run(&walker(11), &PlayerObjects::default(), Some(&table())).is_err());
     assert!(run(&walker(11), &objects, None).is_err());
     assert!(run(&walker(99), &objects, Some(&table())).is_err());
-    let unturned =
-        MasterTable::default().with_sprite(SpriteId::named(11), 1.0, 8, SpriteFlags::NONE);
+    let unturned = MasterTable::default().with_sprite(
+        SpriteId::named(11),
+        1.0,
+        FacetCount::of_data(8),
+        SpriteFlags::NONE,
+    );
     assert!(run(&walker(11), &objects, Some(&unturned)).is_err());
     let masks = table().with_masks(vec![0]);
     assert!(run(&walker(11), &objects, Some(&masks)).is_err());

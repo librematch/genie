@@ -53,7 +53,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             builders: unit_list(object_ids(ids.clone())),
             queued: false,
             commits: true,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         }),
         Command::BuildWall(BuildWallCommand {
             player: player_id(p),

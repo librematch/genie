@@ -658,8 +658,8 @@ mod tests {
 
     const WALKING: Graphic = Graphic {
         id: SpriteId::named(7),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

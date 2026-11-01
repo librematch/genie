@@ -38,10 +38,16 @@ const DT: f32 = 0.02;
 /// 0.05 turns 2π / 0.8 a second, 11.25° in a tick of 0.025 s; a villager turns at once.
 #[test]
 fn a_master_s_turn_rate_comes_from_its_turn_speed_and_walking_facets() {
-    let rate = turn_rate(Seconds::new(0.05), Some(16));
+    let rate = turn_rate(
+        Seconds::new(0.05),
+        Some(crate::objects::FacetCount::of_data(16)),
+    );
     assert_eq!(rate, TurnRate::new(TWO_PI / (16.0f32 * 0.05)));
     assert_eq!(rate.get().to_bits(), 7.853_982f32.to_bits());
-    assert_eq!(turn_rate(Seconds::ZERO, Some(16)), TurnRate::MAX);
+    assert_eq!(
+        turn_rate(Seconds::ZERO, Some(crate::objects::FacetCount::of_data(16))),
+        TurnRate::MAX
+    );
     assert_eq!(turn_rate(Seconds::new(0.05), None), TurnRate::MAX);
 }
 
@@ -57,11 +63,19 @@ fn a_master_s_turning_values_follow_its_turn_speed_and_walking_sprite() {
         revolution_rate: TurnRate::new(5.0),
     };
     assert_eq!(
-        turning(Seconds::ZERO, Some(16), before),
+        turning(
+            Seconds::ZERO,
+            Some(crate::objects::FacetCount::of_data(16)),
+            before
+        ),
         (Turning::PRESET, false)
     );
     assert_eq!(turning(Seconds::new(0.05), None, before), (before, false));
-    let (after, set) = turning(Seconds::new(0.05), Some(16), before);
+    let (after, set) = turning(
+        Seconds::new(0.05),
+        Some(crate::objects::FacetCount::of_data(16)),
+        before,
+    );
     assert!(set);
     let rate = TWO_PI / (16.0f32 * 0.05);
     assert_eq!(
@@ -75,7 +89,13 @@ fn a_master_s_turning_values_follow_its_turn_speed_and_walking_sprite() {
     );
     // a sprite of no facets: a revolution of 0, the largest float
     assert_eq!(
-        turning(Seconds::new(0.05), Some(0), before).0.rate,
+        turning(
+            Seconds::new(0.05),
+            Some(crate::objects::FacetCount::of_data(0)),
+            before
+        )
+        .0
+        .rate,
         TurnRate::MAX
     );
 }
@@ -96,7 +116,7 @@ fn stats() -> MoveStats {
         min_collision: 1.0,
         fast_turn: false,
         facets: Some(crate::objects::facing::SpriteFacets {
-            count: 16,
+            count: crate::objects::FacetCount::of_data(16),
             turns: true,
         }),
         weapon_range: Distance::ZERO,
@@ -1035,7 +1055,7 @@ fn a_yaw_turns_forward_and_right_and_takes_the_facet_s_angle() {
     m.forward = BVector::new(1.0, 0.0, 0.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
     let facets = crate::objects::facing::SpriteFacets {
-        count: 16,
+        count: crate::objects::FacetCount::of_data(16),
         turns: true,
     };
     m.yaw(Angle::new(-std::f32::consts::FRAC_PI_2), Some(facets))
@@ -3178,8 +3198,8 @@ fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
     use crate::objects::sprite::Graphic;
     let with = |factor: f32| Graphic {
         id: SpriteId::named(1),
-        frames: 1,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(1),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: factor,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,

@@ -27,8 +27,8 @@ use crate::world::tests::{forage_world, in_update};
 /// A graphic of sixteen facets, its sequence flag bit 1 set (`turns`).
 const WALKING: Graphic = Graphic {
     id: SpriteId::named(300),
-    frames: 10,
-    facets: 16,
+    frames: crate::objects::Frame::of_data(10),
+    facets: crate::objects::FacetCount::of_data(16),
     speed_multiplier: 1.0,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
@@ -76,7 +76,7 @@ fn the_movement_state_takes_the_sprite_s_facets() {
     assert_eq!(
         u.body.mover().unwrap().sprite_facets,
         Some(crate::objects::facing::SpriteFacets {
-            count: 16,
+            count: crate::objects::FacetCount::of_data(16),
             turns: true,
         })
     );

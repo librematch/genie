@@ -102,8 +102,8 @@ fn an_object_has_actions_while_it_holds_one() {
 fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
     let g = |id| crate::objects::sprite::Graphic {
         id,
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -116,8 +116,8 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
         idle_sprite: Some(g(SpriteId::named(4))),
         idle_attack_sprite: None,
         missile: None,
-        fire_frame: 0,
-        interrupt_frame: -1,
+        fire_frame: crate::objects::Frame::of_data(0),
+        interrupt_frame: crate::objects::Frame::of_data(-1),
     };
     let sprites = MasterSprites {
         moving: Some(g(SpriteId::named(11))),
@@ -315,8 +315,8 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
     let mut t = let_out_world();
     let standing = crate::objects::sprite::Graphic {
         id: SpriteId::named(300),
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -862,8 +862,8 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     use crate::objects::masters::attribute as a;
     let fast = crate::objects::sprite::Graphic {
         id: SpriteId::named(7),
-        frames: 1,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(1),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 2.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1971,8 +1971,8 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
     use crate::objects::sprite::{ActiveSprite, Graphic};
     let graphic = |id| Graphic {
         id,
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

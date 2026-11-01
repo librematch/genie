@@ -111,7 +111,7 @@ pub struct Lifecycle {
     /// A static object's sprite after its death (the master's dying sprite, else its current
     /// one) starts on a random facet (sequence flag 4) of this many (more than one): its death
     /// draws the facet from the Object stream.
-    pub death_facets: Option<i16>,
+    pub death_facets: Option<crate::objects::FacetCount>,
     /// `+0x2f0`: the object it is inside (its `inside_obj`), whose update decides for it.
     pub inside: Option<ObjectId>,
     /// `+0x643`: the next update moves the object to the sleeping list.
@@ -231,8 +231,8 @@ impl Lifecycle {
         // hit points (0) bring it here in the same update
         self.state = ObjectState::Dying;
         if let Some(facets) = self.death_facets.filter(|_| self.class == Class::Static) {
-            let facet = (object.rand15() as i32 * i32::from(facets)) / 0x7fff;
-            let _facet = facet.min(i32::from(facets) - 1);
+            let facet = (object.rand15() as i32 * facets.counted()) / 0x7fff;
+            let _facet = facet.min(facets.counted() - 1);
         }
         // RGE_Animated_Object::update: state 4 with a dying sprite (which the static update gave
         // the object, slot 0x68: the caller's), else 5
@@ -480,7 +480,7 @@ mod tests {
             attribute_type: Some(attribute::WOOD),
             amount: Amount::new(100.0),
             death_spawn: true,
-            death_facets: Some(8),
+            death_facets: Some(crate::objects::FacetCount::of_data(8)),
             ..dead(Class::Static)
         };
         let mut object = Well512::default();

@@ -443,9 +443,9 @@ pub struct Master {
     /// `missile_id`, −1 for none: every short the effects leave in it is kept.
     pub missile: MasterField,
     /// `fire_missile_at_frame`.
-    pub fire_frame: i16,
+    pub fire_frame: crate::objects::Frame,
     /// `interrupt_frame`.
-    pub interrupt_frame: i16,
+    pub interrupt_frame: crate::objects::Frame,
     /// `base_hit_chance`.
     pub hit_chance: HitChance,
     /// `speed_of_attack`: the reload time.

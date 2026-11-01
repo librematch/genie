@@ -728,8 +728,8 @@ mod tests {
     const fn graphic(id: i16) -> Graphic {
         Graphic {
             id: SpriteId::named(id),
-            frames: 10,
-            facets: 1,
+            frames: crate::objects::Frame::of_data(10),
+            facets: crate::objects::FacetCount::of_data(1),
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,

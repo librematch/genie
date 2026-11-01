@@ -4,7 +4,9 @@
 
 mod action_state;
 pub mod actions;
+mod facet;
 pub mod facing;
+mod frame;
 pub(crate) mod hit_points;
 mod hp;
 pub mod layers;
@@ -25,6 +27,8 @@ pub mod unit;
 mod work_rate;
 
 pub use self::action_state::ActionState;
+pub use self::facet::{Facet, FacetCount};
+pub use self::frame::{AnimateState, Frame};
 pub use self::hit_points::HpPowerup;
 pub use self::hp::{HitPoints, MasterHitPoints};
 pub use self::lifecycle::ObjectState;

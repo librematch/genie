@@ -12,6 +12,8 @@ use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::MoveWaitState;
 use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
+use genie_core::objects::FacetCount;
+use genie_core::objects::Frame;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
@@ -302,8 +304,8 @@ fn a_move_to_s_wait_state_of_none_fails() {
 fn a_move_to_takes_its_sprite_from_the_sprites_table() {
     let walking = Graphic {
         id: SpriteId::named(5),
-        frames: 10,
-        facets: 16,
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: 1.5,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -695,8 +697,8 @@ fn a_build_takes_its_task_move_to_and_site() {
     let dropping = with_sub(dropping, MOVE_TO, carrying);
     let carried = Graphic {
         id: SpriteId::named(12),
-        frames: 10,
-        facets: 16,
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1182,8 +1184,8 @@ fn a_wait_solidify_waits_for_its_foundation() {
 fn swing_sprites() -> std::collections::BTreeMap<SpriteId, Graphic> {
     let swing = Graphic {
         id: SpriteId::named(21),
-        frames: 10,
-        facets: 8,
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

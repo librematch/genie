@@ -143,7 +143,7 @@ impl World {
                 {
                     let d = self.streams.get(Stream::Object).rand15() as i32;
                     let _ =
-                        d.checked_rem(i32::from(g.facets) - 1)
+                        d.checked_rem(g.facets.counted() - 1)
                             .ok_or(GenieError::unreachable(
                                 "a random first facet of a sprite of one facet",
                             ))?;

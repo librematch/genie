@@ -118,7 +118,10 @@ pub(super) const TWO_PI: f32 = crate::math::image::movement::TWO_PI;
 /// `FUN_1410e39e0`), and 2π over that is the rate (`+0x77c`, copied to `+0x774`); without either
 /// the largest float. The `.dat`'s own turning values do not survive the copy.
 #[must_use]
-pub fn turn_rate(turn_speed: Seconds, walking_facets: Option<i16>) -> TurnRate {
+pub fn turn_rate(
+    turn_speed: Seconds,
+    walking_facets: Option<crate::objects::FacetCount>,
+) -> TurnRate {
     turning(turn_speed, walking_facets, Turning::PRESET).0.rate
 }
 
@@ -159,7 +162,7 @@ impl Turning {
 #[must_use]
 pub fn turning(
     turn_speed: Seconds,
-    walking_facets: Option<i16>,
+    walking_facets: Option<crate::objects::FacetCount>,
     before: Turning,
 ) -> (Turning, bool) {
     if turn_speed == Seconds::ZERO {
@@ -168,7 +171,7 @@ pub fn turning(
     let Some(facets) = walking_facets else {
         return (before, false);
     };
-    let revolution = Seconds::new(f32::from(facets) * turn_speed.get());
+    let revolution = Seconds::new(f32::from(facets.get()) * turn_speed.get());
     let revolution_rate = if revolution == Seconds::ZERO {
         TurnRate::MAX
     } else {

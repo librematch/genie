@@ -113,7 +113,7 @@ impl World {
         p: PlayerId,
         master: MasterId,
         at: Position,
-        facet: Option<u8>,
+        facet: Option<crate::objects::Facet>,
     ) -> Result<(), GenieError> {
         let made = self.master(p, master)?.clone();
         if made.kind == BUILDING {
@@ -130,7 +130,7 @@ impl World {
                     .copied();
                 let own = standing.map_or(
                     crate::objects::facing::SpriteFacets {
-                        count: 0,
+                        count: crate::objects::FacetCount::NONE,
                         turns: false,
                     },
                     |g| crate::objects::facing::SpriteFacets {
@@ -215,7 +215,7 @@ impl World {
         let mut sprite = None;
         if let Some(g) = standing {
             sprite = Some(ActiveSprite::start(g, self.streams.get(Stream::Sprite)));
-            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets {
+            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
                 let _ = self.streams.get(Stream::Object).rand15();
             }
         }
@@ -242,7 +242,7 @@ impl World {
                         "moving remains of an object without a facet the slice holds",
                     ))?;
                     let own = facets.unwrap_or(crate::objects::facing::SpriteFacets {
-                        count: 0,
+                        count: crate::objects::FacetCount::NONE,
                         turns: false,
                     });
                     crate::objects::facing::angle_of_facet(facet, own)
@@ -288,7 +288,7 @@ impl World {
             let after = made.death_sprite.or(made.standing_sprite);
             after
                 .and_then(|after| self.graphics.get(&after))
-                .filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets)
+                .filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several())
                 .map(|g| g.facets)
         } else {
             None

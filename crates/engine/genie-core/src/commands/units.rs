@@ -173,7 +173,7 @@ mod tests {
             builders: UnitList::last_commanded(),
             queued: false,
             commits: true,
-            frame: 0,
+            frame: crate::objects::Frame::of_data(0),
         }));
         w.run(&Command::Stop(StopCommand {
             player: player_id(1),

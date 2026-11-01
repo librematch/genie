@@ -54,37 +54,47 @@ use std::collections::BTreeMap;
 #[test]
 fn a_swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
     use AfterHit::{Continue, Done, Ready};
+    let f = crate::objects::Frame::of_data;
     // ranged, timer run out (NaN counts too)
-    assert_eq!(after_hit(true, Seconds::ZERO, false, 5, 3, 9), Done);
-    assert_eq!(after_hit(true, Seconds::ZERO, true, 5, 3, 6), Ready);
     assert_eq!(
-        after_hit(true, Seconds::new(f32::NAN), true, 5, 3, 6),
+        after_hit(true, Seconds::ZERO, false, f(5), f(3), f(9)),
+        Done
+    );
+    assert_eq!(
+        after_hit(true, Seconds::ZERO, true, f(5), f(3), f(6)),
         Ready
     );
-    assert_eq!(after_hit(true, Seconds::new(-1.0), true, -1, 3, 4), Ready);
     assert_eq!(
-        after_hit(true, Seconds::ZERO, true, -1, 3, 3),
+        after_hit(true, Seconds::new(f32::NAN), true, f(5), f(3), f(6)),
+        Ready
+    );
+    assert_eq!(
+        after_hit(true, Seconds::new(-1.0), true, f(-1), f(3), f(4)),
+        Ready
+    );
+    assert_eq!(
+        after_hit(true, Seconds::ZERO, true, f(-1), f(3), f(3)),
         Continue { check: false }
     );
     assert_eq!(
-        after_hit(true, Seconds::ZERO, true, 5, 3, 5),
+        after_hit(true, Seconds::ZERO, true, f(5), f(3), f(5)),
         Continue { check: true }
     );
     // ranged with time left, or melee: only the interrupt test
     assert_eq!(
-        after_hit(true, Seconds::new(0.5), false, 5, 3, 9),
+        after_hit(true, Seconds::new(0.5), false, f(5), f(3), f(9)),
         Continue { check: true }
     );
     assert_eq!(
-        after_hit(false, Seconds::ZERO, false, 5, 3, 4),
+        after_hit(false, Seconds::ZERO, false, f(5), f(3), f(4)),
         Continue { check: false }
     );
     assert_eq!(
-        after_hit(false, Seconds::ZERO, true, 5, 3, 5),
+        after_hit(false, Seconds::ZERO, true, f(5), f(3), f(5)),
         Continue { check: true }
     );
     assert_eq!(
-        after_hit(false, Seconds::ZERO, true, -1, 3, 9),
+        after_hit(false, Seconds::ZERO, true, f(-1), f(3), f(9)),
         Continue { check: false }
     );
 }
@@ -136,8 +146,8 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: 0,
-            interrupt_frame: -1,
+            fire_frame: crate::objects::Frame::of_data(0),
+            interrupt_frame: crate::objects::Frame::of_data(-1),
         },
         sub_action: false,
         on_target_moved: TargetMoved::Follows,
@@ -151,8 +161,8 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
 fn a_stop_ends_the_attack_and_the_unit_stands() {
     let stand = Graphic {
         id: SpriteId::named(1),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -442,8 +452,8 @@ fn an_area_effect_s_attack_takes_a_building_s_main_building() {
 fn a_sprite_resets_only_for_its_own_graphic() {
     let swing = Graphic {
         id: SpriteId::named(224),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -454,8 +464,8 @@ fn a_sprite_resets_only_for_its_own_graphic() {
         ..swing
     };
     let mut sprite = Some(ActiveSprite {
-        frame: 6,
-        last_frame: 5,
+        frame: crate::objects::Frame::of_data(6),
+        last_frame: crate::objects::Frame::of_data(5),
         looped: true,
         ..ActiveSprite::start(swing, &mut Well512::default())
     });
@@ -464,7 +474,14 @@ fn a_sprite_resets_only_for_its_own_graphic() {
     assert_eq!(sprite, before);
     assert!(reset_sprite(&mut sprite, swing));
     let s = sprite.unwrap();
-    assert_eq!((s.frame, s.last_frame, s.looped), (0, 0, false));
+    assert_eq!(
+        (s.frame, s.last_frame, s.looped),
+        (
+            crate::objects::Frame::of_data(0),
+            crate::objects::Frame::of_data(0),
+            false
+        )
+    );
     assert!(!reset_sprite(&mut None, swing));
 }
 
@@ -495,7 +512,7 @@ fn soldier_mover(speed: f32) -> Mover {
             min_collision: 1.0,
             fast_turn: false,
             facets: Some(crate::objects::facing::SpriteFacets {
-                count: 8,
+                count: crate::objects::FacetCount::of_data(8),
                 turns: true,
             }),
             weapon_range: Distance::ZERO,
@@ -519,8 +536,8 @@ fn soldier_mover(speed: f32) -> Mover {
 
 const STANDING: Graphic = Graphic {
     id: SpriteId::named(300),
-    frames: 10,
-    facets: 8,
+    frames: crate::objects::Frame::of_data(10),
+    facets: crate::objects::FacetCount::of_data(8),
     speed_multiplier: 1.0,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
@@ -1620,11 +1637,12 @@ fn a_swing_that_fails_its_interrupt_check_stays_failed() {
     };
     rig.unit_mut().sprite = Some(ActiveSprite {
         looped: true,
-        frame: 9,
+        frame: crate::objects::Frame::of_data(9),
         ..ActiveSprite::start(swing, &mut Well512::default())
     });
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
-    (a.state, a.seen, a.arms.interrupt_frame) = (AttackState::Swing, at, 5);
+    (a.state, a.seen, a.arms.interrupt_frame) =
+        (AttackState::Swing, at, crate::objects::Frame::of_data(5));
     let code = rig.run(20, |c, u, f, r| {
         a.update(c, u, me(1, AttackState::Ready), f, r)
     });
@@ -1653,8 +1671,8 @@ fn a_rangeless_attack_reaches_a_tenth_squared_in_f32() {
 fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
     let standing = Graphic {
         id: SpriteId::named(418),
-        frames: 1,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(1),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
@@ -1680,8 +1698,8 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
             idle_sprite: Some(standing),
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: 0,
-            interrupt_frame: -1,
+            fire_frame: crate::objects::Frame::of_data(0),
+            interrupt_frame: crate::objects::Frame::of_data(-1),
         },
         sub_action: false,
         on_target_moved: TargetMoved::Follows,
@@ -1719,8 +1737,8 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
 fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
     let g = |id| Graphic {
         id,
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -2258,8 +2276,8 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     use crate::world::tests::{forage_world, in_update};
     let stand = Graphic {
         id: SpriteId::named(9),
-        frames: 10,
-        facets: 1,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(1),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -2322,8 +2340,8 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
 /// `last` to `frame`.
 fn at_frame(frame: i16, last: i16) -> ActiveSprite {
     ActiveSprite {
-        frame,
-        last_frame: last,
+        frame: crate::objects::Frame::of_data(frame),
+        last_frame: crate::objects::Frame::of_data(last),
         changed: true,
         looped: false,
         ..ActiveSprite::start(STANDING, &mut Well512::default())
@@ -2337,7 +2355,7 @@ fn swinging_attack(state: AttackState, ranged: bool, fire: i16) -> Attack {
     a.pending = true;
     a.arms.idle_sprite = Some(STANDING);
     a.arms.missile = if ranged { Some(master_id(5)) } else { None };
-    a.arms.fire_frame = fire;
+    a.arms.fire_frame = crate::objects::Frame::of_data(fire);
     a
 }
 
@@ -2377,8 +2395,8 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
     let r = reads();
     let mut swing_at = |t: &mut World, a: &mut Attack, frame: i16| {
         let sprite = ActiveSprite {
-            frame,
-            last_frame: frame - 1,
+            frame: crate::objects::Frame::of_data(frame),
+            last_frame: crate::objects::Frame::of_data(frame - 1),
             changed: true,
             looped: false,
             ..ActiveSprite::start(t.graphics[&SpriteId::named(301)], &mut Well512::default())
@@ -2467,8 +2485,8 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
     };
     let r = reads();
     let sprite = ActiveSprite {
-        frame: 5,
-        last_frame: 4,
+        frame: crate::objects::Frame::of_data(5),
+        last_frame: crate::objects::Frame::of_data(4),
         changed: true,
         ..ActiveSprite::start(t.graphics[&SpriteId::named(301)], &mut Well512::default())
     };
@@ -2500,15 +2518,33 @@ fn a_swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         (a.state, rig.mover().animated.speed)
     };
     assert_eq!(
-        after(None, 5, at_frame(9, 8), Seconds::ZERO).0,
+        after(
+            None,
+            crate::objects::Frame::of_data(5),
+            at_frame(9, 8),
+            Seconds::ZERO
+        )
+        .0,
         AttackState::Killed
     );
     assert_eq!(
-        after(Some(object_id(10028)), 5, at_frame(6, 5), Seconds::ZERO).0,
+        after(
+            Some(object_id(10028)),
+            crate::objects::Frame::of_data(5),
+            at_frame(6, 5),
+            Seconds::ZERO
+        )
+        .0,
         AttackState::GotoSeen
     );
     assert_eq!(
-        after(Some(object_id(10028)), -1, at_frame(3, 2), Seconds::ZERO).0,
+        after(
+            Some(object_id(10028)),
+            crate::objects::Frame::of_data(-1),
+            at_frame(3, 2),
+            Seconds::ZERO
+        )
+        .0,
         AttackState::Swing
     );
     let looped = ActiveSprite {
@@ -2516,7 +2552,12 @@ fn a_swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         ..at_frame(0, 9)
     };
     assert_eq!(
-        after(Some(object_id(10028)), -1, looped, Seconds::new(0.5)),
+        after(
+            Some(object_id(10028)),
+            crate::objects::Frame::of_data(-1),
+            looped,
+            Seconds::new(0.5)
+        ),
         (AttackState::GotoSeen, 1.0)
     );
 }

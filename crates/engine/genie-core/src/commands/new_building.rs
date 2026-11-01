@@ -324,7 +324,7 @@ impl World {
             livestock_summation: 0.0,
             livestock: Vec::new(),
             pasture_workers: Vec::new(),
-            build_frame: 0,
+            build_frame: crate::objects::Frame::ZERO,
             raider_countdown: 0,
             // every building holds a gate's lock, open
             gate: Some(Gate {

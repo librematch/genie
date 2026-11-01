@@ -474,8 +474,8 @@ mod tests {
             .map(|(id, frame_duration)| {
                 let g = Graphic {
                     id: SpriteId::named(id),
-                    frames: 60,
-                    facets: 16,
+                    frames: crate::objects::Frame::of_data(60),
+                    facets: crate::objects::FacetCount::of_data(16),
                     speed_multiplier: 1.0,
                     frame_duration: Seconds::new(frame_duration),
                     replay_delay: Seconds::ZERO,

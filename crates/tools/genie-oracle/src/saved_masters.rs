@@ -14,6 +14,7 @@ use genie_core::map::Radii;
 use genie_core::map::TerrainId;
 use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::Speed;
+use genie_core::objects::Frame;
 use genie_core::objects::HitPoints;
 use genie_core::objects::MasterHitPoints;
 use genie_core::objects::SpriteId;
@@ -279,8 +280,8 @@ pub(super) fn work_masters(
                 Offset::new(rc.weapon_offset_x, rc.weapon_offset_y, rc.weapon_offset_z);
             work.missed_spread = rc.missed_missile_spread;
             work.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
-            work.fire_frame = rc.fire_missile_at_frame;
-            work.interrupt_frame = rc.interrupt_frame;
+            work.fire_frame = Frame::of_data(rc.fire_missile_at_frame);
+            work.interrupt_frame = Frame::of_data(rc.interrupt_frame);
             work.hit_chance = HitChance::of_data(rc.base_hit_chance);
             work.reload = Seconds::new(rc.speed_of_attack);
             work.weapons = rc

@@ -8,6 +8,8 @@ use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::TargetMoved;
+use genie_core::objects::AnimateState;
+use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
@@ -66,18 +68,19 @@ pub(super) fn saved_sprite(
             .filter_map(|n| n.rge_active_sprite.as_deref())
             .find(|a| a.sprite_id as i16 == s.sprite)?;
         return Some(genie_core::objects::sprite::ActiveSprite::at_rest(
-            graphic, node.frame,
+            graphic,
+            Frame::of_data(node.frame),
         ));
     };
     Some(genie_core::objects::sprite::ActiveSprite {
         graphic,
-        frame: node.rge_active_sprite.frame,
+        frame: Frame::of_data(node.rge_active_sprite.frame),
         interval: Seconds::new(node.animate_interval),
         last: Seconds::new(node.animate_last),
-        last_frame: node.last_frame as i16,
+        last_frame: Frame::of_data(node.last_frame as i16),
         changed: node.frame_changed != 0,
         looped: node.frame_looped != 0,
-        animate: node.animate_flag,
+        animate: AnimateState::of_data(node.animate_flag),
         speed: node.last_speed_value,
     })
 }
@@ -141,8 +144,8 @@ pub(super) fn saved_attack(
             idle_sprite: g(a.short_val_3),
             idle_attack_sprite: g(a.short_val_4),
             missile: MasterId::of_data(a.missile_id),
-            fire_frame: a.frame_delay,
-            interrupt_frame: a.interrupt_animation_at_frame,
+            fire_frame: Frame::of_data(a.frame_delay),
+            interrupt_frame: Frame::of_data(a.interrupt_animation_at_frame),
         },
         sub_action: b.sub_action_value != 0,
         on_target_moved: TargetMoved::try_from(b.target_moved_state)?,

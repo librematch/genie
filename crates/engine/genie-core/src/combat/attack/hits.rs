@@ -7,6 +7,7 @@ use crate::combat::damage::Victim;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
+use crate::objects::Frame;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
@@ -57,21 +58,25 @@ pub(super) fn after_hit(
     ranged: bool,
     timer: Seconds,
     target: bool,
-    interrupt: i16,
-    fire: i16,
-    frame: i16,
+    interrupt: Frame,
+    fire: Frame,
+    frame: Frame,
 ) -> AfterHit {
     if ranged && crate::math::fmath::at_most_or_unordered(timer.get(), 0.0) {
         if !target {
             return AfterHit::Done;
         }
-        let limit = if interrupt == -1 { fire } else { interrupt };
+        let limit = if interrupt == Frame::NONE {
+            fire
+        } else {
+            interrupt
+        };
         if limit < frame {
             return AfterHit::Ready;
         }
     }
     AfterHit::Continue {
-        check: interrupt != -1 && interrupt <= frame,
+        check: interrupt != Frame::NONE && interrupt <= frame,
     }
 }
 

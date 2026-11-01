@@ -292,7 +292,7 @@ pub(crate) fn show_built(
     sprite: &mut Option<crate::objects::sprite::ActiveSprite>,
     stats: Option<&mut crate::movement::MoveStats>,
     master: &Master,
-    frame: u8,
+    frame: crate::objects::Frame,
     graphics: &BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
     sprite_rng: &mut crate::math::rng::Well512,
 ) {
@@ -302,7 +302,7 @@ pub(crate) fn show_built(
     if let Some(g) = standing {
         crate::objects::sprite::new_sprite(sprite, stats, g, sprite_rng);
         if let Some(s) = sprite.as_mut().filter(|s| s.graphic.id == g.id) {
-            s.set_frame(i16::from(frame));
+            s.set_frame(frame);
         }
     }
 }
@@ -321,8 +321,8 @@ mod built_sprite_tests {
     fn a_completed_building_shows_its_standing_sprite_at_its_frame() {
         let g = |id, flags| Graphic {
             id,
-            frames: 4,
-            facets: 1,
+            frames: crate::objects::Frame::of_data(4),
+            facets: crate::objects::FacetCount::of_data(1),
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -347,21 +347,39 @@ mod built_sprite_tests {
             g(SpriteId::named(10), SpriteFlags::ANIMATED),
             &mut rng,
         ));
-        show_built(&mut sprite, None, &master, 2, &graphics, &mut rng);
+        show_built(
+            &mut sprite,
+            None,
+            &master,
+            crate::objects::Frame::of_data(2),
+            &graphics,
+            &mut rng,
+        );
         let s = sprite.unwrap();
         assert_eq!(
             (s.graphic.id, s.frame, s.last_frame),
-            (SpriteId::named(11), 2, 2)
+            (
+                SpriteId::named(11),
+                crate::objects::Frame::of_data(2),
+                crate::objects::Frame::of_data(2)
+            )
         );
         let statics = BTreeMap::from([(
             SpriteId::named(11),
             g(SpriteId::named(11), SpriteFlags::NONE),
         )]);
         let mut none = None;
-        show_built(&mut none, None, &master, 3, &statics, &mut rng);
+        show_built(
+            &mut none,
+            None,
+            &master,
+            crate::objects::Frame::of_data(3),
+            &statics,
+            &mut rng,
+        );
         assert_eq!(
             none.map(|s| (s.graphic.id, s.frame)),
-            Some((SpriteId::named(11), 3))
+            Some((SpriteId::named(11), crate::objects::Frame::of_data(3)))
         );
     }
 }

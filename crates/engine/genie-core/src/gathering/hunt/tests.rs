@@ -255,7 +255,7 @@ pub(crate) fn walker() -> Mover {
             min_collision: 1.0,
             fast_turn: false,
             facets: Some(crate::objects::facing::SpriteFacets {
-                count: 16,
+                count: crate::objects::FacetCount::of_data(16),
                 turns: true,
             }),
             weapon_range: Distance::ZERO,
@@ -319,8 +319,8 @@ const ARMS: Arms = Arms {
     idle_sprite: None,
     idle_attack_sprite: None,
     missile: None,
-    fire_frame: 0,
-    interrupt_frame: -1,
+    fire_frame: crate::objects::Frame::of_data(0),
+    interrupt_frame: crate::objects::Frame::of_data(-1),
 };
 
 const CHOP: HuntTask = HuntTask {
@@ -768,8 +768,8 @@ fn a_hunt_whose_target_went_walks_to_its_point() {
 fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
     const MOVING: Graphic = Graphic {
         id: SpriteId::named(1880),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1376,8 +1376,8 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
         (a.sub_action, a.seen) = (true, Position::new(30.0, 88.0, 0.0));
         a.arms.idle_sprite = Some(Graphic {
             id: SpriteId::named(1),
-            frames: 10,
-            facets: 8,
+            frames: crate::objects::Frame::of_data(10),
+            facets: crate::objects::FacetCount::of_data(8),
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -1684,8 +1684,8 @@ fn a_drop_off_gives_the_load_to_the_player() {
 fn a_hunt_s_walk_starts_toward_its_target() {
     const MOVING: Graphic = Graphic {
         id: SpriteId::named(1880),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

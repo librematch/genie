@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::math::rng::Stream;
+use crate::objects::AnimateState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
@@ -28,9 +29,9 @@ impl Unit {
             ));
         }
         // the sprite list's slot 0x20 on the current sprite (FUN_1413b38a0)
-        let animating = self
-            .sprite
-            .is_some_and(|s| s.animate != 0 && s.graphic.flags.contains(SpriteFlags::ANIMATED));
+        let animating = self.sprite.is_some_and(|s| {
+            s.animate != AnimateState::STOPPED && s.graphic.flags.contains(SpriteFlags::ANIMATED)
+        });
         let leaves =
             if self
                 .life

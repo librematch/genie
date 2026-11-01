@@ -23,6 +23,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
+use crate::objects::{AnimateState, FacetCount, Frame};
 use crate::world::Seconds;
 use genie_diff::Diff;
 
@@ -32,9 +33,9 @@ pub struct Graphic {
     /// The graphic's id.
     pub id: SpriteId,
     /// `+0x8`, `frame_count`.
-    pub frames: i16,
+    pub frames: Frame,
     /// `+0xa`, `angle_count`: the facets.
-    pub facets: i16,
+    pub facets: FacetCount,
     /// `+0xc`, `speed_multiplier`: at least 1e-7, it scales the frame duration.
     pub speed_multiplier: f32,
     /// `+0x10`, `frame_duration`.
@@ -55,8 +56,12 @@ impl Graphic {
     }
 
     /// The first frame: the last one for a sprite played backwards.
-    const fn first_frame(&self) -> i16 {
-        if self.backwards() { self.frames - 1 } else { 0 }
+    fn first_frame(&self) -> Frame {
+        if self.backwards() {
+            self.frames - Frame::ONE
+        } else {
+            Frame::ZERO
+        }
     }
 }
 
@@ -109,19 +114,19 @@ pub struct ActiveSprite {
     /// The graphic.
     pub graphic: Graphic,
     /// `+0x24`, `frame`.
-    pub frame: i16,
+    pub frame: Frame,
     /// `+0x28`, `animate_interval`: one frame's time at the last speed.
     pub interval: Seconds,
     /// `+0x2c`, `animate_last`: the time since the last frame.
     pub last: Seconds,
     /// `+0x30`, `last_frame`: the frame before the last advance.
-    pub last_frame: i16,
+    pub last_frame: Frame,
     /// `+0x34`, `frame_changed`; `+0x35`, `frame_looped`.
     pub changed: bool,
     /// `+0x35`, `frame_looped`.
     pub looped: bool,
     /// `+0x36`, `animate_flag`: 0 stopped, 1 playing, 2 in the replay delay.
-    pub animate: u8,
+    pub animate: AnimateState,
     /// `+0x38`, `lastSpeedValue`.
     pub speed: f32,
 }
@@ -134,7 +139,7 @@ impl ActiveSprite {
         if !graphic.animated() {
             return Self::start_static(graphic, sprite_rng);
         }
-        let last = graphic.frames - 1;
+        let last = graphic.frames - Frame::ONE;
         if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             // FUN_1413b3490's draw, which the second one overrides
             let _ = sprite_rng.rand15();
@@ -147,7 +152,7 @@ impl ActiveSprite {
             last_frame: graphic.first_frame(),
             changed: false,
             looped: false,
-            animate: 1,
+            animate: AnimateState::PLAYING,
             speed: 0.0,
         };
         if f64::from(s.interval.get()) < 0.001 {
@@ -158,17 +163,17 @@ impl ActiveSprite {
             if 0.0 < d {
                 let draw = sprite_rng.rand15();
                 let t = (draw as i32 as f32
-                    * (f32::from(graphic.frames) * d + graphic.replay_delay.get()))
+                    * (graphic.frames.as_f32() * d + graphic.replay_delay.get()))
                     / 32767.0;
-                let f = (t / d) as i32 as i16;
+                let f = Frame::of_data((t / d) as i32 as i16);
                 s.frame = f;
                 if graphic.frames <= f {
                     s.frame = last;
-                    s.interval = Seconds::new(t - f32::from(last) * d);
+                    s.interval = Seconds::new(t - last.as_f32() * d);
                 }
             } else {
                 let draw = sprite_rng.rand15() as i32;
-                let f = (draw * i32::from(graphic.frames) / 0x7fff) as i16;
+                let f = Frame::of_data((draw * i32::from(graphic.frames.get()) / 0x7fff) as i16);
                 s.frame = f.min(last);
             }
             s.last_frame = s.frame;
@@ -179,11 +184,11 @@ impl ActiveSprite {
     /// A static sprite instance (`FUN_1413b3490`): its first frame, or one the Sprite stream
     /// draws for a sprite with a random first frame.
     fn start_static(graphic: Graphic, sprite_rng: &mut Well512) -> Self {
-        let last = graphic.frames - 1;
+        let last = graphic.frames - Frame::ONE;
         let mut frame = graphic.first_frame();
         if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             let draw = sprite_rng.rand15() as i32;
-            frame = ((draw * i32::from(graphic.frames)) / 0x7fff) as i16;
+            frame = Frame::of_data(((draw * i32::from(graphic.frames.get())) / 0x7fff) as i16);
             frame = frame.min(last);
         }
         Self::at_rest(graphic, frame)
@@ -191,7 +196,7 @@ impl ActiveSprite {
 
     /// A static sprite at `frame` (the save's `RGE_Active_Sprite`), its clock at rest.
     #[must_use]
-    pub const fn at_rest(graphic: Graphic, frame: i16) -> Self {
+    pub const fn at_rest(graphic: Graphic, frame: Frame) -> Self {
         Self {
             graphic,
             frame,
@@ -200,14 +205,14 @@ impl ActiveSprite {
             last_frame: frame,
             changed: false,
             looped: false,
-            animate: 0,
+            animate: AnimateState::STOPPED,
             speed: 0.0,
         }
     }
 
     /// Slot 9 with `0x7fff` (`FUN_1413b4ff0`): back to the first frame, not looped; a static
     /// sprite (`FUN_1413b5030`) only takes the frame.
-    pub const fn reset_frame(&mut self) {
+    pub fn reset_frame(&mut self) {
         if !self.graphic.animated() {
             self.frame = self.graphic.first_frame();
             return;
@@ -220,7 +225,7 @@ impl ActiveSprite {
     /// Slot 9 with `frame` other than `0x7fff` (`FUN_1413b4ff0`): the frame and the last frame
     /// take it (and `+0x32`, not held), the loop flag stays; a static sprite (`FUN_1413b5030`)
     /// only takes the frame.
-    pub const fn set_frame(&mut self, frame: i16) {
+    pub const fn set_frame(&mut self, frame: Frame) {
         self.frame = frame;
         if self.graphic.animated() {
             self.last_frame = frame;
@@ -230,7 +235,7 @@ impl ActiveSprite {
     /// Slot 11 (`FUN_1413b2d70`): the last advance passed `frame` or looped; a static sprite
     /// (`FUN_1413b2d90`) has reached every frame.
     #[must_use]
-    pub const fn reached(&self, frame: i16) -> bool {
+    pub fn reached(&self, frame: Frame) -> bool {
         if !self.graphic.animated() {
             return true;
         }
@@ -257,17 +262,17 @@ impl ActiveSprite {
     /// or stops on it when played once.
     pub fn update(&mut self, dt: Seconds, speed: f32) {
         // a static sprite's update (`FUN_1413b5330`) does nothing
-        if !self.graphic.animated() || self.animate == 0 {
+        if !self.graphic.animated() || self.animate == AnimateState::STOPPED {
             return;
         }
         self.changed = false;
         self.looped = false;
         let g = self.graphic;
-        let last = g.frames - 1;
+        let last = g.frames - Frame::ONE;
         let start = if self.frame > last {
             last
-        } else if self.frame < 0 {
-            0
+        } else if self.frame < Frame::ZERO {
+            Frame::ZERO
         } else {
             self.frame
         };
@@ -293,12 +298,13 @@ impl ActiveSprite {
         self.changed = true;
         self.last_frame = start;
         // CVTTSS2SI EDX, MOVSX EAX, DX (0x1413b5177)
-        let steps = crate::math::conversions::cvttss2si(time.get() / interval.get()) as i16;
-        self.last = time - Seconds::new(f32::from(steps) * interval.get());
+        let steps =
+            Frame::of_data(crate::math::conversions::cvttss2si(time.get() / interval.get()) as i16);
+        self.last = time - Seconds::new(steps.as_f32() * interval.get());
         if 0.0 < speed || g.speed_multiplier == 0.0 {
             let f = start + if forward { steps } else { -steps };
             self.frame = f;
-            self.looped = f < 0 || last < f;
+            self.looped = f < Frame::ZERO || last < f;
         }
         self.interval = self.interval_at(speed);
         self.speed = speed;
@@ -306,38 +312,44 @@ impl ActiveSprite {
         if self.looped {
             let mut f;
             // COMISS/JBE at 0x1413b521f: an unordered delay loops at once
-            if fmath::at_most_or_unordered(g.replay_delay.get(), 0.0) || self.animate == 2 {
-                self.animate = 1;
+            if fmath::at_most_or_unordered(g.replay_delay.get(), 0.0)
+                || self.animate == AnimateState::DELAYED
+            {
+                self.animate = AnimateState::PLAYING;
                 f = self.frame % g.frames;
-                if f < 0 {
-                    f += g.frames;
+                if f < Frame::ZERO {
+                    f = f + g.frames;
                 }
             } else {
                 let mut at = self.frame;
-                if at < 0 {
+                if at < Frame::ZERO {
                     at = last - at;
                 }
                 stop = false;
                 self.looped = false;
-                self.animate = 2;
+                self.animate = AnimateState::DELAYED;
                 self.interval = Seconds::new(
-                    g.replay_delay.get() - f32::from(at - g.frames) * g.frame_duration.get(),
+                    g.replay_delay.get() - (at - g.frames).as_f32() * g.frame_duration.get(),
                 );
-                f = if forward { 0 } else { last };
+                f = if forward { Frame::ZERO } else { last };
             }
             self.frame = f;
             if f == self.last_frame {
-                let next = f + if forward { 1 } else { -1 };
+                let next = f + if forward { Frame::ONE } else { -Frame::ONE };
                 self.frame = next;
-                if next < 0 || last < next {
+                if next < Frame::ZERO || last < next {
                     stop = self.looped;
-                    self.frame = if forward { 0 } else { last };
+                    self.frame = if forward { Frame::ZERO } else { last };
                 }
             }
         }
         if stop && g.flags.contains(SpriteFlags::ONCE) {
-            self.animate = 0;
-            self.frame = if forward { last.max(0) } else { 0 };
+            self.animate = AnimateState::STOPPED;
+            self.frame = if forward {
+                last.max(Frame::ZERO)
+            } else {
+                Frame::ZERO
+            };
         }
     }
 }
@@ -445,8 +457,8 @@ mod tests {
     /// Build 158041's Lumberjack Female (Attack), graphic 1239: 45 frames of 0.0444 s, animated.
     const CHOP: Graphic = Graphic {
         id: SpriteId::named(1239),
-        frames: 45,
-        facets: 8,
+        frames: Frame::of_data(45),
+        facets: FacetCount::of_data(8),
         speed_multiplier: 0.0,
         frame_duration: Seconds::new(0.044_444_446),
         replay_delay: Seconds::ZERO,
@@ -459,18 +471,18 @@ mod tests {
         // the first update (time 0.02), frame 1 after the third (time 0.0155...)
         let mut s = ActiveSprite::start(CHOP, &mut Well512::default());
         s.update(Seconds::new(0.02), 1.0);
-        assert_eq!((s.frame, s.changed), (0, false));
+        assert_eq!((s.frame, s.changed), (Frame::of_data(0), false));
         s.update(Seconds::new(0.02), 1.0);
         s.update(Seconds::new(0.02), 1.0);
-        assert_eq!(s.frame, 1);
+        assert_eq!(s.frame, Frame::of_data(1));
         assert!((s.last - Seconds::new(0.015_555)).get().abs() < 1e-5);
         let mut n = 3;
-        while !s.reached(22) {
+        while !s.reached(Frame::of_data(22)) {
             s.update(Seconds::new(0.02), 1.0);
             n += 1;
         }
         // update 1057, the 49th
-        assert_eq!((n, s.frame), (49, 22));
+        assert_eq!((n, s.frame), (49, Frame::of_data(22)));
     }
 
     /// Slot 0x68: a new sprite starts its instance (a random first frame draws), the one shown
@@ -496,14 +508,14 @@ mod tests {
         assert_eq!(stats.speed, Speed::new(1.0));
         // the sprite shown stays as it runs, and the speed is still the one it reads with it
         if let Some(s) = sprite.as_mut() {
-            s.frame = 3;
+            s.frame = Frame::of_data(3);
         }
         stats.speed = Speed::new(0.5);
         let drawn = rng.clone();
         new_sprite(&mut sprite, Some(&mut stats), walking, &mut rng);
         assert_eq!(
             (sprite.map(|s| s.frame), &rng, stats.speed),
-            (Some(3), &drawn, Speed::new(1.0))
+            (Some(Frame::of_data(3)), &drawn, Speed::new(1.0))
         );
         // a factor of 0 or NaN reads the base alone
         new_sprite(&mut sprite, Some(&mut stats), CHOP, &mut rng);
@@ -532,7 +544,7 @@ mod tests {
         };
         let mut s = ActiveSprite::start(g, &mut Well512::default());
         s.update(Seconds::new(1.0), 1.0);
-        assert_eq!((s.frame, s.changed), (0, false));
+        assert_eq!((s.frame, s.changed), (Frame::of_data(0), false));
     }
 
     /// `CVTTSS2SI EDX` then `MOVSX EAX, DX` (0x1413b5177): a quotient past the i32 range steps
@@ -541,7 +553,10 @@ mod tests {
     fn a_step_count_past_the_i32_range_steps_no_frame() {
         let mut s = ActiveSprite::start(CHOP, &mut Well512::default());
         s.update(Seconds::new(3.0e8), 1.0);
-        assert_eq!((s.frame, s.changed, s.looped), (0, true, false));
+        assert_eq!(
+            (s.frame, s.changed, s.looped),
+            (Frame::of_data(0), true, false)
+        );
     }
 
     /// `FUN_1413b5070` on four frames of 0.25 s: a frame outside the sprite starts from its
@@ -554,8 +569,8 @@ mod tests {
     fn a_sprite_past_its_end_waits_its_delay_loops_or_stops() {
         let four = |flags, replay_delay| Graphic {
             id: SpriteId::named(1),
-            frames: 4,
-            facets: 1,
+            frames: Frame::of_data(4),
+            facets: FacetCount::of_data(1),
             speed_multiplier: 0.0,
             frame_duration: Seconds::new(0.25),
             replay_delay,
@@ -564,23 +579,28 @@ mod tests {
         let after = |g: Graphic, frame: Option<i16>, dt: f32| {
             let mut s = ActiveSprite::start(g, &mut Well512::default());
             if let Some(f) = frame {
-                s.frame = f;
+                s.frame = Frame::of_data(f);
             }
             s.update(Seconds::new(dt), 1.0);
             s
         };
         assert_eq!(
             after(four(SpriteFlags::ANIMATED, Seconds::ZERO), Some(9), 0.1).frame,
-            3
+            Frame::of_data(3)
         );
         assert_eq!(
             after(four(SpriteFlags::ANIMATED, Seconds::ZERO), Some(-2), 0.1).frame,
-            0
+            Frame::of_data(0)
         );
         let s = after(four(SpriteFlags::ANIMATED, Seconds::new(0.5)), None, 1.0);
         assert_eq!(
             (s.frame, s.animate, s.interval, s.looped),
-            (1, 2, Seconds::new(0.5), false)
+            (
+                Frame::of_data(1),
+                AnimateState::of_data(2),
+                Seconds::new(0.5),
+                false
+            )
         );
         let s = after(
             four(
@@ -590,7 +610,14 @@ mod tests {
             None,
             1.0,
         );
-        assert_eq!((s.frame, s.animate, s.interval), (2, 2, Seconds::new(0.5)));
+        assert_eq!(
+            (s.frame, s.animate, s.interval),
+            (
+                Frame::of_data(2),
+                AnimateState::of_data(2),
+                Seconds::new(0.5)
+            )
+        );
         let s = after(
             four(
                 SpriteFlags::ANIMATED | SpriteFlags::BACKWARDS,
@@ -599,13 +626,19 @@ mod tests {
             None,
             1.25,
         );
-        assert_eq!((s.frame, s.animate, s.looped), (2, 1, true));
+        assert_eq!(
+            (s.frame, s.animate, s.looped),
+            (Frame::of_data(2), AnimateState::of_data(1), true)
+        );
         let s = after(
             four(SpriteFlags::ANIMATED | SpriteFlags::ONCE, Seconds::ZERO),
             None,
             1.0,
         );
-        assert_eq!((s.frame, s.animate), (3, 0));
+        assert_eq!(
+            (s.frame, s.animate),
+            (Frame::of_data(3), AnimateState::of_data(0))
+        );
         let s = after(
             four(
                 SpriteFlags::ANIMATED | SpriteFlags::ONCE | SpriteFlags::BACKWARDS,
@@ -614,26 +647,32 @@ mod tests {
             None,
             1.0,
         );
-        assert_eq!((s.frame, s.animate), (0, 0));
+        assert_eq!(
+            (s.frame, s.animate),
+            (Frame::of_data(0), AnimateState::of_data(0))
+        );
         let one = Graphic {
-            frames: 1,
+            frames: Frame::of_data(1),
             ..four(SpriteFlags::ANIMATED, Seconds::ZERO)
         };
         let s = after(one, None, 0.25);
-        assert_eq!((s.frame, s.looped, s.animate), (0, true, 1));
+        assert_eq!(
+            (s.frame, s.looped, s.animate),
+            (Frame::of_data(0), true, AnimateState::of_data(1))
+        );
     }
 
     /// The replay delay's test is COMISS/JBE (0x1413b521f): a NaN delay loops at once.
     #[test]
     fn a_nan_replay_delay_loops_at_once() {
         let g = Graphic {
-            frames: 2,
+            frames: Frame::of_data(2),
             replay_delay: Seconds::new(f32::NAN),
             ..CHOP
         };
         let mut s = ActiveSprite::start(g, &mut Well512::default());
         s.update(Seconds::new(0.1), 1.0);
-        assert_eq!(s.animate, 1);
+        assert_eq!(s.animate, AnimateState::of_data(1));
     }
 
     #[test]
@@ -641,8 +680,8 @@ mod tests {
         // build 158041's town center sprite 3241 does not animate (sequence bit 0 clear)
         let still = Graphic {
             id: SpriteId::named(3241),
-            frames: 1,
-            facets: 1,
+            frames: Frame::of_data(1),
+            facets: FacetCount::of_data(1),
             speed_multiplier: 0.0,
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
@@ -652,8 +691,11 @@ mod tests {
         let mut s = ActiveSprite::start(still, &mut rng);
         assert_eq!(rng, Well512::default());
         s.update(Seconds::new(0.5), 1.0);
-        assert_eq!((s.frame, s.changed, s.looped), (0, false, false));
-        assert!(s.reached(0) && s.reached(7));
+        assert_eq!(
+            (s.frame, s.changed, s.looped),
+            (Frame::of_data(0), false, false)
+        );
+        assert!(s.reached(Frame::of_data(0)) && s.reached(Frame::of_data(7)));
         // a random first frame draws once, not twice as an animated one does
         let mut once = Well512::default();
         let _ = once.rand15();

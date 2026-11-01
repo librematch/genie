@@ -298,8 +298,8 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         crate::combat::attack::tests::own_attack(-1, AttackState::Done, Distance::new(1.0));
     attack.arms.idle_sprite = Some(crate::objects::sprite::Graphic {
         id: SpriteId::named(1),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

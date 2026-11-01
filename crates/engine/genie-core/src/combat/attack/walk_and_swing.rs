@@ -16,6 +16,7 @@ use crate::map::Position;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap_squared};
+use crate::objects::Frame;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
@@ -156,22 +157,22 @@ impl Attack {
         {
             return Err(GenieError::unsupported("a swing of class 35, 51 or 64"));
         }
-        if ranged && self.arms.fire_frame < 0 {
+        if ranged && self.arms.fire_frame < Frame::ZERO {
             return Err(GenieError::unsupported(
                 "a ranged swing without a firing frame",
             ));
         }
         let fire = if ranged {
             self.arms.fire_frame
-        } else if self.arms.fire_frame < 1 {
-            (f32::from(sprite.graphic.frames) * HALF) as u32 as i16
+        } else if self.arms.fire_frame < Frame::ONE {
+            Frame::of_data((sprite.graphic.frames.as_f32() * HALF) as u32 as i16)
         } else {
             self.arms.fire_frame
         };
         if !ranged {
             self.swing -= c.dt.seconds();
         }
-        if fire != 0 && !sprite.reached(fire) {
+        if fire != Frame::ZERO && !sprite.reached(fire) {
             return Ok(());
         }
         self.land_hit(c, unit, f, r, sprite)
@@ -193,15 +194,15 @@ impl Attack {
         sprite: ActiveSprite,
     ) -> Result<(), GenieError> {
         let ranged = self.arms.missile.is_some();
-        let frame = if self.arms.fire_frame == 0 && !ranged {
-            sprite.graphic.frames / 2
+        let frame = if self.arms.fire_frame == Frame::ZERO && !ranged {
+            sprite.graphic.frames.half()
         } else {
             self.arms.fire_frame
         };
         set_attack_timer(
             unit,
             r.world_time,
-            r.reload - Seconds::new(f32::from(frame) * sprite.graphic.frame_duration.get()),
+            r.reload - Seconds::new(frame.as_f32() * sprite.graphic.frame_duration.get()),
         );
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
@@ -235,7 +236,7 @@ impl Attack {
             return self.enter(AttackState::Killed, unit);
         }
         let rest = r.reload
-            - Seconds::new(f32::from(sprite.graphic.frames) * sprite.graphic.frame_duration.get());
+            - Seconds::new(sprite.graphic.frames.as_f32() * sprite.graphic.frame_duration.get());
         self.rest = rest;
         self.swing = rest;
         if rest < Seconds::ZERO {

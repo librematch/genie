@@ -68,7 +68,7 @@ pub enum Facing {
     Drawn,
     /// The dead object's facet it remains of (`FUN_14119d490`, `FUN_14114d780`), None where the
     /// slice does not hold it.
-    Dead(Option<u8>),
+    Dead(Option<crate::objects::Facet>),
 }
 
 /// The building a unit spawns from, as the search reads it.

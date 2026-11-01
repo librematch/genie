@@ -474,8 +474,8 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
             SpriteId::named(300),
             crate::objects::sprite::Graphic {
                 id: SpriteId::named(300),
-                frames: 10,
-                facets: 8,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(8),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -613,8 +613,8 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
             SpriteId::named(300),
             crate::objects::sprite::Graphic {
                 id: SpriteId::named(300),
-                frames: 10,
-                facets: 8,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(8),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -891,8 +891,8 @@ fn remains_world() -> World {
     let mut t = crate::world::tests::forage_world();
     let graphic = |id, flags| crate::objects::sprite::Graphic {
         id,
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -959,7 +959,10 @@ fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
         (u.life.class, u.life.attribute_type, u.life.amount),
         (Class::Static, Some(attribute::POPULATION), Amount::new(5.0))
     );
-    assert_eq!((u.life.death_facets, u.sprite), (Some(8), None));
+    assert_eq!(
+        (u.life.death_facets, u.sprite),
+        (Some(crate::objects::FacetCount::of_data(8)), None)
+    );
     assert_eq!(t.players[1].attributes[4], food + Amount::new(1.0));
     let i = t
         .plain_object(
@@ -967,17 +970,20 @@ fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
             master_id(801),
             &made(&t, master_id(801)),
             Position::new(31.5, 85.5, 0.0),
-            Facing::Dead(Some(2)),
+            Facing::Dead(Some(crate::objects::Facet::of_data(2))),
         )
         .unwrap();
     let u = &t.players[1].objects[i];
     let facets = crate::objects::facing::SpriteFacets {
-        count: 8,
+        count: crate::objects::FacetCount::of_data(8),
         turns: false,
     };
     assert_eq!(
         u.body.mover().map(|m| m.angle),
-        Some(crate::objects::facing::angle_of_facet(2, facets))
+        Some(crate::objects::facing::angle_of_facet(
+            crate::objects::Facet::of_data(2),
+            facets
+        ))
     );
     let reason = |change: &dyn Fn(&mut crate::objects::masters::Master), facing| {
         let mut t = remains_world();

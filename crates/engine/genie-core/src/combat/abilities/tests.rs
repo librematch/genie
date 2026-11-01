@@ -815,8 +815,8 @@ fn keshik(t: &mut World) {
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: 0,
-            interrupt_frame: -1,
+            fire_frame: crate::objects::Frame::of_data(0),
+            interrupt_frame: crate::objects::Frame::of_data(-1),
         },
         sub_action: false,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
@@ -1007,8 +1007,8 @@ fn waters(t: &mut World) {
     ));
     let g = |id| crate::objects::sprite::Graphic {
         id,
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

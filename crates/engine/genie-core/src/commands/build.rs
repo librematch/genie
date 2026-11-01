@@ -38,7 +38,7 @@ pub struct BuildCommand {
     pub commits: bool,
     /// `+0x1c`: the frame the foundation's standing sprite takes once built (its `+0xc54`,
     /// [`crate::objects::unit::Unit::build_frame`]).
-    pub frame: u8,
+    pub frame: crate::objects::Frame,
 }
 
 impl BuildCommand {

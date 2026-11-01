@@ -430,11 +430,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
             |m| m.resistance.get(),
             [3.0, 5.0, 10.0],
         ),
-        (
-            a::FRAME_DELAY,
-            |m| f32::from(m.fire_frame),
-            [3.0, 5.0, 10.0],
-        ),
+        (a::FRAME_DELAY, |m| m.fire_frame.as_f32(), [3.0, 5.0, 10.0]),
         (
             a::BLAST_ATTACK_LEVEL,
             |m| f32::from(m.blast_level.bits()),
@@ -810,12 +806,12 @@ fn armor_and_attack_change_the_class_in_the_amount_s_high_byte() {
 fn some_combat_shorts_multiply_by_the_truncated_amount() {
     let mut m = of_type(master_type::RGE_COMBAT);
     m.base_armor = 3;
-    m.fire_frame = 5;
+    m.fire_frame = crate::objects::Frame::of_data(5);
     m.shown.attack = 7;
     m.multiply_attribute(attribute::BASE_ARMOR, 1.5, &world(false));
     assert_eq!(m.base_armor, 5);
     m.multiply_attribute(attribute::FRAME_DELAY, 2.9, &world(false));
-    assert_eq!(m.fire_frame, 10);
+    assert_eq!(m.fire_frame, crate::objects::Frame::of_data(10));
     m.multiply_attribute(attribute::SHOWN_ATTACK, 3.5, &world(false));
     assert_eq!(m.shown.attack, 21);
     m.add_attribute(attribute::ROTATION_SPEED, 0.25, &world(false));
@@ -1043,7 +1039,7 @@ fn a_foundation_terrain_add_counts_none_as_minus_one() {
 fn a_moving_master_s_derived_values_follow_its_attributes() {
     let graphic = |id, speed_multiplier, facets| crate::objects::sprite::Graphic {
         id,
-        frames: 10,
+        frames: crate::objects::Frame::of_data(10),
         facets,
         speed_multiplier,
         frame_duration: Seconds::new(0.1),
@@ -1051,9 +1047,30 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         flags: SpriteFlags::ANIMATED,
     };
     let graphics = [
-        (SpriteId::named(1), graphic(SpriteId::named(1), 0.0, 8)),
-        (SpriteId::named(2), graphic(SpriteId::named(2), 1.5, 8)),
-        (SpriteId::named(3), graphic(SpriteId::named(3), 0.5, 16)),
+        (
+            SpriteId::named(1),
+            graphic(
+                SpriteId::named(1),
+                0.0,
+                crate::objects::FacetCount::of_data(8),
+            ),
+        ),
+        (
+            SpriteId::named(2),
+            graphic(
+                SpriteId::named(2),
+                1.5,
+                crate::objects::FacetCount::of_data(8),
+            ),
+        ),
+        (
+            SpriteId::named(3),
+            graphic(
+                SpriteId::named(3),
+                0.5,
+                crate::objects::FacetCount::of_data(16),
+            ),
+        ),
     ]
     .into_iter()
     .collect();
@@ -1099,7 +1116,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
     assert_eq!(
         m.moving.unwrap().facets,
         Some(crate::objects::facing::SpriteFacets {
-            count: 8,
+            count: crate::objects::FacetCount::of_data(8),
             turns: false
         })
     );

@@ -284,7 +284,7 @@ fn build(c: &BuildCommand) -> Result<Packet, GenieError> {
         o_id: i32::from(c.master.get()),
         q_id: c.q_id,
         field_0x18: c.sprite_override.cast_unsigned(),
-        frame: c.frame,
+        frame: c.frame.byte(),
         gap_0x1d: [0; 1],
         field_0x1e: u8::from(c.queued),
         field_0x1f: u8::from(!c.commits),

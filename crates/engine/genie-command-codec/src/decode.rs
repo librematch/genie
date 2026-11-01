@@ -306,7 +306,7 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             builders: listed(c.num, &c.ids),
             queued: c.field_0x1e != 0,
             commits: c.field_0x1f == 0,
-            frame: c.frame,
+            frame: genie_core::objects::Frame::of_byte(c.frame),
         }),
         Packet::BuildWall(c) => Command::BuildWall(BuildWallCommand {
             player: PlayerId::from(c.commp_id),

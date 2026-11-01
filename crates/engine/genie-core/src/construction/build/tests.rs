@@ -451,8 +451,8 @@ pub(crate) fn graphics() -> BTreeMap<SpriteId, crate::objects::sprite::Graphic> 
         .map(|id| {
             let g = crate::objects::sprite::Graphic {
                 id: SpriteId::named(id),
-                frames: 10,
-                facets: 16,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(16),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,

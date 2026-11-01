@@ -498,7 +498,7 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
     let v = t.object_mut(object_id(1000)).unwrap().1;
     if let Some(m) = v.body.mover_mut() {
         m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
-            count: 16,
+            count: crate::objects::FacetCount::of_data(16),
             turns: false,
         });
     }
@@ -2502,8 +2502,8 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
     let running = crate::objects::sprite::Graphic {
         id: SpriteId::named(2001),
-        frames: 10,
-        facets: 16,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(16),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,

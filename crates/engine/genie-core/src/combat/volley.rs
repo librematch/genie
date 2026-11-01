@@ -378,7 +378,7 @@ impl Unit {
             .and_then(|s| c.w.graphics.get(&s).copied());
         if let Some(g) = standing {
             let _ = ActiveSprite::start(g, c.w.streams.get(Stream::Sprite));
-            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets {
+            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
                 let _ = c.w.streams.get(Stream::Object).rand15();
             }
         }

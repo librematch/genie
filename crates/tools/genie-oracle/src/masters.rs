@@ -5,6 +5,8 @@
 
 use genie_core::GenieError;
 use genie_core::map::TerrainFlags;
+use genie_core::objects::FacetCount;
+use genie_core::objects::Frame;
 use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
@@ -454,8 +456,8 @@ impl MasterTable {
                     id,
                     genie_core::objects::sprite::Graphic {
                         id,
-                        frames: g.frame_count,
-                        facets: g.angle_count,
+                        frames: Frame::of_data(g.frame_count),
+                        facets: FacetCount::of_data(g.angle_count),
                         speed_multiplier: g.speed_multiplier,
                         frame_duration: Seconds::new(g.frame_duration),
                         replay_delay: Seconds::new(g.replay_delay),
@@ -573,13 +575,13 @@ impl MasterTable {
         mut self,
         sprite: SpriteId,
         speed: f32,
-        facets: i16,
+        facets: FacetCount,
         flags: genie_core::objects::SpriteFlags,
     ) -> Self {
         let _ = self.sprite_speed.insert(sprite, speed);
         let graphic = genie_core::objects::sprite::Graphic {
             id: sprite,
-            frames: 1,
+            frames: Frame::ONE,
             facets,
             speed_multiplier: speed,
             frame_duration: Seconds::new(0.1),

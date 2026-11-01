@@ -249,7 +249,7 @@ impl World {
         &mut self,
         standing: Graphic,
     ) -> (ActiveSprite, crate::objects::facing::SpriteFacets, Angle) {
-        if standing.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < standing.facets {
+        if standing.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && standing.facets.several() {
             let _ = self.streams.get(Stream::Object).rand15();
         }
         let sprite = ActiveSprite::start(standing, self.streams.get(Stream::Sprite));

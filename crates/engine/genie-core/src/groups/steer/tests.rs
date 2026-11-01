@@ -51,8 +51,8 @@ const RUNNING: f32 = 0.8 * 1.875;
 const fn graphic(id: i16, factor: f32) -> Graphic {
     Graphic {
         id: SpriteId::named(id),
-        frames: 1,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(1),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: factor,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,

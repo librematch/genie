@@ -455,8 +455,8 @@ fn a_member_is_free_by_its_action_and_its_unit_ai() {
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: -1,
-            interrupt_frame: -1,
+            fire_frame: crate::objects::Frame::of_data(-1),
+            interrupt_frame: crate::objects::Frame::of_data(-1),
         },
         sub_action: false,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
@@ -637,8 +637,8 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
     for (id, factor) in [(6, 0.125), (7, 1.125), (8, 1.875)] {
         let graphic = crate::objects::sprite::Graphic {
             id: SpriteId::named(id),
-            frames: 1,
-            facets: 8,
+            frames: crate::objects::Frame::of_data(1),
+            facets: crate::objects::FacetCount::of_data(8),
             speed_multiplier: factor,
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
@@ -656,8 +656,8 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
     t.graphics.clear();
     let graphic = crate::objects::sprite::Graphic {
         id: SpriteId::named(1),
-        frames: 1,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(1),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
@@ -665,13 +665,13 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
     };
     t.players[1].objects[ListIndex::new(0)].sprite = Some(crate::objects::sprite::ActiveSprite {
         graphic,
-        frame: 0,
+        frame: crate::objects::Frame::of_data(0),
         interval: Seconds::ZERO,
         last: Seconds::ZERO,
-        last_frame: 0,
+        last_frame: crate::objects::Frame::of_data(0),
         changed: false,
         looped: false,
-        animate: 0,
+        animate: crate::objects::AnimateState::of_data(0),
         speed: 0.0,
     });
     assert!(t.show_walking(object_id(10)).is_err());

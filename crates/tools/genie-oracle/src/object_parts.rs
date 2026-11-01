@@ -59,7 +59,7 @@ pub(super) fn lifecycle(
         .zip(after)
         .and_then(|(t, after)| t.graphics.get(&after))
         .filter(|g| {
-            pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets
+            pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several()
         })
         .map(|g| g.facets);
     let (dying_sprite, [death_spawn, remains], master) = s.own_master().map_or_else(

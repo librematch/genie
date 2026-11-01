@@ -122,9 +122,9 @@ pub struct Arms {
     /// (`interrupt_frame`), -1 for none.
     pub missile: Option<MasterId>,
     /// `+0x98`: the frame it fires at (`fire_missile_at_frame`).
-    pub fire_frame: i16,
+    pub fire_frame: crate::objects::Frame,
     /// `+0x9c`: the frame that may interrupt (`interrupt_frame`), −1 for none.
-    pub interrupt_frame: i16,
+    pub interrupt_frame: crate::objects::Frame,
 }
 
 /// The Attack action (`RGE_Action_Attack`, type 9) as the hunt's sub-action.

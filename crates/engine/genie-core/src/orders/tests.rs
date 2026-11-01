@@ -834,8 +834,8 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     use crate::objects::sprite::Graphic;
     let standing = Graphic {
         id: SpriteId::named(300),
-        frames: 10,
-        facets: 8,
+        frames: crate::objects::Frame::of_data(10),
+        facets: crate::objects::FacetCount::of_data(8),
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -2150,8 +2150,8 @@ fn switched_in_the_open(
         .map(|&id| {
             let g = crate::objects::sprite::Graphic {
                 id: SpriteId::named(id),
-                frames: 10,
-                facets: 8,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(8),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -2234,8 +2234,8 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         sprite: Some(crate::objects::sprite::ActiveSprite::start(
             crate::objects::sprite::Graphic {
                 id: SpriteId::named(10),
-                frames: 10,
-                facets: 8,
+                frames: crate::objects::Frame::of_data(10),
+                facets: crate::objects::FacetCount::of_data(8),
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,

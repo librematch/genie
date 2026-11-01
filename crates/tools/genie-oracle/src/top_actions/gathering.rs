@@ -141,7 +141,7 @@ fn hunt_attack(
         let g = attack.arms.sprite.ok_or(GenieError::unsupported(
             "a saved swing without its attack sprite",
         ))?;
-        let rest = reload - f32::from(g.frames) * g.frame_duration;
+        let rest = reload - g.frames.as_f32() * g.frame_duration;
         attack.swing = Seconds::new(rest);
         attack.rest = Seconds::new(rest.max(0.0));
     }
