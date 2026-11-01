@@ -50,7 +50,7 @@ impl Visibility {
         square: bool,
         offset: bool,
     ) -> Result<TileCount, GenieError> {
-        let Some(s) = self.seers.get(&id).copied() else {
+        let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
         self.sight_on_los(id, position, radius, square, SightTiles::of(s.los), offset)
@@ -67,13 +67,13 @@ impl Visibility {
         los: SightTiles,
         offset: bool,
     ) -> Result<TileCount, GenieError> {
-        let Some(s) = self.seers.get(&id).copied() else {
+        let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
         let (square, offset) = match s.building {
             Some(b) if !b.built => {
                 if !b.started {
-                    if let Some(s) = self.seers.get_mut(&id) {
+                    if let Some(s) = self.seers.get_mut(id) {
                         s.explored = false;
                     }
                     return Ok(TileCount::ZERO);
@@ -142,7 +142,7 @@ impl Visibility {
         } else {
             self.explore(s.player, Tile::new(x as i32, y as i32), los, offset)?
         };
-        if let Some(s) = self.seers.get_mut(&id) {
+        if let Some(s) = self.seers.get_mut(id) {
             s.explored = true;
         }
         Ok(newly)
@@ -158,7 +158,7 @@ impl Visibility {
         square: bool,
         offset: bool,
     ) -> Result<(), GenieError> {
-        let Some(s) = self.seers.get(&id).copied() else {
+        let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
         self.sight_off_los(id, position, radius, square, SightTiles::of(s.los), offset)?;
@@ -176,7 +176,7 @@ impl Visibility {
         los: SightTiles,
         offset: bool,
     ) -> Result<(), GenieError> {
-        let Some(s) = self.seers.get(&id).copied() else {
+        let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
         let offset = match s.building {
@@ -236,7 +236,7 @@ impl Visibility {
         self.sight_off(id, from, radius, false, false)?;
         if self
             .seers
-            .get(&id)
+            .get(id)
             .is_some_and(|s| s.state == ObjectState::Alive)
         {
             let _ = self.sight_on(id, to, radius, false, false)?;
@@ -253,13 +253,13 @@ impl Visibility {
         radius: Footprint,
         new: ObjectState,
     ) -> Result<(), GenieError> {
-        let Some(old) = self.seers.get(&id).map(|s| s.state) else {
+        let Some(old) = self.seers.get(id).map(|s| s.state) else {
             return Ok(());
         };
         if old == new || (new < old && new != ObjectState::Foundation) {
             return Ok(());
         }
-        let master_sees = self.seers.get(&id).is_some_and(|s| Distance::ZERO < s.los);
+        let master_sees = self.seers.get(id).is_some_and(|s| Distance::ZERO < s.los);
         if old == ObjectState::Alive && (ObjectState::Alive < new || new == ObjectState::Foundation)
         {
             self.sight_off(id, position, radius, false, false)?;
@@ -270,7 +270,7 @@ impl Visibility {
         if old < ObjectState::Removed && new == ObjectState::Removed && master_sees {
             self.sight_off(id, position, radius, true, false)?;
         }
-        if let Some(s) = self.seers.get_mut(&id) {
+        if let Some(s) = self.seers.get_mut(id) {
             s.state = new;
         }
         Ok(())
@@ -288,7 +288,7 @@ impl Visibility {
         los: Distance,
     ) -> Result<(), GenieError> {
         self.sight_off(id, position, old_radius, false, false)?;
-        if let Some(s) = self.seers.get_mut(&id) {
+        if let Some(s) = self.seers.get_mut(id) {
             s.master = master;
             s.los = los;
         }
@@ -299,7 +299,7 @@ impl Visibility {
     /// The master and line of sight of seer `id` without its sight (a master change inside
     /// another, whose unit has no tile, `+0x2e8` 0: its sight comes with them on its way out).
     pub fn seer_master(&mut self, id: ObjectId, master: MasterId, los: Distance) {
-        if let Some(s) = self.seers.get_mut(&id) {
+        if let Some(s) = self.seers.get_mut(id) {
             s.master = master;
             s.los = los;
         }

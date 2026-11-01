@@ -535,7 +535,9 @@ impl Unit {
                 new: VisionBits::NONE,
             })?;
             // its mask (`+0x8f8`) is none after
-            r.entries.entry(id).or_default().mask = VisionBits::NONE;
+            r.entries
+                .get_or_insert_with(id, crate::vision::registry::Entry::default)?
+                .mask = VisionBits::NONE;
         }
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
         if bm.kind == BUILDING {

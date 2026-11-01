@@ -67,7 +67,7 @@ impl Visibility {
         class: ClassId,
         main: Option<(Position, u8)>,
     ) -> Result<Option<VisionBits>, GenieError> {
-        let Some(s) = self.seers.get(&id).copied() else {
+        let Some(s) = self.seers.get(id).copied() else {
             return Ok(None);
         };
         if self.registry.is_none() || id.is_recyclable() {
@@ -105,7 +105,10 @@ impl Visibility {
         if mask == old {
             return Ok(None);
         }
-        registry.entries.entry(id).or_default().mask = mask;
+        registry
+            .entries
+            .get_or_insert_with(id, crate::vision::registry::Entry::default)?
+            .mask = mask;
         registry.update_unit(UnitUpdate {
             id,
             owner,
@@ -185,7 +188,7 @@ impl Visibility {
             old: mask & VisionBits::VISIBLE_HALF,
             new: VisionBits::NONE,
         })?;
-        let _ = r.entries.remove(&id);
+        let _ = r.entries.remove(id);
         Ok(())
     }
 
@@ -212,13 +215,13 @@ impl Visibility {
         (new, los): (PlayerId, f32),
         sees: bool,
     ) -> Result<(), GenieError> {
-        if !self.seers.contains_key(&id) {
+        if !self.seers.contains_key(id) {
             return Ok(());
         }
         if sees {
             self.sight_off(id, position, radius, false, false)?;
         }
-        if let Some(s) = self.seers.get_mut(&id) {
+        if let Some(s) = self.seers.get_mut(id) {
             s.player = new;
             s.los = Distance::new(los);
         }
@@ -237,7 +240,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
     ) -> Result<(), GenieError> {
-        let Some(b) = self.seers.get_mut(&id).and_then(|s| s.building.as_mut()) else {
+        let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) else {
             return Ok(());
         };
         if b.built {
@@ -257,7 +260,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
     ) -> Result<(), GenieError> {
-        if let Some(b) = self.seers.get_mut(&id).and_then(|s| s.building.as_mut()) {
+        if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) {
             b.started = true;
         }
         let _ = self.sight_on(id, position, radius, true, false)?;

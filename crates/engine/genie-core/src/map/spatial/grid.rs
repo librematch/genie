@@ -118,7 +118,7 @@ impl Spatial {
             .get(id)
             .and_then(|p| p.obstruction.map(|o| self.filed(p, o.kind)));
         let records = &mut self.records;
-        let old = records.filed.get(&id).copied();
+        let old = records.filed.get(id).copied();
         if old == cell {
             return;
         }
@@ -136,7 +136,7 @@ impl Spatial {
                 let _ = records.cells.entry(c).or_default().insert(id);
             }
             None => {
-                let _ = records.filed.remove(&id);
+                let _ = records.filed.remove(id);
             }
         }
     }

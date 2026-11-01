@@ -9674,7 +9674,10 @@ fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Dist
         vec![false; 3],
     );
     let mut r = crate::vision::registry::Registry::new(3, 65);
-    r.entries.entry(object_id(id)).or_default().mask = VisionBits::from_bits_retain(1 << p.get());
+    r.entries
+        .get_or_insert_with(object_id(id), Default::default)
+        .unwrap()
+        .mask = VisionBits::from_bits_retain(1 << p.get());
     r.update_unit(UnitUpdate {
         id: object_id(id),
         owner: PlayerId::new(p.index() as u8),
@@ -11909,7 +11912,10 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         },
     );
     let r = v.registry.as_mut().unwrap();
-    r.entries.entry(object_id(500)).or_default().mask = VisionBits::from_bits_retain(0b11);
+    r.entries
+        .get_or_insert_with(object_id(500), Default::default)
+        .unwrap()
+        .mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(500),
         owner: PlayerId::new(1),
@@ -12059,7 +12065,10 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
         },
     );
     let r = v.registry.as_mut().unwrap();
-    r.entries.entry(object_id(500)).or_default().mask = VisionBits::from_bits_retain(0b11);
+    r.entries
+        .get_or_insert_with(object_id(500), Default::default)
+        .unwrap()
+        .mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(500),
         owner: PlayerId::new(1),
@@ -17868,7 +17877,10 @@ fn hunted_without_a_deer(setup: impl FnOnce(&mut Unit)) -> World {
     t.build_mesh().unwrap();
     let mut r = crate::vision::registry::Registry::new(2, 65);
     for (id, x) in [(500, 32.5), (501, 36.5)] {
-        r.entries.entry(object_id(id)).or_default().mask = VisionBits::from_bits_retain(1 << 1);
+        r.entries
+            .get_or_insert_with(object_id(id), Default::default)
+            .unwrap()
+            .mask = VisionBits::from_bits_retain(1 << 1);
         r.update_unit(UnitUpdate {
             id: object_id(id),
             owner: PlayerId::new(0),

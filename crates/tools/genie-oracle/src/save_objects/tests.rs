@@ -74,7 +74,7 @@ fn a_registry_dump_reads_its_lists_and_masks() {
     );
     assert_eq!(record.distance.get().to_bits(), one);
     assert_eq!(record.at.y().to_bits(), 2.0_f32.to_bits());
-    let entry = &registry.entries[&object_id(77)];
+    let entry = registry.entries.get(object_id(77)).unwrap();
     assert_eq!(entry.mask, VisionBits::from_bits_retain(3));
     assert_eq!(entry.slots[..2], [None, Some(0)]);
 }

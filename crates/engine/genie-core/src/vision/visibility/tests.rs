@@ -215,7 +215,10 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
 fn an_ownership_change_writes_the_new_owner_into_the_object_s_records() {
     let mut v = world(PlayerId::new(3));
     let mut r = Registry::new(3, 65);
-    r.entries.entry(object_id(7)).or_default().mask = VisionBits::from_bits_retain(0b11);
+    r.entries
+        .get_or_insert_with(object_id(7), Default::default)
+        .unwrap()
+        .mask = VisionBits::from_bits_retain(0b11);
     r.update_unit(UnitUpdate {
         id: object_id(7),
         owner: PlayerId::new(0),

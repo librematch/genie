@@ -19,7 +19,6 @@ use crate::players::PlayerId;
 use crate::players::UnitRelation;
 use crate::vision::VisionBits;
 use crate::world::slots::CheckedIndex;
-use std::collections::BTreeMap;
 
 /// The players a mask has room for in `Update_Unit_Info`'s loop: the object's record pointers
 /// (`+0x8b0`) are nine.
@@ -116,7 +115,7 @@ pub struct Registry {
     /// `lists[player][class]`: the records.
     pub lists: Vec<Vec<Vec<Record>>>,
     /// Each object's entry.
-    pub entries: BTreeMap<ObjectId, Entry>,
+    pub entries: crate::objects::IdTable<Entry>,
 }
 
 impl Registry {
@@ -127,14 +126,14 @@ impl Registry {
             players,
             classes,
             lists: vec![vec![Vec::new(); classes]; players],
-            entries: BTreeMap::new(),
+            entries: crate::objects::IdTable::new(),
         }
     }
 
     /// The object `id`'s entry, if it has one.
     #[must_use]
     pub fn entry(&self, id: ObjectId) -> Option<&Entry> {
-        self.entries.get(&id)
+        self.entries.get(id)
     }
 
     /// `Update_Unit_Info` (`FUN_14128a1d0`): for each player whose bit (of the low 16) differs
@@ -167,8 +166,7 @@ impl Registry {
             if changed & 1 != 0 {
                 let slot = self
                     .entries
-                    .entry(id)
-                    .or_default()
+                    .get_or_insert_with(id, Entry::default)?
                     .slots
                     .get(p)
                     .copied()
@@ -183,17 +181,15 @@ impl Registry {
                         if i != last {
                             list.swap(i, last);
                             let moved = list.checked(i)?.id;
-                            if let Some(s) = self
-                                .entries
-                                .get_mut(&moved)
-                                .and_then(|e| e.slots.get_mut(p))
+                            if let Some(s) =
+                                self.entries.get_mut(moved).and_then(|e| e.slots.get_mut(p))
                             {
                                 *s = Some(i);
                             }
                         }
                         let _ = self.lists.checked_mut(p)?.checked_mut(class)?.pop();
                     }
-                    if let Some(s) = self.entries.get_mut(&id).and_then(|e| e.slots.get_mut(p)) {
+                    if let Some(s) = self.entries.get_mut(id).and_then(|e| e.slots.get_mut(p)) {
                         *s = None;
                     }
                 } else {
@@ -205,7 +201,7 @@ impl Registry {
                         radius: radii,
                     });
                     let i = list.len() - 1;
-                    if let Some(s) = self.entries.get_mut(&id).and_then(|e| e.slots.get_mut(p)) {
+                    if let Some(s) = self.entries.get_mut(id).and_then(|e| e.slots.get_mut(p)) {
                         *s = Some(i);
                     }
                 }
@@ -218,7 +214,7 @@ impl Registry {
 
     /// An ownership change (`FUN_14120f800`): the object's records take the new owner's id.
     pub fn owner_changed(&mut self, id: ObjectId, owner: PlayerId) -> Result<(), GenieError> {
-        let Some(e) = self.entries.get(&id).copied() else {
+        let Some(e) = self.entries.get(id).copied() else {
             return Ok(());
         };
         for (p, slot) in e.slots.iter().enumerate().take(self.players) {
@@ -240,7 +236,7 @@ impl Registry {
     /// The combat object's new place (`FUN_14108c320`): its records in every list follow.
     pub fn moved(&mut self, id: ObjectId, class: ClassId, at: Point) {
         let (x, y) = (at.x(), at.y());
-        let Some(e) = self.entries.get(&id).copied() else {
+        let Some(e) = self.entries.get(id).copied() else {
             return;
         };
         let Some(class) = class.index() else {

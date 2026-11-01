@@ -153,7 +153,7 @@ impl World {
                     ))?;
                 Ok(registry
                     .entries
-                    .get(&id)
+                    .get(id)
                     .map_or(VisionBits::NONE, |e| e.mask)
                     & VisionBits::OBJECT_MASK)
             }

@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, btree_map};
 
+use crate::GenieError;
 use crate::objects::ObjectId;
 
 /// The most ids on either side of 0 a column holds; an id beyond (a stand-in such as
@@ -246,6 +247,30 @@ impl<T> IdTable<T> {
             self.len += 1;
         }
         old
+    }
+
+    /// The value of `id`, `make`'s first when the table holds none (a map's `entry`).
+    ///
+    /// # Errors
+    ///
+    /// A value the table does not find right after it put it there (an invariant broken).
+    pub fn get_or_insert_with(
+        &mut self,
+        id: ObjectId,
+        make: impl FnOnce() -> T,
+    ) -> Result<&mut T, GenieError> {
+        if !self.contains_key(id) {
+            let _ = self.insert(id, make());
+        }
+        self.get_mut(id).ok_or_else(|| {
+            GenieError::unreachable("an id table's value missing right after its insert")
+                .with("id", id)
+        })
+    }
+
+    /// Every value taken out.
+    pub fn clear(&mut self) {
+        *self = Self::default();
     }
 
     /// The value of `id` taken out.
@@ -515,10 +540,16 @@ mod tests {
         assert_eq!(table.remove(id(3)), Some(10));
         assert_eq!(table.remove(id(3)), None);
         assert_eq!(table.get_mut(id(9)), None);
+        assert_eq!(table.get_or_insert_with(id(-4), || 0), Ok(&mut 70));
+        assert_eq!(table.get_or_insert_with(id(8), || 4), Ok(&mut 4));
+        assert_eq!(table.remove(id(8)), Some(4));
         assert_eq!(table.remove(id(-4)), Some(70));
         assert_eq!(table.remove(id(i32::MAX)), Some(90));
         assert!(table.is_empty());
         assert_eq!((&table).into_iter().count(), 0);
+        let mut full: IdTable<i32> = [(id(1), 1), (id(-9), 2)].into_iter().collect();
+        full.clear();
+        assert_eq!(full, IdTable::new());
     }
 
     /// Two tables with the same ids and values are equal, whatever their columns once held.

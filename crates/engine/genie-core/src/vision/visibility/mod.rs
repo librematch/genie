@@ -42,7 +42,6 @@ use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
 use crate::world::slots::CheckedIndex;
-use std::collections::BTreeMap;
 
 mod building_links;
 mod explore;
@@ -246,7 +245,7 @@ pub struct Visibility {
     /// The tiles a computer player's map explored that its AI module has not heard of yet, in
     /// order ([`Visibility::take_ai_tiles`]).
     ai_tiles: Vec<(PlayerId, Tile)>,
-    seers: BTreeMap<ObjectId, Seer>,
+    seers: crate::objects::IdTable<Seer>,
     /// The objects-in-sight registry, when the slice holds it (the save does not).
     pub registry: Option<Registry>,
     /// Each player's tile list (`RGE_Tile_List`, player `+0x180`, not saved): the tiles its map
@@ -328,7 +327,7 @@ impl Visibility {
             extents_capacity,
             computer,
             ai_tiles: Vec::new(),
-            seers: BTreeMap::new(),
+            seers: crate::objects::IdTable::new(),
             registry: None,
             new_tiles: vec![Vec::new(); players],
             resources: vec![VisibleResources::default(); players],
@@ -403,18 +402,18 @@ impl Visibility {
 
     /// The object `id` leaves the sight.
     pub fn remove_seer(&mut self, id: ObjectId) {
-        let _ = self.seers.remove(&id);
+        let _ = self.seers.remove(id);
     }
 
     /// What the object `id`'s sight reads of it.
     #[must_use]
     pub fn seer(&self, id: impl ObjectKey) -> Option<&Seer> {
-        self.seers.get(&id.key()?)
+        self.seers.get(id.key()?)
     }
 
     /// The same, to change.
     pub fn seer_mut(&mut self, id: ObjectId) -> Option<&mut Seer> {
-        self.seers.get_mut(&id)
+        self.seers.get_mut(id)
     }
 
     /// The link bits and byte of `tile`.

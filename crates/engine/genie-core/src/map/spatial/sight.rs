@@ -297,7 +297,7 @@ impl Spatial {
         let mask = v
             .registry
             .as_ref()
-            .and_then(|r| r.entries.get(&id))
+            .and_then(|r| r.entries.get(id))
             .map_or(VisionBits::NONE, |e| e.mask);
         let VisionMasks { visible, explored } = self.vision(player);
         if umv && (visible.intersects(mask) || explored.intersects(mask)) {

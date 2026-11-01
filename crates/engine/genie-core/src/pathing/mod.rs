@@ -72,7 +72,7 @@ pub struct Pathing {
     /// The mesh, None until the slice has the game's.
     mesh: Option<Mesh>,
     /// Each object's shape (`+0x64c`).
-    shapes: BTreeMap<ObjectId, ShapeId>,
+    shapes: crate::objects::IdTable<ShapeId>,
     /// The temporary shapes of the motion step under way (its `local_1688`).
     temporary: Vec<ShapeId>,
     /// The short pather.
@@ -249,7 +249,7 @@ impl Pathing {
     /// An object's shape in the mesh.
     #[must_use]
     pub fn shape(&self, id: ObjectId) -> Option<ShapeId> {
-        self.shapes.get(&id).copied()
+        self.shapes.get(id).copied()
     }
 
     /// The world's load gives restriction `restriction` a planner (`FUN_140f7d310`), unless the
@@ -332,13 +332,13 @@ impl Pathing {
             return;
         }
         if moving {
-            if let Some(s) = self.shapes.remove(&id) {
+            if let Some(s) = self.shapes.remove(id) {
                 mesh.remove(s);
             }
             return;
         }
         let rect = shape_rect(p);
-        let s = match self.shapes.get(&id) {
+        let s = match self.shapes.get(id) {
             None => mesh.add(rect),
             Some(&s) => mesh.replace(s, rect),
         };
@@ -352,7 +352,7 @@ impl Pathing {
             return;
         };
         let rect = shape_rect(p);
-        let s = match self.shapes.get(&id) {
+        let s = match self.shapes.get(id) {
             None => mesh.add(rect),
             Some(&s) => mesh.replace(s, rect),
         };
@@ -374,7 +374,7 @@ impl Pathing {
             return;
         }
         if moving {
-            if let Some(s) = self.shapes.remove(&id) {
+            if let Some(s) = self.shapes.remove(id) {
                 mesh.remove(s);
             }
             return;
@@ -385,7 +385,7 @@ impl Pathing {
             p.radius
         };
         let rect = refreshed_rect(p.position, radius);
-        let s = match self.shapes.get(&id) {
+        let s = match self.shapes.get(id) {
             None => mesh.add(rect),
             Some(&s) => mesh.replace(s, rect),
         };
@@ -414,7 +414,7 @@ impl Pathing {
 
     /// The object left the world: its shape leaves the mesh.
     pub fn removed(&mut self, id: ObjectId) {
-        if let (Some(mesh), Some(s)) = (self.mesh.as_mut(), self.shapes.remove(&id)) {
+        if let (Some(mesh), Some(s)) = (self.mesh.as_mut(), self.shapes.remove(id)) {
             mesh.remove(s);
         }
     }

@@ -549,7 +549,7 @@ struct RecordCells {
     /// The ids by cell, in (level, x, y) order: a query that visits more cells than are held
     /// walks one level's range of them.
     cells: BTreeMap<(i32, i32, i32), std::collections::BTreeSet<ObjectId>>,
-    filed: std::collections::HashMap<ObjectId, (i32, i32, i32)>,
+    filed: crate::objects::IdTable<(i32, i32, i32)>,
 }
 
 /// The world's objects by id, the map's size in tiles and what the game keeps per tile.
