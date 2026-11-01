@@ -14,6 +14,7 @@ use crate::players::attribute::QUEUED;
 use crate::players::game_status::{ONE_UNIT_AGE, ONE_UNIT_MODE};
 use crate::players::tracker::Key;
 use crate::production::{Making, refund, refund_research};
+use crate::technology::CostPaid;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::world::Seconds;
@@ -113,7 +114,7 @@ impl World {
         state.research_done = Seconds::ZERO;
         let building = owner.objects.checked_mut(idx)?;
         if let Some(def) = self.techs.get(t) {
-            for c in def.costs.iter().filter(|c| c.paid == 2) {
+            for c in def.costs.iter().filter(|c| c.paid == CostPaid::BUILDING) {
                 // a cost entry of the building's own store names an attribute
                 let attribute = c.attribute.ok_or(crate::world::NO_ATTRIBUTE)?;
                 match building.store.iter_mut().find(|s| s.0 == attribute) {

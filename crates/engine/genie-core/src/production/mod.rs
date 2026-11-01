@@ -460,6 +460,7 @@ mod tests {
     use crate::objects::masters::master_type;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
+    use crate::technology::CostPaid;
     use crate::technology::ResearchState;
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
@@ -728,17 +729,17 @@ mod tests {
                 Cost {
                     attribute: Some(attribute::FOOD),
                     amount: 100,
-                    paid: 1,
+                    paid: CostPaid::PLAYER,
                 },
                 Cost {
                     attribute: Some(attribute::WOOD),
                     amount: 50,
-                    paid: 0,
+                    paid: CostPaid::UNPAID,
                 },
                 Cost {
                     attribute: None,
                     amount: 5,
-                    paid: 1,
+                    paid: CostPaid::PLAYER,
                 },
             ],
             ..TechDef::default()

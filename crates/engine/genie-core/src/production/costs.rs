@@ -108,7 +108,7 @@ pub fn refund_tech(
         attributes.get(attribute::RESEARCH_COST_MODIFIER)?.get()
     };
     for (j, c) in def.costs.iter().enumerate() {
-        let Some(attribute) = c.attribute.filter(|_| c.paid != 0) else {
+        let Some(attribute) = c.attribute.filter(|_| c.paid.is_paid()) else {
             continue;
         };
         let mut v = (i32::from(state.cost_adj[j]) + i32::from(c.amount)) as f32;

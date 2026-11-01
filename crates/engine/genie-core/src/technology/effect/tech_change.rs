@@ -8,6 +8,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
 use crate::technology::ChangeMode;
+use crate::technology::EffectId;
 use crate::technology::ModifyLocation;
 use crate::technology::ModifyMode;
 use crate::technology::ResearchState;
@@ -157,7 +158,7 @@ impl World {
             ModifyMode::STATE => self.set_tech_state(p, tech, v)?,
             ModifyMode::EFFECT_OVERRIDE => {
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
-                state.effect_override = short;
+                state.effect_override = EffectId::of_data(short);
                 if state.state == ResearchState::Researched {
                     return Err(GenieError::unsupported(
                         "a researched technology's new effect (the world's effect table)",
@@ -276,12 +277,8 @@ impl World {
             let time = self
                 .techs
                 .get(t)
-                .and_then(|d| {
-                    d.locations
-                        .iter()
-                        .find(|&&(b, _)| MasterId::of_data(b) == building)
-                })
-                .map_or(NO_TIME, |&(_, time)| f32::from(time));
+                .and_then(|d| d.locations.iter().find(|&&(b, _)| b == building))
+                .map_or(NO_TIME, |&(_, time)| Seconds::of_master(time).get());
             let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
             let i = state
                 .locations

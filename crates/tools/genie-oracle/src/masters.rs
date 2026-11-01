@@ -11,7 +11,11 @@ use genie_core::objects::masters as work;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::players::AmountRate;
 use genie_core::players::attribute::AttributeId;
+use genie_core::technology::CostPaid;
+use genie_core::technology::EffectId;
+use genie_core::technology::TechId;
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_dat::de::DatFile;
 use std::collections::HashMap;
 
@@ -286,16 +290,21 @@ fn tech_def(
     Ok(genie_core::technology::TechDef {
         costs: tech_costs(t)?,
         kind: genie_core::technology::TechType::from(t.kind),
-        effect_id: t.effect_id,
+        effect_id: EffectId::of_data(t.effect_id),
         effect,
-        required: t.required_techs,
+        required: t.required_techs.map(TechId::of_data),
         required_count: t.required_tech_count,
         civ: genie_core::players::CivId::of_tech(t.civ)?,
         mode: t.full_tech_mode,
         locations: t
             .research_locations
             .iter()
-            .map(|l| (l.location_id, l.queue_time))
+            .map(|l| {
+                (
+                    MasterId::of_data(l.location_id),
+                    WholeSeconds::of_data(l.queue_time),
+                )
+            })
             .collect(),
     })
 }
@@ -307,7 +316,7 @@ fn tech_costs(t: &genie_dat::de::Tech) -> Result<[genie_core::technology::Cost; 
         Ok(genie_core::technology::Cost {
             attribute: AttributeId::of_field(c.kind)?,
             amount: c.amount,
-            paid: c.flag,
+            paid: CostPaid::of_data(c.flag),
         })
     };
     Ok([cost(c0)?, cost(c1)?, cost(c2)?])

@@ -13,6 +13,7 @@ use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
 use crate::technology::ChangeMode;
 use crate::technology::DisabledTech;
+use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER, MODE_WITHOUT_0X26D};
@@ -124,7 +125,7 @@ impl World {
             }
             _ => false,
         });
-        if state.effect_override != -1 && state.effect_override != def.effect_id {
+        if state.effect_override != EffectId::NONE && state.effect_override != def.effect_id {
             return Err(GenieError::unsupported("a technology's effect override"));
         }
         if reaches_object {
@@ -224,7 +225,7 @@ impl World {
     ) -> Result<i32, GenieError> {
         let mut counted = 0;
         let def = self.techs.checked(d)?;
-        if !def.required.contains(&t.get()) || def.kind == crate::technology::TechType::SHARED {
+        if !def.required.contains(&Some(t)) || def.kind == crate::technology::TechType::SHARED {
             return Ok(counted);
         }
         let Some(state) = self.players.player(p)?.techs.get(d) else {
@@ -251,10 +252,11 @@ impl World {
             .required
             .iter()
             .filter(|&&r| {
-                0 <= r
-                    && techs
-                        .get(r as usize)
+                r.is_some_and(|r| {
+                    techs
+                        .get(r.index())
                         .is_some_and(|s| s.state == ResearchState::Researched)
+                })
             })
             .count() as i16;
         let state = self.players.player_mut(p)?.techs.checked_mut(d)?;
@@ -345,7 +347,7 @@ impl World {
         let costs = self.techs.checked(t)?.costs;
         let adjustments = &mut self.players.player_mut(p)?.techs.checked_mut(t)?.cost_adj;
         for (cost, adj) in costs.iter().zip(adjustments.iter_mut()) {
-            if cost.paid == 0 || resource.is_some_and(|r| cost.attribute != Some(r)) {
+            if !cost.paid.is_paid() || resource.is_some_and(|r| cost.attribute != Some(r)) {
                 continue;
             }
             *adj = match mode {

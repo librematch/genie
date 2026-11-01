@@ -29,7 +29,10 @@ use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::technology::CostPaid;
+use crate::technology::EffectId;
 use crate::technology::ResearchState;
+use crate::technology::TechId;
 use crate::test_ids::costs;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
@@ -1245,8 +1248,8 @@ fn barracks_tech() -> World {
         vec![player],
     );
     t.techs = vec![TechDef {
-        required: [-1; 6],
-        locations: vec![(12, 30)],
+        required: [TechId::of_data(-1); 6],
+        locations: vec![(MasterId::of_data(12), WholeSeconds::of_data(30))],
         ..TechDef::default()
     }];
     t
@@ -1292,7 +1295,7 @@ fn a_technology_change_reaches_its_costs_locations_and_state() {
     t.techs[0].costs[0] = Cost {
         attribute: Some(attribute::STONE),
         amount: 100,
-        paid: 1,
+        paid: CostPaid::PLAYER,
     };
     t.masters = vec![Masters::new([combat(master_id(87), class::BUILDING, 1000)])];
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 0x4002, -1, 25.0)], None)
@@ -1372,7 +1375,7 @@ fn a_technology_change_s_location_stacking_and_effect_override() {
     assert_eq!(t.players[0].techs[0].state, ResearchState::Unavailable);
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 7.0)], None)
         .unwrap();
-    assert_eq!(t.players[0].techs[0].effect_override, 7);
+    assert_eq!(t.players[0].techs[0].effect_override, EffectId::of_data(7));
     t.players[0].techs[0].state = ResearchState::Researched;
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 8.0)], None)
@@ -1586,8 +1589,8 @@ fn a_research_whose_effect_needs_its_building_stops() {
         vec![player],
     );
     let def = |effect| TechDef {
-        required: [-1; 6],
-        effect_id: 7,
+        required: [TechId::of_data(-1); 6],
+        effect_id: EffectId::of_data(7),
         effect,
         ..TechDef::default()
     };
@@ -1600,12 +1603,12 @@ fn a_research_whose_effect_needs_its_building_stops() {
             .is_err()
     );
     assert_eq!(t.players[0].techs[0].state, ResearchState::Researching);
-    t.players[0].techs[1].effect_override = 9;
+    t.players[0].techs[1].effect_override = EffectId::of_data(9);
     assert!(
         t.complete_research(PlayerId::new(0), tech_id(1), None)
             .is_err()
     );
-    t.players[0].techs[1].effect_override = 7;
+    t.players[0].techs[1].effect_override = EffectId::of_data(7);
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(1), None),
         Ok(true)
@@ -1636,7 +1639,7 @@ fn an_age_adds_its_event_to_the_history() {
     );
     t.techs = vec![
         TechDef {
-            required: [-1; 6],
+            required: [TechId::of_data(-1); 6],
             ..TechDef::default()
         };
         104
@@ -1671,7 +1674,7 @@ fn an_age_adds_its_event_to_the_history() {
 fn a_dependent_technology_done_already_completes_with_its_requirement() {
     use crate::technology::{Location, TechDef, TechState};
     let def = |required: i16, count| TechDef {
-        required: [required, -1, -1, -1, -1, -1],
+        required: [TechId::of_data(required), None, None, None, None, None],
         required_count: count,
         ..TechDef::default()
     };
@@ -1710,7 +1713,7 @@ fn a_dependent_technology_done_already_completes_with_its_requirement() {
 fn the_full_tech_tree_disables_a_civ_s_own_technologies_but_those_of_mode_1() {
     use crate::technology::{TechDef, TechState};
     let def = |required: i16, civ: i16, mode: i16| TechDef {
-        required: [required, -1, -1, -1, -1, -1],
+        required: [TechId::of_data(required), None, None, None, None, None],
         required_count: i16::from(required != -1),
         civ: CivId::of_tech(civ).unwrap(),
         mode,
@@ -1784,12 +1787,12 @@ fn the_technology_commands_disable_and_adjust_costs() {
             Cost {
                 attribute: Some(attribute::FOOD),
                 amount: 150,
-                paid: 1,
+                paid: CostPaid::PLAYER,
             },
             Cost {
                 attribute: Some(attribute::GOLD),
                 amount: 50,
-                paid: 1,
+                paid: CostPaid::PLAYER,
             },
             Cost::default(),
         ],
@@ -1887,7 +1890,7 @@ fn a_cost_change_past_the_i32_range_adds_nothing() {
             Cost {
                 attribute: Some(attribute::FOOD),
                 amount: 150,
-                paid: 1,
+                paid: CostPaid::PLAYER,
             },
             Cost::default(),
             Cost::default(),
@@ -1937,7 +1940,7 @@ fn the_last_building_of_a_master_withdraws_its_technology() {
         vec![player],
     );
     t.techs = vec![TechDef {
-        required: [-1; 6],
+        required: [TechId::of_data(-1); 6],
         ..TechDef::default()
     }];
     t.withdraw_tech(PlayerId::new(0), master_id(1640), tech_id(0))

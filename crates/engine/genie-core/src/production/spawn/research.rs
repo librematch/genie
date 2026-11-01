@@ -168,8 +168,8 @@ impl World {
             let mut time = def
                 .locations
                 .iter()
-                .find(|l| l.0 == master.get())
-                .map_or(-1.0, |l| f32::from(l.1));
+                .find(|l| l.0 == Some(master))
+                .map_or(-1.0, |l| Seconds::of_master(l.1).get());
             let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
             if !crate::technology::is_age(tech) && Amount::ZERO < modifier {
                 time *= modifier.get();
@@ -295,8 +295,8 @@ impl World {
         let mut time = def
             .locations
             .iter()
-            .find(|l| l.0 == master.get())
-            .map_or(-1.0, |l| f32::from(l.1));
+            .find(|l| l.0 == Some(master))
+            .map_or(-1.0, |l| Seconds::of_master(l.1).get());
         let adjustment = state
             .location(master)
             .map_or(Seconds::ZERO, |l| l.adjustment);

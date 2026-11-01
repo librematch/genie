@@ -16,17 +16,21 @@ use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
 mod command_args;
+mod cost_paid;
 pub mod effect;
 mod effect_command;
+mod effect_id;
 mod research_state;
 mod tech_id;
 mod tech_type;
 pub mod upgrade;
 
 pub use self::command_args::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode};
+pub use self::cost_paid::CostPaid;
 pub use self::effect_command::{
     CostEdit, CostUnits, EffectCommand, ObjectsKind, Party, ResourceChange,
 };
+pub use self::effect_id::EffectId;
 pub use self::research_state::ResearchState;
 pub use self::tech_id::TechId;
 pub use self::tech_type::TechType;
@@ -80,7 +84,7 @@ pub struct Cost {
     /// How much.
     pub amount: i16,
     /// 0 not paid, 1 paid from the player's attribute, 2 from the building (`FUN_141204310`).
-    pub paid: u8,
+    pub paid: CostPaid,
 }
 
 /// A technology of the `.dat` as the tech tree holds it (its 0x88-byte record).
@@ -91,11 +95,11 @@ pub struct TechDef {
     /// `+0x3c`, the technology's type.
     pub kind: TechType,
     /// Its effect (`+0x3a`) and the effect's commands (the world's effect table `+0x128`).
-    pub effect_id: i16,
+    pub effect_id: EffectId,
     /// The effect's commands.
     pub effect: Vec<EffectCommand>,
     /// `+0x18`, `+0x24`: the technologies it requires and how many of them.
-    pub required: [i16; 6],
+    pub required: [Option<TechId>; 6],
     /// How many of them it requires.
     pub required_count: i16,
     /// `+0x26`: the civ it belongs to (below 1 every civ's); `+0x28`: the game modes it is for
@@ -104,7 +108,7 @@ pub struct TechDef {
     /// `+0x28`: the game modes it is for (0 and 1 every one, `FUN_1413cf2f0`).
     pub mode: i16,
     /// `+0x70`: where it is researched, the building's master and the seconds it takes.
-    pub locations: Vec<(i16, i16)>,
+    pub locations: Vec<(Option<MasterId>, crate::world::WholeSeconds)>,
 }
 
 impl TechDef {
@@ -173,7 +177,7 @@ pub struct TechState {
     /// `+0x60` (`mEnabledTech`): the dependents' update leaves it alone.
     pub enabled: bool,
     /// `+0x62`: the effect it gives instead of its own (−1 none).
-    pub effect_override: i16,
+    pub effect_override: EffectId,
     /// `+0x64`: the master of the building it was last queued at.
     pub building_master: Option<MasterId>,
     /// `+0x68`.
@@ -268,7 +272,7 @@ impl TechState {
             let (amount, attr, used) = *self.overrides.checked(j)?;
             let c = *def.costs.checked(j)?;
             let attr = if used == 1 { attr } else { c.attribute };
-            let Some(attr) = attr.filter(|_| c.paid != 0) else {
+            let Some(attr) = attr.filter(|_| c.paid.is_paid()) else {
                 continue;
             };
             let mut v = if used == 1 {
@@ -285,7 +289,7 @@ impl TechState {
                 .filter(|&&(k, _)| k == Some(attr))
                 .map(|&(_, a)| a)
                 .fold(0.0, |s, a| s + a);
-            if c.paid == 2 {
+            if c.paid == CostPaid::BUILDING {
                 return Err(GenieError::unsupported(
                     "a research cost the building holds (FUN_141204310)",
                 ));
@@ -318,7 +322,7 @@ impl TechState {
             let c = *def.costs.checked(j)?;
             let (attribute, base) = match used {
                 0 => continue,
-                -2 if c.paid != 0 => (c.attribute, c.amount),
+                -2 if c.paid.is_paid() => (c.attribute, c.amount),
                 _ => (attribute, amount),
             };
             slot.0 = attribute;
@@ -352,11 +356,11 @@ impl TechState {
         def: &TechDef,
         j: usize,
         (modifier, scale): (f32, i16),
-    ) -> Option<(AttributeId, f32, u8)> {
+    ) -> Option<(AttributeId, f32, CostPaid)> {
         let (amount, attribute, used) = *self.overrides.get(j)?;
         let c = *def.costs.get(j)?;
         let attribute = if used == 1 { attribute } else { c.attribute };
-        let attribute = attribute.filter(|_| c.paid != 0 || used != 0)?;
+        let attribute = attribute.filter(|_| c.paid.is_paid() || used != 0)?;
         let mut v = if used == 1 {
             f32::from(amount)
         } else {
@@ -395,7 +399,7 @@ impl TechState {
             let Some((attr, amount, paid)) = self.payment(def, j, factors) else {
                 continue;
             };
-            if paid == 2 {
+            if paid == CostPaid::BUILDING {
                 return Err(GenieError::unsupported(
                     "a research cost the building holds (FUN_141204310)",
                 ));
@@ -428,7 +432,7 @@ impl TechState {
             let Some((attr, amount, paid)) = self.payment(def, j, factors) else {
                 continue;
             };
-            if paid == 2 {
+            if paid == CostPaid::BUILDING {
                 return Err(GenieError::unsupported(
                     "a research cost the building pays (FUN_1411c7470)",
                 ));
@@ -514,12 +518,12 @@ mod tests {
         let none = Cost {
             attribute: None,
             amount: 0,
-            paid: 0,
+            paid: CostPaid::UNPAID,
         };
         let gold = Cost {
             attribute: Some(attribute::GOLD),
             amount: 50,
-            paid: 1,
+            paid: CostPaid::PLAYER,
         };
         let def = TechDef {
             costs: [gold, none, none],

@@ -111,6 +111,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::players::relations;
 use crate::players::tracker::ListKey;
+use crate::technology::CostPaid;
 use crate::technology::ResearchState;
 use crate::test_ids::attack_category;
 use crate::test_ids::carrying;
@@ -8975,7 +8976,7 @@ fn research_world() -> World {
     t.techs[5].costs[0] = Cost {
         attribute: Some(attribute::FOOD),
         amount: 50,
-        paid: 1,
+        paid: CostPaid::PLAYER,
     };
     let mut techs = vec![TechState::default(); 6];
     techs[5] = TechState {

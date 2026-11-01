@@ -19,7 +19,9 @@ the player's masters, resources or other technologies.
 | File | What it holds |
 | --- | --- |
 | [`command_args.rs`](command_args.rs) | The arguments of the technology commands: how a cost or a research time changes (`ChangeMode`), what kind 8 changes (`ModifyMode`) and at which location (`ModifyLocation`), and the technology a disable names (`DisabledTech`). |
+| [`cost_paid.rs`](cost_paid.rs) | How a technology's cost entry is paid (its paid flag). |
 | [`effect_command.rs`](effect_command.rs) | An effect's commands by kind: the `.dat`'s 12 bytes each (a kind and four arguments) as `TRIBE_Effects::do_effect` (`FUN_141462440`) and its base (`FUN_140ec2ac0`) read them, parsed once where the `.dat` is read. |
+| [`effect_id.rs`](effect_id.rs) | An effect's id (a technology's `+0x3a`, a player's effect override `+0x62`). |
 | [`mod.rs`](mod.rs) | Technologies and upgrades: the players' technologies, a research's effects and an object's upgrade to another master. |
 | [`research_state.rs`](research_state.rs) | A player's technology's state: whether it may be researched, is being researched or is researched. |
 | [`tech_id.rs`](tech_id.rs) | A technology's id as one type: the place of a technology in the tech tree and in a player's technologies, the `.dat`'s technology record index. |

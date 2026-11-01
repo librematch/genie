@@ -33,6 +33,7 @@ use crate::players::relation_row;
 use crate::production::{
     Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
 };
+use crate::technology::CostPaid;
 use crate::technology::ResearchState;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
@@ -742,11 +743,11 @@ fn researching(progress: f32) -> World {
     };
     defs[22] = TechDef {
         costs: [
-            cost(Some(attribute::GOLD), 50, 1),
-            cost(Some(attribute::WOOD), 20, 2),
-            cost(None, 0, 0),
+            cost(Some(attribute::GOLD), 50, CostPaid::PLAYER),
+            cost(Some(attribute::WOOD), 20, CostPaid::BUILDING),
+            cost(None, 0, CostPaid::UNPAID),
         ],
-        locations: vec![(109, 25)],
+        locations: vec![(MasterId::of_data(109), WholeSeconds::of_data(25))],
         ..TechDef::default()
     };
     t.techs = defs;
