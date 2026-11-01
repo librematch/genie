@@ -128,7 +128,7 @@ impl World {
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let site_at = self
             .spatial
             .get(foundation)

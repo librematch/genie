@@ -189,7 +189,7 @@ impl World {
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
     fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> Result<bool, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         self.spatial
             .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
     }
@@ -360,7 +360,7 @@ impl World {
         ignore: &[ObjectId],
         record: &mut Path,
     ) -> Result<ShortFound, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -410,7 +410,7 @@ impl World {
             computer,
             (to, 0.0),
             None,
-            crate::world::index::ObjectsRef::new(&self.players, &self.index),
+            crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
         )
     }
 

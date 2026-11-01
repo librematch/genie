@@ -170,7 +170,7 @@ impl World {
                         Some(crate::gathering::DropSiteId::new(id)),
                     ),
                     (current, ObjectState::Foundation, crate::unit_ai::NO_POINT),
-                    crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                    crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
                 )?;
                 if let Some(f) = f {
                     found.push(f);

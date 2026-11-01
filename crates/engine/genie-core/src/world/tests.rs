@@ -8413,6 +8413,7 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
     );
     let master = |id: i16, class: ClassId, transform_unit: i16| Master {
         id: master_id(id),
+        kind: BUILDING,
         class,
         building: Some(crate::objects::masters::BuildingMaster {
             transform_unit: opt_master(transform_unit),
@@ -8420,19 +8421,30 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
         }),
         ..Master::default()
     };
+    // a gate's class on an object that is no building answers as the base slot 0x678: no
+    let not_building = Master {
+        kind: master_type::COMBAT,
+        ..master(67, class::GATE, 63)
+    };
     let masters = Masters::new([
         master(64, class::GATE, 63),
         master(65, class::GATE, -1),
         master(66, class::VILLAGER, 63),
+        not_building,
     ]);
     t.masters = vec![masters.clone(), masters];
-    let passes: Vec<bool> = (0..5)
+    let mut passes: Vec<bool> = (0..5)
         .map(|i| {
             t.gate_passes(PlayerId::new(1), ListIndex::new(i), PlayerId::new(1))
                 .unwrap()
         })
         .collect();
-    assert_eq!(passes, [true, false, false, false, false]);
+    t.players[1].objects[ListIndex::new(0)].life.master_id = master_id(67);
+    passes.push(
+        t.gate_passes(PlayerId::new(1), ListIndex::new(0), PlayerId::new(1))
+            .unwrap(),
+    );
+    assert_eq!(passes, [true, false, false, false, false, false]);
 }
 
 #[test]
@@ -8473,6 +8485,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
     );
     let master = Master {
         id: master_id(64),
+        kind: BUILDING,
         class: class::GATE,
         obstruction_type: ObstructionType::TYPE_2,
         obstruction_class: ObstructionClass::GATE,
@@ -8817,6 +8830,55 @@ fn gate_world() -> World {
         ),
     );
     t
+}
+
+/// [`gate_world`]'s gate as the long pather asks it (`FUN_140f9eb70` on an allied gate's record,
+/// [`crate::pathing::long_path::gate_lets_pass`]): a tile of the gate's footprint leads to its
+/// anchor, whose first object of class 39 is the gate; it lets its own player pass while it
+/// stands below state 3, unlocked, of a master that transforms; an enemy, a tile of no building
+/// and a gate that is locked, dying or of a master without a transform stay closed.
+#[test]
+fn the_long_pather_asks_the_gate_on_its_anchor() {
+    use crate::pathing::long_path::gate_lets_pass;
+    fn gate(t: &mut World) -> &mut Unit {
+        t.players[1].objects.by_id_mut(object_id(27745)).unwrap()
+    }
+    let mut t = gate_world();
+    let mut v = crate::vision::visibility::Visibility::new(
+        GridSize::new(40, 40),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        0,
+        Vec::new(),
+    );
+    let _ = v
+        .link_building(Position::new(20.0, 20.0, 0.0), Footprint::new(1.5, 0.5))
+        .unwrap();
+    let side = Tile::new(19, 20);
+    let anchor = v.anchor_of(side).unwrap();
+    assert_ne!(anchor, side);
+    t.spatial.sight = Some(v);
+    let ask = |t: &World, p: u8, tile| {
+        gate_lets_pass(&t.spatial, t.objects(), PlayerId::new(p), tile).unwrap()
+    };
+    assert!(t.spatial.tile_list(anchor).contains(&object_id(27745)));
+    assert!(ask(&t, 1, side) && ask(&t, 1, anchor));
+    assert!(!ask(&t, 0, side));
+    assert!(!ask(&t, 1, Tile::new(5, 5)));
+    gate(&mut t).building.gate = Some(Gate {
+        locked: true,
+        ..Gate::default()
+    });
+    assert!(!ask(&t, 1, side));
+    gate(&mut t).building.gate = Some(Gate::default());
+    gate(&mut t).life.state = ObjectState::Dying;
+    assert!(!ask(&t, 1, side));
+    gate(&mut t).life.state = ObjectState::Alive;
+    gate(&mut t).life.master_id = master_id(92);
+    assert!(!ask(&t, 1, side));
+    t.spatial.sight = None;
+    assert!(!ask(&t, 1, side));
 }
 
 /// The player's gate toggle (`FUN_14162f8c0`) on records/425906646's gate 27745 (annexes 27746
@@ -18776,6 +18838,68 @@ fn a_building_s_own_completion_completes_its_annexes_first() {
     );
     let (annex, house) = done_at(&t, 10030, 10028);
     assert!(annex.is_some() && annex < house, "{annex:?} {house:?}");
+}
+
+/// The update of [`house_builder`]'s object `id` (player 1) as far as
+/// [`Unit::let_removed_links_go`]: its annexes and its main building after it.
+fn links_after_update(
+    t: &mut World,
+    id: ObjectId,
+) -> Result<(Vec<ObjectId>, Option<MainBuildingId>), GenieError> {
+    let i = t.players[1].objects.position_of(id).unwrap();
+    in_update(t, (PlayerId::new(1), i), 50, |unit, c| {
+        unit.let_removed_links_go(c)?;
+        Ok((
+            unit.building.annexes.ids().collect(),
+            unit.building.annex_of,
+        ))
+    })
+}
+
+/// A building's update (`0x1411c9000`) lets go its annex once the annex is past state 6
+/// (removed or gone) and keeps one in state 3; an annex lets go its main building past state 6;
+/// a house (the walls' branch) keeps its slots; a link to an object the world does not file
+/// stops the update.
+#[test]
+fn a_building_lets_its_links_past_state_6_go() {
+    let (centre, annex) = (object_id(700), object_id(10030));
+    let linked = |annex_state, centre_state| {
+        let mut t = house_builder();
+        let mut a = t.players[1].objects.by_id(centre).unwrap().clone();
+        a.id = annex;
+        a.life.state = annex_state;
+        let _ = t.push_live(PlayerId::new(1), a).unwrap();
+        t.link_test_annex(annex, centre);
+        t.players[1].objects.by_id_mut(centre).unwrap().life.state = centre_state;
+        t
+    };
+    let main = Some(MainBuildingId::new(centre));
+    let (alive, dying) = (ObjectState::Alive, ObjectState::Dying);
+    for (state, kept) in [
+        (dying, vec![annex]),
+        (ObjectState::Removed, vec![]),
+        (ObjectState::Gone, vec![]),
+    ] {
+        let mut t = linked(state, alive);
+        assert_eq!(links_after_update(&mut t, centre).unwrap(), (kept, None));
+    }
+    for (state, kept) in [(dying, main), (ObjectState::Removed, None)] {
+        let mut t = linked(alive, state);
+        assert_eq!(links_after_update(&mut t, annex).unwrap(), (vec![], kept));
+    }
+    let mut t = annexed_house();
+    t.players[1].objects.by_id_mut(annex).unwrap().life.state = ObjectState::Removed;
+    assert_eq!(
+        links_after_update(&mut t, object_id(10028)).unwrap(),
+        (vec![annex], None)
+    );
+    let mut t = house_builder();
+    let c = t.players[1].objects.by_id_mut(centre).unwrap();
+    c.building.annexes.link(0, object_id(55_555)).unwrap();
+    assert_eq!(
+        links_after_update(&mut t, centre).map_err(|e| e.reason().to_owned()),
+        Err("a building's link to an object the world does not file".to_owned())
+    );
 }
 
 /// [`house_builder`]'s forager after it built town centre 700 (its Build's target in state 224,

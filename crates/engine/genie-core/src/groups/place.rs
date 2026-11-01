@@ -176,7 +176,7 @@ impl World {
                 grow,
                 &members,
                 true,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
             )? {
                 return Ok(at);
             }
@@ -256,7 +256,7 @@ impl World {
         group: GroupId,
         ahead: Distance,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };

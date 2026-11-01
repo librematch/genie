@@ -167,7 +167,11 @@ impl UnitView<'_, '_> {
         site: FoundationId,
         radius: Footprint,
     ) -> Result<crate::unit_ai::OffFootprint, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.c.w.players,
+            &self.c.w.index,
+            &self.c.w.masters,
+        );
         let unit = &*self.unit;
         let master = unit.master(&self.c.w.masters, self.player)?;
         let (player, others) = (

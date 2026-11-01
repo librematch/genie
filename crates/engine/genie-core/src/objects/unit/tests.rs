@@ -188,7 +188,7 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
         let level = bush.body.mover().unwrap().paths[0].pause_time;
         Ok((
             level,
-            crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index)
+            crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters)
                 .gait(object_id(600))
                 .and_then(|g| g.pause),
         ))

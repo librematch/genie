@@ -299,7 +299,7 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
     ) -> Result<bool, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let spatial = &mut c.w.spatial;
         let terrain = spatial
             .terrain

@@ -45,6 +45,26 @@ impl Annexes {
     pub const fn clear(&mut self) {
         self.0 = [None; Self::SLOTS];
     }
+
+    /// Each slot whose annex `gone` tells is gone clears, in slot order (the building's update
+    /// lets an annex past state 6 go).
+    ///
+    /// # Errors
+    ///
+    /// The first error of `gone`.
+    pub fn let_go(
+        &mut self,
+        mut gone: impl FnMut(ObjectId) -> Result<bool, GenieError>,
+    ) -> Result<(), GenieError> {
+        for slot in &mut self.0 {
+            if let Some(id) = *slot
+                && gone(id)?
+            {
+                *slot = None;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -68,5 +88,29 @@ mod tests {
         assert!(a.link(Annexes::SLOTS, object_id(14)).is_err());
         a.clear();
         assert_eq!(a, Annexes::NONE);
+    }
+
+    /// The update lets go the slots of the gone annexes and keeps the others in their slots; an
+    /// error stops it at its slot.
+    #[test]
+    fn a_building_lets_its_gone_annexes_go() {
+        let mut a = Annexes::new([
+            Some(object_id(10)),
+            None,
+            Some(object_id(12)),
+            Some(object_id(13)),
+        ]);
+        a.let_go(|id| Ok(id != object_id(12))).unwrap();
+        assert_eq!(a, Annexes::new([None, None, Some(object_id(12)), None]));
+        let mut b = Annexes::new([Some(object_id(10)), Some(object_id(11)), None, None]);
+        let failed = b.let_go(|id| {
+            if id == object_id(11) {
+                Err(GenieError::unreachable("test"))
+            } else {
+                Ok(true)
+            }
+        });
+        assert!(failed.is_err());
+        assert_eq!(b, Annexes::new([None, Some(object_id(11)), None, None]));
     }
 }

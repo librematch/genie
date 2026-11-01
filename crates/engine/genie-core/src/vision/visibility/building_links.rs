@@ -37,6 +37,17 @@ impl Visibility {
         None
     }
 
+    /// Whether `tile` is a building's tile: its map tile's `+0x19` holds the linked or the
+    /// anchor bit (`& 0x60`).
+    #[must_use]
+    pub fn building_tile(&self, tile: Tile) -> bool {
+        self.size.holds(tile)
+            && self
+                .links
+                .get(self.index(tile))
+                .is_some_and(|&(bits, _)| bits & (LINKED | ANCHOR) != 0)
+    }
+
     /// `FUN_140f68e30`: the building's tile rectangle from one of its tiles, through its
     /// anchor's UMV entry.
     #[must_use]

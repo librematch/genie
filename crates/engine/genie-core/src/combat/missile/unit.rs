@@ -287,7 +287,7 @@ impl Unit {
             ally_factor: 1.0,
             player: Some(c.player),
             ignore: &[RecordId::from(self.id)],
-            objects: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index),
+            objects: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters),
         })?;
         let mut met = Vec::new();
         for record in crossed {

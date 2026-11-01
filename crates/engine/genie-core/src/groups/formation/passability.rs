@@ -379,7 +379,7 @@ impl World {
                 p.ground(),
                 grow,
                 members,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
             )? {
                 unreachable.push(j);
             } else {
@@ -491,7 +491,7 @@ impl World {
                 Point::new((ddx + fx) as f32 + PASS_HALF, (fy + ddy) as f32 + PASS_HALF),
                 grow,
                 members,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
             )?
         {
             *grid.cells.checked_mut(cell)? = count_up(b);

@@ -474,7 +474,7 @@ impl EnterAction {
                 reads.start,
                 meeting,
                 &moves,
-                crate::world::index::ObjectsRef::new(&w.players, &w.index),
+                crate::world::index::ObjectsRef::new(&w.players, &w.index, &w.masters),
             )?
         };
         match walking {

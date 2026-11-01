@@ -5,6 +5,7 @@ use crate::map::Tile;
 use crate::movement::StepPlans;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionType;
+use crate::pathing::long_path::gate_lets_pass;
 use crate::players::PlayerId;
 
 use crate::map::Footprint;
@@ -160,7 +161,14 @@ pub(crate) fn long_path_for(
                 world.allies_of(p.player)
             }),
     };
-    crate::pathing::long_path::path(world.tiles(), world.map, &req, walker.position.z())
+    let player = world.get(walker.id).map(|p| p.player);
+    let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
+    crate::pathing::long_path::path(
+        world.tiles(),
+        world.map,
+        (&req, &gates),
+        walker.position.z(),
+    )
 }
 
 /// What the tile pathfinder is asked besides its walker ([`tile_plan_for`]'s arguments).

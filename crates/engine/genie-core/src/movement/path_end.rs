@@ -198,7 +198,13 @@ impl Mover {
                     world.allies_of(p.player)
                 }),
         };
-        crate::pathing::long_path::reaches(world.tiles(), world.map, &req)
+        let player = world.get(me.id).map(|p| p.player);
+        let gates = |t| {
+            player.map_or(Ok(false), |p| {
+                crate::pathing::long_path::gate_lets_pass(world, by_id, p, t)
+            })
+        };
+        crate::pathing::long_path::reaches(world.tiles(), world.map, &req, &gates)
     }
 
     /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in

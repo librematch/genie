@@ -31,9 +31,10 @@ impl Unit {
     }
 
     /// `RGE_Static_Object::update` and the combat object's steps before the actions: the death
-    /// blast, the sleep ([`Unit::go_to_sleep`], None), the sprite's facets, a gate's and a
-    /// building's update, the attack timers, the motion, the life step (what
-    /// the unit AI later reads of it), the animation and the actions past the unit's life.
+    /// blast, the sleep ([`Unit::go_to_sleep`], None), the sprite's facets, a building's links
+    /// to removed objects ([`Unit::let_removed_links_go`]), a gate's and a building's update,
+    /// the attack timers, the motion, the life step (what the unit AI later reads of it), the
+    /// animation and the actions past the unit's life.
     pub(crate) fn update_to_actions(
         &mut self,
         c: &mut Step<'_>,
@@ -43,6 +44,7 @@ impl Unit {
             return Ok(None);
         }
         self.take_sprite_facets();
+        self.let_removed_links_go(c)?;
         self.gate_update(c)?;
         self.complete_on_update(c)?;
         self.building_seconds(c)?;

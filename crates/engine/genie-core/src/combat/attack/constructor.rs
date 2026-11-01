@@ -209,7 +209,7 @@ impl Attack {
                 object_rng: None,
                 buffer: Some(&mut posted),
                 graphics: &c.w.graphics,
-                by_id: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index),
+                by_id: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters),
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }

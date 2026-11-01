@@ -126,7 +126,7 @@ impl Unit {
     /// the closest (`FUN_1411671e0` as `set_state(8)` searches, [`Unit::drop_site`]), with none
     /// found 0, and the hunt's class goes (−1).
     pub(crate) fn hunt_search_notify(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let hunt = self
             .actions
@@ -424,7 +424,7 @@ impl Unit {
             groups: &c.w.groups,
         };
         let master_id = self.life.master_id;
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object(&me, (spatial, by_id), &mut plan, id, range, master_id)
         };
@@ -626,7 +626,7 @@ impl Unit {
     /// [`HuntAction::set_drop`]: crate::gathering::hunt::HuntAction::set_drop
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
     pub(crate) fn hunt_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let w = DropWorld {
             masters: c.w.masters.of(c.player),
             spatial: &mut c.w.spatial,

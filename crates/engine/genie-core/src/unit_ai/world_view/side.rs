@@ -71,7 +71,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
             "a stand test of a unit without movement state",
         ))?;
-        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.c.w.players,
+            &self.c.w.index,
+            &self.c.w.masters,
+        );
         self.c.w.spatial.point_clear(
             unit.id,
             point,
@@ -240,7 +244,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
             "a reach test of a unit that does not move",
         ))?;
-        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.c.w.players,
+            &self.c.w.index,
+            &self.c.w.masters,
+        );
         mover.reaches_object(
             &walker,
             (&mut self.c.w.spatial, by_id),
@@ -275,7 +283,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             )?
             .players(),
             every: &self.c.w.masters,
-            by_id: crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index),
+            by_id: crate::world::index::ObjectsRef::new(
+                &self.c.w.players,
+                &self.c.w.index,
+                &self.c.w.masters,
+            ),
             restriction: self
                 .unit
                 .master(&self.c.w.masters, self.player)?
@@ -307,7 +319,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let unit = &*self.unit;
         let walker = unit.me();
         let (mover, master_id) = (unit.body.mover(), unit.life.master_id);
-        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.c.w.players,
+            &self.c.w.index,
+            &self.c.w.masters,
+        );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             let m = mover.ok_or(GenieError::unsupported(
                 "a reach test of a unit that does not move",

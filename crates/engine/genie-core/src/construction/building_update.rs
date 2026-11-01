@@ -10,6 +10,7 @@ use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::movement::MoveAlgorithm;
 use crate::objects::HitPoints;
+use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::SpriteId;
@@ -22,6 +23,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::HOUSE;
 use crate::objects::masters::ids::MONASTERY;
+use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -45,6 +47,40 @@ pub(crate) fn walls_branch(master: &Master) -> bool {
 }
 
 impl Unit {
+    /// `TRIBE_Building_Object::update` (`0x1411c9000`) outside the walls' branch, before the
+    /// gate's update: a building's link to its main building (`+0xbb8`) and each of its annex
+    /// slots (`+0xbc0`..`+0xbd8`) whose object is past state 6 (`+0x640`: removed or gone) let
+    /// it go. A building updates in every update, so it meets each linked object in state 7 or 8
+    /// before that object leaves its list.
+    ///
+    /// # Errors
+    ///
+    /// A link to an object the world does not file.
+    pub(crate) fn let_removed_links_go(&mut self, c: &Step<'_>) -> Result<(), GenieError> {
+        let master = self.master(&c.w.masters, c.player)?;
+        if master.kind != BUILDING || walls_branch(master) {
+            return Ok(());
+        }
+        let objects = c.w.objects();
+        let removed = |id: ObjectId| {
+            objects
+                .get(id)
+                .map(|u| ObjectState::Removed <= u.life.state)
+                .ok_or_else(|| {
+                    GenieError::unreachable(
+                        "a building's link to an object the world does not file",
+                    )
+                    .with("object", id)
+                })
+        };
+        if let Some(main) = self.building.annex_of
+            && removed(main.id())?
+        {
+            self.building.annex_of = None;
+        }
+        self.building.annexes.let_go(removed)
+    }
+
     /// The gate's update (`FUN_1411e7730`, `TRIBE_Building_Object::update` for a master of class
     /// 39 outside the walls' branch): a gate in state 2 whose master transforms
     /// (`transform_unit`, `+0x9ba`) clears its first update (its endpoints, not held). Unless it
@@ -56,7 +92,7 @@ impl Unit {
     /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
     /// of at most 0).
     pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let master = self.master(&c.w.masters, c.player)?;
         let transforms = master
             .building
@@ -125,7 +161,7 @@ impl Unit {
         spatial: &mut Spatial,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(usize, usize), GenieError> {
-        let annexes: Vec<crate::objects::ObjectId> = self.building.annexes.ids().collect();
+        let annexes: Vec<ObjectId> = self.building.annexes.ids().collect();
         let (units, allied) = gate_units(spatial, self.id, &annexes, by_id)?;
         Ok((units.len(), allied))
     }

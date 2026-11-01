@@ -374,14 +374,14 @@ impl World {
                 world,
                 others,
                 &self.graphics,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
             )
         } else {
             unit.gather_drop_off_in(
                 world,
                 others,
                 &self.graphics,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
             )
         };
         let idx = self.put_back_own(p, unit)?;

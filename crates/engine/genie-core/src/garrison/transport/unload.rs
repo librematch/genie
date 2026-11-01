@@ -393,7 +393,7 @@ impl crate::world::World {
                     spot,
                     Distance::new(grow),
                     mask,
-                    crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                    crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
                 )?
             {
                 found = Some(spot);

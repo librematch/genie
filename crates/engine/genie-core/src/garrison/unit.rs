@@ -84,7 +84,7 @@ impl Unit {
         c: &mut Step<'_>,
         enter: &crate::garrison::EnterAction,
     ) -> Result<crate::garrison::EnterReads, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {

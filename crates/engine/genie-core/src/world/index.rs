@@ -14,6 +14,7 @@ use crate::objects::IdTable;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
+use crate::objects::masters::{Master, Masters};
 use crate::objects::object_list::ObjectList;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
@@ -252,31 +253,57 @@ impl ObjectIndex {
 }
 
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
-/// spatial index and the planners): the players' lists and the table by id. An object out for
-/// its update is none.
+/// spatial index and the planners): the players' lists, the table by id and the players'
+/// masters. An object out for its update is none.
 #[derive(Clone, Copy, Debug)]
 pub struct ObjectsRef<'a> {
     players: &'a [Player],
     index: &'a ObjectIndex,
+    masters: &'a [Masters],
 }
 
 impl<'a> ObjectsRef<'a> {
-    /// The objects of `players`, which the world's table `index` finds.
+    /// The objects of `players`, which the world's table `index` finds, with the players'
+    /// `masters`.
     #[must_use]
-    pub const fn new(players: &'a [Player], index: &'a ObjectIndex) -> Self {
-        Self { players, index }
+    pub const fn new(
+        players: &'a [Player],
+        index: &'a ObjectIndex,
+        masters: &'a [Masters],
+    ) -> Self {
+        Self {
+            players,
+            index,
+            masters,
+        }
     }
 
     /// No objects: a test's walk that meets none by id.
     #[cfg(test)]
     pub(crate) fn empty() -> ObjectsRef<'static> {
-        ObjectsRef::new(&[], ObjectIndex::scanning())
+        ObjectsRef::new(&[], ObjectIndex::scanning(), &[])
     }
 
     /// Object `id`, live or sleeping.
     #[must_use]
     pub fn get(&self, id: impl ObjectKey) -> Option<&'a Unit> {
         self.index.locate(self.players, id).map(|(_, u, _)| u)
+    }
+
+    /// Object `id`, live or sleeping, with its owner and its master ([`Unit::master`]); none
+    /// for an object the world does not hold or one out for its update.
+    ///
+    /// # Errors
+    ///
+    /// A master its owner's table does not hold.
+    pub fn with_master(
+        &self,
+        id: impl ObjectKey,
+    ) -> Result<Option<(PlayerId, &'a Unit, &'a Master)>, GenieError> {
+        let Some((p, u, _)) = self.index.locate(self.players, id) else {
+            return Ok(None);
+        };
+        Ok(Some((p, u, u.master(self.masters, p)?)))
     }
 
     /// What a walk reads of the moving object `id` ([`Unit::gait`]); none for an object without
@@ -331,6 +358,7 @@ impl<'a> ObjectsRef<'a> {
 pub(crate) struct TestObjects {
     players: Vec<Player>,
     index: ObjectIndex,
+    masters: Vec<Masters>,
 }
 
 #[cfg(test)]
@@ -397,7 +425,7 @@ impl TestObjects {
 
     /// The units by id.
     pub(crate) fn view(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index)
+        ObjectsRef::new(&self.players, &self.index, &self.masters)
     }
 }
 
@@ -442,7 +470,7 @@ impl World {
     /// The objects by id, to read ([`ObjectsRef`]).
     #[must_use]
     pub fn objects(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index)
+        ObjectsRef::new(&self.players, &self.index, &self.masters)
     }
 
     /// The table by id again from the players' lists (after a list changed in place).

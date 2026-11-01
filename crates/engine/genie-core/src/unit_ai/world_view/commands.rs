@@ -258,7 +258,11 @@ impl UnitView<'_, '_> {
         let me = unit.me();
         let area = ScoutArea {
             spatial: &mut self.c.w.spatial,
-            by_id: crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index),
+            by_id: crate::world::index::ObjectsRef::new(
+                &self.c.w.players,
+                &self.c.w.index,
+                &self.c.w.masters,
+            ),
             zones,
             plan: Planning {
                 pathing: &mut self.c.w.pathing,

@@ -318,7 +318,11 @@ impl World {
                 spatial: &mut self.spatial,
                 plan: &mut plan,
                 dt: self.dt_seconds,
-                by_id: crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                by_id: crate::world::index::ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    &self.masters,
+                ),
             };
             path_step(&mut motion, &view, &lead, &mut world, budget)
         };

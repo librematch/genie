@@ -432,6 +432,7 @@ impl World {
             graphics,
             players,
             index,
+            masters,
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();
@@ -441,7 +442,7 @@ impl World {
             object_rng: Some(object),
             buffer: None,
             graphics,
-            by_id: crate::world::index::ObjectsRef::new(players, index),
+            by_id: crate::world::index::ObjectsRef::new(players, index, masters),
         }
     }
 }

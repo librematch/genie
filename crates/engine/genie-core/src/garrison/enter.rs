@@ -308,7 +308,7 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let tm = t.master(&self.masters, tp)?.clone();
@@ -340,7 +340,7 @@ impl World {
         t: &EnterTarget,
         start: WalkStart,
     ) -> Result<Walking, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(&self.masters, tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
@@ -371,7 +371,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let master = t.master(&self.masters, tp)?.clone();
@@ -398,7 +398,7 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let Some(crate::world::index::Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };

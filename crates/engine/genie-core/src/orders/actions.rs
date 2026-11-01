@@ -227,7 +227,7 @@ impl World {
                 &mut self.spatial,
                 id,
                 &annexes,
-                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters),
             )?;
             for u in units {
                 self.shut_in_gate(u)?;

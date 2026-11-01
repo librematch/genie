@@ -90,7 +90,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index, &self.masters);
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(&self.masters, p)?;
         let seeks = master.kind < COMBAT

@@ -208,7 +208,11 @@ impl UnitView<'_, '_> {
         &mut self,
         search: crate::unit_ai::ResourceSearch,
     ) -> Result<Option<crate::unit_ai::Gatherable>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(
+            &self.c.w.players,
+            &self.c.w.index,
+            &self.c.w.masters,
+        );
         let mut w = ResourceWorld {
             player: self.player,
             spatial: &mut self.c.w.spatial,
@@ -291,7 +295,7 @@ impl Unit {
         cap: crate::objects::WorkerCount,
         site: Option<crate::gathering::DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current = self
             .combat
