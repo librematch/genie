@@ -21,6 +21,7 @@ use crate::objects::Frame;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::class;
@@ -54,12 +55,12 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         (target, radius): (Position, Footprint),
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let gives_up = GiveUp {
             waits: !r.computer && f.own.class == class::VILLAGER,
             stance: r.stance,
         };
-        match self.update_list(c, unit, me, r, gives_up)? {
+        match self.update_list(c, unit, me, r, gives_up)?.get() {
             0 => self.within_reach(c, unit, f, r, (target, radius)),
             1 | 2 => {
                 self.delete_move_to(unit)?;
@@ -67,11 +68,11 @@ impl Attack {
                     return self.arrived_at_seen(c, unit, f, r, target);
                 }
                 self.ready(unit, &mut c.w.attack_ground(), f, r)?;
-                Ok(0)
+                Ok(UpdateCode::UNDER_WAY)
             }
             3 => self.walk_failed(c, unit),
             4 => Err(QUIET_CODE),
-            _ => Ok(0),
+            _ => Ok(UpdateCode::UNDER_WAY),
         }
     }
 
@@ -84,7 +85,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         (target, radius): (Position, Footprint),
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let ground = unit
             .body
             .mover()
@@ -94,10 +95,10 @@ impl Attack {
         let reach = squared_reach(self.range);
         if reach.get().abs() <= EPSILON || reach < footprint_gap_squared(at, ground, target, radius)
         {
-            return Ok(0);
+            return Ok(UpdateCode::UNDER_WAY);
         }
         self.ready(unit, &mut c.w.attack_ground(), f, r)?;
-        Ok(0)
+        Ok(UpdateCode::UNDER_WAY)
     }
 
     /// The failed `MoveTo` (its update returns 3 without a notify, it being quiet):
@@ -107,13 +108,13 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         self.move_to = None;
         self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
         if !self.sub_action {
             unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
         }
-        Ok(3)
+        Ok(UpdateCode::FAILED)
     }
 
     /// State 7 (case 6). A melee swing counts down and lands its hit when its sprite reaches the
@@ -128,7 +129,7 @@ impl Attack {
         unit: &mut Unit,
         f: &mut Fight,
         r: &AttackReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let Some(sprite) = unit.sprite else {
             return Err(GenieError::unsupported("a swing without the unit's sprite"));
         };
@@ -137,7 +138,7 @@ impl Attack {
         } else {
             self.swing_after_hit(c, unit, f, r, sprite)?;
         }
-        Ok(0)
+        Ok(UpdateCode::UNDER_WAY)
     }
 
     /// The swing before its hit (state 7 with the hit pending): a melee swing counts down; at the

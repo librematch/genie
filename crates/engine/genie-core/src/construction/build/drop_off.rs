@@ -226,7 +226,7 @@ impl BuildAction {
             self.drop_again(c, builder, reads.by)?;
             return Ok(HeadCode::Keeps);
         }
-        match self.step_walk(c, builder, me, reads)? {
+        match self.step_walk(c, builder, me, reads)?.get() {
             1 | 2 => {}
             3..=5 => {
                 self.drop_again(c, builder, reads.by)?;

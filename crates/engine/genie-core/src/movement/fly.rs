@@ -15,6 +15,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, graphic_of};
 use crate::movement::{Me, Mover};
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::Task;
@@ -158,7 +159,7 @@ impl Fly {
                 // (its set_state(4) shows its sprite, +0x58, before the motion step)
                 let code =
                     update_sub_actions(&mut self.move_to, c, bird, me, ListUpdate::default())?;
-                if code == 0 {
+                if code == UpdateCode::UNDER_WAY {
                     return Ok(());
                 }
                 if EPSILON < rest.get() {

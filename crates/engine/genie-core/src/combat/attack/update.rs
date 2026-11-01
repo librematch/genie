@@ -20,6 +20,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::layers::Body;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
@@ -44,11 +45,11 @@ impl Attack {
         dt: Seconds,
         armed: bool,
         body: &mut Body,
-    ) -> Result<(u8, bool), GenieError> {
+    ) -> Result<(UpdateCode, bool), GenieError> {
         self.timer += dt;
         if !armed {
             self.state = AttackState::Done;
-            return Ok((1, true));
+            return Ok((UpdateCode::DONE, true));
         }
         if self.state != AttackState::Done {
             return Err(GenieError::unsupported(
@@ -56,7 +57,7 @@ impl Attack {
             ));
         }
         body.set_anim_speed(Speed::ZERO);
-        Ok((1, false))
+        Ok((UpdateCode::DONE, false))
     }
 
     /// The update (`0x140a82ae0`) of an Attack in state 5 or 11 whose target is gone (its target
@@ -77,24 +78,24 @@ impl Attack {
         me: Me,
         r: &AttackReads,
         master_class: ClassId,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         self.timer += c.dt.seconds();
         let gives_up = GiveUp {
             waits: !r.computer && master_class == class::VILLAGER,
             stance: r.stance,
         };
-        match self.update_list(c, unit, me, r, gives_up)? {
+        match self.update_list(c, unit, me, r, gives_up)?.get() {
             1 | 2 => {
                 self.delete_move_to(unit)?;
                 if !self.sub_action {
                     unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
                 }
                 self.finish(unit, c.w.streams.get(Stream::Sprite))?;
-                Ok(1)
+                Ok(UpdateCode::DONE)
             }
             3 => self.walk_failed(c, unit),
             4 => Err(QUIET_CODE),
-            _ => Ok(0),
+            _ => Ok(UpdateCode::UNDER_WAY),
         }
     }
 
@@ -136,7 +137,7 @@ impl Attack {
         me: Me,
         f: &mut Fight,
         r: &AttackReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         self.timer += c.dt.seconds();
         // a dead tree (class 15) up to state 5 keeps a non-villager's attack going: its update
         // goes on, the target not alive (`0x140a8342e`)
@@ -162,7 +163,7 @@ impl Attack {
             // case 0: the unit's animation stops; the list deletes the Attack
             AttackState::Done => {
                 set_walker_anim(&mut unit.body, Speed::new(0.0));
-                Ok(1)
+                Ok(UpdateCode::DONE)
             }
             // case 3 (state 4) walks the MoveTo to the target, cases 4 and 10 (states 5 and
             // 11) to where it was seen
@@ -177,11 +178,11 @@ impl Attack {
             AttackState::Failed => {
                 unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
                 set_walker_anim(&mut unit.body, Speed::new(0.0));
-                Ok(3)
+                Ok(UpdateCode::FAILED)
             }
             // the states without a case (0; 3, 8 to 10, 12, 14 and above, which no step sets)
             // return 0
-            AttackState::New => Ok(0),
+            AttackState::New => Ok(UpdateCode::UNDER_WAY),
         }
     }
 
@@ -193,7 +194,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         // the target died before the attack ended (the update's start): one of stance 0 that
         // moves would wait (set_state 5), not modelled; a villager's unit AI keeps a dead
         // target of Gaia's (another's FUN_140c5e1e0 forgets, not modelled). The attack lets
@@ -216,7 +217,7 @@ impl Attack {
         self.target = None;
         self.point = Position::from([NONE; 3]);
         self.finish(unit, c.w.streams.get(Stream::Sprite))?;
-        Ok(5)
+        Ok(UpdateCode::CODE_5)
     }
 
     /// The update on a target `t` that moved from where it was seen; Some with the update's code
@@ -228,7 +229,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         t: &crate::map::spatial::Placed,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<UpdateCode>, GenieError> {
         // the target moved: where it was seen follows (`+0xa4`..`+0xac`); one the unit's
         // player sees (the target's slot 0x1e0, `FUN_1416635e0` at its tile: 0xf), or only
         // explored (0x80) with its master's fog flag (`+0x605`), keeps the attack going, but
@@ -247,7 +248,7 @@ impl Attack {
                 .ok_or(crate::world::ATTACKER_UNMOVING)?;
             let gap = footprint_gap(unit.body.position(), ground, t.position, t.radius);
             self.follow(unit, &mut c.w.attack_ground(), r, f, gap)?;
-            return Ok(Some(0));
+            return Ok(Some(UpdateCode::UNDER_WAY));
         }
         if !seen && matches!(self.state, AttackState::Move | AttackState::GotoSeen) {
             let gives_up = match r.ai_order {
@@ -260,7 +261,7 @@ impl Attack {
             }
             if self.state != AttackState::GotoSeen {
                 self.wait_at_seen(unit, f, r, &c.w.graphics)?;
-                return Ok(Some(0));
+                return Ok(Some(UpdateCode::UNDER_WAY));
             }
         }
         Ok(None)
@@ -275,7 +276,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         alive: bool,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<UpdateCode>, GenieError> {
         // LAB_140a834ab: a live target (state 0 to 2) of a player's unit (+0x718 not 0) that
         // its player counts as itself or an ally (FUN_141663dc0 with 1) ends the attack
         // (set_state 1; its own Attack, not quiet, posts 0x1fb with 600 and the target) and
@@ -291,7 +292,7 @@ impl Attack {
                     [600, ObjectId::field(self.target), 0],
                 )?;
             }
-            return Ok(Some(1));
+            return Ok(Some(UpdateCode::DONE));
         }
         // a target inside another (+0x2f0): the attack ends (set_state 1) and returns 4, which
         // keeps it in the list; a unit's own Attack (not quiet, +0x60) of a unit whose unit AI's
@@ -304,7 +305,7 @@ impl Attack {
                     [600, ObjectId::field(self.target), 0],
                 )?;
             }
-            return Ok(Some(4));
+            return Ok(Some(UpdateCode::CODE_4));
         }
         // a building that cannot attack (FUN_14120ea30) ends it (set_state 1), its own Attack
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
@@ -316,7 +317,7 @@ impl Attack {
                     [600, ObjectId::field(self.target), 0],
                 )?;
             }
-            return Ok(Some(1));
+            return Ok(Some(UpdateCode::DONE));
         }
         Ok(None)
     }
@@ -331,19 +332,19 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         alive: bool,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let mut g = c.w.attack_ground();
         match self.ready_to_attack(unit, &mut g, f, r, false)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
                 self.finish(unit, g.sprite_rng)?;
-                return Ok(5);
+                return Ok(UpdateCode::CODE_5);
             }
             Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
             Readiness::Waiting => {}
             Readiness::Away(gap) => self.follow(unit, &mut g, r, f, Distance::new(gap))?,
         }
-        Ok(0)
+        Ok(UpdateCode::UNDER_WAY)
     }
 
     /// State 2's step (case 1, the target killed): once the swing's sprite looped the attack lets
@@ -352,14 +353,14 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         // case 1: once the swing's sprite looped (or there is none, or it does not
         // animate) the attack lets its target go and ends; the hunt reads code 5
         let done = unit
             .sprite
             .is_none_or(|sp| sp.looped || !sp.graphic.flags.contains(SpriteFlags::ANIMATED));
         if !done {
-            return Ok(0);
+            return Ok(UpdateCode::UNDER_WAY);
         }
         // the target goes (slot 0x68 with none: a sub-action lets nothing go; the unit's
         // attack count clears, the caller's) and the attack ends (set_state 1); the Hunt's
@@ -368,7 +369,7 @@ impl Attack {
             self.target = None;
             self.finish(unit, c.w.streams.get(Stream::Sprite))?;
             unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
-            return Ok(5);
+            return Ok(UpdateCode::CODE_5);
         }
         // a unit's own Attack (not quiet, `+0x60` 0): the target goes (slot 0x68 with
         // none), it posts 0x1fb with 600 and 0x202, ends (set_state 1) and returns 2,
@@ -377,7 +378,7 @@ impl Attack {
         let_go(c, unit, target)?;
         unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
         self.finish(unit, c.w.streams.get(Stream::Sprite))?;
-        Ok(2)
+        Ok(UpdateCode::CODE_2)
     }
 
     /// `set_state(5)` (`0x140a820c0` case 5): the sub-actions go, the range is slot 0x238's
@@ -425,10 +426,10 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         target: Position,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         if sees(&c.w.spatial, f, target)? {
             self.ready(unit, &mut c.w.attack_ground(), f, r)?;
-            return Ok(0);
+            return Ok(UpdateCode::UNDER_WAY);
         }
         if self.state == AttackState::GotoSeen
             && f.own.player != PlayerId::new(0)
@@ -438,7 +439,7 @@ impl Attack {
             self.enter(AttackState::GotoPoint, unit)?;
             self.range = f.own.source.weapon_range;
             self.goto_point(unit, r, &c.w.graphics)?;
-            return Ok(0);
+            return Ok(UpdateCode::UNDER_WAY);
         }
         let target = self.target.take();
         if !self.sub_action {
@@ -448,7 +449,7 @@ impl Attack {
         if !self.sub_action {
             unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
         }
-        Ok(3)
+        Ok(UpdateCode::FAILED)
     }
 }
 

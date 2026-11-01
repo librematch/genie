@@ -24,6 +24,7 @@ use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, MoveToReads};
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
 use crate::objects::sprite::Graphic;
 use genie_diff::Diff;
@@ -172,7 +173,7 @@ pub(crate) struct TransportReads {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Updated {
     /// The update's code: 1 done, 3 failed (the action list removes it), else 0.
-    Code(u8),
+    Code(UpdateCode),
     /// State 6 unloads (`FUN_140aa3ba0`, the caller's after the actions), then
     /// [`TransportAction::unloaded`]; its code is 0.
     Unload,

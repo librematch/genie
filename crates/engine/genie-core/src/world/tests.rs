@@ -2355,7 +2355,10 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
     }
     t.spatial
         .set_annex(object_id(10031), Some(object_id(10028)));
-    assert_eq!(t.work_building(object_id(10031), 0.021), Ok(true));
+    assert_eq!(
+        t.work_building(object_id(10031), Seconds::new(0.021)),
+        Ok(true)
+    );
     let c = |id: ObjectId| t.object(id).unwrap().1.construction.unwrap();
     let started = f32::from_bits(0x2edb_e6ff);
     assert!(!c(object_id(10031)).desolid);

@@ -21,6 +21,7 @@ use crate::movement::PathAsk;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::{Master, TaskId};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
@@ -209,7 +210,7 @@ impl TransportAction {
         unit: &mut Unit,
         me: Me,
         r: &TransportReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let walked = self.walk(c, unit, me)?;
         let computer = c.w.players.player(c.player)?.computer;
         let World {
@@ -232,7 +233,7 @@ impl TransportAction {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
                 self.unload(c, unit)?;
-                Ok(0)
+                Ok(UpdateCode::UNDER_WAY)
             }
         }
     }
@@ -276,21 +277,23 @@ impl TransportAction {
     /// the unit lacks.
     pub(crate) fn state_update(
         &mut self,
-        walked: u8,
+        walked: UpdateCode,
         (ship, shore): (&Ship<'_>, &mut impl Shore),
         unit: &mut Unit,
         look: (Option<Graphic>, &mut Well512),
         computer: bool,
     ) -> Result<Updated, GenieError> {
         let (changed, code) = match self.state {
-            TransportState::Done => return Ok(Updated::Code(1)),
-            TransportState::SailToUnload | TransportState::Sail if (1..=5).contains(&walked) => {
+            TransportState::Done => return Ok(Updated::Code(UpdateCode::DONE)),
+            TransportState::SailToUnload | TransportState::Sail
+                if (1..=5).contains(&walked.get()) =>
+            {
                 let next = if self.state == TransportState::Sail {
                     TransportState::Idle
                 } else {
                     TransportState::Unload
                 };
-                (self.set_state(next, ship, shore)?, 0)
+                (self.set_state(next, ship, shore)?, UpdateCode::UNDER_WAY)
             }
             // Failed: the update returns 3.
             TransportState::Failed => {
@@ -300,7 +303,7 @@ impl TransportAction {
                     crate::unit_ai::NotifyKind::ACTION_FAILED,
                     [ActionKind::Transport.value(), 0, 0],
                 )?;
-                return Ok(Updated::Code(3));
+                return Ok(Updated::Code(UpdateCode::FAILED));
             }
             TransportState::Unload => {
                 let (x, y) = (self.point.x(), self.point.y());
@@ -328,9 +331,9 @@ impl TransportAction {
                 if cannot_unload {
                     crate::unit_ai::alert_owner(computer)?;
                 }
-                return Ok(Updated::Code(0));
+                return Ok(Updated::Code(UpdateCode::UNDER_WAY));
             }
-            _ => (Changed::default(), 0),
+            _ => (Changed::default(), UpdateCode::UNDER_WAY),
         };
         stand(unit, changed, look)?;
         Ok(Updated::Code(code))
@@ -392,9 +395,9 @@ impl TransportAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let Some(state) = self.move_to.as_ref().map(|m| m.state) else {
-            return Ok(1);
+            return Ok(UpdateCode::DONE);
         };
         let start = state == MoveTo::Start;
         let walks = start || state == MoveTo::Moving;

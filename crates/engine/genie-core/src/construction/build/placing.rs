@@ -333,7 +333,7 @@ impl BuildAction {
         if 1.0 < n {
             rate *= ((n - 1.0) * EXTRA_BUILDER + 1.0) / n;
         }
-        if self.work_on(c, builder, rate)? {
+        if self.work_on(c, builder, Seconds::new(rate))? {
             return Ok(());
         }
         // a finished foundation with hit points ends the work (its `+0x278`, decoded); one

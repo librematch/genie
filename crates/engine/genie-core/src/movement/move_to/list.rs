@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, Shown};
 use crate::movement::{Me, PathAsk};
+use crate::objects::UpdateCode;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::unit_ai::Inbox;
@@ -34,9 +35,9 @@ pub(crate) fn update_sub_actions(
     unit: &mut Unit,
     me: Me,
     how: ListUpdate,
-) -> Result<u8, GenieError> {
+) -> Result<UpdateCode, GenieError> {
     let Some(move_to) = list else {
-        return Ok(1);
+        return Ok(UpdateCode::DONE);
     };
     let held = c.w.object_state(move_to.target);
     let (mut walk, beside) = c.w.walk_beside(c.pace(), &mut unit.body, me);

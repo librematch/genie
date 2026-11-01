@@ -164,8 +164,8 @@ impl Construction {
     /// point: at most up to its build time, it adds its share of its master's hit points `hp`
     /// (all of them without a build time of at least 1), never past them; true when its build
     /// points reach its build time.
-    pub(crate) fn add_work(&mut self, hp: &mut HitPoints, amount: f32) -> bool {
-        let mut amount = amount;
+    pub(crate) fn add_work(&mut self, hp: &mut HitPoints, amount: Seconds) -> bool {
+        let mut amount = amount.get();
         let build_time = Seconds::of_master(self.build_time).get();
         let hit_points = HitPoints::of_master(self.hit_points).get();
         if build_time < self.progress.get() + amount {

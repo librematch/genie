@@ -399,7 +399,7 @@ impl HuntAction {
             waits: !who.computer && who.villager,
             stance: who.stance,
         };
-        let ended = match self.update_list(c, unit, me, gives_up)? {
+        let ended = match self.update_list(c, unit, me, gives_up)?.get() {
             0 => return Ok(PointWalk::Walking),
             1 | 2 | 5 => true,
             3 => false,

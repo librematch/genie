@@ -93,7 +93,7 @@ impl HuntAction {
         let attack = self.attack.as_mut().ok_or(GenieError::unsupported(
             "a Hunt in state 12 without its Attack",
         ))?;
-        match attack.update(c, unit, me, f, &r.attack)? {
+        match attack.update(c, unit, me, f, &r.attack)?.get() {
             0 | 6.. => Ok(HuntNext::Stay),
             1 | 2 | 5 if self.target.is_none() => {
                 self.tear_down(unit.body.mover_mut())?;
@@ -146,7 +146,7 @@ impl HuntAction {
             waits: !r.attack.computer && f.own.class == class::VILLAGER,
             stance: r.attack.stance,
         };
-        match self.update_list(c, unit, me, gives_up)? {
+        match self.update_list(c, unit, me, gives_up)?.get() {
             0 => Ok(HuntNext::Stay),
             1 | 2 => self.walk_arrived(c, unit, f, r),
             3 => self.walk_failed(unit, r).map(|()| HuntNext::Stay),

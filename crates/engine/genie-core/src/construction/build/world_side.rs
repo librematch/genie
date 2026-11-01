@@ -16,6 +16,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, player_master};
 use crate::orders::Place;
 use crate::players::PlayerId;
+use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
 impl crate::world::World {
@@ -122,7 +123,7 @@ impl crate::world::World {
 
 /// The seconds of work a new object's building gets at once from its owner's slot 0x1c0 with its
 /// flag (`FUN_14162ce00`'s `FUN_1411cc430` with `DAT_142eea788`).
-pub(crate) const STACK_WORK: f32 = crate::math::image::build::STACK_WORK;
+pub(crate) const STACK_WORK: Seconds = Seconds::new(crate::math::image::build::STACK_WORK);
 
 /// The guard of an object the routines here reach through the object itself (their callers
 /// hold it): the slice's lists hold every object the world does.
@@ -160,7 +161,11 @@ impl crate::world::World {
     /// # Errors
     ///
     /// What the starts and the completion do not model.
-    pub(crate) fn work_building(&mut self, id: ObjectId, amount: f32) -> Result<bool, GenieError> {
+    pub(crate) fn work_building(
+        &mut self,
+        id: ObjectId,
+        amount: Seconds,
+    ) -> Result<bool, GenieError> {
         let mut at = id;
         loop {
             for annex in self.spatial.annexes_of(at) {

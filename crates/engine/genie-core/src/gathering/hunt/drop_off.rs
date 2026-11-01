@@ -112,7 +112,7 @@ impl HuntAction {
             waits: !who.computer && who.villager,
             stance: who.stance,
         };
-        match self.update_list(c, unit, me, gives_up)? {
+        match self.update_list(c, unit, me, gives_up)?.get() {
             0 => return Ok(Dropped::Going),
             // failed or its target let go: the hunt waits and the unit's animation stops
             3..=5 => {

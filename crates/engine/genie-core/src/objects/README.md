@@ -58,6 +58,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`sprite_flags.rs`](sprite_flags.rs) | A sprite's sequence flags (`SpriteFlags`, the `.dat`'s `sequence_type`). |
 | [`sprite_id.rs`](sprite_id.rs) | A sprite's id (`SpriteId`): the `.dat`'s graphic a master or a task shows. |
 | [`teardown.rs`](teardown.rs) | The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor (its slot 0): what they leave the unit's world to apply. |
+| [`update_code.rs`](update_code.rs) | What an action's update answers its list. |
 | [`work_rate.rs`](work_rate.rs) | A worker's work rate (`WorkRate`), with the game's `f32` operations. |
 | [`worker_count.rs`](worker_count.rs) | The count of the actions that work on an object, and the caps on it. |
 | [`lifecycle/`](lifecycle/) | What happens to an object once it is dead: the state steps of `RGE_Static_Object::update` (158041 `0x14118ad50`) and `RGE_Animated_Object::update` (`0x141071880`), up to the update that returns 1 and so takes the object off its player's list (`RGE_Object_List::update`, `0x141166550`). |

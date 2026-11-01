@@ -38,6 +38,7 @@ use crate::technology::CostPaid;
 use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::TechMode;
 use crate::test_ids::costs;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
@@ -1733,7 +1734,7 @@ fn the_full_tech_tree_disables_a_civ_s_own_technologies_but_those_of_mode_1() {
         required: [TechId::of_data(required), None, None, None, None, None],
         required_count: i16::from(required != -1),
         civ: CivId::of_tech(civ).unwrap(),
-        mode,
+        mode: TechMode::of_data(mode),
         ..TechDef::default()
     };
     let states = |full_tech_tree: bool| {

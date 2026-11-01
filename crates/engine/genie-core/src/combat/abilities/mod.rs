@@ -50,7 +50,6 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Task, player_master};
-use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
@@ -239,9 +238,7 @@ impl World {
             for task in &tasks {
                 if task.action_type == REMOVAL_REWARD && task.work_range < Distance::new(EPSILON) {
                     let held = self.players.player(owner)?;
-                    let multiplier = (task.attribute_type2)
-                        .and_then(|a| held.attribute(a))
-                        .map(Amount::get);
+                    let multiplier = (task.attribute_type2).and_then(|a| held.attribute(a));
                     let cost = player_master(&self.masters, owner, own.id)
                         .map_or(&[][..], |m| &m.cost[..]);
                     rewards.push(reward(task, owner, multiplier, cost));

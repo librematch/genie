@@ -12,6 +12,7 @@ use crate::movement::move_to::{
 };
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::UpdateCode;
 use crate::objects::sprite::Graphic;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{ActionKind, Inbox};
@@ -104,7 +105,7 @@ impl MoveToAction {
         target_state: Option<ObjectState>,
         shown: Option<Shown<'_>>,
         inbox: &mut Inbox<'_>,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let target = self.target;
         if let Some(code) = self.check_held(target_state, inbox)? {
             // no owner makes a sub-action MoveTo to an object that is not quiet, which would
@@ -125,11 +126,11 @@ impl MoveToAction {
                     self.point = point;
                 }
                 self.state = started.unwrap_or_else(|| self.wait.give_up(waits, stance));
-                0
+                UpdateCode::UNDER_WAY
             }
             MoveTo::Moving => {
                 match self.check_target(walk)? {
-                    Follow::Again => return Ok(0),
+                    Follow::Again => return Ok(UpdateCode::UNDER_WAY),
                     Follow::Blocked => inbox.post(NotifyKind::TARGET_MOVED, [0, 0, 0])?,
                     Follow::Stays | Follow::PathEnd(_) => {}
                 }
@@ -138,7 +139,7 @@ impl MoveToAction {
                     Some(other) => self.state = other,
                     None => self.state = self.wait.give_up(waits, stance),
                 }
-                0
+                UpdateCode::UNDER_WAY
             }
             MoveTo::Waiting => {
                 self.wait.timer += walk.dt;
@@ -146,15 +147,15 @@ impl MoveToAction {
                     self.wait.timer = Seconds::ZERO;
                     self.state = MoveTo::Start;
                 }
-                0
+                UpdateCode::UNDER_WAY
             }
             MoveTo::Failed => {
                 self.post_end(inbox, NotifyKind::ACTION_FAILED)?;
-                3
+                UpdateCode::FAILED
             }
             MoveTo::Arrived => {
                 self.post_end(inbox, NotifyKind::ACTION_COMPLETED)?;
-                1
+                UpdateCode::DONE
             }
         })
     }

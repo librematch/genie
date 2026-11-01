@@ -119,7 +119,7 @@ impl GatherAction {
         me: Me,
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)? {
+        match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 | 3 | 5 => self.begin_search(c, unit, r),
             code => Err(QUIET_CODE.with("code", code)),
@@ -202,7 +202,7 @@ impl GatherAction {
         target: Option<&Victim>,
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)? {
+        match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 | 5 => {
                 self.tear_down(unit.body.mover_mut())?;
@@ -306,7 +306,7 @@ impl GatherAction {
         me: Me,
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)? {
+        match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             code @ (1 | 2 | 3 | 5) => {
                 self.tear_down(unit.body.mover_mut())?;

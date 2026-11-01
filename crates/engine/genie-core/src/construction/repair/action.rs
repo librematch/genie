@@ -19,6 +19,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::WorkRate;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::COMBAT;
@@ -247,7 +248,7 @@ impl RepairAction {
         me: Me,
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, repairer, me, reads)? {
+        match self.step_walk(c, repairer, me, reads)?.get() {
             0 => Ok(()),
             4 => {
                 self.drop_target(c, repairer, reads)?;
@@ -270,7 +271,7 @@ impl RepairAction {
         me: Me,
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, repairer, me, reads)? {
+        match self.step_walk(c, repairer, me, reads)?.get() {
             0 => return Ok(()),
             4 | 5 => {
                 self.drop_target(c, repairer, reads)?;
@@ -327,7 +328,7 @@ impl RepairAction {
         repairer: &mut Unit,
         me: Me,
         reads: &RepairReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let how = ListUpdate {
             gives_up: GiveUp {
                 waits: reads.waits,

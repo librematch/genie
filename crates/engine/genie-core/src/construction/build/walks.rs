@@ -6,6 +6,7 @@ use crate::construction::build::{BuildAction, BuildReads, BuildTask, SITE_GONE};
 use crate::movement::Me;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, MoveToReads, TargetMoved, WalkTo};
+use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
 use crate::world::step::Step;
 
@@ -67,7 +68,7 @@ impl BuildAction {
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let how = ListUpdate {
             gives_up: Self::gives_up(c, builder, reads)?,
             ..ListUpdate::default()

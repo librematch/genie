@@ -25,6 +25,7 @@ mod effect_id;
 mod research_count;
 mod research_state;
 mod tech_id;
+mod tech_mode;
 mod tech_type;
 pub mod upgrade;
 
@@ -38,6 +39,7 @@ pub use self::effect_id::EffectId;
 pub use self::research_count::{ResearchCap, ResearchCount};
 pub use self::research_state::ResearchState;
 pub use self::tech_id::TechId;
+pub use self::tech_mode::TechMode;
 pub use self::tech_type::TechType;
 
 /// The age technologies (`FUN_1413cc3c0`: 101 to 103), whose costs the research cost modifier
@@ -111,7 +113,7 @@ pub struct TechDef {
     /// (0 every one, `FUN_1413cf2f0`).
     pub civ: Option<crate::players::CivId>,
     /// `+0x28`: the game modes it is for (0 and 1 every one, `FUN_1413cf2f0`).
-    pub mode: i16,
+    pub mode: TechMode,
     /// `+0x70`: where it is researched, the building's master and the seconds it takes.
     pub locations: Vec<(Option<MasterId>, crate::world::WholeSeconds)>,
 }

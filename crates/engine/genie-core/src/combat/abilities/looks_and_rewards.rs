@@ -70,13 +70,18 @@ pub fn look(
 /// resource times the rate (`CVTDQ2PS`, `MULSS`), 0 without one. The amount is truncated
 /// (`CVTTSS2SI`).
 #[must_use]
-pub fn reward(task: &Task, player: PlayerId, multiplier: Option<f32>, cost: &[CostSlot]) -> Reward {
+pub fn reward(
+    task: &Task,
+    player: PlayerId,
+    multiplier: Option<crate::players::Amount>,
+    cost: &[CostSlot],
+) -> Reward {
     let out = task.attribute_type3;
     let mut rate = task.work_val1.get();
     if task.attribute_type2.is_some()
         && let Some(m) = multiplier
     {
-        rate *= m;
+        rate *= m.get();
     }
     let mut amount = rate;
     if !task.combat_level_flag.is_empty() {

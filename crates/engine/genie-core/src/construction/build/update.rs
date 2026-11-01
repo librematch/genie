@@ -268,7 +268,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, builder, me, reads)? {
+        match self.step_walk(c, builder, me, reads)?.get() {
             1 | 2 => self.walk_ended(c, builder, reads),
             3 => self.walk_failed(c, builder, reads),
             4 | 5 => self.lose_foundation(c, builder, reads),
@@ -292,7 +292,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, builder, me, reads)? {
+        match self.step_walk(c, builder, me, reads)?.get() {
             1..=3 | 5 => self.idle(c, builder, reads),
             4 => self.lose_foundation(c, builder, reads),
             _ => Ok(()),

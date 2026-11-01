@@ -8,6 +8,7 @@ use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::sprite::standing;
@@ -146,7 +147,7 @@ impl Unit {
     /// ends there (4: the list keeps it).
     ///
     /// [`MoveToAction::check_held`]: crate::movement::move_to::MoveToAction::check_held
-    fn own_move_held(&mut self, c: &mut Step<'_>) -> Result<Option<u8>, GenieError> {
+    fn own_move_held(&mut self, c: &mut Step<'_>) -> Result<Option<UpdateCode>, GenieError> {
         let Some(move_to) = self.actions.move_to_mut() else {
             return Ok(None);
         };

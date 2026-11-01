@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::objects::ListIndex;
+use crate::objects::UpdateCode;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -75,7 +76,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         dt_seconds: Seconds,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         use crate::technology::Attributes;
         if self.players.player(p)?.computer {
             return Err(GenieError::unsupported(
@@ -88,9 +89,9 @@ impl World {
             return Err(NO_RESEARCH_ACTION);
         };
         match r.state {
-            MakeTechState::Done => return Ok(1),
+            MakeTechState::Done => return Ok(UpdateCode::DONE),
             MakeTechState::Researching => {}
-            MakeTechState::New => return Ok(0),
+            MakeTechState::New => return Ok(UpdateCode::UNDER_WAY),
         }
         let (t, def) = self.research_tech(p, r.tech)?;
         let master = building.life.master_id;
@@ -134,9 +135,9 @@ impl World {
                 ));
             }
             self.research_done(p, i, r.tech, master, repeatable)?;
-            return Ok(1);
+            return Ok(UpdateCode::DONE);
         }
-        Ok(0)
+        Ok(UpdateCode::UNDER_WAY)
     }
 
     /// The research's end in its update (`0x140ad2a20`) once its progress reaches its time:

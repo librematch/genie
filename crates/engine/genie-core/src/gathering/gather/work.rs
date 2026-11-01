@@ -187,7 +187,7 @@ impl GatherAction {
             return Ok(Dropped::Again);
         }
         // the list's code: 0 walks or waits, 1 and 2 end it; 3 to 5 wait at random
-        match self.update_list(c, unit, me, r)? {
+        match self.update_list(c, unit, me, r)?.get() {
             0 => return Ok(Dropped::Going),
             3..=5 => {
                 self.random_wait(c, unit);

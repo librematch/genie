@@ -16,6 +16,7 @@ use crate::movement::{Mover, PathAsk, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::TOWN_CENTRE;
@@ -421,7 +422,7 @@ impl MoveToAction {
         &mut self,
         state: Option<ObjectState>,
         inbox: &mut Inbox<'_>,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<UpdateCode>, GenieError> {
         if self.target.is_none() {
             return Ok(None);
         }
@@ -433,13 +434,13 @@ impl MoveToAction {
             Some(s) if ObjectState::Undead < s => {
                 self.target = None;
                 if self.quiet {
-                    return Ok(Some(5));
+                    return Ok(Some(UpdateCode::CODE_5));
                 }
                 inbox.post(
                     NotifyKind::ACTION_INVALIDATED,
                     [ActionKind::Move.value(), -1, 0],
                 )?;
-                Ok(Some(4))
+                Ok(Some(UpdateCode::CODE_4))
             }
             Some(_) => Ok(None),
         }

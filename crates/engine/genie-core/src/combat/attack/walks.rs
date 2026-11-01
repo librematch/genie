@@ -11,6 +11,7 @@ use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
@@ -138,7 +139,7 @@ impl Attack {
         me: Me,
         r: &AttackReads,
         gives_up: GiveUp,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let state = self.move_to.as_ref().map(|m| m.state);
         let how = ListUpdate {
             gives_up,

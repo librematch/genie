@@ -13,6 +13,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveToReads;
+use crate::objects::UpdateCode;
 use crate::objects::layers::Body;
 use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
@@ -125,7 +126,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
         if r.ai_order.has_ai()
             && (f.victim.player != PlayerId::new(0) || f.own.class != class::VILLAGER)
@@ -153,14 +154,14 @@ impl Attack {
                     unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
                 }
                 self.wait_at_seen(unit, f, r, &c.w.graphics)?;
-                return Ok(5);
+                return Ok(UpdateCode::CODE_5);
             }
             unit.post_own(NotifyKind::ACTION_COMPLETED, [600, 0, 0])?;
         } else if r.ai_order.has_ai() && r.queue_empty {
             unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
         }
         self.finish(unit, c.w.streams.get(Stream::Sprite))?;
-        Ok(5)
+        Ok(UpdateCode::CODE_5)
     }
 
     /// The update's answer to a target out of sight ([`Attack::update`]): the target goes (slot
@@ -176,7 +177,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let target = self.target.take();
         self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
         // The predators' class (10), whose unit AI's slot 0x1f0 a failed Attack calls.
@@ -188,7 +189,7 @@ impl Attack {
             ));
         }
         if self.sub_action {
-            return Ok(3);
+            return Ok(UpdateCode::FAILED);
         }
         let_go(c, unit, target)?;
         if r.ai_order.has_ai() {
@@ -203,7 +204,7 @@ impl Attack {
         if r.queue_empty {
             unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
         }
-        Ok(3)
+        Ok(UpdateCode::FAILED)
     }
 
     /// `set_state(1)` (case 1): the unit's animation runs at speed 1 and it takes the sprite it

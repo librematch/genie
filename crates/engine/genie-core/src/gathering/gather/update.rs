@@ -17,6 +17,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::ObjectState;
+use crate::objects::UpdateCode;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -297,7 +298,7 @@ impl GatherAction {
         target: &Victim,
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)? {
+        match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 => {
                 self.tear_down(unit.body.mover_mut())?;
@@ -350,7 +351,7 @@ impl GatherAction {
         unit: &mut Unit,
         mut me: Me,
         r: &GatherReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.move_to.as_ref().map(|m| m.state);
         // the computer player's test is not held: its villagers would fail at once

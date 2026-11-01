@@ -821,7 +821,10 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     };
     let house = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
     let mut t = site_world(world, vec![master], vec![house]);
-    assert_eq!(t.work_building(object_id(10026), 0.02), Ok(false));
+    assert_eq!(
+        t.work_building(object_id(10026), Seconds::new(0.02)),
+        Ok(false)
+    );
     let h = t.players[1].objects.by_id(object_id(10026)).unwrap();
     let c = h.construction.unwrap();
     assert_eq!(
@@ -986,7 +989,10 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         vec![site],
     );
     let rate = 1.0f32 * 1.0 * 0.021;
-    assert_eq!(t.work_building(object_id(10028), rate), Ok(true));
+    assert_eq!(
+        t.work_building(object_id(10028), Seconds::new(rate)),
+        Ok(true)
+    );
     let h = t.players[1].objects.by_id(object_id(10028)).unwrap();
     let c = h.construction.unwrap();
     assert_eq!(h.life.hp, HitPoints::new(1.462));
@@ -1062,7 +1068,10 @@ fn the_work_starts_the_desolid_annexes_first() {
             unit(10030, 31.5, master_id(1192), false),
         ],
     );
-    assert_eq!(t.work_building(object_id(10028), 0.021), Ok(true));
+    assert_eq!(
+        t.work_building(object_id(10028), Seconds::new(0.021)),
+        Ok(true)
+    );
     let u = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
     let post = u(object_id(10029)).construction.unwrap();
     assert!(!post.desolid);
@@ -1194,7 +1203,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
             built_master(master_id(1192), &Vec::new()),
         ];
         let mut t = site_world(world, masters, vec![gate, post]);
-        let going = t.work_building(object_id(10029), amount);
+        let going = t.work_building(object_id(10029), Seconds::new(amount));
         let post = t.players[1].objects.by_id(object_id(10029)).unwrap();
         assert_eq!(
             (post.construction, post.life.hp),

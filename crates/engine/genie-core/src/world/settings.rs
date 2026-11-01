@@ -3,6 +3,7 @@
 //! option's member and offset as the load reads it (`&mWalkableFarms` into `+0x69`, …); the
 //! recording's header holds them all (genie-save's `GameOptions`).
 
+use crate::technology::TechMode;
 use crate::world::{
     Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
 };
@@ -81,7 +82,8 @@ impl Settings {
     /// # Errors
     ///
     /// Modes 15 and −15 (the root's `+0x560` entry, not held).
-    pub fn tech_mode_allows(&self, mode: i16) -> Result<bool, crate::GenieError> {
+    pub fn tech_mode_allows(&self, mode: TechMode) -> Result<bool, crate::GenieError> {
+        let mode = mode.get();
         let positive = match mode.unsigned_abs() {
             n @ 2..=18 => self.rule_mode(n)?,
             n @ 19..=25 => self.resource_level.get() == i32::from(n) - 19,
@@ -208,6 +210,7 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::technology::TechMode;
 
     /// `FUN_141302150`: the force drop counts in the scenario modes but King of the Hill; in
     /// the standard modes, and in any mode without it, a hunter keeps what it carries.
@@ -366,41 +369,63 @@ mod tests {
             (34, age(5)),
         ];
         for (m, allows) in cases {
-            assert_eq!(allows.tech_mode_allows(m), Ok(true), "{m}");
-            assert_eq!(allows.tech_mode_allows(-m), Ok(m == 32), "-{m}");
-            assert_eq!(mode(9).tech_mode_allows(m), Ok(false), "{m} in mode 9");
+            assert_eq!(
+                allows.tech_mode_allows(TechMode::of_data(m)),
+                Ok(true),
+                "{m}"
+            );
+            assert_eq!(
+                allows.tech_mode_allows(TechMode::of_data(-m)),
+                Ok(m == 32),
+                "-{m}"
+            );
+            assert_eq!(
+                mode(9).tech_mode_allows(TechMode::of_data(m)),
+                Ok(false),
+                "{m} in mode 9"
+            );
         }
         let walkable = Settings {
             walkable_farms: true,
             ..mode(9)
         };
-        assert_eq!(walkable.tech_mode_allows(17), Ok(false));
-        assert_eq!(mode(9).tech_mode_allows(-32), Ok(true));
-        assert_eq!(mode(9).tech_mode_allows(15), Err(ROOT_MODE));
-        assert_eq!(mode(9).tech_mode_allows(27), Ok(true));
-        assert_eq!(mode(13).tech_mode_allows(27), Ok(false));
-        assert_eq!(age(2).tech_mode_allows(27), Ok(true));
+        assert_eq!(walkable.tech_mode_allows(TechMode::of_data(17)), Ok(false));
+        assert_eq!(mode(9).tech_mode_allows(TechMode::of_data(-32)), Ok(true));
+        assert_eq!(
+            mode(9).tech_mode_allows(TechMode::of_data(15)),
+            Err(ROOT_MODE)
+        );
+        assert_eq!(mode(9).tech_mode_allows(TechMode::of_data(27)), Ok(true));
+        assert_eq!(mode(13).tech_mode_allows(TechMode::of_data(27)), Ok(false));
+        assert_eq!(age(2).tech_mode_allows(TechMode::of_data(27)), Ok(true));
         let level = |resource_level: i32| Settings {
             resource_level: ResourceLevel::of_data(resource_level),
             ..mode(9)
         };
         for n in 19..=25 {
             assert_eq!(
-                level(i32::from(n) - 19).tech_mode_allows(n),
+                level(i32::from(n) - 19).tech_mode_allows(TechMode::of_data(n)),
                 Ok(true),
                 "{n}"
             );
-            assert_eq!(level(7).tech_mode_allows(n), Ok(false), "{n}");
+            assert_eq!(
+                level(7).tech_mode_allows(TechMode::of_data(n)),
+                Ok(false),
+                "{n}"
+            );
         }
         let antiquity = Settings {
             antiquity: true,
             ..mode(9)
         };
-        assert_eq!(antiquity.tech_mode_allows(26), Ok(true));
-        assert_eq!(mode(9).tech_mode_allows(26), Ok(false));
-        assert_eq!(mode(9).tech_mode_allows(1), Ok(true));
-        assert_eq!(mode(9).tech_mode_allows(35), Ok(true));
-        assert_eq!(mode(9).tech_mode_allows(17), Ok(!mode(9).walkable_farms));
+        assert_eq!(antiquity.tech_mode_allows(TechMode::of_data(26)), Ok(true));
+        assert_eq!(mode(9).tech_mode_allows(TechMode::of_data(26)), Ok(false));
+        assert_eq!(mode(9).tech_mode_allows(TechMode::of_data(1)), Ok(true));
+        assert_eq!(mode(9).tech_mode_allows(TechMode::of_data(35)), Ok(true));
+        assert_eq!(
+            mode(9).tech_mode_allows(TechMode::of_data(17)),
+            Ok(!mode(9).walkable_farms)
+        );
     }
 
     /// `FUN_1413cf2f0` by mode: the game mode's (2, 3, 13), the sub mode flag's (4), the
@@ -413,32 +438,38 @@ mod tests {
             game_mode: GameMode::of_data(2),
             ..Settings::default()
         };
-        assert_eq!(s.tech_mode_allows(0), Ok(true));
-        assert_eq!(s.tech_mode_allows(1), Ok(true));
-        assert_eq!(s.tech_mode_allows(99), Ok(true));
-        assert_eq!(s.tech_mode_allows(3), Ok(true));
-        assert_eq!(s.tech_mode_allows(-3), Ok(false));
-        assert_eq!(s.tech_mode_allows(2), Ok(false));
-        assert_eq!(s.tech_mode_allows(-2), Ok(true));
-        assert_eq!(s.tech_mode_allows(13), Ok(false));
-        assert!(s.tech_mode_allows(15).is_err() && s.tech_mode_allows(-15).is_err());
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(0)), Ok(true));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(1)), Ok(true));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(99)), Ok(true));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(3)), Ok(true));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(-3)), Ok(false));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(2)), Ok(false));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(-2)), Ok(true));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(13)), Ok(false));
+        assert!(
+            s.tech_mode_allows(TechMode::of_data(15)).is_err()
+                && s.tech_mode_allows(TechMode::of_data(-15)).is_err()
+        );
         // mode 2 (death match) with the default age: at least Castle and Imperial and 5, not
         // Feudal (27) and not 28
         assert_eq!(
-            [27, 28, 32, 33, 34].map(|m| s.tech_mode_allows(m)),
+            [27, 28, 32, 33, 34].map(|m| s.tech_mode_allows(TechMode::of_data(m))),
             [Ok(false), Ok(false), Ok(true), Ok(true), Ok(true)]
         );
-        assert_eq!(s.tech_mode_allows(-32), Ok(true));
+        assert_eq!(s.tech_mode_allows(TechMode::of_data(-32)), Ok(true));
         let feudal = Settings {
             starting_age: Age::of_data(2),
             ..Settings::default()
         };
         assert_eq!(
-            [27, -27, 32, 34].map(|m| feudal.tech_mode_allows(m)),
+            [27, -27, 32, 34].map(|m| feudal.tech_mode_allows(TechMode::of_data(m))),
             [Ok(true), Ok(false), Ok(false), Ok(false)]
         );
         // the default age in the random map mode (0) is Feudal's (27)
-        assert_eq!(Settings::default().tech_mode_allows(27), Ok(true));
+        assert_eq!(
+            Settings::default().tech_mode_allows(TechMode::of_data(27)),
+            Ok(true)
+        );
         let options = Settings {
             sub_game_mode_flag: SubModeFlags::from_bits_retain(1),
             resource_level: ResourceLevel::of_data(3),
@@ -447,7 +478,7 @@ mod tests {
             ..Settings::default()
         };
         assert_eq!(
-            [4, 22, 21, -22, 17, -17, 26].map(|m| options.tech_mode_allows(m)),
+            [4, 22, 21, -22, 17, -17, 26].map(|m| options.tech_mode_allows(TechMode::of_data(m))),
             [
                 Ok(true),
                 Ok(true),

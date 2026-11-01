@@ -27,6 +27,7 @@ mod sprite_flags;
 mod sprite_id;
 pub(crate) mod teardown;
 pub mod unit;
+mod update_code;
 mod work_rate;
 mod worker_count;
 
@@ -45,5 +46,6 @@ pub use self::relics::Relics;
 pub use self::speed_multiplier::SpeedMultiplier;
 pub use self::sprite_flags::SpriteFlags;
 pub use self::sprite_id::SpriteId;
+pub use self::update_code::UpdateCode;
 pub use self::work_rate::WorkRate;
 pub use self::worker_count::WorkerCount;

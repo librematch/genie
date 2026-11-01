@@ -10,6 +10,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::world::step::Step;
@@ -96,7 +97,7 @@ impl HuntAction {
         unit: &mut Unit,
         mut me: Me,
         gives_up: GiveUp,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.move_to.as_ref().map(|m| m.state);
         let how = ListUpdate {

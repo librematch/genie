@@ -514,6 +514,7 @@ mod tests {
     use crate::movement::Speed;
     use crate::objects::ActionState;
     use crate::objects::ObjectState;
+    use crate::objects::UpdateCode;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
@@ -561,12 +562,12 @@ mod tests {
                 &mut inbox,
             )
         };
-        assert_eq!(update(&mut m), Ok(0));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
         assert_eq!(
             (m.state, m.wait.state),
             (MoveTo::Moving, MoveWaitState::AskedAgain)
         );
-        assert_eq!(update(&mut m), Ok(0));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
         assert_eq!(m.state, MoveTo::Moving);
         // the walk is a tenth of a second: the wait of 0.15 asks again on its second update
         m.state = MoveTo::Waiting;
@@ -575,18 +576,21 @@ mod tests {
             timer: Seconds::ZERO,
             delay: Seconds::new(0.15),
         };
-        assert_eq!(update(&mut m), Ok(0));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
         assert_eq!(
             (m.state, m.wait.timer),
             (MoveTo::Waiting, Seconds::new(0.1))
         );
-        assert_eq!(update(&mut m), Ok(0));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
         assert_eq!((m.state, m.wait.timer), (MoveTo::Start, Seconds::ZERO));
         m.wait.timer = Seconds::new(f32::NAN);
         m.state = MoveTo::Waiting;
-        assert_eq!(update(&mut m), Ok(0));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
         assert_eq!(m.state, MoveTo::Waiting);
-        for (state, code) in [(MoveTo::Arrived, 1), (MoveTo::Failed, 3)] {
+        for (state, code) in [
+            (MoveTo::Arrived, UpdateCode::DONE),
+            (MoveTo::Failed, UpdateCode::FAILED),
+        ] {
             m.state = state;
             assert_eq!(update(&mut m), Ok(code));
         }
@@ -701,16 +705,16 @@ mod tests {
         let off = Position::new(30.6, 88.0, 0.0);
         assert_eq!(
             walk_on(TargetMoved::AsksAgain, false),
-            (Ok(0), MoveTo::Start, vec![], false, off)
+            (Ok(UpdateCode::UNDER_WAY), MoveTo::Start, vec![], false, off)
         );
         assert_eq!(
             walk_on(TargetMoved::Ignores, false),
-            (Ok(0), MoveTo::Moving, vec![], true, off)
+            (Ok(UpdateCode::UNDER_WAY), MoveTo::Moving, vec![], true, off)
         );
         assert_eq!(
             walk_on(TargetMoved::Follows, false),
             (
-                Ok(0),
+                Ok(UpdateCode::UNDER_WAY),
                 MoveTo::Moving,
                 vec![],
                 true,
@@ -720,7 +724,7 @@ mod tests {
         assert_eq!(
             walk_on(TargetMoved::Follows, true),
             (
-                Ok(0),
+                Ok(UpdateCode::UNDER_WAY),
                 MoveTo::Start,
                 vec![crate::unit_ai::NotifyKind::TARGET_MOVED],
                 true,
@@ -765,7 +769,7 @@ mod tests {
         );
         assert_eq!(
             checked(true, 10028, Some(ObjectState::Removed)),
-            (Some(5), -1, vec![])
+            (Some(UpdateCode::CODE_5), -1, vec![])
         );
         let invalidated = (
             crate::unit_ai::NotifyKind::ACTION_INVALIDATED,
@@ -773,7 +777,7 @@ mod tests {
         );
         assert_eq!(
             checked(false, 10028, Some(ObjectState::Removed)),
-            (Some(4), -1, vec![invalidated])
+            (Some(UpdateCode::CODE_4), -1, vec![invalidated])
         );
         // through the sub-action's update, before its state's case
         let mut rig = crate::movement::tests::WalkRig::on_the_path();
@@ -794,7 +798,7 @@ mod tests {
         );
         assert_eq!(
             (code, ObjectId::field(m.target), m.state),
-            (Ok(5), -1, MoveTo::Moving)
+            (Ok(UpdateCode::CODE_5), -1, MoveTo::Moving)
         );
         let mut loud = MoveToAction {
             target: Some(object_id(10028)),
@@ -842,19 +846,19 @@ mod tests {
             });
             (code, posted)
         };
-        assert_eq!(update(true, MoveTo::Arrived), (1, vec![]));
-        assert_eq!(update(true, MoveTo::Failed), (3, vec![]));
+        assert_eq!(update(true, MoveTo::Arrived), (UpdateCode::DONE, vec![]));
+        assert_eq!(update(true, MoveTo::Failed), (UpdateCode::FAILED, vec![]));
         assert_eq!(
             update(false, MoveTo::Arrived),
             (
-                1,
+                UpdateCode::DONE,
                 vec![(crate::unit_ai::NotifyKind::ACTION_COMPLETED, [0x262, 0, 0])]
             )
         );
         assert_eq!(
             update(false, MoveTo::Failed),
             (
-                3,
+                UpdateCode::FAILED,
                 vec![(crate::unit_ai::NotifyKind::ACTION_FAILED, [0x262, 0, 0])]
             )
         );

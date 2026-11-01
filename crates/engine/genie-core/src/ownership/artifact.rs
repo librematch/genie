@@ -349,7 +349,7 @@ impl Artifact {
                 }
                 // its target let go (4, 5): it ends now, as at 1 to 3, its notify posted by the
                 // check
-                if !matches!(code, 4 | 5) {
+                if !matches!(code.get(), 4 | 5) {
                     return Ok(());
                 }
                 None

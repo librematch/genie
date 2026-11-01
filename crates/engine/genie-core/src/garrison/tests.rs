@@ -34,6 +34,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
@@ -4126,9 +4127,9 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
             )
         })
     };
-    assert_eq!(update(&mut None), Ok(1));
+    assert_eq!(update(&mut None), Ok(UpdateCode::DONE));
     let mut arrived = enter_of_move(MoveTo::Arrived);
-    assert_eq!(update(&mut arrived), Ok(1));
+    assert_eq!(update(&mut arrived), Ok(UpdateCode::DONE));
 }
 
 /// A quiet `MoveTo` to ship 200 in `state`.

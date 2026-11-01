@@ -696,7 +696,10 @@ mod stack_tests {
             *ms = Masters::new(ms.iter().cloned().chain([castle]));
         }
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
-        assert_eq!(t.work_building(object_id(8759), 1.0), Ok(false));
+        assert_eq!(
+            t.work_building(object_id(8759), Seconds::new(1.0)),
+            Ok(false)
+        );
         assert_eq!(
             t.players[1].history.events,
             [crate::players::history::Event {
@@ -723,7 +726,10 @@ mod stack_tests {
     #[test]
     fn a_town_centre_foundation_completes_into_the_town_centre_and_its_annexes() {
         let mut t = world();
-        assert_eq!(t.work_building(object_id(8759), 1.0), Ok(false));
+        assert_eq!(
+            t.work_building(object_id(8759), Seconds::new(1.0)),
+            Ok(false)
+        );
         let ids: Vec<(i32, i16, ObjectState)> = t.players[1]
             .objects
             .iter()
@@ -899,12 +905,15 @@ mod stack_tests {
     fn a_stack_unit_s_completion_reads_the_foundation_s_attacking_units() {
         let mut gone = world();
         gone.players[1].objects[ListIndex::new(0)].attacking_units = vec![object_id(99_999)];
-        assert_eq!(gone.work_building(object_id(8759), 1.0), Ok(false));
+        assert_eq!(
+            gone.work_building(object_id(8759), Seconds::new(1.0)),
+            Ok(false)
+        );
         let mut held = world();
         let first = held.players[1].objects[ListIndex::new(0)].id;
         held.players[1].objects[ListIndex::new(0)].attacking_units = vec![first];
         assert_eq!(
-            held.work_building(object_id(8759), 1.0),
+            held.work_building(object_id(8759), Seconds::new(1.0)),
             Err(GenieError::unsupported(
                 "a stack unit's completion with other players' units on it (+0xce0)"
             ))

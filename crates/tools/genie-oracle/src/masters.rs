@@ -300,7 +300,7 @@ fn tech_def(
         required: t.required_techs.map(TechId::of_data),
         required_count: t.required_tech_count,
         civ: genie_core::players::CivId::of_tech(t.civ)?,
-        mode: t.full_tech_mode,
+        mode: genie_core::technology::TechMode::of_data(t.full_tech_mode),
         locations: t
             .research_locations
             .iter()

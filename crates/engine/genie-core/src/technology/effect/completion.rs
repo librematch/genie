@@ -18,6 +18,7 @@ use crate::technology::DisabledTech;
 use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::TechMode;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER};
 use crate::technology::{EffectCommand, ObjectsKind, Party};
 use crate::world::Seconds;
@@ -282,7 +283,9 @@ impl World {
         // unless of mode 1
         let other_civ = match def.civ {
             None => false,
-            Some(own) if own == civ => self.settings.full_tech_tree && def.mode != 1,
+            Some(own) if own == civ => {
+                self.settings.full_tech_tree && def.mode != TechMode::KEPT_IN_FULL_TREE
+            }
             Some(_) => true,
         };
         Ok(other_civ || !self.settings.tech_mode_allows(def.mode)?)

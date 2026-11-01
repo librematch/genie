@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::UpdateCode;
 use crate::objects::actions::{Action, ActionList};
 use crate::objects::layers::Body;
 use crate::objects::release::Releaser;
@@ -150,9 +151,9 @@ pub(crate) enum HeadCode {
 }
 
 impl HeadCode {
-    /// The head's update `code` (`(code - 1) & 0xfd == 0`).
-    pub(crate) const fn of(code: u8) -> Self {
-        if matches!(code, 1 | 3) {
+    /// The head's update `code` ([`UpdateCode::deletes`]).
+    pub(crate) const fn of(code: UpdateCode) -> Self {
+        if code.deletes() {
             Self::Deletes
         } else {
             Self::Keeps
@@ -223,6 +224,7 @@ mod tests {
     use crate::map::Position;
     use crate::math::fmath::BVector;
     use crate::movement::move_to::MoveToAction;
+    use crate::objects::UpdateCode;
     use crate::objects::WorkRate;
     use crate::objects::masters::TaskId;
     use crate::test_ids::object_id;
@@ -261,7 +263,7 @@ mod tests {
     #[test]
     fn codes_1_and_3_delete_the_head() {
         let deleting: Vec<u8> = (0..=u8::MAX)
-            .filter(|&c| HeadCode::of(c) == HeadCode::Deletes)
+            .filter(|&c| HeadCode::of(UpdateCode::of_data(c)) == HeadCode::Deletes)
             .collect();
         assert_eq!(deleting, [1, 3]);
         assert_eq!(HeadCode::ended(true), HeadCode::Deletes);

@@ -19,6 +19,7 @@ use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
@@ -349,7 +350,7 @@ impl EnterAction {
         let walked_again = self.target_moved(t);
         let entered = walked_again && self.again(c, unit, t, reads)?;
         let code = self.move_to_update(c, unit, me, reads)?;
-        match code {
+        match code.get() {
             // the walk again's enter put the unit inside, at the target's place: still in reach,
             // it enters again
             1 | 2 if entered => self.on_unit(unit, |unit| unit.entered_again(c)),
@@ -377,7 +378,7 @@ impl EnterAction {
         unit: &mut Unit,
         me: Me,
         reads: &EnterReads,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let how = ListUpdate {
             gives_up: GiveUp {
                 waits: reads.waits,

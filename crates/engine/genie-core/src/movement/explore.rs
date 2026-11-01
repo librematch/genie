@@ -237,7 +237,7 @@ impl ExploreAction {
         };
         let code = update_sub_actions(&mut self.move_to, c, explorer, me, how)?;
         let walked = self.move_to.is_some();
-        let owner = self.after_walk(code)?;
+        let owner = self.after_walk(code.get())?;
         if walked && self.move_to.is_none() {
             explorer.stop_mover()?;
         }

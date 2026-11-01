@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::objects::ListIndex;
+use crate::objects::UpdateCode;
 use crate::objects::masters::action_type;
 use crate::objects::masters::player_master;
 use crate::orders::NO_QUEUE;
@@ -109,10 +110,10 @@ impl World {
             return Ok(());
         }
         let code = self.update_production_action(p, i, dt_seconds)?;
-        if !matches!(code, 1..=3) {
+        if !matches!(code.get(), 1..=3) {
             return Ok(());
         }
-        if code == 1 {
+        if code == UpdateCode::DONE {
             self.note_shared_research(p, i)?;
         }
         self.end_production_action(p, i)?;
@@ -272,7 +273,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         dt_seconds: Seconds,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let action = self
             .players
             .live(p, i)?
@@ -280,7 +281,7 @@ impl World {
             .as_ref()
             .and_then(|q| q.action);
         match action {
-            None => Ok(1),
+            None => Ok(UpdateCode::DONE),
             Some(Making::Unit(_)) => self.make_step(p, i, dt_seconds),
             Some(Making::Research(_)) => self.research_step(p, i, dt_seconds),
         }
@@ -300,15 +301,15 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         dt_seconds: Seconds,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<UpdateCode, GenieError> {
         let building = &self.players.live(p, i)?;
         let Some(Some(Making::Unit(make))) = building.production.as_ref().map(|q| q.action) else {
             return Err(NO_MAKE_ACTION);
         };
         match make.state {
-            MakeObjState::Done => return Ok(1),
+            MakeObjState::Done => return Ok(UpdateCode::DONE),
             MakeObjState::Making => {}
-            MakeObjState::New | MakeObjState::NoSpot => return Ok(0),
+            MakeObjState::New | MakeObjState::NoSpot => return Ok(UpdateCode::UNDER_WAY),
         }
         let site = building.master(&self.masters, p)?;
         let rate = building.work_rate_powerup + site.work_rate;
@@ -325,7 +326,7 @@ impl World {
             m.progress = progress;
         }
         if crate::math::fmath::below_or_unordered(progress.get(), time) {
-            return Ok(0);
+            return Ok(UpdateCode::UNDER_WAY);
         }
         let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
         self.spawn(
@@ -345,7 +346,7 @@ impl World {
         {
             m.state = MakeObjState::Done;
         }
-        Ok(1)
+        Ok(UpdateCode::DONE)
     }
 
     /// The production list's first action goes (`FUN_140a98e20`, and `FUN_140a98620` for the

@@ -560,7 +560,7 @@ fn bounty() -> Task {
 fn a_removal_reward_pays_the_rate_times_the_attribute() {
     let t = bounty();
     assert_eq!(
-        reward(&t, PlayerId::new(2), Some(1.5), &[]),
+        reward(&t, PlayerId::new(2), Some(Amount::new(1.5)), &[]),
         Reward {
             player: PlayerId::new(2),
             attribute: Some(attribute::GOLD),
@@ -568,17 +568,23 @@ fn a_removal_reward_pays_the_rate_times_the_attribute() {
         }
     );
     // truncated
-    assert_eq!(reward(&t, PlayerId::new(2), Some(0.25), &[]).amount, 2);
+    assert_eq!(
+        reward(&t, PlayerId::new(2), Some(Amount::new(0.25)), &[]).amount,
+        2
+    );
     // the player lacks the attribute, or the task names none
     assert_eq!(reward(&t, PlayerId::new(2), None, &[]).amount, 10);
     let none = Task {
         attribute_type2: None,
         ..bounty()
     };
-    assert_eq!(reward(&none, PlayerId::new(2), Some(3.0), &[]).amount, 10);
+    assert_eq!(
+        reward(&none, PlayerId::new(2), Some(Amount::new(3.0)), &[]).amount,
+        10
+    );
     // a NaN rate is the integer indefinite
     assert_eq!(
-        reward(&t, PlayerId::new(2), Some(f32::NAN), &[]).amount,
+        reward(&t, PlayerId::new(2), Some(Amount::new(f32::NAN)), &[]).amount,
         i32::MIN
     );
 }
@@ -594,14 +600,20 @@ fn a_removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_
         (attribute::FOOD, 50, true),
         (attribute::GOLD, 30, false),
     ]);
-    assert_eq!(reward(&t, PlayerId::new(1), Some(0.5), &cost).amount, 100);
+    assert_eq!(
+        reward(&t, PlayerId::new(1), Some(Amount::new(0.5)), &cost).amount,
+        100
+    );
     let cost = costs(&[(attribute::GOLD, 20, true), (attribute::GOLD, 30, true)]);
-    assert_eq!(reward(&t, PlayerId::new(1), Some(1.0), &cost).amount, 300);
+    assert_eq!(
+        reward(&t, PlayerId::new(1), Some(Amount::new(1.0)), &cost).amount,
+        300
+    );
     assert_eq!(
         reward(
             &t,
             PlayerId::new(1),
-            Some(1.0),
+            Some(Amount::new(1.0)),
             &costs(&[(attribute::FOOD, 50, true)])
         )
         .amount,

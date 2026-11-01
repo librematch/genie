@@ -11,6 +11,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
 use crate::players::Amount;
+use crate::world::Seconds;
 use std::collections::BTreeMap;
 
 use crate::GenieError;
@@ -241,7 +242,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        rate: f32,
+        rate: Seconds,
     ) -> Result<bool, GenieError> {
         let target = self
             .target

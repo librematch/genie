@@ -10,6 +10,7 @@ use crate::gathering::hunt::NO_HUNT;
 use crate::movement::move_to::MoveTo;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectState;
+use crate::objects::UpdateCode;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
@@ -256,7 +257,7 @@ impl Unit {
             crate::unit_ai::NotifyKind::ACTION_FAILED,
             [ActionKind::Hunt.value(), 0, 0],
         )?;
-        Ok(HeadCode::of(3))
+        Ok(HeadCode::of(UpdateCode::FAILED))
     }
 
     /// States 15 and 11: the walk to a point
