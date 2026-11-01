@@ -23,6 +23,7 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::QUEUED;
 use crate::production::Production;
+use crate::production::QueueButton;
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -285,7 +286,7 @@ impl World {
                     .and_then(|t| owner.techs.get(t))
                     .and_then(|t| t.location(building.life.master_id))
                     .map_or((WholeSeconds::ZERO, Seconds::ZERO), |l| {
-                        (WholeSeconds::of_data(l.time as i16), l.adjustment)
+                        (l.time, l.adjustment)
                     });
                 queued += (Seconds::of_master(time) + adjustment) * f32::from(e.count);
             }
@@ -316,7 +317,7 @@ impl World {
         unit: Option<MasterId>,
         count: u16,
         tech: Option<TechId>,
-        button: i32,
+        button: QueueButton,
     ) -> Result<bool, GenieError> {
         let mut master = if unit == Some(VILLAGER_ANY) {
             Some(VILLAGER_MALE)
@@ -371,7 +372,7 @@ impl World {
         i: ListIndex,
         master: MasterId,
         count: i16,
-        button: i32,
+        button: QueueButton,
     ) -> Result<bool, GenieError> {
         use crate::production::{as_entry_costs, master_costs, pay, population};
         let empty = Masters::default();
@@ -439,7 +440,7 @@ impl World {
         i: ListIndex,
         (master, tech): (Option<MasterId>, TechId),
         count: i16,
-        button: i32,
+        button: QueueButton,
     ) -> Result<bool, GenieError> {
         let t = tech.index();
         let def = self.techs.get(t).ok_or(GenieError::unsupported(
@@ -512,7 +513,7 @@ impl World {
         i: ListIndex,
         (master, tech): (Option<MasterId>, Option<TechId>),
         n: i16,
-        button: i32,
+        button: QueueButton,
         time: Option<WholeSeconds>,
     ) -> Result<(), GenieError> {
         let queue = &self

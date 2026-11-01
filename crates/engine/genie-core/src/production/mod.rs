@@ -29,11 +29,13 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use genie_diff::Diff;
 
+mod button;
 mod costs;
 mod make_obj_state;
 mod make_tech_state;
 pub mod spawn;
 
+pub use self::button::{LocationButton, QueueButton};
 pub use self::costs::{
     as_entry_costs, cost_test, costed, master_costs, pay, refund, refund_master, refund_research,
     refund_tech,
@@ -59,7 +61,7 @@ pub struct Entry {
     #[diff(unsaved)]
     pub serial: i64,
     /// `+0x28`, `mButtonLocationId`: the train button QUEUE named, −1 for none.
-    pub button: i32,
+    pub button: QueueButton,
     /// `+0x2c`, `mTrainTime`: the unit's train time at the building and button
     /// ([`train_time`]); a research entry does not write it.
     pub train_time: WholeSeconds,
@@ -76,7 +78,7 @@ impl Default for Entry {
             // the zeroed field's attribute 0, food
             costs: [(Some(attribute::FOOD), 0.0); 3],
             serial: 0,
-            button: 0,
+            button: QueueButton::default(),
             train_time: WholeSeconds::ZERO,
         }
     }
@@ -238,7 +240,7 @@ impl Queue {
         master: Option<MasterId>,
         count: i16,
         tech: Option<TechId>,
-        button: i32,
+        button: QueueButton,
     ) -> usize {
         let i = usize::try_from(self.count).unwrap_or(0);
         let serial = self.next_serial;
@@ -276,14 +278,18 @@ impl Queue {
 /// that building whose button is the button's low byte, else the first location's; 0 without
 /// locations.
 #[must_use]
-pub fn train_time(locations: &[TrainLocation], building: MasterId, button: i32) -> WholeSeconds {
+pub fn train_time(
+    locations: &[TrainLocation],
+    building: MasterId,
+    button: QueueButton,
+) -> WholeSeconds {
     let first = locations.first().map_or(WholeSeconds::ZERO, |l| l.time);
-    if button == -1 {
+    if button == QueueButton::NONE {
         return first;
     }
     locations
         .iter()
-        .find(|l| l.location == Some(building) && l.button == button as u8)
+        .find(|l| l.location == Some(building) && button.names(l.button))
         .map_or(first, |l| l.time)
 }
 
@@ -304,7 +310,7 @@ pub struct MakeObj {
     /// `+0x70`, `unique_id` (−1 from the building's update).
     pub unique_id: i32,
     /// `+0x78`, `mButtonLocationId`.
-    pub button: i32,
+    pub button: QueueButton,
     /// `+0x7c`, `mTrainTime`: the train time of the entry it was made for.
     pub train_time: WholeSeconds,
 }
@@ -474,7 +480,7 @@ mod tests {
             tech: None,
             costs: [(Some(attribute::FOOD), food), (None, 0.0), (None, 0.0)],
             serial: 0,
-            button: -1,
+            button: QueueButton::NONE,
             train_time: WholeSeconds::of_data(25),
         }
     }
@@ -490,7 +496,11 @@ mod tests {
         );
         assert_eq!(
             (e.costs, e.button, e.train_time),
-            ([(Some(attribute::FOOD), 0.0); 3], 0, WholeSeconds::ZERO)
+            (
+                [(Some(attribute::FOOD), 0.0); 3],
+                QueueButton::default(),
+                WholeSeconds::ZERO
+            )
         );
     }
 
@@ -583,7 +593,7 @@ mod tests {
         );
         assert_eq!(q.slots[15], Entry::default());
         // a new entry takes the next serial and no costs
-        let i = q.open(Some(master_id(5)), 2, None, 3);
+        let i = q.open(Some(master_id(5)), 2, None, QueueButton::of_data(3));
         assert_eq!((i, q.slots[1].serial, q.slots[1].costs), (1, 10, NO_COSTS));
         assert_eq!(q.next_serial, 11);
     }
@@ -630,26 +640,37 @@ mod tests {
             hotkey: 0,
         };
         let locations = [
-            at(Some(ids::CASTLE), WholeSeconds::of_data(30), 2),
-            at(Some(ids::TOWN_CENTRE), WholeSeconds::of_data(25), 1),
+            at(
+                Some(ids::CASTLE),
+                WholeSeconds::of_data(30),
+                LocationButton::of_data(2),
+            ),
+            at(
+                Some(ids::TOWN_CENTRE),
+                WholeSeconds::of_data(25),
+                LocationButton::of_data(1),
+            ),
         ];
         assert_eq!(
-            train_time(&locations, ids::TOWN_CENTRE, 1),
+            train_time(&locations, ids::TOWN_CENTRE, QueueButton::of_data(1)),
             WholeSeconds::of_data(25)
         );
         assert_eq!(
-            train_time(&locations, ids::TOWN_CENTRE, 2),
+            train_time(&locations, ids::TOWN_CENTRE, QueueButton::of_data(2)),
             WholeSeconds::of_data(30)
         );
         assert_eq!(
-            train_time(&locations, ids::TOWN_CENTRE, -1),
+            train_time(&locations, ids::TOWN_CENTRE, QueueButton::NONE),
             WholeSeconds::of_data(30)
         );
         assert_eq!(
-            train_time(&locations, ids::TOWN_CENTRE, 0x101),
+            train_time(&locations, ids::TOWN_CENTRE, QueueButton::of_data(0x101)),
             WholeSeconds::of_data(25)
         );
-        assert_eq!(train_time(&[], ids::TOWN_CENTRE, 1), WholeSeconds::ZERO);
+        assert_eq!(
+            train_time(&[], ids::TOWN_CENTRE, QueueButton::of_data(1)),
+            WholeSeconds::ZERO
+        );
         let mut m = Master {
             kind: COMBAT,
             train_locations: locations.to_vec(),
@@ -657,7 +678,7 @@ mod tests {
         };
         let mut make = MakeObj::for_entry(&Entry {
             master: Some(ids::VILLAGER_MALE),
-            button: 1,
+            button: QueueButton::of_data(1),
             train_time: WholeSeconds::of_data(99),
             ..Entry::default()
         });
@@ -672,7 +693,7 @@ mod tests {
         );
         m.kind = master_type::MISSILE;
         assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), WholeSeconds::ZERO);
-        make.button = -1;
+        make.button = QueueButton::NONE;
         assert_eq!(
             (make.time(None, ids::TOWN_CENTRE), make.paid, make.unique_id),
             (WholeSeconds::ZERO, true, -1)

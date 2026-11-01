@@ -111,6 +111,8 @@ use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::players::relations;
 use crate::players::tracker::ListKey;
+use crate::production::LocationButton;
+use crate::production::QueueButton;
 use crate::technology::CostPaid;
 use crate::technology::ResearchState;
 use crate::test_ids::attack_category;
@@ -7663,7 +7665,7 @@ fn queue(building: i32, unit: i16, amount: i16) -> Command {
         building_master: master_id(109),
         unit: master_id(unit),
         amount,
-        button: -1,
+        button: QueueButton::NONE,
     })
 }
 
@@ -8492,7 +8494,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
         train_locations: vec![crate::objects::masters::TrainLocation {
             location: Some(ids::TOWN_CENTRE),
             time,
-            button: 1,
+            button: LocationButton::of_data(1),
             hotkey: 0,
         }],
         ..Master::default()
@@ -8631,7 +8633,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
             building_master: master_id(109),
             unit: master_id(99),
             amount,
-            button: -1,
+            button: QueueButton::NONE,
         })
     };
     let total = |t: &World, k: ListIndex| {
@@ -8708,7 +8710,7 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
         building_master: master_id(109),
         unit: master_id(99),
         amount: 3,
-        button: -1,
+        button: QueueButton::NONE,
     });
     let mut t = with_trophy(vec![trophy(9), centre(10)]);
     t.tick_with(Millis::new(104), &[both]);
@@ -8787,7 +8789,7 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
         building_master: master_id(109),
         unit: master_id(99),
         amount: 2,
-        button: -1,
+        button: QueueButton::NONE,
     });
     t.tick_with(Millis::new(104), &[both]);
     assert!(t.players[0].unsupported.is_none());
@@ -8938,8 +8940,8 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
             building_master: None,
             locations: vec![Location {
                 building: Some(ids::TOWN_CENTRE),
-                time: 160,
-                button: 1,
+                time: WholeSeconds::of_data(160),
+                button: LocationButton::of_data(1),
                 adjustment: Seconds::ZERO,
             }],
             ..TechState::default()
@@ -8986,8 +8988,8 @@ fn research_world() -> World {
         overrides: [(0, None, -2), (0, None, 0), (0, None, 0)],
         locations: vec![Location {
             building: Some(ids::TOWN_CENTRE),
-            time: 30,
-            button: 1,
+            time: WholeSeconds::of_data(30),
+            button: LocationButton::of_data(1),
             adjustment: Seconds::ZERO,
         }],
         ..TechState::default()
@@ -9197,7 +9199,14 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         })
     };
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.tick_with(Millis::new(104), &[with(2, -1), with(3, -1), with(1, 1)]);
+    t.tick_with(
+        Millis::new(104),
+        &[
+            with(2, QueueButton::NONE),
+            with(3, QueueButton::NONE),
+            with(1, QueueButton::of_data(1)),
+        ],
+    );
     let q = &t.players[0].objects[ListIndex::new(0)]
         .production
         .as_ref()
@@ -9206,7 +9215,7 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
     assert_eq!((q.count, q.total, q.changes, q.next_serial), (2, 6, 3, 2));
     assert_eq!(
         (q.slots[0].count, q.slots[1].count, q.slots[1].button),
-        (5, 1, 1)
+        (5, 1, QueueButton::of_data(1))
     );
     assert_eq!(
         (q.slots[1].train_time, q.slots[1].serial),
@@ -9214,7 +9223,9 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
     );
     assert_eq!(t.players[0].tracker.queued, 6);
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    let alternating: Vec<_> = (0..11).map(|k| with(1, k % 2)).collect();
+    let alternating: Vec<_> = (0..11)
+        .map(|k| with(1, QueueButton::of_data(k % 2)))
+        .collect();
     t.tick_with(Millis::new(104), &alternating);
     let q = &t.players[0].objects[ListIndex::new(0)]
         .production
@@ -19652,7 +19663,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
         building_master: master_id(109),
         unit: master_id(83),
         amount: 1,
-        button: 0,
+        button: QueueButton::of_data(0),
     };
     let changed = [
         routes(
@@ -19663,7 +19674,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
                 building_master: master_id(109),
                 unit: master_id(83),
                 amount: 1,
-                button: 0,
+                button: QueueButton::of_data(0),
             }),
             PlayerId::new(1),
             |w| queue.run(w),

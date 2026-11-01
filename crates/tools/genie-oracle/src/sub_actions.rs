@@ -15,6 +15,7 @@ use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::attribute::AttributeId;
+use genie_core::production::QueueButton;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
@@ -280,7 +281,7 @@ pub(super) fn production(
                 tech: genie_core::technology::TechId::of_data(e.production_queue_tech_id),
                 costs: [cost(0)?, cost(1)?, cost(2)?],
                 serial: k as i64,
-                button: e.production_queue_button_location_id,
+                button: QueueButton::of_data(e.production_queue_button_location_id),
                 train_time: WholeSeconds::of_data(e.production_queue_train_time),
             })
         })
@@ -303,7 +304,7 @@ pub(super) fn production(
                 master: MasterId::of_data(make.obj_id),
                 progress: Seconds::new(make.work_done),
                 unique_id: make.unique_id,
-                button: make.button_location_id,
+                button: QueueButton::of_data(make.button_location_id),
                 train_time: WholeSeconds::of_data(make.train_time),
             }))
         }

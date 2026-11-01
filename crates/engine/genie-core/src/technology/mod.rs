@@ -144,10 +144,10 @@ impl TechDef {
 pub struct Location {
     /// The building's master, none for an entry the data leaves open (−1).
     pub building: Option<MasterId>,
-    /// The seconds it takes there.
-    pub time: u16,
+    /// The seconds it takes there (the save's `u16`, its bits kept).
+    pub time: crate::world::WholeSeconds,
     /// Its button.
-    pub button: u8,
+    pub button: crate::production::LocationButton,
     /// The seconds added (`+0xc`, `FUN_1413cec90`).
     pub adjustment: Seconds,
 }
@@ -497,7 +497,9 @@ mod tests {
     use super::*;
     use crate::objects::masters::ids;
     use crate::players::attribute;
+    use crate::production::LocationButton;
     use crate::test_ids::master_id;
+    use crate::world::WholeSeconds;
 
     /// Loom (22) as player 2 of MarvinBlue/426048731 holds it before its RESEARCH in 3842.
     fn loom() -> (TechState, TechDef) {
@@ -509,8 +511,8 @@ mod tests {
             building_master: None,
             locations: vec![Location {
                 building: Some(ids::TOWN_CENTRE),
-                time: 25,
-                button: 6,
+                time: WholeSeconds::of_data(25),
+                button: LocationButton::of_data(6),
                 adjustment: Seconds::ZERO,
             }],
             ..TechState::default()
@@ -587,7 +589,10 @@ mod tests {
         // without the entry's payment the 50 gold left would do too, but that difference is
         // the game's FUN_1411c68b0
         assert!(s.start_test(&d, (0.0, 1), &[(None, 0.0); 3], &get).is_err());
-        assert_eq!(s.location(ids::TOWN_CENTRE).map(|l| l.time), Some(25));
+        assert_eq!(
+            s.location(ids::TOWN_CENTRE).map(|l| l.time),
+            Some(WholeSeconds::of_data(25))
+        );
     }
 
     #[test]

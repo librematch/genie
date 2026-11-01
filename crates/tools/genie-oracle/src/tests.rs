@@ -5,6 +5,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::actions::ActionList;
 use genie_core::objects::masters::{MasterId, ids};
 use genie_core::ownership::artifact::ArtifactState;
+use genie_core::production::QueueButton;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_core::world::checkpoint::ActionTerm;
@@ -32,7 +33,7 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
                 master: Some(ids::VILLAGER_MALE),
                 progress: Seconds::new(0.5),
                 unique_id: -1,
-                button: 0,
+                button: QueueButton::of_data(0),
                 train_time: WholeSeconds::of_data(25),
             },
         )),

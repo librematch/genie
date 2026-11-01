@@ -565,7 +565,7 @@ pub struct TrainLocation {
     /// `+0x2`, `trainTime`.
     pub time: WholeSeconds,
     /// `+0x4`, `buttonLocationID`.
-    pub button: u8,
+    pub button: crate::production::LocationButton,
     /// `+0x8`, `hotkeyID`.
     pub hotkey: i32,
 }

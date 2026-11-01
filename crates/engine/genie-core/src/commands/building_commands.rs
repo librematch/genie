@@ -15,6 +15,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::orders::tech_outside;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::production::QueueButton;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::unit_ai::ActionKind;
@@ -410,7 +411,7 @@ impl World {
         let state = &self.players.player(player)?.techs[t];
         let one = !state.allow_multiple || def.upgrades();
         let count: u16 = if !shift || one { 1 } else { 5 };
-        self.queue_at(player, i, None, count, Some(tech), -1)
+        self.queue_at(player, i, None, count, Some(tech), QueueButton::NONE)
     }
 }
 

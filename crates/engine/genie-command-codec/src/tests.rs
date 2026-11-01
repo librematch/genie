@@ -19,6 +19,7 @@ use genie_core::orders::{Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::tribute::Gift;
+use genie_core::production::QueueButton;
 use genie_core::unit_ai::UnitStance;
 use genie_core::{ErrorKind, GenieError};
 use genie_rec::de::command as packets;
@@ -687,7 +688,7 @@ fn queue_and_research_keep_their_fields() {
             building_master: master_id(109),
             unit: master_id(83),
             amount: 5,
-            button: 2,
+            button: QueueButton::of_data(2),
         })
     );
     let research = packets::Research {

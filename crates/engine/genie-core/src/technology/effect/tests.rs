@@ -29,6 +29,7 @@ use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::production::LocationButton;
 use crate::technology::CostPaid;
 use crate::technology::EffectId;
 use crate::technology::ResearchState;
@@ -1228,8 +1229,8 @@ fn barracks_tech() -> World {
         research_done: Seconds::new(20.0),
         locations: vec![Location {
             building: Some(master_id(12)),
-            time: 30,
-            button: 3,
+            time: WholeSeconds::of_data(30),
+            button: LocationButton::of_data(3),
             adjustment: Seconds::ZERO,
         }],
         building_master: None,
@@ -1313,7 +1314,7 @@ fn a_technology_change_reaches_its_costs_locations_and_state() {
     let s = &t.players[0].techs[0];
     assert_eq!(
         (s.locations[0].building, s.locations[0].button),
-        (Some(master_id(87)), 7)
+        (Some(master_id(87)), LocationButton::of_data(7))
     );
     assert_eq!(s.research_cap, 2);
     // a location past the list adds a copy of the last, without a building
@@ -1321,7 +1322,10 @@ fn a_technology_change_reaches_its_costs_locations_and_state() {
         .unwrap();
     let s = &t.players[0].techs[0];
     assert_eq!(s.locations.len(), 2);
-    assert_eq!((s.locations[1].building, s.locations[1].button), (None, 9));
+    assert_eq!(
+        (s.locations[1].building, s.locations[1].button),
+        (None, LocationButton::of_data(9))
+    );
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 12, -1, 0.0)], None)
         .unwrap();
     assert_eq!(t.players[0].techs[0].state, ResearchState::Disabled);
@@ -1353,8 +1357,8 @@ fn a_technology_change_s_location_stacking_and_effect_override() {
     let mut t = barracks_tech();
     t.players[0].techs[0].locations.push(Location {
         building: Some(master_id(13)),
-        time: 40,
-        button: 4,
+        time: WholeSeconds::of_data(40),
+        button: LocationButton::of_data(4),
         adjustment: Seconds::ZERO,
     });
     t.do_effect(PlayerId::new(0), &[attribute(8, 5, 9, -1, 1.0)], None)
@@ -1368,7 +1372,7 @@ fn a_technology_change_s_location_stacking_and_effect_override() {
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, -2, 1, 5.9)], None)
         .unwrap();
     let s = &t.players[0].techs[0];
-    let at = |i: usize| (s.locations[i].button, s.locations[i].adjustment);
+    let at = |i: usize| (s.locations[i].button.get(), s.locations[i].adjustment);
     assert_eq!([at(0), at(1)], [(3, Seconds::ZERO), (9, Seconds::new(5.0))]);
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 12, -1, 1.0)], None)
         .unwrap();

@@ -320,7 +320,7 @@ fn queue(c: &QueueCommand) -> Result<Packet, GenieError> {
         b_id: c.building_master.get(),
         t_id: c.unit.get(),
         count: c.amount,
-        button_location_id: c.button,
+        button_location_id: c.button.get(),
         ids: ids(&c.buildings.ids, packets::MultiQueue::FIXED)?,
     }))
 }

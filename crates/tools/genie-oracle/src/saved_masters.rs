@@ -45,6 +45,7 @@ use genie_core::objects::masters::{BlastDefense, BlastLevel};
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
+use genie_core::production::LocationButton;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
@@ -369,7 +370,7 @@ pub(super) fn work_masters(
                 .map(|t| genie_core::objects::masters::TrainLocation {
                     location: MasterId::of_data(t.train_location_id),
                     time: WholeSeconds::of_data(t.train_time),
-                    button: t.button_location_id,
+                    button: LocationButton::of_data(t.button_location_id),
                     hotkey: t.hotkey_id,
                 })
                 .collect()

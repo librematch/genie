@@ -21,7 +21,7 @@ pub struct QueueCommand {
     /// How many (`+0xe`, which the handler takes as an int).
     pub amount: i16,
     /// `button_location_id`: the train button, −1 for none.
-    pub button: i32,
+    pub button: crate::production::QueueButton,
 }
 
 impl QueueCommand {

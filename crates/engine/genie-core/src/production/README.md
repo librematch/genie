@@ -26,6 +26,7 @@ A building's update runs its production action after its combat update.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`button.rs`](button.rs) | A train or research button: as a QUEUE command and a queue entry hold it (`QueueButton`), and as a train or research location holds it (`LocationButton`). |
 | [`costs.rs`](costs.rs) | A queue entry's costs: the test and the payment of a unit's or a technology's costs, and their refunds when an entry is cancelled (`FUN_141630530` and the cancels' calls). |
 | [`make_obj_state.rs`](make_obj_state.rs) | A unit's make action's state: making the unit its building trains. |
 | [`make_tech_state.rs`](make_tech_state.rs) | A research's state: researching a technology at its building. |
@@ -37,5 +38,5 @@ A building's update runs its production action after its combat update.
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`commands`](../commands/), [`garrison`](../garrison/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`movement`](../movement/), [`objects`](../objects/), [`players`](../players/).
+- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`movement`](../movement/), [`objects`](../objects/), [`players`](../players/), [`technology`](../technology/).
 <!-- /uses -->

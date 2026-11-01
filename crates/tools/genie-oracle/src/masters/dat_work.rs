@@ -36,6 +36,7 @@ use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
+use genie_core::production::LocationButton;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 
@@ -194,7 +195,7 @@ pub(super) fn dat_work(
                 .map(|t| work::TrainLocation {
                     location: MasterId::of_data(t.location_id),
                     time: WholeSeconds::of_data(t.queue_time),
-                    button: t.button_id,
+                    button: LocationButton::of_data(t.button_id),
                     hotkey: t.hot_key_id.unwrap_or_default(),
                 })
                 .collect()

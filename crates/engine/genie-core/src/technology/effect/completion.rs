@@ -11,6 +11,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
+use crate::production::LocationButton;
 use crate::technology::ChangeMode;
 use crate::technology::DisabledTech;
 use crate::technology::EffectId;
@@ -19,7 +20,6 @@ use crate::technology::TechId;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER, MODE_WITHOUT_0X26D};
 use crate::technology::{EffectCommand, ObjectsKind, Party};
 use crate::world::Seconds;
-use crate::world::WholeSeconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -65,7 +65,7 @@ impl World {
         let owner = &self.players.player(p)?;
         let state = owner.techs.checked(t)?;
         let location = building.map_or_else(|| state.locations.first(), |b| state.location(b));
-        if location.is_some_and(|l| l.building.is_some() && l.button != 0) {
+        if location.is_some_and(|l| l.building.is_some() && l.button != LocationButton::NONE) {
             let get = |k: AttributeId| owner.get(k);
             let factors = crate::technology::factors(tech, &get)?;
             let listed = state.listed_costs(&def, factors)?;
@@ -298,8 +298,7 @@ impl World {
                 .and_then(|b| state.location(b))
                 .copied()
                 .unwrap_or(*l);
-            Seconds::of_master(WholeSeconds::of_data(l.time as i16)) + at.adjustment
-                <= state.research_done
+            Seconds::of_master(l.time) + at.adjustment <= state.research_done
         };
         // its research done already: it completes (`FUN_1413cdcd0` with `param_3` 0 and no
         // building), once per location reached without a building of its own (each

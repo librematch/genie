@@ -123,7 +123,7 @@ impl World {
         {
             r.progress = progress;
         }
-        let mut time = f32::from(location.time as i16);
+        let mut time = Seconds::of_master(location.time).get();
         if !crate::technology::is_age(r.tech) && Amount::ZERO < time_modifier {
             time *= time_modifier.get();
         }

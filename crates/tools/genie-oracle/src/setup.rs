@@ -6,9 +6,11 @@ use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::objects::ListIndex;
 use genie_core::players::Amount;
+use genie_core::production::LocationButton;
 use genie_core::technology::EffectId;
 use genie_core::world::Millis;
 use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
 
 use crate::masters::{MasterTable, TerrainTable};
@@ -58,8 +60,8 @@ pub(super) fn tech_state(
             .flatten()
             .map(|l| genie_core::technology::Location {
                 building: MasterId::of_data(l.location_research_location_id as i16),
-                time: l.location_research_time,
-                button: l.location_button_location_id,
+                time: WholeSeconds::of_data(l.location_research_time.cast_signed()),
+                button: LocationButton::of_data(l.location_button_location_id),
                 adjustment: Seconds::new(f32::from_bits(l.location_research_adjustment)),
             })
             .collect(),

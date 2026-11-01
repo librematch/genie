@@ -13,6 +13,7 @@ use crate::objects::masters::class;
 use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::attribute as player_attribute;
+use crate::production::LocationButton;
 use crate::test_ids::carrying;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
@@ -497,7 +498,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::TRAIN_BUTTON,
-            |m| f32::from(m.train_locations[1].button),
+            |m| f32::from(m.train_locations[1].button.get()),
             [3.0; 3],
         ),
         (
@@ -899,7 +900,7 @@ fn the_train_location_attributes_change_the_selected_entry() {
     let barracks = |time| TrainLocation {
         location: Some(master_id(12)),
         time,
-        button: 1,
+        button: LocationButton::of_data(1),
         hotkey: 16_000,
     };
     let mut m = of_type(master_type::COMBAT);

@@ -7,6 +7,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
+use crate::production::LocationButton;
 use crate::technology::ChangeMode;
 use crate::technology::EffectId;
 use crate::technology::ModifyLocation;
@@ -141,7 +142,8 @@ impl World {
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
                 for (i, l) in state.locations.iter_mut().enumerate() {
                     if at.is_none_or(|a| a == i) {
-                        l.button = crate::math::conversions::cvttss2si(v) as u8;
+                        l.button =
+                            LocationButton::of_data(crate::math::conversions::cvttss2si(v) as u8);
                     }
                 }
             }

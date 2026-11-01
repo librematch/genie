@@ -13,6 +13,7 @@ use crate::commands::{
 use crate::map::Point;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::production::QueueButton;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
@@ -78,7 +79,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             building_master: master_id(109),
             unit: master_id(83),
             amount: 1,
-            button: -1,
+            button: QueueButton::NONE,
         }),
         Command::Research(ResearchCommand {
             player: player_id(p),

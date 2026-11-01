@@ -30,6 +30,8 @@ use crate::players::Relation;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
+use crate::production::LocationButton;
+use crate::production::QueueButton;
 use crate::production::{
     Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
 };
@@ -61,7 +63,7 @@ fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
             (Some(attribute::HEADROOM), 1.0),
         ],
         serial: 0,
-        button: -1,
+        button: QueueButton::NONE,
         train_time: WholeSeconds::of_data(25),
     }
 }
@@ -728,8 +730,8 @@ fn researching(progress: f32) -> World {
         overrides: [(-1, None, -2); 3],
         locations: vec![Location {
             building: Some(ids::TOWN_CENTRE),
-            time: 25,
-            button: 1,
+            time: WholeSeconds::of_data(25),
+            button: LocationButton::of_data(1),
             adjustment: Seconds::ZERO,
         }],
         ..TechState::default()

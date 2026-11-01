@@ -19,6 +19,7 @@ use crate::objects::masters::{
 use crate::objects::masters::{GarrisonKinds, HeroFlags};
 use crate::players::Amount;
 use crate::players::attribute as players_attribute;
+use crate::production::LocationButton;
 use crate::world::WholeSeconds;
 
 impl Master {
@@ -170,7 +171,7 @@ impl Master {
             }
             a::TRAIN_BUTTON => {
                 if let Some(t) = self.train_location_mut() {
-                    t.button = low8(v);
+                    t.button = LocationButton::of_data(low8(v));
                 }
             }
             a::HOTKEY_ID => {

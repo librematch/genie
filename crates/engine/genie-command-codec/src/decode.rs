@@ -324,7 +324,7 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             building_master: MasterId::try_from(c.b_id)?,
             unit: MasterId::try_from(c.t_id)?,
             amount: c.count,
-            button: c.button_location_id,
+            button: genie_core::production::QueueButton::of_data(c.button_location_id),
         }),
         Packet::Research(c) => Command::Research(ResearchCommand {
             player: PlayerId::from(c.commp_id),
