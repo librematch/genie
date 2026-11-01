@@ -16,6 +16,7 @@ use crate::objects::masters::{CostSlot, Master, master_type, player_master};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::technology::UpgradeMode;
 use crate::technology::{CostEdit, CostUnits, ObjectsKind};
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -37,7 +38,7 @@ impl World {
         &mut self,
         p: PlayerId,
         (from, to): (Option<MasterId>, Option<MasterId>),
-        mode: i16,
+        mode: UpgradeMode,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         self.all_garrison_volleys(p, false)?;
@@ -67,7 +68,7 @@ impl World {
         p: PlayerId,
         from: MasterId,
         to: MasterId,
-        mode: i16,
+        mode: UpgradeMode,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let Some(masters) = self.masters.of(p) else {
@@ -86,9 +87,9 @@ impl World {
                     .is_some_and(|e| d.copy_id != e.copy_id)
             });
         let dead = dead.cloned();
-        let keep = mode == -1 || mode == 3;
+        let keep = mode.keeps_masters();
         let (old, new) = (old.clone(), new.clone());
-        if mode == 2
+        if mode.one_object()
             && let Some(id) = object
         {
             self.upgrade_named(p, id, &new)?;
@@ -136,7 +137,7 @@ impl World {
     fn upgrade_walk(
         &mut self,
         p: PlayerId,
-        (from, mode, keep): (MasterId, i16, bool),
+        (from, mode, keep): (MasterId, UpgradeMode, bool),
         Masters { old, new, dead }: Masters<'_>,
     ) -> Result<(), GenieError> {
         use crate::orders::Place;
@@ -154,7 +155,7 @@ impl World {
             } else if table && let Some(d) = dead.filter(|d| d.id == u.life.master_id) {
                 let d = d.clone();
                 self.players.live_mut(p, i)?.own_master = Some(Box::new(d));
-            } else if mode == 3
+            } else if mode.own_masters()
                 && let Some(own) = u.own_master.as_deref().filter(|m| m.id == from)
                 && upgradable(own.kind, u.life.state)
             {

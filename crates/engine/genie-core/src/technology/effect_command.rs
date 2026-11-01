@@ -8,6 +8,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::players::attribute::AttributeId;
+use crate::technology::UpgradeMode;
 use crate::technology::effect::Change;
 use crate::technology::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode, TechId};
 
@@ -214,8 +215,8 @@ pub enum EffectCommand {
         from: Option<MasterId>,
         /// The second.
         to: Option<MasterId>,
-        /// The third: the upgrade's mode (2 the effect's object alone).
-        mode: i16,
+        /// The third: the upgrade's mode.
+        mode: UpgradeMode,
     },
     /// Kind 7 of a block: `count` objects of `master` spawned at the player's buildings of `at`.
     Spawn {
@@ -373,7 +374,7 @@ impl EffectCommand {
                 party,
                 from: MasterId::of_data(a),
                 to: MasterId::of_data(b),
-                mode: c,
+                mode: UpgradeMode::of_data(c),
             },
             kind::SPAWN => Self::Spawn {
                 party,
@@ -409,6 +410,7 @@ mod tests {
     use crate::technology::ChangeMode;
     use crate::technology::DisabledTech;
     use crate::technology::TechId;
+    use crate::technology::UpgradeMode;
     use crate::technology::effect::Change;
     use crate::technology::{
         CostEdit, CostUnits, EffectCommand, ObjectsKind, Party, ResourceChange,
@@ -528,7 +530,7 @@ mod tests {
                 party: Party::Neutrals,
                 from: Some(master_id(4)),
                 to: Some(master_id(24)),
-                mode: 2,
+                mode: UpgradeMode::ONE_OBJECT,
             }
         );
         assert_eq!(

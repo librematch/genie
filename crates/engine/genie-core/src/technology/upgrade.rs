@@ -720,6 +720,7 @@ mod tests {
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
+    use crate::technology::UpgradeMode;
     use crate::test_ids::carrying;
     use crate::test_ids::class_id;
     use crate::test_ids::master_id;
@@ -1035,8 +1036,14 @@ mod tests {
             .map(|id| (SpriteId::named(id), graphic(id)))
             .into_iter()
             .collect();
-        t.upgrade_objects(PlayerId::new(0), master_id(70), master_id(464), -1, None)
-            .unwrap();
+        t.upgrade_objects(
+            PlayerId::new(0),
+            master_id(70),
+            master_id(464),
+            UpgradeMode::KEEP,
+            None,
+        )
+        .unwrap();
         let [house, dead, rubble] = t.players[0].objects.as_slice() else {
             panic!("three objects");
         };
@@ -1116,8 +1123,14 @@ mod tests {
         );
         t.masters = vec![Masters::new([old, new])];
         t.players[0].attributes[37] = Amount::new(1.0);
-        t.upgrade_objects(PlayerId::new(0), master_id(83), master_id(6), 0, None)
-            .unwrap();
+        t.upgrade_objects(
+            PlayerId::new(0),
+            master_id(83),
+            master_id(6),
+            UpgradeMode::WALK,
+            None,
+        )
+        .unwrap();
         let v = &t.players[0].objects[ListIndex::new(0)];
         assert_eq!(
             (v.life.master_id, v.life.hp, v.firepower),
@@ -1347,7 +1360,7 @@ mod tests {
             PlayerId::new(0),
             master_id(4),
             master_id(5),
-            2,
+            UpgradeMode::ONE_OBJECT,
             Some(object_id(10)),
         )
         .unwrap();
@@ -1365,8 +1378,14 @@ mod tests {
             Some(MasterHitPoints::of_data(40))
         );
         let mut t = upgrade_world();
-        t.upgrade_objects(PlayerId::new(0), master_id(4), master_id(5), 3, None)
-            .unwrap();
+        t.upgrade_objects(
+            PlayerId::new(0),
+            master_id(4),
+            master_id(5),
+            UpgradeMode::OWN_MASTERS,
+            None,
+        )
+        .unwrap();
         assert_eq!(hp(&t), [30.0, 30.0, 30.0]);
         let own = t.players[0].objects[ListIndex::new(1)]
             .own_master
@@ -1382,8 +1401,14 @@ mod tests {
         );
         for (p, to) in [(0, 99), (3, 5)] {
             let mut t = upgrade_world();
-            t.upgrade_objects(PlayerId::from(p), master_id(4), master_id(to), 0, None)
-                .unwrap();
+            t.upgrade_objects(
+                PlayerId::from(p),
+                master_id(4),
+                master_id(to),
+                UpgradeMode::WALK,
+                None,
+            )
+            .unwrap();
             assert_eq!(t, upgrade_world());
         }
     }
@@ -1393,8 +1418,14 @@ mod tests {
     #[test]
     fn an_upgrade_to_0x67f_moves_the_tracker_s_list() {
         let mut t = upgrade_world();
-        t.upgrade_objects(PlayerId::new(0), master_id(4), master_id(0x67f), 0, None)
-            .unwrap();
+        t.upgrade_objects(
+            PlayerId::new(0),
+            master_id(4),
+            master_id(0x67f),
+            UpgradeMode::WALK,
+            None,
+        )
+        .unwrap();
         let tracker = &t.players[0].tracker;
         assert_eq!(
             (
@@ -1404,8 +1435,14 @@ mod tests {
             (&[Some(object_id(10))][..], &[][..])
         );
         let mut t = upgrade_world();
-        t.upgrade_objects(PlayerId::new(0), master_id(4), master_id(5), 0, None)
-            .unwrap();
+        t.upgrade_objects(
+            PlayerId::new(0),
+            master_id(4),
+            master_id(5),
+            UpgradeMode::WALK,
+            None,
+        )
+        .unwrap();
         assert_eq!(
             t.players[0].tracker.list(ListKey::master(master_id(4))),
             [Some(object_id(10))]

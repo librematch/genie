@@ -28,6 +28,7 @@ mod tech_id;
 mod tech_mode;
 mod tech_type;
 pub mod upgrade;
+mod upgrade_mode;
 
 pub use self::command_args::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode};
 pub use self::cost_override::{CostOverride, OverrideUse};
@@ -41,6 +42,7 @@ pub use self::research_state::ResearchState;
 pub use self::tech_id::TechId;
 pub use self::tech_mode::TechMode;
 pub use self::tech_type::TechType;
+pub use self::upgrade_mode::UpgradeMode;
 
 /// The age technologies (`FUN_1413cc3c0`: 101 to 103), whose costs the research cost modifier
 /// leaves alone.

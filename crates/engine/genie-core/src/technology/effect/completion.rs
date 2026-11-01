@@ -120,7 +120,7 @@ impl World {
                 party: Party::Own,
                 mode,
                 ..
-            } => mode == 2,
+            } => mode.one_object(),
             EffectCommand::TechDisable { tech } => shared(tech),
             EffectCommand::Objects(kind) => {
                 matches!(kind, ObjectsKind::Object(_) | ObjectsKind::ObjectMaster)
