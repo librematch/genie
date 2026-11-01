@@ -52,7 +52,9 @@ fn a_plan_from_off_the_map_reads_no_start_cell() {
         full: true,
     };
     let mut out = Path::default();
-    let found = p.plan::<()>(&req, false, &mut out, None).unwrap();
+    let found = p
+        .plan::<crate::GenieError>(&req, false, &mut out, None)
+        .unwrap();
     assert_eq!(found, Found::OffMap);
 }
 
@@ -70,17 +72,20 @@ fn the_last_open_point_walks_the_path_back_to_a_tile_with_an_edge() {
     );
     // a goal on the water: the path's end
     assert_eq!(
-        p.last_open_point(Point::new(2.5, 4.5), Point::new(7.5, 4.5)),
+        p.last_open_point(Point::new(2.5, 4.5), Point::new(7.5, 4.5))
+            .unwrap(),
         Some(Point::new(7.5, 4.5))
     );
     // ashore: the path ends at the node nearest the goal, the last water tile
     assert_eq!(
-        p.last_open_point(Point::new(2.5, 4.5), Point::new(13.5, 4.5)),
+        p.last_open_point(Point::new(2.5, 4.5), Point::new(13.5, 4.5))
+            .unwrap(),
         Some(Point::new(9.5, 4.5))
     );
     // a goal off the map (result 0): none
     assert_eq!(
-        p.last_open_point(Point::new(2.5, 4.5), Point::new(16.5, 4.5)),
+        p.last_open_point(Point::new(2.5, 4.5), Point::new(16.5, 4.5))
+            .unwrap(),
         None
     );
 }
@@ -153,12 +158,12 @@ fn the_tile_search_reaches_a_goal_on_an_open_map() {
         full: true,
     };
     let mut out = Path::default();
-    assert_eq!(p.search_on_tiles(&req, &mut out), Found::Goal);
+    assert_eq!(p.search_on_tiles(&req, &mut out).unwrap(), Found::Goal);
     assert_eq!(out.points.first(), Some(&BVector::new(1.5, 0.0, 2.5)));
     assert_eq!(out.points.last(), Some(&BVector::new(6.5, 0.0, 5.5)));
     // the search leaves its marks behind: the same search again finds the same path
     let mut again = Path::default();
-    assert_eq!(p.search_on_tiles(&req, &mut again), Found::Goal);
+    assert_eq!(p.search_on_tiles(&req, &mut again).unwrap(), Found::Goal);
     assert_eq!(again.points, out.points);
 }
 
@@ -182,7 +187,7 @@ fn the_tile_search_ends_nearest_the_goal_behind_a_wall() {
         full: true,
     };
     let mut out = Path::default();
-    assert_eq!(p.search_on_tiles(&req, &mut out), Found::Nearest);
+    assert_eq!(p.search_on_tiles(&req, &mut out).unwrap(), Found::Nearest);
     assert_eq!(out.points.first(), Some(&BVector::new(1.5, 0.0, 2.5)));
     assert_eq!(out.points.last(), Some(&BVector::new(2.5, 0.0, 2.5)));
 }
@@ -208,7 +213,11 @@ fn a_full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
             full: true,
         };
         let mut out = Path::default();
-        assert_eq!(p.plan::<()>(&req, false, &mut out, None), Ok(Found::Goal));
+        assert_eq!(
+            p.plan::<crate::GenieError>(&req, false, &mut out, None)
+                .unwrap(),
+            Found::Goal
+        );
         assert_eq!(out.points.first(), Some(&BVector::new(1.5, 0.0, 2.5)));
         assert_eq!(out.points.last(), Some(&BVector::new(to.x(), 0.0, to.y())));
     }
@@ -484,7 +493,7 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
     for id in ids {
         open.push(id, &nodes);
     }
-    let order: Vec<NodeIndex> = std::iter::from_fn(|| open.pop(&nodes)).collect();
+    let order: Vec<NodeIndex> = std::iter::from_fn(|| open.pop(&nodes).unwrap()).collect();
     assert_eq!(order, [1, 2, 0, 4, 3].map(|i| ids[i]));
     assert!(open.is_empty());
 }

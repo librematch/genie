@@ -4,16 +4,36 @@
 //!
 //! `pred(a, b)` is the sort's comparator: true when `a` goes before `b`.
 
+use crate::GenieError;
+use crate::world::slots::CheckedIndex;
+
 /// `std::sort` (`_Sort_unchecked`, the tile pathfinder's at `0x140f9c510`): quicksort by the
 /// median guess while the range holds more than 32 elements and divisions are left, a heap sort
 /// when they run out, an insertion sort for the rest.
-pub fn sort<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) {
+///
+/// # Errors
+///
+/// A position outside `v`, which the algorithm's bounds never reach (an unreachable error
+/// that names it), whatever `pred` answers.
+pub fn sort<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), GenieError> {
     let ideal = v.len() as isize;
-    sort_unchecked(v, 0, v.len(), ideal, pred);
+    sort_unchecked(v, 0, v.len(), ideal, pred)
 }
 
 /// `_ISORT_MAX`.
 const INSERTION_MAX: usize = 32;
+
+/// The element at `i` of `v`.
+fn at<T: Copy>(v: &[T], i: usize) -> Result<T, GenieError> {
+    v.checked(i).copied()
+}
+
+/// `std::iter_swap` of the elements at `a` and `b` of `v`.
+fn swap<T>(v: &mut [T], a: usize, b: usize) -> Result<(), GenieError> {
+    let _ = (v.checked(a)?, v.checked(b)?);
+    v.swap(a, b);
+    Ok(())
+}
 
 fn sort_unchecked<T: Copy>(
     v: &mut [T],
@@ -21,61 +41,73 @@ fn sort_unchecked<T: Copy>(
     mut last: usize,
     mut ideal: isize,
     pred: &impl Fn(T, T) -> bool,
-) {
+) -> Result<(), GenieError> {
     loop {
         if last - first <= INSERTION_MAX {
-            insertion_sort(v, first, last, pred);
-            return;
+            return insertion_sort(v, first, last, pred);
         }
         if ideal <= 0 {
-            make_heap(&mut v[first..last], pred);
-            sort_heap(&mut v[first..last], pred);
-            return;
+            let range = v.head_mut(last)?.tail_mut(first)?;
+            make_heap(range, pred)?;
+            return sort_heap(range, pred);
         }
-        let (mid_first, mid_last) = partition_by_median_guess(v, first, last, pred);
+        let (mid_first, mid_last) = partition_by_median_guess(v, first, last, pred)?;
         ideal = (ideal >> 1) + (ideal >> 2);
         if mid_first - first < last - mid_last {
-            sort_unchecked(v, first, mid_first, ideal, pred);
+            sort_unchecked(v, first, mid_first, ideal, pred)?;
             first = mid_last;
         } else {
-            sort_unchecked(v, mid_last, last, ideal, pred);
+            sort_unchecked(v, mid_last, last, ideal, pred)?;
             last = mid_first;
         }
     }
 }
 
 /// `_Insertion_sort_unchecked`: equal elements keep their order.
-fn insertion_sort<T: Copy>(v: &mut [T], first: usize, last: usize, pred: &impl Fn(T, T) -> bool) {
+fn insertion_sort<T: Copy>(
+    v: &mut [T],
+    first: usize,
+    last: usize,
+    pred: &impl Fn(T, T) -> bool,
+) -> Result<(), GenieError> {
     if first == last {
-        return;
+        return Ok(());
     }
     for mid in first + 1..last {
-        let val = v[mid];
-        if pred(val, v[first]) {
-            v.copy_within(first..mid, first + 1);
-            v[first] = val;
+        let val = at(v, mid)?;
+        if pred(val, at(v, first)?) {
+            v.head_mut(mid + 1)?.copy_within(first..mid, first + 1);
+            *v.checked_mut(first)? = val;
         } else {
             let mut hole = mid;
-            while pred(val, v[hole - 1]) {
-                v[hole] = v[hole - 1];
+            while pred(val, at(v, hole - 1)?) {
+                *v.checked_mut(hole)? = at(v, hole - 1)?;
                 hole -= 1;
             }
-            v[hole] = val;
+            *v.checked_mut(hole)? = val;
         }
     }
+    Ok(())
 }
 
 /// `_Med3_unchecked`: the median of three to the middle.
-fn med3<T: Copy>(v: &mut [T], first: usize, mid: usize, last: usize, pred: &impl Fn(T, T) -> bool) {
-    if pred(v[mid], v[first]) {
-        v.swap(mid, first);
+fn med3<T: Copy>(
+    v: &mut [T],
+    first: usize,
+    mid: usize,
+    last: usize,
+    pred: &impl Fn(T, T) -> bool,
+) -> Result<(), GenieError> {
+    if pred(at(v, mid)?, at(v, first)?) {
+        swap(v, mid, first)?;
     }
-    if pred(v[last], v[mid]) {
-        v.swap(last, mid);
-        if pred(v[mid], v[first]) {
-            v.swap(mid, first);
+    if pred(at(v, last)?, at(v, mid)?) {
+        swap(v, last, mid)?;
+        if pred(at(v, mid)?, at(v, first)?) {
+            swap(v, mid, first)?;
         }
     }
+    Ok(())
 }
 
 /// `_Guess_median_unchecked` (`0x140f9c040`): Tukey's ninther above 40 elements; `last` is the
@@ -86,18 +118,23 @@ fn guess_median<T: Copy>(
     mid: usize,
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) {
+) -> Result<(), GenieError> {
     let count = last - first;
     if 40 < count {
         let step = (count + 1) >> 3;
         let two_step = step << 1;
-        med3(v, first, first + step, first + two_step, pred);
-        med3(v, mid - step, mid, mid + step, pred);
-        med3(v, last - two_step, last - step, last, pred);
-        med3(v, first + step, mid, last - step, pred);
+        med3(v, first, first + step, first + two_step, pred)?;
+        med3(v, mid - step, mid, mid + step, pred)?;
+        med3(v, last - two_step, last - step, last, pred)?;
+        med3(v, first + step, mid, last - step, pred)
     } else {
-        med3(v, first, mid, last, pred);
+        med3(v, first, mid, last, pred)
     }
+}
+
+/// Whether neither of `a` and `b` goes before the other.
+fn equal<T: Copy>(a: T, b: T, pred: &impl Fn(T, T) -> bool) -> bool {
+    !pred(a, b) && !pred(b, a)
 }
 
 /// `_Partition_by_median_guess_unchecked` (`0x140f9c210`): the range of elements equal to the
@@ -107,69 +144,110 @@ fn partition_by_median_guess<T: Copy>(
     first: usize,
     last: usize,
     pred: &impl Fn(T, T) -> bool,
-) -> (usize, usize) {
+) -> Result<(usize, usize), GenieError> {
     let mid = first + ((last - first) >> 1);
-    guess_median(v, first, mid, last - 1, pred);
-    let mut pfirst = mid;
-    let mut plast = pfirst + 1;
-    while first < pfirst && !pred(v[pfirst - 1], v[pfirst]) && !pred(v[pfirst], v[pfirst - 1]) {
-        pfirst -= 1;
-    }
-    while plast < last && !pred(v[plast], v[pfirst]) && !pred(v[pfirst], v[plast]) {
-        plast += 1;
-    }
+    guess_median(v, first, mid, last - 1, pred)?;
+    let (mut pfirst, mut plast) = pivot_run(v, first, last, mid, pred)?;
     let mut gfirst = plast;
     let mut glast = pfirst;
     loop {
-        while gfirst < last {
-            if pred(v[pfirst], v[gfirst]) {
-            } else if pred(v[gfirst], v[pfirst]) {
-                break;
-            } else {
-                if plast != gfirst {
-                    v.swap(plast, gfirst);
-                }
-                plast += 1;
-            }
-            gfirst += 1;
-        }
-        while first < glast {
-            if pred(v[glast - 1], v[pfirst]) {
-            } else if pred(v[pfirst], v[glast - 1]) {
-                break;
-            } else {
-                pfirst -= 1;
-                if pfirst != glast - 1 {
-                    v.swap(pfirst, glast - 1);
-                }
-            }
-            glast -= 1;
-        }
+        (plast, gfirst) = scan_up(v, (pfirst, plast, gfirst), last, pred)?;
+        (pfirst, glast) = scan_down(v, (pfirst, glast), first, pred)?;
         if glast == first && gfirst == last {
-            return (pfirst, plast);
+            return Ok((pfirst, plast));
         }
         if glast == first {
             if plast != gfirst {
-                v.swap(pfirst, plast);
+                swap(v, pfirst, plast)?;
             }
             plast += 1;
-            v.swap(pfirst, gfirst);
+            swap(v, pfirst, gfirst)?;
             pfirst += 1;
             gfirst += 1;
         } else if gfirst == last {
             glast -= 1;
             pfirst -= 1;
             if glast != pfirst {
-                v.swap(glast, pfirst);
+                swap(v, glast, pfirst)?;
             }
             plast -= 1;
-            v.swap(pfirst, plast);
+            swap(v, pfirst, plast)?;
         } else {
             glast -= 1;
-            v.swap(gfirst, glast);
+            swap(v, gfirst, glast)?;
             gfirst += 1;
         }
     }
+}
+
+/// [`partition_by_median_guess`]'s pivot run: from `mid` the elements equal to it before and
+/// after it, as a range.
+fn pivot_run<T: Copy>(
+    v: &[T],
+    first: usize,
+    last: usize,
+    mid: usize,
+    pred: &impl Fn(T, T) -> bool,
+) -> Result<(usize, usize), GenieError> {
+    let mut pfirst = mid;
+    let mut plast = pfirst + 1;
+    while first < pfirst && equal(at(v, pfirst - 1)?, at(v, pfirst)?, pred) {
+        pfirst -= 1;
+    }
+    while plast < last && equal(at(v, plast)?, at(v, pfirst)?, pred) {
+        plast += 1;
+    }
+    Ok((pfirst, plast))
+}
+
+/// [`partition_by_median_guess`]'s scan up from `gfirst`: past the elements after the pivot
+/// (at `pfirst`), an equal one joining the run's end `plast`; it stops at one before the pivot
+/// or at `last`. The run's end and where the scan stopped.
+fn scan_up<T: Copy>(
+    v: &mut [T],
+    (pfirst, mut plast, mut gfirst): (usize, usize, usize),
+    last: usize,
+    pred: &impl Fn(T, T) -> bool,
+) -> Result<(usize, usize), GenieError> {
+    while gfirst < last {
+        let (pivot, g) = (at(v, pfirst)?, at(v, gfirst)?);
+        if pred(pivot, g) {
+        } else if pred(g, pivot) {
+            break;
+        } else {
+            if plast != gfirst {
+                swap(v, plast, gfirst)?;
+            }
+            plast += 1;
+        }
+        gfirst += 1;
+    }
+    Ok((plast, gfirst))
+}
+
+/// [`partition_by_median_guess`]'s scan down from `glast`: past the elements before the pivot
+/// (at `pfirst`), an equal one joining the run's start; it stops at one after the pivot or at
+/// `first`. The run's start and where the scan stopped.
+fn scan_down<T: Copy>(
+    v: &mut [T],
+    (mut pfirst, mut glast): (usize, usize),
+    first: usize,
+    pred: &impl Fn(T, T) -> bool,
+) -> Result<(usize, usize), GenieError> {
+    while first < glast {
+        let (g, pivot) = (at(v, glast - 1)?, at(v, pfirst)?);
+        if pred(g, pivot) {
+        } else if pred(pivot, g) {
+            break;
+        } else {
+            pfirst -= 1;
+            if pfirst != glast - 1 {
+                swap(v, pfirst, glast - 1)?;
+            }
+        }
+        glast -= 1;
+    }
+    Ok((pfirst, glast))
 }
 
 /// `_Push_heap_by_index`.
@@ -179,16 +257,18 @@ fn push_heap_by_index<T: Copy>(
     top: usize,
     val: T,
     pred: &impl Fn(T, T) -> bool,
-) {
+) -> Result<(), GenieError> {
     while top < hole {
         let idx = (hole - 1) >> 1;
-        if !pred(v[idx], val) {
+        let parent = at(v, idx)?;
+        if !pred(parent, val) {
             break;
         }
-        v[hole] = v[idx];
+        *v.checked_mut(hole)? = parent;
         hole = idx;
     }
-    v[hole] = val;
+    *v.checked_mut(hole)? = val;
+    Ok(())
 }
 
 /// `_Pop_heap_hole_by_index`: the hole moves down to the larger child, then `val` goes up.
@@ -198,45 +278,47 @@ fn pop_heap_hole_by_index<T: Copy>(
     bottom: usize,
     val: T,
     pred: &impl Fn(T, T) -> bool,
-) {
+) -> Result<(), GenieError> {
     let top = hole;
     let mut idx = hole;
     let max_non_leaf = (bottom.wrapping_sub(1)) >> 1;
     while idx < max_non_leaf {
         idx = 2 * idx + 2;
-        if pred(v[idx], v[idx - 1]) {
+        if pred(at(v, idx)?, at(v, idx - 1)?) {
             idx -= 1;
         }
-        v[hole] = v[idx];
+        *v.checked_mut(hole)? = at(v, idx)?;
         hole = idx;
     }
     if idx == max_non_leaf && bottom.is_multiple_of(2) {
-        v[hole] = v[bottom - 1];
+        *v.checked_mut(hole)? = at(v, bottom - 1)?;
         hole = bottom - 1;
     }
-    push_heap_by_index(v, hole, top, val, pred);
+    push_heap_by_index(v, hole, top, val, pred)
 }
 
 /// `_Make_heap_unchecked`.
-fn make_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) {
+fn make_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), GenieError> {
     let bottom = v.len();
     let mut hole = bottom >> 1;
     while 0 < hole {
         hole -= 1;
-        let val = v[hole];
-        pop_heap_hole_by_index(v, hole, bottom, val, pred);
+        let val = at(v, hole)?;
+        pop_heap_hole_by_index(v, hole, bottom, val, pred)?;
     }
+    Ok(())
 }
 
 /// `_Sort_heap_unchecked`.
-fn sort_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) {
+fn sort_heap<T: Copy>(v: &mut [T], pred: &impl Fn(T, T) -> bool) -> Result<(), GenieError> {
     let mut last = v.len();
     while 2 <= last {
         last -= 1;
-        let val = v[last];
-        v[last] = v[0];
-        pop_heap_hole_by_index(v, 0, last, val, pred);
+        let val = at(v, last)?;
+        *v.checked_mut(last)? = at(v, 0)?;
+        pop_heap_hole_by_index(v, 0, last, val, pred)?;
     }
+    Ok(())
 }
 
 /// The buckets of a new `std::unordered_map` (`_Min_buckets`).
@@ -321,7 +403,7 @@ mod tests {
 
     /// Pairs sorted by their key, descending, as the pathfinder sorts its open nodes.
     fn by_key(v: &mut [(u32, usize)]) {
-        sort(v, &|a: (u32, usize), b: (u32, usize)| a.0 > b.0);
+        sort(v, &|a: (u32, usize), b: (u32, usize)| a.0 > b.0).unwrap();
     }
 
     #[test]
@@ -373,7 +455,8 @@ mod tests {
         let n = v.len();
         sort_unchecked(&mut v, 0, n, 0, &|a: (u32, usize), b: (u32, usize)| {
             a.0 > b.0
-        });
+        })
+        .unwrap();
         assert!(v.windows(2).all(|w| w[0].0 >= w[1].0));
     }
 
@@ -438,7 +521,8 @@ mod tests {
             let mut v = lcg_keys(n, m, seed);
             sort_unchecked(&mut v, 0, n, ideal, &|a: (f32, usize), b: (f32, usize)| {
                 a.0 > b.0
-            });
+            })
+            .unwrap();
             let ours: Vec<usize> = v.iter().map(|e| e.1).collect();
             assert_eq!(
                 ours, game,
@@ -495,7 +579,8 @@ mod tests {
             let mut v = lcg_keys(n, m, seed);
             sort_unchecked(&mut v, 0, n, ideal, &|a: (f32, usize), b: (f32, usize)| {
                 a.0 < b.0
-            });
+            })
+            .unwrap();
             let ours: Vec<usize> = v.iter().map(|e| e.1).collect();
             assert_eq!(
                 ours, game,

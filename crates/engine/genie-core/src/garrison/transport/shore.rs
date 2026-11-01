@@ -274,8 +274,13 @@ impl Shore for MapShore<'_> {
         self.terrain.flags_at(tile)
     }
 
-    fn shore_point(&mut self, from: Point, to: Point) -> Option<Point> {
-        let planner = self.pathing.planner(self.restriction?, self.tiles)?;
+    fn shore_point(&mut self, from: Point, to: Point) -> Result<Option<Point>, GenieError> {
+        let Some(planner) = self
+            .restriction
+            .and_then(|r| self.pathing.planner(r, self.tiles))
+        else {
+            return Ok(None);
+        };
         planner.last_open_point(from, to)
     }
 }

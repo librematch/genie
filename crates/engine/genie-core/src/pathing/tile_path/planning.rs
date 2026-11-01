@@ -1,6 +1,7 @@
 //! The planner's entry (`FUN_140f7c530`): the search over the levels, the shortcut near the
 //! start and the search on the tiles.
 
+use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath;
@@ -14,14 +15,22 @@ impl Planner {
     /// `FUN_140f77f20`: the search over the levels: from the coarsest node cell that holds the
     /// start, toward the node cells within the goal's ranges; the path enters each node cell at
     /// the tile nearest the line toward the next crossing.
-    pub fn search_over_levels(&mut self, req: &Request, out: &mut Path) -> Found {
+    ///
+    /// # Errors
+    ///
+    /// What the open list's sort fails on.
+    pub fn search_over_levels(
+        &mut self,
+        req: &Request,
+        out: &mut Path,
+    ) -> Result<Found, GenieError> {
         for &r in &req.closed {
             self.close_rect(r, true);
         }
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
         if !self.on_map(start) || !self.on_map(goal) {
-            return Found::OffMap;
+            return Ok(Found::OffMap);
         }
         self.open.clear();
         self.mark_goal(req.goal(), true);
@@ -30,7 +39,7 @@ impl Planner {
         for level in GridLevel::ALL.into_iter().rev() {
             let cell = start.at_level(level);
             if level == GridLevel::TILES || self.cell(level, cell).kind.contains(CellKind::NODE) {
-                found = match self.search_levels(level, cell, start, req.full) {
+                found = match self.search_levels(level, cell, start, req.full)? {
                     None => (self.best, Found::Nearest),
                     Some(n) if self.goal_marked => (Some(n), Found::Goal),
                     Some(n) => (Some(n), Found::Nearest),
@@ -73,7 +82,7 @@ impl Planner {
         for &r in &req.closed {
             self.close_rect(r, false);
         }
-        result
+        Ok(result)
     }
 
     /// `FUN_140f7d160`: the tile or one of its four neighbours (right, below, left, above) has an
@@ -94,7 +103,7 @@ impl Planner {
     /// obstruction manager's segment test for the unit, None without a unit); the shorter, or
     /// the one with the better result, appended to `out`. `target_box` is the target's flag the
     /// game reads at `+0x658` (a goal tile without edges then counts if a neighbour has some).
-    pub fn plan<E>(
+    pub fn plan<E: From<GenieError>>(
         &mut self,
         req: &Request,
         target_box: bool,
@@ -107,7 +116,7 @@ impl Planner {
         }
         let mut levels = Path::default();
         let mut tiles = Path::default();
-        let first = self.search_over_levels(req, &mut levels);
+        let first = self.search_over_levels(req, &mut levels)?;
         let mut second = None;
         let goal = PlanTile::of_point(req.to);
         // the start's cell is read only once the search over the levels reached the goal
@@ -125,10 +134,10 @@ impl Planner {
                 levels.length < TILE_SEARCH_LENGTH
             }
         {
-            second = Some(self.search_on_tiles(req, &mut tiles));
+            second = Some(self.search_on_tiles(req, &mut tiles)?);
         }
         if req.full && second != Some(Found::Goal) && !levels.points.is_empty() {
-            self.shorter_start(req, &mut levels);
+            self.shorter_start(req, &mut levels)?;
         }
         if let Some(walls) = walls {
             let smoothed = |r: Found| !matches!(r, Found::OffMap | Found::Nothing);
@@ -157,7 +166,11 @@ impl Planner {
     /// planner's pool lends, `+0x238` and `+0x278`); when it found one (a result other than 0),
     /// the last of its points whose tile has an edge (byte 0 of its level-0 cell, the tile of the
     /// point's `(short)(int)` coordinates), searched from the end; None without one.
-    pub fn last_open_point(&mut self, from: Point, to: Point) -> Option<Point> {
+    ///
+    /// # Errors
+    ///
+    /// What the planner's searches fail on.
+    pub fn last_open_point(&mut self, from: Point, to: Point) -> Result<Option<Point>, GenieError> {
         let req = Request {
             from,
             to,
@@ -167,13 +180,12 @@ impl Planner {
             full: false,
         };
         let mut path = Path::default();
-        let found = self
-            .plan::<std::convert::Infallible>(&req, false, &mut path, None)
-            .unwrap_or_else(|never| match never {});
+        let found = self.plan::<GenieError>(&req, false, &mut path, None)?;
         if found == Found::OffMap {
-            return None;
+            return Ok(None);
         }
-        path.points
+        Ok(path
+            .points
             .iter()
             .rev()
             .find(|p| {
@@ -182,24 +194,32 @@ impl Planner {
                     .edges
                     .is_empty()
             })
-            .map(|p| p.ground())
+            .map(|p| p.ground()))
     }
 
     /// `FUN_140f7c530`'s shortcut: the last point of the path within 10 tiles of its start (past
     /// the second, short of the end) is searched for on the tiles; when that reaches it, the path
     /// becomes that search's path and the rest after the point.
-    pub(super) fn shorter_start(&mut self, req: &Request, levels: &mut Path) {
+    ///
+    /// # Errors
+    ///
+    /// What the search on the tiles fails on.
+    pub(super) fn shorter_start(
+        &mut self,
+        req: &Request,
+        levels: &mut Path,
+    ) -> Result<(), GenieError> {
         let n = levels.points.len();
         let Some(&p0) = levels.points.first() else {
-            return;
+            return Ok(());
         };
         let mut i = 1;
         if n <= 1 {
-            return;
+            return Ok(());
         }
         loop {
             let Some(&pi) = levels.points.get(i) else {
-                return;
+                return Ok(());
             };
             let d = (p0.height() - pi.height()) * (p0.height() - pi.height())
                 + (p0.x() - pi.x()) * (p0.x() - pi.x())
@@ -214,17 +234,17 @@ impl Planner {
             }
         }
         if i <= 1 || i == n {
-            return;
+            return Ok(());
         }
         let Some(&pt) = levels.points.get(i) else {
-            return;
+            return Ok(());
         };
         let mut shortcut = Path::default();
         let to_point = Request {
             to: pt.ground(),
             ..req.clone()
         };
-        if self.search_on_tiles(&to_point, &mut shortcut) == Found::Goal {
+        if self.search_on_tiles(&to_point, &mut shortcut)? == Found::Goal {
             for &p in levels.points.iter().skip(i + 1) {
                 let _ = shortcut.push(p);
             }
@@ -232,22 +252,27 @@ impl Planner {
             levels.points.clear();
             levels.append(&shortcut);
         }
+        Ok(())
     }
 
     /// `FUN_140f78ba0`: the search on level 0, tile by tile, toward the tiles within the goal's
     /// ranges.
-    pub fn search_on_tiles(&mut self, req: &Request, out: &mut Path) -> Found {
+    ///
+    /// # Errors
+    ///
+    /// What the open list's sort fails on.
+    pub fn search_on_tiles(&mut self, req: &Request, out: &mut Path) -> Result<Found, GenieError> {
         for &r in &req.closed {
             self.close_rect(r, true);
         }
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
         if !self.on_map(start) || !self.on_map(goal) {
-            return Found::OffMap;
+            return Ok(Found::OffMap);
         }
         self.mark_goal_tiles(req.goal(), true);
         self.best = None;
-        let found = match self.search_tiles(start) {
+        let found = match self.search_tiles(start)? {
             None => (self.best, Found::Nearest),
             Some(n) => (Some(n), Found::Goal),
         };
@@ -280,6 +305,6 @@ impl Planner {
         for &r in &req.closed {
             self.close_rect(r, false);
         }
-        result
+        Ok(result)
     }
 }

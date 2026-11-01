@@ -144,7 +144,11 @@ pub trait Shore {
     /// `FUN_140f7c390` with the planner of the unit's restriction (`FUN_140f7cb30`, none without
     /// a master): the last point of the planner's path from `from` to `to` whose tile has an edge
     /// ([`crate::pathing::tile_path::Planner::last_open_point`]); None without a planner or such a point.
-    fn shore_point(&mut self, from: Point, to: Point) -> Option<Point>;
+    ///
+    /// # Errors
+    ///
+    /// What the planner's searches fail on.
+    fn shore_point(&mut self, from: Point, to: Point) -> Result<Option<Point>, GenieError>;
 }
 
 /// What a state change leaves to its caller.

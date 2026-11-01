@@ -11,8 +11,9 @@
 #[allow(missing_copy_implementations)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Well512 {
+    /// The 16 words of the ring, turned so that the word at the game's index (`+0x64`) comes
+    /// first: the step's taps sit at fixed places, and a step turns the ring by one.
     state: [u32; 16],
-    index: u32,
     /// Draws since construction; `set_seed` leaves it alone.
     pub draws: u32,
     /// The last `rand15` value; the constructor sets it to `u32::MAX`.
@@ -29,7 +30,6 @@ impl Default for Well512 {
     fn default() -> Self {
         Self {
             state: [0; 16],
-            index: 0,
             draws: 0,
             last: u32::MAX,
             stream: NO_STREAM,
@@ -50,7 +50,6 @@ impl Well512 {
             hash = jenkins(hash);
             *word = shift ^ hash;
         }
-        self.index = 0;
     }
 
     /// One step. The engine's variant of `WELL512a`: taps at index − 3 and index − 7, the mask
@@ -59,21 +58,23 @@ impl Well512 {
     #[track_caller]
     pub fn raw(&mut self) -> u32 {
         self.draws = self.draws.wrapping_add(1);
-        let i = self.index as usize;
+        // the ring from the index on: index − 3 is its 14th word, index − 7 its 10th, and
+        // index − 1, the next index, its last
         let s = &mut self.state;
-        let v0 = s[i];
-        let t = s[(i.wrapping_sub(3)) & 15];
+        let v0 = s[0];
+        let t = s[13];
         let z1 = (((v0 << 1) ^ t) << 15) ^ t ^ v0;
-        let c = s[(i.wrapping_sub(7)) & 15];
+        let c = s[9];
         let z2 = c ^ (c >> 11);
         let new1 = z1 ^ z2;
-        s[i] = new1;
-        let j = (i.wrapping_sub(1)) & 15;
-        self.index = j as u32;
-        let z0 = s[j];
-        s[j] = z0 ^ ((((z2 << 10) ^ z1) << 16 ^ z0) << 2) ^ ((new1 & 0xfed2_2169) << 5) ^ new1 ^ z1;
-        crate::trace::draw(self.stream, self.draws, s[j]);
-        s[j]
+        s[0] = new1;
+        let z0 = s[15];
+        s[15] =
+            z0 ^ ((((z2 << 10) ^ z1) << 16 ^ z0) << 2) ^ ((new1 & 0xfed2_2169) << 5) ^ new1 ^ z1;
+        // the next index's word comes first
+        s.rotate_right(1);
+        crate::trace::draw(self.stream, self.draws, s[0]);
+        s[0]
     }
 
     /// `rand15`: a step masked to 15 bits, kept as `last`.
@@ -237,7 +238,32 @@ impl Streams {
 
     /// The stream `stream`.
     pub const fn get(&mut self, stream: Stream) -> &mut Well512 {
-        &mut self.rngs[stream as usize]
+        let [
+            action,
+            random_map,
+            sprite,
+            world,
+            ai,
+            object,
+            player,
+            editor,
+            unsynced,
+            comm,
+            ui,
+        ] = &mut self.rngs;
+        match stream {
+            Stream::Action => action,
+            Stream::RandomMap => random_map,
+            Stream::Sprite => sprite,
+            Stream::World => world,
+            Stream::Ai => ai,
+            Stream::Object => object,
+            Stream::Player => player,
+            Stream::Editor => editor,
+            Stream::Unsynced => unsynced,
+            Stream::Comm => comm,
+            Stream::Ui => ui,
+        }
     }
 
     /// Three different streams at once.
@@ -257,15 +283,10 @@ impl Streams {
     ///
     /// When `a` and `b` are the same stream.
     pub fn two(&mut self, a: Stream, b: Stream) -> (&mut Well512, &mut Well512) {
-        let (i, j) = (a as usize, b as usize);
-        assert_ne!(i, j, "two different streams");
-        if i < j {
-            let (lo, hi) = self.rngs.split_at_mut(j);
-            (&mut lo[i], &mut hi[0])
-        } else {
-            let (lo, hi) = self.rngs.split_at_mut(i);
-            (&mut hi[0], &mut lo[j])
-        }
+        self.rngs
+            .get_disjoint_mut([a as usize, b as usize])
+            .expect("two different streams")
+            .into()
     }
 }
 
@@ -275,10 +296,12 @@ mod tests {
 
     #[test]
     fn float01_is_the_game_s_get_rand_float_0_to_1() {
-        // FUN_1408115a0 run in unicorn on this state (words at +0x24, index at +0x64)
+        // FUN_1408115a0 run in unicorn on this state (words at +0x24, index at +0x64 = 5)
+        let mut state: [u32; 16] =
+            std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
+        state.rotate_left(5);
         let mut r = Well512 {
-            state: std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1)),
-            index: 5,
+            state,
             ..Well512::default()
         };
         let game = [
@@ -321,7 +344,6 @@ mod tests {
             &r.state[..4],
             &[0xd80f_fb63, 0x00fd_e7a2, 0x5fd2_5128, 0x2699_7df5]
         );
-        assert_eq!(r.index, 0);
     }
 
     #[test]
@@ -349,6 +371,42 @@ mod tests {
         let got: Vec<u32> = (0..5).map(|_| r.rand15()).collect();
         assert_eq!(got, [7241, 25269, 9993, 9310, 16801]);
         assert_eq!(r.last, 16801);
+    }
+
+    /// The ring turned to its index draws as the game's 16 words with their index (`+0x64`,
+    /// the step as the game runs it), over two and a half turns.
+    #[test]
+    fn the_turned_ring_draws_as_the_game_s_indexed_ring() {
+        let words: [u32; 16] = std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
+        let (mut s, mut i) = (words, 5usize);
+        let game: Vec<u32> = (0..40)
+            .map(|_| {
+                let v0 = s[i];
+                let t = s[i.wrapping_sub(3) & 15];
+                let z1 = (((v0 << 1) ^ t) << 15) ^ t ^ v0;
+                let c = s[i.wrapping_sub(7) & 15];
+                let z2 = c ^ (c >> 11);
+                let new1 = z1 ^ z2;
+                s[i] = new1;
+                let j = i.wrapping_sub(1) & 15;
+                let z0 = s[j];
+                s[j] = z0
+                    ^ ((((z2 << 10) ^ z1) << 16 ^ z0) << 2)
+                    ^ ((new1 & 0xfed2_2169) << 5)
+                    ^ new1
+                    ^ z1;
+                i = j;
+                s[j]
+            })
+            .collect();
+        let mut state = words;
+        state.rotate_left(5);
+        let mut r = Well512 {
+            state,
+            ..Well512::default()
+        };
+        let ours: Vec<u32> = (0..40).map(|_| r.raw()).collect();
+        assert_eq!(ours, game);
     }
 
     #[test]

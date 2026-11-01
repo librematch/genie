@@ -1,6 +1,7 @@
 //! The A* searches over the node cells and over the tiles: the nodes, the open list, the
 //! estimates and the expansions.
 
+use crate::GenieError;
 use crate::map::Distance;
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{
@@ -135,10 +136,18 @@ impl OpenList {
 
     /// `FUN_140f9cd40`: the last node of the lowest bucket; an emptied bucket hands over to the
     /// next one that holds nodes, which is sorted then.
-    pub(super) fn pop(&mut self, nodes: &Nodes) -> Option<NodeIndex> {
-        let m = self.min?;
+    ///
+    /// # Errors
+    ///
+    /// What the sort of the next bucket fails on.
+    pub(super) fn pop(&mut self, nodes: &Nodes) -> Result<Option<NodeIndex>, GenieError> {
+        let Some(m) = self.min else {
+            return Ok(None);
+        };
         let bucket = &mut self.buckets[m as usize];
-        let node = bucket.pop()?;
+        let Some(node) = bucket.pop() else {
+            return Ok(None);
+        };
         if bucket.is_empty() {
             let max = self.max.unwrap_or(m);
             if let Some(i) = (m + 1..=max).find(|&i| !self.buckets[i as usize].is_empty()) {
@@ -146,13 +155,13 @@ impl OpenList {
                 msvc::sort(
                     &mut self.buckets[i as usize],
                     &|a: NodeIndex, b: NodeIndex| nodes[a].f > nodes[b].f,
-                );
+                )?;
             } else {
                 self.min = None;
                 self.max = None;
             }
         }
-        Some(node)
+        Ok(Some(node))
     }
 }
 
@@ -369,16 +378,20 @@ impl Planner {
     /// `FUN_140f78850`: A* over the node cells from the start's cell at `level`; Some node in the
     /// goal, None when the open list runs dry (or a computer player's search stops early, keeping
     /// the node it stopped at as the best).
+    ///
+    /// # Errors
+    ///
+    /// What the open list's sort fails on.
     pub(super) fn search_levels(
         &mut self,
         level: GridLevel,
         cell: PlanTile,
         start: PlanTile,
         full: bool,
-    ) -> Option<NodeIndex> {
+    ) -> Result<Option<NodeIndex>, GenieError> {
         let start_cell = self.cell(level, cell);
         if !start_cell.kind.contains(CellKind::LONE) && start_cell.edges.is_empty() {
-            return None;
+            return Ok(None);
         }
         let h0 = self.start_estimate(start);
         let mut count: u32 = 0;
@@ -393,14 +406,16 @@ impl Planner {
         });
         let cell = self.nodes[n].cell;
         if self.cells[cell].kind.contains(CellKind::GOAL) {
-            return Some(n);
+            return Ok(Some(n));
         }
         // the start's open mark, added without a test
         self.cells[cell].edges = self.cells[cell].edges.plus(CellEdges::OPEN);
         self.open.push(n, &self.nodes);
         self.best_cost = NO_COST;
         while !self.open.is_empty() {
-            let n = self.open.pop(&self.nodes)?;
+            let Some(n) = self.open.pop(&self.nodes)? else {
+                return Ok(None);
+            };
             count += 1;
             let Some(b) = self.close(n) else { continue };
             let node = self.nodes[n];
@@ -411,24 +426,31 @@ impl Planner {
                 && (h0.get() as i32 * 10) as u32 <= count
             {
                 self.best = Some(n);
-                return None;
+                return Ok(None);
             }
             for (edge, dx, dy, back) in STEPS {
                 if b.intersects(edge)
                     && let Some(found) =
                         self.expand(node.level, node.at.stepped(dx, dy), node.g, n, back)
                 {
-                    return Some(found);
+                    return Ok(Some(found));
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     /// `FUN_140f79250`: A* over the tiles from the start's tile.
-    pub(super) fn search_tiles(&mut self, start: PlanTile) -> Option<NodeIndex> {
+    ///
+    /// # Errors
+    ///
+    /// What the open list's sort fails on.
+    pub(super) fn search_tiles(
+        &mut self,
+        start: PlanTile,
+    ) -> Result<Option<NodeIndex>, GenieError> {
         if self.cell(GridLevel::TILES, start).edges.is_empty() {
-            return None;
+            return Ok(None);
         }
         let h0 = self.start_estimate(start);
         let n = self.alloc(TileNode {
@@ -442,7 +464,7 @@ impl Planner {
         });
         let cell = self.nodes[n].cell;
         if self.cells[cell].kind.contains(CellKind::GOAL) {
-            return Some(n);
+            return Ok(Some(n));
         }
         self.open.clear();
         // the start's open mark, added without a test
@@ -450,17 +472,19 @@ impl Planner {
         self.open.push(n, &self.nodes);
         self.best_cost = NO_COST;
         while !self.open.is_empty() {
-            let n = self.open.pop(&self.nodes)?;
+            let Some(n) = self.open.pop(&self.nodes)? else {
+                return Ok(None);
+            };
             let Some(b) = self.close(n) else { continue };
             let node = self.nodes[n];
             for (edge, dx, dy, back) in STEPS {
                 if b.intersects(edge)
                     && let Some(found) = self.expand0(node.at.stepped(dx, dy), node.g, n, back)
                 {
-                    return Some(found);
+                    return Ok(Some(found));
                 }
             }
         }
-        None
+        Ok(None)
     }
 }

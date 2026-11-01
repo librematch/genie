@@ -110,7 +110,7 @@ impl TransportAction {
             TransportState::Idle => changed.stands = true,
             TransportState::SailToUnload | TransportState::Sail => {
                 if let Some(shore_at) =
-                    shore.shore_point(ship.position.ground(), self.point.ground())
+                    shore.shore_point(ship.position.ground(), self.point.ground())?
                 {
                     self.point = self.point.with_x(shore_at.x()).with_y(shore_at.y());
                 }

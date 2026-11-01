@@ -37,6 +37,6 @@ that make sure of it. Every other system uses them.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`map`](../map/).
+- Uses: [`map`](../map/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

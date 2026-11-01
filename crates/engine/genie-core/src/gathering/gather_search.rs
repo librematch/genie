@@ -447,7 +447,7 @@ pub fn closest_resource_at<W>(
         };
         d(a) < d(b)
     };
-    let passes = search_passes(site, map, &|t| passable(world, t), unit_tile, los, &nearer);
+    let passes = search_passes(site, map, &|t| passable(world, t), unit_tile, los, &nearer)?;
     let cap = if max_workers == crate::objects::WorkerCount::NO_CAP {
         crate::objects::WorkerCount::of_data(i32::MAX)
     } else {
@@ -474,7 +474,7 @@ pub fn closest_resource_at<W>(
             }
             if passable(world, tile) {
                 push_neighbours(&mut queue, &mut seen, &at, Cell { tile, steps }, map)?;
-                msvc::sort(queue.tail_mut(i)?, &nearer);
+                msvc::sort(queue.tail_mut(i)?, &nearer)?;
             }
             let on_tile = objects(world, tile)?;
             let Some(o) = first_resource(&on_tile, kind)? else {
@@ -509,6 +509,10 @@ pub fn closest_resource_at<W>(
 /// stand on ([`footprint_seeds`], sorted by `nearer`, within the site's line of sight plus 10 of
 /// its tile), then the unit's tile alone; from another site its tile alone; without one the
 /// unit's tile alone (a single tile's pass within the line of sight `los` plus 5).
+///
+/// # Errors
+///
+/// What the sort of the footprint's tiles fails on.
 fn search_passes(
     site: Option<&SearchSite>,
     map: GridSize,
@@ -516,7 +520,7 @@ fn search_passes(
     unit_tile: Tile,
     los: SightTiles,
     nearer: &impl Fn(Cell, Cell) -> bool,
-) -> Vec<Pass> {
+) -> Result<Vec<Pass>, GenieError> {
     let single = |at: Tile| Pass {
         origin: at,
         max_steps: los.get().wrapping_add(5),
@@ -526,7 +530,7 @@ fn search_passes(
     match site {
         Some(s) if s.footprint => {
             let mut seeds = footprint_seeds(s, map, passable);
-            msvc::sort(&mut seeds, nearer);
+            msvc::sort(&mut seeds, nearer)?;
             passes.push(Pass {
                 origin: Tile::new(s.position.x() as i32, s.position.y() as i32),
                 max_steps: SightTiles::of(s.line_of_sight).get().wrapping_add(10),
@@ -540,7 +544,7 @@ fn search_passes(
         ))),
         None => passes.push(single(unit_tile)),
     }
-    passes
+    Ok(passes)
 }
 
 /// [`closest_resource_at`]'s spread from a passable `cell`: its neighbours x−1, x+1, y−1, y+1

@@ -318,7 +318,7 @@ impl World {
         crate::math::msvc::sort(
             &mut pairs,
             &|a: (usize, usize, f32), b: (usize, usize, f32)| a.2 < b.2,
-        );
+        )?;
         let (going, first_taken) =
             assign_shelters(&pairs, units, (&all, &capacities), shelters.counts.clone())?;
         for building in crate::math::msvc::unordered_map_order(first_taken) {

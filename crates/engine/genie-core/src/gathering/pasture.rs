@@ -212,7 +212,7 @@ impl World {
             );
             tended.push((id, l.workers, gap));
         }
-        crate::math::msvc::sort(&mut tended, &|a, b| a.2 < b.2);
+        crate::math::msvc::sort(&mut tended, &|a, b| a.2 < b.2)?;
         let room = Attributes::get(
             self.players.player(q)?,
             crate::players::attribute::PASTURE_WORKERS,

@@ -43,9 +43,9 @@ impl Shore for Coast {
         (self.flags)(tile)
     }
 
-    fn shore_point(&mut self, from: Point, to: Point) -> Option<Point> {
+    fn shore_point(&mut self, from: Point, to: Point) -> Result<Option<Point>, GenieError> {
         self.asked.push((from, to));
-        self.shore
+        Ok(self.shore)
     }
 }
 
