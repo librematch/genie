@@ -34,7 +34,7 @@ impl Shore for Coast {
         }))
     }
 
-    fn near(&mut self, _zone: u8, _reach: Distance) -> Result<bool, GenieError> {
+    fn near(&mut self, _zone: ZoneId, _reach: Distance) -> Result<bool, GenieError> {
         Ok(self.near)
     }
 
@@ -189,7 +189,7 @@ fn a_new_transport_sails_to_its_own_place_and_a_start_off_the_map_idles() {
     let mut t = TransportAction::new(s.position);
     assert_eq!(
         (t.state, t.mode, t.retarget),
-        (TransportState::New, -1, false)
+        (TransportState::New, TransportMode::NEW, false)
     );
     // the list's add (first_in_stack with 1): set_state(11), its MoveTo to the shore point
     // on the way, none here, so the place itself
@@ -258,7 +258,7 @@ fn a_move_sails_to_its_point_and_a_stop_idles() {
     c.shore = Some(Point::new(19.5, 8.5));
     let mut t = TransportAction {
         state: TransportState::Unload,
-        mode: 1,
+        mode: TransportMode::WORK,
         ..TransportAction::new(s.position)
     };
     let changed = t
@@ -269,7 +269,7 @@ fn a_move_sails_to_its_point_and_a_stop_idles() {
         (t.state, t.mode, t.point, t.move_to.map(|m| m.state)),
         (
             TransportState::Sail,
-            0,
+            TransportMode::MOVE,
             Position::new(19.5, 8.5, 2.0),
             Some(MoveTo::Start)
         )
@@ -291,7 +291,11 @@ fn a_work_order_near_its_zone_unloads_at_once_else_sails_there() {
         .unwrap();
     assert_eq!(
         (t.state, t.mode, t.point),
-        (TransportState::Unload, 1, Position::new(15.0, 8.5, 1.0))
+        (
+            TransportState::Unload,
+            TransportMode::WORK,
+            Position::new(15.0, 8.5, 1.0)
+        )
     );
     // a bit further: sail there to unload, from the unit itself, else just sail
     let mut t = TransportAction::new(s.position);
@@ -323,7 +327,7 @@ fn a_work_order_near_its_zone_unloads_at_once_else_sails_there() {
         assert_eq!(t.work(bad, true, &s, &mut far).unwrap(), Changed::default());
         assert_eq!(
             (t.state, t.mode, t.point),
-            (TransportState::New, 1, s.position)
+            (TransportState::New, TransportMode::WORK, s.position)
         );
     }
     // a NaN gap stays NaN (MAXSS) and is not within (COMISS/JC): it sails

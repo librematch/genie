@@ -261,11 +261,13 @@ impl Shore for MapShore<'_> {
         Ok(self.zone_map()?.map_or(ZoneId::OFF_MAP, |m| m.zone(tile)))
     }
 
-    fn near(&mut self, zone: u8, reach: Distance) -> Result<bool, GenieError> {
+    fn near(&mut self, zone: ZoneId, reach: Distance) -> Result<bool, GenieError> {
         let tile = self.tile;
+        // the game passes the zone's low byte
+        let zone = ZoneId::new(u16::from(zone.byte()));
         Ok(self
             .zone_map()?
-            .is_some_and(|m| m.near(ZoneId::new(u16::from(zone)), tile, reach).is_some()))
+            .is_some_and(|m| m.near(zone, tile, reach).is_some()))
     }
 
     fn flags(&self, tile: Tile) -> TerrainFlags {

@@ -3,6 +3,7 @@ use crate::combat::Firepower;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
+use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -2897,7 +2898,7 @@ fn an_unload_command_sends_a_transport_toward_the_shore() {
         ),
         (
             TransportState::SailToUnload,
-            1,
+            TransportMode::WORK,
             Position::new(14.5, 10.5, 0.0),
             Some(MoveTo::Start),
             false
@@ -3025,7 +3026,7 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
         ),
         (
             TransportState::Sail,
-            -1,
+            TransportMode::NEW,
             Some(TaskId::test(7)),
             Position::new(14.5, 10.5, 0.0),
             Some(MoveTo::Start)
@@ -3056,7 +3057,7 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
         .unwrap();
     assert_eq!(
         (again.state, again.mode, again.task),
-        (TransportState::Sail, 1, tr.task)
+        (TransportState::Sail, TransportMode::WORK, tr.task)
     );
     // water: no task, no Transport
     let (mut t, idx) = transport_task_world();
@@ -3101,7 +3102,10 @@ fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
     )
     .unwrap();
     let ship = t.object(object_id(200)).unwrap().1;
-    assert_eq!(ship.actions.transport().map(|tr| tr.mode), Some(-1));
+    assert_eq!(
+        ship.actions.transport().map(|tr| tr.mode),
+        Some(TransportMode::NEW)
+    );
     let ai = ship.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_target, ai.target_class),
@@ -3128,7 +3132,7 @@ fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
             .actions
             .transport()
             .map(|tr| tr.mode),
-        Some(1)
+        Some(TransportMode::WORK)
     );
 }
 
@@ -3196,7 +3200,7 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
         ),
         (
             TransportState::Sail,
-            0,
+            TransportMode::MOVE,
             Position::new(5.5, 5.5, 0.0),
             Some(MoveTo::Start),
             None

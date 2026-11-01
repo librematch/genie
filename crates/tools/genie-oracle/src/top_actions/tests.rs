@@ -1063,7 +1063,12 @@ fn a_transport_takes_its_base_alone() {
     let m = t.move_to.unwrap();
     assert_eq!(
         (t.state, t.mode, m.state, m.quiet),
-        (TransportState::Idle, -1, MoveTo::Moving, true)
+        (
+            TransportState::Idle,
+            genie_core::garrison::transport::TransportMode::NEW,
+            MoveTo::Moving,
+            true
+        )
     );
     assert!(!t.retarget);
     assert_eq!(

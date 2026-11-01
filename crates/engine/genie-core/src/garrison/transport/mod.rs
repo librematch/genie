@@ -27,10 +27,12 @@ use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
 use crate::objects::sprite::Graphic;
+use crate::pathing::zones::ZoneId;
 use genie_diff::Diff;
 
 mod action;
 mod shore;
+mod transport_mode;
 mod transport_state;
 mod unload;
 mod work;
@@ -38,6 +40,7 @@ mod work;
 pub use self::shore::Around;
 pub(crate) use self::shore::MapShore;
 pub(crate) use self::shore::{DropDraws, in_zone, retry_point};
+pub use self::transport_mode::TransportMode;
 pub use self::transport_state::TransportState;
 #[cfg(test)]
 use crate::math::rng::Well512;
@@ -86,9 +89,8 @@ pub const STACK_PLACE: GenieError =
 pub struct TransportAction {
     /// The action state (`+0x18`), which word 9 adds.
     pub state: TransportState,
-    /// `+0x34`: −1 from the constructor (the base's `+0x30` pair), 1 after a work order (slot 9),
-    /// 0 after a move (slot 8).
-    pub mode: i32,
+    /// `+0x34` (the base's `+0x30` pair's second): how it was last ordered.
+    pub mode: TransportMode,
     /// `+0x38`..`+0x40`: where it sails or unloads; x [`NONE`] for nowhere.
     pub point: Position,
     /// Its `MoveTo` sub-action to the point within [`MOVE_RANGE`]: quiet, with the sprite
@@ -128,14 +130,14 @@ pub trait Shore {
     /// # Errors
     ///
     /// A map the caller cannot read.
-    fn zone(&mut self, tile: Tile) -> Result<crate::pathing::zones::ZoneId, GenieError>;
+    fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError>;
     /// `FUN_1411a7570`: a tile of zone `zone` lies within `reach` of the unit's tile (its place
     /// cut by `CVTTSS2SI`, [`crate::pathing::zones::ZoneMap::near`]); no without a zone map.
     ///
     /// # Errors
     ///
     /// A map the caller cannot read.
-    fn near(&mut self, zone: u8, reach: Distance) -> Result<bool, GenieError>;
+    fn near(&mut self, zone: ZoneId, reach: Distance) -> Result<bool, GenieError>;
     /// The terrain table's flags of `tile`, its x and y shorts
     /// ([`crate::map::terrain::Terrain::flags_at`]).
     fn flags(&self, tile: Tile) -> TerrainFlags;

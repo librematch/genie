@@ -2,6 +2,7 @@
 //! update, its walk and its test beside the shore.
 
 use crate::GenieError;
+use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::{
     Changed, MOVE_RANGE, MapShore, NEAR, NO_TRANSPORT, NONE, SHORE_MARGIN, Ship, Shore,
@@ -45,7 +46,7 @@ impl TransportAction {
     pub const fn on_task(task: Option<TaskId>, at: Position) -> Self {
         Self {
             state: TransportState::New,
-            mode: -1,
+            mode: TransportMode::NEW,
             point: at,
             move_to: None,
             retarget: false,
@@ -137,7 +138,7 @@ impl TransportAction {
         shore: &mut impl Shore,
     ) -> Result<Changed, GenieError> {
         self.point = point;
-        self.mode = 0;
+        self.mode = TransportMode::MOVE;
         self.set_state(TransportState::Sail, ship, shore)
     }
 
@@ -170,14 +171,14 @@ impl TransportAction {
         ship: &Ship<'_>,
         shore: &mut impl Shore,
     ) -> Result<Changed, GenieError> {
-        self.mode = 1;
+        self.mode = TransportMode::WORK;
         let (x, y) = (point.x(), point.y());
         let zone = shore.zone(point.tile())?;
         let (ux, uy) = (ship.position.x(), ship.position.y());
         // MAXSS 0, gap: the gap when it is not below 0, a NaN gap too
         let dx = crate::math::fmath::maxss(0.0, (x - ux).abs() - ship.radius.x());
         let dy = crate::math::fmath::maxss(0.0, (y - uy).abs() - ship.radius.y());
-        let near = shore.near(zone.byte(), Distance::new(NEAR))?;
+        let near = shore.near(zone, Distance::new(NEAR))?;
         let within =
             !crate::math::fmath::below_or_unordered(UNLOAD_REACH_SQUARED, dy * dy + dx * dx);
         let state = if near && within {
@@ -313,7 +314,7 @@ impl TransportAction {
                 } else {
                     let zone = shore.zone(self.point.tile())?;
                     self.retarget = false;
-                    reaches = shore.near(zone.byte(), Distance::new(NEAR))?;
+                    reaches = shore.near(zone, Distance::new(NEAR))?;
                 }
                 let mut cannot_unload = !reaches;
                 if reaches && ship.loaded {
