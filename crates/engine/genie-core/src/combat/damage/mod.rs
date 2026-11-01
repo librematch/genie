@@ -242,7 +242,7 @@ pub struct Building {
     pub trebuchet: bool,
     /// Its master's paid cost (`+0x880`: each entry with a resource and the paid flag, summed as
     /// floats in their order).
-    pub cost: f32,
+    pub cost: Amount,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after each hit, a second off in its update.
     pub damaged_lately: crate::objects::DamagedTimer,
     /// A hit got past its hit point test: the write-back gives its annexes its hit points and
@@ -268,7 +268,7 @@ pub struct Razed {
     /// ([`crate::players::history::EventKind::CASTLE_DESTROYED`], [`crate::players::history::EventKind::WONDER_DESTROYED`]).
     pub event: Option<crate::players::history::EventKind>,
     /// The attribute adds: (player, attribute, amount).
-    pub adds: Vec<(PlayerId, AttributeId, f32)>,
+    pub adds: Vec<(PlayerId, AttributeId, Amount)>,
 }
 
 /// What a killing hit leaves for the caller after the update
@@ -293,7 +293,7 @@ pub struct Facing {
     /// `+0x7e8`, where it faces.
     pub angle: Angle,
     /// Its sprite's facets, 0 without a sprite.
-    pub facets: i16,
+    pub facets: crate::objects::FacetCount,
 }
 
 /// What a hit on a combat object reads of it (its master's and its own values) and changes.
@@ -387,7 +387,7 @@ pub struct Attacker {
     pub charge_hit: bool,
     /// Its attack powerup (`+0xa24`) and the game's setting `+0x680`
     /// ([`crate::world::World::mode_680`]: at 1 a hit may do no damage).
-    pub attack_powerup: f32,
+    pub attack_powerup: crate::combat::AttackPowerup,
     /// The game's setting `+0x680` ([`crate::world::World::mode_680`]).
     pub mode_680: crate::world::Mode680,
     /// Its player and whether its master has a task of action type 0x9a (a kill bonus,

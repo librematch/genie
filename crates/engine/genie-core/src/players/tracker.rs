@@ -887,7 +887,7 @@ mod tests {
                 construction: progress.map(|progress| crate::construction::build::Construction {
                     progress: Seconds::new(progress),
                     desolid: false,
-                    builders: 0,
+                    builders: crate::construction::BuilderCount::of_data(0),
                     hit_points: MasterHitPoints::of_data(2400),
                     build_time: WholeSeconds::of_data(150),
                     record: crate::map::spatial::Obstruction {

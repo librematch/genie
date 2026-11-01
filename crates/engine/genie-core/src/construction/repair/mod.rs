@@ -157,7 +157,7 @@ pub struct Repairee {
 
 /// The object `FUN_140ad9050` counts a Repair's repairers in (the target, an annex's main
 /// building) and their count (`+0x9e8`), None without one.
-pub(crate) type CountedIn = Option<(ObjectId, u8)>;
+pub(crate) type CountedIn = Option<(ObjectId, crate::construction::BuilderCount)>;
 
 /// What a Repair's update reads as it starts, each constant through the update: its target,
 /// the object its repairers count in, and the repairer's own values ([`Unit::repair_reads`]).

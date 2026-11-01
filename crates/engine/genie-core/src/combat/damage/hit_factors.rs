@@ -64,15 +64,14 @@ pub fn building_elevation_factor(
 /// wrapped into −π to π, times the facets over 2π; 0 on the same point or without facets.
 #[must_use]
 pub fn facing_offset(at: Position, facing: Facing, other: Position) -> f32 {
-    if facing.facets <= 0 {
+    if !facing.facets.any() {
         return 0.0;
     }
-    let n = if 7 < facing.facets { facing.facets } else { 8 };
     crate::objects::facing::offset_in_facets(
         other.x() - at.x(),
         other.y() - at.y(),
         facing.angle,
-        i32::from(n),
+        facing.facets.at_least_eight(),
     )
 }
 

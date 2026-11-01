@@ -213,7 +213,7 @@ pub fn armor_damage(
             }
             if pierce_or_melee && !bonused {
                 // the bonus, then the stinger plus the powerup
-                attack += bonus + (0.0 + attacker.attack_powerup);
+                attack += bonus + (0.0 + attacker.attack_powerup.get());
                 bonused = true;
             }
         }

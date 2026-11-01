@@ -328,7 +328,7 @@ impl BuildAction {
         if 0.0 < factor {
             rate *= factor;
         }
-        let n = f32::from(Self::builders(c, self.target)?);
+        let n = Self::builders(c, self.target)?.as_f32();
         if 1.0 < n {
             rate *= ((n - 1.0) * EXTRA_BUILDER + 1.0) / n;
         }

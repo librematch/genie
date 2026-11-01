@@ -2058,7 +2058,7 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
         construction: Some(Construction {
             progress: Seconds::ZERO,
             desolid: true,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(550),
             build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
@@ -2461,7 +2461,7 @@ fn a_work_command_on_another_building_moves_the_repair_there() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = 1;
+        .builders = crate::construction::BuilderCount::of_data(1);
     t.order_work(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -2487,7 +2487,7 @@ fn a_work_command_on_another_building_moves_the_repair_there() {
             .construction
             .unwrap()
             .builders,
-        0
+        crate::construction::BuilderCount::of_data(0)
     );
 }
 
@@ -2700,7 +2700,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
         .construction
         .as_mut()
         .unwrap()
-        .builders = 1;
+        .builders = crate::construction::BuilderCount::of_data(1);
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(29.0, 88.0, 0.0));
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -2721,7 +2721,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
     assert_eq!(
         t.players[1].objects[ListIndex::new(1)]
             .construction
-            .map(|k| k.builders),
+            .map(|k| k.builders.get()),
         Some(0)
     );
     // the same unit's work command on itself does nothing
@@ -2774,7 +2774,7 @@ fn a_work_command_on_another_foundation_moves_the_build_there() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = 1;
+        .builders = crate::construction::BuilderCount::of_data(1);
     t.order_work(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -2804,7 +2804,7 @@ fn a_work_command_on_another_foundation_moves_the_build_there() {
     );
     let site = |i: ListIndex| {
         let o = &t.players[1].objects[i];
-        (o.workers.get(), o.construction.map(|k| k.builders))
+        (o.workers.get(), o.construction.map(|k| k.builders.get()))
     };
     assert_eq!(
         (site(ListIndex::new(1)), site(ListIndex::new(2))),
@@ -4361,7 +4361,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
         construction: desolid.then_some(Construction {
             progress: Seconds::ZERO,
             desolid: true,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(550),
             build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
@@ -5530,7 +5530,10 @@ fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
     let mut t = lets_world();
     for id in [520, 521] {
         let u = t.object_mut(object_id(id)).unwrap().1;
-        (u.workers, u.builders) = (crate::objects::WorkerCount::of_data(2), 3);
+        (u.workers, u.builders) = (
+            crate::objects::WorkerCount::of_data(2),
+            crate::construction::BuilderCount::of_data(3),
+        );
     }
     let own = in_update(
         &mut t,
@@ -5538,7 +5541,10 @@ fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
         50,
         |unit, c| {
             let by = unit.releaser(c)?;
-            (unit.workers, *unit.repairers_mut()) = (crate::objects::WorkerCount::ONE, 1);
+            (unit.workers, *unit.repairers_mut()) = (
+                crate::objects::WorkerCount::ONE,
+                crate::construction::BuilderCount::of_data(1),
+            );
             for id in [520, 521, 9999] {
                 release(c, unit, object_id(id), by)?;
             }
@@ -5547,13 +5553,13 @@ fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
             leave_builders(c, unit, object_id(530))?;
             leave_builders(c, unit, unit.id)?;
             torn_down(c, unit, (vec![object_id(521)], vec![(object_id(520), by)]))?;
-            Ok((unit.workers.get(), *unit.repairers_mut()))
+            Ok((unit.workers.get(), unit.repairers_mut().get()))
         },
     );
     assert_eq!(own, Ok((0, 0)));
     let tree = |t: &World, id| {
         t.object(object_id(id))
-            .map(|(_, u)| (u.workers.get(), u.builders, u.life.goto_sleep))
+            .map(|(_, u)| (u.workers.get(), u.builders.get(), u.life.goto_sleep))
     };
     assert_eq!(tree(&t, 520), Some((0, 1, true)));
     assert_eq!(tree(&t, 521), Some((1, 2, false)));
@@ -5594,9 +5600,13 @@ fn outside_an_update_the_lets_run_on_the_whole_world() {
         .object(object_id(521))
         .map(|(_, u)| (u.workers.get(), u.life.goto_sleep));
     assert_eq!(tree, Some((0, true)));
-    t.object_mut(object_id(520)).unwrap().1.builders = 2;
+    t.object_mut(object_id(520)).unwrap().1.builders =
+        crate::construction::BuilderCount::of_data(2);
     t.leave_builders(object_id(530)).unwrap();
-    assert_eq!(t.object(object_id(520)).map(|(_, u)| u.builders), Some(1));
+    assert_eq!(
+        t.object(object_id(520)).map(|(_, u)| u.builders.get()),
+        Some(1)
+    );
 }
 
 /// A player's live object out of its slot ([`World::take_out_own`]) is out of the world's
@@ -10307,7 +10317,7 @@ fn teardown_world() -> World {
         construction: Some(Construction {
             progress: Seconds::ZERO,
             desolid: false,
-            builders: 1,
+            builders: crate::construction::BuilderCount::of_data(1),
             hit_points: MasterHitPoints::of_data(550),
             build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
@@ -10493,7 +10503,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .unwrap();
     let foundation = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(foundation.workers, crate::objects::WorkerCount::of_data(0));
-    assert_eq!(foundation.construction.map(|k| k.builders), Some(0));
+    assert_eq!(foundation.construction.map(|k| k.builders.get()), Some(0));
 }
 
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode
@@ -10659,7 +10669,7 @@ fn deaths_world() -> World {
         construction: Some(Construction {
             progress: Seconds::ZERO,
             desolid: false,
-            builders: 1,
+            builders: crate::construction::BuilderCount::of_data(1),
             hit_points: MasterHitPoints::of_data(550),
             build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
@@ -10742,7 +10752,7 @@ fn a_dead_unit_s_actions_go_and_let_their_targets_go_in_the_update_of_its_death(
     );
     let foundation = &villagers[ListIndex::new(3)];
     assert_eq!(foundation.workers, crate::objects::WorkerCount::of_data(0));
-    assert_eq!(foundation.construction.map(|k| k.builders), Some(0));
+    assert_eq!(foundation.construction.map(|k| k.builders.get()), Some(0));
 }
 
 /// `FUN_140aaddb0`: a Build counts its builder in a building annex's main building (`+0xbb8`),
@@ -10758,7 +10768,7 @@ fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = 0;
+        .builders = crate::construction::BuilderCount::of_data(0);
     t.players[1].objects.push(main);
     assert_eq!(
         t.counted_building(object_id(10028)),
@@ -10780,7 +10790,7 @@ fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
             .iter()
             .find(|u| u.id == id)
             .and_then(|u| u.construction)
-            .map(|k| k.builders)
+            .map(|k| k.builders.get())
     };
     assert_eq!(
         (builders(object_id(10028)), builders(object_id(10030))),
@@ -11608,7 +11618,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         construction: Some(Construction {
             progress: Seconds::new(10.0),
             desolid: false,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(20000),
             build_time: WholeSeconds::of_data(10),
             record: crate::map::spatial::Obstruction {
@@ -12535,7 +12545,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     let mut v = t.victim(object_id(30), PlayerId::new(1)).unwrap().unwrap();
     let b = v.building.clone().unwrap();
     assert_eq!(
-        (b.main, b.annexes, b.cost, b.trebuchet),
+        (b.main, b.annexes, b.cost.get(), b.trebuchet),
         (None, vec![object_id(31), object_id(32)], 650.0, false)
     );
     let a = t.victim(object_id(31), PlayerId::new(1)).unwrap().unwrap();
@@ -12554,9 +12564,9 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
         owner: PlayerId::new(2),
         event: Some(crate::players::history::EventKind::CASTLE_DESTROYED),
         adds: vec![
-            (PlayerId::new(1), attribute::RAZINGS, 1.0),
-            (PlayerId::new(2), attribute::RAZINGS_OTHER, 1.0),
-            (PlayerId::new(1), attribute::KILLS_VALUE, 650.0),
+            (PlayerId::new(1), attribute::RAZINGS, Amount::new(1.0)),
+            (PlayerId::new(2), attribute::RAZINGS_OTHER, Amount::new(1.0)),
+            (PlayerId::new(1), attribute::KILLS_VALUE, Amount::new(650.0)),
         ],
     });
     write_hit(&mut t, (PlayerId::new(1), ListIndex::new(0)), v);
@@ -12721,7 +12731,7 @@ fn a_trebuchet_is_a_master_of_class_51_or_54_with_a_weapon() {
         ]),
         ..Master::default()
     };
-    assert_eq!(paid_cost(&paid), 400.0);
+    assert_eq!(paid_cost(&paid), Amount::new(400.0));
 }
 
 /// MarvinBlue/426048731's 1086: SET GATHER POINT on TC 9149 at (107.2451, 46.075863) on the
@@ -13384,7 +13394,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         construction: Some(Construction {
             progress: Seconds::new(100.0),
             desolid: false,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(1650),
             build_time: WholeSeconds::of_data(100),
             record: crate::map::spatial::Obstruction {
@@ -13504,7 +13514,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         construction: Some(Construction {
             progress: Seconds::new(10.0),
             desolid: false,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(10),
             build_time: WholeSeconds::of_data(70),
             record: crate::map::spatial::Obstruction {
@@ -13875,7 +13885,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         construction: Some(Construction {
             progress: Seconds::new(10.0),
             desolid: false,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(1200),
             build_time: WholeSeconds::of_data(50),
             record: crate::map::spatial::Obstruction {
@@ -17874,7 +17884,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
     centre.construction = Some(Construction {
         progress: Seconds::new(25.0),
         desolid: false,
-        builders: 0,
+        builders: crate::construction::BuilderCount::of_data(0),
         hit_points: MasterHitPoints::of_data(2400),
         build_time: WholeSeconds::of_data(25),
         record: crate::map::spatial::Obstruction {
@@ -17981,7 +17991,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
         .by_id_mut(object_id(10028))
         .and_then(|h| h.construction.as_mut())
         .unwrap()
-        .builders = 1;
+        .builders = crate::construction::BuilderCount::of_data(1);
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), dt, |unit, c| {
         let me = crate::movement::Me {
             id: unit.id,
@@ -18049,7 +18059,7 @@ fn a_builder_s_completion_reaches_the_world_within_its_update() {
     );
     let house = t.players[1].objects.by_id(object_id(10028)).unwrap();
     assert_eq!(
-        (house.life.state, house.repairers()),
+        (house.life.state, house.repairers().get()),
         (ObjectState::Alive, 0)
     );
     let k = crate::players::tracker::key(t.masters.get(1), &t.lines, ids::HOUSE);
@@ -18326,7 +18336,8 @@ fn a_building_heals_its_garrison_each_whole_second() {
     assert_eq!(
         reason(centre_seconds(|t| t.players[1].objects
             [ListIndex::new(0)]
-        .raider_countdown = 1)),
+        .raider_countdown =
+            crate::garrison::RaiderCountdown::of_data(1))),
         "a unit inside whose raider_build_countdown runs (FUN_1411e7220)"
     );
     let repairs = |t: &mut World| {
@@ -18479,7 +18490,7 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
     );
     let house = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
-        (house.life.hp, house.repairers(), house.workers),
+        (house.life.hp, house.repairers().get(), house.workers),
         (
             HitPoints::new(300.0),
             0,
@@ -18515,7 +18526,7 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
     );
     let house = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
-        (house.life.hp, house.repairers(), house.workers),
+        (house.life.hp, house.repairers().get(), house.workers),
         (
             HitPoints::new(309.947_57),
             1,
@@ -18657,7 +18668,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         (
             house.life.hp,
             house.armor_removed,
-            house.repairers(),
+            house.repairers().get(),
             house.workers
         ),
         (
@@ -18705,7 +18716,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
             states,
             h.life.hp.get(),
             h.armor_removed,
-            h.repairers(),
+            h.repairers().get(),
             h.workers.get(),
         )
     };
@@ -18779,8 +18790,8 @@ fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
         (
             annex.life.hp,
             main.life.hp,
-            annex.repairers(),
-            main.repairers()
+            annex.repairers().get(),
+            main.repairers().get()
         ),
         (HitPoints::new(302.449_4), HitPoints::new(302.449_4), 0, 1)
     );
@@ -18849,7 +18860,7 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
     (0..10).for_each(|_| update(&mut t));
     let before = seen(&t);
     assert_eq!(
-        usize::from(t.players[1].objects[ListIndex::new(1)].repairers()),
+        usize::from(t.players[1].objects[ListIndex::new(1)].repairers().get()),
         n
     );
     (0..100).for_each(|_| update(&mut t));
@@ -19258,7 +19269,7 @@ fn own_razing(adds: &[(AttributeId, f32)]) -> crate::combat::victims::KillLeft {
             event: None,
             adds: adds
                 .iter()
-                .map(|&(a, v)| (PlayerId::new(1), a, v))
+                .map(|&(a, v)| (PlayerId::new(1), a, Amount::new(v)))
                 .collect(),
         }],
     }

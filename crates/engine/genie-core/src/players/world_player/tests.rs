@@ -220,11 +220,11 @@ fn a_mill_s_livestock_makes_food() {
     ]);
     t.masters = vec![masters.clone(), masters.clone(), masters.clone(), masters];
     let mut mill = object(10, master_id(68), ObjectState::Alive);
-    mill.livestock_summation = 100.0;
+    mill.livestock_summation = Amount::new(100.0);
     let mut other = object(11, master_id(68), ObjectState::Alive);
-    other.livestock_summation = 300.0;
+    other.livestock_summation = Amount::new(300.0);
     let mut sheep = object(12, master_id(5), ObjectState::Alive);
-    sheep.livestock_summation = 1000.0;
+    sheep.livestock_summation = Amount::new(1000.0);
     let key = Key {
         master: Some(ids::MILL),
         class: Some(class::BUILDING),

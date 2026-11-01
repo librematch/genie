@@ -72,7 +72,7 @@ pub struct Unit {
     /// `+0x9e8` (`num_builders`) of a combat object that is no building: the Repair actions
     /// counted among its repairers. A building's is its construction's
     /// ([`Construction::builders`]).
-    pub builders: u8,
+    pub builders: crate::construction::BuilderCount,
     /// Its layers below the action layer ([`Body`]): the static layer with its place (every
     /// object), the animated layer (`+0x7b8`, types 20 and up) and the moving one with its
     /// movement state (types 30 and up).
@@ -151,7 +151,7 @@ pub struct Unit {
     pub damaged_lately: crate::objects::DamagedTimer,
     /// A building's `mLivestockSummation` (`+0xc28`, saved): the livestock inside it (their
     /// master's `+0x610`, `FUN_1411cb850`), whose food a mill makes ([`crate::players::world_player`]).
-    pub livestock_summation: f32,
+    pub livestock_summation: Amount,
     /// A pasture's livestock (`+0xb78`, saved as `livestockId`): the objects its completion put
     /// on its edges ([`crate::world::World::setup_pasture`]), in the order it made them.
     pub livestock: Vec<ObjectId>,
@@ -164,7 +164,7 @@ pub struct Unit {
     pub build_frame: crate::objects::Frame,
     /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
     /// building.
-    pub raider_countdown: i32,
+    pub raider_countdown: crate::garrison::RaiderCountdown,
     /// A building's gate lock ([`Gate`]).
     pub gate: Option<Gate>,
     /// Its active sprite, held from an attack's swing on; None while the slice does not know it.
@@ -188,7 +188,7 @@ pub struct Unit {
     /// `+0xa4c` pierce, slots 0x708 and 0x710; whole numbers), the armor attacks removed
     /// (`+0x9e4`, `+0x9e6`), the charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack`
     /// (`+0x8a8`: its last hit was its charge's).
-    pub attack_powerup: f32,
+    pub attack_powerup: crate::combat::AttackPowerup,
     /// `mMaxRangePowerup` (`+0xa40`, slot 0x700): what its shown range adds
     /// ([`crate::combat::damage::shown_range`]).
     pub range_powerup: Distance,

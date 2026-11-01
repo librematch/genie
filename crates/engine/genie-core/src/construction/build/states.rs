@@ -51,7 +51,7 @@ impl BuildAction {
             && let Some((_, u)) = c.w.object_mut(id)
         {
             let n = u.repairers_mut();
-            *n = n.wrapping_add_signed(by);
+            *n = n.changed_by(by);
         }
         Ok(())
     }
@@ -62,11 +62,16 @@ impl BuildAction {
     /// # Errors
     ///
     /// An object of a master its owner lacks.
-    pub(super) fn builders(c: &Step<'_>, site: Option<ObjectId>) -> Result<u8, GenieError> {
+    pub(super) fn builders(
+        c: &Step<'_>,
+        site: Option<ObjectId>,
+    ) -> Result<crate::construction::BuilderCount, GenieError> {
         Ok(c.w
             .counted_building(site)?
             .and_then(|id| c.w.object(id))
-            .map_or(0, |(_, u)| u.repairers()))
+            .map_or(crate::construction::BuilderCount::NONE, |(_, u)| {
+                u.repairers()
+            }))
     }
 
     /// A counted builder leaves the builders of its foundation ([`BuildAction::count`]) and
@@ -364,7 +369,7 @@ impl BuildAction {
         at: Position,
         walk: Option<MoveToAction>,
         mover: Option<&mut crate::movement::Mover>,
-        builders: Option<&mut u8>,
+        builders: Option<&mut crate::construction::BuilderCount>,
         computer: bool,
     ) -> Result<(), GenieError> {
         if self.state == BuildState::Work || (self.state == BuildState::Move && computer) {
@@ -374,7 +379,7 @@ impl BuildAction {
             let b = builders.ok_or(GenieError::unsupported(
                 "a builder retaking a foundation the slice does not hold",
             ))?;
-            *b = b.wrapping_sub(1);
+            *b = b.left();
         }
         if self.move_to.is_some()
             && let Some(m) = mover

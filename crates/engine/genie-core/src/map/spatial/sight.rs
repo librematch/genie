@@ -9,6 +9,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
 use crate::map::Tile;
+use crate::map::spatial::TileSight;
 use crate::map::spatial::{BLOCKED, Spatial};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -246,9 +247,9 @@ impl Spatial {
     /// ([`crate::vision::VisionBits::NO_TILE_EXPLORED`]); else 0x80 when it explored it or the word
     /// is explored by all; else 0, also off the map. None without the players' sight.
     #[must_use]
-    pub fn tile_sight(&self, player: PlayerId, tile: Tile) -> Option<u8> {
+    pub fn tile_sight(&self, player: PlayerId, tile: Tile) -> Option<TileSight> {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
-            return Some(0);
+            return Some(TileSight::UNKNOWN);
         };
         let VisionMasks {
             visible: seen,
@@ -260,9 +261,13 @@ impl Spatial {
         if seen.intersects(word & VisionBits::OBJECT_MASK)
             || (revealed && (explored || all_explored))
         {
-            return Some(0xf);
+            return Some(TileSight::SEEN);
         }
-        Some(if explored || all_explored { 0x80 } else { 0 })
+        Some(if explored || all_explored {
+            TileSight::EXPLORED
+        } else {
+            TileSight::UNKNOWN
+        })
     }
 
     /// A building's slot 0x1e0 (`FUN_1411d3280`) for `player`, as far as the world holds it:
@@ -273,12 +278,20 @@ impl Spatial {
     /// when neither: a ghost of it on its tile that the player is not among the blind of decides
     /// then (0xf), which the world does not hold. Without the players' sight: 0.
     #[must_use]
-    pub fn building_sight(&self, id: ObjectId, position: Position, player: PlayerId) -> Option<u8> {
+    pub fn building_sight(
+        &self,
+        id: ObjectId,
+        position: Position,
+        player: PlayerId,
+    ) -> Option<TileSight> {
         let Some(v) = self.sight.as_ref() else {
-            return Some(0);
+            return Some(TileSight::UNKNOWN);
         };
-        if self.tile_sight(player, position.ground().tile()) == Some(0xf) {
-            return Some(0xf);
+        if self
+            .tile_sight(player, position.ground().tile())
+            .is_some_and(TileSight::seen)
+        {
+            return Some(TileSight::SEEN);
         }
         let umv = v.seer(id).is_some_and(|s| s.umv != 0);
         let mask = v
@@ -288,7 +301,7 @@ impl Spatial {
             .map_or(VisionBits::NONE, |e| e.mask);
         let VisionMasks { visible, explored } = self.vision(player);
         if umv && (visible.intersects(mask) || explored.intersects(mask)) {
-            return Some(0xf);
+            return Some(TileSight::SEEN);
         }
         None
     }
@@ -299,9 +312,9 @@ impl Spatial {
     /// does, else 0, also off the map (the visible map's own size, `+0x20`, `+0x24`, the map's).
     /// The revealed bits 29 and 61 lie outside the mask. None without the players' sight.
     #[must_use]
-    pub fn scout_sight(&self, player: PlayerId, tile: Tile) -> Option<u8> {
+    pub fn scout_sight(&self, player: PlayerId, tile: Tile) -> Option<TileSight> {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
-            return Some(0);
+            return Some(TileSight::UNKNOWN);
         };
         let word = word & VisionBits::OBJECT_MASK;
         let VisionMasks {
@@ -309,11 +322,11 @@ impl Spatial {
             explored,
         } = self.vision(player);
         Some(if seen.intersects(word) {
-            0xf
+            TileSight::SEEN
         } else if explored.intersects(word) {
-            0x80
+            TileSight::EXPLORED
         } else {
-            0
+            TileSight::UNKNOWN
         })
     }
 
@@ -324,9 +337,9 @@ impl Spatial {
     /// (`FUN_140ab79e0`, `FUN_140c567c0`, `FUN_140c26f60`) pass an object's tile, which the
     /// position setter holds on the map, so off the map is 0 here. None without the players' sight.
     #[must_use]
-    pub fn visibility(&self, player: PlayerId, tile: Tile) -> Option<u8> {
+    pub fn visibility(&self, player: PlayerId, tile: Tile) -> Option<TileSight> {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
-            return Some(0);
+            return Some(TileSight::UNKNOWN);
         };
         let word = word & VisionBits::OBJECT_MASK;
         let VisionMasks {
@@ -334,11 +347,11 @@ impl Spatial {
             explored,
         } = self.vision(player);
         Some(if seen.intersects(word) {
-            0xf
+            TileSight::SEEN
         } else if explored.intersects(word) {
-            0x80
+            TileSight::EXPLORED
         } else {
-            0
+            TileSight::UNKNOWN
         })
     }
 
@@ -357,7 +370,7 @@ impl Spatial {
     /// players' sight.
     #[must_use]
     pub fn sees_tile(&self, player: PlayerId, tile: Tile) -> bool {
-        self.tile_sight(player, tile) == Some(0xf)
+        self.tile_sight(player, tile).is_some_and(TileSight::seen)
     }
 
     /// [`Spatial::tile_sight`] is not 0: player `player` sees `tile` or explored it. Unknown
@@ -368,14 +381,14 @@ impl Spatial {
             .ok_or(GenieError::unsupported(
                 "a test of explored tiles without the players' sight",
             ))?;
-        Ok(answer != 0)
+        Ok(answer != TileSight::UNKNOWN)
     }
 
     /// [`Spatial::visibility`] is 0xf: player `player` sees `tile` now. False without the
     /// players' sight.
     #[must_use]
     pub fn visible(&self, player: PlayerId, tile: Tile) -> bool {
-        self.visibility(player, tile) == Some(0xf)
+        self.visibility(player, tile).is_some_and(TileSight::seen)
     }
 
     /// `RGE_Combat_Object::update`'s sight ([`Visibility::combat_sight`]); an annex reads its

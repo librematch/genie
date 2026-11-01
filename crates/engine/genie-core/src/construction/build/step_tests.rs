@@ -109,7 +109,7 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
     Construction {
         progress: Seconds::new(progress),
         desolid,
-        builders,
+        builders: crate::construction::BuilderCount::of_data(builders),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
@@ -304,7 +304,7 @@ const SEARCH: (NotifyKind, [i32; 3]) = (
 /// The house's builders, workers and state.
 fn house(t: &World) -> (u8, i32, ObjectState) {
     let u = t.players[1].objects.by_id(HOUSE).unwrap();
-    (u.repairers(), u.workers.get(), u.life.state)
+    (u.repairers().get(), u.workers.get(), u.life.state)
 }
 
 /// Moves object `id` of player 1 to `at`, its body and its place on the map.
@@ -362,7 +362,7 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
         (b.state, b.added, house(&t).0),
         (BuildState::Place, true, 2)
     );
-    assert_eq!(annex_of(&t).map(|k| k.builders), Some(0));
+    assert_eq!(annex_of(&t).map(|k| k.builders.get()), Some(0));
     let _ = code(&mut t, 30);
     let rate = 1.0f32 * 1.0 * Millis::new(30).seconds();
     let n = 2.0f32;

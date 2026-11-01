@@ -30,6 +30,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`let_out.rs`](let_out.rs) | A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its place on the map. |
 | [`meeting.rs`](meeting.rs) | Where an Enter meets its target (`FUN_140a85f30`): the landing tile, the walled-off test, the meeting point and the reach. |
 | [`mod.rs`](mod.rs) | Units inside other objects: the garrison order, the Enter action, the unloads and the Transport action. |
+| [`raider_countdown.rs`](raider_countdown.rs) | A combat object's raider countdown. |
 | [`shelter.rs`](shelter.rs) | The garrison order and `SEEK_SHELTER`: each unit to a building that takes it in, nearest first (`Shelters`). |
 | [`takes_in.rs`](takes_in.rs) | A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds. |
 | [`tests.rs`](tests.rs) | Tests. |
@@ -43,5 +44,5 @@ Units go into buildings and transports, and come out again. This folder holds bo
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`commands`](../commands/), [`gathering`](../gathering/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/).
+- Used by: [`commands`](../commands/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/).
 <!-- /uses -->

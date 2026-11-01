@@ -466,7 +466,7 @@ pub(crate) fn readiness(orders: &mut Vec<crate::unit_ai::QueuedOrder>, drop_read
 /// sets `+0xa2c` to slot 0x1b8 × 0.05 and takes a sight powerup (`+0xad4`) off (slots 0x1d8,
 /// 0x1d0): none of them is held.
 const fn clear_powerups(unit: &mut Unit) {
-    unit.attack_powerup = 0.0;
+    unit.attack_powerup = crate::combat::AttackPowerup::ZERO;
     unit.range_powerup = Distance::ZERO;
     unit.reload_powerup = Seconds::ZERO;
     unit.work_rate_powerup = WorkRate::ZERO;

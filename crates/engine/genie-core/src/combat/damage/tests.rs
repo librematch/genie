@@ -433,7 +433,7 @@ fn bonus_damage_counts_whole_steps_of_a_hit_point_share() {
 #[test]
 fn the_bonus_damage_adds_to_the_first_melee_weapon() {
     let (sheep, mut hunter) = (sheep(), hunter());
-    hunter.source.attack_powerup = 1.0;
+    hunter.source.attack_powerup = crate::combat::AttackPowerup::new(1.0);
     assert_eq!(
         armor_damage(
             &sheep,
@@ -455,7 +455,7 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     let (sheep, mut v) = (sheep(), hunter());
     let none = Shown::default();
     assert_eq!(shown_attack(&v, &none), DamageAmount::new(3));
-    v.source.attack_powerup = 1.7;
+    v.source.attack_powerup = crate::combat::AttackPowerup::new(1.7);
     assert_eq!(shown_attack(&v, &none), DamageAmount::new(4));
     let mut far = v.clone();
     far.weapons = vec![ClassAmount::new(13, 6), ClassAmount::new(11, -2)];
@@ -668,7 +668,7 @@ fn a_facing_offset_counts_facets_from_the_angle() {
     let at = Position::new(10.0, 10.0, 0.0);
     let facing = Facing {
         angle: Angle::ZERO,
-        facets: 16,
+        facets: crate::objects::FacetCount::of_data(16),
     };
     assert_eq!(
         facing_offset(at, facing, Position::new(11.0, 10.0, 0.0)),
@@ -678,7 +678,7 @@ fn a_facing_offset_counts_facets_from_the_angle() {
     let q = facing_offset(at, facing, Position::new(10.0, 11.0, 0.0));
     assert!((q - 4.0).abs() < 1e-5);
     let few = Facing {
-        facets: 4,
+        facets: crate::objects::FacetCount::of_data(4),
         ..facing
     };
     assert!((facing_offset(at, few, Position::new(10.0, 11.0, 0.0)) - 2.0).abs() < 1e-5);
@@ -691,7 +691,7 @@ fn a_facing_offset_counts_facets_from_the_angle() {
         facing_offset(
             at,
             Facing {
-                facets: 0,
+                facets: crate::objects::FacetCount::of_data(0),
                 ..facing
             },
             Position::new(11.0, 12.0, 0.0)
@@ -709,7 +709,7 @@ fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
     x.special_attack = SpecialAttack::FRONT_DEFENCE;
     x.facing = Some(Facing {
         angle: Angle::new(std::f32::consts::FRAC_PI_2),
-        facets: 8,
+        facets: crate::objects::FacetCount::of_data(8),
     });
     take(
         &mut sheep,
@@ -762,7 +762,7 @@ fn a_retaliation_strikes_the_melee_attacker_first() {
     x.alert_idle = Some(true);
     x.facing = Some(Facing {
         angle: Angle::new(std::f32::consts::FRAC_PI_2),
-        facets: 8,
+        facets: crate::objects::FacetCount::of_data(8),
     });
     take(
         &mut sheep,
@@ -864,7 +864,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
     elephant.source.blast_level = BlastLevel::from_bits_retain(0x82);
     elephant.armored.as_mut().unwrap().facing = Some(Facing {
         angle: Angle::new(f32::NAN),
-        facets: 8,
+        facets: crate::objects::FacetCount::of_data(8),
     });
     let mut t = enemy(10.8, 11.0);
     assert!(
@@ -872,7 +872,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
             center,
             Facing {
                 angle: Angle::new(f32::NAN),
-                facets: 8
+                facets: crate::objects::FacetCount::of_data(8)
             },
             t.position
         )
@@ -992,7 +992,7 @@ fn house() -> Victim {
             ..Armored::default()
         }),
         building: Some(Building {
-            cost: 25.0,
+            cost: Amount::new(25.0),
             ..Building::default()
         }),
         ..Victim::default()
@@ -1140,7 +1140,7 @@ fn a_hit_on_an_annex_goes_to_its_main_building() {
         hp: HitPoints::new(2400.0),
         building: Some(Building {
             annexes: vec![object_id(11), object_id(12)],
-            cost: 275.0,
+            cost: Amount::new(275.0),
             ..Building::default()
         }),
         ..house()
@@ -1223,15 +1223,39 @@ fn a_player_s_building_below_one_hit_point_is_razed() {
             owner: PlayerId::new(2),
             event: Some(crate::players::history::EventKind::CASTLE_DESTROYED),
             adds: vec![
-                (PlayerId::new(1), attribute::RAZINGS, 1.0),
-                (PlayerId::new(1), attribute::KILLS_VALUE, 25.0),
-                (PlayerId::new(2), attribute::KILLS_VALUE_OTHER, 25.0),
-                (PlayerId::new(2), attribute::RAZINGS_OTHER, 1.0),
-                (PlayerId::new(1), AttributeId::numbered(352), 1.0),
-                (PlayerId::new(2), AttributeId::numbered(376), 1.0),
-                (PlayerId::new(1), AttributeId::numbered(427), 25.0),
-                (PlayerId::new(1), attribute::RAZINGS_VALUE, 25.0),
-                (PlayerId::new(2), attribute::RAZINGS_VALUE_OTHER, 25.0),
+                (PlayerId::new(1), attribute::RAZINGS, Amount::new(1.0)),
+                (PlayerId::new(1), attribute::KILLS_VALUE, Amount::new(25.0)),
+                (
+                    PlayerId::new(2),
+                    attribute::KILLS_VALUE_OTHER,
+                    Amount::new(25.0)
+                ),
+                (PlayerId::new(2), attribute::RAZINGS_OTHER, Amount::new(1.0)),
+                (
+                    PlayerId::new(1),
+                    AttributeId::numbered(352),
+                    Amount::new(1.0)
+                ),
+                (
+                    PlayerId::new(2),
+                    AttributeId::numbered(376),
+                    Amount::new(1.0)
+                ),
+                (
+                    PlayerId::new(1),
+                    AttributeId::numbered(427),
+                    Amount::new(25.0)
+                ),
+                (
+                    PlayerId::new(1),
+                    attribute::RAZINGS_VALUE,
+                    Amount::new(25.0)
+                ),
+                (
+                    PlayerId::new(2),
+                    attribute::RAZINGS_VALUE_OTHER,
+                    Amount::new(25.0)
+                ),
             ],
         }]
     );
@@ -1286,7 +1310,7 @@ fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
         master_id: ids::ID_42,
         building: Some(Building {
             trebuchet: true,
-            cost: 400.0,
+            cost: Amount::new(400.0),
             ..Building::default()
         }),
         ..house()
@@ -1307,7 +1331,11 @@ fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
     .unwrap();
     assert_eq!((t.hp, t.killed), (HitPoints::new(0.5), None));
     assert_eq!(
-        t.building.as_ref().unwrap().razed[0].adds,
+        t.building.as_ref().unwrap().razed[0]
+            .adds
+            .iter()
+            .map(|&(p, a, v)| (p, a, v.get()))
+            .collect::<Vec<_>>(),
         vec![
             (PlayerId::new(1), attribute::KILLS, 1.0),
             (PlayerId::new(1), attribute::KILLS_VALUE, 400.0),
@@ -1332,7 +1360,11 @@ fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
     .unwrap();
     assert!(t.killed.is_some());
     assert_eq!(
-        t.building.as_ref().unwrap().razed[0].adds,
+        t.building.as_ref().unwrap().razed[0]
+            .adds
+            .iter()
+            .map(|&(p, a, v)| (p, a, v.get()))
+            .collect::<Vec<_>>(),
         vec![
             (PlayerId::new(1), attribute::RAZINGS_VALUE, 400.0),
             (PlayerId::new(2), attribute::RAZINGS_VALUE_OTHER, 400.0)
@@ -1797,7 +1829,7 @@ fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
     );
     attacker.armored.as_mut().unwrap().facing = Some(Facing {
         angle: Angle::ZERO,
-        facets: 8,
+        facets: crate::objects::FacetCount::of_data(8),
     });
     let narrow = level(BlastLevel::from_bits_retain(0x82));
     assert_eq!(

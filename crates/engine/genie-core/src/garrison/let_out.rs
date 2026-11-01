@@ -205,7 +205,7 @@ impl World {
         self.pathing.tiles_changed(self.spatial.take_changes());
         unit.life.inside = None;
         // a unit out of its container no longer counts down to its raid (`+0x9a0` 0)
-        unit.raider_countdown = 0;
+        unit.raider_countdown = crate::garrison::RaiderCountdown::NONE;
         // the position setter's end: a place off where it last moved to is a move
         if let Some(m) = unit.body.mover_mut() {
             m.mark_move(at, world_time);

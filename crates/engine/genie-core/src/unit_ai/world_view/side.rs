@@ -439,7 +439,13 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let (w, h) = (self.c.w.spatial.map.width(), self.c.w.spatial.map.height());
         for y in 0..h {
             for x in 0..w {
-                if self.c.w.spatial.scout_sight(self.player, Tile::new(x, y)) == Some(0xf) {
+                if self
+                    .c
+                    .w
+                    .spatial
+                    .scout_sight(self.player, Tile::new(x, y))
+                    .is_some_and(crate::map::spatial::TileSight::seen)
+                {
                     m.set(Tile::new(x, y), 1);
                 }
             }

@@ -3647,12 +3647,12 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     }
     assert_eq!(t.garrisoned(object_id(100)), Ok(3));
     // a raider inside a building: its +0xc2c share is not kept
-    t.object_mut(object_id(1000)).unwrap().1.raider_countdown = 20;
+    t.object_mut(object_id(1000)).unwrap().1.raider_countdown = RaiderCountdown::of_data(20);
     assert!(t.garrisoned(object_id(100)).is_err());
     // a transport has no +0xc2c term
     let mut u = unit(3000, VILLAGER, HitPoints::new(25.0));
     u.life.inside = Some(object_id(200));
-    u.raider_countdown = 20;
+    u.raider_countdown = RaiderCountdown::of_data(20);
     t.players[1].objects.push(u);
     assert_eq!(t.garrisoned(object_id(200)), Ok(1));
 }

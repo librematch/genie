@@ -8,10 +8,13 @@ use crate::{
 };
 use genie_core::GenieError;
 use genie_core::combat::AttackCount;
+use genie_core::combat::AttackPowerup;
 use genie_core::combat::Charge;
 use genie_core::combat::Firepower;
 use genie_core::combat::MissileCount;
 use genie_core::combat::damage::ArmorPair;
+use genie_core::construction::BuilderCount;
+use genie_core::garrison::RaiderCountdown;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
@@ -120,7 +123,9 @@ pub(super) fn unit(
         builders: object
             .combat()
             .filter(|_| object.tribe_building_object.is_none())
-            .map_or(0, |c| c.num_builders),
+            .map_or(BuilderCount::NONE, |c| {
+                BuilderCount::of_data(c.num_builders)
+            }),
         regen_powerup: Regeneration::new(
             object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
         ),
@@ -130,7 +135,9 @@ pub(super) fn unit(
         town_bell,
         combat: object.combat().is_some(),
         next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
-        raider_countdown: object.combat().map_or(0, |c| c.raider_build_countdown),
+        raider_countdown: RaiderCountdown::of_data(
+            object.combat().map_or(0, |c| c.raider_build_countdown),
+        ),
         garrison_time: object
             .tribe_building_object
             .as_deref()
@@ -147,7 +154,7 @@ pub(super) fn unit(
         livestock_summation: object
             .tribe_building_object
             .as_deref()
-            .map_or(0.0, |b| b.livestock_summation),
+            .map_or(Amount::ZERO, |b| Amount::new(b.livestock_summation)),
         livestock: lists.livestock,
         pasture_workers: lists.pasture_workers,
         attacking_units: lists.attacking_units,
@@ -186,7 +193,7 @@ pub(super) fn unit(
         reload_powerup: object
             .combat()
             .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_powerup)),
-        attack_powerup: object.combat().map_or(0.0, |c| c.attack_powerup),
+        attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |c| c.attack_powerup)),
         range_powerup: object
             .combat()
             .map_or(Distance::ZERO, |c| Distance::new(c.max_range_powerup)),
@@ -432,7 +439,7 @@ pub(super) fn construction(
     Some(genie_core::construction::build::Construction {
         progress: Seconds::new(b.build_pts),
         desolid: b.desolid_flag != 0,
-        builders: b.tribe_combat_object.num_builders,
+        builders: BuilderCount::of_data(b.tribe_combat_object.num_builders),
         hit_points: MasterHitPoints::of_data(ms.read_temp_6),
         build_time,
         record: genie_core::map::spatial::Obstruction {

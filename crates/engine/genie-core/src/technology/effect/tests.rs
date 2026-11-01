@@ -427,7 +427,7 @@ fn built() -> crate::construction::build::Construction {
     crate::construction::build::Construction {
         progress: Seconds::new(1.0),
         desolid: false,
-        builders: 0,
+        builders: crate::construction::BuilderCount::of_data(0),
         hit_points: MasterHitPoints::of_data(1),
         build_time: WholeSeconds::of_data(1),
         record: crate::map::spatial::Obstruction {

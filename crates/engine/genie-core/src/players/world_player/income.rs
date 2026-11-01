@@ -56,7 +56,7 @@ impl World {
                 // The buildings' type (the object's `+0xf`, `'P'`).
                 .is_ok_and(|m| m.kind == BUILDING);
             if building {
-                sum += unit.livestock_summation;
+                sum += unit.livestock_summation.get();
             }
         }
         let grows = crate::math::fmath::log(sum / LIVESTOCK_SCALE + SECOND);
@@ -207,7 +207,10 @@ impl World {
         };
         for pair in tiles {
             let (x, y) = (pair.x(), pair.y());
-            let seen = self.spatial.scout_sight(p, Tile::new(x, y)) == Some(0xf);
+            let seen = self
+                .spatial
+                .scout_sight(p, Tile::new(x, y))
+                .is_some_and(crate::map::spatial::TileSight::seen);
             if (self.world_time < EARLY_SCOUTING_MS && seen) || EARLY_SCOUTING_MS <= self.world_time
             {
                 self.spatial.scout(p, Tile::new(x, y));

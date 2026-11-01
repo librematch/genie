@@ -29,6 +29,7 @@ found, as in the game.
 | [`search.rs`](search.rs) | A position's change, the sight check and the unit AI's searches: the closest object and the best unit to attack. |
 | [`sight.rs`](sight.rs) | The artifact's owner search, an ownership change, vision and sight, ghosts and the standable spots. |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`tile_sight.rs`](tile_sight.rs) | What a player knows of a tile. |
 <!-- /files -->
 
 ## How it connects

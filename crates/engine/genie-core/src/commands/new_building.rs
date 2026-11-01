@@ -275,7 +275,7 @@ impl World {
             unmodelled_action: None,
             production: None,
             gather_point: None,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             body: crate::objects::layers::Body::new(
                 position,
@@ -285,7 +285,7 @@ impl World {
             construction: Some(Construction {
                 progress,
                 desolid,
-                builders: 0,
+                builders: crate::construction::BuilderCount::of_data(0),
                 hit_points: made.hit_points,
                 build_time: made.build_time,
                 record: crate::map::spatial::Obstruction {
@@ -322,11 +322,11 @@ impl World {
             garrison_time: WorldTime::ZERO,
             relics: Relics::NONE,
             damaged_lately: crate::objects::DamagedTimer::OUT,
-            livestock_summation: 0.0,
+            livestock_summation: Amount::ZERO,
             livestock: Vec::new(),
             pasture_workers: Vec::new(),
             build_frame: crate::objects::Frame::ZERO,
-            raider_countdown: 0,
+            raider_countdown: crate::garrison::RaiderCountdown::NONE,
             // every building holds a gate's lock, open
             gate: Some(Gate {
                 first_update: true,
@@ -344,7 +344,7 @@ impl World {
             abilities: crate::combat::abilities::Abilities::default(),
             reload_stinger: Seconds::ZERO,
             reload_powerup: Seconds::ZERO,
-            attack_powerup: 0.0,
+            attack_powerup: crate::combat::AttackPowerup::ZERO,
             range_powerup: Distance::ZERO,
             armor_powerups: ArmorPair::ZERO,
             armor_removed: ArmorPair::ZERO,

@@ -7,6 +7,9 @@ use crate::combat::damage::{
     ONE, RETALIATION_RANGE, RETALIATION_SCALE, Razed, SPECIAL, Victim, charge_hit, damage,
     effective, elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
+
+/// One kill or razing, as the counts add it to an attribute.
+const ONE_COUNT: Amount = Amount::new(ONE);
 use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HitPoints;
@@ -65,15 +68,15 @@ pub fn take(
 /// A per-player table past the attributes.
 fn razing_counts(
     (ap, q): (PlayerId, PlayerId),
-    cost: f32,
-) -> Result<[(PlayerId, AttributeId, f32); 7], GenieError> {
+    cost: Amount,
+) -> Result<[(PlayerId, AttributeId, Amount); 7], GenieError> {
     Ok([
-        (ap, attribute::RAZINGS, ONE),
+        (ap, attribute::RAZINGS, ONE_COUNT),
         (ap, attribute::KILLS_VALUE, cost),
         (q, attribute::KILLS_VALUE_OTHER, cost),
-        (q, attribute::RAZINGS_OTHER, ONE),
-        (ap, attribute::RAZINGS_OF.offset(q.index())?, ONE),
-        (q, attribute::RAZED_BY.offset(ap.index())?, ONE),
+        (q, attribute::RAZINGS_OTHER, ONE_COUNT),
+        (ap, attribute::RAZINGS_OF.offset(q.index())?, ONE_COUNT),
+        (q, attribute::RAZED_BY.offset(ap.index())?, ONE_COUNT),
         (ap, attribute::RAZINGS_VALUE_OF.offset(q.index())?, cost),
     ])
 }
@@ -87,15 +90,15 @@ fn razing_counts(
 /// A per-player table past the attributes.
 fn kill_counts(
     (ap, q): (PlayerId, PlayerId),
-    cost: f32,
-) -> Result<[(PlayerId, AttributeId, f32); 7], GenieError> {
+    cost: Amount,
+) -> Result<[(PlayerId, AttributeId, Amount); 7], GenieError> {
     Ok([
-        (ap, attribute::KILLS, ONE),
+        (ap, attribute::KILLS, ONE_COUNT),
         (ap, attribute::KILLS_VALUE, cost),
-        (q, attribute::KILLS_OTHER, ONE),
+        (q, attribute::KILLS_OTHER, ONE_COUNT),
         (q, attribute::KILLS_VALUE_OTHER, cost),
-        (ap, attribute::KILLS_OF.offset(q.index())?, ONE),
-        (q, attribute::KILLED_BY.offset(ap.index())?, ONE),
+        (ap, attribute::KILLS_OF.offset(q.index())?, ONE_COUNT),
+        (q, attribute::KILLED_BY.offset(ap.index())?, ONE_COUNT),
         (ap, attribute::KILLS_VALUE_OF.offset(q.index())?, cost),
     ])
 }

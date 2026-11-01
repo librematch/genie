@@ -376,7 +376,7 @@ pub struct Seen {
     pub flags: ObjectFlags,
     /// The viewer's test of its tile (`FUN_1416635e0`, [`crate::map::spatial::Spatial::tile_sight`]):
     /// 0xf seen, 0x80 explored, else 0.
-    pub sight: u8,
+    pub sight: crate::map::spatial::TileSight,
 }
 
 /// A patrol's path goes back and forth when its point is at least this far from the unit

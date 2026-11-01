@@ -116,7 +116,7 @@ impl World {
                         crate::math::conversions::cvttss2si(y),
                     ),
                 )
-                .unwrap_or(0),
+                .unwrap_or(crate::map::spatial::TileSight::UNKNOWN),
         })
     }
 
@@ -413,7 +413,7 @@ impl World {
             for &(p, attribute, amount) in &r.adds {
                 self.players
                     .player_mut(p)?
-                    .add_attribute(attribute, Amount::new(amount))?;
+                    .add_attribute(attribute, amount)?;
             }
         }
         Ok(())
@@ -559,14 +559,13 @@ impl World {
         let cost = paid_cost(master);
         self.players
             .player_mut(ap)?
-            .add_attribute(attribute::KILLS_VALUE, Amount::new(cost))?;
+            .add_attribute(attribute::KILLS_VALUE, cost)?;
         self.players
             .player_mut(q)?
-            .add_attribute(attribute::KILLS_VALUE_OTHER, Amount::new(cost))?;
-        self.players.player_mut(ap)?.add_attribute(
-            attribute::KILLS_VALUE_OF.offset(q.index())?,
-            Amount::new(cost),
-        )?;
+            .add_attribute(attribute::KILLS_VALUE_OTHER, cost)?;
+        self.players
+            .player_mut(ap)?
+            .add_attribute(attribute::KILLS_VALUE_OF.offset(q.index())?, cost)?;
         Ok(())
     }
 }
@@ -581,11 +580,11 @@ pub(crate) fn is_trebuchet(master: &Master) -> bool {
 
 /// `master`'s paid cost (`+0x880`: each entry with a resource and the paid flag), summed as
 /// floats in its order, as the kill counts read it (`FUN_1412005b0`, `FUN_1411cea90`).
-pub(crate) fn paid_cost(master: &Master) -> f32 {
-    let mut cost = 0.0f32;
+pub(crate) fn paid_cost(master: &Master) -> Amount {
+    let mut cost = Amount::ZERO;
     for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
         if paid {
-            cost += f32::from(amount);
+            cost += Amount::new(f32::from(amount));
         }
     }
     cost

@@ -372,5 +372,5 @@ impl Lets<'_> {
 /// A counted builder leaves the building `b` (`+0x9e8` one less).
 const fn leave_site(b: &mut Unit) {
     let n = b.repairers_mut();
-    *n = n.wrapping_sub(1);
+    *n = n.left();
 }

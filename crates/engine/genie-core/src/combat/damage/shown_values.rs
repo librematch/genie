@@ -183,7 +183,11 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
     if attack == DamageAmount::ZERO {
         attack = best_attack(&v.weapons, false);
     }
-    let powerup = if v.tribe() { a.attack_powerup } else { 0.0 };
+    let powerup = if v.tribe() {
+        a.attack_powerup.get()
+    } else {
+        0.0
+    };
     attack = attack
         .plus(DamageAmount::of_effect(powerup))
         .plus(DamageAmount::of_effect(0.0));

@@ -32,6 +32,7 @@ it. After the combat update, every combat unit and building runs its passive abi
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`attack_powerup.rs`](attack_powerup.rs) | An object's attack powerup. |
 | [`charge.rs`](charge.rs) | An object's charge (`Charge`) and how fast it fills (`ChargeRate`), with the game's `f32` operations. |
 | [`firepower.rs`](firepower.rs) | A volley's size: the firepower (missiles a volley), the missiles counted and the swings that fired. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |

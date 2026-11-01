@@ -350,7 +350,7 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
     let built = Construction {
         progress: Seconds::new(15.0),
         desolid: false,
-        builders: 1,
+        builders: crate::construction::BuilderCount::of_data(1),
         hit_points: MasterHitPoints::of_data(480),
         build_time: WholeSeconds::of_data(15),
         record: Obstruction {
@@ -624,7 +624,7 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
     let mut c = Construction {
         progress: Seconds::new(3.0),
         desolid: false,
-        builders: 2,
+        builders: crate::construction::BuilderCount::of_data(2),
         hit_points: MasterHitPoints::of_data(25),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
@@ -643,7 +643,7 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
     let walk = started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK).move_to;
     b.retake(Position::ORIGIN, walk, None, Some(&mut c.builders), false)
         .unwrap();
-    assert_eq!(c.builders, 1);
+    assert_eq!(c.builders, crate::construction::BuilderCount::of_data(1));
     assert_eq!(
         b,
         started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
@@ -659,7 +659,7 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
         .retake(Position::ORIGIN, walk, None, Some(&mut c.builders), false)
         .unwrap();
     assert_eq!(working, before);
-    assert_eq!(c.builders, 1);
+    assert_eq!(c.builders, crate::construction::BuilderCount::of_data(1));
 }
 
 /// A world of player 1 holding the foundations `units` on `spatial`, `masters` its masters'
@@ -807,7 +807,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let c = Construction {
         progress: Seconds::new(24.99),
         desolid: false,
-        builders: 2,
+        builders: crate::construction::BuilderCount::of_data(2),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
@@ -874,7 +874,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
         let c = Construction {
             progress: Seconds::new(100.0),
             desolid: false,
-            builders: 1,
+            builders: crate::construction::BuilderCount::of_data(1),
             hit_points: MasterHitPoints::of_data(100),
             build_time: WholeSeconds::of_data(100),
             record: Obstruction {
@@ -967,7 +967,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
     let c = Construction {
         progress: Seconds::ZERO,
         desolid: true,
-        builders: 1,
+        builders: crate::construction::BuilderCount::of_data(1),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
@@ -1023,7 +1023,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     let foundation = |desolid| Construction {
         progress: Seconds::ZERO,
         desolid,
-        builders: 1,
+        builders: crate::construction::BuilderCount::of_data(1),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
@@ -1114,7 +1114,7 @@ fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
     let mut c = Construction {
         progress: Seconds::ZERO,
         desolid: true,
-        builders: 1,
+        builders: crate::construction::BuilderCount::of_data(1),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
@@ -1150,7 +1150,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
     let foundation = Construction {
         progress: Seconds::ZERO,
         desolid: true,
-        builders: 1,
+        builders: crate::construction::BuilderCount::of_data(1),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {

@@ -296,7 +296,9 @@ pub(crate) fn town_centre_unit(units: OthersRef<'_>) -> Result<Option<&Unit>, Ge
 
 impl crate::players::ai_module::SearchArea for ScoutArea<'_> {
     fn visible_now(&self, tile: Tile) -> bool {
-        self.spatial.scout_sight(self.player, tile) == Some(0xf)
+        self.spatial
+            .scout_sight(self.player, tile)
+            .is_some_and(crate::map::spatial::TileSight::seen)
     }
 }
 

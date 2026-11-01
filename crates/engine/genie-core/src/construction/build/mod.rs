@@ -71,8 +71,6 @@ use crate::players::PlayerId;
 
 /// A builder within this of its foundation's footprint has reached it (`DAT_142eb5690`).
 const REACH: f32 = crate::math::image::build::REACH;
-/// A player's sight of an object it sees (slot 0x1e0).
-const SEEN: u8 = 0xf;
 /// A foundation of another player than the builder's, which the slice does not hand the Build.
 const FOREIGN_SITE: GenieError = GenieError::unsupported("a foundation of another player");
 /// The Build's foundation the world no longer holds where its place is read.
@@ -155,7 +153,7 @@ pub struct Construction {
     /// `+0xc60`, `desolid_flag`: no builder has started it; it has no obstruction record.
     pub desolid: bool,
     /// `+0x9e8`, `num_builders`.
-    pub builders: u8,
+    pub builders: crate::construction::BuilderCount,
     /// Its master's hit points (`+0x530`) and build time (`+0x898`, the first train location's
     /// train time; 0 without one).
     pub hit_points: MasterHitPoints,
@@ -606,7 +604,7 @@ mod stack_tests {
             construction: Some(Construction {
                 progress: Seconds::new(149.99),
                 desolid: false,
-                builders: 1,
+                builders: crate::construction::BuilderCount::of_data(1),
                 hit_points: MasterHitPoints::of_data(2400),
                 build_time: WholeSeconds::of_data(150),
                 record: Obstruction {

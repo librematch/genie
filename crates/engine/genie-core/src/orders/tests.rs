@@ -333,7 +333,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         construction: Some(crate::construction::build::Construction {
             progress: Seconds::new(1.0),
             desolid: false,
-            builders: 1,
+            builders: crate::construction::BuilderCount::of_data(1),
             hit_points: MasterHitPoints::of_data(550),
             build_time: WholeSeconds::of_data(25),
             record: crate::map::spatial::Obstruction {
@@ -462,7 +462,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     assert_eq!(
         t.players[0].objects[ListIndex::new(1)]
             .construction
-            .map(|k| k.builders),
+            .map(|k| k.builders.get()),
         Some(0)
     );
     assert_eq!(
@@ -1517,7 +1517,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         construction: Some(crate::construction::build::Construction {
             progress: Seconds::new(10.0),
             desolid: false,
-            builders: 0,
+            builders: crate::construction::BuilderCount::of_data(0),
             hit_points: MasterHitPoints::of_data(100),
             build_time: WholeSeconds::of_data(10),
             record: crate::map::spatial::Obstruction {
@@ -2370,7 +2370,7 @@ fn a_master_change_s_unmodelled_parts_fail() {
 #[test]
 fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
     let mut unit = Unit {
-        attack_powerup: 2.0,
+        attack_powerup: crate::combat::AttackPowerup::new(2.0),
         reload_powerup: Seconds::new(0.5),
         reload_stinger: Seconds::new(0.25),
         work_rate_powerup: WorkRate::new(0.15),
@@ -2388,7 +2388,11 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
             unit.reload_powerup,
             unit.work_rate_powerup
         ),
-        (0.0, Seconds::ZERO, WorkRate::ZERO)
+        (
+            crate::combat::AttackPowerup::ZERO,
+            Seconds::ZERO,
+            WorkRate::ZERO
+        )
     );
     assert_eq!(
         (unit.hp_powerup, unit.armor_powerups),
@@ -2687,7 +2691,7 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
     let construction = crate::construction::build::Construction {
         progress: Seconds::ZERO,
         desolid: true,
-        builders: 2,
+        builders: crate::construction::BuilderCount::of_data(2),
         hit_points: MasterHitPoints::of_data(100),
         build_time: WholeSeconds::of_data(10),
         record: crate::map::spatial::Obstruction {
@@ -2713,7 +2717,8 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
     ]
     .into();
     t.leave_builders(object_id(70)).unwrap();
-    let builders = |t: &World, i: ListIndex| t.players[1].objects[i].construction.unwrap().builders;
+    let builders =
+        |t: &World, i: ListIndex| t.players[1].objects[i].construction.unwrap().builders.get();
     assert_eq!(
         (
             builders(&t, ListIndex::new(0)),
@@ -2901,8 +2906,14 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
         },
         ..Unit::default()
     };
-    t.players[1].objects.push(foundation(object_id(60), 1));
-    t.players[1].objects.push(foundation(object_id(61), 0));
+    t.players[1].objects.push(foundation(
+        object_id(60),
+        crate::construction::BuilderCount::of_data(1),
+    ));
+    t.players[1].objects.push(foundation(
+        object_id(61),
+        crate::construction::BuilderCount::of_data(0),
+    ));
     t.players[1].objects[ListIndex::new(0)]
         .actions
         .set_build(Some(crate::construction::build::BuildAction {
@@ -2956,7 +2967,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     assert_eq!((build.target, build.added), (Some(object_id(61)), false));
     let site = |t: &World, i: ListIndex| {
         let u = &t.players[1].objects[i];
-        (u.construction.unwrap().builders, u.workers.get())
+        (u.construction.unwrap().builders.get(), u.workers.get())
     };
     assert_eq!(
         (site(&t, ListIndex::new(1)), site(&t, ListIndex::new(2))),

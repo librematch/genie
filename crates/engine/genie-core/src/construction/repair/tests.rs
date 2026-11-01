@@ -109,7 +109,7 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
             WorkRate::new(1.0),
             crate::objects::masters::WorkValue::new(0.5),
             Seconds::new(0.05),
-            Some(1)
+            Some(crate::construction::BuilderCount::of_data(1))
         ),
         HitPoints::new(1.0 * 0.5 * 0.05)
     );
@@ -119,7 +119,7 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
             WorkRate::new(1.0),
             crate::objects::masters::WorkValue::new(0.5),
             Seconds::new(0.05),
-            Some(3)
+            Some(crate::construction::BuilderCount::of_data(3))
         ),
         HitPoints::new(alone * (((3.0 - 1.0) * 0.5 + 1.0) / 3.0))
     );
@@ -386,7 +386,7 @@ fn sprite_of(t: &crate::world::World) -> Option<SpriteId> {
 /// The house's hit points, repairers and holders (its slot 0x180 count).
 fn the_house(t: &crate::world::World) -> (f32, u8, i32) {
     let h = t.object(object_id(10028)).unwrap().1;
-    (h.life.hp.get(), h.repairers(), h.workers.get())
+    (h.life.hp.get(), h.repairers().get(), h.workers.get())
 }
 
 /// The sprite its `MoveTo` shows: the task's moving sprite, else the default of its
@@ -662,7 +662,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = 1;
+        .builders = crate::construction::BuilderCount::of_data(1);
     t.players[1].objects[ListIndex::new(0)]
         .actions
         .repair_mut()
@@ -678,7 +678,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
                     WorkRate::new(1.0),
                     crate::objects::masters::WorkValue::new(0.5),
                     Seconds::new(0.05),
-                    Some(1)
+                    Some(crate::construction::BuilderCount::of_data(1))
                 )
                 .get(),
             1,
@@ -715,7 +715,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = 1;
+        .builders = crate::construction::BuilderCount::of_data(1);
     t.players[1].objects[ListIndex::new(0)]
         .actions
         .repair_mut()

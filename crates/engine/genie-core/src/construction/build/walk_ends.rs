@@ -4,7 +4,7 @@
 use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
-    BUILDER_UNMOVING, BuildAction, BuildReads, FOREIGN_SITE, REACH, SEEN, SITE_GONE, UNSEEN_SITE,
+    BUILDER_UNMOVING, BuildAction, BuildReads, FOREIGN_SITE, REACH, SITE_GONE, UNSEEN_SITE,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -90,7 +90,7 @@ impl BuildAction {
                     c.w.spatial
                         .building_sight(target, placed.position, placed.player)
                         .ok_or(UNSEEN_SITE)?
-                        == SEEN;
+                        .seen();
                 if seen {
                     self.remove_marked(c)?;
                     return self.halt_in(c, builder, reads);

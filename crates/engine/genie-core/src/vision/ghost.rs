@@ -1326,7 +1326,7 @@ mod tests {
         foundation.construction = Some(crate::construction::build::Construction {
             progress: Seconds::ZERO,
             desolid: true,
-            builders: 0,
+            builders: crate::construction::BuilderCount::NONE,
             hit_points: MasterHitPoints::of_data(0),
             build_time: WholeSeconds::ZERO,
             record: crate::map::spatial::Obstruction {

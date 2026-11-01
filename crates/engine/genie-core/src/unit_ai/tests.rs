@@ -4650,7 +4650,7 @@ fn the_artifact_s_notifies_stop_it_or_go_on() {
     ai.current_target = Some(object_id(9));
     let seen = Surroundings {
         target: Some(Seen {
-            sight: 0xf,
+            sight: crate::map::spatial::TileSight::of_data(0xf),
             ..Seen::default()
         }),
         ..at.clone()
@@ -4661,7 +4661,7 @@ fn the_artifact_s_notifies_stop_it_or_go_on() {
     );
     let explored = Surroundings {
         target: Some(Seen {
-            sight: 0x80,
+            sight: crate::map::spatial::TileSight::of_data(0x80),
             ..Seen::default()
         }),
         ..at
@@ -7522,7 +7522,7 @@ fn a_grouped_unit_s_full_update_reads_its_group() {
         radius: Footprint::new(0.2, 0.2),
         visible: true,
         flags: ObjectFlags::NONE,
-        sight: 0xf,
+        sight: crate::map::spatial::TileSight::of_data(0xf),
     };
     let target_at = Surroundings {
         target: Some(seen),

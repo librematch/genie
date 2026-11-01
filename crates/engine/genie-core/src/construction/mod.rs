@@ -2,8 +2,11 @@
 //! the wait for a foundation, a building's own update and the gates.
 
 pub mod build;
+mod builder_count;
 pub(crate) mod building_update;
 pub(crate) mod gates;
 pub mod repair;
 pub mod wait_solidify;
 mod wait_solidify_state;
+
+pub use self::builder_count::BuilderCount;

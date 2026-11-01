@@ -43,6 +43,7 @@ mod pather;
 mod record_id;
 mod search;
 mod sight;
+mod tile_sight;
 
 pub use self::grid::WalkQuery;
 
@@ -52,6 +53,7 @@ use self::pather::{WalkTest, record_meets_segment};
 use self::pather::{box_meets_segment, ccw};
 pub use self::record_id::RecordId;
 pub use self::search::SearchQuery;
+pub use self::tile_sight::TileSight;
 
 /// The range of `ClosestObject`'s reachability check (`FUN_140c488b0`, `DAT_142eb5690`).
 const CLOSEST_RANGE: Distance = Distance::new(crate::math::image::spatial::CLOSEST_RANGE);

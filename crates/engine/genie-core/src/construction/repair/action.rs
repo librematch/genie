@@ -37,11 +37,11 @@ pub fn work_amount(
     rate: WorkRate,
     work_value: crate::objects::masters::WorkValue,
     dt: Seconds,
-    repairers: Option<u8>,
+    repairers: Option<crate::construction::BuilderCount>,
 ) -> HitPoints {
     let mut amount = rate * work_value * dt;
     if let Some(n) = repairers {
-        let n = f32::from(n);
+        let n = n.as_f32();
         if ONE < n {
             amount *= ((n - ONE) * EXTRA_REPAIRER + ONE) / n;
         }
@@ -411,7 +411,7 @@ impl RepairAction {
             && let Some((_, u)) = c.w.object_mut(id)
         {
             let n = u.repairers_mut();
-            *n = n.wrapping_add_signed(by);
+            *n = n.changed_by(by);
         }
     }
 

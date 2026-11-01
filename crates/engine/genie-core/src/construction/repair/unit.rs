@@ -79,7 +79,7 @@ impl Unit {
     }
 
     /// `+0x9e8` (`num_builders`): a building's in its construction, any other's its own.
-    pub(crate) const fn repairers(&self) -> u8 {
+    pub(crate) const fn repairers(&self) -> crate::construction::BuilderCount {
         match &self.construction {
             Some(k) => k.builders,
             None => self.builders,
@@ -87,7 +87,7 @@ impl Unit {
     }
 
     /// [`Unit::repairers`] to change.
-    pub(crate) const fn repairers_mut(&mut self) -> &mut u8 {
+    pub(crate) const fn repairers_mut(&mut self) -> &mut crate::construction::BuilderCount {
         match &mut self.construction {
             Some(k) => &mut k.builders,
             None => &mut self.builders,

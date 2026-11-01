@@ -87,7 +87,7 @@ impl UnitAi {
             // "Target is still visible.": the world holds the target, which its owner sees
             NotifyKind::TARGET_MOVED => !at
                 .target
-                .is_some_and(|t| self.current_target.is_some() && t.sight == 0xf),
+                .is_some_and(|t| self.current_target.is_some() && t.sight.seen()),
             NotifyKind::SENT_OFF | NotifyKind::SENT_OFF_GROUP => {
                 return self.base_notify(n, time, at, computer, ai_rng, side);
             }

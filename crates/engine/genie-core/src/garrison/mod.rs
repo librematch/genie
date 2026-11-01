@@ -15,6 +15,7 @@ mod enter_state;
 mod firepower;
 mod let_out;
 mod meeting;
+mod raider_countdown;
 mod shelter;
 mod takes_in;
 pub mod transport;
@@ -28,6 +29,7 @@ pub use self::firepower::{attack_rate, firepower, share};
 use self::meeting::{ENTER_NEAR, HALF_TILE, UNPLACED};
 pub use self::meeting::{LandingWalk, MeetAt, MeetingTarget, Walls, meet_at, walled_off};
 pub(crate) use self::meeting::{UNREACHED, enter_view, ship_reaches};
+pub use self::raider_countdown::RaiderCountdown;
 use self::shelter::LEAST_HP_SHARE;
 pub(crate) use self::shelter::Shelters;
 #[cfg(test)]

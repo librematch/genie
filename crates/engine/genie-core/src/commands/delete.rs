@@ -620,7 +620,7 @@ mod tests {
             construction: Some(Construction {
                 progress: Seconds::new(progress),
                 desolid,
-                builders: 0,
+                builders: crate::construction::BuilderCount::of_data(0),
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {

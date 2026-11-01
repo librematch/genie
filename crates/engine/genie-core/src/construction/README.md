@@ -29,6 +29,7 @@ building's own steps first, then the builder's or repairer's action.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`builder_count.rs`](builder_count.rs) | The builders or repairers on an object. |
 | [`building_update.rs`](building_update.rs) | A gate's and a farm's update, a building's completion and seconds, the idle swap and the death blast. |
 | [`gates.rs`](gates.rs) | The gates: the units in a gate, a player's gate list and passes, and the gates opened before and closed after a player's update. |
 | [`mod.rs`](mod.rs) | Building and repairing: the Build and Repair actions with each worker's part of its update, the wait for a foundation, a building's own update and the gates. |
