@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupCommand;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::attack::AttackOrder;
@@ -18,7 +19,8 @@ use crate::world::World;
 
 /// The tasks `BUnitGroup::command` runs through the general command (`FUN_14100fc50`): the cases
 /// of its switch besides the attack path's.
-const GENERAL_COMMANDS: [i32; 11] = [3, 5, 0xc, 0x65, 0x69, 0x6a, 0x6e, 0x6f, 0x84, 0x88, 0x99];
+const GENERAL_COMMANDS: [GroupCommandKind; 11] =
+    GroupCommandKind::table([3, 5, 0xc, 0x65, 0x69, 0x6a, 0x6e, 0x6f, 0x84, 0x88, 0x99]);
 /// What `BUnitGroup::command` is told besides the group, the target and the point: the order's
 /// queued (`param_5`) and direct (`param_6`) bytes, its seventh byte (`param_7`), which the
 /// group keeps as its target's `mDisableRetargeting`, and its task filter (`param_8`, `-1` for
@@ -74,9 +76,9 @@ impl World {
         }
         let g = self.groups.held_mut(group)?;
         g.replaces_queue = u8::from(!order.queued);
-        let command = task.map(|t| t.command);
+        let command = task.map(|t| GroupCommandKind::of_action(t.command));
         let mut moved = false;
-        if command.is_none_or(|c| i32::from(c.get()) == MOVE_COMMAND) {
+        if command.is_none_or(|c| c == MOVE_COMMAND) {
             moved = self.command_move_to(
                 group,
                 target,
@@ -90,12 +92,13 @@ impl World {
             )?;
         }
         if let (Some(task), Some(held)) = (task, target) {
-            if ATTACK_COMMANDS.contains(&i32::from(task.command.get())) {
+            let command = GroupCommandKind::of_action(task.command);
+            if ATTACK_COMMANDS.contains(&command) {
                 moved = self.attack_command(group, held, point, (task, order), moved)?;
-            } else if GENERAL_COMMANDS.contains(&i32::from(task.command.get())) {
+            } else if GENERAL_COMMANDS.contains(&command) {
                 moved = self.general_command(
                     group,
-                    (i32::from(task.command.get()), held),
+                    (command, held),
                     point,
                     task.range.unwrap_or(Distance::ZERO),
                     order,
@@ -129,7 +132,7 @@ impl World {
     pub(super) fn general_command(
         &mut self,
         group: GroupId,
-        (command, target): (i32, ObjectId),
+        (command, target): (GroupCommandKind, ObjectId),
         point: Point,
         range: Distance,
         order: CommandArgs,
@@ -146,7 +149,7 @@ impl World {
         };
         if order.queued {
             g.queue_command(entry(u8::from(order.direct)));
-            if g.current_command == -1 && order.direct && g.hibernating != 1 {
+            if g.current_command == GroupCommandKind::NONE && order.direct && g.hibernating != 1 {
                 g.hibernating = 1;
             }
             return Ok(false);
@@ -211,7 +214,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         let g = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
-            command: i32::from(task.command.get()),
+            command: GroupCommandKind::of_action(task.command),
             target_id: Some(target),
             range: task.range.unwrap_or(Distance::ZERO),
             point: BVector::new(point.x(), 0.0, point.y()),
@@ -221,7 +224,7 @@ impl World {
         };
         if order.queued {
             g.queue_command(entry(u8::from(order.direct)));
-            if g.current_command == -1 && order.direct && g.hibernating != 1 {
+            if g.current_command == GroupCommandKind::NONE && order.direct && g.hibernating != 1 {
                 g.hibernating = 1;
             }
             return Ok(moved);

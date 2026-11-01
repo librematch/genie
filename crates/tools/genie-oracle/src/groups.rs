@@ -9,9 +9,9 @@ use genie_core::GenieError;
 use genie_core::groups::GroupFlags;
 use genie_core::groups::MotionFlags;
 use genie_core::groups::{
-    Formation, FormationKind, FormationLine, GroupCommand, GroupId, GroupOrder, GroupTarget,
-    LinePoint, Member, Motion, PointLine, Slot, SlotState, SpecificMove, TargetData, UnitGroup,
-    UnitGroups, UnitTypeStatistic,
+    Formation, FormationKind, FormationLine, GroupCommand, GroupCommandKind, GroupId, GroupOrder,
+    GroupTarget, LinePoint, Member, Motion, PointLine, Slot, SlotState, SpecificMove, TargetData,
+    UnitGroup, UnitGroups, UnitTypeStatistic,
 };
 use genie_core::map::Distance;
 use genie_core::math::fmath::BVector;
@@ -200,7 +200,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
             })
             .collect::<Result<_, GenieError>>()?,
         waypoints: g.waypoints.iter().map(vec3).collect(),
-        current_command: g.current_command,
+        current_command: GroupCommandKind::named(g.current_command),
         current_target: TargetData {
             target: GroupTarget::of_saved(t.target, t.type_),
             original_position: vec3(&t.original_position),
@@ -215,7 +215,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
             .order_queue
             .iter()
             .map(|o| GroupOrder {
-                command: o.new_order_command,
+                command: GroupCommandKind::named(o.new_order_command),
                 target_id: ObjectId::of_field(o.new_order_target_id),
                 parm: o.new_order_parm,
                 point: vec3(&o.new_order_point),
@@ -227,7 +227,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
             .command_queue
             .iter()
             .map(|c| GroupCommand {
-                command: c.new_command_command,
+                command: GroupCommandKind::named(c.new_command_command),
                 target_id: ObjectId::of_field(c.new_command_target_id),
                 range: Distance::new(c.new_command_range),
                 point: vec3(&c.new_command_point),
@@ -473,6 +473,13 @@ impl Flat for TurnRate {
 
 /// A vector flattens as its three components in the game's order, as the save holds them.
 impl Flat for BVector {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A group command's kind flattens as its value, as the save holds it.
+impl Flat for GroupCommandKind {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }

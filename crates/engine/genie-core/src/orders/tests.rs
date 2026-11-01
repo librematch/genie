@@ -4,6 +4,7 @@ use crate::construction::build::BuildState;
 use crate::gathering::gather::GatherState;
 use crate::gathering::hunt::HuntState;
 use crate::groups::FormationKind;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
 use crate::map::Footprint;
@@ -4133,7 +4134,10 @@ fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
         (g.owner, g.has(object_id(11)), g.has(object_id(12))),
         (1, true, true)
     );
-    assert_eq!((g.differentiator_id, g.current_command), (0, 1));
+    assert_eq!(
+        (g.differentiator_id, g.current_command),
+        (0, GroupCommandKind::MOVE)
+    );
     let top = g.motion.paths.last().unwrap();
     assert_eq!(
         top.path_flags & (PathFlags::LOOPS | PathFlags::BACK_AND_FORTH),
@@ -4935,7 +4939,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_a_group_that_attacks_it() 
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
     assert_eq!(
         (g[0].current_command, g[0].current_target.target),
-        (9, GroupTarget::Object(object_id(60)))
+        (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
     assert_eq!(t.groups.commands, 1);
 }

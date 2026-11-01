@@ -3,6 +3,7 @@
 //! returns 0 (the world list's unlink, then `BUnitGroup`'s destructor, `FUN_140fe1920`).
 
 use crate::GenieError;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
 use crate::groups::UnitGroup;
@@ -21,14 +22,15 @@ mod send;
 pub use self::awake::IDLE_SPAN;
 
 /// The group's current command (`mCurrentCommand`, `+0x3a8`) without one.
-const NO_COMMAND: i32 = -1;
+const NO_COMMAND: GroupCommandKind = GroupCommandKind::NONE;
 /// The group commands the update tells apart: an attack, a build, a repair, a relic's pick-up
 /// and its delivery.
-const ATTACK: i32 = crate::combat::attack::ATTACK.get() as i32;
-const BUILD: i32 = crate::objects::masters::action_type::BUILD.get() as i32;
-const REPAIR: i32 = crate::construction::repair::REPAIR.get() as i32;
-const PICK_UP_RELIC: i32 = 0x84;
-const DELIVER_RELIC: i32 = 0x88;
+const ATTACK: GroupCommandKind = GroupCommandKind::ATTACK;
+const BUILD: GroupCommandKind =
+    GroupCommandKind::of_action(crate::objects::masters::action_type::BUILD);
+const REPAIR: GroupCommandKind = GroupCommandKind::of_action(crate::construction::repair::REPAIR);
+const PICK_UP_RELIC: GroupCommandKind = GroupCommandKind::named(0x84);
+const DELIVER_RELIC: GroupCommandKind = GroupCommandKind::named(0x88);
 /// The action types of the tasks that pick up and deliver relics (`FUN_1415c60b0`'s third
 /// argument, as the commands).
 const RELIC_PICKUP_ACTION: ActionType = ActionType::named(0x84);
@@ -36,7 +38,7 @@ const RELIC_DELIVERY_ACTION: ActionType = ActionType::named(0x88);
 /// The nearest member's target starts this far (`FUN_141007ca0`, `DAT_14330ebf4`).
 const FARTHEST: f32 = crate::math::image::group::FARTHEST;
 /// A follow (`mCurrentCommand` 2).
-const FOLLOW: i32 = 2;
+const FOLLOW: GroupCommandKind = GroupCommandKind::FOLLOW;
 /// A turn of the motion above this lays the formation out anew (`DAT_142eb6e44`, π/4).
 const TURN_LIMIT: f32 = crate::math::image::facing::QUARTER_PI;
 /// How far ahead of the group its front is looked for (`DAT_14330ebcc`).
@@ -84,7 +86,7 @@ impl UnitGroup {
         if self.flags.contains(GroupFlags::MEMBERS_SENT) {
             return true;
         }
-        if self.current_command == 1 && self.patrols() {
+        if self.current_command == GroupCommandKind::MOVE && self.patrols() {
             return true;
         }
         !(self.motion.moving() || self.motion.waits_to_move())

@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationKind;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
@@ -147,7 +148,10 @@ impl World {
         let g = self.groups.held(group)?;
         // the re-attack: an attack plan of 1 before, command 9 (attack) and a target the
         // world's table holds; a target it does not hold does nothing
-        if old_plan == 1 && g.current_command == 9 && self.world_object(target).is_some() {
+        if old_plan == 1
+            && g.current_command == GroupCommandKind::ATTACK
+            && self.world_object(target).is_some()
+        {
             return Err(GenieError::unsupported(
                 "a group's attack plan that attacks again (FUN_14100f7f0)",
             ));
@@ -862,7 +866,7 @@ mod tests {
         g.unit_types[0].units.push(object_id(50));
         g.current_target.target = GroupTarget::of_saved(99, -1);
         g.attack_plan_type = 1;
-        g.current_command = 9;
+        g.current_command = GroupCommandKind::ATTACK;
         g.objects = vec![object_id(77)];
         let _ = t.statistics_only(group_id(1), false).unwrap();
         let g = t.groups.get(group_id(1)).unwrap();

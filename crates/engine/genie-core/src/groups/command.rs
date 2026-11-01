@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::CommandArgs;
 use crate::groups::FormationKind;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
@@ -33,17 +34,19 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 /// a path shorter than it one.
 const EPSILON: f32 = crate::math::image::group::EPSILON;
 /// The group's command while it moves (`mCurrentCommand` 1).
-pub const MOVE_COMMAND: i32 = 1;
+pub const MOVE_COMMAND: GroupCommandKind = GroupCommandKind::MOVE;
 /// A patrol's leg goes back and forth when its point is at least this far from the group on
 /// the ground (`commandMoveTo` at 0x141010ddb, `DAT_14330ebb8`).
 const PATROL_LEG_REACH: f32 = crate::math::image::group::PATROL_LEG_REACH;
 
 /// The queued commands on a target `checkQueuedOrders` hands to `FUN_14100fc50` when the world
 /// holds the target (its switch's cases 3 and `0x2713`).
-const TARGET_COMMANDS: [i32; 11] = [3, 5, 0xc, 0x65, 0x69, 0x6a, 0x6e, 0x6f, 0x84, 0x88, 0x2713];
+const TARGET_COMMANDS: [GroupCommandKind; 11] =
+    GroupCommandKind::table([3, 5, 0xc, 0x65, 0x69, 0x6a, 0x6e, 0x6f, 0x84, 0x88, 0x2713]);
 /// The queued attacks `checkQueuedOrders` hands to `FUN_14100f7f0` when the world holds the
 /// target.
-pub(super) const ATTACK_COMMANDS: [i32; 4] = [7, 9, 0x68, 0x7d];
+pub(super) const ATTACK_COMMANDS: [GroupCommandKind; 4] =
+    GroupCommandKind::table([7, 9, 0x68, 0x7d]);
 
 /// What `commandMoveTo` is told besides the target and the point: the range (`param_5`), and its
 /// flags `param_6` (a patrol's leg), `param_7` (the group's target goes), `param_8`, `param_9`
@@ -164,7 +167,7 @@ impl World {
                 disable_retargeting: 0,
                 approved_2: 0xffff,
             });
-            if g.current_command == -1 && how.direct && g.hibernating != 1 {
+            if g.current_command == GroupCommandKind::NONE && how.direct && g.hibernating != 1 {
                 g.hibernating = 1;
             }
             return Ok(Some(false));
@@ -411,7 +414,8 @@ impl World {
     /// [`World::check_queued_orders`]' run over the queue and its move to the run's last command
     /// (`bVar2`: a command on a held target ends the run without the move).
     fn run_queued_commands(&mut self, group: GroupId) -> Result<(), GenieError> {
-        let (mut first, mut kept, mut ran, mut running) = (-1, None, false, true);
+        let (mut first, mut kept, mut ran, mut running) =
+            (GroupCommandKind::NONE, None, false, true);
         let mut i = 0;
         while running {
             let g = self.groups.held(group)?;
@@ -423,15 +427,18 @@ impl World {
                 continue;
             }
             ran = true;
-            if first == -1 {
+            if first == GroupCommandKind::NONE {
                 first = node.command;
             }
             let count = g.command_queue.len();
             running = !self.run_queued_node(group, node, count)?;
             let g = self.groups.held_mut(group)?;
-            let next = g.command_queue.get(i + 1).map_or(-1, |n| n.command);
+            let next = g
+                .command_queue
+                .get(i + 1)
+                .map_or(GroupCommandKind::NONE, |n| n.command);
             let _ = g.command_queue.remove(i);
-            let ends = first != -1 && next != first;
+            let ends = first != GroupCommandKind::NONE && next != first;
             if ends || g.command_queue.is_empty() {
                 kept = Some(node);
             }
@@ -708,7 +715,7 @@ mod tests {
 
     fn command(command: i32, target: i32, x: f32, z: f32, approved: u8) -> GroupCommand {
         GroupCommand {
-            command,
+            command: GroupCommandKind::named(command),
             target_id: ObjectId::of_field(target),
             range: Distance::new(0.5),
             point: BVector::new(x, 0.0, z),
@@ -735,7 +742,10 @@ mod tests {
         );
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(g.command_queue, [command(1, -1, 3.0, 4.0, 1)]);
-        assert_eq!((g.hibernating, g.current_command), (1, -1));
+        assert_eq!(
+            (g.hibernating, g.current_command),
+            (1, GroupCommandKind::NONE)
+        );
         assert!(!g.motion.paths[0].has_path);
     }
 
@@ -795,7 +805,10 @@ mod tests {
         assert_eq!(g.command_queue, []);
         assert_eq!(
             (g.current_command, g.current_target.target),
-            (3, GroupTarget::Object(object_id(7)))
+            (
+                GroupCommandKind::named(3),
+                GroupTarget::Object(object_id(7))
+            )
         );
         // nothing queued: a hibernating group wakes
         let mut t = moving_world();

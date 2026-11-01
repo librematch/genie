@@ -28,6 +28,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
 
+mod command_kind;
 mod formation_kind;
 mod group_flags;
 mod group_id;
@@ -36,6 +37,7 @@ mod motion_flags;
 mod objects;
 mod slot_state;
 
+pub use self::command_kind::GroupCommandKind;
 pub use self::formation_kind::FormationKind;
 pub use self::group_flags::GroupFlags;
 pub use self::group_id::GroupId;
@@ -321,7 +323,7 @@ pub struct TargetData {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct GroupOrder {
     /// `mCommand`.
-    pub command: i32,
+    pub command: GroupCommandKind,
     /// `mTargetID`.
     pub target_id: Option<ObjectId>,
     /// `mParm`.
@@ -336,7 +338,7 @@ pub struct GroupOrder {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct GroupCommand {
     /// `mCommand`.
-    pub command: i32,
+    pub command: GroupCommandKind,
     /// `mTargetID`.
     pub target_id: Option<ObjectId>,
     /// `mRange`.
@@ -401,7 +403,7 @@ pub struct UnitGroup {
     /// `mWaypoints`.
     pub waypoints: Vec<BVector>,
     /// `mCurrentCommand`.
-    pub current_command: i32,
+    pub current_command: GroupCommandKind,
     /// `mCurrentTarget`.
     pub current_target: TargetData,
     /// `mAttackPlanType`.
@@ -505,7 +507,7 @@ impl UnitGroup {
             owner: u32::MAX,
             stance: None,
             flags: GroupFlags::TURN,
-            current_command: -1,
+            current_command: GroupCommandKind::NONE,
             current_target: TargetData::default(),
             differentiator_id: -1,
             replaces_queue: 1,

@@ -33,6 +33,7 @@ The world runs the update of each group that a player owns, before the player's 
 | --- | --- |
 | [`attack.rs`](attack.rs) | A group's command on an attack task (FD-036): `FUN_14100f7f0`, which `BUnitGroup::command` runs for the tasks 1, 7, 9, `0x68` and `0x7d` on a target, with the member passes it makes (`FUN_14100c6c0`, `FUN_141007ba0`, `FUN_14102bbd0`). |
 | [`command.rs`](command.rs) | A group's orders (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), `commandMoveTo` (`FUN_141010a80`) and `stopAllUnits` (`FUN_14103a0d0`), the HD PDB's names. |
+| [`command_kind.rs`](command_kind.rs) | A group command's kind (`GroupCommandKind`): a move, a follow, or the action type of the task the group's members carry out. |
 | [`create.rs`](create.rs) | A group's members (FD-036): `AddUnit` (`FUN_1410083c0`) with its sub-formation statistics (`FUN_141008d90`, `FUN_1410116c0`) and a unit's radius in a formation (`FUN_141025920`). |
 | [`formation_kind.rs`](formation_kind.rs) | A formation's type as one type: `BFormation`'s `mType`, a group's lock, a unit AI's formation type and the `FORM_FORMATION` command's. |
 | [`group_flags.rs`](group_flags.rs) | A group's flags (`GroupFlags`, `mGroupFlags`). |

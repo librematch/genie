@@ -258,7 +258,7 @@ fn a_new_group_holds_the_constructor_s_values() {
     assert_eq!((g.id, g.owner, g.stance), (group_id(7), u32::MAX, None));
     assert_eq!(
         (g.flags, g.current_command, g.differentiator_id),
-        (GroupFlags::TURN, -1, -1)
+        (GroupFlags::TURN, GroupCommandKind::NONE, -1)
     );
     assert_eq!(g.current_target.target, GroupTarget::None);
     assert_eq!(
@@ -716,7 +716,7 @@ fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
             certain_action: Some(crate::objects::masters::ActionType::named(0x1234)),
         }
     );
-    assert_eq!(g.current_command, 9);
+    assert_eq!(g.current_command, GroupCommandKind::ATTACK);
     assert_eq!(
         (
             g.flags & GroupFlags::ARRIVED,
@@ -901,7 +901,7 @@ fn a_general_command_moves_the_group_to_the_target_and_takes_the_command() {
     let moved = t
         .general_command(
             group_id(1),
-            (5, building_60()),
+            (GroupCommandKind::named(5), building_60()),
             Point::new(40.0, 45.0),
             Distance::new(3.0),
             general(false, true),
@@ -909,7 +909,7 @@ fn a_general_command_moves_the_group_to_the_target_and_takes_the_command() {
         .unwrap();
     assert!(moved);
     let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!(g.current_command, 5);
+    assert_eq!(g.current_command, GroupCommandKind::named(5));
     assert_eq!(
         g.current_target,
         TargetData {
@@ -940,14 +940,17 @@ fn a_general_command_of_a_group_that_cannot_move_does_nothing() {
     assert!(
         !t.general_command(
             group_id(1),
-            (5, building_60()),
+            (GroupCommandKind::named(5), building_60()),
             Point::new(40.0, 45.0),
             Distance::new(3.0),
             general(false, true)
         )
         .unwrap()
     );
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, -1);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::NONE
+    );
 }
 
 /// Queued, the command joins the queue approved by `direct` and a group without a command told
@@ -959,7 +962,7 @@ fn a_general_command_queues_or_runs_the_queue() {
     assert!(
         !t.general_command(
             group_id(1),
-            (5, building_60()),
+            (GroupCommandKind::named(5), building_60()),
             Point::new(40.0, 45.0),
             Distance::new(3.0),
             general(true, true)
@@ -979,7 +982,7 @@ fn a_general_command_queues_or_runs_the_queue() {
             node.approved_2
         ),
         (
-            5,
+            GroupCommandKind::named(5),
             Some(object_id(60)),
             Distance::new(3.0),
             BVector::new(40.0, 0.0, 45.0),
@@ -990,7 +993,7 @@ fn a_general_command_queues_or_runs_the_queue() {
     assert!(
         t.general_command(
             group_id(1),
-            (5, building_60()),
+            (GroupCommandKind::named(5), building_60()),
             Point::new(40.0, 45.0),
             Distance::new(3.0),
             general(false, false)
@@ -999,7 +1002,7 @@ fn a_general_command_queues_or_runs_the_queue() {
     );
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.command_queue, []);
-    assert_eq!(g.current_command, 5);
+    assert_eq!(g.current_command, GroupCommandKind::named(5));
 }
 
 /// `FUN_14100c6c0`: a group of fewer than five members lists one special unit, of five or more
@@ -1114,7 +1117,7 @@ fn a_group_ordered_on_an_enemy_building_runs_the_attack_path() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         (g.current_command, g.current_target.target),
-        (9, GroupTarget::Object(object_id(60)))
+        (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
     assert_eq!(g.flags & GroupFlags::JOINED, GroupFlags::NONE);
 }
@@ -1143,7 +1146,10 @@ fn a_group_ordered_with_a_general_task_runs_the_general_command() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         (g.current_command, g.current_target.target),
-        (5, GroupTarget::Object(object_id(60)))
+        (
+            GroupCommandKind::named(5),
+            GroupTarget::Object(object_id(60))
+        )
     );
     assert_eq!(g.current_target.range, Distance::new(6.0));
 }
@@ -1164,7 +1170,7 @@ fn a_group_ordered_on_an_object_the_world_lacks_moves_to_the_point() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         (g.current_command, g.current_target.target),
-        (1, GroupTarget::None)
+        (GroupCommandKind::MOVE, GroupTarget::None)
     );
 }
 
@@ -1193,7 +1199,7 @@ fn a_queued_attack_joins_the_command_queue() {
     assert_eq!(
         g.command_queue,
         [GroupCommand {
-            command: 7,
+            command: GroupCommandKind::named(7),
             target_id: Some(object_id(60)),
             range: Distance::new(1.5),
             point: BVector::new(40.0, 0.0, 45.0),
@@ -1204,7 +1210,7 @@ fn a_queued_attack_joins_the_command_queue() {
     );
     assert_eq!(
         (g.current_command, g.hibernating, g.replaces_queue),
-        (-1, 1, 0)
+        (GroupCommandKind::NONE, 1, 0)
     );
 }
 
@@ -1215,7 +1221,7 @@ fn a_queued_attack_joins_the_command_queue() {
 fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
-        command: 7,
+        command: GroupCommandKind::named(7),
         target_id: Some(object_id(60)),
         range: Distance::new(1.5),
         point: BVector::new(40.0, 0.0, 45.0),
@@ -1236,7 +1242,7 @@ fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
     assert_eq!(g.command_queue.len(), 1);
     assert_eq!(
         (g.current_command, g.current_target.target),
-        (9, GroupTarget::Object(object_id(60)))
+        (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
 }
 
@@ -1247,7 +1253,7 @@ fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
 fn a_queued_attack_on_a_held_target_ends_the_run_with_the_attack() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
-        command: 7,
+        command: GroupCommandKind::named(7),
         target_id: Some(object_id(60)),
         range: Distance::new(1.5),
         point: BVector::new(40.0, 0.0, 45.0),
@@ -1258,7 +1264,7 @@ fn a_queued_attack_on_a_held_target_ends_the_run_with_the_attack() {
     t.check_queued_orders(group_id(1)).unwrap();
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.command_queue, []);
-    assert_eq!(g.current_command, 9);
+    assert_eq!(g.current_command, GroupCommandKind::ATTACK);
     assert_eq!(
         (
             g.current_target.disable_retargeting,

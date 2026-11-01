@@ -169,7 +169,7 @@ impl Unit {
             )?,
             group: (self.group.id).and_then(|id| c.w.groups.get(id)).map(|g| {
                 crate::unit_ai::GroupState {
-                    commanded: g.current_command != -1,
+                    commanded: g.current_command != crate::groups::GroupCommandKind::NONE,
                     idle: g.is_idle(),
                     patrol: g.patrols(),
                     moving: g.motion.moving(),

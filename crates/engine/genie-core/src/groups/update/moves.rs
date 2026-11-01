@@ -2,6 +2,7 @@
 //! due orders and the idle timer.
 
 use crate::GenieError;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
@@ -277,7 +278,7 @@ impl World {
     pub fn move_to_desired_positions(
         &mut self,
         group: GroupId,
-        command: i32,
+        command: GroupCommandKind,
         target: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;

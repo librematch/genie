@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::command::MoveTo;
@@ -172,7 +173,7 @@ impl World {
             g.forget_target_data();
             return Ok(false);
         }
-        g.current_command = 9;
+        g.current_command = GroupCommandKind::ATTACK;
         g.flags &= !GroupFlags::ARRIVED;
         g.flags |= GroupFlags::ATTACKING;
         Ok(true)

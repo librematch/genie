@@ -1,6 +1,7 @@
 use crate::combat::Charge;
 use crate::combat::attack::AttackState;
 use crate::groups::FormationKind;
+use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
 use crate::groups::SlotState;
@@ -230,7 +231,7 @@ fn a_hibernating_group_waits_runs_its_queue_or_goes() {
     let mut t = world();
     let set = |t: &mut World, command: i32, target: i32, queued: bool| {
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.current_command = command;
+        g.current_command = GroupCommandKind::named(command);
         // the target alone: the constructor's kind −1 stays
         g.current_target.target = GroupTarget::of_saved(target, -1);
         g.command_queue = if queued {
@@ -285,7 +286,7 @@ fn a_target_is_pending_while_seen_and_no_ally_s() {
     let mut t = world();
     let target = |t: &mut World, command: i32, id: i32| {
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.current_command = command;
+        g.current_command = GroupCommandKind::named(command);
         g.current_target.target = GroupTarget::of_saved(id, -1);
     };
     target(&mut t, 9, 20);
@@ -363,7 +364,7 @@ fn relic_carriers_keep_their_command_pending() {
         a.current_action = action;
         a.current_target = ObjectId::of_field(target);
     };
-    t.groups.get_mut(group_id(1)).unwrap().current_command = 0x84;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x84);
     set_masters(
         &mut t,
         vec![task(crate::objects::masters::action_type::PICK_UP)],
@@ -384,7 +385,7 @@ fn relic_carriers_keep_their_command_pending() {
     ai(&mut t, Some(OrderKind::OnTarget), None, 41);
     assert!(!t.target_pending(group_id(1)).unwrap());
     // the delivery: on the monastery, with either task
-    t.groups.get_mut(group_id(1)).unwrap().current_command = 0x88;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x88);
     assert!(t.target_pending(group_id(1)).unwrap());
     set_masters(
         &mut t,
@@ -479,7 +480,7 @@ fn a_member_is_free_by_its_action_and_its_unit_ai() {
 #[test]
 fn a_group_rests_without_command_motion_or_moving_member() {
     let mut t = world();
-    t.groups.get_mut(group_id(1)).unwrap().current_command = -1;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::NONE;
     assert!(t.at_rest(group_id(1)));
     t.players[1].objects[ListIndex::new(1)]
         .body
@@ -489,7 +490,7 @@ fn a_group_rests_without_command_motion_or_moving_member() {
     t.groups.get_mut(group_id(1)).unwrap().motion.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(!t.at_rest(group_id(1)));
     t.groups.get_mut(group_id(1)).unwrap().motion.velocity = BVector::ZERO;
-    t.groups.get_mut(group_id(1)).unwrap().current_command = 1;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::MOVE;
     assert!(!t.at_rest(group_id(1)));
     assert!(!t.at_rest(group_id(2)));
 }
@@ -531,10 +532,10 @@ fn kept_apart_units_leave_unless_busy() {
         .orders
         .clear();
     t.players[1].objects[ListIndex::new(3)].group.id = Some(group_id(1));
-    t.groups.get_mut(group_id(1)).unwrap().current_command = 1;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::MOVE;
     t.keep_apart(group_id(1)).unwrap();
     assert_eq!(t.groups.get(group_id(1)).unwrap().objects, [object_id(15)]);
-    t.groups.get_mut(group_id(1)).unwrap().current_command = -1;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::NONE;
     t.keep_apart(group_id(1)).unwrap();
     assert_eq!(t.groups.get(group_id(1)).unwrap().objects, Vec::new());
 }
@@ -849,7 +850,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
         GroupFlags::RELAYOUT
     );
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 9;
+    g.current_command = GroupCommandKind::ATTACK;
     g.current_formation = Some(crate::groups::Formation {
         kind: FormationKind::TYPE_6,
         ..crate::groups::Formation::default()
@@ -867,7 +868,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
 fn a_follow_moves_to_its_target_when_it_strays() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 2;
+    g.current_command = GroupCommandKind::FOLLOW;
     g.current_target.target = GroupTarget::of_saved(20, -1);
     g.current_target.original_position = BVector::new(3.5, 0.0, 4.5);
     g.flags = GroupFlags::NONE;
@@ -898,7 +899,7 @@ fn a_follow_moves_to_its_target_when_it_strays() {
     assert!(t.command_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(t.groups.get(group_id(1)).unwrap().hibernating, 1);
     assert!(!relayout);
-    t.groups.get_mut(group_id(1)).unwrap().current_command = 3;
+    t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(3);
     assert!(t.command_update(group_id(1), &mut relayout).is_err());
 }
 
@@ -909,7 +910,7 @@ fn a_follow_moves_to_its_target_when_it_strays() {
 fn a_moving_group_s_move_waits_or_follows() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.flags = GroupFlags::NONE;
     g.motion.flags = MotionFlags::NEW;
     let mut relayout = false;
@@ -933,23 +934,26 @@ fn a_moving_group_s_move_waits_or_follows() {
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(
         (relayout, t.groups.get(group_id(1)).unwrap().current_command),
-        (true, 1)
+        (true, GroupCommandKind::MOVE)
     );
     t.groups.get_mut(group_id(1)).unwrap().motion.paths[0].points[1] = BVector::new(3.5, 0.0, 4.5);
     let mut relayout = false;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(
         (relayout, t.groups.get(group_id(1)).unwrap().current_command),
-        (false, 2)
+        (false, GroupCommandKind::FOLLOW)
     );
     // standing with bit 12: a follow at once; else wait delays or a level waiting do nothing
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.motion.velocity = BVector::ZERO;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 2);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::FOLLOW
+    );
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.flags = GroupFlags::NONE;
     g.motion.number_wait_delays = 1;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
@@ -957,7 +961,10 @@ fn a_moving_group_s_move_waits_or_follows() {
     g.motion.number_wait_delays = 0;
     g.motion.paths[0].state = PathState::WantsPath;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 1);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::MOVE
+    );
 }
 
 /// `FUN_141041420` for a standing group: without a path walked and no formation the move finishes
@@ -968,13 +975,16 @@ fn a_moving_group_s_move_waits_or_follows() {
 fn a_standing_group_s_move_ends_or_goes_on() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.flags = GroupFlags::LINE;
     g.motion.flags = MotionFlags::NONE;
     let mut relayout = false;
     assert!(t.move_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!((g.current_command, g.flags), (-1, GroupFlags::MEMBERS_SENT));
+    assert_eq!(
+        (g.current_command, g.flags),
+        (GroupCommandKind::NONE, GroupFlags::MEMBERS_SENT)
+    );
     let walked = || {
         let mut path = crate::movement::PathData::without_path();
         path.has_path = true;
@@ -982,16 +992,22 @@ fn a_standing_group_s_move_ends_or_goes_on() {
         path
     };
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.motion.paths = vec![walked()];
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 1);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::MOVE
+    );
     // on a patrol ([`GroupFlags::PATROL`]) without a path walked: the command ends, unfinished
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.motion.paths[0].has_path = false;
     g.flags = GroupFlags::PATROL;
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, -1);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::NONE
+    );
     // every slot in place: its units leave and the command ends
     let mut t = world();
     let slot = |unit, state| crate::groups::Slot {
@@ -1000,7 +1016,7 @@ fn a_standing_group_s_move_ends_or_goes_on() {
         ..crate::groups::Slot::default()
     };
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.motion.flags = MotionFlags::NONE;
     g.current_formation = Some(crate::groups::Formation {
         kind: FormationKind::COLUMN,
@@ -1016,14 +1032,14 @@ fn a_standing_group_s_move_ends_or_goes_on() {
         g.members.iter().map(|m| m.id).collect::<Vec<_>>(),
         [object_id(12)]
     );
-    assert_eq!(g.current_command, -1);
+    assert_eq!(g.current_command, GroupCommandKind::NONE);
     // none in place but no free unit: the formation locks to its kind, the command ends
     let mut t = world();
     for u in &mut t.players[1].objects {
         u.ai.as_mut().unwrap().current_action = Some(ActionKind::Move);
     }
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     g.motion.flags = MotionFlags::NONE;
     g.current_formation = Some(crate::groups::Formation {
         kind: FormationKind::COLUMN,
@@ -1031,7 +1047,10 @@ fn a_standing_group_s_move_ends_or_goes_on() {
         ..crate::groups::Formation::default()
     });
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, -1);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::NONE
+    );
 }
 
 /// `AutomaticMoveUnitsToDesiredPositions`: a slot without a unit, of a unit the world does
@@ -1059,10 +1078,12 @@ fn units_out_of_their_places_get_paths() {
         ],
         ..crate::groups::Formation::default()
     });
-    t.move_to_desired_positions(group_id(1), 1, None).unwrap();
-    t.move_to_desired_positions(group_id(1), 9, None).unwrap();
+    t.move_to_desired_positions(group_id(1), GroupCommandKind::MOVE, None)
+        .unwrap();
+    t.move_to_desired_positions(group_id(1), GroupCommandKind::ATTACK, None)
+        .unwrap();
     assert!(
-        t.move_to_desired_positions(group_id(1), 9, Some(object_id(20)))
+        t.move_to_desired_positions(group_id(1), GroupCommandKind::ATTACK, Some(object_id(20)))
             .is_err()
     );
     t.groups
@@ -1073,7 +1094,10 @@ fn units_out_of_their_places_get_paths() {
         .unwrap()
         .slots[3]
         .state = SlotState::Steering;
-    assert!(t.move_to_desired_positions(group_id(1), 1, None).is_err());
+    assert!(
+        t.move_to_desired_positions(group_id(1), GroupCommandKind::MOVE, None)
+            .is_err()
+    );
 }
 
 /// The members' own moves: a member moved aside (reason 2) that is free stops, counts its
@@ -1291,7 +1315,7 @@ fn the_idle_timer_counts_while_idle() {
 fn an_idle_group_goes() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = -1;
+    g.current_command = GroupCommandKind::NONE;
     g.flags = GroupFlags::NONE;
     g.current_formation = Some(crate::groups::Formation {
         kind: FormationKind::COLUMN,
@@ -1310,7 +1334,7 @@ fn an_idle_group_goes() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.flags = GroupFlags::NONE;
     g.objects = vec![object_id(10), object_id(11), object_id(12)];
-    g.current_command = 1;
+    g.current_command = GroupCommandKind::MOVE;
     assert!(!t.group_update(group_id(1)).unwrap());
     assert_eq!(t.groups.get(group_id(1)).unwrap().members, Vec::new());
     assert_eq!(t.groups.get(group_id(1)).unwrap().objects, Vec::new());
@@ -1569,7 +1593,7 @@ fn a_group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     assert!(t.is_idle(group_id(1)));
     t.groups.groups[0].motion.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(!t.is_idle(group_id(1)));
-    t.groups.groups[0].current_command = 1;
+    t.groups.groups[0].current_command = GroupCommandKind::MOVE;
     t.groups.groups[0].flags |= GroupFlags::PATROL;
     assert!(t.is_idle(group_id(1)));
     t.groups.groups[0].flags = GroupFlags::MEMBERS_SENT;
@@ -1816,7 +1840,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
 /// three members in category 1.
 fn attacking(t: &mut World) {
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.current_command = 9;
+    g.current_command = GroupCommandKind::ATTACK;
     g.current_target = crate::groups::TargetData {
         target: GroupTarget::Object(object_id(20)),
         original_position: BVector::new(3.5, 0.0, 3.5),
@@ -1875,14 +1899,17 @@ fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
         vec![crate::groups::GroupCommand::default()];
     let mut relayout = false;
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 9);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::ATTACK
+    );
     t.groups.get_mut(group_id(1)).unwrap().command_queue.clear();
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         (g.current_command, g.current_target),
         (
-            -1,
+            GroupCommandKind::NONE,
             crate::groups::TargetData {
                 target: GroupTarget::None,
                 ..crate::groups::TargetData::default()
@@ -1903,7 +1930,10 @@ fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
         t.groups.get(group_id(1)).unwrap().current_target.target,
         GroupTarget::None
     );
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 1);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::MOVE
+    );
 }
 
 /// A first member the world does not hold ends the update without finishing it.
@@ -1914,7 +1944,10 @@ fn an_attack_without_a_first_member_does_nothing() {
     t.groups.get_mut(group_id(1)).unwrap().members[0].id = object_id(99);
     let mut relayout = false;
     assert!(!t.attack_update(group_id(1), &mut relayout).unwrap());
-    assert_eq!(t.groups.get(group_id(1)).unwrap().current_command, 9);
+    assert_eq!(
+        t.groups.get(group_id(1)).unwrap().current_command,
+        GroupCommandKind::ATTACK
+    );
 }
 
 /// The categories of a pending attack: a category none of whose units is within its range (the
@@ -2016,7 +2049,7 @@ fn an_attack_follows_a_target_that_moved() {
             g.current_command,
             g.flags & (GroupFlags::ARRIVED | GroupFlags::ATTACKING)
         ),
-        (9, GroupFlags::ATTACKING)
+        (GroupCommandKind::ATTACK, GroupFlags::ATTACKING)
     );
 }
 
