@@ -1,7 +1,10 @@
 use super::*;
+use crate::combat::missile::SmartMode;
+use crate::combat::missile::VanishMode;
 use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
+use crate::movement::MoveAlgorithm;
 use crate::movement::TurnRate;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -444,7 +447,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::COMBAT_ABILITY,
-            |m| f32::from(m.combat_ability),
+            |m| f32::from(m.combat_ability.bits()),
             [3.0, 5.0, 5.0],
         ),
         (a::ATTACK_DISPERSION, |m| m.missed_spread, [3.0, 5.0, 10.0]),
@@ -478,7 +481,11 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
 fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
     use attribute as a;
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
-        (a::HERO_STATUS, |m| f32::from(m.hero_flag), [3.0, 5.0, 5.0]),
+        (
+            a::HERO_STATUS,
+            |m| f32::from(m.hero_flag.bits()),
+            [3.0, 5.0, 5.0],
+        ),
         (
             a::TRAIN_LOCATION,
             |m| f32::from(MasterId::field(m.train_locations[1].location)),
@@ -810,9 +817,9 @@ fn a_missile_s_smart_mode_multiply_sets_it() {
     let mut m = of_type(master_type::MISSILE);
     m.missile_stats = Some(crate::combat::missile::MissileStats {
         projectile_type: 0,
-        smart_mode: 1,
+        smart_mode: SmartMode::LEADS_TARGET,
         hit_mode: 0,
-        vanish_mode: 0,
+        vanish_mode: VanishMode::NONE,
         arc: 0.5,
         speed: Speed::new(7.0),
         radius: Radii::ZERO,
@@ -825,7 +832,7 @@ fn a_missile_s_smart_mode_multiply_sets_it() {
     let s = m.missile_stats.unwrap();
     assert_eq!(
         (s.smart_mode, s.arc, m.reload),
-        (3, 0.25, Seconds::new(1.0))
+        (SmartMode::from_bits_retain(3), 0.25, Seconds::new(1.0))
     );
 }
 
@@ -1044,7 +1051,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         restriction: RestrictionId::named(7),
         restriction_mask: TerrainMask::of_bits(1),
         turn_time: Seconds::ZERO,
-        move_algorithm: 0,
+        move_algorithm: MoveAlgorithm::NONE,
         min_collision: 0.0,
         fast_turn: false,
         facets: None,
@@ -1145,7 +1152,11 @@ fn the_combat_master_s_own_values_change() {
     assert_eq!(m, before);
     assert_eq!(
         (m.hero_flag, m.max_charge, m.recharge_rate),
-        (5, Charge::new(15.0), ChargeRate::new(0.5))
+        (
+            HeroFlags::FULL_HERO | HeroFlags::REGENERATES,
+            Charge::new(15.0),
+            ChargeRate::new(0.5)
+        )
     );
     assert_eq!((m.charge_event, m.charge_type), (2, 6));
     assert_eq!(
@@ -1183,9 +1194,9 @@ fn the_missile_building_and_animated_setters() {
     let mut m = of_type(master_type::MISSILE);
     m.missile_stats = Some(crate::combat::missile::MissileStats {
         projectile_type: 0,
-        smart_mode: 0,
+        smart_mode: SmartMode::NONE,
         hit_mode: 1,
-        vanish_mode: 0,
+        vanish_mode: VanishMode::NONE,
         arc: 0.25,
         speed: Speed::new(7.0),
         radius: Radii::ZERO,
@@ -1196,7 +1207,10 @@ fn the_missile_building_and_animated_setters() {
     m.add_attribute(attribute::PROJECTILE_ARC, 0.25, &world(false));
     m.set_attribute(attribute::MAXIMUM_RANGE, 5.0, &world(false));
     let s = m.missile_stats.unwrap();
-    assert_eq!((s.smart_mode, s.hit_mode, s.arc), (1, 2, 0.5));
+    assert_eq!(
+        (s.smart_mode, s.hit_mode, s.arc),
+        (SmartMode::LEADS_TARGET, 2, 0.5)
+    );
     assert_eq!(m.weapon_range, Distance::new(5.0));
     let mut b = of_type(master_type::BUILDING);
     b.building = Some(BuildingMaster::default());
@@ -1204,7 +1218,7 @@ fn the_missile_building_and_animated_setters() {
     b.add_attribute(attribute::GARRISON_TYPE, 2.0, &world(false));
     assert_eq!(
         (b.building_facet, b.building.unwrap().garrison_type),
-        (3, 2)
+        (3, GarrisonKinds::INFANTRY)
     );
     let mut a = of_type(master_type::DOPPELGANGER);
     a.set_attribute(attribute::MOVEMENT_SPEED, 1.2, &world(false));

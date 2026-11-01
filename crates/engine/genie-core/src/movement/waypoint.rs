@@ -8,6 +8,7 @@ use crate::map::Rect;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
+use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
@@ -417,7 +418,11 @@ impl Mover {
     /// algorithm has bit 0 also resets the unit's sprite (`+0x78c`, `+0x958`), which is not
     /// modelled.
     pub(crate) fn stop(&mut self) -> Result<(), GenieError> {
-        if self.stats.move_algorithm & 1 != 0 {
+        if self
+            .stats
+            .move_algorithm
+            .contains(MoveAlgorithm::ALTERNATES_SPRITES)
+        {
             return Err(GenieError::unsupported(
                 "a stop that resets the sprite (move algorithm bit 0)",
             ));

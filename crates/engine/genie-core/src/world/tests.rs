@@ -2,6 +2,7 @@ use super::*;
 use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::damage::ArmorPair;
+use crate::combat::missile::SmartMode;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::game::GameCommand;
@@ -39,6 +40,7 @@ use crate::map::terrain::TileTerrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::{Stream, Streams, Well512};
+use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
@@ -61,7 +63,9 @@ use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -475,7 +479,7 @@ pub(crate) fn builder_masters() -> Masters {
             restriction: RestrictionId::named(7),
             restriction_mask: TerrainMask::of_bits(6),
             turn_time: Seconds::ZERO,
-            move_algorithm: 0,
+            move_algorithm: MoveAlgorithm::NONE,
             min_collision: 1.0,
             fast_turn: false,
             facets: None,
@@ -5955,7 +5959,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
         let house = masters.get_mut(ids::HOUSE).unwrap();
         house.garrison = room;
         // it takes villagers in (bit 0)
-        house.building.as_mut().unwrap().garrison_type = 1;
+        house.building.as_mut().unwrap().garrison_type = GarrisonKinds::VILLAGERS;
     }
     t.players[1].objects[ListIndex::new(0)]
         .body
@@ -6149,7 +6153,7 @@ fn livestock_enter_world() -> World {
             .building
             .as_mut()
             .unwrap()
-            .garrison_type = 1 << 4;
+            .garrison_type = GarrisonKinds::HERDABLES;
     }
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     v.life.master_id = master_id(594);
@@ -13373,7 +13377,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     );
     // a hero's 30 and the powerups: stinger + (powerup + (30 + master))
     let hero = Master {
-        hero_flag: 1,
+        hero_flag: HeroFlags::FULL_HERO,
         ..berserk.clone()
     };
     let mut powered = unit(HitPoints::new(10.0));
@@ -13381,7 +13385,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     powered.regen_stinger = 5.0;
     assert_eq!(regeneration_rate(&hero, &powered), 60.0);
     let not_hero = Master {
-        hero_flag: 0x84,
+        hero_flag: HeroFlags::REGENERATES | HeroFlags::INVERTED,
         ..berserk.clone()
     };
     assert_eq!(regeneration_rate(&not_hero, &powered), 30.0);
@@ -14710,7 +14714,7 @@ const fn house_moves() -> crate::movement::MoveStats {
         restriction: RestrictionId::named(7),
         restriction_mask: TerrainMask::of_bits(6),
         turn_time: Seconds::ZERO,
-        move_algorithm: 0,
+        move_algorithm: MoveAlgorithm::NONE,
         min_collision: 1.0,
         fast_turn: false,
         facets: None,
@@ -16152,7 +16156,7 @@ fn the_missile_chain_s_unmodelled_cases_stop_the_player_with_their_reason() {
             |t| {
                 for m in &mut t.masters {
                     if let Some(s) = m.get_mut(master_id(363)).unwrap().missile_stats.as_mut() {
-                        s.smart_mode = 1;
+                        s.smart_mode = SmartMode::LEADS_TARGET;
                     }
                 }
             },
@@ -18659,7 +18663,7 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let _ = t.graphics.insert(id, shown);
     let seen = in_update(

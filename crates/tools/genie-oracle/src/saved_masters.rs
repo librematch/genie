@@ -5,18 +5,25 @@ use crate::masters::MasterTable;
 use crate::{animated_master, combat_master, moving_master};
 use genie_core::GenieError;
 use genie_core::combat::Charge;
+use genie_core::combat::missile::SmartMode;
+use genie_core::combat::missile::VanishMode;
 use genie_core::map::Distance;
 use genie_core::map::Footprint;
 use genie_core::map::Offset;
 use genie_core::map::Radii;
 use genie_core::map::TerrainId;
+use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::Speed;
 use genie_core::objects::HitPoints;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
+use genie_core::objects::masters::CombatAbility;
+use genie_core::objects::masters::GarrisonKinds;
+use genie_core::objects::masters::HeroFlags;
 use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{
@@ -148,7 +155,7 @@ pub(super) fn core_task(
         object_group: ClassId::of_field(t.object_group)?,
         object_id: MasterId::of_data(t.object_id),
         combat_level: t.combat_level,
-        combat_level_flag: t.combat_level_flag,
+        combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
         terrain: t.terrain_id,
         owner_type: t.owner_type,
         holding_attr: t.holding_attr,
@@ -219,7 +226,7 @@ pub(super) fn work_masters(
             work.build_time = c.train_location.first().map_or(0, |t| t.train_time);
             work.charge_type = c.charge_type;
             work.formation_category = c.temp_formation_category;
-            work.hero_flag = c.hero_flag;
+            work.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
             work.volley_fire = c.volley_fire_amount;
             work.max_volley = c.max_attacks_in_volley;
             work.volley_spread = VolleySpread {
@@ -268,7 +275,7 @@ pub(super) fn work_masters(
                 .map(|&a| ClassAmount::new((a & 0xffff) as i16, (a >> 16) as i16))
                 .collect();
             work.resistance = rc.bonus_damage_resistance;
-            work.combat_ability = rc.combat_ability;
+            work.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
             work.reflection = rc.damage_reflection;
             work.friendly_fire = rc.friendly_fire_damage;
             work.area_effect = Distance::new(rc.area_effect_range);
@@ -297,7 +304,7 @@ pub(super) fn work_masters(
             work.building.as_mut(),
             m.tribe_master_building_object.as_deref(),
         ) {
-            b.garrison_type = saved.garrison_units;
+            b.garrison_type = GarrisonKinds::from_bits_retain(saved.garrison_units);
             b.garrison_heal_rate = HitPoints::new(saved.garrison_heal_rate);
             b.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
             b.foundation_terrain = TerrainId::of_data(saved.on_build_make_tile);
@@ -315,9 +322,9 @@ pub(super) fn work_masters(
         {
             work.missile_stats = Some(genie_core::combat::missile::MissileStats {
                 projectile_type: table.projectile_type(civ, s.copy_id()).unwrap_or(0),
-                smart_mode: mm.targetting_type,
+                smart_mode: SmartMode::from_bits_retain(mm.targetting_type),
                 hit_mode: mm.missile_hit_info,
-                vanish_mode: mm.missile_die_info,
+                vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
                 arc: mm.ballistics_ratio,
                 speed: animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed)),
                 radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
@@ -418,7 +425,7 @@ pub(super) fn moving_stats(
         restriction,
         restriction_mask: *table.terrain.masks().get(restriction.index())?,
         turn_time: Seconds::new(moving.turn_speed),
-        move_algorithm: turning.move_algorithm,
+        move_algorithm: MoveAlgorithm::from_bits_retain(turning.move_algorithm),
         min_collision: turning.min_collision_size_multiplier,
         fast_turn: ObjectFlags::from_bits_retain(s.object_flags).contains(ObjectFlags::SHIP),
         facets: master_facets(m, s, table),

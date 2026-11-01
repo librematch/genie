@@ -8,6 +8,7 @@ use crate::combat::damage::ArmorPair;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
@@ -70,12 +71,11 @@ impl HpPowerup {
 /// Slot 0x260 of a combat object (`FUN_1412033a0`), its regeneration rate in hit points a
 /// minute: its stinger (`+0xb3c`, slot 0x750) plus (its powerup (`+0xa34`, slot 0x6f0) plus (a
 /// hero's [`HERO_REGENERATION`] plus its master's `regeneration_rate`, `+0x8b4`)), in the
-/// assembly's order. A hero is a master whose `hero_flag` (`+0x8d9`) has bit 0 or 2, unless it
-/// has both bits 7 and 2.
+/// assembly's order. A hero is a master whose `hero_flag` (`+0x8d9`) grants
+/// [`HeroFlags::REGENERATES`].
 #[must_use]
 pub(crate) fn regeneration_rate(master: &Master, unit: &Unit) -> f32 {
-    let flag = master.hero_flag;
-    let hero = flag & 5 != 0 && !(flag & 0x80 != 0 && flag & 4 != 0);
+    let hero = master.hero_flag.grants(HeroFlags::REGENERATES);
     let bonus = if hero { HERO_REGENERATION } else { 0.0 };
     unit.regen_stinger + (unit.regen_powerup + (bonus + master.regeneration))
 }

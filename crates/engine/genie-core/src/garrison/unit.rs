@@ -14,6 +14,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
@@ -578,7 +579,9 @@ impl Unit {
         }
         if bm.kind == BUILDING
             && state == ObjectState::Alive
-            && bm.building.is_some_and(|b| b.garrison_type & 1 != 0)
+            && bm
+                .building
+                .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS))
         {
             self.town_bell.flag = true;
         }

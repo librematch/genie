@@ -63,10 +63,11 @@ pub struct Task {
     pub object_id: Option<MasterId>,
     /// `+0x14`, `combat_level` (`enable_targeting`): the task is for a target's combat level.
     pub combat_level: u8,
-    /// `+0x15`, `combat_level_flag`: a generation task (151, [`crate::combat::abilities`]) of a combat
-    /// unit with bit 1 or of a building with bit 2 works on its own; a removal reward task (161)
-    /// not 0 pays the master's cost of its resource times the rate.
-    pub combat_level_flag: u8,
+    /// `+0x15`, `combat_level_flag`: a generation task (151, [`crate::combat::abilities`]) of a
+    /// combat unit with [`TaskFlags::UNITS_ALWAYS`] or of a building with
+    /// [`TaskFlags::BUILDINGS_ALWAYS`] works on its own; a removal reward task (161) with any
+    /// flag pays the master's cost of its resource times the rate.
+    pub combat_level_flag: TaskFlags,
     /// `+0x16`: the terrain the task is for, -1 for none.
     pub terrain: i16,
     /// `+0x18`, `owner_type` (`target_diplomacy`): whose targets.
@@ -122,7 +123,7 @@ impl Default for Task {
             object_group: None,
             object_id: None,
             combat_level: 0,
-            combat_level_flag: 0,
+            combat_level_flag: TaskFlags::NONE,
             terrain: -1,
             owner_type: 0,
             holding_attr: 0,
@@ -198,8 +199,8 @@ pub struct BuildingMaster {
     pub foundation_terrain: Option<TerrainId>,
     /// `+0x98c`, `tech_id`: the technology its completion researches (−1 for none).
     pub tech: Option<TechId>,
-    /// `+0x9bc`, `garrison_type`: the kinds of units it takes in (bit 0 villagers, `FUN_14120eb10`).
-    pub garrison_type: u8,
+    /// `+0x9bc`, `garrison_type`: the kinds of units it takes in (`FUN_14120eb10`).
+    pub garrison_type: GarrisonKinds,
     /// `+0x9c0`, `garrison_heal_rate`: the hit points a second it gives the units inside.
     pub garrison_heal_rate: HitPoints,
     /// `+0x9c4`, `garrison_repair_rate`: its repair a second per villager inside.
@@ -299,9 +300,9 @@ pub struct Master {
     /// `+0x8bc`, `mFormationCategory`: 0 (villagers) keeps a unit out of the groups an order's
     /// splitter forms (`FUN_140fd76d0`).
     pub formation_category: u8,
-    /// `+0x8d9`, `hero_flag`: a combat master with bit 0 or 4 set and not both 4 and 7 joins a
-    /// group's fifth sub-formation (`FUN_141011300`).
-    pub hero_flag: u8,
+    /// `+0x8d9`, `hero_flag`: a combat master it grants
+    /// [`HeroFlags::PROTECTED_FORMATION`] joins a group's fifth sub-formation (`FUN_141011300`).
+    pub hero_flag: HeroFlags,
     /// `+0x8b8`, `mSpacingModifier`: with the radius on x the unit's radius in a group's
     /// formation (`FUN_141025920`). The player's masters copy it from the data file's.
     pub spacing_modifier: f32,
@@ -343,7 +344,7 @@ pub struct Master {
     /// `bonus_damage_resistance` (`+0x824`).
     pub resistance: f32,
     /// `combat_ability` (`+0x840`).
-    pub combat_ability: u8,
+    pub combat_ability: CombatAbility,
     /// `damage_reflection` (`+0x864`).
     pub reflection: f32,
     /// `invulnerability_level` (`+0x930`): a hit point floor.
@@ -596,8 +597,11 @@ pub mod attribute;
 pub mod class;
 mod class_id;
 mod class_mask;
+mod combat_ability;
 mod damage_class;
+mod garrison_kinds;
 mod gather_group;
+mod hero_flags;
 pub mod ids;
 mod master_id;
 mod master_kind;
@@ -607,6 +611,7 @@ mod obstruction_class;
 mod obstruction_type;
 mod placement_terrains;
 mod sound_events;
+mod task_flags;
 mod task_sprites;
 mod volley_spread;
 
@@ -615,9 +620,12 @@ pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
 pub use self::class_id::ClassId;
 pub use self::class_mask::ClassMask;
+pub use self::combat_ability::CombatAbility;
 pub use self::conversion_adjust::ConversionAdjust;
 pub use self::damage_class::{ClassAmount, DamageClass};
+pub use self::garrison_kinds::GarrisonKinds;
 pub use self::gather_group::GatherGroup;
+pub use self::hero_flags::HeroFlags;
 pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
 pub use self::object_flags::ObjectFlags;
@@ -625,6 +633,7 @@ pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
 pub use self::placement_terrains::PlacementTerrains;
 pub use self::sound_events::{SoundEventId, SoundEvents};
+pub use self::task_flags::TaskFlags;
 pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;
 

@@ -17,6 +17,7 @@ use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::movement::MoveAlgorithm;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveToAction;
@@ -32,6 +33,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -103,7 +105,9 @@ fn garrison_masters() -> Masters {
             hit_points: 2400,
             garrison: 15,
             building: Some(BuildingMaster {
-                garrison_type: 11,
+                garrison_type: (GarrisonKinds::VILLAGERS
+                    | GarrisonKinds::INFANTRY
+                    | GarrisonKinds::MONKS),
                 ..BuildingMaster::default()
             }),
             ..Master::default()
@@ -949,7 +953,7 @@ fn walled_map(
         restriction: RestrictionId::named(0),
         restriction_mask: TerrainMask::of_bits(1),
         turn_time: Seconds::ZERO,
-        move_algorithm: 0,
+        move_algorithm: MoveAlgorithm::NONE,
         min_collision: 1.0,
         fast_turn: false,
         facets: None,
@@ -1045,26 +1049,61 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
 fn a_town_center_takes_villagers_infantry_cavalry_and_monks() {
     // a town center's garrison_type 11: bits 0, 1 and 3
     assert!(garrison_type_takes(
-        11,
+        GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::VILLAGER,
         ids::VILLAGER_MALE,
         true
     ));
-    assert!(garrison_type_takes(11, class::CLASS_6, master_id(74), true));
+    assert!(garrison_type_takes(
+        GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
+        class::CLASS_6,
+        master_id(74),
+        true
+    ));
     assert!(!garrison_type_takes(
-        11,
+        GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_12,
         master_id(38),
         true
     ));
-    assert!(garrison_type_takes(11, class::MONK, master_id(125), true));
+    assert!(garrison_type_takes(
+        GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
+        class::MONK,
+        master_id(125),
+        true
+    ));
     // master 1811 is no infantry, but a monk
-    assert!(garrison_type_takes(11, class::CLASS_6, MASTER_1811, true));
-    assert!(!garrison_type_takes(2, class::CLASS_6, MASTER_1811, true));
+    assert!(garrison_type_takes(
+        GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
+        class::CLASS_6,
+        MASTER_1811,
+        true
+    ));
+    assert!(!garrison_type_takes(
+        GarrisonKinds::INFANTRY,
+        class::CLASS_6,
+        MASTER_1811,
+        true
+    ));
     // a tower's 3 takes no monk; the task finder takes no class 42
-    assert!(!garrison_type_takes(3, class::MONK, master_id(125), true));
-    assert!(garrison_type_takes(8, class::RELIC, master_id(1), true));
-    assert!(!garrison_type_takes(8, class::RELIC, master_id(1), false));
+    assert!(!garrison_type_takes(
+        GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY,
+        class::MONK,
+        master_id(125),
+        true
+    ));
+    assert!(garrison_type_takes(
+        GarrisonKinds::MONKS,
+        class::RELIC,
+        master_id(1),
+        true
+    ));
+    assert!(!garrison_type_takes(
+        GarrisonKinds::MONKS,
+        class::RELIC,
+        master_id(1),
+        false
+    ));
 }
 
 #[test]
@@ -1562,7 +1601,7 @@ fn standing() -> crate::movement::MoveStats {
         restriction: RestrictionId::named(0),
         restriction_mask: TerrainMask::ALL,
         turn_time: Seconds::ZERO,
-        move_algorithm: 0,
+        move_algorithm: MoveAlgorithm::NONE,
         min_collision: 0.0,
         fast_turn: false,
         facets: None,
@@ -3370,7 +3409,7 @@ fn seek_shelter_sends_the_players_villagers_and_checked_units_to_its_buildings()
     let mut t = let_out_world();
     for m in &mut t.masters {
         if let Some(b) = m.get_mut(TC).and_then(|tc| tc.building.as_mut()) {
-            b.garrison_type = 2;
+            b.garrison_type = GarrisonKinds::INFANTRY;
         }
     }
     walker(

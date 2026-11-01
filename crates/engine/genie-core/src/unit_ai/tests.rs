@@ -13,6 +13,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
@@ -379,7 +380,7 @@ fn a_priest_converts_by_its_faith_its_task_and_the_object() {
         owner: PlayerId::new(2),
         class: class::CLASS_12,
         master: master_id(38),
-        hero: 0,
+        hero: HeroFlags::NONE,
     };
     assert!(can_convert(&monk, Some(&knight), false));
     let tired = Converter {
@@ -405,7 +406,10 @@ fn a_priest_converts_by_its_faith_its_task_and_the_object() {
         ..knight
     };
     assert!(!can_convert(&monk, Some(&tc), true));
-    let hero = Convertee { hero: 1, ..knight };
+    let hero = Convertee {
+        hero: HeroFlags::FULL_HERO,
+        ..knight
+    };
     assert!(!can_convert(&monk, Some(&hero), true));
     // a building's task names attribute 28, which the owner holds at 0
     let house = Convertee {
@@ -4962,11 +4966,26 @@ fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
         UnitStance::AGGRESSIVE
     );
     // a hero defends: bit 0 or 3, not 3 with 7
-    assert_eq!(stance(&|n| n.hero_flag = 1), UnitStance::DEFENSIVE);
-    assert_eq!(stance(&|n| n.hero_flag = 8), UnitStance::DEFENSIVE);
-    assert_eq!(stance(&|n| n.hero_flag = 0x81), UnitStance::DEFENSIVE);
-    assert_eq!(stance(&|n| n.hero_flag = 0x88), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(&|n| n.hero_flag = 0x10), UnitStance::AGGRESSIVE);
+    assert_eq!(
+        stance(&|n| n.hero_flag = HeroFlags::FULL_HERO),
+        UnitStance::DEFENSIVE
+    );
+    assert_eq!(
+        stance(&|n| n.hero_flag = HeroFlags::DEFENSIVE),
+        UnitStance::DEFENSIVE
+    );
+    assert_eq!(
+        stance(&|n| n.hero_flag = HeroFlags::FULL_HERO | HeroFlags::INVERTED),
+        UnitStance::DEFENSIVE
+    );
+    assert_eq!(
+        stance(&|n| n.hero_flag = HeroFlags::DEFENSIVE | HeroFlags::INVERTED),
+        UnitStance::AGGRESSIVE
+    );
+    assert_eq!(
+        stance(&|n| n.hero_flag = HeroFlags::PROTECTED_FORMATION),
+        UnitStance::AGGRESSIVE
+    );
     // class 61 does not attack, unless a hero
     assert_eq!(
         stance(&|n| n.class = class::CLASS_61),
@@ -4975,7 +4994,7 @@ fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(
         stance(&|n| {
             n.class = class::CLASS_61;
-            n.hero_flag = 1;
+            n.hero_flag = HeroFlags::FULL_HERO;
         }),
         UnitStance::DEFENSIVE
     );
@@ -5023,7 +5042,7 @@ fn a_new_object_takes_its_hunt_range_from_its_master_s_last_task_of_type_6() {
         copy_id: Some(master_id(1240)),
         class: class::PREY,
         object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
-        hero_flag: 4,
+        hero_flag: HeroFlags::REGENERATES,
         tasks: vec![
             task(ActionType::named(6), Distance::new(2.0)),
             task(
@@ -5044,7 +5063,7 @@ fn a_new_object_takes_its_hunt_range_from_its_master_s_last_task_of_type_6() {
             copy_id: Some(master_id(1240)),
             class: class::PREY,
             object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
-            hero_flag: 4,
+            hero_flag: HeroFlags::REGENERATES,
             hunt_range: Distance::new(3.5),
             ..NewObject::default()
         }

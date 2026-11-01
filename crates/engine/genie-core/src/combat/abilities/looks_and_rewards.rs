@@ -62,9 +62,9 @@ pub fn look(
 
 /// A removal reward task's command (`FUN_14120b5f0`): the task's `work_val1`, times the player's
 /// attribute its `attribute_type2` names when that is not negative and the player has it
-/// (`FUN_1416625b0`: `multiplier`); with the task's `combat_level_flag` set, the object's master
-/// cost (the player's master of its id, its three entries at `+0x880`: resource, amount, paid)
-/// of the task's `attribute_type3` decides instead: the amount of the last paid entry of that
+/// (`FUN_1416625b0`: `multiplier`); with any flag of the task's `combat_level_flag`, the object's
+/// master cost (the player's master of its id, its three entries at `+0x880`: resource, amount,
+/// paid) of the task's `attribute_type3` decides instead: the amount of the last paid entry of that
 /// resource times the rate (`CVTDQ2PS`, `MULSS`), 0 without one. The amount is truncated
 /// (`CVTTSS2SI`).
 #[must_use]
@@ -77,7 +77,7 @@ pub fn reward(task: &Task, player: PlayerId, multiplier: Option<f32>, cost: &[Co
         rate *= m;
     }
     let mut amount = rate;
-    if task.combat_level_flag != 0 {
+    if !task.combat_level_flag.is_empty() {
         amount = 0.0;
         for (resource, count, paid) in crate::objects::masters::cost_entries(cost) {
             if Some(resource) == out && paid {

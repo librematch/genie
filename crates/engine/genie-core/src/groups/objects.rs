@@ -3,6 +3,7 @@
 
 use crate::map::Position;
 use crate::math::fmath::BVector;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::master_type::COMBAT;
@@ -123,17 +124,21 @@ impl crate::world::World {
     }
 }
 
-/// A unit's sub-formation in its group (`FUN_141011300`, `World::unit_category` for a held
-/// object), from its master's type, `hero_flag` (`+0x8d9`) and formation category
-/// (`+0x8bc`): none below type 70 (unsigned); a combat master (70) with a hero flag of bit 0 or
-/// 4 but not both 4 and 7 is 5; categories 1 to 4 are themselves, 0 and 5 are 5, 6 is 0, any
-/// other (255) none ("Invalid formation category").
+/// A unit's sub-formation in its group (`FUN_141011300`, `World::unit_category` for a held object),
+/// from its master's type, `hero_flag` (`+0x8d9`) and formation category (`+0x8bc`): none below
+/// type 70 (unsigned); a combat master (70) whose hero flag grants
+/// [`HeroFlags::PROTECTED_FORMATION`] is 5; categories 1 to 4 are themselves, 0 and 5 are 5, 6 is
+/// 0, any other (255) none ("Invalid formation category").
 #[must_use]
-pub fn sub_formation(kind: MasterKind, hero_flag: u8, formation_category: u8) -> Option<i32> {
+pub fn sub_formation(
+    kind: MasterKind,
+    hero_flag: HeroFlags,
+    formation_category: u8,
+) -> Option<i32> {
     if kind < COMBAT {
         return None;
     }
-    if kind == COMBAT && hero_flag & 0x11 != 0 && hero_flag & 0x90 != 0x90 {
+    if kind == COMBAT && hero_flag.grants(HeroFlags::PROTECTED_FORMATION) {
         return Some(5);
     }
     match formation_category {

@@ -100,7 +100,7 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let arms = crate::combat::attack::Arms {
         move_sprite: Some(g(SpriteId::named(1))),
@@ -852,7 +852,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         speed_multiplier: 2.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let moving = |id| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));

@@ -25,9 +25,11 @@ use crate::objects::masters::class;
 use crate::world::Seconds;
 use genie_diff::Diff;
 
+mod missile_modes;
 mod missile_state;
 pub(crate) mod unit;
 
+pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
 
 /// The missile action's type, which word 9 adds when it is the top action.
@@ -68,11 +70,11 @@ pub struct MissileStats {
     /// `projectile_type` (`+0x880`).
     pub projectile_type: u8,
     /// `smart_mode`.
-    pub smart_mode: u8,
+    pub smart_mode: SmartMode,
     /// `hit_mode` (`missile_hit_info`).
     pub hit_mode: u8,
     /// `vanish_mode` (`missile_die_info`).
-    pub vanish_mode: u8,
+    pub vanish_mode: VanishMode,
     /// `projectile_arc` (`ballistics_ratio`).
     pub arc: f32,
     /// Its master's speed (slot 0xe8).
@@ -361,7 +363,7 @@ impl MissileAction {
         let dz2 = dz * dz;
         let way = fmath::sqrt(dy * dy + dx * dx + dz2);
         self.distance = Distance::new(way);
-        if stats.smart_mode & 1 != 0 && self.target.is_some() {
+        if stats.smart_mode.contains(SmartMode::LEADS_TARGET) && self.target.is_some() {
             return Err(GenieError::unsupported(
                 "a smart missile leading its target",
             ));

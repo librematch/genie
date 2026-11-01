@@ -8,6 +8,7 @@ use crate::combat::attack::{
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::movement::MoveAlgorithm;
 use crate::movement::Speed;
 use crate::movement::footprint_gap;
 use crate::objects::ObjectId;
@@ -72,7 +73,8 @@ impl Attack {
     /// charge range is a charge of types 6 and 7, which [`engagement`] does not take); else the
     /// attack sprite (`+0x70`) or, with a second one (`+0x78`), a draw of the Object stream
     /// (`FUN_140810fc0` with 2, [`crate::math::rng::Well512::below_checked`]: 0 the first) for a master
-    /// whose move algorithm lacks bit 0 (slot 0x5d8); one with it takes the second after a stop
+    /// whose move algorithm lacks [`crate::movement::MoveAlgorithm::ALTERNATES_SPRITES`] (slot
+    /// 0x5d8); one with it takes the second after a stop
     /// (`+0x958`, not held). The unit takes it (without one slot 0x68 shows its master's standing
     /// sprite) from its first frame (`FUN_1413b9f00`); a hit is pending; a reload shorter than
     /// the sprite speeds the animation up to fit it.
@@ -87,10 +89,11 @@ impl Attack {
         r: &AttackReads,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::Swing, unit)?;
-        let alternates = unit
-            .body
-            .mover()
-            .is_some_and(|m| m.stats.move_algorithm & 1 != 0);
+        let alternates = unit.body.mover().is_some_and(|m| {
+            m.stats
+                .move_algorithm
+                .contains(MoveAlgorithm::ALTERNATES_SPRITES)
+        });
         let special = r
             .swing_sprites
             .special

@@ -9,6 +9,7 @@ use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
 use crate::map::Distance;
 use crate::objects::ObjectId;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::master_type::COMBAT;
@@ -42,7 +43,7 @@ const CLEARED_ACTIONS: [ActionKind; 3] = [
 pub(crate) struct FormationUnit {
     pub(crate) master: MasterId,
     pub(crate) kind: MasterKind,
-    pub(crate) hero_flag: u8,
+    pub(crate) hero_flag: HeroFlags,
     pub(crate) formation_category: u8,
     /// `FUN_141025920`: the unit's radius in a formation.
     pub(crate) radius: Distance,

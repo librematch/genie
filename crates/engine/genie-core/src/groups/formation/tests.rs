@@ -19,6 +19,7 @@ use crate::movement::WaypointLevel;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -223,7 +224,8 @@ fn the_point_from_the_front_runs_along_the_stored_positions() {
 
 /// `FUN_141011300`: a null object (none in the world's table) is -1; a ghost (its master 243
 /// of type 25) is below 70, -1; a ram (class 13, master 35, of a human player) keeps its own
-/// category (2), as the rams' rule never holds; a combat master with hero flag bit 4 is 5.
+/// category (2), as the rams' rule never holds; a combat master whose hero flag grants
+/// [`crate::objects::masters::HeroFlags::PROTECTED_FORMATION`] is 5.
 #[test]
 fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
     let mut t = slot_world(&[(10, 4, 1.0, 0.0), (35, 35, 2.0, 0.0)], &[]);
@@ -233,7 +235,7 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
                 id: master_id(4),
                 kind: master_type::COMBAT,
                 formation_category: 1,
-                hero_flag: 0x10,
+                hero_flag: HeroFlags::PROTECTED_FORMATION,
                 ..crate::objects::masters::Master::default()
             },
             crate::objects::masters::Master {

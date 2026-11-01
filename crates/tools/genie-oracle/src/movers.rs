@@ -10,6 +10,7 @@ use genie_core::map::{Position, Radii};
 use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::LevelFlags;
+use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::PathFlags;
 use genie_core::movement::Speed;
 use genie_core::objects::ObjectId;
@@ -284,7 +285,7 @@ pub(super) fn mover(
                     "a terrain restriction the data file does not have",
                 ))?,
             turn_time: Seconds::new(turn_speed),
-            move_algorithm: turning.move_algorithm,
+            move_algorithm: MoveAlgorithm::from_bits_retain(turning.move_algorithm),
             min_collision: turning.min_collision_size_multiplier,
             fast_turn: flags & 2 != 0,
             facets: sprite_facets,

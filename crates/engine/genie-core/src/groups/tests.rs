@@ -7,6 +7,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
@@ -212,14 +213,42 @@ fn the_stored_positions_keep_their_desired_length() {
 
 #[test]
 fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
-    assert_eq!(sub_formation(master_type::MISSILE, 0, 3), None);
-    assert_eq!(sub_formation(master_type::COMBAT, 0, 3), Some(3));
-    assert_eq!(sub_formation(master_type::COMBAT, 0, 0), Some(5));
-    assert_eq!(sub_formation(master_type::COMBAT, 0, 6), Some(0));
-    assert_eq!(sub_formation(master_type::COMBAT, 0, 255), None);
-    assert_eq!(sub_formation(master_type::COMBAT, 1, 3), Some(5));
-    assert_eq!(sub_formation(master_type::COMBAT, 0x90, 3), Some(3));
-    assert_eq!(sub_formation(master_type::BUILDING, 1, 3), Some(3));
+    assert_eq!(
+        sub_formation(master_type::MISSILE, HeroFlags::NONE, 3),
+        None
+    );
+    assert_eq!(
+        sub_formation(master_type::COMBAT, HeroFlags::NONE, 3),
+        Some(3)
+    );
+    assert_eq!(
+        sub_formation(master_type::COMBAT, HeroFlags::NONE, 0),
+        Some(5)
+    );
+    assert_eq!(
+        sub_formation(master_type::COMBAT, HeroFlags::NONE, 6),
+        Some(0)
+    );
+    assert_eq!(
+        sub_formation(master_type::COMBAT, HeroFlags::NONE, 255),
+        None
+    );
+    assert_eq!(
+        sub_formation(master_type::COMBAT, HeroFlags::FULL_HERO, 3),
+        Some(5)
+    );
+    assert_eq!(
+        sub_formation(
+            master_type::COMBAT,
+            HeroFlags::PROTECTED_FORMATION | HeroFlags::INVERTED,
+            3
+        ),
+        Some(3)
+    );
+    assert_eq!(
+        sub_formation(master_type::BUILDING, HeroFlags::FULL_HERO, 3),
+        Some(3)
+    );
 }
 
 /// `FUN_140fe1550`: every value the constructor writes that the group holds.

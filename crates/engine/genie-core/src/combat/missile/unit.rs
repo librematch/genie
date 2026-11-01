@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::missile::MissileState;
+use crate::combat::missile::VanishMode;
 use crate::combat::victims::{readable, victim, victim_of, write_strike_back};
 use crate::combat::volley::Fired;
 use crate::map::Distance;
@@ -168,18 +169,19 @@ impl Unit {
         Ok(())
     }
 
-    /// `FUN_140a9e6e0`'s hits (projectile types 0 to 2): the objects whose obstruction boxes,
-    /// grown by the missile's radius on x, its step from `old` crossed (`FUN_14113f740` ->
+    /// `FUN_140a9e6e0`'s hits (projectile types 0 to 2): the objects whose obstruction boxes, grown
+    /// by the missile's radius on x, its step from `old` crossed (`FUN_14113f740` ->
     /// `FUN_1411570c0`: the query `FUN_141051900` with flags 0x10, the missile itself ignored, the
-    /// ends held inside the map) and that lie at its height ([`crate::combat::missile::meets_height`]).
-    /// Each one the last step did not meet, while the missile still flies: hit mode 0 hits its
-    /// target alone; hit mode 1 (a miss) an object of another player that is no ally's and no
-    /// missile, but not one of Gaia's above type 15 or one below the missile's blast level unless
-    /// it is the target. A hit is the shooter's ([`Unit::missile_strike`]); unless the master's
-    /// vanish mode has bit 0 or a shield blocked it, the missile ends (`set_state` 1: slot 0xd8,
-    /// its hit points 0). The step's objects become the met ones (`+0x88`) when there are any. A
-    /// missed missile's hit on another object than its target, hit mode 2 and the Hussite
-    /// wagon's case (`+0x90`) are not modelled.
+    /// ends held inside the map) and that lie at its height
+    /// ([`crate::combat::missile::meets_height`]). Each one the last step did not meet, while the
+    /// missile still flies: hit mode 0 hits its target alone; hit mode 1 (a miss) an object of
+    /// another player that is no ally's and no missile, but not one of Gaia's above type 15 or one
+    /// below the missile's blast level unless it is the target. A hit is the shooter's
+    /// ([`Unit::missile_strike`]); unless the master's vanish mode has
+    /// [`crate::combat::missile::VanishMode::PASSES_THROUGH`] or a shield blocked it, the missile
+    /// ends (`set_state` 1: slot 0xd8, its hit points 0). The step's objects become the met ones
+    /// (`+0x88`) when there are any. A missed missile's hit on another object than its target, hit
+    /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled.
     pub(crate) fn missile_hits(
         &mut self,
         action: &mut crate::combat::missile::MissileAction,
@@ -207,7 +209,7 @@ impl Unit {
                     }
                     let result = self.missile_strike(action, fired, c)?;
                     action.result = result;
-                    if stats.vanish_mode & 1 == 0 && result != 2 {
+                    if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH) && result != 2 {
                         self.end_missile(action);
                     }
                 }
@@ -223,7 +225,9 @@ impl Unit {
                     let result = self.missile_strike(action, fired, c)?;
                     action.result = result;
                     // the master's dying sprite plays there (a sprite of its own, not held)
-                    if (stats.vanish_mode & 1 != 0 || result == 2) && blast_level <= level {
+                    if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH) || result == 2)
+                        && blast_level <= level
+                    {
                         continue;
                     }
                     self.end_missile(action);
@@ -441,7 +445,8 @@ impl Unit {
     /// ([`Unit::missile_strike`]), which ends it unless a shield blocked it. A missile that still
     /// flies after that hits the ground: unless its last hit was blocked, the blast of the object
     /// it was fired from there (slot 0x848, `FUN_14107f690`: nothing without an area effect; one
-    /// is not modelled); it ends (`set_state` 1) and, unless its master's vanish mode has bit 1, is
+    /// is not modelled); it ends (`set_state` 1) and, unless its master's vanish mode has
+    /// [`crate::combat::missile::VanishMode::STAYS`], is
     /// destroyed (slot 0xd0, `FUN_14106c420`: its action list goes, which lets its target and
     /// shooter go; `FUN_14118f1e0`: its hit points 0 and state 7).
     pub(crate) fn missile_lands(
@@ -482,7 +487,7 @@ impl Unit {
             }
         }
         self.end_missile(action);
-        if stats.vanish_mode & 2 == 0 {
+        if !stats.vanish_mode.contains(VanishMode::STAYS) {
             self.missile_destroyed(slot, c)?;
         }
         Ok(())

@@ -15,6 +15,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::SoundEvents;
+use crate::objects::masters::TaskFlags;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -44,7 +45,7 @@ fn feitoria_food() -> Task {
         attribute_type2: Some(AttributeId::numbered(205)),
         attribute_type3: Some(attribute::FOOD),
         work_val1: 1.6,
-        combat_level_flag: 1,
+        combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
     }
 }
@@ -56,7 +57,7 @@ fn keshik_gold() -> Task {
         attribute_type2: Some(AttributeId::numbered(213)),
         attribute_type3: Some(attribute::GOLD),
         work_val1: 0.01,
-        combat_level_flag: 1,
+        combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
     }
 }
@@ -74,10 +75,10 @@ fn the_living_path_takes_at_least_1_hit_point_or_a_nan() {
 fn a_task_with_its_type_s_flag_bit_generates_always() {
     // bit 1 for an object of type 70, bit 2 for one of type 80
     let mut t = feitoria_food();
-    t.combat_level_flag = 2;
+    t.combat_level_flag = TaskFlags::UNITS_ALWAYS;
     assert!(generates(&t, COMBAT, COMBAT, None, false));
     assert!(!generates(&t, BUILDING, BUILDING, None, false));
-    t.combat_level_flag = 4;
+    t.combat_level_flag = TaskFlags::BUILDINGS_ALWAYS;
     assert!(generates(&t, BUILDING, BUILDING, None, false));
     assert!(!generates(&t, COMBAT, COMBAT, None, false));
 }
@@ -564,7 +565,7 @@ fn a_removal_reward_pays_the_rate_times_the_attribute() {
 #[test]
 fn a_removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_the_rate() {
     let t = Task {
-        combat_level_flag: 1,
+        combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..bounty()
     };
     let cost = costs(&[

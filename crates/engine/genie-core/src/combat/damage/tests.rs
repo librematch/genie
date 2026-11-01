@@ -1304,15 +1304,15 @@ fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
     );
 }
 
-/// With the flag, an attacker of type 50 and up leaves a building of 1 hit point or more
-/// (`COMISS hp, 1` / `JC` past) to its combat ability's effects (`FUN_14107bdf0`): only bit 7
-/// against a player not allied both ways does anything, which is not modelled. The kill
-/// bonus (`FUN_1415c6510`) of a razing: only an attacker of type 40 and up with a task of
-/// action type 0x9a does anything, which is not modelled.
+/// With the flag, an attacker of type 50 and up leaves a building of 1 hit point or more (`COMISS
+/// hp, 1` / `JC` past) to its combat ability's effects (`FUN_14107bdf0`): only
+/// [`crate::objects::masters::CombatAbility::HIT_EFFECTS`] against a player not allied both ways
+/// does anything, which is not modelled. The kill bonus (`FUN_1415c6510`) of a razing: only an
+/// attacker of type 40 and up with a task of action type 0x9a does anything, which is not modelled.
 #[test]
 fn a_building_s_attacker_effects_and_kill_bonus_are_the_game_s() {
     let mut villager = hunter();
-    villager.source.ability = 0x80;
+    villager.source.ability = CombatAbility::HIT_EFFECTS;
     let mut h = house();
     assert!(
         take(

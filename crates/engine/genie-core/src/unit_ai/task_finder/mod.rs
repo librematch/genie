@@ -381,7 +381,12 @@ fn garrison_task<'m>(
         && (list.kind == COMBAT || list.id == ids::MASTER_1808)
         && t.master.garrison != 0
     {
-        let garrison_type = t.master.building.map_or(0, |b| b.garrison_type);
+        let garrison_type = t
+            .master
+            .building
+            .map_or(crate::objects::masters::GarrisonKinds::NONE, |b| {
+                b.garrison_type
+            });
         let takes = crate::garrison::garrison_type_takes(garrison_type, list.class, list.id, false);
         if let Some(task) = first(list, crate::garrison::is_garrison_task).filter(|_| takes) {
             if matches!(t.top_action, Some(action_type::PACK | action_type::UNPACK)) {

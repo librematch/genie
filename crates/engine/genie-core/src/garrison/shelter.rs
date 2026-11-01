@@ -13,6 +13,7 @@ use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
@@ -126,7 +127,8 @@ impl World {
     /// nothing. Of the others, the villagers (class 4 of type 70) and the units of master 1808
     /// seek shelter (a villager of master 1808 is listed twice) in the player's buildings that
     /// take villagers: in the player's object order, those of type 80 in state 2, not inside
-    /// another (`+0x2f0`, `FUN_141188da0`), whose master's `garrison_type` has bit 0
+    /// another (`+0x2f0`, `FUN_141188da0`), whose master's `garrison_type` has
+    /// [`crate::objects::masters::GarrisonKinds::VILLAGERS`]
     /// (`FUN_1411ccb60` with 1), each with its count ([`World::garrisoned`]); then
     /// [`World::shelter`] (`FUN_141622450`).
     pub(crate) fn seek_shelter(
@@ -161,7 +163,9 @@ impl World {
         let mut buildings = Vec::new();
         for b in &self.players.player(player)?.objects {
             let m = b.master(&self.masters, player)?;
-            let takes_villagers = m.building.is_some_and(|x| x.garrison_type & 1 != 0);
+            let takes_villagers = m
+                .building
+                .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
             if b.life.state == ObjectState::Alive
                 && b.life.inside.is_none()
                 && m.kind == BUILDING

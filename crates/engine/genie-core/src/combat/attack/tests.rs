@@ -9,6 +9,7 @@ use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::movement::MoveAlgorithm;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveTo, MoveToReads, MoveWait, SpriteReads};
@@ -149,7 +150,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
     a.move_to = Some(walking(MoveTo::Moving));
@@ -484,7 +485,7 @@ fn soldier_mover(speed: f32) -> Mover {
             restriction: RestrictionId::named(7),
             restriction_mask: TerrainMask::of_bits(6),
             turn_time: Seconds::ZERO,
-            move_algorithm: 0,
+            move_algorithm: MoveAlgorithm::NONE,
             min_collision: 1.0,
             fast_turn: false,
             facets: Some(crate::objects::facing::SpriteFacets {
@@ -1645,7 +1646,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let mut a = Attack {
         target: None,

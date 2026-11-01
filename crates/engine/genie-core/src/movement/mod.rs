@@ -43,12 +43,14 @@ mod explore_state;
 pub mod fly;
 mod fly_state;
 mod long_walk;
+mod move_algorithm;
 pub mod move_to;
 mod new_path;
 mod path_end;
 mod path_flags;
 mod path_points;
 mod path_state;
+pub use self::move_algorithm::MoveAlgorithm;
 pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;
 mod request;
@@ -207,9 +209,8 @@ pub struct MoveStats {
     /// The master's turn time (`+0x758`, the `.dat`'s `rotation_speed`): the seconds between the
     /// facet steps of a unit facing a target; 0 faces at once (`FUN_141162db0`).
     pub turn_time: Seconds,
-    /// The master's move algorithm (`+0x768`, the `.dat`'s `move_algorithm`): bit 0 has a stop
-    /// reset the unit's sprite (slot 0x5d8).
-    pub move_algorithm: u8,
+    /// The master's move algorithm (`+0x768`, the `.dat`'s `move_algorithm`).
+    pub move_algorithm: MoveAlgorithm,
     /// Master `+0x780`, `min_collision_size_multiplier`: the walk's query grows moving allies by
     /// the unit's radius times this.
     pub min_collision: f32,

@@ -34,13 +34,16 @@ file for what the save does not hold.
 | [`class.rs`](class.rs) | The master classes (`+0x18`, an `i16`): the one definition of the class values. |
 | [`class_id.rs`](class_id.rs) | A master's class as one type: the group of masters the game treats alike (villagers, siege weapons, gates, farms), the value the `.dat` names `unit_class`. |
 | [`class_mask.rs`](class_mask.rs) | A set of classes as the game tests one: a bit mask over the classes below a bound. |
+| [`combat_ability.rs`](combat_ability.rs) | A master's combat abilities (`CombatAbility`, `combat_ability`). |
 | [`combat_setters.rs`](combat_setters.rs) | The RGE combat and missile masters' setters: the armor and attack amounts. |
 | [`conversion_adjust.rs`](conversion_adjust.rs) | A master's adjustments of a conversion (`ConversionAdjust`). |
 | [`cost_slot.rs`](cost_slot.rs) | A master's cost (`+0x880`): three slots in their places, an empty one among them. |
 | [`damage_class.rs`](damage_class.rs) | An armor or attack entry's class as one type, and the entry: the `.dat`'s armor and attack classes. |
 | [`derived.rs`](derived.rs) | The values the slice derives from a master after a change (`Master::follow`): the sprites' speed and facets, a moving unit's values. |
 | [`dispatch.rs`](dispatch.rs) | The attribute setters by master type (slots 0x18, 0x20 and 0x28), the master copy (slot 8), the loader's defaults and the selected entries. |
+| [`garrison_kinds.rs`](garrison_kinds.rs) | The kinds of units a building takes in (`GarrisonKinds`, `garrison_type`). |
 | [`gather_group.rs`](gather_group.rs) | A master's gather group as one type: the kind of resource the unit AI's resource searches look for, the value the `.dat` names `resource_gather_group`. |
+| [`hero_flags.rs`](hero_flags.rs) | A master's hero flags (`HeroFlags`, `hero_flag`). |
 | [`ids.rs`](ids.rs) | The master ids (`i16`, `crate::objects::masters::Master::id`): the one definition of the masters the engine names, by the `.dat`'s unit id. |
 | [`lookup.rs`](lookup.rs) | A player's masters by id (`Masters`) and the work command's choice of master and task. |
 | [`master_id.rs`](master_id.rs) | A master's id as one type: the master a command builds, trains or turns an object into, and a target's master. |
@@ -53,6 +56,7 @@ file for what the save does not hold.
 | [`placement_terrains.rs`](placement_terrains.rs) | A master's placement terrains (`PlacementTerrains`). |
 | [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`) and a sound event's id (`SoundEventId`). |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
+| [`task_flags.rs`](task_flags.rs) | A task's flags (`TaskFlags`, `combat_level_flag`). |
 | [`task_id.rs`](task_id.rs) | A task's id as one type: the place of a task in its master's task list, which an action keeps to name the task it works on. |
 | [`task_sprites.rs`](task_sprites.rs) | A task's four sprites (`TaskSprites`). |
 | [`tests.rs`](tests.rs) | Tests. |

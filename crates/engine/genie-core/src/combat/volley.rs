@@ -19,6 +19,7 @@ use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
@@ -76,18 +77,19 @@ impl Unit {
 
     /// Slot 0x858 (`FUN_14120c0a0`), a combat object's hit at its target from the Attack's swing
     /// when it has a missile, a volley missile or a charge projectile
-    /// ([`crate::combat::attack::volleys`]; the others' melee hit is the Attack's). A master without
-    /// `max_attacks_in_volley` fires its missile ([`Unit::fire`]). One with it fires its volley
-    /// (`next_volley`, `+0xa04`, already fired of [`crate::combat::missile::volley_count`] missiles):
-    /// unless its `combat_ability` has bit 4, a master with a spread fires 1 to 3 at a time (an
-    /// Object-stream draw, "attack"), the rest of the volley next with its attack timer at 0.05;
-    /// the volley's last (masters 73 and 559 tell their unit AI the action executed) leaves
-    /// `next_volley` 0. Of the missiles at a time, the first of a volley is its missile (none
-    /// without one) and the others its extra missiles ([`Unit::volley_missile`]), each scattered
-    /// by two draws. A target of a player but Gaia has its player make a flare at the attacker
-    /// ([`crate::world::World::make_flare`]). Not modelled: the self-destructing masters (527, 528, 1104,
-    /// 2133..2135, classes 35 and 64 alive), a charge (charge types 6 and 7) and a target of a
-    /// computer player (its notify 0x214). Not held: the local player's statistics
+    /// ([`crate::combat::attack::volleys`]; the others' melee hit is the Attack's). A master
+    /// without `max_attacks_in_volley` fires its missile ([`Unit::fire`]). One with it fires its
+    /// volley (`next_volley`, `+0xa04`, already fired of [`crate::combat::missile::volley_count`]
+    /// missiles): unless its `combat_ability` has
+    /// [`crate::objects::masters::CombatAbility::FULL_VOLLEY`], a master with a spread fires 1 to 3
+    /// at a time (an Object-stream draw, "attack"), the rest of the volley next with its attack
+    /// timer at 0.05; the volley's last (masters 73 and 559 tell their unit AI the action executed)
+    /// leaves `next_volley` 0. Of the missiles at a time, the first of a volley is its missile
+    /// (none without one) and the others its extra missiles ([`Unit::volley_missile`]), each
+    /// scattered by two draws. A target of a player but Gaia has its player make a flare at the
+    /// attacker ([`crate::world::World::make_flare`]). Not modelled: the self-destructing masters
+    /// (527, 528, 1104, 2133..2135, classes 35 and 64 alive), a charge (charge types 6 and 7) and a
+    /// target of a computer player (its notify 0x214). Not held: the local player's statistics
     /// (`FUN_140a4ba80`).
     pub(crate) fn volley(&mut self, c: &mut Step<'_>, aimed: Aimed) -> Result<(), GenieError> {
         let master = object_master(
@@ -133,7 +135,7 @@ impl Unit {
                 ..
             } = master.volley_spread;
             let mut all = true;
-            if master.combat_ability & 0x10 == 0 {
+            if !master.combat_ability.contains(CombatAbility::FULL_VOLLEY) {
                 let k = if 0.0 < x_spread || 0.0 < y_spread {
                     let draw = c.w.streams.get(Stream::Object).rand15() as i32;
                     (draw * 2) / 0x7fff + 1

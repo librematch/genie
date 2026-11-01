@@ -11,6 +11,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
@@ -54,7 +55,7 @@ pub struct Convertee {
     /// Its master's id.
     pub master: MasterId,
     /// Its master's hero flag (`hero_flag`, `+0x8d9`).
-    pub hero: u8,
+    pub hero: HeroFlags,
 }
 
 /// The faith a priest's conversion asks unless `any` (`DAT_14330ebcc`).
@@ -75,15 +76,14 @@ pub(super) const NEVER_CONVERTED: [MasterId; 9] = [
 /// The priest master that converts only boats (53).
 pub(super) const BOAT_CONVERTER: MasterId = MasterId::named(53);
 
-/// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert
-/// object `t` (None: one the world does not hold), with `any` its faith not asked. Never for
-/// class 43, nor without full faith (100, `COMISS`: a NaN fails) unless `any`; never a Gaia
-/// object, nor with the owner's attribute 67 at most 0, nor livestock (58); master 53 converts
-/// only the boats (2, 20, 21, 22, 53); never the [`NEVER_CONVERTED`] masters, walls (27), gates
-/// (39) or flags (30); never a master whose hero flag forbids it (bit 0 or 1 set, but bit 7 with
-/// bit 1). Then the priest's convert task (action type 104): its last for any class and master,
-/// or the first for the object's master or class; one that names an attribute (`+0x26`) the
-/// owner holds at most 0 (or not a number) fails.
+/// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert object
+/// `t` (None: one the world does not hold), with `any` its faith not asked. Never for class 43, nor
+/// without full faith (100, `COMISS`: a NaN fails) unless `any`; never a Gaia object, nor with the
+/// owner's attribute 67 at most 0, nor livestock (58); master 53 converts only the boats (2, 20,
+/// 21, 22, 53); never the [`NEVER_CONVERTED`] masters, walls (27), gates (39) or flags (30); never
+/// a master whose hero flag grants [`HeroFlags::NO_CONVERSION`]. Then the priest's convert task
+/// (action type 104): its last for any class and master, or the first for the object's master or
+/// class; one that names an attribute (`+0x26`) the owner holds at most 0 (or not a number) fails.
 #[must_use]
 pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool {
     if p.class == class::CLASS_43 {
@@ -118,9 +118,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
     {
         return false;
     }
-    let hero = t.hero;
-    let free = hero.trailing_zeros() >= 2 || ((hero as i8) < 0 && hero & 2 != 0);
-    if !free {
+    if t.hero.grants(HeroFlags::NO_CONVERSION) {
         return false;
     }
     let mut task = None;

@@ -431,6 +431,7 @@ mod stack_tests {
     use crate::map::TerrainFlags;
     use crate::map::spatial::{Placed, Tiles};
     use crate::map::terrain::TileTerrain;
+    use crate::movement::MoveAlgorithm;
     use crate::movement::Speed;
     use crate::movement::TurnRate;
     use crate::objects::ListIndex;
@@ -831,7 +832,7 @@ mod stack_tests {
                         restriction: crate::map::RestrictionId::named(0),
                         restriction_mask: crate::map::TerrainMask::ALL,
                         turn_time: Seconds::ZERO,
-                        move_algorithm: 0,
+                        move_algorithm: MoveAlgorithm::NONE,
                         min_collision: 0.0,
                         fast_turn: false,
                         facets: None,

@@ -11,6 +11,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::CombatAbility;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::WONDER;
@@ -223,12 +224,12 @@ pub(super) fn kill_bonus(src: &Attacker) -> Result<(), GenieError> {
     Ok(())
 }
 
-/// `FUN_14107bdf0`, the attacker `src`'s combat ability's effects on its target `t`: only a
-/// combat ability with bit 7, against a target whose player is not allied with the attacker's
-/// both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does anything (its
-/// master's effects on the target, not modelled).
+/// `FUN_14107bdf0`, the attacker `src`'s combat ability's effects on its target `t`: only a combat
+/// ability with [`CombatAbility::HIT_EFFECTS`], against a target whose player is not allied with
+/// the attacker's both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does anything
+/// (its master's effects on the target, not modelled).
 pub(super) const fn attack_effects(src: &Attacker, t: &Victim) -> Result<(), GenieError> {
-    if src.ability & 0x80 != 0 && !t.allied.both() {
+    if src.ability.contains(CombatAbility::HIT_EFFECTS) && !t.allied.both() {
         return Err(GenieError::unsupported(
             "an attacker whose hits apply effects (FUN_14107bdf0)",
         ));
@@ -284,17 +285,17 @@ pub(super) fn take_static(
     }
 }
 
-/// A combat object's slot 0xe8 (`FUN_1412108e0`): none on an object below 1 hit point. The
-/// special attack (`special_attack_flag` 1) of an idle target facing its attacker takes the
-/// damage to 0.66 (its sprite, master `+0x8e8`, is not modelled); the retaliation (flag 2) of an
-/// idle target with a unit AI facing an attacker of weapon range below 0.2 strikes the attacker
-/// first with its own weapons (four times over a unit whose charge is ready,
-/// [`special_charge_ready`]), and an attacker left with at most 1 hit point
-/// takes the hit to nothing. Then the damage ([`damage`]); a hit takes at least one hit point
-/// (but past the hit point floor); a target with `damage_reflection` gives its attacker that
-/// share of the loss, at least 1 (slot 0xb0, no kill handling). Not held: the statistics
-/// (`FUN_1417783d0`); not modelled: a kill bonus task of the attacker (action type 0x9a,
-/// `FUN_1415c6510`) and its combat ability's effects (bit 7, `FUN_14107bdf0`).
+/// A combat object's slot 0xe8 (`FUN_1412108e0`): none on an object below 1 hit point. The special
+/// attack (`special_attack_flag` 1) of an idle target facing its attacker takes the damage to 0.66
+/// (its sprite, master `+0x8e8`, is not modelled); the retaliation (flag 2) of an idle target with
+/// a unit AI facing an attacker of weapon range below 0.2 strikes the attacker first with its own
+/// weapons (four times over a unit whose charge is ready, [`special_charge_ready`]), and an
+/// attacker left with at most 1 hit point takes the hit to nothing. Then the damage ([`damage`]); a
+/// hit takes at least one hit point (but past the hit point floor); a target with
+/// `damage_reflection` gives its attacker that share of the loss, at least 1 (slot 0xb0, no kill
+/// handling). Not held: the statistics (`FUN_1417783d0`); not modelled: a kill bonus task of the
+/// attacker (action type 0x9a, `FUN_1415c6510`) and its combat ability's effects
+/// ([`CombatAbility::HIT_EFFECTS`], `FUN_14107bdf0`).
 pub(super) fn take_unit(
     t: &mut Victim,
     src: &mut Victim,

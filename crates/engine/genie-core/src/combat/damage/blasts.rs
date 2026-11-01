@@ -12,6 +12,7 @@ use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::CombatAbility;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -50,7 +51,7 @@ pub(super) fn damage(
     }
     let marks = t.kind == COMBAT
         || (t.kind == BUILDING && matches!(t.class, class::CLASS_51 | class::CLASS_54));
-    if MISSILE <= src.kind && src.source.ability & 4 != 0 && marks {
+    if MISSILE <= src.kind && src.source.ability.contains(CombatAbility::MARKS_TARGET) && marks {
         return Err(GenieError::unsupported(
             "an attacker whose combat ability marks its target (FUN_141206250)",
         ));

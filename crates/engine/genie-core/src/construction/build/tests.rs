@@ -14,6 +14,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
@@ -708,7 +709,7 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
             stack_unit: None,
             foundation_terrain: None,
             tech: None,
-            garrison_type: 0,
+            garrison_type: GarrisonKinds::NONE,
             garrison_heal_rate: HitPoints::ZERO,
             garrison_repair_rate: HitPoints::ZERO,
             annexes: [None; 4],

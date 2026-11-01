@@ -8,6 +8,7 @@ use crate::construction::gates::gate_units;
 use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
+use crate::movement::MoveAlgorithm;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
@@ -335,11 +336,11 @@ impl Unit {
         let Some(second) = second else {
             return;
         };
-        if self
-            .body
-            .mover()
-            .is_some_and(|m| m.stats.move_algorithm & 1 != 0)
-        {
+        if self.body.mover().is_some_and(|m| {
+            m.stats
+                .move_algorithm
+                .contains(MoveAlgorithm::ALTERNATES_SPRITES)
+        }) {
             return;
         }
         let Some(shown) = self.sprite.as_ref() else {

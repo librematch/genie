@@ -10,6 +10,7 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::GatherGroup;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObjectFlags;
@@ -17,6 +18,7 @@ use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::masters::PlacementTerrains;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
@@ -70,7 +72,7 @@ fn dat_task(
         object_group: genie_core::objects::masters::ClassId::of_field(t.class_id)?,
         object_id: MasterId::of_data(t.unit_id),
         combat_level: t.enable_targeting,
-        combat_level_flag: t.combat_level_flag,
+        combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
         terrain: t.terrain_id,
         owner_type: t.target_diplomacy,
         holding_attr: t.carry_check,
@@ -204,7 +206,7 @@ pub(super) fn dat_work(
             stack_unit: MasterId::of_data(b.stack_unit_id),
             foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
             tech: genie_core::technology::TechId::of_data(b.tech_id),
-            garrison_type: b.garrison_type,
+            garrison_type: GarrisonKinds::from_bits_retain(b.garrison_type),
             garrison_heal_rate: HitPoints::new(b.garrison_heal_rate),
             garrison_repair_rate: HitPoints::new(b.garrison_repair_rate),
             annexes: b.annexes.map(|a| MasterId::of_data(a.unit_id)),

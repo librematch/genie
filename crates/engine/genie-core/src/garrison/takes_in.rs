@@ -6,6 +6,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
@@ -39,44 +40,50 @@ pub(super) const MASTER_1811: MasterId = MasterId::named(1811);
 pub(super) const MASTER_1822: MasterId = MasterId::named(1822);
 
 /// Whether `garrison_type` (a building master's `+0x9bc`) takes in a unit of `class` and master
-/// `id` (the switch of `FUN_14120eb10` on the class): bit 0 villagers (classes 4, 19, 59), bit 1
-/// archers and infantry (0, 6, 35, 44, 45, 46, 50, 56; not masters 1263, 1811), bit 2 cavalry
-/// (12, 23, 36, 47, 57), bit 3 monks (18, 42, 43; not masters 775, 1715, 1822), bit 4 herdables
-/// (58), bit 5 siege (13, 51, 54, 55), bit 6 ships (2, 20, 21, 22, 53); then bit 2 for masters
-/// 1263, 775, 1715 and 1822 and bit 3 for masters 1811 and 1808, whatever their class. The task
+/// `id` (the switch of `FUN_14120eb10` on the class, [`GarrisonKinds`]'s bits; infantry not of
+/// masters 1263, 1811, monks not of masters 775, 1715, 1822); then cavalry for masters 1263,
+/// 775, 1715 and 1822 and monks for masters 1811 and 1808, whatever their class. The task
 /// finder's copy of the switch (`FUN_1412784d0`) leaves class 42 out (`with_42` false).
 #[must_use]
-pub fn garrison_type_takes(garrison_type: u8, class: ClassId, id: MasterId, with_42: bool) -> bool {
-    let bit = |b: u8| garrison_type & (1 << b) != 0;
+pub fn garrison_type_takes(
+    garrison_type: GarrisonKinds,
+    class: ClassId,
+    id: MasterId,
+    with_42: bool,
+) -> bool {
+    let bit = |kind| garrison_type.contains(kind);
     let by_class = match class {
-        class::CLASS_0 | class::CLASS_44 => bit(1),
+        class::CLASS_0 | class::CLASS_44 => bit(GarrisonKinds::INFANTRY),
         class::TRADE_BOAT
         | class::TRANSPORT
         | class::FISHING_SHIP
         | class::WARSHIP
-        | class::CLASS_53 => bit(6),
-        class::VILLAGER | class::TRADE_CART | class::KING => bit(0),
+        | class::CLASS_53 => bit(GarrisonKinds::SHIPS),
+        class::VILLAGER | class::TRADE_CART | class::KING => bit(GarrisonKinds::VILLAGERS),
         class::CLASS_6
         | class::CLASS_35
         | class::CLASS_45
         | class::CLASS_46
         | class::CLASS_50
-        | class::CLASS_56 => id != MASTER_1263 && id != MASTER_1811 && bit(1),
+        | class::CLASS_56 => id != MASTER_1263 && id != MASTER_1811 && bit(GarrisonKinds::INFANTRY),
         class::CLASS_12 | class::CLASS_23 | class::CLASS_36 | class::CLASS_47 | class::CLASS_57 => {
-            bit(2)
+            bit(GarrisonKinds::CAVALRY)
         }
-        class::SIEGE | class::CLASS_51 | class::CLASS_54 | class::CLASS_55 => bit(5),
+        class::SIEGE | class::CLASS_51 | class::CLASS_54 | class::CLASS_55 => {
+            bit(GarrisonKinds::SIEGE)
+        }
         class::MONK | class::CLASS_43 => {
-            id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(3)
+            id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(GarrisonKinds::MONKS)
         }
         class::RELIC if with_42 => {
-            id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(3)
+            id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(GarrisonKinds::MONKS)
         }
-        class::LIVESTOCK => bit(4),
+        class::LIVESTOCK => bit(GarrisonKinds::HERDABLES),
         _ => false,
     };
-    let as_cavalry = matches!(id, MASTER_1263 | MASTER_775 | MASTER_1715 | MASTER_1822) && bit(2);
-    let as_monk = matches!(id, MASTER_1811 | MASTER_1808) && bit(3);
+    let as_cavalry = matches!(id, MASTER_1263 | MASTER_775 | MASTER_1715 | MASTER_1822)
+        && bit(GarrisonKinds::CAVALRY);
+    let as_monk = matches!(id, MASTER_1811 | MASTER_1808) && bit(GarrisonKinds::MONKS);
     by_class || as_cavalry || as_monk
 }
 
@@ -195,7 +202,7 @@ impl World {
         if !has_garrison_task(&unit.tasks, GARRISON, class::BUILDING) {
             return Ok(false);
         }
-        let garrison_type = bm.building.map_or(0, |m| m.garrison_type);
+        let garrison_type = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_type);
         if !garrison_type_takes(garrison_type, unit.class, unit.id, true) {
             return Ok(false);
         }

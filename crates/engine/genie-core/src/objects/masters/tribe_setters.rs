@@ -12,6 +12,7 @@ use crate::objects::masters::{
     AttributeWorld, Master, ROUND, add_sprite, attribute, cost_resource, id_of,
     insert_train_location, low8, low16, resize_train_locations, select_entry, set_sprite,
 };
+use crate::objects::masters::{GarrisonKinds, HeroFlags};
 use crate::players::Amount;
 use crate::players::attribute as players_attribute;
 
@@ -42,7 +43,7 @@ impl Master {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::HERO_STATUS => self.hero_flag = low8(v),
+            a::HERO_STATUS => self.hero_flag = HeroFlags::from_bits_retain(low8(v)),
             a::TRAIN_LOCATION
             | a::TRAIN_BUTTON
             | a::HOTKEY_ID
@@ -203,7 +204,10 @@ impl Master {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::attribute as a;
         match attribute {
-            a::HERO_STATUS => self.hero_flag = self.hero_flag.wrapping_add(low8(v)),
+            a::HERO_STATUS => {
+                self.hero_flag =
+                    HeroFlags::from_bits_retain(self.hero_flag.bits().wrapping_add(low8(v)));
+            }
             a::SHOWN_PIERCE_ARMOR => {
                 self.shown.pierce_armor = self.shown.pierce_armor.wrapping_add(low16(v));
             }
@@ -332,7 +336,7 @@ impl Master {
             a::BUILDING_ICON_OVERRIDE => self.building_facet = low16(v),
             a::GARRISON_TYPE => {
                 if let Some(b) = self.building.as_mut() {
-                    b.garrison_type = low8(v);
+                    b.garrison_type = GarrisonKinds::from_bits_retain(low8(v));
                 }
             }
             a::FOUNDATION_TERRAIN => {
@@ -373,7 +377,9 @@ impl Master {
             }
             a::GARRISON_TYPE => {
                 if let Some(b) = self.building.as_mut() {
-                    b.garrison_type = b.garrison_type.wrapping_add(low8(v));
+                    b.garrison_type = GarrisonKinds::from_bits_retain(
+                        b.garrison_type.bits().wrapping_add(low8(v)),
+                    );
                 }
             }
             a::FOUNDATION_TERRAIN => {

@@ -290,7 +290,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     });
     let attack = add(Unit {
         id: object_id(33),

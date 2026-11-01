@@ -53,7 +53,7 @@ const fn graphic(id: i16, factor: f32) -> Graphic {
         speed_multiplier: factor,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     }
 }
 

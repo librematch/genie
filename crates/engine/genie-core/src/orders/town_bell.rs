@@ -15,6 +15,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::ids::TOWN_CENTRE;
@@ -225,12 +226,13 @@ impl World {
 
     /// `FUN_14163a650`: player `owner`'s town centre `tc` (master 109; any other object does
     /// nothing) rings: of its owner's live objects, in the list's order, those in state 2 not
-    /// inside another (`FUN_141188da0`) within [`REACH`] of it (`FUN_14118f8c0`; `COMISS`/`JC`:
-    /// a NaN gap is out) are the units, a villager (class 4 of type 70) or master 1808, else
-    /// the buildings (type 80) that take villagers (`garrison_type` bit 0, `FUN_1411ccb60`), each
-    /// with its count ([`crate::world::World::garrisoned`]) and its bell flag (`+0x9dc`) set (its
-    /// sound, slot 0x4c0, is not simulation); then [`crate::world::World::shelter`] with the
-    /// reach (`param_6` 1), no transports, not through the unit AIs.
+    /// inside another (`FUN_141188da0`) within [`REACH`] of it (`FUN_14118f8c0`; `COMISS`/`JC`: a
+    /// NaN gap is out) are the units, a villager (class 4 of type 70) or master 1808, else the
+    /// buildings (type 80) that take villagers
+    /// ([`crate::objects::masters::GarrisonKinds::VILLAGERS`], `FUN_1411ccb60`), each with its
+    /// count ([`crate::world::World::garrisoned`]) and its bell flag (`+0x9dc`) set (its sound,
+    /// slot 0x4c0, is not simulation); then [`crate::world::World::shelter`] with the reach
+    /// (`param_6` 1), no transports, not through the unit AIs.
     pub(crate) fn ring_town_bell(
         &mut self,
         owner: PlayerId,
@@ -260,7 +262,9 @@ impl World {
             let id = o.id;
             let m = o.master(&self.masters, owner)?;
             let (kind, class, master) = (m.kind, m.class, m.id);
-            let takes_villagers = m.building.is_some_and(|b| b.garrison_type & 1 != 0);
+            let takes_villagers = m
+                .building
+                .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS));
             let near = |t: &Self| -> Result<bool, GenieError> {
                 let (o_at, o_radius) = t.ground(id)?;
                 let gap = footprint_gap_squared(o_at, o_radius, at, radius);
@@ -307,7 +311,9 @@ impl World {
             k = k.next();
             let b = &self.players.live(owner, idx)?;
             let m = b.master(&self.masters, owner)?;
-            let takes_villagers = m.building.is_some_and(|x| x.garrison_type & 1 != 0);
+            let takes_villagers = m
+                .building
+                .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
             if m.kind != BUILDING
                 || ObjectState::Dying <= b.life.state
                 || !takes_villagers
@@ -356,7 +362,9 @@ impl World {
             k = k.next();
             let b = &self.players.live(owner, idx)?;
             let m = b.master(&self.masters, owner)?;
-            let takes_villagers = m.building.is_some_and(|x| x.garrison_type & 1 != 0);
+            let takes_villagers = m
+                .building
+                .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
             if b.life.state != ObjectState::Alive
                 || b.life.inside.is_some()
                 || m.kind != BUILDING
@@ -473,7 +481,8 @@ impl World {
     /// `FUN_1412067f0` before slot 0x7e8's work command, for a villager or master 1808 and a
     /// target the world holds: the town-bell record ([`World::record_town_bell`]); then, with the
     /// garrison filter (3), the flag goes on for a building in state 2 of the player or an ally
-    /// whose master takes villagers (`garrison_type` bit 0), with any other filter it goes off.
+    /// whose master takes villagers
+    /// ([`crate::objects::masters::GarrisonKinds::VILLAGERS`]), with any other filter it goes off.
     /// The UI's flag for the viewing player's building (`+0x1874`) is not held.
     pub(crate) fn town_bell_order(
         &mut self,
@@ -499,7 +508,9 @@ impl World {
             (tm.kind == BUILDING
                 && t.life.state == ObjectState::Alive
                 && world.allied(player, tp, true)
-                && tm.building.is_some_and(|b| b.garrison_type & 1 != 0))
+                && tm
+                    .building
+                    .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS)))
             .then_some(true)
         } else {
             Some(false)

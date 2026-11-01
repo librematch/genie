@@ -89,7 +89,7 @@ fn stats() -> MoveStats {
         restriction: RestrictionId::named(7),
         restriction_mask: TerrainMask::of_bits(6),
         turn_time: Seconds::ZERO,
-        move_algorithm: 0,
+        move_algorithm: MoveAlgorithm::NONE,
         min_collision: 1.0,
         fast_turn: false,
         facets: Some(crate::objects::facing::SpriteFacets {
@@ -674,7 +674,7 @@ fn a_stop_clears_the_animation_speed_within_the_call() {
     );
     // a master whose move algorithm has bit 0 also resets the sprite, which is not modelled
     let mut resets = builder_9177();
-    resets.stats.move_algorithm |= 1;
+    resets.stats.move_algorithm |= MoveAlgorithm::ALTERNATES_SPRITES;
     assert!(resets.stop().is_err());
 }
 
@@ -3176,7 +3176,7 @@ fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
         speed_multiplier: factor,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let mut m = crate::gathering::hunt::tests::walker();
     m.stats.base = Speed::new(0.8);

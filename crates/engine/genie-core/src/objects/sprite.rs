@@ -645,7 +645,7 @@ mod tests {
             speed_multiplier: 0.0,
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
-            flags: SpriteFlags::from_bits_retain(0x0),
+            flags: SpriteFlags::NONE,
         };
         let mut rng = Well512::default();
         let mut s = ActiveSprite::start(still, &mut rng);

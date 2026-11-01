@@ -1,6 +1,7 @@
 use crate::fixtures::{combat_master, master_moving_mut, master_static_mut};
 use crate::masters::{MasterTable, Turning};
 use crate::saved_masters::{master_facets, moving_stats};
+use genie_core::movement::MoveAlgorithm;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::facing::SpriteFacets;
@@ -71,7 +72,10 @@ fn a_walker_moves_by_its_sprites_speed_factors() {
     };
     let stats = moving_stats(&master, s, 1, &table([8; 3])).unwrap();
     assert_eq!(stats.speed.get().to_bits(), 3.0_f32.to_bits());
-    assert_eq!((stats.fly_mode, stats.move_algorithm), (2, 1));
+    assert_eq!(
+        (stats.fly_mode, stats.move_algorithm),
+        (2, MoveAlgorithm::ALTERNATES_SPRITES)
+    );
     assert_eq!(
         (stats.restriction, stats.restriction_mask),
         (

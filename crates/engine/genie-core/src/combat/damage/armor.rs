@@ -6,6 +6,7 @@ use crate::combat::damage::{Armored, Attacker, Victim, charge_damage, charge_wor
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
@@ -97,10 +98,10 @@ impl OwnSlot {
     }
 }
 
-/// [`armor_damage`]'s armor against weapon class `class`: the base armor, else the last entry
-/// of that class; an attacker of type 60 and up with `combat_ability` bit 1 against a melee or
-/// pierce entry (3, 4) of a victim without bit 2 meets 0; a combat victim's (type 70 and up)
-/// melee or pierce armor reads its class's ([`class_armor`]).
+/// [`armor_damage`]'s armor against weapon class `class`: the base armor, else the last entry of
+/// that class; an attacker of type 60 and up with [`CombatAbility::IGNORES_ARMOR`] against a melee
+/// or pierce entry (3, 4) of a victim without [`CombatAbility::RESISTS_IGNORING`] meets 0; a combat
+/// victim's (type 70 and up) melee or pierce armor reads its class's ([`class_armor`]).
 pub(super) fn weapon_armor(
     a: &Armored,
     class: DamageClass,
@@ -117,8 +118,8 @@ pub(super) fn weapon_armor(
         let own_slot = OwnSlot::of(e.class);
         if MISSILE <= attacker.kind
             && own_slot.is_some()
-            && attacker.ability & 1 != 0
-            && a.ability & 2 == 0
+            && attacker.ability.contains(CombatAbility::IGNORES_ARMOR)
+            && !a.ability.contains(CombatAbility::RESISTS_IGNORING)
         {
             armor = 0;
             continue;

@@ -332,7 +332,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let (mut sprite, mut rng) = (None, Well512::default());
     let released = g
@@ -971,7 +971,7 @@ fn a_gatherer_facing_its_target_works_it() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: SpriteFlags::from_bits_retain(0x0),
+        flags: SpriteFlags::NONE,
     };
     let mut rig = Rig::on_the_path();
     rig.mover_mut().stats.turn_time = Seconds::ZERO;

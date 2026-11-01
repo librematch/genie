@@ -1,6 +1,8 @@
 //! The RGE combat and missile masters' setters: the armor and attack amounts.
 
+use crate::combat::missile::{SmartMode, VanishMode};
 use crate::map::Distance;
+use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{
@@ -45,7 +47,7 @@ impl Master {
             a::SHOWN_ATTACK => self.shown.attack = low16(v),
             a::SHOWN_RANGE => self.shown.range = Distance::new(v),
             a::SHOWN_MELEE_ARMOR => self.shown.melee_armor = low16(v),
-            a::COMBAT_ABILITY => self.combat_ability = low8(v),
+            a::COMBAT_ABILITY => self.combat_ability = CombatAbility::from_bits_retain(low8(v)),
             a::ATTACK_DISPERSION => self.missed_spread = v,
             a::ATTACK_GRAPHIC => set_sprite(&mut self.attack_sprite, cvttss2si(v), world),
             a::AREA_DAMAGE => self.area_damage = v,
@@ -123,7 +125,9 @@ impl Master {
                 self.shown.melee_armor = self.shown.melee_armor.wrapping_add(low16(v));
             }
             a::COMBAT_ABILITY => {
-                self.combat_ability = self.combat_ability.wrapping_add(low8(v));
+                self.combat_ability = CombatAbility::from_bits_retain(
+                    self.combat_ability.bits().wrapping_add(low8(v)),
+                );
             }
             a::ATTACK_DISPERSION => self.missed_spread += v,
             a::ATTACK_GRAPHIC => add_sprite(&mut self.attack_sprite, v, world),
@@ -268,9 +272,13 @@ impl Master {
     ) {
         if let Some(m) = self.missile_stats.as_mut() {
             match attribute {
-                attribute::PROJECTILE_SMART_MODE => m.smart_mode = low8(v),
+                attribute::PROJECTILE_SMART_MODE => {
+                    m.smart_mode = SmartMode::from_bits_retain(low8(v));
+                }
                 attribute::PROJECTILE_HIT_MODE => m.hit_mode = low8(v),
-                attribute::PROJECTILE_VANISH_MODE => m.vanish_mode = low8(v),
+                attribute::PROJECTILE_VANISH_MODE => {
+                    m.vanish_mode = VanishMode::from_bits_retain(low8(v));
+                }
                 attribute::PROJECTILE_ARC => m.arc = v,
                 _ => {}
             }
@@ -288,11 +296,13 @@ impl Master {
         if let Some(m) = self.missile_stats.as_mut() {
             match attribute {
                 attribute::PROJECTILE_SMART_MODE => {
-                    m.smart_mode = m.smart_mode.wrapping_add(low8(v));
+                    m.smart_mode =
+                        SmartMode::from_bits_retain(m.smart_mode.bits().wrapping_add(low8(v)));
                 }
                 attribute::PROJECTILE_HIT_MODE => m.hit_mode = m.hit_mode.wrapping_add(low8(v)),
                 attribute::PROJECTILE_VANISH_MODE => {
-                    m.vanish_mode = m.vanish_mode.wrapping_add(low8(v));
+                    m.vanish_mode =
+                        VanishMode::from_bits_retain(m.vanish_mode.bits().wrapping_add(low8(v)));
                 }
                 attribute::PROJECTILE_ARC => m.arc += v,
                 _ => {}
@@ -311,7 +321,9 @@ impl Master {
     ) {
         if let Some(m) = self.missile_stats.as_mut() {
             match attribute {
-                attribute::PROJECTILE_SMART_MODE => m.smart_mode = low8(v),
+                attribute::PROJECTILE_SMART_MODE => {
+                    m.smart_mode = SmartMode::from_bits_retain(low8(v));
+                }
                 attribute::PROJECTILE_ARC => m.arc *= v,
                 _ => {}
             }

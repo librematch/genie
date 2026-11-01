@@ -7,6 +7,7 @@ use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::movement::MoveAlgorithm;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
@@ -249,7 +250,7 @@ pub(crate) fn walker() -> Mover {
             restriction: RestrictionId::named(7),
             restriction_mask: TerrainMask::of_bits(6),
             turn_time: Seconds::ZERO,
-            move_algorithm: 0,
+            move_algorithm: MoveAlgorithm::NONE,
             min_collision: 1.0,
             fast_turn: false,
             facets: Some(crate::objects::facing::SpriteFacets {
@@ -1379,7 +1380,7 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
-            flags: SpriteFlags::from_bits_retain(0x0),
+            flags: SpriteFlags::NONE,
         });
         h.attack = Some(a);
         let mut rig = Rig::on_the_path(victim).holding(10028, PlayerId::new(1));

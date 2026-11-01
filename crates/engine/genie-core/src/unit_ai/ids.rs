@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::objects::ActionState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
@@ -284,7 +285,7 @@ pub struct NewObject {
     /// Its master's `object_flags` (`+0x654`).
     pub object_flags: ObjectFlags,
     /// Its master's `hero_flag` (`+0x8d9`).
-    pub hero_flag: u8,
+    pub hero_flag: HeroFlags,
     /// The object's slot 0x7b0 (`+0xb74`, which the action object's constructor set before
     /// through slot 0x8a8, `FUN_141206d50`: the work range of its master's last task of action
     /// type 6, else 0): the hunted animal's leash.
@@ -349,12 +350,12 @@ pub(super) const DEFENSIVE_MASTERS: [MasterId; 3] = [
 pub(super) const NO_ATTACK_CLASSES: [ClassId; 2] = [class::CLASS_35, class::CLASS_64];
 /// The class whose soldier is in `NoAttack` unless a hero (`FUN_140c12300`: `-0xe6f` raw).
 pub(super) const NO_ATTACK_CLASS: ClassId = class::CLASS_61;
-/// The soldier's stance (`+0x1a9`) its constructor (`FUN_140c12300`) gives a new object: 2
-/// (stand ground) to a human player's object of a master with object flag 0x10 that is its own
-/// copy (`copy_id`, `+0x158`, its id) while the player's current age (attribute 6) is 0; 1
-/// (defensive) to a human player's of masters 527, 528 and 1104; 3 (no attack) to a human
-/// player's of classes 35 and 64; then 1 to a hero (`hero_flag` with bit 0 or 3, not both 3
-/// and 7); 3 to class 61; else the owner's posture (slot 0x90, `+0x71c`, its low byte).
+/// The soldier's stance (`+0x1a9`) its constructor (`FUN_140c12300`) gives a new object: 2 (stand
+/// ground) to a human player's object of a master with object flag 0x10 that is its own copy
+/// (`copy_id`, `+0x158`, its id) while the player's current age (attribute 6) is 0; 1 (defensive)
+/// to a human player's of masters 527, 528 and 1104; 3 (no attack) to a human player's of classes
+/// 35 and 64; then 1 to a hero (its `hero_flag` grants [`HeroFlags::DEFENSIVE`]); 3 to class 61;
+/// else the owner's posture (slot 0x90, `+0x71c`, its low byte).
 pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
     // UCOMISS with JP, JNZ: the age equals 0 (a NaN does not)
     if !new.computer
@@ -371,8 +372,7 @@ pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
         return UnitStance::NO_ATTACK;
     }
     // TEST 9, then a signed byte at least 0 or bit 3 clear
-    let hero = new.hero_flag & 9 != 0 && (new.hero_flag & 0x80 == 0 || new.hero_flag & 8 == 0);
-    if hero {
+    if new.hero_flag.grants(HeroFlags::DEFENSIVE) {
         return UnitStance::DEFENSIVE;
     }
     if new.class == NO_ATTACK_CLASS {

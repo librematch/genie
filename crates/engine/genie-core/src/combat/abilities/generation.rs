@@ -9,6 +9,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
+use crate::objects::masters::TaskFlags;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
@@ -44,7 +45,8 @@ pub struct WorkTarget {
 }
 
 /// Whether a generation task generates this update (`0x141207d4d`..`0x141207fbe`): an object
-/// of type 70 (`+0xf`) whose task has `combat_level_flag` bit 1, or of type 80 with bit 2, does;
+/// of type 70 (`+0xf`) whose task has [`TaskFlags::UNITS_ALWAYS`], or of type 80 with
+/// [`TaskFlags::BUILDINGS_ALWAYS`], does;
 /// otherwise one whose master is of type 70 does while its top action is one of
 /// [`WORKING_ACTIONS`] in state 7 with a target the world holds that has hit points above 0 or
 /// whose master stores some (`COMISS`/`JA`, `JBE`: a NaN does not) and whose master's class is
@@ -59,8 +61,8 @@ pub fn generates(
     built: bool,
 ) -> bool {
     match kind {
-        COMBAT if task.combat_level_flag & 2 != 0 => return true,
-        BUILDING if task.combat_level_flag & 4 != 0 => return true,
+        COMBAT if task.combat_level_flag.contains(TaskFlags::UNITS_ALWAYS) => return true,
+        BUILDING if task.combat_level_flag.contains(TaskFlags::BUILDINGS_ALWAYS) => return true,
         _ => {}
     }
     if master_kind == COMBAT
@@ -125,8 +127,8 @@ impl World {
         let unit = &self.players[p].objects[i];
         let flags = task.combat_level_flag;
         let short_cut = match master.kind {
-            COMBAT => flags & 2 != 0,
-            _ => flags & 4 != 0,
+            COMBAT => flags.contains(TaskFlags::UNITS_ALWAYS),
+            _ => flags.contains(TaskFlags::BUILDINGS_ALWAYS),
         };
         let top = if short_cut || master.kind != COMBAT {
             None

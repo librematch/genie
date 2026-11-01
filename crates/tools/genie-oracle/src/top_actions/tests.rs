@@ -17,6 +17,7 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::action_type::BUILD;
@@ -41,7 +42,7 @@ fn task(id: i16, range: f32) -> Task {
         object_group: Some(class_id(3)),
         object_id: None,
         combat_level: 0,
-        combat_level_flag: 0,
+        combat_level_flag: TaskFlags::NONE,
         terrain: -1,
         owner_type: 0,
         holding_attr: 0,

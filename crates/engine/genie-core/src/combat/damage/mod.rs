@@ -58,6 +58,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -302,7 +303,7 @@ pub struct Armored {
     /// Its master's `bonus_damage_resistance`.
     pub resistance: f32,
     /// Its master's `combat_ability`.
-    pub ability: u8,
+    pub ability: CombatAbility,
     /// Its master's `damage_reflection`.
     pub reflection: f32,
     /// Its master's `invulnerability_level`.
@@ -351,7 +352,7 @@ pub struct Attacker {
     /// Its master.
     pub master_id: MasterId,
     /// Its master's `combat_ability`.
-    pub ability: u8,
+    pub ability: CombatAbility,
     /// Its master's missile, −1 for none.
     pub missile: Option<MasterId>,
     /// Its master's weapon range (`+0x828`), `area_effect_range` (`+0x82c`: the blast's radius),
