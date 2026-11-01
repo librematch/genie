@@ -20,6 +20,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::ChargeType;
+use crate::objects::masters::HitChance;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
@@ -321,7 +322,7 @@ impl Attack {
     pub(super) fn hit(
         f: &mut Fight,
         blasted: &mut [Victim],
-        chance: i16,
+        chance: HitChance,
         object_rng: &mut Well512,
     ) -> Result<Option<ObjectId>, GenieError> {
         let a = f.own.source;
@@ -338,7 +339,7 @@ impl Attack {
     pub(super) fn strike(
         f: &mut Fight,
         blasted: &mut [Victim],
-        chance: i16,
+        chance: HitChance,
         object_rng: &mut Well512,
     ) -> Result<Option<ObjectId>, GenieError> {
         let hit = Hit {
@@ -362,7 +363,7 @@ impl Attack {
     pub(super) fn trample(
         f: &mut Fight,
         blasted: &mut [Victim],
-        chance: i16,
+        chance: HitChance,
         object_rng: &mut Well512,
     ) -> Result<Option<ObjectId>, GenieError> {
         let (center, target) = (f.own.position, f.victim.id);
@@ -372,7 +373,7 @@ impl Attack {
         let taken = blast_so_far(&f.victim, blasted)?;
         let draw = object_rng.raw64();
         let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
-        if r <= i64::from(chance) {
+        if r <= i64::from(chance.get()) {
             let factor =
                 damage::elevation_factor(f.own.position.z(), f.own.attack_elevation, &f.victim);
             if !damage::shield(&mut f.victim, false) {

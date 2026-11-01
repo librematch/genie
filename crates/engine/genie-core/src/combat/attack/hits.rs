@@ -11,6 +11,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
 use crate::objects::masters::ChargeType;
+use crate::objects::masters::HitChance;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MISSILE;
@@ -28,7 +29,7 @@ pub(crate) struct Hit {
     pub at: Position,
     pub from_z: Option<f32>,
     pub missile: bool,
-    pub chance: i16,
+    pub chance: HitChance,
 }
 
 /// What the swing does after its hit, before it waits for its sprite's loop (`FUN_140a82ae0`
@@ -132,7 +133,7 @@ pub(crate) fn strike(
     }
     let draw = object_rng.raw64();
     let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
-    if i64::from(hit.chance) < r && a.missile.is_none() {
+    if i64::from(hit.chance.get()) < r && a.missile.is_none() {
         return Ok(struck);
     }
     // a building's slot 0x1f0 (FUN_1411cc890) scales the factor by its relics and a building

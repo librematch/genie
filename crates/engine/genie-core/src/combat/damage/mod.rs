@@ -60,6 +60,7 @@ use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
@@ -176,7 +177,7 @@ pub struct Victim {
     /// Its master's first storage amount (`+0x610`), which a gatherer reads.
     pub storage: Amount,
     /// Its master's `attribute_max_amount`.
-    pub capacity: i16,
+    pub capacity: CarryCapacity,
     /// `+0x644`, `worker_num`: the actions that have it as their target (a farm another farmer
     /// works).
     pub workers: i32,

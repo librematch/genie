@@ -380,7 +380,7 @@ fn garrison_task<'m>(
         // A building's master type (`'P'`).
         && t.master.kind == BUILDING
         && (list.kind == COMBAT || list.id == ids::MASTER_1808)
-        && t.master.garrison != 0
+        && t.master.garrison.holds()
     {
         let garrison_type = t
             .master
@@ -588,6 +588,7 @@ fn finder_tail<'m>(
 mod tests {
     use super::*;
     use crate::objects::masters::CombatLevel;
+    use crate::objects::masters::GarrisonCapacity;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::TaskTerrain;
     use crate::players::CivId;
@@ -1090,7 +1091,7 @@ mod tests {
         // building's task, so LAB_1412796b4's first task of action 3 on class 20
         let ship = Master {
             object_flags: ObjectFlags::GARRISON,
-            garrison: 5,
+            garrison: GarrisonCapacity::of_data(5),
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
         let enter = task(crate::garrison::ENTER, class::TRANSPORT.get(), -1, 0.0);
@@ -1158,7 +1159,7 @@ mod tests {
         // class 13) only under the garrison filter (or mode 1, not modelled)
         let ram = Master {
             object_flags: ObjectFlags::GARRISON,
-            garrison: 4,
+            garrison: GarrisonCapacity::of_data(4),
             ..master(ids::ID_35, COMBAT, class::SIEGE, vec![])
         };
         let enter = task(crate::garrison::ENTER, class::SIEGE.get(), -1, 0.0);

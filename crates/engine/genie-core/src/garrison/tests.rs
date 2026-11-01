@@ -37,6 +37,7 @@ use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
+use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::ObjectFlags;
@@ -109,7 +110,7 @@ fn garrison_masters() -> Masters {
             kind: master_type::BUILDING,
             class: class::TOWER,
             hit_points: MasterHitPoints::of_data(2400),
-            garrison: 15,
+            garrison: GarrisonCapacity::of_data(15),
             building: Some(BuildingMaster {
                 garrison_type: (GarrisonKinds::VILLAGERS
                     | GarrisonKinds::INFANTRY
@@ -142,7 +143,7 @@ fn garrison_masters() -> Masters {
             kind: master_type::COMBAT,
             class: class::TRANSPORT,
             object_flags: ObjectFlags::GARRISON,
-            garrison: 1,
+            garrison: GarrisonCapacity::of_data(1),
             // no sprites (the world's sprites' table is empty)
             standing_sprite: None,
             move_sprite: None,
@@ -154,7 +155,7 @@ fn garrison_masters() -> Masters {
             kind: master_type::BUILDING,
             class: class::GATE,
             hit_points: MasterHitPoints::of_data(2750),
-            garrison: 0,
+            garrison: GarrisonCapacity::of_data(0),
             ..Master::default()
         },
     ])
@@ -1918,7 +1919,7 @@ fn an_enter_gives_its_load_to_a_drop_site_and_needs_room() {
     );
     let full: fn(&mut World) = |t| {
         for m in &mut t.masters {
-            m.get_mut(TC).unwrap().garrison = 0;
+            m.get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(0);
         }
     };
     assert_eq!(
@@ -2072,7 +2073,7 @@ fn a_unit_ais_test_takes_a_building_or_transport_that_takes_its_unit_in() {
         id: master_id(59),
         kind: master_type::MISSILE,
         class: class::BUILDING,
-        garrison: 5,
+        garrison: GarrisonCapacity::of_data(5),
         ..Master::default()
     }]));
     t.masters = (0..4).map(|_| masters.clone()).collect();
@@ -2240,7 +2241,7 @@ fn a_garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
         let mut t = sized_world(40, 40);
         for m in &mut t.masters {
             if let Some(tc) = m.get_mut(TC) {
-                tc.garrison = 1;
+                tc.garrison = GarrisonCapacity::of_data(1);
             }
         }
         building_at(&mut t, 101, TC, Point::new(16.0, 10.0), None);
@@ -2704,7 +2705,7 @@ fn coast_world(ship: Point) -> World {
             s.terrain_restriction = Some(RestrictionId::named(1));
             s.radius = Footprint::new(0.5, 0.5);
             s.tall = true;
-            s.garrison = 5;
+            s.garrison = GarrisonCapacity::of_data(5);
             s.moving = Some(sails);
         }
         if let Some(v) = m.get_mut(VILLAGER) {

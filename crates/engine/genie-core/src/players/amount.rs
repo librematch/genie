@@ -1,5 +1,7 @@
 //! An amount of a player attribute ([`Amount`]), with the game's `f32` operations.
 
+use crate::objects::masters::CarryCapacity;
+
 /// An amount of a player attribute (a resource) as the game's `f32` holds it: what an object
 /// holds of its attribute (`+0x310`), what a unit carries at most (its master's
 /// `attribute_max_amount`, [`Amount::of_master`]), what a gather, a hunt or a drop-off moves.
@@ -20,8 +22,8 @@ impl Amount {
 
     /// A master's whole amount as the game converts it (`CVTSI2SS`, exact for an `i16`).
     #[must_use]
-    pub fn of_master(amount: i16) -> Self {
-        Self(f32::from(amount))
+    pub fn of_master(amount: CarryCapacity) -> Self {
+        Self(f32::from(amount.get()))
     }
 
     /// The amount, as the save and the game's arithmetic hold it.
@@ -129,6 +131,7 @@ impl genie_diff::Diff for Amount {
 
 #[cfg(test)]
 mod tests {
+    use crate::objects::masters::CarryCapacity;
     use crate::players::Amount;
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
@@ -160,8 +163,10 @@ mod tests {
     /// A master's whole amount converts exactly, a negative one too.
     #[test]
     fn a_master_s_whole_amount_converts_exactly() {
-        assert_eq!(Amount::of_master(10), Amount::new(10.0));
-        assert_eq!(Amount::of_master(i16::MAX).get(), 32767.0);
-        assert_eq!(Amount::of_master(-1).get(), -1.0);
+        let of = |amount| Amount::of_master(CarryCapacity::of_data(amount));
+        assert_eq!(of(10), Amount::new(10.0));
+        assert_eq!(of(i16::MAX).get(), 32767.0);
+        assert_eq!(of(-1).get(), -1.0);
+        assert!(CarryCapacity::default() < CarryCapacity::of_data(1));
     }
 }

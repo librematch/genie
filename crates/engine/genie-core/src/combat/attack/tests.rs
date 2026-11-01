@@ -536,7 +536,7 @@ pub(crate) fn reads() -> AttackReads {
         standing: Some(STANDING),
         volleys: false,
         reload: Seconds::new(2.0),
-        hit_chance: 100,
+        hit_chance: HitChance::of_data(100),
         armed: true,
         swing_sprites: SwingSprites::default(),
         computer: false,
@@ -807,7 +807,7 @@ fn a_strike_on_an_annex_hits_its_main_building() {
         at: own.position,
         from_z: Some(0.0),
         missile: false,
-        chance: 100,
+        chance: HitChance::of_data(100),
     };
     let struck = strike(
         &mut own,
@@ -861,7 +861,7 @@ fn a_building_s_relic_raises_its_missile_s_hit() {
             at: target.position,
             from_z: Some(2.0),
             missile: true,
-            chance: 100,
+            chance: HitChance::of_data(100),
         };
         let _ = strike(
             &mut own,
@@ -917,7 +917,13 @@ fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
             ..soldier()
         },
     };
-    let executed = Attack::hit(&mut f, &mut blasted, 100, &mut Well512::default()).unwrap();
+    let executed = Attack::hit(
+        &mut f,
+        &mut blasted,
+        HitChance::of_data(100),
+        &mut Well512::default(),
+    )
+    .unwrap();
     assert_eq!(executed, Some(object_id(21)));
     assert_eq!(
         (blasted[0].hp, f.victim.hp),

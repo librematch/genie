@@ -270,7 +270,7 @@ impl World {
                 .object(building)
                 .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
             let bm = b.master(&self.masters, bp)?;
-            capacities.push((bm.kind == BUILDING, i32::from(bm.garrison), bm.class));
+            capacities.push((bm.kind == BUILDING, i32::from(bm.garrison.get()), bm.class));
         }
         let first_transport = shelters.buildings.len();
         for (i, &id) in units.iter().enumerate() {

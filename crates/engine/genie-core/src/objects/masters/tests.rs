@@ -193,14 +193,14 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::GARRISON_CAPACITY,
-            |m| f32::from(m.garrison),
+            |m| f32::from(m.garrison.get()),
             [3.0, 5.0, 10.0],
         ),
         (a::SIZE_X, |m| m.radius.x(), [3.0, 5.0, 10.0]),
         (a::SIZE_Y, |m| m.radius.y(), [3.0, 5.0, 10.0]),
         (
             a::CARRY_CAPACITY,
-            |m| f32::from(m.capacity),
+            |m| f32::from(m.capacity.get()),
             [3.0, 5.0, 10.0],
         ),
         (a::STORAGE_1, |m| m.storage[0].1.get(), [3.0, 5.0, 10.0]),
@@ -406,7 +406,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         (a::ATTACK_RELOAD_TIME, |m| m.reload.get(), [3.0, 5.0, 10.0]),
         (
             a::ACCURACY_PERCENT,
-            |m| f32::from(m.hit_chance),
+            |m| f32::from(m.hit_chance.get()),
             [3.0, 5.0, 10.0],
         ),
         (a::MAXIMUM_RANGE, |m| m.weapon_range.get(), [3.0, 5.0, 10.0]),
@@ -660,10 +660,10 @@ fn the_hit_points_add_and_multiply_up_to_their_cap_when_capped() {
     m.hit_points = MasterHitPoints::of_data(20000);
     m.multiply_attribute(attribute::HIT_POINTS, 2.0, &world(true));
     assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
-    m.capacity = 10;
+    m.capacity = CarryCapacity::of_data(10);
     m.multiply_attribute(attribute::CARRY_CAPACITY, 1.25, &world(true));
     // 12.5 + 0.5 = 13
-    assert_eq!(m.capacity, 13);
+    assert_eq!(m.capacity, CarryCapacity::of_data(13));
 }
 
 /// The storage amounts take a short (`(float)(int)(short)(int)v`), the object flags a 64-bit

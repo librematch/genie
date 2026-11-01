@@ -85,7 +85,7 @@ impl Unit {
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {
                 let master = t.master(&c.w.masters, tp)?;
-                let room = units_inside(others, t.id) < usize::from(master.garrison);
+                let room = units_inside(others, t.id) < master.garrison.units();
                 let (mut view, start) = crate::garrison::enter_view(
                     &mut c.w.spatial,
                     &c.w.masters,
@@ -395,7 +395,7 @@ impl Unit {
                 "an enter of a master that transforms (task 0x88)",
             ));
         }
-        if usize::from(bm.garrison) <= inside {
+        if bm.garrison.units() <= inside {
             return Ok(false);
         }
         self.go_inside(c, target, &me, &bm)?;

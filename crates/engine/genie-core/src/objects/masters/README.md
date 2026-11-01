@@ -33,6 +33,7 @@ file for what the save does not hold.
 | [`attack_priority.rs`](attack_priority.rs) | A master's attack priority: which targets its unit AI's checks let it choose. |
 | [`attribute.rs`](attribute.rs) | The attributes an effect changes on a master and on its objects (the game's attribute list: string 12200 plus the number names each). |
 | [`blast_level.rs`](blast_level.rs) | A master's blast level and blast defence (`BlastLevel`, `BlastDefense`). |
+| [`carry_capacity.rs`](carry_capacity.rs) | A master's carry capacity (`+0x61c`): how much an object of it carries. |
 | [`charge_event.rs`](charge_event.rs) | A master's charge event (`+0x920`): the range a ranged charge adds. |
 | [`charge_target.rs`](charge_target.rs) | A master's charge targets (`+0x924`): the groups of classes its charge works on. |
 | [`charge_type.rs`](charge_type.rs) | A master's charge type (`+0x922`): what its charge does. |
@@ -50,11 +51,13 @@ file for what the save does not hold.
 | [`fly_mode.rs`](fly_mode.rs) | A master's fly mode (`+0x608`): where its objects' height goes on the ground. |
 | [`fog_visibility.rs`](fog_visibility.rs) | A master's fog visibility (`+0x605`): whether its objects show in the fog of war. |
 | [`formation_class.rs`](formation_class.rs) | A master's formation category (`+0x8bc`): the sub-formation its units take in a group. |
+| [`garrison_capacity.rs`](garrison_capacity.rs) | A master's garrison capacity (`+0x5d4`): how many units an object of it holds. |
 | [`garrison_kinds.rs`](garrison_kinds.rs) | The kinds of units a building takes in (`GarrisonKinds`, `garrison_type`). |
 | [`gather_group.rs`](gather_group.rs) | A master's gather group as one type: the kind of resource the unit AI's resource searches look for, the value the `.dat` names `resource_gather_group`. |
 | [`ghost_mode.rs`](ghost_mode.rs) | A master's `create_doppelganger_on_death` (`+0x682`): whether its objects leave ghosts. |
 | [`hero_flags.rs`](hero_flags.rs) | A master's hero flags (`HeroFlags`, `hero_flag`). |
 | [`hill_mode.rs`](hill_mode.rs) | A master's hill mode (`+0x604`): how much its site's tiles may differ in height. |
+| [`hit_chance.rs`](hit_chance.rs) | A master's hit chance (`base_hit_chance`): the percent of its missiles and strikes that hit. |
 | [`id_field.rs`](id_field.rs) | A master's id fields as its data holds them: shorts the effects set, add to and scale, every value kept, which name a master (`MasterField`) or a terrain restriction (`RestrictionField`) when 0 or more. |
 | [`ids.rs`](ids.rs) | The master ids (`i16`, `crate::objects::masters::Master::id`): the one definition of the masters the engine names, by the `.dat`'s unit id. |
 | [`interaction_mode.rs`](interaction_mode.rs) | A master's interaction mode (`+0x62d`): how a player may select and order its objects. |

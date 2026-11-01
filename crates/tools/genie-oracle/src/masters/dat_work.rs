@@ -12,8 +12,10 @@ use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::AdjacentMode;
+use genie_core::objects::masters::CarryCapacity;
 use genie_core::objects::masters::CombatLevel;
 use genie_core::objects::masters::FogVisibility;
+use genie_core::objects::masters::GarrisonCapacity;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::GatherGroup;
 use genie_core::objects::masters::GhostMode;
@@ -172,7 +174,7 @@ pub(super) fn dat_work(
                 .collect()
         }),
         hit_points: MasterHitPoints::of_data(unit.hit_points),
-        capacity: unit.resource_capacity,
+        capacity: CarryCapacity::of_data(unit.resource_capacity),
         build_time: unit
             .creatable
             .as_ref()
@@ -229,7 +231,7 @@ pub(super) fn dat_work(
             destruction_sprite: SpriteId::of_data(b.destruction_graphic_id),
             construction_sprite: SpriteId::of_data(b.construction_graphic_id),
         }),
-        garrison: unit.garrison_capacity,
+        garrison: GarrisonCapacity::of_data(unit.garrison_capacity),
         recyclable: unit.recyclable != 0,
         auto_gather: unit.enable_auto_gather != 0,
         gather_group: GatherGroup::from(unit.resource_gather_group),

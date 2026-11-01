@@ -15,6 +15,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskSprites;
@@ -325,7 +326,7 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
             ..ms.get(VILLAGER).unwrap().clone()
         };
         *ms = Masters::new(ms.iter().cloned().chain([female]));
-        ms.get_mut(TC).unwrap().garrison = 15;
+        ms.get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(15);
     }
     t.players[1].attributes = vec![Amount::ZERO; 600];
     let before = t.players[1].objects.len();

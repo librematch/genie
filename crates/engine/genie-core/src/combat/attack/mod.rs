@@ -26,6 +26,7 @@ use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::{Master, Masters};
@@ -272,7 +273,7 @@ pub(crate) struct AttackReads {
     /// unit's reload stinger and powerup.
     pub(crate) reload: Seconds,
     /// The master's hit chance (`+0x83e`).
-    pub(crate) hit_chance: i16,
+    pub(crate) hit_chance: HitChance,
     /// `FUN_14120ea30` for a building: it can attack (class 51 or 54, a missile, or a firepower
     /// above 1); true for the others.
     pub(crate) armed: bool,

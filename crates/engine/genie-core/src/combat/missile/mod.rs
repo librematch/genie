@@ -21,6 +21,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
+use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
@@ -269,7 +270,7 @@ const MASTER_528: MasterId = MasterId::named(528);
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aimer {
     /// The firing object's master's `base_hit_chance` (`+0x83e`).
-    pub hit_chance: i16,
+    pub hit_chance: HitChance,
     /// Its `missed_missile_spread` (`+0x860`).
     pub spread: f32,
     /// Its class.
@@ -325,10 +326,10 @@ pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, Gen
         && radius.x() < 1.0
         && matches!(class, class::WALL | class::TOWER | class::BUILDING)
     {
-        chance = 0x50;
+        chance = HitChance::of_data(0x50);
     }
     let r = draw();
-    if i32::from(chance) < (r as i32 * 100) / 0x7fff {
+    if i32::from(chance.get()) < (r as i32 * 100) / 0x7fff {
         if *hit_mode == 0 {
             *hit_mode = 1;
         }
@@ -562,7 +563,7 @@ mod tests {
     #[test]
     fn a_missile_misses_by_its_spread_and_master_528_by_its_attack_count_s_share() {
         let aimer = Aimer {
-            hit_chance: 70,
+            hit_chance: HitChance::of_data(70),
             spread: 0.5,
             class: class::CLASS_0,
         };

@@ -18,14 +18,17 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::MasterHitPoints;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
+use genie_core::objects::masters::CarryCapacity;
 use genie_core::objects::masters::ChargeTarget;
 use genie_core::objects::masters::ChargeType;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::FormationClass;
+use genie_core::objects::masters::GarrisonCapacity;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::HeroFlags;
+use genie_core::objects::masters::HitChance;
 use genie_core::objects::masters::MasterField;
 use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::SoundEvents;
@@ -215,7 +218,7 @@ pub(super) fn work_masters(
         work.available = s.available != 0;
         work.disabled = s.disabled != 0;
         work.line_of_sight = Distance::new(s.los);
-        work.capacity = s.attribute_max_amount;
+        work.capacity = CarryCapacity::of_data(s.attribute_max_amount);
         work.blast_defense = BlastDefense::new(s.area_effect_object_level);
         if let Some(a) = action_part(m) {
             work.work_rate = WorkRate::new(a.work_rate);
@@ -275,7 +278,7 @@ pub(super) fn work_masters(
             work.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
             work.fire_frame = rc.fire_missile_at_frame;
             work.interrupt_frame = rc.interrupt_frame;
-            work.hit_chance = rc.base_hit_chance;
+            work.hit_chance = HitChance::of_data(rc.base_hit_chance);
             work.reload = Seconds::new(rc.speed_of_attack);
             work.weapons = rc
                 .weapon
@@ -386,7 +389,7 @@ pub(super) fn work_masters(
             )
         });
         work.death_sprite = SpriteId::of_data(s.death_sprite_id);
-        work.garrison = s.obj_max;
+        work.garrison = GarrisonCapacity::of_data(s.obj_max);
         work.death_spawns = [
             MasterId::of_data(s.death_spawn_obj_id),
             MasterId::of_data(s.death_spawn_obj_id2),

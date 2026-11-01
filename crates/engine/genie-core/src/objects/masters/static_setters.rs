@@ -5,8 +5,10 @@ use crate::movement::Speed;
 use crate::objects::MasterHitPoints;
 use crate::objects::WorkRate;
 use crate::objects::masters::BlastDefense;
+use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::FogVisibility;
+use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
 use crate::objects::masters::MasterAttribute;
@@ -39,10 +41,10 @@ impl Master {
         match attribute {
             a::HIT_POINTS => self.hit_points = MasterHitPoints::of_data(low16(v)),
             a::LINE_OF_SIGHT => self.line_of_sight = Distance::new(v),
-            a::GARRISON_CAPACITY => self.garrison = low8(v),
+            a::GARRISON_CAPACITY => self.garrison = GarrisonCapacity::of_data(low8(v)),
             a::SIZE_X => self.radius = self.radius.with_x(v),
             a::SIZE_Y => self.radius = self.radius.with_y(v),
-            a::CARRY_CAPACITY => self.capacity = low16(v),
+            a::CARRY_CAPACITY => self.capacity = CarryCapacity::of_data(low16(v)),
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
                     *amount = Amount::new(f32::from(low16(v)));
@@ -185,10 +187,13 @@ impl Master {
                     MasterHitPoints::of_data(add_short(self.hit_points.get(), v, world.capped));
             }
             a::LINE_OF_SIGHT => self.line_of_sight += Distance::new(v),
-            a::GARRISON_CAPACITY => self.garrison = self.garrison.wrapping_add(low8(v)),
+            a::GARRISON_CAPACITY => self.garrison = self.garrison.plus(low8(v)),
             a::SIZE_X => self.radius = self.radius.with_x(self.radius.x() + v),
             a::SIZE_Y => self.radius = self.radius.with_y(self.radius.y() + v),
-            a::CARRY_CAPACITY => self.capacity = add_short(self.capacity, v, world.capped),
+            a::CARRY_CAPACITY => {
+                self.capacity =
+                    CarryCapacity::of_data(add_short(self.capacity.get(), v, world.capped));
+            }
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
                     *amount += Amount::new(f32::from(low16(v)));
@@ -310,10 +315,16 @@ impl Master {
                 ));
             }
             a::LINE_OF_SIGHT => self.line_of_sight *= v,
-            a::GARRISON_CAPACITY => self.garrison = low8(f32::from(self.garrison) * v + ROUND),
+            a::GARRISON_CAPACITY => {
+                self.garrison =
+                    GarrisonCapacity::of_data(low8(f32::from(self.garrison.get()) * v + ROUND));
+            }
             a::SIZE_X => self.radius = self.radius.with_x(self.radius.x() * v),
             a::SIZE_Y => self.radius = self.radius.with_y(self.radius.y() * v),
-            a::CARRY_CAPACITY => self.capacity = multiply_short(self.capacity, v, world.capped),
+            a::CARRY_CAPACITY => {
+                self.capacity =
+                    CarryCapacity::of_data(multiply_short(self.capacity.get(), v, world.capped));
+            }
             a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
                     *amount = Amount::new(f32::from(low16(v * amount.get() + ROUND)));

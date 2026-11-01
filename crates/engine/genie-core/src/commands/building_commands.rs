@@ -42,7 +42,7 @@ impl World {
             .players
             .live(player, i)?
             .master(&self.masters, player)?;
-        Ok(master.garrison != 0 || self.trainable_count(player, master.id) > 0)
+        Ok(master.garrison.holds() || self.trainable_count(player, master.id) > 0)
     }
 
     /// SET GATHER POINT's handler ([`GatherPointCommand`], `FUN_140e7e9a0`).

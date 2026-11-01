@@ -184,6 +184,7 @@ mod tests {
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::WorkRate;
+    use crate::objects::masters::CarryCapacity;
     use crate::objects::masters::ids;
     use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
@@ -214,7 +215,7 @@ mod tests {
             kind: master_type::BUILDING,
             class: class::FARM,
             work_rate: WorkRate::new(0.4),
-            capacity: 15,
+            capacity: CarryCapacity::of_data(15),
             ..Master::default()
         }
     }

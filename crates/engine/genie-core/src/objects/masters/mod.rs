@@ -306,7 +306,7 @@ pub struct Master {
     /// targets (slot 0x2f8).
     pub charge_type: ChargeType,
     /// `+0x61c`, `attribute_max_amount`: how much an object of this master carries.
-    pub capacity: i16,
+    pub capacity: CarryCapacity,
     /// `+0x8bc`, `mFormationCategory`: 0 (villagers) keeps a unit out of the groups an order's
     /// splitter forms (`FUN_140fd76d0`).
     pub formation_category: FormationClass,
@@ -385,7 +385,7 @@ pub struct Master {
     pub charge_target: ChargeTarget,
     /// `+0x5d4`, `obj_max` (the `.dat`'s `garrison_capacity`): a building that garrisons takes a
     /// gather point (`FUN_140e7e9a0`).
-    pub garrison: u8,
+    pub garrison: GarrisonCapacity,
     /// `+0x680`, the `.dat`'s `recyclable`: its objects take ids from the negative range
     /// (`FUN_1415301b0`).
     pub recyclable: bool,
@@ -447,7 +447,7 @@ pub struct Master {
     /// `interrupt_frame`.
     pub interrupt_frame: i16,
     /// `base_hit_chance`.
-    pub hit_chance: i16,
+    pub hit_chance: HitChance,
     /// `speed_of_attack`: the reload time.
     pub reload: Seconds,
     /// Its weapons (class, amount).
@@ -606,6 +606,7 @@ mod adjacent_mode;
 mod attack_priority;
 pub mod attribute;
 mod blast_level;
+mod carry_capacity;
 mod charge_event;
 mod charge_target;
 mod charge_type;
@@ -617,11 +618,13 @@ mod damage_class;
 mod fly_mode;
 mod fog_visibility;
 mod formation_class;
+mod garrison_capacity;
 mod garrison_kinds;
 mod gather_group;
 mod ghost_mode;
 mod hero_flags;
 mod hill_mode;
+mod hit_chance;
 mod id_field;
 pub mod ids;
 mod interaction_mode;
@@ -649,6 +652,7 @@ pub use self::adjacent_mode::AdjacentMode;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
 pub use self::blast_level::{BlastDefense, BlastLevel};
+pub use self::carry_capacity::CarryCapacity;
 pub use self::charge_event::ChargeEvent;
 pub use self::charge_target::ChargeTarget;
 pub use self::charge_type::ChargeType;
@@ -660,11 +664,13 @@ pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::fly_mode::FlyMode;
 pub use self::fog_visibility::FogVisibility;
 pub use self::formation_class::FormationClass;
+pub use self::garrison_capacity::GarrisonCapacity;
 pub use self::garrison_kinds::GarrisonKinds;
 pub use self::gather_group::GatherGroup;
 pub use self::ghost_mode::GhostMode;
 pub use self::hero_flags::HeroFlags;
 pub use self::hill_mode::HillMode;
+pub use self::hit_chance::HitChance;
 pub use self::id_field::{MasterField, RestrictionField};
 pub use self::interaction_mode::InteractionMode;
 pub use self::interface_kind::InterfaceKind;

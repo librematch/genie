@@ -64,6 +64,7 @@ use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
@@ -71,9 +72,11 @@ use crate::objects::masters::CombatLevel;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
+use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
+use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
@@ -2893,7 +2896,7 @@ pub(crate) fn forage_world() -> World {
     for masters in &mut t.masters {
         let forager = Master {
             id: master_id(120),
-            capacity: 10,
+            capacity: CarryCapacity::of_data(10),
             drop_sites: vec![ids::TOWN_CENTRE],
             tasks: vec![crate::objects::masters::Task {
                 id: TaskId::test(2),
@@ -4971,7 +4974,7 @@ fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         });
         for masters in &mut t.masters {
             let hunter = masters.get_mut(master_id(122)).unwrap();
-            (hunter.capacity, hunter.work_rate) = (10, WorkRate::new(1.0));
+            (hunter.capacity, hunter.work_rate) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
         }
         let deer = &mut t.players[0].objects[ListIndex::new(0)];
         (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
@@ -5032,7 +5035,7 @@ fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
     });
     for masters in &mut t.masters {
         let hunter = masters.get_mut(master_id(122)).unwrap();
-        (hunter.capacity, hunter.work_rate) = (10, WorkRate::new(1.0));
+        (hunter.capacity, hunter.work_rate) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
     }
     let deer = &mut t.players[0].objects[ListIndex::new(0)];
     (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
@@ -5979,7 +5982,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
     for masters in &mut t.masters {
         let house = masters.get_mut(ids::HOUSE).unwrap();
-        house.garrison = room;
+        house.garrison = GarrisonCapacity::of_data(room);
         // it takes villagers in (bit 0)
         house.building.as_mut().unwrap().garrison_type = GarrisonKinds::VILLAGERS;
     }
@@ -7259,7 +7262,7 @@ fn farm_master() -> Master {
         kind: BUILDING,
         class: class::FARM,
         work_rate: WorkRate::new(0.4),
-        capacity: 15,
+        capacity: CarryCapacity::of_data(15),
         default_task: TaskIndex::of_data(0),
         tasks: vec![crate::objects::masters::Task {
             action_type: crate::gathering::make::MAKE,
@@ -12438,7 +12441,7 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
     let mut t = one_player(vec![tc], [200.0; 4]);
     t.masters = vec![Masters::new([Master {
         id: ids::TOWN_CENTRE,
-        garrison: 15,
+        garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
     }])];
     let set = |target, point, own| {
@@ -12497,7 +12500,7 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
     );
     t.masters = vec![Masters::new([Master {
         id: ids::TOWN_CENTRE,
-        garrison: 15,
+        garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
     }])];
     let set = |state| {
@@ -12580,7 +12583,7 @@ fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
     let mut t = one_player(vec![tc], [200.0; 4]);
     t.masters = vec![Masters::new([Master {
         id: ids::TOWN_CENTRE,
-        garrison: 15,
+        garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
     }])];
     let set = |target: Option<i32>, own| {
@@ -12697,7 +12700,7 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
     t.masters = vec![Masters::new([Master {
         id: ids::TOWN_CENTRE,
         kind: BUILDING,
-        garrison: 15,
+        garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
     }])];
     let step = |point| {
@@ -15704,7 +15707,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         weapon_offset: Offset::new(0.0, 0.0, 1.0),
         weapon_range: Distance::new(4.0),
         reload: Seconds::new(2.0),
-        hit_chance,
+        hit_chance: HitChance::of_data(hit_chance),
         max_volley,
         volley_spread: VolleySpread {
             x: spread,

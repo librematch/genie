@@ -13,6 +13,7 @@ use crate::objects::ActionState;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
+use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::SoundEvents;
@@ -434,7 +435,7 @@ fn a_hit_below_1_hit_point_leaves_0_and_holds_nothing() {
     let mut v = Victim {
         hp: HitPoints::new(0.5),
         amount: Amount::new(30.0),
-        capacity: 100,
+        capacity: CarryCapacity::of_data(100),
         ..Victim::default()
     };
     assert!(finish(&mut v));
@@ -443,7 +444,7 @@ fn a_hit_below_1_hit_point_leaves_0_and_holds_nothing() {
     let mut v = Victim {
         hp: HitPoints::new(-3.0),
         amount: Amount::new(30.0),
-        capacity: -1,
+        capacity: CarryCapacity::of_data(-1),
         ..Victim::default()
     };
     assert!(finish(&mut v));

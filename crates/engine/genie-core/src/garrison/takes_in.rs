@@ -115,7 +115,7 @@ impl World {
         b: &crate::objects::unit::Unit,
         unit: Option<ObjectId>,
     ) -> Result<bool, GenieError> {
-        let capacity = i32::from(b.master(&self.masters, bp)?.garrison);
+        let capacity = i32::from(b.master(&self.masters, bp)?.garrison.get());
         let with = match unit {
             Some(u) => self.garrisoned(u)? + 1,
             None => 1,
@@ -197,7 +197,7 @@ impl World {
         // nothing
         let max_hp = f64::from(HitPoints::of_master(bm.hit_points).get());
         let above = f64::from(b.life.hp.get()) > max_hp * LEAST_HP_SHARE;
-        if !above || bm.garrison == 0 {
+        if !above || !bm.garrison.holds() {
             return Ok(false);
         }
         if !has_garrison_task(&unit.tasks, GARRISON, class::BUILDING) {
