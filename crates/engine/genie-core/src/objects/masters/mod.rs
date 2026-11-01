@@ -463,9 +463,9 @@ pub struct Master {
     pub garrison_firepower: f32,
     /// `volley_fire_amount` (`+0x8c0`, the `.dat`'s total projectiles): a new object's missiles
     /// per volley (`+0xa00`).
-    pub volley_fire: f32,
+    pub volley_fire: crate::combat::Firepower,
     /// `max_attacks_in_volley` (`+0x8c4`, the `.dat`'s max total projectiles).
-    pub max_volley: u8,
+    pub max_volley: crate::combat::MissileCount,
     /// `volley_x_spread`, `volley_y_spread` and `volley_start_spread_adjustment` (`+0x8c8`..
     /// `+0x8d0`, the `.dat`'s projectile spawning area): how far a volley's missiles scatter.
     pub volley_spread: VolleySpread,

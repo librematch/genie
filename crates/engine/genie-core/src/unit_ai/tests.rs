@@ -6150,7 +6150,7 @@ fn a_making_building_runs_process_idle_only_without_a_target() {
     // a building without a missile and a single volley forgets its target, then searches
     let single = Surroundings {
         ranged: false,
-        firepower: 1.0,
+        firepower: crate::combat::Firepower::new(1.0),
         ..at
     };
     let mut u = tc(Some(object_id(29826)));
@@ -6164,7 +6164,7 @@ fn a_making_building_runs_process_idle_only_without_a_target() {
     );
     // with units inside it shoots more and keeps it
     let manned = Surroundings {
-        firepower: 3.0,
+        firepower: crate::combat::Firepower::new(3.0),
         ..single
     };
     let mut u = tc(Some(object_id(29826)));
@@ -6698,7 +6698,7 @@ const TC: Attacker = Attacker {
     radius: Footprint::new(2.0, 2.0),
     speed: Speed::ZERO,
     scenario: false,
-    firepower: 0.0,
+    firepower: crate::combat::Firepower::new(0.0),
     capture: 0,
 };
 
@@ -6859,7 +6859,7 @@ fn a_tower_passes_a_boar_but_not_a_wolf() {
     };
     assert_eq!(can_attack(&bare, &IDLE, &enemy), Ok(false));
     let manned = Attacker {
-        firepower: 2.0,
+        firepower: crate::combat::Firepower::new(2.0),
         ..bare
     };
     assert_eq!(can_attack(&manned, &IDLE, &enemy), Ok(true));

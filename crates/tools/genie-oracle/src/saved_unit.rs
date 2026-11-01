@@ -7,11 +7,15 @@ use crate::{
     object_ids, production, saved_actions, saved_sprite, task_at, unit_ai,
 };
 use genie_core::GenieError;
+use genie_core::combat::AttackCount;
 use genie_core::combat::Charge;
+use genie_core::combat::Firepower;
+use genie_core::combat::MissileCount;
 use genie_core::combat::damage::ArmorPair;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
+use genie_core::objects::DamagedTimer;
 use genie_core::objects::HitPoints;
 use genie_core::objects::HpPowerup;
 use genie_core::objects::MasterHitPoints;
@@ -124,7 +128,7 @@ pub(super) fn unit(
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
         town_bell,
         combat: object.combat().is_some(),
-        next_volley: object.combat().map_or(0, |c| c.next_volley),
+        next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
         raider_countdown: object.combat().map_or(0, |c| c.raider_build_countdown),
         garrison_time: object
             .tribe_building_object
@@ -138,7 +142,7 @@ pub(super) fn unit(
             .map_or(Relics::NONE, |b| {
                 Relics::new(b.relic_count, b.specific_relic_count)
             }),
-        damaged_lately: s.damaged_lately_timer as u8,
+        damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
         livestock_summation: object
             .tribe_building_object
             .as_deref()
@@ -163,7 +167,7 @@ pub(super) fn unit(
                         .map(|b| &b.tribe_master_combat_object)
                 })
             })
-            .map_or(0.0, |c| c.volley_fire_amount),
+            .map_or(Firepower::ZERO, |c| Firepower::new(c.volley_fire_amount)),
         attack_timer: object.combat().map_or(Seconds::ZERO, |c| {
             Seconds::new(c.rge_combat_object.attack_timer)
         }),
@@ -219,7 +223,7 @@ pub(super) fn unit(
                     .and_then(|r| r.rge_missile_object.as_deref())
                     .map(|m| &m.rge_combat_object)
             })
-            .map_or(0, |c| c.attack_count),
+            .map_or(AttackCount::ZERO, |c| AttackCount::of_data(c.attack_count)),
         roo_called: s.rooalready_called != 0,
         // mIsOnMangroveShallows (+0xcd0); build 158041's saves all hold it (its version gate
         // 0x421999 lies before them)

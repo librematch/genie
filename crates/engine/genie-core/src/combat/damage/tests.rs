@@ -1019,7 +1019,10 @@ fn a_building_takes_its_damage_and_at_least_its_least_hit() {
     assert_eq!(h.hp, HitPoints::new(547.0));
     assert_eq!(h.damaged, [(Some(object_id(10029)), [10029, 547, 550])]);
     let b = h.building.as_ref().unwrap();
-    assert_eq!((b.damaged_lately, b.struck, b.razed.len()), (60, true, 0));
+    assert_eq!(
+        (b.damaged_lately, b.struck, b.razed.len()),
+        (crate::objects::DamagedTimer::of_data(60), true, 0)
+    );
     // at 1 a hit may do nothing: the least takes 1 more
     villager.source.mode_680 = 1;
     let mut h = house();

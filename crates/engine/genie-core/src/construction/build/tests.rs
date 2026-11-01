@@ -1050,7 +1050,7 @@ fn the_work_starts_the_desolid_annexes_first() {
         u
     };
     let mut post = built_master(master_id(1192), &Vec::new());
-    post.volley_fire = 2.0;
+    post.volley_fire = crate::combat::Firepower::new(2.0);
     let mut t = site_world(
         world,
         vec![built_master(master_id(665), &Vec::new()), post],
@@ -1065,7 +1065,10 @@ fn the_work_starts_the_desolid_annexes_first() {
     let post = u(object_id(10029)).construction.unwrap();
     assert!(!post.desolid);
     assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
-    assert_eq!(u(object_id(10029)).firepower, 2.0);
+    assert_eq!(
+        u(object_id(10029)).firepower,
+        crate::combat::Firepower::new(2.0)
+    );
     assert!(
         t.spatial
             .get(object_id(10029))
@@ -1078,7 +1081,7 @@ fn the_work_starts_the_desolid_annexes_first() {
             u(object_id(10030)).construction.unwrap(),
             u(object_id(10030)).firepower
         ),
-        (foundation(false), 0.0)
+        (foundation(false), crate::combat::Firepower::new(0.0))
     );
     assert!(!u(object_id(10028)).construction.unwrap().desolid);
 }

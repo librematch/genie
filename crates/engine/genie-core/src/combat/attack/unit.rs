@@ -160,7 +160,7 @@ impl Unit {
         }
         // then a reload world time past ends the volley under way (`+0xa04`) and is none
         if self.reload_worldtime != WorldTime::ZERO && self.reload_worldtime < c.w.world_time {
-            self.next_volley = 0;
+            self.next_volley = crate::combat::MissileCount::ZERO;
             self.reload_worldtime = WorldTime::ZERO;
         }
     }

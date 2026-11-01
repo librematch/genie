@@ -244,7 +244,7 @@ pub struct Building {
     /// floats in their order).
     pub cost: f32,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after each hit, a second off in its update.
-    pub damaged_lately: u8,
+    pub damaged_lately: crate::objects::DamagedTimer,
     /// A hit got past its hit point test: the write-back gives its annexes its hit points and
     /// its `damaged_lately`.
     pub struck: bool,

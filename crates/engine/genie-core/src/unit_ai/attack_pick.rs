@@ -202,7 +202,7 @@ pub struct Attacker {
     /// The game mode is a scenario's.
     pub scenario: bool,
     /// Its firepower (`+0xa00`): the units inside a building add theirs.
-    pub firepower: f32,
+    pub firepower: crate::combat::Firepower,
     /// Its `+0x924` (`FUN_14107cc90`): a Gaia siege unit attacks only with 0.
     pub capture: u8,
 }
@@ -398,7 +398,8 @@ pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
 
 /// An attacker without a missile is armed with a firepower above this (`FUN_14120ea30`,
 /// `DAT_14330eb8c`).
-pub(super) const ARMED_FIREPOWER: f32 = crate::math::image::unit_ai::ARMED_FIREPOWER;
+pub(super) const ARMED_FIREPOWER: crate::combat::Firepower =
+    crate::combat::Firepower::new(crate::math::image::unit_ai::ARMED_FIREPOWER);
 /// A soldier never attacks with this master (raw `0x6258`).
 pub(super) const SOLDIER_NEVER: MasterId = MasterId::named(444);
 /// The master and class whose packed state (top action 124 or 125) attacks nothing (raw

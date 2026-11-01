@@ -197,7 +197,7 @@ pub(super) fn take_building(
             adds,
         });
     }
-    b.damaged_lately = DAMAGED_LATELY;
+    b.damaged_lately = crate::objects::DamagedTimer::HIT;
     b.struck = true;
     let annexes = b.annexes.clone();
     for a in others.iter_mut().filter(|a| annexes.contains(&a.id)) {
@@ -208,10 +208,6 @@ pub(super) fn take_building(
     }
     Ok(true)
 }
-
-/// `damaged_lately_timer` after a hit on a building (`MOV byte ptr [RBX + 0x30d],0x3c` at
-/// `0x1411cf4d2`).
-pub(super) const DAMAGED_LATELY: u8 = 0x3c;
 
 /// `FUN_1415c6510`, the kill bonus of the attacker `src` (type 40 and up) for an object it
 /// killed: its master's tasks of action type 0x9a pay their owner's attributes, research

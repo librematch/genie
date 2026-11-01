@@ -146,7 +146,7 @@ impl World {
             .with("object", unit.id)
             .with("master", unit.life.master_id));
         }
-        unit.attack_count = 0;
+        unit.attack_count = crate::combat::AttackCount::ZERO;
         crate::objects::sprite::new_sprite(
             &mut unit.sprite,
             unit.body.move_stats_mut(),

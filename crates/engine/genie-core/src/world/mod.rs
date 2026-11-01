@@ -212,7 +212,8 @@ pub(crate) const TREE_NEAR: f32 = crate::math::image::hunt::TREE_NEAR;
 /// A velocity longer than this sets the animation speed (`DAT_142eb0c60`).
 pub(crate) const SPEED_EPSILON: f32 = crate::math::image::turn::SPEED_EPSILON;
 /// A building attacks with a firepower above this (`FUN_14120ea30`).
-pub(crate) const ARMED_FIREPOWER: f32 = crate::math::image::turn::ARMED_FIREPOWER;
+pub(crate) const ARMED_FIREPOWER: crate::combat::Firepower =
+    crate::combat::Firepower::new(crate::math::image::turn::ARMED_FIREPOWER);
 
 /// A queued villager's master: male when the 64-bit Action draw times 100 (wrapping) is below 50
 /// modulo 100.

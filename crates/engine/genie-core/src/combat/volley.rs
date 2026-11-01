@@ -1,6 +1,7 @@
 //! A unit's strikes back and its volleys: the missiles it fires and launches.
 
 use crate::GenieError;
+use crate::combat::MissileCount;
 use crate::combat::damage::Victim;
 use crate::combat::missile::AimAt;
 use crate::map::Distance;
@@ -123,12 +124,12 @@ impl Unit {
                 ..
             },
         ) = (master.class == class::CLASS_54, master.volley_spread);
-        let (first, extra) = if master.max_volley == 0 {
+        let (first, extra) = if master.max_volley == MissileCount::ZERO {
             (true, 0)
         } else {
             let count = crate::combat::missile::volley_count(self.firepower, master.max_volley);
             let old = self.next_volley;
-            let mut n = count - i32::from(old);
+            let mut n = count - old.counted();
             let VolleySpread {
                 x: x_spread,
                 y: y_spread,
@@ -143,7 +144,7 @@ impl Unit {
                     1
                 };
                 if k < n {
-                    self.next_volley = self.next_volley.wrapping_add(k as u8);
+                    self.next_volley = self.next_volley.plus(k as u8);
                     // an immediate 0.05
                     self.attack_timer = Seconds::new(0.05);
                     n = k;
@@ -151,12 +152,15 @@ impl Unit {
                 }
             }
             if all {
-                self.next_volley = 0;
+                self.next_volley = MissileCount::ZERO;
                 if notifies {
                     self.post_own(NotifyKind::ACTION_EXECUTED, [600, -1, 0])?;
                 }
             }
-            (old == 0, if old == 0 { n - 1 } else { n })
+            (
+                old == MissileCount::ZERO,
+                if old == MissileCount::ZERO { n - 1 } else { n },
+            )
         };
         if missile || 0 < extra {
             // a target of a player but Gaia: its player makes a flare (master 112, slot 0x1c0)
@@ -201,7 +205,7 @@ impl Unit {
     /// spare friends notifies (0x20f). Not held: the damaged flag of masters 83, 293, 122 and 216
     /// (`+0x683`).
     pub(crate) fn fire(&mut self, c: &mut Step<'_>, aimed: &Aimed) -> Result<(), GenieError> {
-        self.attack_count += 1;
+        self.attack_count = self.attack_count.next();
         let master = self.master(&c.w.masters, c.player)?;
         if master.charge_type.ranged() {
             return Err(GenieError::unsupported(
@@ -320,7 +324,7 @@ impl Unit {
                 spread: aimer.missed_spread,
                 class: aimer.class,
             },
-            attack_count: 0,
+            attack_count: crate::combat::AttackCount::ZERO,
         };
         self.launch(c, aimed, &shot)?;
         if !matches!(self.life.master_id, ids::ID_73 | ids::ID_559) {
@@ -594,7 +598,7 @@ impl Aimed {
 
 /// `FUN_14120ea30` of an attacker of `master` with `firepower` (`+0xa00`): a building can attack
 /// when of class 51 or 54, with a missile, or with a firepower above 1; any other attacker can.
-pub(crate) fn armed(master: &Master, firepower: f32) -> bool {
+pub(crate) fn armed(master: &Master, firepower: crate::combat::Firepower) -> bool {
     master.kind != BUILDING
         || matches!(master.class, class::CLASS_51 | class::CLASS_54)
         || master.missile.master().is_some()
@@ -627,5 +631,5 @@ pub(crate) struct Shot {
     pub(crate) reach: Distance,
     pub(crate) shooter: bool,
     pub(crate) aimer: crate::combat::missile::Aimer,
-    pub(crate) attack_count: i32,
+    pub(crate) attack_count: crate::combat::AttackCount,
 }

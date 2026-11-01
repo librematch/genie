@@ -1495,7 +1495,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         kind: BUILDING,
         hit_points: MasterHitPoints::of_data(100),
         build_time,
-        volley_fire: f32::from(build_time.get() / 15),
+        volley_fire: crate::combat::Firepower::new(f32::from(build_time.get() / 15)),
         ..Master::default()
     };
     t.masters[1] = crate::objects::masters::Masters::new([
@@ -1504,7 +1504,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
     ]);
     let trophy = |state| Unit {
         id: object_id(60),
-        firepower: 7.0,
+        firepower: crate::combat::Firepower::new(7.0),
         construction: Some(crate::construction::build::Construction {
             progress: Seconds::new(10.0),
             desolid: false,
@@ -1534,7 +1534,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
     assert_eq!(unit.life.hp, HitPoints::new(50.0));
     assert_eq!(unit.construction.unwrap().progress, Seconds::new(30.0));
     // FUN_141225b70 in state 2: the volleys are the new master's volley fire
-    assert_eq!(unit.firepower, 2.0);
+    assert_eq!(unit.firepower, crate::combat::Firepower::new(2.0));
     t.players[1].objects = vec![trophy(ObjectState::Unfinished)].into();
     t.transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
@@ -1545,7 +1545,10 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
             .progress,
         Seconds::new(10.0)
     );
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].firepower, 7.0);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(0)].firepower,
+        crate::combat::Firepower::new(7.0)
+    );
 }
 
 /// INTERACT to an object that does not move (`FUN_140e68b90`): it takes the order at once
@@ -2202,7 +2205,7 @@ fn switch_masters() -> (Master, Master) {
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(AttributeId::numbered(14)), Amount::new(1.0), 16),
         ],
-        volley_fire: 3.0,
+        volley_fire: crate::combat::Firepower::new(3.0),
         obstruction_type: ObstructionType::TYPE_3,
         obstruction_class: ObstructionClass::RESOURCE,
         ..Master::default()
@@ -2261,7 +2264,11 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
     assert!(switched.promoted);
     assert_eq!(
         (u.life.master_id, u.life.hp, u.firepower),
-        (master_id(5), HitPoints::new(30.0), 3.0)
+        (
+            master_id(5),
+            HitPoints::new(30.0),
+            crate::combat::Firepower::new(3.0)
+        )
     );
     assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(11)));
     assert_eq!(
@@ -2285,8 +2292,14 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
                 .unwrap();
         (u.life.hp, u.firepower)
     };
-    assert_eq!(hp(HitPoints::new(50.0)), (HitPoints::new(60.0), 0.0));
-    assert_eq!(hp(HitPoints::new(0.5)), (HitPoints::new(1.0), 0.0));
+    assert_eq!(
+        hp(HitPoints::new(50.0)),
+        (HitPoints::new(60.0), crate::combat::Firepower::new(0.0))
+    );
+    assert_eq!(
+        hp(HitPoints::new(0.5)),
+        (HitPoints::new(1.0), crate::combat::Firepower::new(0.0))
+    );
     let (switched, u, record) = switched_in_the_open(
         unit(HitPoints::new(20.0), ObjectState::Dying),
         &old,

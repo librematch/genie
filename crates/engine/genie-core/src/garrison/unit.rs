@@ -493,7 +493,7 @@ impl Unit {
             let rate = crate::garrison::attack_rate(bm, own, reload);
             crate::garrison::share(me, masters, self.reload_powerup, rate)?
         } else {
-            0.0
+            crate::combat::Firepower::ZERO
         };
         if let Some((_, b)) = c.w.object_mut(target) {
             b.firepower += firepower;

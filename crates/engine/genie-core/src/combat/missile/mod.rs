@@ -202,9 +202,12 @@ pub fn reach(radius: Footprint, range: Distance) -> Distance {
 /// `FUN_141203140` (no charge): a volley's missiles, the object's firepower (`+0xa00`, in whole
 /// missiles past a hair) up to its master's `max_attacks_in_volley`.
 #[must_use]
-pub fn volley_count(firepower: f32, max_volley: u8) -> i32 {
-    let n = (firepower + VOLLEY_EPSILON) as i64 as i32;
-    n.min(i32::from(max_volley))
+pub fn volley_count(
+    firepower: crate::combat::Firepower,
+    max_volley: crate::combat::MissileCount,
+) -> i32 {
+    let n = (firepower.get() + VOLLEY_EPSILON) as i64 as i32;
+    n.min(max_volley.counted())
 }
 
 /// `FUN_14120c0a0`'s scatter of a volley's extra missile along a spread: an Object-stream draw
@@ -291,7 +294,7 @@ pub struct AimAt<'a> {
     /// The missile's master's id.
     pub master_id: MasterId,
     /// The missile's attack count (`+0x900`).
-    pub attack_count: i32,
+    pub attack_count: crate::combat::AttackCount,
     /// The hit mode, which a miss sets to 1.
     pub hit_mode: &'a mut u8,
 }
@@ -337,8 +340,11 @@ pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, Gen
         // the missile's attack count (`+0x900`, its firer's when fired): master 528 strays by its
         // share, 527 and the others by all of it
         // DIVSS hands on a NaN distance quieted, which it is already: its bits stay on any host
-        if 0 < attack_count && master_id == MASTER_528 && !gap.is_nan() {
-            gap /= attack_count as f32;
+        if crate::combat::AttackCount::ZERO < attack_count
+            && master_id == MASTER_528
+            && !gap.is_nan()
+        {
+            gap /= attack_count.as_f32();
         }
         let gap = gap + 0.0;
         let half = gap * HALF;
@@ -502,6 +508,8 @@ pub fn grounded(z: f32, ground: f32, flying: bool, fly_mode: FlyMode) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::combat::Firepower;
+    use crate::combat::MissileCount;
     use crate::combat::missile::MissileState;
     use crate::objects::masters::ids;
     use crate::test_ids::master_id;
@@ -580,7 +588,7 @@ mod tests {
                     target,
                     aimer,
                     master_id: master,
-                    attack_count: count,
+                    attack_count: crate::combat::AttackCount::of_data(count),
                     hit_mode: mode,
                 },
                 &mut || d.next().unwrap(),
@@ -634,7 +642,7 @@ mod tests {
                     target: narrow,
                     aimer: siege,
                     master_id: master_id(4),
-                    attack_count: 0,
+                    attack_count: crate::combat::AttackCount::of_data(0),
                     hit_mode: &mut mode
                 },
                 &mut || d.next().unwrap()
@@ -700,9 +708,18 @@ mod tests {
     #[test]
     fn a_volley_fires_whole_missiles_up_to_its_master_s_most_scattered_about_its_point() {
         // a town center with 7 villagers inside fires 8 a volley, 11 at most
-        assert_eq!(volley_count(8.0, 11), 8);
-        assert_eq!(volley_count(12.0, 11), 11);
-        assert_eq!(volley_count(0.999_999_9, 11), 1);
+        assert_eq!(
+            volley_count(Firepower::new(8.0), MissileCount::of_data(11)),
+            8
+        );
+        assert_eq!(
+            volley_count(Firepower::new(12.0), MissileCount::of_data(11)),
+            11
+        );
+        assert_eq!(
+            volley_count(Firepower::new(0.999_999_9), MissileCount::of_data(11)),
+            1
+        );
         // a spread of 0.5: from a quarter short to a quarter past
         assert_eq!(scatter(0, 0.5), -0.25);
         assert_eq!(scatter(0x7fff, 0.5), 0.25);

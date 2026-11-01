@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::combat::Firepower;
 use crate::map::Distance;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -259,9 +260,9 @@ impl World {
             (a::TOTAL_MISSILES, _) => {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
                 u.firepower = match change {
-                    Change::Set => v,
-                    Change::Add => v + u.firepower,
-                    Change::Multiply => v * u.firepower,
+                    Change::Set => Firepower::new(v),
+                    Change::Add => Firepower::new(v) + u.firepower,
+                    Change::Multiply => Firepower::new(v * u.firepower.get()),
                 };
                 Ok(())
             }

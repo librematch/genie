@@ -106,7 +106,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
         radius: Footprint::new(0.2, 0.2),
         speed: Speed::new(0.8),
         scenario: false,
-        firepower: 0.0,
+        firepower: crate::combat::Firepower::new(0.0),
         capture: 0,
     };
     let none = ObjectList::default();
@@ -217,7 +217,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         radius: Footprint::new(0.3, 0.3),
         speed: Speed::new(1.0),
         scenario: false,
-        firepower: 0.0,
+        firepower: crate::combat::Firepower::new(0.0),
         capture: 0,
     };
     let foreign = Foreign {
@@ -369,7 +369,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         radius: Footprint::new(0.3, 0.3),
         speed: Speed::new(1.0),
         scenario: false,
-        firepower: 0.0,
+        firepower: crate::combat::Firepower::new(0.0),
         capture: 0,
     };
     let none = ObjectList::default();

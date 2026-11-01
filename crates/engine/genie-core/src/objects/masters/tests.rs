@@ -564,10 +564,10 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
             |m| f32::from(m.train_locations[1].time.get()),
             [3.0, 5.0, 10.0],
         ),
-        (a::TOTAL_MISSILES, |m| m.volley_fire, [3.0, 5.0, 10.0]),
+        (a::TOTAL_MISSILES, |m| m.volley_fire.get(), [3.0, 5.0, 10.0]),
         (
             a::MAXIMUM_TOTAL_MISSILES,
-            |m| f32::from(m.max_volley),
+            |m| f32::from(m.max_volley.get()),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -1243,7 +1243,11 @@ fn the_combat_master_s_own_values_change() {
     assert_eq!(m.regeneration, Regeneration::new(30.0));
     assert_eq!(
         (m.volley_fire, m.max_volley, m.attack_sprite2),
-        (2.0, 0, Some(SpriteId::named(12)))
+        (
+            crate::combat::Firepower::new(2.0),
+            crate::combat::MissileCount::of_data(0),
+            Some(SpriteId::named(12))
+        )
     );
     assert_eq!(
         m.volley_spread,

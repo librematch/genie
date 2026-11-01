@@ -118,7 +118,7 @@ fn a_missile_without_its_action_keeps_flying() {
     assert_eq!(flying.fired_from, Some(object_id(900)));
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());
-    assert_eq!(u.attack_count, 2);
+    assert_eq!(u.attack_count, genie_core::combat::AttackCount::of_data(2));
 }
 
 /// The town bell's back-to-work records import with their actions; an action value none names

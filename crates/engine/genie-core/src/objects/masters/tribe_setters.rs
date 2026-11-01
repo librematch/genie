@@ -76,8 +76,10 @@ impl Master {
                     *c = low16(v);
                 }
             }
-            a::TOTAL_MISSILES => self.volley_fire = v,
-            a::MAXIMUM_TOTAL_MISSILES => self.max_volley = low8(v),
+            a::TOTAL_MISSILES => self.volley_fire = crate::combat::Firepower::new(v),
+            a::MAXIMUM_TOTAL_MISSILES => {
+                self.max_volley = crate::combat::MissileCount::of_data(low8(v));
+            }
             a::REGENERATION_RATE => self.regeneration = Regeneration::new(v),
             a::POPULATION => {
                 // the unpaid entries take the negated amount; the storage of population (4) the
@@ -243,8 +245,8 @@ impl Master {
                     t.time = t.time.plus(low16(v));
                 }
             }
-            a::TOTAL_MISSILES => self.volley_fire += v,
-            a::MAXIMUM_TOTAL_MISSILES => self.max_volley = self.max_volley.wrapping_add(low8(v)),
+            a::TOTAL_MISSILES => self.volley_fire += crate::combat::Firepower::new(v),
+            a::MAXIMUM_TOTAL_MISSILES => self.max_volley = self.max_volley.plus(low8(v)),
             a::REGENERATION_RATE => self.regeneration += Regeneration::new(v),
             a::MIN_CONVERSION_TIME_MODIFIER
             | a::MAX_CONVERSION_TIME_MODIFIER
@@ -311,7 +313,9 @@ impl Master {
             }
             a::TOTAL_MISSILES => self.volley_fire *= v,
             a::MAXIMUM_TOTAL_MISSILES => {
-                self.max_volley = low8(f32::from(self.max_volley) * v + ROUND);
+                self.max_volley = crate::combat::MissileCount::of_data(low8(
+                    f32::from(self.max_volley.get()) * v + ROUND,
+                ));
             }
             a::REGENERATION_RATE => self.regeneration *= v,
             a::MIN_CONVERSION_TIME_MODIFIER

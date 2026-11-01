@@ -525,7 +525,7 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
 fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     let mut tower = unit_of(10, master_id(79), HitPoints::new(1000.0));
     tower.garrison = vec![object_id(11)];
-    tower.firepower = 2.0;
+    tower.firepower = crate::combat::Firepower::new(2.0);
     let mut archer = unit_of(11, master_id(4), HitPoints::new(30.0));
     archer.life.inside = Some(object_id(10));
     let player = Player {
@@ -562,7 +562,7 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     );
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)].firepower,
-        2.0 - 0.8 + 1.2
+        crate::combat::Firepower::new(2.0 - 0.8 + 1.2)
     );
 }
 

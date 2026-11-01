@@ -5,6 +5,8 @@ use crate::masters::MasterTable;
 use crate::{animated_master, combat_master, moving_master};
 use genie_core::GenieError;
 use genie_core::combat::Charge;
+use genie_core::combat::Firepower;
+use genie_core::combat::MissileCount;
 use genie_core::combat::missile::SmartMode;
 use genie_core::combat::missile::VanishMode;
 use genie_core::map::Distance;
@@ -248,8 +250,8 @@ pub(super) fn work_masters(
             work.charge_type = ChargeType::of_data(c.charge_type);
             work.formation_category = FormationClass::of_data(c.temp_formation_category);
             work.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
-            work.volley_fire = c.volley_fire_amount;
-            work.max_volley = c.max_attacks_in_volley;
+            work.volley_fire = Firepower::new(c.volley_fire_amount);
+            work.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
             work.volley_spread = VolleySpread {
                 x: c.volley_x_spread,
                 y: c.volley_y_spread,

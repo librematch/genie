@@ -116,7 +116,7 @@ impl UnitView<'_, '_> {
             self.c.w.world_time,
         )?;
         // the constructor clears +0x900 for a target other than its own (none yet)
-        unit.attack_count = 0;
+        unit.attack_count = crate::combat::AttackCount::ZERO;
         if unit.life.inside.is_some() {
             return self
                 .attack_from_inside(crate::combat::attack::Attack::own(target, &e, arms), by);
@@ -255,7 +255,7 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         if w.clears_count {
-            unit.attack_count = 0;
+            unit.attack_count = crate::combat::AttackCount::ZERO;
         }
         if let Some(old) = w.lets_go {
             self.release(old, by)?;

@@ -4,6 +4,7 @@
 
 mod action_state;
 pub mod actions;
+mod damaged_timer;
 mod facet;
 pub mod facing;
 mod frame;
@@ -27,6 +28,7 @@ pub mod unit;
 mod work_rate;
 
 pub use self::action_state::ActionState;
+pub use self::damaged_timer::DamagedTimer;
 pub use self::facet::{Facet, FacetCount};
 pub use self::frame::{AnimateState, Frame};
 pub use self::hit_points::HpPowerup;

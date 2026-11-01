@@ -33,6 +33,7 @@ it. After the combat update, every combat unit and building runs its passive abi
 | File | What it holds |
 | --- | --- |
 | [`charge.rs`](charge.rs) | An object's charge (`Charge`) and how fast it fills (`ChargeRate`), with the game's `f32` operations. |
+| [`firepower.rs`](firepower.rs) | A volley's size: the firepower (missiles a volley), the missiles counted and the swings that fired. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
 | [`victim_reads.rs`](victim_reads.rs) | What a hit reads of its victim: the object's values and its relations to the attacker. |
 | [`victims.rs`](victims.rs) | A hit's victim: what the hit reads of it, the objects it may reach, the hit written back, the kill and its counts. |
@@ -47,5 +48,5 @@ it. After the combat update, every combat unit and building runs its passive abi
 
 <!-- uses -->
 - Uses: [`construction`](../construction/), [`gathering`](../gathering/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
+- Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

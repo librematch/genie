@@ -78,7 +78,7 @@ fn a_stopped_player_is_listed_and_compared_no_more() {
 fn the_scope_widens_the_compared_fields() {
     let unit = |attack_count, idle_variant| Unit {
         id: object_id(1),
-        attack_count,
+        attack_count: genie_core::combat::AttackCount::of_data(attack_count),
         idle_variant,
         ..Unit::default()
     };

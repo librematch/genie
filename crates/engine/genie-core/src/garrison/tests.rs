@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::Firepower;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
@@ -1131,8 +1132,8 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
         weapon_range: Distance::new(6.0),
         weapons: vec![ClassAmount::new(3, 5)],
         volley_missile: Some(master_id(54)),
-        volley_fire: 1.0,
-        max_volley: 11,
+        volley_fire: Firepower::new(1.0),
+        max_volley: crate::combat::MissileCount::of_data(11),
         ..Master::default()
     };
     let villager = Master {
@@ -1155,8 +1156,14 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
     assert_eq!(rate, 2.5);
     // a garrison firepower at most 0 is its magnitude
     assert_eq!(firepower(&villager, &masters, Seconds::ZERO), 2.5);
-    assert_eq!(share(&villager, &masters, Seconds::ZERO, rate), Ok(1.0));
-    assert_eq!(share(&villager, &masters, Seconds::ZERO, 0.0), Ok(0.0));
+    assert_eq!(
+        share(&villager, &masters, Seconds::ZERO, rate),
+        Ok(Firepower::new(1.0))
+    );
+    assert_eq!(
+        share(&villager, &masters, Seconds::ZERO, 0.0),
+        Ok(Firepower::new(0.0))
+    );
     // one above 0 times the melee, pierce, class 31 and 38 amounts over the reload
     let armed = Master {
         garrison_firepower: 0.5,
@@ -1176,7 +1183,7 @@ fn town_center() -> Master {
         weapon_range: Distance::new(6.0),
         weapons: vec![ClassAmount::new(3, 5)],
         volley_missile: Some(master_id(54)),
-        volley_fire: 1.0,
+        volley_fire: Firepower::new(1.0),
         ..Master::default()
     }
 }
@@ -1258,7 +1265,7 @@ fn a_volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
         weapons: vec![ClassAmount::new(3, 4)],
         missile: MasterField::of(Some(ids::FARM)),
         garrison_firepower: 1.0,
-        volley_fire: 3.0,
+        volley_fire: Firepower::new(3.0),
         volley_missile,
         ..Master::default()
     };
@@ -1299,7 +1306,7 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
         kind: master_type::COMBAT,
         reload: Seconds::new(1.0),
         garrison_firepower: 1.0,
-        volley_fire: 1e10,
+        volley_fire: Firepower::new(1e10),
         volley_missile: Some(master_id(54)),
         ..Master::default()
     };
@@ -1310,7 +1317,7 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
     // the f32 truncation toward zero: 3.9 - 1 gives 2 extra missiles
     let masters = Masters::new([volley(3)]);
     let three = Master {
-        volley_fire: 3.9,
+        volley_fire: Firepower::new(3.9),
         ..tower
     };
     assert_eq!(firepower(&three, &masters, Seconds::ZERO), 6.0);
@@ -1341,35 +1348,53 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
     };
     let masters = Masters::new([foot.clone(), mounted.clone()]);
     // its own 1.0 against the other form's 3.0, over a rate of 2
-    assert_eq!(share(&foot, &masters, Seconds::ZERO, 2.0), Ok(1.5));
+    assert_eq!(
+        share(&foot, &masters, Seconds::ZERO, 2.0),
+        Ok(Firepower::new(1.5))
+    );
     // the other form's lower share leaves its own
-    assert_eq!(share(&mounted, &masters, Seconds::ZERO, 2.0), Ok(1.5));
+    assert_eq!(
+        share(&mounted, &masters, Seconds::ZERO, 2.0),
+        Ok(Firepower::new(1.5))
+    );
     let reversed = Master {
         object_flags: ObjectFlags::from_bits_retain(8 | (1120 << 16)),
         ..mounted.clone()
     };
-    assert_eq!(share(&reversed, &masters, Seconds::ZERO, 2.0), Ok(1.5));
+    assert_eq!(
+        share(&reversed, &masters, Seconds::ZERO, 2.0),
+        Ok(Firepower::new(1.5))
+    );
     // a named master not of type 70, or none, gives the floor 0.0; flag 3 clear names none
     let building = Master {
         kind: master_type::BUILDING,
         ..mounted
     };
     let masters_80 = Masters::new([foot.clone(), building]);
-    assert_eq!(share(&foot, &masters_80, Seconds::ZERO, 2.0), Ok(0.5));
+    assert_eq!(
+        share(&foot, &masters_80, Seconds::ZERO, 2.0),
+        Ok(Firepower::new(0.5))
+    );
     let unflagged = Master {
         object_flags: ObjectFlags::from_bits_retain(1122 << 16),
         ..foot.clone()
     };
-    assert_eq!(share(&unflagged, &masters, Seconds::ZERO, 2.0), Ok(0.5));
+    assert_eq!(
+        share(&unflagged, &masters, Seconds::ZERO, 2.0),
+        Ok(Firepower::new(0.5))
+    );
     // a negative quotient and a NaN one give the floor 0.0
-    assert_eq!(share(&unflagged, &masters, Seconds::ZERO, -2.0), Ok(0.0));
+    assert_eq!(
+        share(&unflagged, &masters, Seconds::ZERO, -2.0),
+        Ok(Firepower::new(0.0))
+    );
     assert_eq!(
         share(&unflagged, &masters, Seconds::ZERO, f32::NAN),
-        Ok(0.0)
+        Ok(Firepower::new(0.0))
     );
     // _fdclass: a rate of ±0 gives +0.0; class 42 gives 1.0 whatever the rate
     assert_eq!(
-        share(&foot, &masters, Seconds::ZERO, -0.0).map(f32::to_bits),
+        share(&foot, &masters, Seconds::ZERO, -0.0).map(|f| f.get().to_bits()),
         Ok(0)
     );
     let relic_like = Master {
@@ -1378,7 +1403,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
     };
     assert_eq!(
         share(&relic_like, &masters, Seconds::ZERO, f32::NAN),
-        Ok(1.0)
+        Ok(Firepower::new(1.0))
     );
 }
 
@@ -1629,7 +1654,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     if let Some(tc) = masters.get_mut(TC) {
         tc.radius = Footprint::new(2.0, 2.0);
         tc.tall = true;
-        tc.volley_fire = 1.0;
+        tc.volley_fire = Firepower::new(1.0);
         // no stack unit, head or annexes: the tracker files it under its own id
         if let Some(b) = tc.building.as_mut() {
             b.stack_unit = None;
@@ -1676,7 +1701,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     ));
     let tc = &mut t.players[1].objects[ListIndex::new(0)];
     tc.place_for_test(Position::new(10.0, 10.0, 0.0));
-    tc.firepower = 1.0;
+    tc.firepower = Firepower::new(1.0);
     t.spatial.insert(
         object_id(100),
         crate::map::spatial::Placed {
@@ -1970,13 +1995,16 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         ..crate::orders::town_bell::BackToWork::NONE
     };
     // the building's last unit inside: the volleys go back to the master's volley fire
-    t.players[1].objects[ListIndex::new(0)].firepower = 2.0;
+    t.players[1].objects[ListIndex::new(0)].firepower = Firepower::new(2.0);
     t.go_back_to_work(player_id(1), &object_ids([100])).unwrap();
     let v = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(v.life.inside, None);
     assert!(!v.town_bell.flag);
     assert_eq!(t.players[1].objects[ListIndex::new(0)].garrison.len(), 0);
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].firepower, 1.0);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(0)].firepower,
+        Firepower::new(1.0)
+    );
     assert!(t.spatial.get_known(object_id(2000)).unwrap().is_some());
     // FUN_141217910's reset: COMISS volley, firepower; JBE keeps it while units stay inside
     // and the firepower is not below the volley fire (a NaN one too)
@@ -1984,17 +2012,22 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
     t.players[2].objects[ListIndex::new(0)].town_bell.work.point = Point::new(4.5, 4.5);
-    t.players[1].objects[ListIndex::new(0)].firepower = f32::NAN;
+    t.players[1].objects[ListIndex::new(0)].firepower = Firepower::new(f32::NAN);
     assert!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(2000))
             .unwrap()
     );
-    assert!(t.players[1].objects[ListIndex::new(0)].firepower.is_nan());
+    assert!(
+        t.players[1].objects[ListIndex::new(0)]
+            .firepower
+            .get()
+            .is_nan()
+    );
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].garrison,
         [object_id(1000)]
     );
-    t.players[1].objects[ListIndex::new(0)].firepower = 0.5;
+    t.players[1].objects[ListIndex::new(0)].firepower = Firepower::new(0.5);
     t.object_mut(object_id(1000))
         .unwrap()
         .1
@@ -2005,7 +2038,10 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(1000))
             .unwrap()
     );
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].firepower, 1.0);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(0)].firepower,
+        Firepower::new(1.0)
+    );
     // a unit not a villager stays inside
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(2), 2001, ARCHER);

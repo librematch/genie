@@ -2,6 +2,7 @@
 //! (`FUN_141213520`).
 
 use crate::GenieError;
+use crate::combat::Firepower;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::objects::masters::ClassId;
@@ -92,7 +93,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
     }
     let mut sum = 0.0f32;
     // COMISS volley, 1.0; JBE: an unordered volley fire adds no missiles
-    if ONE_MISSILE < master.volley_fire {
+    if ONE_MISSILE < master.volley_fire.get() {
         // the volley missile's slot when the table has one, else the missile's (an id out of
         // the table gives none); a null slot or one without weapons adds nothing
         let missile = master
@@ -101,7 +102,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
             .or_else(|| master.missile.master())
             .and_then(|id| masters.get(id));
         if let Some(m) = missile {
-            let extra = cvttss2si(master.volley_fire - ONE_MISSILE);
+            let extra = cvttss2si(master.volley_fire.get() - ONE_MISSILE);
             for &ClassAmount { class, amount } in &m.weapons {
                 if matches!(class, DamageClass::PIERCE | DamageClass::CLASS_38) {
                     // IMUL EAX, R8D then CVTDQ2PS
@@ -139,12 +140,12 @@ pub fn share(
     masters: &Masters,
     reload_powerup: Seconds,
     rate: f32,
-) -> Result<f32, GenieError> {
+) -> Result<Firepower, GenieError> {
     if rate == 0.0 {
-        return Ok(0.0);
+        return Ok(Firepower::ZERO);
     }
     if master.class == WHOLE_SHARE_CLASS {
-        return Ok(1.0);
+        return Ok(Firepower::new(1.0));
     }
     let mut floor = 0.0;
     if master.object_flags.contains(ObjectFlags::TRANSFORMS) {
@@ -162,8 +163,8 @@ pub fn share(
             floor = firepower(m, masters, reload_powerup) / rate;
         }
     }
-    Ok(maxss(
+    Ok(Firepower::new(maxss(
         firepower(master, masters, reload_powerup) / rate,
         floor,
-    ))
+    )))
 }

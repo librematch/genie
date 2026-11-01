@@ -126,13 +126,13 @@ pub struct Unit {
     #[diff(
         gap = "differs on 380 of MarvinBlue/426048731's samples (9181 at update 1075: genie 0, game 1): the resets on a new target (FUN_140a7c210, FUN_140a82a10) are not checked"
     )]
-    pub attack_count: i32,
+    pub attack_count: crate::combat::AttackCount,
     /// `+0xa00` (not saved): a combat object's missiles per volley, its master's volley fire plus
     /// the shares of the units inside it ([`crate::garrison::share`]).
     #[diff(unsaved)]
-    pub firepower: f32,
+    pub firepower: crate::combat::Firepower,
     /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired.
-    pub next_volley: u8,
+    pub next_volley: crate::combat::MissileCount,
     /// `mReloadWorldtime` (`+0x920`, slots 0x248 and 0x250): the world time its attack timer
     /// runs out at (`FUN_141089820`), 0 for none; once past, the volley under way is over.
     pub reload_worldtime: WorldTime,
@@ -148,7 +148,7 @@ pub struct Unit {
     pub relics: Relics,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after a hit on a building (`FUN_1411cea90`),
     /// one off in each of its updates that passes whole seconds; the computer AI reads it.
-    pub damaged_lately: u8,
+    pub damaged_lately: crate::objects::DamagedTimer,
     /// A building's `mLivestockSummation` (`+0xc28`, saved): the livestock inside it (their
     /// master's `+0x610`, `FUN_1411cb850`), whose food a mill makes ([`crate::players::world_player`]).
     pub livestock_summation: f32,

@@ -267,8 +267,8 @@ impl Unit {
             return Ok(());
         }
         self.garrison_time = self.garrison_time.after(Millis::new(seconds * 1000));
-        if self.damaged_lately != 0 {
-            self.damaged_lately -= 1;
+        if self.damaged_lately.running() {
+            self.damaged_lately = self.damaged_lately.tick();
         }
         if master.id == MONASTERY && self.relics != Relics::NONE {
             return Err(GenieError::unsupported(

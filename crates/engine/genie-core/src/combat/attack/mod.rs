@@ -337,7 +337,7 @@ impl AttackReads {
             queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),
             ai_type: ai.map(|ai| ai.ai_type),
-            volley_under_way: unit.next_volley != 0,
+            volley_under_way: unit.next_volley != crate::combat::MissileCount::ZERO,
             move_defaults: MoveDefaults::of(master, unit.abilities.look.as_ref()),
         }
     }

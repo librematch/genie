@@ -2,6 +2,8 @@
 //! sound events, its costs in their slots and the rest the work command reads.
 
 use genie_core::GenieError;
+use genie_core::combat::Firepower;
+use genie_core::combat::MissileCount;
 use genie_core::map::Distance;
 use genie_core::map::TerrainId;
 use genie_core::map::{Footprint, GroundOffset, Radii};
@@ -263,16 +265,17 @@ pub(super) fn dat_work(
             .as_ref()
             .and_then(|t| t.garrison_firepower)
             .unwrap_or(0.0),
-        volley_fire: unit.creatable.as_ref().map_or(0.0, |c| c.total_projectiles),
+        volley_fire: Firepower::new(unit.creatable.as_ref().map_or(0.0, |c| c.total_projectiles)),
         // the DE master's mSpacingModifier (+0x8b8), the data file's "flank attack modifier"
         spacing_modifier: unit
             .creatable
             .as_ref()
             .map_or(0.0, |c| c.flank_attack_modifier),
-        max_volley: unit
-            .creatable
-            .as_ref()
-            .map_or(0, |c| c.max_total_projectiles),
+        max_volley: MissileCount::of_data(
+            unit.creatable
+                .as_ref()
+                .map_or(0, |c| c.max_total_projectiles),
+        ),
         volley_spread: unit
             .creatable
             .as_ref()

@@ -7625,7 +7625,7 @@ fn a_building_s_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
             state: ObjectState::Alive,
             ..Lifecycle::default()
         },
-        damaged_lately: 2,
+        damaged_lately: crate::objects::DamagedTimer::of_data(2),
         ..Unit::default()
     };
     let mut t = World::new(
@@ -7649,13 +7649,13 @@ fn a_building_s_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
     }])];
     let timer = |t: &World| t.players[0].objects[ListIndex::new(0)].damaged_lately;
     t.tick(Millis::new(500));
-    assert_eq!(timer(&t), 2);
+    assert_eq!(timer(&t), crate::objects::DamagedTimer::of_data(2));
     t.tick(Millis::new(2600));
-    assert_eq!(timer(&t), 1);
+    assert_eq!(timer(&t), crate::objects::DamagedTimer::of_data(1));
     t.tick(Millis::new(1000));
-    assert_eq!(timer(&t), 0);
+    assert_eq!(timer(&t), crate::objects::DamagedTimer::of_data(0));
     t.tick(Millis::new(1000));
-    assert_eq!(timer(&t), 0);
+    assert_eq!(timer(&t), crate::objects::DamagedTimer::of_data(0));
     assert!(t.players[0].unsupported.is_none());
 }
 
@@ -12408,7 +12408,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
         to_gaia: false,
     });
     let b = v.building.as_mut().unwrap();
-    (b.struck, b.damaged_lately) = (true, 60);
+    (b.struck, b.damaged_lately) = (true, crate::objects::DamagedTimer::of_data(60));
     b.razed.push(crate::combat::damage::Razed {
         attacker_player: PlayerId::new(1),
         owner: PlayerId::new(2),
@@ -12426,7 +12426,10 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
         .map(|u| u.life.hp.get())
         .collect();
     assert_eq!(hp, [0.0, 0.0, 0.0]);
-    assert_eq!(t.players[2].objects[ListIndex::new(0)].damaged_lately, 60);
+    assert_eq!(
+        t.players[2].objects[ListIndex::new(0)].damaged_lately,
+        crate::objects::DamagedTimer::of_data(60)
+    );
     let (attacker, owner) = (&t.players[1].attributes, &t.players[2].attributes);
     assert_eq!(
         [attacker[20], owner[154]],
@@ -14282,7 +14285,7 @@ fn on_side<R>(
                     radius: Footprint::new(0.2, 0.2),
                     speed: Speed::new(1.2),
                     scenario: false,
-                    firepower: 0.0,
+                    firepower: crate::combat::Firepower::new(0.0),
                     capture: 0,
                 },
                 player: PlayerId::new(1),
@@ -15875,7 +15878,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         weapon_range: Distance::new(4.0),
         reload: Seconds::new(2.0),
         hit_chance: HitChance::of_data(hit_chance),
-        max_volley,
+        max_volley: crate::combat::MissileCount::of_data(max_volley),
         volley_spread: VolleySpread {
             x: spread,
             y: spread,
@@ -15977,7 +15980,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
             turns: false,
         });
     }
-    archer.firepower = f32::from(max_volley);
+    archer.firepower = crate::combat::Firepower::new(f32::from(max_volley));
     let mut attack = own_attack(50, -1, AttackState::Ready);
     attack.range = Distance::new(4.0);
     attack.arms.missile = Some(master_id(363));
@@ -16219,7 +16222,7 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
         t.tick(Millis::new(100));
     }
     let first = missiles(&t);
-    let fired = t.players[1].objects[ListIndex::new(0)].next_volley;
+    let fired = t.players[1].objects[ListIndex::new(0)].next_volley.get();
     assert!((1..3).contains(&fired), "{fired}");
     assert_eq!(first.len(), usize::from(fired));
     let (main, scattered) = first.split_last().unwrap();
@@ -16232,9 +16235,15 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
     // the next swing, six updates after the first, fires the rest
     t.tick(Millis::new(100));
     t.tick(Millis::new(100));
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].next_volley, fired);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(0)].next_volley,
+        crate::combat::MissileCount::of_data(fired)
+    );
     t.tick(Millis::new(100));
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].next_volley, 0);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(0)].next_volley,
+        crate::combat::MissileCount::of_data(0)
+    );
     let mut one = archer_world(100, 3, 0.0);
     for _ in 0..6 {
         one.tick(Millis::new(100));
@@ -16244,10 +16253,10 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
             missiles(&one).len(),
             one.players[1].objects[ListIndex::new(0)].next_volley
         ),
-        (1, 1)
+        (1, crate::combat::MissileCount::of_data(1))
     );
     // the missile's own +0x900 is its archer's attack count when fired
-    let counts: Vec<i32> = one.players[1].objects.as_slice()[1..]
+    let counts: Vec<crate::combat::AttackCount> = one.players[1].objects.as_slice()[1..]
         .iter()
         .filter(|u| u.missile.is_some())
         .map(|u| u.attack_count)
@@ -16256,7 +16265,7 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
         counts,
         [one.players[1].objects[ListIndex::new(0)].attack_count]
     );
-    assert_ne!(counts, [0]);
+    assert_ne!(counts, [crate::combat::AttackCount::ZERO]);
 }
 
 /// `FUN_141226690` with the master's own volley missile (`volley_missile`, 364): the extra
@@ -16282,7 +16291,7 @@ fn a_volley_s_own_missiles_hit_without_the_shooter() {
     for _ in 0..6 {
         t.tick(Millis::new(100));
     }
-    let fired = t.players[1].objects[ListIndex::new(0)].next_volley;
+    let fired = t.players[1].objects[ListIndex::new(0)].next_volley.get();
     let first = missiles(&t);
     let masters: Vec<i16> = first.iter().map(|m| m.1).collect();
     let mut expected = vec![364; usize::from(fired) - 1];

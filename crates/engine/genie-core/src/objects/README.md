@@ -37,6 +37,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | --- | --- |
 | [`action_state.rs`](action_state.rs) | The state of an action of any type (`ActionState`): its number. |
 | [`actions.rs`](actions.rs) | The object's action list (`RGE_Action_List`, FD-045-D12): the actions it holds, its current one (the head) first, each a variant of `Action`. |
+| [`damaged_timer.rs`](damaged_timer.rs) | A building's timer since its last hit. |
 | [`facet.rs`](facet.rs) | A sprite's facets: their count and the facet an object faces. |
 | [`facing.rs`](facing.rs) | Where an object faces: its angle (`+0x7e8`, radians on the map, 0 to 2π) and its facet (`+0xe`), counted in its current sprite's facets (`+0x140` -> `+0xa`). |
 | [`frame.rs`](frame.rs) | A sprite's frame and its animation state. |

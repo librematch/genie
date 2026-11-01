@@ -175,7 +175,7 @@ pub struct Surroundings {
     /// Its master has a missile (`+0x83c` 0 or more, `FUN_1410bfca0`).
     pub ranged: bool,
     /// Its missiles per volley (`+0xa00`, `FUN_1412136d0`), 0 for a unit without volleys.
-    pub firepower: f32,
+    pub firepower: crate::combat::Firepower,
     /// The unit's `+0x924`.
     pub capture: u8,
     /// The unit's master.
@@ -385,7 +385,8 @@ pub(super) const PATROL_TURN_REACH: f32 = crate::math::image::unit_ai::PATROL_TU
 
 /// A building on its make action without a missile and with at most this firepower forgets its
 /// target (`DAT_14330eb8c`).
-pub(super) const SINGLE_VOLLEY: f32 = crate::math::image::unit_ai::SINGLE_VOLLEY;
+pub(super) const SINGLE_VOLLEY: crate::combat::Firepower =
+    crate::combat::Firepower::new(crate::math::image::unit_ai::SINGLE_VOLLEY);
 
 /// A move the unit AI gives its unit (unit-AI slot 0x130, `FUN_140c55620`, to the unit's slot
 /// 0x340): a `MoveTo` to `point` within `range`.

@@ -1031,7 +1031,7 @@ mod tests {
             kind: master_type::COMBAT,
             class: class::VILLAGER,
             hit_points: MasterHitPoints::of_data(25),
-            volley_fire: 1.0,
+            volley_fire: crate::combat::Firepower::new(1.0),
             ..Master::default()
         };
         let new = Master {
@@ -1039,7 +1039,7 @@ mod tests {
             kind: master_type::COMBAT,
             class: class::CLASS_6,
             hit_points: MasterHitPoints::of_data(50),
-            volley_fire: 3.0,
+            volley_fire: crate::combat::Firepower::new(3.0),
             ..Master::default()
         };
         let mut v = object(
@@ -1050,7 +1050,7 @@ mod tests {
         );
         (v.life.attribute_type, v.life.amount) =
             (Some(AttributeId::numbered(17)), Amount::new(10.0));
-        v.firepower = 1.0;
+        v.firepower = crate::combat::Firepower::new(1.0);
         let player = crate::world::Player {
             objects: vec![v].into(),
             attributes: vec![Amount::ZERO; 300],
@@ -1070,7 +1070,11 @@ mod tests {
         let v = &t.players[0].objects[ListIndex::new(0)];
         assert_eq!(
             (v.life.master_id, v.life.hp, v.firepower),
-            (master_id(6), HitPoints::new(50.0), 3.0)
+            (
+                master_id(6),
+                HitPoints::new(50.0),
+                crate::combat::Firepower::new(3.0)
+            )
         );
         assert_eq!(v.life.held(), carrying(None, 0.0));
         let a = &t.players[0].attributes;
