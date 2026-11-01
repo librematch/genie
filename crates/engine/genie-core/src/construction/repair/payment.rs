@@ -15,6 +15,7 @@ use crate::objects::masters::master_type;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
+use crate::world::slots::CheckedIndex;
 
 /// What a repair's slot 0x8c8 answers (the game's 0, 1 and 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -117,19 +118,20 @@ pub fn repair_building(
     top: bool,
     payer: &mut Payer<'_>,
 ) -> Result<RepairOutcome, GenieError> {
-    if TREBUCHETS.contains(&set[idx].class) {
+    let o = set.checked(idx)?;
+    if TREBUCHETS.contains(&o.class) {
         return repair_unit(set, idx, amount, payer);
     }
-    if crate::math::fmath::below_or_unordered(set[idx].hp.get(), ONE) {
+    if crate::math::fmath::below_or_unordered(o.hp.get(), ONE) {
         return Ok(RepairOutcome::Unpaid);
     }
-    if top && let Some(main) = set[idx].main {
+    if top && let Some(main) = o.main {
         let m = find(set, main.id())?;
         return repair_building(set, m, amount, true, payer);
     }
-    for annex in set[idx].annexes.clone() {
+    for annex in o.annexes.clone() {
         let a = find(set, annex)?;
-        match set[a].kind {
+        match set.checked(a)?.kind {
             master_type::COMBAT => {
                 let _ = repair_unit(set, a, amount, payer)?;
             }
@@ -139,7 +141,7 @@ pub fn repair_building(
             _ => {}
         }
     }
-    let o = &set[idx];
+    let o = set.checked(idx)?;
     let most = HitPoints::of_master(o.master_hp);
     let mut amount = amount;
     if most < o.hp + amount {
@@ -168,7 +170,7 @@ pub fn repair_unit(
     amount: HitPoints,
     payer: &mut Payer<'_>,
 ) -> Result<RepairOutcome, GenieError> {
-    let o = &mut set[idx];
+    let o = set.checked_mut(idx)?;
     let mut amount = amount;
     if COSTED.contains(&o.class) {
         let most = HitPoints::of_master(o.master_hp) + o.hp_powerup.max;

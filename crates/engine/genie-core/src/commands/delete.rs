@@ -432,7 +432,7 @@ impl World {
         let Some(place) = self.place(id) else {
             return self.base_set_state(owner, id, new, master);
         };
-        let u = held(&mut self.players, place);
+        let u = held(&mut self.players, place)?;
         let (state, main) = (u.life.state, u.annex_of);
         if ObjectState::Dying <= new && state < ObjectState::Dying {
             crate::objects::lifecycle::death_parts::combat_dies(

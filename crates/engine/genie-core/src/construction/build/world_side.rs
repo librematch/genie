@@ -98,11 +98,11 @@ impl crate::world::World {
     ) -> Result<(), GenieError> {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let (Place::Live(p, _) | Place::Sleeping(p, _)) = place;
-        let volley = held(&mut self.players, place)
+        let volley = held(&mut self.players, place)?
             .master(&self.masters, p)?
             .volley_fire;
         let now = self.world_time;
-        let u = held(&mut self.players, place);
+        let u = held(&mut self.players, place)?;
         let Some(c) = u.construction.as_mut() else {
             return Ok(());
         };
@@ -136,13 +136,17 @@ pub(crate) const NO_CONSTRUCTION: GenieError =
 
 /// The object at `place`, in its player's live or sleeping list (the world's table,
 /// `FUN_1415417a0`, holds both).
+///
+/// # Errors
+///
+/// A place its player's lists do not hold.
 pub(crate) fn held(
     players: &mut [crate::world::Player],
     place: Place,
-) -> &mut crate::objects::unit::Unit {
+) -> Result<&mut crate::objects::unit::Unit, GenieError> {
     match place {
-        Place::Live(p, i) => &mut players[p.index()].objects[i],
-        Place::Sleeping(p, i) => &mut players[p.index()].sleeping[i],
+        Place::Live(p, i) => players.live_mut(p, i),
+        Place::Sleeping(p, i) => players.asleep_mut(p, i),
     }
 }
 

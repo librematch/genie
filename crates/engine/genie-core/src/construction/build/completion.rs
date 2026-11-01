@@ -136,7 +136,7 @@ impl crate::world::World {
             streams,
             ..
         } = self;
-        let u = held(players, place);
+        let u = held(players, place)?;
         show_built(
             &mut u.sprite,
             u.body.move_stats_mut(),
@@ -210,7 +210,7 @@ impl crate::world::World {
         let Self {
             players, spatial, ..
         } = self;
-        let u = held(players, place);
+        let u = held(players, place)?;
         let (main, rice) = (u.annex_of.is_some(), u.rice);
         let c = u.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let laid = stack_master(master, building, rice);

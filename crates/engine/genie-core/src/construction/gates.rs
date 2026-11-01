@@ -89,7 +89,7 @@ impl World {
         let owner = self.players.player(q)?;
         let mut gates = Vec::new();
         for i in owner.objects.places().rev() {
-            let m = owner.objects[i].master_in(masters)?;
+            let m = owner.objects.checked(i)?.master_in(masters)?;
             if m.class == class::GATE
                 && m.building
                     .as_ref()
