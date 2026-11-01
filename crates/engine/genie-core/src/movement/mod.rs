@@ -170,8 +170,8 @@ pub struct PathData {
     pub created: WorldTime,
     /// `+0x38`, `mContinueCounter`: the plans the level may still try before it gives up.
     pub continue_counter: PlanTries,
-    /// `+0x40`, `mRepathTime`.
-    pub repath_time: f32,
+    /// `+0x40`, `mRepathTime`: 2 to 2.5 seconds, drawn when the path is planned.
+    pub repath_time: Seconds,
     /// The path's hash set of ignored units (`+0x18`, `FUN_140f96120`), which the save writes as
     /// `numberIgnoreUnits` and the ids after it (`0x140f98f00`); empty in this game (the probe
     /// `path_sets.py`).
@@ -470,7 +470,7 @@ impl PathData {
             length: Distance::ZERO,
             created: now,
             continue_counter: PlanTries::FULL,
-            repath_time: 0.0,
+            repath_time: Seconds::ZERO,
             ignore: Vec::new(),
             ignored: Vec::new(),
         }
@@ -495,7 +495,7 @@ impl PathData {
             length: Distance::ZERO,
             created: WorldTime::ZERO,
             continue_counter: PlanTries::FULL,
-            repath_time: 0.0,
+            repath_time: Seconds::ZERO,
             ignore: Vec::new(),
             ignored: Vec::new(),
         }

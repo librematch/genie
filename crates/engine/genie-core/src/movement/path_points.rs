@@ -68,10 +68,10 @@ pub(super) const fn ground_line(at: Position, waypoint: BVector) -> (Point, Poin
 }
 
 /// The length on the ground from `a` to `b`.
-pub(super) fn ground(a: BVector, b: BVector) -> f32 {
+pub(super) fn ground(a: BVector, b: BVector) -> Distance {
     let mut d = fmath::sub(a, b);
     d = d.with_height(0.0);
-    fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())
+    Distance::new(fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
 
 /// The short pather's range for a request (`0x141150f00`): the level's range less 0.1 when its
@@ -225,7 +225,7 @@ pub(super) fn split(path: &mut Path, i: i32) {
 pub(super) struct Goal<'w> {
     pub(super) target: Option<(ObjectId, &'w Placed)>,
     pub(super) gap: Distance,
-    pub(super) to_end: f32,
+    pub(super) to_end: Distance,
 }
 
 /// What the motion step's planning needs of the world besides the objects' places.

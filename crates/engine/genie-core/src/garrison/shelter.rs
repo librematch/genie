@@ -2,9 +2,9 @@
 //! first ([`Shelters`]).
 
 use crate::GenieError;
+use crate::garrison::ClassFlags;
 use crate::garrison::{
-    COMPUTER_IDS, FAR, HUMAN_IDS, NEARBY, TOWN_BELL_REACH, TRANSPORTED, class_has_flags,
-    has_garrison_task,
+    COMPUTER_IDS, FAR, HUMAN_IDS, NEARBY, TOWN_BELL_REACH, class_has_flags, has_garrison_task,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -294,7 +294,7 @@ impl World {
                     }
                 }
             }
-            if !class_has_flags(class, TRANSPORTED) {
+            if !class_has_flags(class, ClassFlags::TRANSPORTED) {
                 continue;
             }
             for (k, &transport) in shelters.transports.iter().enumerate() {

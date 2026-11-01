@@ -168,7 +168,7 @@ fn the_walked_levels_below_the_high_level_go() {
         level(0, &[Point::new(1.0, 1.0)], 1, PathState::Walking),
         level(1, &[Point::new(2.0, 2.0)], 1, PathState::Idle),
     ];
-    m.paths[0].repath_time = 4.0;
+    m.paths[0].repath_time = Seconds::new(4.0);
     m.drop_to_high_level().unwrap();
     assert_eq!(m.paths, [PathData::without_path()]);
     let lone = vec![level(0, &[Point::new(1.0, 1.0)], 1, PathState::Walking)];
@@ -208,13 +208,13 @@ fn a_reset_level_drops_its_parents_and_keeps_its_repath_time() {
         level(0, &[Point::new(1.0, 1.0)], 1, PathState::Walking),
         level(2, &[], 0, PathState::Idle),
     ];
-    paths[0].repath_time = 2.5;
+    paths[0].repath_time = Seconds::new(2.5);
     reset_level(&mut paths).unwrap();
     assert_eq!(paths.len(), 1);
     assert_eq!(
         paths[0],
         PathData {
-            repath_time: 2.5,
+            repath_time: Seconds::new(2.5),
             ..PathData::without_path()
         }
     );

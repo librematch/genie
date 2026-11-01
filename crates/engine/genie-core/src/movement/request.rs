@@ -30,7 +30,7 @@ pub(super) struct LongAsk<'a> {
     /// The waypoint (x, height, y).
     pub(super) waypoint: BVector,
     /// The unit's ground distance to it.
-    pub(super) way: f32,
+    pub(super) way: Distance,
     /// How near the waypoint counts.
     pub(super) range: Distance,
     /// The target object, its id and record.
@@ -89,7 +89,7 @@ impl Mover {
                 include,
                 position,
                 waypoint,
-                distance: Distance::new(ground(waypoint, position)),
+                distance: ground(waypoint, position),
                 radius: Distance::new(self.stats.radius.x()),
                 level: level.level,
                 range: level.range,
@@ -126,7 +126,7 @@ impl Mover {
             return Some(AfterRequest::Again);
         }
         let waypoint = level.point(level.waypoint);
-        if ground(position, waypoint) != 0.0 {
+        if ground(position, waypoint) != Distance::ZERO {
             return None;
         }
         let away = goal.target.is_none_or(|(_, t)| {
@@ -234,7 +234,7 @@ impl Mover {
         plan: &Planning<'_>,
         ask: LongAsk<'_>,
         path: &mut Path,
-    ) -> Result<Option<(bool, Option<f32>)>, GenieError> {
+    ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
         let LongAsk {
             waypoint,
             way,
@@ -346,14 +346,10 @@ impl Mover {
     /// `FUN_14114d3d0`: the walked level's goal is in reach: its target's gap (else where its top
     /// path ends) within its range, or a target's last waypoint at most 16 tiles beyond its
     /// range on a top level.
-    pub(super) fn near_goal(&self, way: Distance, gap: Distance, to_end: f32) -> bool {
+    pub(super) fn near_goal(&self, way: Distance, gap: Distance, to_end: Distance) -> bool {
         let level = &self.paths[0];
-        let d = if level.target.is_none() {
-            to_end
-        } else {
-            gap.get()
-        };
-        if d - level.range.get() < EPSILON {
+        let d = if level.target.is_none() { to_end } else { gap };
+        if (d - level.range).get() < EPSILON {
             return true;
         }
         level.target.is_some()

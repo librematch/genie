@@ -36,6 +36,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::math::fmath;
+use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -83,7 +84,7 @@ const WORKING_ACTIONS: [ActionType; 4] = [
     crate::gathering::hunt::HUNT,
 ];
 /// The action state of an action at work (`+0x18`).
-const WORKING: u8 = 7;
+const WORKING: ActionState = ActionState::new(7);
 
 /// The building classes a movement damage hits (`0x141207ae8`, decoded 0x33 and 0x36); it hits
 /// any object of another type.

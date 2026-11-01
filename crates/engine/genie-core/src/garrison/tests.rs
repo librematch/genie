@@ -1530,22 +1530,28 @@ fn the_class_flags_are_the_images_table_by_class() {
     // siege (13, 0x3) garrison a transport; ships (20, 21, 22) do not
     for class in [0, 4, 6, 13, 18, 44, 58] {
         assert!(
-            class_has_flags(ClassId::of_master(class), TRANSPORTED),
+            class_has_flags(ClassId::of_master(class), ClassFlags::TRANSPORTED),
             "class {class}"
         );
     }
     for class in [2, 20, 21, 22, 52, 60, 63] {
         assert!(
-            !class_has_flags(ClassId::of_master(class), TRANSPORTED),
+            !class_has_flags(ClassId::of_master(class), ClassFlags::TRANSPORTED),
             "class {class}"
         );
     }
     // other flags of the same words; a class outside the table has none (JS, JGE)
-    assert!(class_has_flags(class::CLASS_17, 0x10));
-    assert!(class_has_flags(class::FISHING_SHIP, 0x100));
-    assert!(!class_has_flags(class::NO_CLASS, u32::MAX));
-    assert!(!class_has_flags(class::CLASS_64, u32::MAX));
-    assert!(class_has_flags(class::CLASS_61, u32::MAX));
+    assert!(class_has_flags(
+        class::CLASS_17,
+        ClassFlags::from_bits_retain(0x10)
+    ));
+    assert!(class_has_flags(
+        class::FISHING_SHIP,
+        ClassFlags::from_bits_retain(0x100)
+    ));
+    assert!(!class_has_flags(class::NO_CLASS, ClassFlags::all()));
+    assert!(!class_has_flags(class::CLASS_64, ClassFlags::all()));
+    assert!(class_has_flags(class::CLASS_61, ClassFlags::all()));
 }
 
 #[test]

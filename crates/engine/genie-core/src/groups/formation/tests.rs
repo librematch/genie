@@ -917,7 +917,7 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
         length: Distance::ZERO,
         created: WorldTime::ZERO,
         continue_counter: crate::movement::PlanTries::of_data(10),
-        repath_time: 0.0,
+        repath_time: Seconds::ZERO,
         ignore: Vec::new(),
         ignored: Vec::new(),
     }

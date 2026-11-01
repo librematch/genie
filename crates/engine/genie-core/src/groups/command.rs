@@ -90,9 +90,9 @@ impl UnitGroup {
     /// `FUN_14100f6b0`: [`GroupFlags::MEMBERS_SENT`] clears; with `forget_target` the target goes
     /// (-1, type -1, its place, range and radius 0, its retargeting byte 0); the rams are not
     /// re-added (`FUN_14102b730`, gated by `DAT_143f01837`, which nothing writes); every member's
-    /// seconds since attacking are `f32::MAX`; the waypoints (`+0x398`, count `+0x3a0`) take (`x`,
-    /// the desired height, `z`). The array's growth (5, then twice) fails only without memory.
-    pub fn add_waypoint(&mut self, x: f32, z: f32, forget_target: bool) {
+    /// seconds since attacking are `f32::MAX`; the waypoints (`+0x398`, count `+0x3a0`) take (`at`'s
+    /// x, the desired height, its y). The array's growth (5, then twice) fails only without memory.
+    pub fn add_waypoint(&mut self, at: Point, forget_target: bool) {
         self.flags &= !GroupFlags::MEMBERS_SENT;
         if forget_target {
             let t = &mut self.current_target;
@@ -105,7 +105,8 @@ impl UnitGroup {
         for m in &mut self.members {
             m.seconds_since_attacking = Seconds::MAX;
         }
-        self.waypoints.push(BVector::new(x, self.desired_height, z));
+        self.waypoints
+            .push(BVector::new(at.x(), self.desired_height, at.y()));
     }
 }
 
@@ -366,7 +367,11 @@ impl World {
             g.flags &= !GroupFlags::PATROL;
         }
         // FUN_140f98e80: the level and its parents go, its repath time stays
-        let repath_time = g.motion.paths.first().map_or(0.0, |l| l.repath_time);
+        let repath_time = g
+            .motion
+            .paths
+            .first()
+            .map_or(Seconds::ZERO, |l| l.repath_time);
         g.motion.paths.truncate(1);
         let length = path.as_ref().map(|p| p.length);
         let level = move_level(path, path_flags, repath_time, world_time, how.range, target);
@@ -517,7 +522,7 @@ impl World {
             {
                 self.groups
                     .held_mut(group)?
-                    .add_waypoint(node.point.x(), node.point.y(), false);
+                    .add_waypoint(node.point.position().ground(), false);
                 Ok(false)
             }
             _ => Ok(false),
@@ -626,7 +631,7 @@ fn move_path_flags(from: BVector, to: BVector, leg: bool) -> PathFlags {
 fn move_level(
     path: Option<Path>,
     path_flags: PathFlags,
-    repath_time: f32,
+    repath_time: Seconds,
     world_time: WorldTime,
     range: Distance,
     target: Option<ObjectId>,

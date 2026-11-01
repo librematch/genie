@@ -232,7 +232,7 @@ impl World {
                 let req = crate::pathing::tile_path::Request {
                     from: b.position.ground(),
                     to: a.position.ground(),
-                    radii: a.radius.get(),
+                    radii: a.radius,
                     range: b.radius,
                     closed: Vec::new(),
                     full: false,

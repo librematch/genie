@@ -6,6 +6,7 @@ use crate::movement::LevelFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointIndex;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 use std::ops::ControlFlow;
 
@@ -33,7 +34,7 @@ pub(super) struct NewPath {
     pub(super) partial: bool,
     pub(super) planned: bool,
     failed: bool,
-    end_gap: f32,
+    end_gap: Distance,
 }
 
 impl NewPath {
@@ -46,7 +47,7 @@ impl NewPath {
             partial: false,
             planned: false,
             failed: false,
-            end_gap: FAR,
+            end_gap: Distance::new(FAR),
         }
     }
 }
@@ -102,7 +103,7 @@ impl Mover {
             self.tile_again(me, world, plan, w, np)?;
         }
         if !(np.path.length <= w.distance * DETOUR || np.path.length <= LONG) {
-            np.new.repath_time = (plan.object.rand15() as f32 * 0.5) / 32767.0 + 2.0;
+            np.new.repath_time = Seconds::new((plan.object.rand15() as f32 * 0.5) / 32767.0 + 2.0);
         }
         Ok(None)
     }
@@ -183,7 +184,7 @@ impl Mover {
             .map_or(0.0, |(_, t)| t.radius.x());
         let ask = TileAsk {
             goal: w.waypoint,
-            radii: target_radius + w.radius.get(),
+            radii: Distance::new(target_radius + w.radius.get()),
             range: w.range,
             target: w.goal.target.map(|(_, t)| t),
         };
@@ -202,7 +203,7 @@ impl Mover {
         }
         np.planned = true;
         let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
-        let farther = w.distance < Distance::new(ground(w.waypoint, last));
+        let farther = w.distance < ground(w.waypoint, last);
         if farther {
             np.path.points.clear();
         }
@@ -377,7 +378,7 @@ impl Mover {
         let target = w.goal.target;
         let ask = LongAsk {
             waypoint: w.waypoint,
-            way: w.distance.get(),
+            way: w.distance,
             range: w.range,
             target,
         };
@@ -412,7 +413,7 @@ impl Mover {
         let mut other = Path::default();
         let ask = TileAsk {
             goal: w.waypoint,
-            radii: target_radius + w.radius.get(),
+            radii: Distance::new(target_radius + w.radius.get()),
             range: w.range,
             target: w.goal.target.map(|(_, t)| t),
         };
@@ -421,7 +422,7 @@ impl Mover {
         };
         let last = point_or_zero(&other, WaypointIndex::last_of(other.points.len()));
         let end = ground(w.waypoint, last);
-        if end <= w.distance.get() {
+        if end <= w.distance {
             // the game's `result - 1 < 2 || 4 < result`: above 4 the planner never returns
             if r.leads() && end < np.end_gap {
                 np.path.points.clear();

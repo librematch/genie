@@ -8,6 +8,7 @@
 use crate::GenieError;
 use crate::gathering::closest_resource::herded;
 use crate::map::Distance;
+use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -92,7 +93,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         /// The siege tower master (`FUN_141194f10`'s 0x451).
         const SIEGE_TOWER: MasterId = MasterId::named(0x451);
         /// `AskForHelp`'s reach (`DAT_142ecccc4`): the squared footprint gap of 3 tiles.
-        const HELP_REACH: f32 = crate::math::image::unit_ai::HELP_REACH;
+        const HELP_REACH: DistanceSquared =
+            DistanceSquared::new(crate::math::image::unit_ai::HELP_REACH);
         let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
             "a search that reads the registry's last answer (before any query)",
         ))?;
@@ -127,7 +129,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             }
             let gap =
                 footprint_gap_squared(self.unit.position(), my_radius, u.position(), m.radius);
-            if HELP_REACH < gap.get() {
+            if HELP_REACH < gap {
                 continue;
             }
             if !self.helper_free(owner, u, m, attacker)? {

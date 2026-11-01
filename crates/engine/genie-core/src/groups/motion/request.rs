@@ -37,7 +37,7 @@ struct Leg {
     waypoint: BVector,
     at: BVector,
     from: Point,
-    way: f32,
+    way: Distance,
 }
 
 /// The path the planners made so far, and what the routine's flags say of it.
@@ -91,13 +91,13 @@ pub(super) fn request(
     let (short_range, beyond) = if leg.level == WaypointLevel::TOP
         && level.waypoint == WaypointIndex::last_of(level.points.len())
     {
-        (leg.range, leg.way - leg.range.get())
+        (leg.range, leg.way - leg.range)
     } else {
         (Distance::ZERO, leg.way)
     };
     let mut long = false;
     if !plan.has_plan || plan.path.points.len() < 3 {
-        if leg.way <= SHORT_REACH
+        if leg.way.get() <= SHORT_REACH
             && let Some(pass) = short_plan(
                 motion,
                 lead,
@@ -111,7 +111,7 @@ pub(super) fn request(
             return Ok(Some(pass));
         }
         if !plan.has_plan {
-            if beyond < CLOSE || target_gap2 < DistanceSquared::new(CLOSE) {
+            if beyond.get() < CLOSE || target_gap2 < DistanceSquared::new(CLOSE) {
                 straight_way(lead, world.spatial, &leg, &mut plan)?;
             }
             long = !plan.found;
@@ -178,7 +178,7 @@ fn tile_plan(
     plan: &mut PathSoFar,
 ) -> Result<(), GenieError> {
     let spatial = &mut *world.spatial;
-    let radii = target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get();
+    let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
     let mut planning = world.plan.reborrow();
     planning.computer = lead.computer;
     let r = tile_plan_for(

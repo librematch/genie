@@ -118,7 +118,7 @@ impl BuildAction {
             let req = crate::pathing::tile_path::Request {
                 from: moved_at.ground(),
                 to: t.position.ground(),
-                radii: radius + ground,
+                radii: Distance::new(radius + ground),
                 range: Distance::ZERO,
                 closed: Vec::new(),
                 full: false,

@@ -40,7 +40,7 @@ const ENTER_TARGET_DIED: GenieError =
     GenieError::unsupported("an Enter whose building died or is not allied (state 11)");
 /// `set_state(2)`'s wait before the Enter walks again, in seconds (`FUN_140a87320`, the constant
 /// `0x3f800000` it stores).
-pub(super) const WAIT_SECONDS: f32 = 1.0;
+pub(super) const WAIT_SECONDS: Seconds = Seconds::new(1.0);
 
 /// An Enter of a unit without movement state, which is not modelled.
 pub(crate) const NO_SPEED: GenieError =
@@ -255,7 +255,7 @@ impl EnterAction {
     pub(super) fn wait(&mut self, c: &mut Step<'_>, unit: &mut Unit) -> Result<(), GenieError> {
         self.move_to = None;
         self.state = EnterState::Wait;
-        self.timer = Seconds::new(WAIT_SECONDS);
+        self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
             c.w.masters.of(c.player),
             &c.w.graphics,

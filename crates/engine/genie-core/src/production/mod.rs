@@ -466,6 +466,7 @@ pub fn housed(attributes: &[Amount], pop: Amount) -> Result<bool, GenieError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gathering::QueueCount;
     use crate::objects::masters::CostAmount;
     use crate::objects::masters::CostSlot;
     use crate::objects::masters::Masters;
@@ -914,7 +915,7 @@ mod tests {
                 (None, Amount::ZERO),
                 (Some(attribute::FOOD), Amount::new(0.5)),
             ],
-            3,
+            QueuedUnits::of_data(3),
             &mut held,
         )
         .unwrap();
@@ -922,7 +923,7 @@ mod tests {
             (held.0[3], held.0[0]),
             (Amount::new(151.0), Amount::new(47.5))
         );
-        refund_master(&m, 1, &mut held).unwrap();
+        refund_master(&m, QueueCount::ONE, &mut held).unwrap();
         assert_eq!(
             (held.0[0], held.0[3], held.0[4]),
             (Amount::new(107.5), Amount::new(171.0), Amount::new(1.0))

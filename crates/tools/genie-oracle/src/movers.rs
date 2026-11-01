@@ -147,7 +147,7 @@ pub(super) fn path_level(
             WorldTime::from_millis(p.creation_time_value)
         }),
         continue_counter: PlanTries::of_data(d.continue_counter),
-        repath_time: d.repath_time,
+        repath_time: Seconds::new(d.repath_time),
         ignore: path.map_or_else(
             || Ok(Vec::new()),
             |p| {

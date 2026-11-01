@@ -178,7 +178,7 @@ impl Unit {
         if let Some(m) = self.body.mover_mut() {
             m.clear_user_waypoints();
             for p in &points {
-                m.add_user_waypoint(p.x(), p.y(), p.height());
+                m.add_user_waypoint(p.position());
             }
         }
         Some(AiMove {

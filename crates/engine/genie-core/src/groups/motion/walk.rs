@@ -40,7 +40,7 @@ pub(super) fn steer(
     let level = motion.paths.checked(0)?;
     let waypoint = point(level, level.waypoint);
     let at = motion.position[0];
-    if ground(at, waypoint) < EPSILON {
+    if ground(at, waypoint).get() < EPSILON {
         set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
         return Ok(Pass::Reached);
     }

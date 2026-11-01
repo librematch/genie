@@ -46,7 +46,7 @@ const TURN_LIMIT: f32 = crate::math::image::facing::QUARTER_PI;
 const FRONT_AHEAD: Distance = Distance::new(crate::math::image::movement::LOOK_AHEAD);
 /// A total spacing above this lays the formation out anew on a changed count
 /// (`DAT_142ec9eb4`).
-const RELAYOUT_SPACING: f32 = crate::math::image::missile::VOLLEY_REACH_MARGIN;
+const RELAYOUT_SPACING: Distance = Distance::new(crate::math::image::missile::VOLLEY_REACH_MARGIN);
 /// The share of the lead's line of sight a follow keeps within (`DAT_142e7f384`).
 const FOLLOW_SHARE: f32 = crate::math::image::group::FRONT_SHARE;
 /// A follow's target this near the top path's end (squared, `DAT_14330eb8c`) keeps the move.

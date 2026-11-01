@@ -287,9 +287,9 @@ impl History {
     /// of the event of the player's age (attribute 6 through `CVTTSS2SI`: 1 Feudal, 2 Castle, 3
     /// Imperial) when the history holds one; for another age the world's seconds.
     #[must_use]
-    pub fn age_time(&self, current_age: f32, world_time: WorldTime) -> u32 {
+    pub fn age_time(&self, current_age: Amount, world_time: WorldTime) -> u32 {
         let now = world_time.millis() / 1000;
-        let kind = match cvttss2si(current_age) {
+        let kind = match cvttss2si(current_age.get()) {
             1 => EventKind::FEUDAL_AGE,
             2 => EventKind::CASTLE_AGE,
             3 => EventKind::IMPERIAL_AGE,
@@ -698,10 +698,22 @@ mod tests {
             }],
             ..History::default()
         };
-        assert_eq!(h.age_time(2.0, WorldTime::from_millis(900_500)), 300);
-        assert_eq!(h.age_time(1.9, WorldTime::from_millis(900_500)), 900);
-        assert_eq!(h.age_time(3.0, WorldTime::from_millis(900_500)), 900);
-        assert_eq!(h.age_time(0.0, WorldTime::from_millis(900_500)), 900);
+        assert_eq!(
+            h.age_time(Amount::new(2.0), WorldTime::from_millis(900_500)),
+            300
+        );
+        assert_eq!(
+            h.age_time(Amount::new(1.9), WorldTime::from_millis(900_500)),
+            900
+        );
+        assert_eq!(
+            h.age_time(Amount::new(3.0), WorldTime::from_millis(900_500)),
+            900
+        );
+        assert_eq!(
+            h.age_time(Amount::new(0.0), WorldTime::from_millis(900_500)),
+            900
+        );
     }
 
     fn attributes() -> Vec<Amount> {

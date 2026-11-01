@@ -166,7 +166,7 @@ pub struct TileAsk<'a> {
     /// The goal (x, height, y).
     pub goal: BVector,
     /// The walker's and the target's radii added.
-    pub radii: f32,
+    pub radii: Distance,
     /// How near the goal counts.
     pub range: Distance,
     /// The target object's record.

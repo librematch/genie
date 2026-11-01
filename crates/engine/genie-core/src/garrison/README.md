@@ -24,6 +24,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`class_flags.rs`](class_flags.rs) | A class's garrison flags (`ClassFlags`, the class-flags table's word). |
 | [`enter.rs`](enter.rs) | The enter command and the Enter's construction, install and start, at once or with the transport's move. |
 | [`enter_state.rs`](enter_state.rs) | An Enter's state: walking to a building or transport, waiting, inside. |
 | [`firepower.rs`](firepower.rs) | A unit's attack rate and firepower, and its share of a building's volleys (`FUN_141213520`). |

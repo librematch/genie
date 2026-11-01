@@ -150,7 +150,7 @@ fn level(level: u8, points: &[Point], state: PathState) -> PathData {
         length: Distance::ZERO,
         created: WorldTime::from_millis(16360),
         continue_counter: PlanTries::of_data(10),
-        repath_time: 0.0,
+        repath_time: Seconds::ZERO,
         ignore: Vec::new(),
         ignored: Vec::new(),
     }
@@ -869,7 +869,7 @@ fn a_big_unit_s_path_request_takes_the_old_pather_with_the_walk_s_kept_hits() {
     let goal = Goal {
         target: None,
         gap: Distance::new(FAR),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut request = |include: &[ObjectId]| {
         let mut m = builder_9177().placed(Position::new(4.5, 5.5, 0.0));
@@ -1214,7 +1214,7 @@ fn an_arrived_level_hands_a_looping_parent_its_next_waypoint() {
     let goal = Goal {
         target: None,
         gap: Distance::new(FAR),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = builder_9177();
     m.paths[0].linked_type = LinkedPathType::of_data(2);
@@ -1264,7 +1264,7 @@ fn a_loop_s_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     let goal = Goal {
         target: None,
         gap: Distance::new(FAR),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = looping(WaypointIndex::of_data(1));
     let next = m.reached(&me, &mut world, None, goal, WorldTime::ZERO);
@@ -1878,7 +1878,7 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
             band[y * 120 + x] = 1;
         }
     }
-    let plan = |classes: &[u8], waypoint: BVector, way: f32| {
+    let plan = |classes: &[u8], waypoint: BVector, way: Distance| {
         let mut world = tiled_world(classes.to_vec());
         let mut pathing = Pathing::default();
         pathing.start_mesh(120);
@@ -1914,7 +1914,7 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
     };
     let open = vec![4; 120 * 120];
     assert_eq!(
-        plan(&open, BVector::new(28.0, 0.0, 60.0), 100.0),
+        plan(&open, BVector::new(28.0, 0.0, 60.0), Distance::new(100.0)),
         (
             Ok(Some((true, None))),
             vec![BVector::new(28.5, 0.0, 89.5), BVector::new(28.5, 0.0, 60.5)],
@@ -1922,19 +1922,22 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
         )
     );
     assert_eq!(
-        plan(&open, BVector::new(28.0, 0.0, 89.0), 100.0).0,
+        plan(&open, BVector::new(28.0, 0.0, 89.0), Distance::new(100.0)).0,
         Ok(None)
     );
     assert_eq!(
-        plan(&band, BVector::new(28.0, 0.0, 72.0), 100.0),
+        plan(&band, BVector::new(28.0, 0.0, 72.0), Distance::new(100.0)),
         (
             Ok(Some((false, None))),
             vec![BVector::new(28.5, 0.0, 89.5), BVector::new(28.5, 0.0, 75.5)],
             Distance::new(14.0)
         )
     );
-    let short = plan(&band, BVector::new(28.0, 0.0, 72.0), 0.5);
-    assert_eq!(short.0, Ok(Some((false, Some(12.5f32.sqrt())))));
+    let short = plan(&band, BVector::new(28.0, 0.0, 72.0), Distance::new(0.5));
+    assert_eq!(
+        short.0,
+        Ok(Some((false, Some(Distance::new(12.5f32.sqrt())))))
+    );
     assert_eq!((short.1.len(), short.2), (0, Distance::ZERO));
 }
 
@@ -1951,7 +1954,7 @@ fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     m.paths[0].flags = LevelFlags::MET_TARGET;
     assert!(matches!(
-        m.no_path(false, Some(&target), 0.5),
+        m.no_path(false, Some(&target), Distance::new(0.5)),
         Ok(AfterRequest::Paused)
     ));
     assert_eq!(m.paths[0].pause_time, STUCK_PAUSE);
@@ -1963,7 +1966,7 @@ fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
         let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
         m.paths[0].continue_counter = PlanTries::of_data(0);
         edit(&mut m);
-        let r = m.no_path(false, None, 0.5);
+        let r = m.no_path(false, None, Distance::new(0.5));
         (r, m)
     };
     let (r, m) = out(&|m| m.paths[1].waypoint = WaypointIndex::of_data(0));
@@ -1981,10 +1984,10 @@ fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
     assert!(matches!(r, Ok(AfterRequest::Again)));
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
-    assert!(m.no_path(true, None, 0.05).is_err());
+    assert!(m.no_path(true, None, Distance::new(0.05)).is_err());
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
-        m.no_path(true, None, 0.05),
+        m.no_path(true, None, Distance::new(0.05)),
         Ok(AfterRequest::Again)
     ));
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
@@ -2181,27 +2184,43 @@ fn the_first_step_reaches_top_speed_and_moves_along_the_saved_forward_vector() {
 fn the_speed_slot_caps_the_speed_unless_the_unit_s_group_steers_it() {
     let mut m = builder_9177();
     m.stats.speed = Speed::new(1.2);
-    assert_eq!(m.next_speed(5.0, None), 1.2);
-    assert_eq!(m.next_speed(-1.0, None), 0.0);
-    assert_eq!(m.next_speed(0.7, None), 0.7);
-    assert!(m.next_speed(f32::NAN, None).is_nan());
-    assert_eq!(m.next_speed(5.0, Some(GroupSpeed::Aside)), 0.0);
-    assert_eq!(m.next_speed(5.0, Some(GroupSpeed::Free)), 5.0);
-    assert_eq!(m.next_speed(-1.0, Some(GroupSpeed::Free)), 0.0);
-    assert_eq!(m.next_speed(10.0, Some(GroupSpeed::Free)), 1.2);
-    assert!(m.next_speed(f32::NAN, Some(GroupSpeed::Free)).is_nan());
+    assert_eq!(m.next_speed(Speed::new(5.0), None), Speed::new(1.2));
+    assert_eq!(m.next_speed(Speed::new(-1.0), None), Speed::new(0.0));
+    assert_eq!(m.next_speed(Speed::new(0.7), None), Speed::new(0.7));
+    assert!(m.next_speed(Speed::new(f32::NAN), None).get().is_nan());
+    assert_eq!(
+        m.next_speed(Speed::new(5.0), Some(GroupSpeed::Aside)),
+        Speed::new(0.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(5.0), Some(GroupSpeed::Free)),
+        Speed::new(5.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(-1.0), Some(GroupSpeed::Free)),
+        Speed::new(0.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(10.0), Some(GroupSpeed::Free)),
+        Speed::new(1.2)
+    );
+    assert!(
+        m.next_speed(Speed::new(f32::NAN), Some(GroupSpeed::Free))
+            .get()
+            .is_nan()
+    );
     let own = Some(GroupSpeed::OwnMove(Speed::new(1.44)));
     assert_eq!(m.paths[0].state, PathState::Walking);
-    assert_eq!(m.next_speed(-1.0, own), 1.44);
+    assert_eq!(m.next_speed(Speed::new(-1.0), own), Speed::new(1.44));
     m.paths[0].pause_time = Seconds::new(0.028);
-    assert_eq!(m.next_speed(0.5, own), 0.0);
+    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(0.0));
     m.paths[0].pause_time = Seconds::new(f32::NAN);
-    assert_eq!(m.next_speed(0.5, own), 1.44);
+    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(1.44));
     m.paths[0].pause_time = Seconds::ZERO;
     m.paths[0].state = PathState::WantsPath;
-    assert_eq!(m.next_speed(0.5, own), 0.0);
+    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(0.0));
     m.paths.clear();
-    assert_eq!(m.next_speed(0.5, own), 0.0);
+    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(0.0));
 }
 
 /// The velocity step (`FUN_140f9ba80`) takes slot 0x5e0's speed: a member on an own move whose
@@ -2400,7 +2419,7 @@ fn a_top_level_short_of_its_moved_target_arrives() {
         let goal = Goal {
             target: Some((object_id(target_id), &placed)),
             gap: Distance::new(9.0),
-            to_end: 9.0,
+            to_end: Distance::new(9.0),
         };
         m.reached(&me, &mut world, None, goal, WorldTime::ZERO)
     };
@@ -2487,7 +2506,7 @@ fn a_next_waypoint_an_object_stands_on_goes() {
     let goal = Goal {
         target: None,
         gap: Distance::new(FAR),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = walk();
     let _ = m
@@ -2869,9 +2888,9 @@ fn a_group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gate
 #[test]
 fn a_user_waypoint_on_a_tile_edge_moves_to_the_tile_s_middle() {
     let mut m = builder_9177();
-    m.add_user_waypoint(25.0, 20.0, 1.0);
-    m.add_user_waypoint(25.25, 20.000_000_1, 0.0);
-    m.add_user_waypoint(f32::NAN, 7.75, 2.0);
+    m.add_user_waypoint(Position::new(25.0, 20.0, 1.0));
+    m.add_user_waypoint(Position::new(25.25, 20.000_000_1, 0.0));
+    m.add_user_waypoint(Position::new(f32::NAN, 7.75, 2.0));
     assert_eq!(m.user_waypoints[0], BVector::new(25.5, 1.0, 20.5));
     // 20.000_000_1 is 20.0 as an f32: on the edge
     assert_eq!(m.user_waypoints[1], BVector::new(25.25, 0.0, 20.5));
@@ -3017,7 +3036,7 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     let near = Goal {
         target: Some((object_id(10028), &house)),
         gap: Distance::new(0.1),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     assert_eq!(m.in_reach(near, start), Some(AfterRequest::Again));
@@ -3033,7 +3052,7 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     let far = Goal {
         target: None,
         gap: Distance::new(FAR),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     assert_eq!(m.in_reach(far, start), None);
@@ -3108,10 +3127,7 @@ fn way_9177(goal: Goal<'_>, range: Distance) -> Way<'_> {
         include: &[],
         position: BVector::new(28.0, 0.0, 89.0),
         waypoint: BVector::new(30.0, 0.0, 88.0),
-        distance: Distance::new(ground(
-            BVector::new(30.0, 0.0, 88.0),
-            BVector::new(28.0, 0.0, 89.0),
-        )),
+        distance: ground(BVector::new(30.0, 0.0, 88.0), BVector::new(28.0, 0.0, 89.0)),
         radius: Distance::new(0.2),
         level: WaypointLevel::WALKED,
         range,
@@ -3129,7 +3145,7 @@ fn a_waypoint_in_range_ends_the_level_or_gives_up_on_a_fresh_path() {
     let point = |gap| Goal {
         target: None,
         gap,
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = builder_9177();
     assert_eq!(
@@ -3165,7 +3181,7 @@ fn a_waypoint_in_range_ends_the_level_or_gives_up_on_a_fresh_path() {
     let target = Goal {
         target: Some((object_id(10028), &house)),
         gap: Distance::new(RANGE_FLOOR),
-        to_end: FAR,
+        to_end: Distance::new(FAR),
     };
     let mut m = builder_9177();
     assert_eq!(

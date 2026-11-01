@@ -1,6 +1,7 @@
 //! A building's production list and its make action (`TRIBE_Action_Make_Obj`).
 
 use crate::GenieError;
+use crate::gathering::QueueCount;
 use crate::objects::ListIndex;
 use crate::objects::UpdateCode;
 use crate::objects::masters::action_type;
@@ -394,7 +395,7 @@ impl World {
             let owner = self.players.player_mut(p)?;
             owner.add_attribute(IN_PRODUCTION, -pop)?;
             if let Some(m) = refund {
-                crate::production::refund_master(&m, 1, owner)?;
+                crate::production::refund_master(&m, QueueCount::ONE, owner)?;
             }
         }
         let building = self.players.live_mut(p, i)?;

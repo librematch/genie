@@ -362,7 +362,7 @@ impl Unit {
             here,
             mover,
             (target, state),
-            Distance::new(range),
+            range,
             (sprite, livestock),
         )?;
         if move_to.shows_standing() {

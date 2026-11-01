@@ -10,6 +10,7 @@
 use crate::GenieError;
 use crate::vision::SightTiles;
 
+mod class_flags;
 mod enter;
 mod enter_state;
 mod firepower;
@@ -23,6 +24,7 @@ pub(crate) mod unit;
 mod unload;
 mod walk_in;
 
+pub use self::class_flags::ClassFlags;
 pub use self::enter_state::EnterState;
 use self::firepower::WHOLE_SHARE_CLASS;
 pub use self::firepower::{attack_rate, firepower, share};
@@ -76,8 +78,6 @@ const COMPUTER_IDS: usize = 500;
 /// The class-flags table `FUN_1411205e0` reads (`DAT_1439e37b0`, a u32 per class; its count,
 /// `DAT_1439e2cf8`, is 64), as the image holds it (nothing writes it).
 const CLASS_FLAGS: [u32; 64] = crate::math::image::garrison::CLASS_FLAGS;
-/// The class flags a unit garrisons a transport with (`FUN_14120eb10`, `FUN_141621220`).
-const TRANSPORTED: u32 = 0x10002;
 
 #[cfg(test)]
 pub(crate) mod tests;

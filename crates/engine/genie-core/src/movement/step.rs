@@ -26,7 +26,7 @@ use crate::{GenieError, math::fmath};
 /// [`Mover::level_gaps`]'s measure: the target with its place (none for a level without one or
 /// a target that is gone), the gap to it, and the gap to it, else to where the top level's path
 /// ends.
-type LevelGaps = (Option<(ObjectId, Placed)>, f32, f32);
+type LevelGaps = (Option<(ObjectId, Placed)>, Distance, Distance);
 
 /// The speed below which a free group member's speed is not capped by its top speed (slot
 /// 0x5e0).
@@ -84,9 +84,9 @@ impl Mover {
     /// only the floor). Any other is capped by the top speed (slot 0x208; `COMISS` then `JA`: a
     /// NaN is not above it), then floored at 0 (a NaN stays).
     #[must_use]
-    pub fn next_speed(&self, wanted: f32, group: Option<GroupSpeed>) -> f32 {
+    pub fn next_speed(&self, wanted: Speed, group: Option<GroupSpeed>) -> Speed {
         match group {
-            Some(GroupSpeed::Aside) => return 0.0,
+            Some(GroupSpeed::Aside) => return Speed::ZERO,
             Some(GroupSpeed::OwnMove(speed)) => {
                 // the walked level walks (state 3) and its pause is not above 0 (`COMISS`
                 // then `JA`: a NaN pause walks)
@@ -94,16 +94,20 @@ impl Mover {
                     l.state == PathState::Walking
                         && fmath::at_most_or_unordered(l.pause_time.get(), 0.0)
                 });
-                return if walks { speed.get() } else { 0.0 };
+                return if walks { speed } else { Speed::ZERO };
             }
-            Some(GroupSpeed::Free) if wanted < UNCAPPED_SPEED => {}
+            Some(GroupSpeed::Free) if wanted.get() < UNCAPPED_SPEED => {}
             Some(GroupSpeed::Free) | None => {
-                if self.stats.speed.get() < wanted {
-                    return self.stats.speed.get();
+                if self.stats.speed.get() < wanted.get() {
+                    return self.stats.speed;
                 }
             }
         }
-        if wanted < 0.0 { 0.0 } else { wanted }
+        if wanted.get() < 0.0 {
+            Speed::ZERO
+        } else {
+            wanted
+        }
     }
 
     /// The velocity part of `RGE_Moving_Object::update` (`FUN_140f9ba80`): the forward speed moves
@@ -121,12 +125,12 @@ impl Mover {
         let Some(v) = self.velocity.as_ref() else {
             return position;
         };
-        let speed = self.next_speed(v.acceleration.y() * dt + v.velocity.y(), group);
+        let speed = self.next_speed(Speed::new(v.acceleration.y() * dt + v.velocity.y()), group);
         if let Some(v) = self.velocity.as_mut() {
-            v.velocity = v.velocity.with_y(speed);
+            v.velocity = v.velocity.with_y(speed.get());
         }
         // the position setter runs only for a distance it moves
-        let Some(at) = self.move_forward(Distance::new(dt.get() * speed), map) else {
+        let Some(at) = self.move_forward(Distance::new(dt.get() * speed.get()), map) else {
             return position;
         };
         let at = self.grounded(at, terrain);
@@ -350,7 +354,7 @@ impl Mover {
                 .get()
             }),
         };
-        Ok((target, gap, to_end))
+        Ok((target, Distance::new(gap), Distance::new(to_end)))
     }
 
     /// [`Mover::motion_passes`]'s dispatch on the level's state toward `goal`: an arrived level (4,
@@ -425,7 +429,7 @@ impl Mover {
             let (target, gap, to_end) = self.level_gaps(world, level.target, ground_radius)?;
             let goal = Goal {
                 target: target.as_ref().map(|(id, t)| (*id, t)),
-                gap: Distance::new(gap),
+                gap,
                 to_end,
             };
             if self.paths[0].flags.contains(LevelFlags::REACHED) {
@@ -498,7 +502,7 @@ impl Mover {
         let position = self.moved_at.vector();
         let level = &self.paths[0];
         let waypoint = point_or_zero_of(level, level.waypoint);
-        if ground(position, waypoint) < EPSILON {
+        if ground(position, waypoint).get() < EPSILON {
             self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
             return Ok(Next::Again);
         }

@@ -68,7 +68,7 @@ pub fn generates(
     if master_kind == COMBAT
         && let Some(top) = top
         && WORKING_ACTIONS.contains(&top.kind)
-        && top.state.get() == WORKING
+        && top.state == WORKING
         && let Some(t) = top.target
         && (HitPoints::ZERO < t.hp || Amount::ZERO < t.storage)
         && task.for_class(t.class)
@@ -140,7 +140,7 @@ impl World {
                 Some(a) => {
                     // FUN_140a78450: an id below 0 names no object; the target only matters
                     // to an action of the test's at work
-                    let works = WORKING_ACTIONS.contains(&a.kind) && a.state.get() == WORKING;
+                    let works = WORKING_ACTIONS.contains(&a.kind) && a.state == WORKING;
                     let target = match unit.top_target().filter(|t| works && !t.is_recyclable()) {
                         Some(t) => self.work_target(t)?,
                         None => None,

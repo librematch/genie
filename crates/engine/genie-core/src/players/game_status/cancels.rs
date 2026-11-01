@@ -113,7 +113,7 @@ impl World {
             return Ok(());
         };
         let owner = self.players.player_mut(p)?;
-        refund_research(&e.costs, count.get(), owner)?;
+        refund_research(&e.costs, count, owner)?;
         let state = owner.techs.checked_mut(t)?;
         state.state = ResearchState::Available;
         state.research_done = Seconds::ZERO;

@@ -2,6 +2,7 @@
 //! their refunds when an entry is cancelled (`FUN_141630530` and the cancels' calls).
 
 use crate::GenieError;
+use crate::gathering::QueueCount;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
@@ -11,6 +12,7 @@ use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
+use crate::production::QueuedUnits;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::world::Seconds;
@@ -47,7 +49,7 @@ pub fn refund(
 /// attribute. (Its technology's state 1 and work done 0 are the caller's.)
 pub fn refund_research(
     costs: &[(Option<AttributeId>, Amount); 3],
-    count: i16,
+    count: QueuedUnits,
     attributes: &mut dyn crate::technology::Attributes,
 ) -> Result<(), GenieError> {
     for &(attribute, amount) in costs {
@@ -57,7 +59,7 @@ pub fn refund_research(
         let held = attributes.get(attribute)?;
         attributes.set(
             attribute,
-            held + Amount::new(f32::from(count) * amount.get()),
+            held + Amount::new(f32::from(count.get()) * amount.get()),
         )?;
     }
     Ok(())
@@ -68,7 +70,7 @@ pub fn refund_research(
 /// flag gives back its amount times `n` (an integer product), straight into the attribute.
 pub fn refund_master(
     master: &Master,
-    n: i32,
+    n: QueueCount,
     attributes: &mut dyn crate::technology::Attributes,
 ) -> Result<(), GenieError> {
     if master.kind < COMBAT {
@@ -81,7 +83,7 @@ pub fn refund_master(
         let held = attributes.get(attribute)?;
         attributes.set(
             attribute,
-            Amount::new((i32::from(amount.get()) * n) as f32 + held.get()),
+            Amount::new((i32::from(amount.get()) * n.get()) as f32 + held.get()),
         )?;
     }
     Ok(())

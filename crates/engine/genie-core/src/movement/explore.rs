@@ -18,6 +18,7 @@ use crate::movement::Me;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToAction, MoveToReads, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
@@ -169,8 +170,8 @@ impl ExploreAction {
     /// What the update does after its `MoveTo`'s update returned `code` (`0x140a880c0` in state 11,
     /// `FUN_140a992b0`): 0 goes on; 1, 2, 3 and 5 make it wait for a new point (`set_state` 3); 4
     /// runs the action's slot 0x68 and walks again (`set_state` 11), which is not modelled.
-    pub fn after_walk(&mut self, code: u8) -> Result<Owner, GenieError> {
-        match code {
+    pub fn after_walk(&mut self, code: UpdateCode) -> Result<Owner, GenieError> {
+        match code.get() {
             1 | 2 | 3 | 5 => self.set_state(ExploreState::Wait, None),
             4 => Err(GenieError::unsupported(
                 "an Explore whose MoveTo returned 4 (its slot 0x68)",
@@ -237,7 +238,7 @@ impl ExploreAction {
         };
         let code = update_sub_actions(&mut self.move_to, c, explorer, me, how)?;
         let walked = self.move_to.is_some();
-        let owner = self.after_walk(code.get())?;
+        let owner = self.after_walk(code)?;
         if walked && self.move_to.is_none() {
             explorer.stop_mover()?;
         }
@@ -767,8 +768,8 @@ mod tests {
             wait: crate::movement::move_to::MoveWait::NEW,
         };
         assert_eq!((a.state, a.move_to), (ExploreState::Walk, Some(made)));
-        assert_eq!(a.after_walk(0), Ok(Owner::Nothing));
-        assert_eq!(a.after_walk(1), Ok(Owner::WantsPoint));
+        assert_eq!(a.after_walk(UpdateCode::UNDER_WAY), Ok(Owner::Nothing));
+        assert_eq!(a.after_walk(UpdateCode::DONE), Ok(Owner::WantsPoint));
         assert_eq!((a.state, a.move_to), (ExploreState::Wait, None));
         assert_eq!(
             a.take_point(Position::new(-1.0, 5.0, 0.0), &walk),

@@ -198,7 +198,7 @@ impl World {
                 continue;
             };
             for w in before {
-                g.add_waypoint(w.x(), w.y(), true);
+                g.add_waypoint(*w, true);
             }
             let leg = crate::groups::CommandMoveTo {
                 range: Distance::ZERO,
@@ -291,7 +291,7 @@ impl World {
                 let req = crate::pathing::tile_path::Request {
                     from,
                     to: at.ground(),
-                    radii: 0.0,
+                    radii: Distance::ZERO,
                     range: Distance::ZERO,
                     closed: Vec::new(),
                     full: false,
@@ -378,7 +378,7 @@ impl World {
         let (lx, ly) = (last.x(), last.y());
         if let Some(m) = u.body.mover_mut() {
             for w in before {
-                m.add_user_waypoint(w.x(), w.y(), z);
+                m.add_user_waypoint(Position::new(w.x(), w.y(), z));
             }
         }
         // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep)

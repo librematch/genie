@@ -53,7 +53,7 @@ impl Planner {
                     let dy = f32::from(goal.y()) - f32::from(c.y());
                     let dx = f32::from(goal.x()) - f32::from(c.x());
                     if result != Found::Goal
-                        || req.radii + GOAL_GAP < fmath::sqrt(dy * dy + dx * dx)
+                        || req.radii.get() + GOAL_GAP < fmath::sqrt(dy * dy + dx * dx)
                     {
                         end = Self::centre(c);
                     }
@@ -161,7 +161,7 @@ impl Planner {
         let req = Request {
             from,
             to,
-            radii: 0.0,
+            radii: Distance::ZERO,
             range: Distance::ZERO,
             closed: Vec::new(),
             full: false,

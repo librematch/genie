@@ -102,9 +102,9 @@ pub struct MoveStep {
 /// mule cart's); any other's (`FUN_14106a6d0`) is 0. A `MoveTo` to a point (`FUN_140aa0d30`)
 /// keeps its range.
 #[must_use]
-pub fn object_range(range: Distance, master: Option<&Master>) -> f32 {
+pub fn object_range(range: Distance, master: Option<&Master>) -> Distance {
     if range != Distance::ZERO {
-        return range.get();
+        return range;
     }
     let cart = master.is_some_and(|m| {
         m.kind == master_type::BUILDING
@@ -113,9 +113,9 @@ pub fn object_range(range: Distance, master: Option<&Master>) -> f32 {
                 .any(|t| t.action_type == crate::construction::build::CART_TASK)
     });
     if cart {
-        crate::math::image::order::CART_MOVE_RANGE
+        Distance::new(crate::math::image::order::CART_MOVE_RANGE)
     } else {
-        0.0
+        Distance::ZERO
     }
 }
 
@@ -825,13 +825,32 @@ mod tests {
             kind: master_type::COMBAT,
             ..cart.clone()
         };
-        assert_eq!(object_range(Distance::ZERO, Some(&cart)), 0.75);
-        assert_eq!(object_range(Distance::new(-0.0), Some(&cart)), 0.75);
-        assert_eq!(object_range(Distance::ZERO, Some(&building)), 0.0);
-        assert_eq!(object_range(Distance::ZERO, Some(&unit)), 0.0);
-        assert_eq!(object_range(Distance::ZERO, None), 0.0);
-        assert_eq!(object_range(Distance::new(0.5), Some(&cart)), 0.5);
-        assert!(object_range(Distance::new(f32::NAN), Some(&cart)).is_nan());
+        assert_eq!(
+            object_range(Distance::ZERO, Some(&cart)),
+            Distance::new(0.75)
+        );
+        assert_eq!(
+            object_range(Distance::new(-0.0), Some(&cart)),
+            Distance::new(0.75)
+        );
+        assert_eq!(
+            object_range(Distance::ZERO, Some(&building)),
+            Distance::new(0.0)
+        );
+        assert_eq!(
+            object_range(Distance::ZERO, Some(&unit)),
+            Distance::new(0.0)
+        );
+        assert_eq!(object_range(Distance::ZERO, None), Distance::new(0.0));
+        assert_eq!(
+            object_range(Distance::new(0.5), Some(&cart)),
+            Distance::new(0.5)
+        );
+        assert!(
+            object_range(Distance::new(f32::NAN), Some(&cart))
+                .get()
+                .is_nan()
+        );
     }
 
     #[test]

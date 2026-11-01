@@ -38,7 +38,7 @@ impl Mover {
         &mut self,
         found: bool,
         target: Option<&Placed>,
-        to_end: f32,
+        to_end: Distance,
     ) -> Result<AfterRequest, GenieError> {
         let top_has_more = self.top_has_more();
         if target.is_some() && self.paths[0].flags.contains(LevelFlags::MET_TARGET) {
@@ -49,7 +49,7 @@ impl Mover {
             }
         }
         let level = &mut self.paths[0];
-        if !found || level.range < Distance::new(to_end) {
+        if !found || level.range < to_end {
             if level.waypoint.at_or_past_last(level.points.len()) {
                 if level.continue_counter.left() {
                     // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
@@ -438,7 +438,7 @@ impl Mover {
         world: &Spatial,
         plan: &mut Planning<'_>,
         to: Point,
-        radii: f32,
+        radii: Distance,
     ) -> Result<Option<(Found, Distance)>, GenieError> {
         let full = !plan.computer;
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {

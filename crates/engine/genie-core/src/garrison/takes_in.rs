@@ -1,7 +1,7 @@
 //! A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds.
 
 use crate::GenieError;
-use crate::garrison::{CLASS_FLAGS, LEAST_HP_SHARE, TRANSPORTED};
+use crate::garrison::{CLASS_FLAGS, ClassFlags, LEAST_HP_SHARE};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -25,11 +25,11 @@ use crate::world::World;
 /// `flags` in the class-flags table: a class below 0 or not below the table's count
 /// (`CMP`/`JGE`, signed) has none.
 #[must_use]
-pub fn class_has_flags(class: ClassId, flags: u32) -> bool {
+pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
     usize::try_from(class.get())
         .ok()
         .and_then(|c| CLASS_FLAGS.get(c))
-        .is_some_and(|&f| f & flags != 0)
+        .is_some_and(|&f| ClassFlags::from_bits_retain(f).intersects(flags))
 }
 
 /// The unit masters whose own rules `FUN_14120eb10` keeps apart from their class's (the game
@@ -176,7 +176,7 @@ impl World {
         }
         let own = b.master(&self.masters, bp)?;
         if own.object_flags.contains(ObjectFlags::GARRISON)
-            && (unit.kind == COMBAT || class_has_flags(unit.class, TRANSPORTED))
+            && (unit.kind == COMBAT || class_has_flags(unit.class, ClassFlags::TRANSPORTED))
         {
             if !has_garrison_task(&unit.tasks, GARRISON, own.class) {
                 return Ok(false);

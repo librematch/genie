@@ -153,7 +153,7 @@ impl World {
         // the game reads the master without a test: a queue of a master the player lacks
         // cannot have been paid for
         if let Some(m) = player_master(&self.masters, p, master) {
-            refund_master(m, n.get(), player)?;
+            refund_master(m, n, player)?;
         }
         Ok(true)
     }

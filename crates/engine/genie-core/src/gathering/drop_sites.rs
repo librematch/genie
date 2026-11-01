@@ -68,7 +68,7 @@ impl Seeker<'_, '_> {
         squared: f32,
         last: &mut f32,
     ) -> Result<Option<f32>, GenieError> {
-        let radii = self.mover.stats.radius.x() + master.radius.x();
+        let radii = Distance::new(self.mover.stats.radius.x() + master.radius.x());
         let to = o.position().ground();
         let ground = self.mover.stats.radius.ground();
         let near = || {

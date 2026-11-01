@@ -3,12 +3,14 @@
 
 use crate::GenieError;
 use crate::groups::motion::NEAR;
+use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
 use crate::movement::PathData;
+use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
 /// `FUN_140f9b4d0(level, bit, on)` on the walked level: its flag `flag` set or cleared;
@@ -28,7 +30,7 @@ pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, on: bool) {
 /// `FUN_140f98e80` on the walked level: it and its parents go, the level holds the defaults
 /// (its plans back to 10, flags clear; its repath time stays).
 pub(super) fn reset_level(paths: &mut Vec<PathData>) -> Result<(), GenieError> {
-    let repath_time = paths.first().map_or(0.0, |l| l.repath_time);
+    let repath_time = paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
     paths.truncate(1);
     let level = PathData {
         repath_time,
@@ -52,10 +54,10 @@ pub(super) fn point(level: &PathData, index: crate::movement::WaypointIndex) -> 
 }
 
 /// The length on the ground from `a` to `b` (`FUN_14087e560`, the height zeroed).
-pub(super) fn ground(a: BVector, b: BVector) -> f32 {
+pub(super) fn ground(a: BVector, b: BVector) -> Distance {
     let mut d = fmath::sub(a, b);
     d = d.with_height(0.0);
-    fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())
+    Distance::new(fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
 
 /// Where a step toward a waypoint ends against it (`FUN_141046130`'s answer).

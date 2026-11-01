@@ -17,17 +17,17 @@ use crate::world::slots::PlayerSlots;
 
 /// A commodity's price after its net trades came back to 0 (`DAT_142f03164`, `DAT_14330eb8c`,
 /// `DAT_142f0703c`).
-const FOOD_START: f32 = crate::math::image::market::FOOD_START;
-const WOOD_START: f32 = crate::math::image::market::WOOD_START;
-const STONE_START: f32 = crate::math::image::market::STONE_START;
-const ORE_START: f32 = crate::math::image::market::ORE_START;
+const FOOD_START: Price = Price::new(crate::math::image::market::FOOD_START);
+const WOOD_START: Price = Price::new(crate::math::image::market::WOOD_START);
+const STONE_START: Price = Price::new(crate::math::image::market::STONE_START);
+const ORE_START: Price = Price::new(crate::math::image::market::ORE_START);
 /// A trade's growth of the swing (`DAT_142e8c150`), the hundredths of its step
 /// (`DAT_14330ebcc`) and the sign flip of a negative growth (`DAT_14330ec20`).
 const SWING: f32 = crate::math::image::market::SWING;
 const PERCENT: f32 = crate::math::image::market::PERCENT;
 const FLIP: f32 = crate::math::image::market::FLIP;
 /// The price of an attribute no commodity is (`FUN_1415cd3c0`, `DAT_14330ec20`).
-const UNKNOWN_PRICE: f32 = crate::math::image::market::UNKNOWN_PRICE;
+const UNKNOWN_PRICE: Price = Price::new(crate::math::image::market::UNKNOWN_PRICE);
 /// A purchase costs at least this (`DAT_142f66f34`).
 const LEAST_COST: f32 = crate::math::image::market::LEAST_COST;
 /// A sale's gold rounds half up (`DAT_142e7f384`).
@@ -67,10 +67,10 @@ impl Market {
     /// The commodity of attribute `commodity` with its starting price, none for another.
     const fn commodity(&mut self, commodity: AttributeId) -> Option<(&mut Commodity, Price)> {
         match commodity {
-            attribute::FOOD => Some((&mut self.food, Price::new(FOOD_START))),
-            attribute::WOOD => Some((&mut self.wood, Price::new(WOOD_START))),
-            attribute::STONE => Some((&mut self.stone, Price::new(STONE_START))),
-            attribute::ORE => Some((&mut self.ore, Price::new(ORE_START))),
+            attribute::FOOD => Some((&mut self.food, FOOD_START)),
+            attribute::WOOD => Some((&mut self.wood, WOOD_START)),
+            attribute::STONE => Some((&mut self.stone, STONE_START)),
+            attribute::ORE => Some((&mut self.ore, ORE_START)),
             _ => None,
         }
     }
@@ -83,7 +83,7 @@ impl Market {
             attribute::WOOD => self.wood.price,
             attribute::STONE => self.stone.price,
             attribute::ORE => self.ore.price,
-            _ => Price::new(UNKNOWN_PRICE),
+            _ => UNKNOWN_PRICE,
         }
     }
 

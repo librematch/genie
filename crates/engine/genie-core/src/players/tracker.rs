@@ -97,7 +97,7 @@ impl ListKey {
 }
 
 /// The keys run below this master id (`FUN_141658430`: 9000 or more is none).
-const TRACKED_MASTERS: i16 = 9000;
+const TRACKED_MASTERS: MasterId = MasterId::named(9000);
 /// The classes a key holds below this (`FUN_141658430`).
 const CLASSES: i16 = 100;
 /// The classes that count as done from the start (packed and unpacked siege, 51 and 54).
@@ -180,7 +180,7 @@ impl Key {
 /// not wait.
 #[must_use]
 pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId) -> Key {
-    let get = |id: MasterId| masters?.get(id).filter(|_| id.get() < TRACKED_MASTERS);
+    let get = |id: MasterId| masters?.get(id).filter(|_| id < TRACKED_MASTERS);
     let Some(m) = get(master) else {
         return Key::NONE;
     };

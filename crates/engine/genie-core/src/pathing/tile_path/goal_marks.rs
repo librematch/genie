@@ -16,7 +16,7 @@ pub struct Request {
     pub to: Point,
     /// The unit's and its target's radii, and how near the goal counts as there (the path
     /// level's range).
-    pub radii: f32,
+    pub radii: Distance,
     /// How near the goal counts as there (the path level's range).
     pub range: Distance,
     /// Rectangles of tiles closed for this search.
@@ -30,7 +30,7 @@ pub struct Request {
 pub(super) struct Goal {
     pub(super) x: f32,
     pub(super) y: f32,
-    pub(super) radii: f32,
+    pub(super) radii: Distance,
     pub(super) range: Distance,
 }
 
@@ -55,6 +55,7 @@ impl Planner {
     /// one of its passable (or lone) tiles, measured from the tile's corner.
     pub(super) fn in_range(&self, level: GridLevel, cell: PlanTile, goal: Goal) -> bool {
         let Goal { x, y, radii, range } = goal;
+        let radii = radii.get();
         if !self.region.holds_at(level, cell) {
             return false;
         }
@@ -94,7 +95,7 @@ impl Planner {
     /// goal ± the radii and the range (+ 1 when the range is below 1); the far sides grow by `far`.
     pub(super) fn goal_square(&mut self, goal: Goal, far: f32) {
         let Goal { x, y, radii, range } = goal;
-        let mut r = radii + range.get();
+        let mut r = (radii + range).get();
         if range < Distance::new(ONE) {
             r += ONE;
         }

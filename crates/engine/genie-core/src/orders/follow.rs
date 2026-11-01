@@ -410,7 +410,7 @@ impl World {
             here,
             mover,
             (target, t_state),
-            Distance::new(range),
+            range,
             (sprite, livestock),
         )?;
         if move_to.shows_standing() {

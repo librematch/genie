@@ -101,7 +101,7 @@ impl Mover {
             let req = Request {
                 from: Point::new(x, y),
                 to,
-                radii: radius.x() + target_radius,
+                radii: Distance::new(radius.x() + target_radius),
                 range: if bonus { range + WIDE_RANGE } else { range },
                 closed: Vec::new(),
                 full: false,
@@ -272,7 +272,7 @@ impl Mover {
         now: WorldTime,
         planned: bool,
     ) {
-        let repath_time = self.paths.first().map_or(0.0, |l| l.repath_time);
+        let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
         self.paths = vec![PathData {
             level: if planned {
                 WaypointLevel::TOP
@@ -362,7 +362,7 @@ impl Mover {
         } else {
             path_flags & !PathFlags::BACK_AND_FORTH
         };
-        let repath_time = self.paths.first().map_or(0.0, |l| l.repath_time);
+        let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
         self.paths = vec![PathData {
             level: WaypointLevel::TOP,
             points: path.points,
@@ -380,11 +380,11 @@ impl Mover {
         }];
     }
 
-    /// Slot 0x448 (`FUN_14114e920`): a waypoint of the unit's own at `x`, `y` and height `z`,
+    /// Slot 0x448 (`FUN_14114e920`): a waypoint of the unit's own at `at` (x, y and height z),
     /// held as (x, height, y); an x or y less than 1e-7 above a whole number (`floorf`, `COMISS`,
     /// `JBE`: not a NaN) moves to that tile's middle. Its array's growth (5, then twice) fails only
     /// without memory.
-    pub fn add_user_waypoint(&mut self, x: f32, y: f32, z: f32) {
+    pub fn add_user_waypoint(&mut self, at: Position) {
         let snap = |v: f32| {
             let whole = libm::floorf(v);
             if (v - whole).abs() < EPSILON {
@@ -393,7 +393,8 @@ impl Mover {
                 v
             }
         };
-        self.user_waypoints.push(BVector::new(snap(x), z, snap(y)));
+        self.user_waypoints
+            .push(BVector::new(snap(at.x()), at.z(), snap(at.y())));
     }
 
     /// Slot 0x450 (`FUN_141070ce0`): the unit's own waypoints go (their count `+0x7fc` 0).

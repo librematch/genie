@@ -428,22 +428,18 @@ impl World {
                 refill = true;
             } else if crate::math::fmath::at_most_or_unordered(
                 g.total_spacing.get(),
-                RELAYOUT_SPACING,
+                RELAYOUT_SPACING.get(),
             ) {
                 g.flags |= GroupFlags::RELAYOUT_SPREAD;
             } else {
                 relayout = true;
             }
         }
-        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD) && RELAYOUT_SPACING < g.total_spacing.get()
-        {
+        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD) && RELAYOUT_SPACING < g.total_spacing {
             relayout = true;
             g.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
         }
-        if g.flags.contains(GroupFlags::RELAYOUT)
-            && RELAYOUT_SPACING < g.total_spacing.get()
-            && idle
-        {
+        if g.flags.contains(GroupFlags::RELAYOUT) && RELAYOUT_SPACING < g.total_spacing && idle {
             g.flags &= !GroupFlags::RELAYOUT;
             relayout = true;
         }
