@@ -31,6 +31,7 @@ pub use self::fixed_point::FixedPoint;
 pub use self::fixed_rect::FixedRect;
 pub use self::shape_id::ShapeId;
 pub use self::shape_side::ShapeSide;
+pub use self::short_found::ShortFound;
 
 mod fixed_distance;
 mod fixed_point;
@@ -40,6 +41,7 @@ pub mod long_path;
 pub mod mesh;
 mod shape_id;
 mod shape_side;
+mod short_found;
 pub mod short_path;
 pub mod tile_path;
 pub mod zones;
@@ -423,6 +425,47 @@ mod tests {
     use crate::objects::masters::class;
     use crate::objects::masters::ids;
     use crate::test_ids::object_id;
+
+    /// A short path's result keeps the game's code, and the tests its readers make by code:
+    /// `result < 2` reaches, 1 and 2 lead on, 3 and 4 fail.
+    #[test]
+    fn a_short_path_result_reads_by_the_game_s_code() {
+        let all = [
+            ShortFound::InRange,
+            ShortFound::Reached,
+            ShortFound::Partial,
+            ShortFound::Blocked,
+            ShortFound::Invalid,
+        ];
+        assert_eq!(all.map(ShortFound::code), [0, 1, 2, 3, 4]);
+        assert_eq!(
+            all.map(ShortFound::reaches),
+            [true, true, false, false, false]
+        );
+        assert_eq!(
+            all.map(ShortFound::leads),
+            [false, true, true, false, false]
+        );
+        assert_eq!(
+            all.map(ShortFound::fails),
+            [false, false, false, true, true]
+        );
+    }
+
+    /// A fixed-point length adds and subtracts as the game's 32-bit words, wrapping.
+    #[test]
+    fn a_fixed_distance_wraps_as_a_32_bit_word() {
+        let a = FixedDistance::new(i32::MAX);
+        assert_eq!(
+            a.wrapping_add(FixedDistance::TILE).get(),
+            i32::MIN + ONE - 1
+        );
+        assert_eq!(
+            FixedDistance::ZERO.wrapping_sub(FixedDistance::TILE).get(),
+            -ONE
+        );
+        assert!(FixedDistance::ZERO < FixedDistance::TILE);
+    }
 
     /// `FUN_14165d6f0`: no budget once the plans reached a set attempt cap, unless the walker
     /// waited more often than a set delay cap allows; caps of -1 never stop a plan. A plan counts

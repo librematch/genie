@@ -74,7 +74,7 @@ pub fn quick_reach_from(
     // the slot removes the manager's temporary tile records after (FUN_1410561f0), which the
     // quick path's exit leaves
     world.clear_tile_records();
-    Ok((result < 2).then(|| path.length()))
+    Ok(result.reaches().then(|| path.length()))
 }
 
 impl<'w> HullPather<'w> {

@@ -44,6 +44,7 @@ members' steering (`groups/steer/`) ask the same planners.
 | [`mod.rs`](mod.rs) | Finding a way: the planners of the paths that units walk, from the tile pathfinder over the whole map to the short pathers around the obstructions near a unit. |
 | [`shape_id.rs`](shape_id.rs) | A shape's id in the obstruction manager's mesh. |
 | [`shape_side.rs`](shape_side.rs) | A side of a shape in the obstruction manager's mesh. |
+| [`short_found.rs`](short_found.rs) | What a short path search returns (`ShortFound`). |
 | [`zones.rs`](zones.rs) | The map's zones (`RGE_Zone_Map`, made by `FUN_141410680`, labelled by `FUN_141413190`): every tile gets the number of the patch of tiles it belongs to, a patch being the tiles a 4-way flood reaches over tiles that are, like its first, passable or not for a terrain restriction (its value for the tile's terrain, map tile `+0x9`, above 0). |
 | [`hull_path/`](hull_path/) | The obstruction manager's old short pather (`MShortPather`, the names of the `AoK HD` PDB; build 158041's `FindShortPath` is `FUN_140f85580`): a search around convex hulls of the obstructions near a straight walk: the short path of a unit wider than half a tile (`FUN_140f9e540`'s dispatch, `crate::movement::short_path_for`) and the length of a unit's short path to an object (slot 0x3e8). |
 | [`short_path/`](short_path/) | The short pather (`FUN_140f9e540` -> `FUN_140fa53d0`): a fixed-point any-angle search around the shapes of the obstruction manager's `Mesh`, for the path a unit walks next. |

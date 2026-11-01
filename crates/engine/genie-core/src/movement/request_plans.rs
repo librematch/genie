@@ -19,6 +19,7 @@ use crate::movement::{
     short_range, too_short,
 };
 use crate::objects::ObjectId;
+use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Path;
 
 /// The new level and its path, and what the request's planners found: a path (`local_19d0`),
@@ -151,7 +152,7 @@ impl Mover {
         }
         let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end);
         let r = self.short_path_to(me, world, plan, w, near, np)?;
-        if r != 1 || np.path.length.get() <= EPSILON {
+        if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
             np.failed = true;
             np.path.points.clear();
             return Ok(false);
@@ -221,7 +222,7 @@ impl Mover {
         w: &Way<'_>,
         near: bool,
         np: &mut NewPath,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<ShortFound, GenieError> {
         let line = ground_line(self.moved_at, w.waypoint);
         let ignore = self.ignore_list(me, world, plan, w.goal.target, line)?;
         let ask = ShortAsk {
@@ -296,9 +297,9 @@ impl Mover {
         np.path.points.clear();
         let r = self.short_path_to(me, world, plan, w, near, np)?;
         let length = np.path.length.get();
-        let blocked = r == 3
-            || r == 4
-            || length <= EPSILON && (r != 0 || (1 < np.path.points.len() && EPSILON <= length));
+        let blocked = r.fails()
+            || length <= EPSILON
+                && (r != ShortFound::InRange || (1 < np.path.points.len() && EPSILON <= length));
         if blocked {
             // far from its end (LONG < to_end) the game tells the units ahead to make way
             // (FUN_140f8a230, FUN_140f88750), which return at once: their switch is a zeroed
@@ -309,7 +310,7 @@ impl Mover {
             return self.waypoint_in_range(w, plan.now).map(Some);
         }
         np.found = true;
-        np.partial = r == 2;
+        np.partial = r == ShortFound::Partial;
         let last = point_or_zero(&np.path, np.path.points.len() as i32 - 1);
         np.end_gap = ground(w.waypoint, last);
         Ok(None)

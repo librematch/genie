@@ -5,8 +5,7 @@ use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
 use crate::groups::steer::{
-    BLOCKED, EPSILON, OFF_MAP, PARTIAL, REACHED, ROUND_LENGTH, ROUND_RADIUS, ROUND_REACH,
-    ROUND_STILL, ROUND_TIMER,
+    EPSILON, ROUND_LENGTH, ROUND_RADIUS, ROUND_REACH, ROUND_STILL, ROUND_TIMER,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -16,7 +15,8 @@ use crate::map::Position;
 use crate::math::fmath::{BVector, at_most_or_unordered};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
-use crate::pathing::tile_path::Path;
+use crate::pathing::ShortFound;
+use crate::pathing::tile_path::{Found, Path};
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
@@ -130,19 +130,19 @@ impl World {
     ) -> Result<(Way, bool), GenieError> {
         let mut way = Way {
             record: Path::default(),
-            result: BLOCKED,
+            result: ShortFound::Blocked,
             planned: false,
             goal: to,
         };
         self.round_to_slot(r, to, &mut way)?;
-        if way.result != REACHED {
+        if way.result != ShortFound::Reached {
             self.round_one_step(r, to, forward, &mut way)?;
-            if !matches!(way.result, REACHED | PARTIAL) {
+            if !way.result.leads() {
                 self.round_to_place(r, place, &mut way)?;
             }
         }
-        let mut serves = matches!(way.result, REACHED | PARTIAL);
-        if matches!(way.result, BLOCKED | OFF_MAP) {
+        let mut serves = way.result.leads();
+        if way.result.fails() {
             serves = self.round_long_way(r, to, &mut way)?;
         }
         Ok((way, serves))
@@ -219,13 +219,14 @@ impl World {
                 way.record.points.clear();
             } else {
                 way.result = res;
-                served = !matches!(res, BLOCKED | OFF_MAP);
+                served = !res.fails();
             }
         }
         if !served
-            && let Some(res) = self.round_plan(r.restriction, r.at.ground(), to, &mut way.record)?
+            && let Some(found) =
+                self.round_plan(r.restriction, r.at.ground(), to, &mut way.record)?
         {
-            way.result = res;
+            way.result = planned_as_short(found);
             way.planned = true;
         }
         Ok(())
@@ -266,18 +267,18 @@ impl World {
             // a long path found is measured once and taken as it is
             way.record.measure();
             if found {
-                way.result = REACHED;
+                way.result = ShortFound::Reached;
                 reached = true;
             }
         }
         // COMISS with JA (a NaN length passes), then JNC
         if !reached
-            && (way.result != REACHED
+            && (way.result != ShortFound::Reached
                 || ROUND_LENGTH < way.record.length
                 || way.record.points.len() < 2
                 || at_most_or_unordered(way.record.length.get(), EPSILON))
         {
-            way.result = BLOCKED;
+            way.result = ShortFound::Blocked;
             way.record.points.clear();
         }
         Ok(())
@@ -310,13 +311,13 @@ impl World {
             )?;
             if way.record.points.len() < 2 || at_most_or_unordered(way.record.length.get(), EPSILON)
             {
-                way.result = BLOCKED;
+                way.result = ShortFound::Blocked;
                 way.record.points.clear();
             }
-        } else if let Some(res) =
+        } else if let Some(found) =
             self.round_plan(r.restriction, r.at.ground(), place, &mut way.record)?
         {
-            way.result = res;
+            way.result = planned_as_short(found);
             way.planned = true;
         }
         Ok(())
@@ -354,7 +355,7 @@ impl World {
         to: BVector,
         ignore: &[ObjectId],
         record: &mut Path,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<ShortFound, GenieError> {
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -410,7 +411,7 @@ impl World {
         from: Point,
         to: BVector,
         record: &mut Path,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<Found>, GenieError> {
         let tiles = self.spatial.tiles();
         let Some(planner) = self.pathing.planner(restriction, tiles) else {
             return Ok(None);
@@ -425,7 +426,7 @@ impl World {
             full: false,
         };
         let found = planner.plan::<GenieError>(&req, false, record, None)?;
-        Ok(Some(found.code()))
+        Ok(Some(found))
     }
 }
 
@@ -459,11 +460,24 @@ impl Rounder<'_> {
     }
 }
 
+/// The tile planner's result as the way round keeps it, in the short pather's integer, read by
+/// its code: the goal (1) as reached, the nearest node (2) as partial, nothing (3) as blocked
+/// and off the map (0) as in range.
+pub(super) const fn planned_as_short(found: Found) -> ShortFound {
+    match found {
+        Found::OffMap => ShortFound::InRange,
+        Found::Goal => ShortFound::Reached,
+        Found::Nearest => ShortFound::Partial,
+        Found::Nothing => ShortFound::Blocked,
+    }
+}
+
 /// The way round found so far: the record's path (a new path record, `FUN_14152eea0`), the
-/// pather's result, whether the tile planner made it, and where the member goes.
+/// pather's result (the tile planner's read as the short pather's, [`planned_as_short`]),
+/// whether the tile planner made it, and where the member goes.
 struct Way {
     record: Path,
-    result: u8,
+    result: ShortFound,
     planned: bool,
     goal: BVector,
 }

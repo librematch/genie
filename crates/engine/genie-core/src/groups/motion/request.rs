@@ -20,6 +20,7 @@ use crate::movement::{
     LongWalker, PathData, TileAsk, long_path_for, short_path_for, tile_plan_for,
 };
 use crate::objects::ObjectId;
+use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Path;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
@@ -233,7 +234,7 @@ fn short_plan(
         .group
         .as_ref()
         .map_or_else(|| vec![lead.walker.id], |g| g.differentiator_units.clone());
-    let mut r = 0;
+    let mut r = ShortFound::InRange;
     if lead.solid {
         let mut planning = world.plan.reborrow();
         planning.computer = lead.computer;
@@ -249,14 +250,15 @@ fn short_plan(
     }
     plan.path.measure();
     plan.has_plan = plan.found;
-    if r == 3 || r == 4 {
+    if r.fails() {
         return Ok(None);
     }
     if EPSILON < plan.path.length.get() && 1 < plan.path.points.len() {
         (plan.found, plan.has_plan) = (true, true);
         return Ok(None);
     }
-    if r != 0 || !(plan.path.points.len() < 2 || plan.path.length.get() < EPSILON) {
+    if r != ShortFound::InRange || !(plan.path.points.len() < 2 || plan.path.length.get() < EPSILON)
+    {
         return Ok(None);
     }
     let reach = if target.is_none() || Distance::ZERO < leg.range {

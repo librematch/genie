@@ -20,6 +20,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::pathing::FixedPoint;
+use crate::pathing::ShortFound;
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Path, Request};
 use crate::world::WorldTime;
@@ -278,7 +279,7 @@ impl Mover {
 
     /// The short pather (`FUN_140f9e540`) from the unit to `to` with the ignore and include
     /// lists `lists`, the owner's number for the player ([`short_path_including`]), into `out`;
-    /// returns its result (0 in range, 1 reached, 2 partial, 3 blocked, 4 invalid).
+    /// returns its result.
     pub(super) fn short_path(
         &self,
         me: &Me,
@@ -286,7 +287,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: ShortAsk<'_>,
         out: &mut Path,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<ShortFound, GenieError> {
         let walker = self.walker(me.id);
         // from +0x824: the motion step's `local_18c8`, the reach test's start (FUN_14114fea0)
         short_path_including(
@@ -416,7 +417,7 @@ impl Mover {
         let (result, path) = pather.find(self.position().ground(), to, Some(target), range)?;
         // the slot removes the manager's temporary tile records after (FUN_1410561f0)
         world.clear_tile_records();
-        Ok((result < 2).then(|| path.length()))
+        Ok(result.reaches().then(|| path.length()))
     }
 
     /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no

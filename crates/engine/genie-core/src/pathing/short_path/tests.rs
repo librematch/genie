@@ -4,6 +4,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::TerrainMask;
+use crate::pathing::ShortFound;
 use crate::test_ids::object_id;
 
 /// A search on an empty mesh toward a point target at `at` within `range` (fixed point), its
@@ -488,7 +489,7 @@ fn the_entry_s_float_tests_take_the_game_s_nan_paths() {
 /// A search on a 32-tile mesh holding `walls` (tiles, `[x0, y0, x1, y1]`) from `from` to `to`
 /// (tiles) with a radius of a quarter tile; the path's points in tiles. With `ignored`, every
 /// wall is ignored.
-fn around(walls: &[[f32; 4]], from: Point, to: Point, ignored: bool) -> (u8, Vec<Point>) {
+fn around(walls: &[[f32; 4]], from: Point, to: Point, ignored: bool) -> (ShortFound, Vec<Point>) {
     let fixed = |v: f32| (v * ONE as f32) as i32;
     let mut mesh = Mesh::new(32);
     let ids: Vec<ShapeId> = walls
@@ -533,7 +534,7 @@ fn a_path_bends_round_a_wall_at_its_nearer_end() {
     assert_eq!(
         around(&wall, Point::new(6.5, 8.5), Point::new(14.5, 8.5), false),
         (
-            1,
+            ShortFound::Reached,
             vec![
                 Point::new(6.5, 8.5),
                 Point::new(10.25, 11.75),
@@ -545,7 +546,7 @@ fn a_path_bends_round_a_wall_at_its_nearer_end() {
     assert_eq!(
         around(&wall, Point::new(6.5, 8.5), Point::new(14.5, 8.5), true),
         (
-            1,
+            ShortFound::Reached,
             vec![
                 Point::new(6.5, 8.5),
                 Point::new(6.5, 8.5),
@@ -568,7 +569,7 @@ fn a_path_leaves_a_u_by_its_open_side() {
     assert_eq!(
         around(&u, Point::new(6.5, 8.5), Point::new(14.5, 8.5), false),
         (
-            1,
+            ShortFound::Reached,
             vec![
                 Point::new(6.5, 8.5),
                 Point::new(4.25, 11.25),
@@ -592,11 +593,14 @@ fn a_goal_shut_in_a_box_gives_a_partial_path_to_its_nearest_point() {
     ];
     assert_eq!(
         around(&walls, Point::new(6.5, 8.5), Point::new(12.5, 8.5), false),
-        (2, vec![Point::new(6.5, 8.5), Point::new(10.25, 8.5)])
+        (
+            ShortFound::Partial,
+            vec![Point::new(6.5, 8.5), Point::new(10.25, 8.5)]
+        )
     );
     assert_eq!(
         around(&walls, Point::new(6.5, 8.5), Point::new(12.5, 8.5), true).0,
-        1
+        ShortFound::Reached
     );
 }
 
@@ -606,7 +610,7 @@ fn a_goal_shut_in_a_box_gives_a_partial_path_to_its_nearest_point() {
 fn a_path_past_staggered_walls_bends_only_at_their_corners() {
     let walls = [[10.0, 4.0, 11.0, 9.0], [12.0, 8.0, 13.0, 14.0]];
     let (result, points) = around(&walls, Point::new(6.5, 6.5), Point::new(16.5, 12.5), false);
-    assert_eq!(result, 1);
+    assert_eq!(result, ShortFound::Reached);
     assert_eq!(points.first(), Some(&Point::new(6.5, 6.5)));
     assert_eq!(points.last(), Some(&Point::new(16.5, 12.5)));
     let corners = [
@@ -642,9 +646,9 @@ fn the_search_truncates_its_radius_and_range_to_fixed_point() {
     let mut mesh = Mesh::new(16);
     let mut pather = Pather::default();
     let found = pather.search(&mut mesh, &words, &range_query(Distance::new(1.75)), &[]);
-    assert_eq!(found.map(|f| f.result), Ok(0));
+    assert_eq!(found.map(|f| f.result), Ok(ShortFound::InRange));
     let found = pather.search(&mut mesh, &words, &range_query(Distance::new(below)), &[]);
-    assert_eq!(found.map(|f| f.result), Ok(1));
+    assert_eq!(found.map(|f| f.result), Ok(ShortFound::Reached));
 }
 
 /// A square outline of four tiles' side at the origin, its sides 0 to 3 in turn (with `run`,

@@ -20,6 +20,7 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::ID_45;
+use crate::pathing::ShortFound;
 use crate::players::ByPlayer;
 use crate::players::relation_row;
 use crate::test_ids::group_id;
@@ -567,7 +568,11 @@ fn a_big_unit_s_short_path_takes_the_old_pather() {
             Distance::ZERO,
         )
         .unwrap();
-    assert_eq!((r, result), (Ok(1), 1), "{path:?}");
+    assert_eq!(
+        (r, result),
+        (Ok(ShortFound::Reached), ShortFound::Reached),
+        "{path:?}"
+    );
     let points: Vec<BVector> = path
         .points
         .iter()
@@ -585,7 +590,7 @@ fn a_big_unit_s_short_path_takes_the_old_pather() {
         &[object_id(9171)],
         &mut out,
     );
-    assert_eq!((r, out.points.len()), (Ok(4), 0));
+    assert_eq!((r, out.points.len()), (Ok(ShortFound::Invalid), 0));
     let small = Walker {
         radius: Distance::new(0.5),
         ..walker

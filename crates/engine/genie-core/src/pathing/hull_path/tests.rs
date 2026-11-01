@@ -13,6 +13,7 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
+use crate::pathing::ShortFound;
 use crate::pathing::hull_path::rounds::Rounds;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
@@ -240,7 +241,7 @@ fn the_quick_path_goes_around_one_square_obstruction() {
             Distance::new(0.1),
         )
         .unwrap();
-    assert_eq!(result, 1);
+    assert_eq!(result, ShortFound::Reached);
     // by the tree's lower side: (half side + radius) √2 below its middle
     let [start, by, end] = path.points[..] else {
         panic!("{path:?}")
@@ -405,7 +406,7 @@ fn find_short_path_removes_its_tile_records_but_on_its_quick_only_exit() {
             Distance::ZERO,
         )
         .unwrap();
-    assert_eq!(result, 3);
+    assert_eq!(result, ShortFound::Blocked);
     assert!(
         w.tile_records().contains(&Tile::new(8, 5)),
         "{:?}",
@@ -427,7 +428,7 @@ fn find_short_path_removes_its_tile_records_but_on_its_quick_only_exit() {
             Distance::ZERO,
         )
         .unwrap();
-    assert_ne!(result, 1);
+    assert_ne!(result, ShortFound::Reached);
     assert_eq!(w.tile_records(), Vec::<Tile>::new());
     // slot 0x3e0 removes what its quick path left
     assert_eq!(
@@ -1669,7 +1670,7 @@ fn the_pather_s_float_tests_take_the_game_s_nan_paths() {
             Point::new(9.0, 9.0),
             Distance::new(0.5)
         ),
-        2
+        ShortFound::Partial
     );
     assert_eq!(path.points.len(), 2);
 }
@@ -1745,7 +1746,7 @@ fn the_hull_search_goes_around_a_wall_to_the_target() {
     let x = 11.8 - NUDGE;
     assert_eq!(p.hulls[1].entrances, [-1, -1, -1, 2, 0, 1, 3, -1]);
     assert_eq!(p.hulls[1].points[3].x(), x);
-    assert_eq!(result, 1);
+    assert_eq!(result, ShortFound::Reached);
     assert_eq!(
         path.points[..3],
         [
@@ -1797,7 +1798,7 @@ fn a_start_inside_a_hull_leaves_it_by_its_exit_paths() {
     );
     let starts: Vec<Point> = p.entrances.iter().map(|e| e.points[0]).collect();
     assert_eq!(starts, [Point::new(12.5, 5.5); 4]);
-    assert_eq!(result, 1);
+    assert_eq!(result, ShortFound::Reached);
     assert_eq!(
         path.points[..5],
         [
@@ -2088,7 +2089,10 @@ fn a_goal_at_the_map_s_edge_needs_its_target_on_it() {
         .unwrap();
     assert_eq!(
         (result, path.points),
-        (1, vec![Point::new(15.0, 5.5), Point::new(19.9, 5.5)])
+        (
+            ShortFound::Reached,
+            vec![Point::new(15.0, 5.5), Point::new(19.9, 5.5)]
+        )
     );
     assert_eq!(p.bounds, Rect::new(0.2, 0.2, 19.8, 19.8));
     // no target, a target elsewhere, a goal off the map
@@ -2101,7 +2105,7 @@ fn a_goal_at_the_map_s_edge_needs_its_target_on_it() {
         )
         .unwrap()
         .0,
-        4
+        ShortFound::Invalid
     );
     assert_eq!(
         p.find(
@@ -2112,7 +2116,7 @@ fn a_goal_at_the_map_s_edge_needs_its_target_on_it() {
         )
         .unwrap()
         .0,
-        4
+        ShortFound::Invalid
     );
     assert_eq!(
         p.find(
@@ -2123,7 +2127,7 @@ fn a_goal_at_the_map_s_edge_needs_its_target_on_it() {
         )
         .unwrap()
         .0,
-        4
+        ShortFound::Invalid
     );
     assert_eq!(p.bounds, Rect::new(0.0, 0.0, 20.0, 20.0));
 }
@@ -2190,7 +2194,7 @@ fn a_kept_search_reuses_the_last_area_and_hulls() {
         .unwrap();
     assert_eq!(
         (result, p.area, p.hulls.len()),
-        (3, TileRect::new(0, 2, 14, 8), 0)
+        (ShortFound::Blocked, TileRect::new(0, 2, 14, 8), 0)
     );
     // not kept: the area and the hulls anew
     let (result, _) = p
@@ -2203,7 +2207,7 @@ fn a_kept_search_reuses_the_last_area_and_hulls() {
         .unwrap();
     assert_eq!(
         (result, p.area, p.hulls.len()),
-        (1, TileRect::new(0, 3, 14, 7), 2)
+        (ShortFound::Reached, TileRect::new(0, 3, 14, 7), 2)
     );
 }
 
@@ -2258,7 +2262,7 @@ fn a_node_beyond_the_area_grows_it_once() {
         (p.hulls[0].min, p.hulls[0].max),
         (Point::new(5.8, 2.8), Point::new(7.2, 9.2))
     );
-    assert_eq!(result, 1);
+    assert_eq!(result, ShortFound::Reached);
     assert_eq!(
         path.points,
         [
@@ -2359,7 +2363,7 @@ fn a_walk_to_a_point_goes_around_a_wall_without_a_target() {
             Distance::ZERO,
         )
         .unwrap();
-    assert_eq!(result, 1);
+    assert_eq!(result, ShortFound::Reached);
     assert_eq!(
         path.points,
         [
@@ -2385,7 +2389,7 @@ fn a_walk_to_a_point_goes_around_a_wall_without_a_target() {
             Distance::ZERO
         )
         .unwrap(),
-        (1, path)
+        (ShortFound::Reached, path)
     );
 }
 
@@ -2415,7 +2419,7 @@ fn a_goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
             Distance::ZERO,
         )
         .unwrap();
-    assert_eq!(result, 2);
+    assert_eq!(result, ShortFound::Partial);
     let end = *path.points.last().unwrap();
     let t = Target {
         at: Point::new(10.5, 5.5),
@@ -2441,7 +2445,7 @@ fn a_goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
         .unwrap();
     assert_eq!(
         (result, path.points.last()),
-        (1, Some(&Point::new(10.6, 5.5)))
+        (ShortFound::Reached, Some(&Point::new(10.6, 5.5)))
     );
     // a second object holding the goal
     w.insert(
@@ -2510,7 +2514,10 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         .unwrap();
     assert_eq!(
         (result, path.points),
-        (1, vec![Point::new(2.0, 5.5), Point::new(10.0, 5.5)])
+        (
+            ShortFound::Reached,
+            vec![Point::new(2.0, 5.5), Point::new(10.0, 5.5)]
+        )
     );
     let mut p = HullPather::for_list(
         &mut w,
@@ -2545,7 +2552,11 @@ fn an_included_moving_unit_blocks_the_line_tests() {
     };
     assert_eq!(
         (result, start, end),
-        (1, Point::new(2.0, 5.5), Point::new(10.0, 5.5))
+        (
+            ShortFound::Reached,
+            Point::new(2.0, 5.5),
+            Point::new(10.0, 5.5)
+        )
     );
     assert!((by.x() - 6.0).abs() < 1e-5 && (by.y() - (5.5 - off)).abs() < 1e-5);
     let mut q = HullPather::for_list(
@@ -2684,7 +2695,10 @@ fn a_unit_within_range_needs_no_path() {
             Distance::new(0.1),
         )
         .unwrap();
-    assert_eq!((result, path.length()), (0, Distance::ZERO));
+    assert_eq!(
+        (result, path.length()),
+        (ShortFound::InRange, Distance::ZERO)
+    );
 }
 
 /// The triangle hull (5, 6), (5, 4), (4, 5) crossed on its edge 1 by a node at `at` (the
@@ -2907,17 +2921,17 @@ fn an_unfound_search_ends_at_the_node_or_the_walk_nearer_the_goal() {
     let to_node = [Point::new(2.0, 5.0), Point::new(6.0, 5.0)];
     for walk in [&[Point::new(2.0, 5.0), Point::new(4.0, 5.0)][..], &[]] {
         let mut path = walked(walk);
-        assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(2));
+        assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(ShortFound::Partial));
         assert_eq!(path.points, to_node);
     }
     let mut path = walked(&[Point::new(2.0, 5.0), Point::new(8.0, 5.0)]);
-    assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(2));
+    assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(ShortFound::Partial));
     assert_eq!(path.points, [Point::new(2.0, 5.0), Point::new(8.0, 5.0)]);
     rounds.best_node = None;
     let mut path = walked(&[Point::new(2.0, 5.0), Point::new(8.0, 5.0)]);
-    assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(2));
+    assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(ShortFound::Partial));
     rounds.within = false;
-    assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(3));
+    assert_eq!(p.path_end(&q, &rounds, &mut path), Ok(ShortFound::Blocked));
 }
 
 /// A start and a goal in the same hull (the object 48's grown box): the round walks within the
@@ -2950,13 +2964,19 @@ fn a_goal_in_the_start_s_hull_is_walked_to_within_it() {
         .unwrap();
     assert_eq!(
         (result, path.points),
-        (1, vec![Point::new(4.9, 5.5), side, Point::new(4.85, 6.15)])
+        (
+            ShortFound::Reached,
+            vec![Point::new(4.9, 5.5), side, Point::new(4.85, 6.15)]
+        )
     );
     let to = Point::new(6.1, 5.5);
     let (result, path) = p
         .find(Point::new(4.9, 5.5), to, None, Distance::ZERO)
         .unwrap();
-    assert_eq!((result, path.points), (2, vec![Point::new(4.9, 5.5), side]));
+    assert_eq!(
+        (result, path.points),
+        (ShortFound::Partial, vec![Point::new(4.9, 5.5), side])
+    );
     let q = HullQuery {
         from: Point::new(4.9, 5.5),
         to,

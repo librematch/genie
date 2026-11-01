@@ -17,7 +17,7 @@ use crate::movement::{
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::short_path::{Call, Entry, Listed};
 use crate::pathing::tile_path::{Path, Request};
-use crate::pathing::{Pathing, PlanBudget};
+use crate::pathing::{Pathing, PlanBudget, ShortFound};
 use crate::{GenieError, math::fmath, pathing::short_path};
 
 /// How a step relates to its waypoint (slot 196, `0x14114f400`).
@@ -337,7 +337,7 @@ pub(crate) fn short_path_for(
     goal: (BVector, Distance, Option<ObjectId>),
     ignore: &[ObjectId],
     out: &mut Path,
-) -> Result<u8, GenieError> {
+) -> Result<ShortFound, GenieError> {
     let player = owner_number(world, walker.id);
     let (to, range, target) = goal;
     let ask = ShortAsk {
@@ -360,12 +360,12 @@ pub(super) fn owner_number(world: &Spatial, id: ObjectId) -> i32 {
 /// `range` of `target` (the game's -1 for none), `ignore` its ignore list (arguments 6 and 7), `include`
 /// the objects the old pather tests even moving (8 and 9), `player` the owner's number (13).
 /// A start within range of the target (`FUN_14118faf0` less the radius) empties `out` and
-/// returns 0; else `out` empties (`+0x440 = +0x438`) and an end off the map returns 4. A unit
+/// returns in range; else `out` empties (`+0x440 = +0x438`) and an end off the map returns invalid. A unit
 /// wider than half a tile ([`old_pather_for`]) takes the old pather (`FUN_140f89e40` with the
 /// ignore list and the restriction's mask, then `FUN_140f85580` from `from` to `to` with the
 /// radius, the target, the range, the player and the include list, its argument 11 0:
 /// [`HullPather::find`]), whose waypoints `out` takes at height 0; else the new one. Returns
-/// the result (0 in range, 1 reached, 2 partial, 3 blocked, 4 invalid). The path's creation
+/// the result. The path's creation
 /// time (`+8`, the world's time, set past the map tests) is the caller's.
 ///
 /// # Errors
@@ -379,7 +379,7 @@ pub(crate) fn short_path_including(
     ask: ShortAsk<'_>,
     player: i32,
     out: &mut Path,
-) -> Result<u8, GenieError> {
+) -> Result<ShortFound, GenieError> {
     let ShortAsk {
         goal: to,
         range,
@@ -424,11 +424,11 @@ pub(crate) fn short_path_including(
     let (query, shapes) = match call.entry() {
         Entry::InRange => {
             out.points.clear();
-            return Ok(0);
+            return Ok(ShortFound::InRange);
         }
         Entry::Invalid => {
             out.points.clear();
-            return Ok(4);
+            return Ok(ShortFound::Invalid);
         }
         Entry::Search { query, ignore } => (query, ignore),
     };

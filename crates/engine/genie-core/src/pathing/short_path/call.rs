@@ -10,6 +10,7 @@ use crate::objects::ObjectId;
 use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::ShapeId;
+use crate::pathing::ShortFound;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::short_path::{
     Ctx, FixedPoint, Goal, NodeIndex, Search, TO_FIXED, TO_FLOAT, clip, tile_of,
@@ -74,8 +75,8 @@ pub(super) struct Fixed {
 /// fixed point (the game appends them as floats, `{x, 0, y}`, through the path's own dedup).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ShortPath {
-    /// 0 already in range, 1 reached, 2 a partial path, 3 the start blocked, 4 invalid.
-    pub result: u8,
+    /// The search's result.
+    pub result: ShortFound,
     /// The path's points.
     pub points: Vec<FixedPoint>,
 }
@@ -411,7 +412,7 @@ impl Pather {
             hold_high(if gy < sy { sy } else { gy }),
         );
         let invalid = ShortPath {
-            result: 4,
+            result: ShortFound::Invalid,
             points: Vec::new(),
         };
         if sx < bounds.x0() || sy < bounds.y0() || bounds.x1() < sx || bounds.y1() < sy {

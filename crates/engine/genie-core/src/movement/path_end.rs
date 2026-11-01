@@ -126,7 +126,7 @@ impl Mover {
                 ignore: &ignore,
                 include: &[],
             };
-            if self.short_path(me, world, plan, ask, &mut path)? < 2 {
+            if self.short_path(me, world, plan, ask, &mut path)?.reaches() {
                 return Ok(true);
             }
         }

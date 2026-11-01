@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::map::Distance;
+use crate::pathing::ShortFound;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::walk_in::WalkIn;
 use crate::pathing::hull_path::walks::WalkOut;
@@ -82,7 +83,7 @@ impl HullPather<'_> {
         keep: bool,
         rounds: &mut Rounds,
         path: &mut Waypoints,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<ShortFound>, GenieError> {
         while rounds.iterations < ITERATION_CAP && rounds.growths < GROWTHS {
             if let Some(result) = self.round_start(q, keep, rounds, path)? {
                 return Ok(Some(result));
@@ -108,7 +109,7 @@ impl HullPather<'_> {
         keep: bool,
         rounds: &mut Rounds,
         path: &mut Waypoints,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<ShortFound>, GenieError> {
         self.close_all(0)?;
         if !keep && rounds.growths == 0 {
             self.build_hulls()?;
@@ -149,7 +150,7 @@ impl HullPather<'_> {
         sh: HullIndex,
         rounds: &mut Rounds,
         path: &mut Waypoints,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<ShortFound>, GenieError> {
         if Some(sh) == rounds.goal_hull {
             path.points.clear();
             let mut count = 0;
@@ -166,16 +167,20 @@ impl HullPather<'_> {
             })?;
             if walk.result == 0 {
                 let partial = q.target.is_some() && q.target_id.is_none_or(|t| t.get() < 1);
-                return Ok(Some(if partial { 2 } else { 1 }));
+                return Ok(Some(if partial {
+                    ShortFound::Partial
+                } else {
+                    ShortFound::Reached
+                }));
             }
             if walk.result == 3 || !walk.left_boxes {
-                return Ok(Some(3));
+                return Ok(Some(ShortFound::Blocked));
             }
             rounds.within = walk.result == 1;
         }
         let count = self.exit_paths(sh, q.from, q.range)?;
         if count < 1 {
-            return Ok(Some(3));
+            return Ok(Some(ShortFound::Blocked));
         }
         self.close(0, root)?;
         self.add_exits(root, count, q.to, sh)?;

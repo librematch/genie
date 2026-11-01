@@ -113,7 +113,7 @@ impl World {
                 &members,
                 &mut path,
             )?;
-            !matches!(r, 3 | 4)
+            !r.fails()
         } else {
             let walker = crate::movement::LongWalker {
                 id,

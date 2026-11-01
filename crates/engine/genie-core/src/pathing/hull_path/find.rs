@@ -9,6 +9,7 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{below_or_unordered, maxss, minss, sqrt};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::pathing::ShortFound;
 use crate::pathing::hull_path::NO_AREA;
 use crate::pathing::hull_path::rounds::Rounds;
 use crate::pathing::hull_path::{
@@ -33,7 +34,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<(u8, Waypoints), GenieError> {
+    ) -> Result<(ShortFound, Waypoints), GenieError> {
         self.find_with(from, to, target_id, range, false, false)
     }
 
@@ -49,7 +50,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<(u8, Waypoints), GenieError> {
+    ) -> Result<(ShortFound, Waypoints), GenieError> {
         self.find_with(from, to, target_id, range, true, false)
     }
 
@@ -65,7 +66,7 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-    ) -> Result<(u8, Waypoints), GenieError> {
+    ) -> Result<(ShortFound, Waypoints), GenieError> {
         self.find_with(from, to, target_id, range, false, true)
     }
 
@@ -81,7 +82,7 @@ impl HullPather<'_> {
         range: Distance,
         keep: bool,
         quick_only: bool,
-    ) -> Result<(u8, Waypoints), GenieError> {
+    ) -> Result<(ShortFound, Waypoints), GenieError> {
         let (result, path, clears) =
             self.find_unclear(from, to, target_id, range, keep, quick_only)?;
         if clears {
@@ -105,20 +106,20 @@ impl HullPather<'_> {
         range: Distance,
         keep: bool,
         quick_only: bool,
-    ) -> Result<(u8, Waypoints, bool), GenieError> {
+    ) -> Result<(ShortFound, Waypoints, bool), GenieError> {
         let r = self.radius.get();
         let mut path = Waypoints::default();
         if !keep {
             self.area = NO_AREA;
         }
         if self.off_map(from, to, target_id)? {
-            return Ok((4, path, false));
+            return Ok((ShortFound::Invalid, path, false));
         }
         self.start = from;
         self.goal = to;
         let mut q = self.query(from, to, target_id, range)?;
         if self.already_there(&q) {
-            return Ok((0, path, false));
+            return Ok((ShortFound::InRange, path, false));
         }
         self.buffer = (0.0 < r).then_some(r * HALF);
         // the pather's buffer becomes the manager's (FUN_1410562d0), its temporary tile records
@@ -128,10 +129,10 @@ impl HullPather<'_> {
         self.world.clear_tile_records();
         self.world.set_manager_ignore(&self.ignore);
         if self.quick_path(from, self.quick_goal(&q), q.target_id, &mut path)? {
-            return Ok((1, path, true));
+            return Ok((ShortFound::Reached, path, true));
         }
         if quick_only {
-            return Ok((3, path, false));
+            return Ok((ShortFound::Blocked, path, false));
         }
         let keep = self.set_area(from, to, keep);
         // no target on the goal: the first record with an object that holds the goal is the
@@ -292,11 +293,11 @@ impl HullPather<'_> {
         q: &HullQuery,
         rounds: &Rounds,
         path: &mut Waypoints,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<ShortFound, GenieError> {
         let (from, to, range) = (q.from, q.to, q.range);
         let Some(end) = rounds.best_node else {
             if !rounds.within {
-                return Ok(3);
+                return Ok(ShortFound::Blocked);
             }
             return Ok(self.partway(path, from, to, range));
         };
@@ -306,7 +307,7 @@ impl HullPather<'_> {
         path.points.clear();
         self.build_path(path, end)?;
         if rounds.found && self.found_end(q, rounds, path)? {
-            return Ok(1);
+            return Ok(ShortFound::Reached);
         }
         Ok(self.partway(path, from, to, range))
     }

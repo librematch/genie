@@ -799,3 +799,17 @@ fn a_member_with_its_slot_and_step_held_goes_round_to_the_group() {
     assert_eq!((own.active, own.goal), (1, BVector::new(5.0, 0.0, 8.0)));
     assert_eq!(state(&t, 0), SlotState::Steering);
 }
+
+/// The way round keeps the tile planner's result in the short pather's integer and reads it by
+/// its code: the goal as reached, the nearest node as partial, nothing as blocked and off the
+/// map as in range.
+#[test]
+fn the_way_round_reads_the_planner_s_result_by_its_code() {
+    use crate::pathing::ShortFound;
+    use crate::pathing::tile_path::Found;
+    for found in [Found::OffMap, Found::Goal, Found::Nearest, Found::Nothing] {
+        let read = detour::planned_as_short(found);
+        assert_eq!(read.code(), found.code());
+    }
+    assert_eq!(detour::planned_as_short(Found::OffMap), ShortFound::InRange);
+}

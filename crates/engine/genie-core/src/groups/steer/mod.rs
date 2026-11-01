@@ -51,12 +51,6 @@ const ROUND_STILL: f32 = crate::math::image::group::ROUND_STILL;
 const ROUND_LENGTH: Distance = Distance::new(crate::math::image::group::ROUND_LENGTH);
 /// The own move the way round gives a member: its timer and distance (`DAT_142eb1c98`).
 const ROUND_TIMER: f32 = crate::math::image::group::ROUND_TIMER;
-/// The short pather's and the tile planner's results the way round reads: reached, partial,
-/// blocked and off the map.
-const REACHED: u8 = 1;
-const PARTIAL: u8 = 2;
-const BLOCKED: u8 = 3;
-const OFF_MAP: u8 = 4;
 
 #[cfg(test)]
 mod tests;

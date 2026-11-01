@@ -15,7 +15,7 @@ use genie_core::world::World;
 use genie_save::Header;
 
 /// The old short pather's result and path for one call ([`old_pather_paths`]).
-pub type PatherAnswer = (u8, Vec<Point>);
+pub type PatherAnswer = (genie_core::pathing::ShortFound, Vec<Point>);
 
 /// One call of the old short pather ([`old_pather_paths`]): the unit, its place then, the target
 /// and the range.

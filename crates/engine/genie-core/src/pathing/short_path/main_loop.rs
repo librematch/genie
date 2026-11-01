@@ -7,7 +7,7 @@ use crate::pathing::short_path::{
     TO_FIXED, TO_FLOAT, UNSET, VertexIndex, WalkDir, cheb, corner_emits, float_distance, in_box,
     isqrt, through_float,
 };
-use crate::pathing::{FixedDistance, ShapeId, ShapeSide};
+use crate::pathing::{FixedDistance, ShapeId, ShapeSide, ShortFound};
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -71,7 +71,7 @@ impl Search<'_> {
         *self.polys.checked_mut(last)? = poly;
         if rc == 1 || rc == 2 || empty {
             return Ok(Some(ShortPath {
-                result: 4,
+                result: ShortFound::Invalid,
                 points: Vec::new(),
             }));
         }
@@ -311,13 +311,13 @@ impl Search<'_> {
         match res4410 {
             3 => {
                 return Ok(ShortPath {
-                    result: 0,
+                    result: ShortFound::InRange,
                     points: Vec::new(),
                 });
             }
             2 => {
                 return Ok(ShortPath {
-                    result: 3,
+                    result: ShortFound::Blocked,
                     points: Vec::new(),
                 });
             }
@@ -332,8 +332,8 @@ impl Search<'_> {
         }
         // without a goal node in range, the best one
         let (result, goal) = match self.goal_node {
-            Some(goal) => (1, goal),
-            None => (2, self.best),
+            Some(goal) => (ShortFound::Reached, goal),
+            None => (ShortFound::Partial, self.best),
         };
         self.goal_node = Some(goal);
         // the path from the goal back, without the root
@@ -422,7 +422,7 @@ impl Search<'_> {
                 match found {
                     None => {
                         return Ok(Some(ShortPath {
-                            result: 1,
+                            result: ShortFound::Reached,
                             points: vec![start, p, t],
                         }));
                     }

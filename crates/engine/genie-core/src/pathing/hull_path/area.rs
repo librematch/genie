@@ -9,6 +9,7 @@ use crate::map::TileRect;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::ObjectId;
+use crate::pathing::ShortFound;
 use crate::pathing::hull_path::{
     EPSILON, HullIndex, HullPather, MOST_AREA, PATHS, Point, Target, Waypoints,
 };
@@ -116,8 +117,8 @@ impl HullPather<'_> {
         from: Point,
         to: Point,
         range: Distance,
-    ) -> u8 {
-        let mut result = 2;
+    ) -> ShortFound {
+        let mut result = ShortFound::Partial;
         let last = *path
             .points
             .last()
@@ -126,7 +127,7 @@ impl HullPather<'_> {
             && (last.y() - self.start.y()).abs() < EPSILON
         {
             path.points.clear();
-            result = 3;
+            result = ShortFound::Blocked;
         }
         let d =
             (last.y() - to.y()) * (last.y() - to.y()) + (last.x() - to.x()) * (last.x() - to.x());
@@ -135,11 +136,11 @@ impl HullPather<'_> {
             (from.y() - to.y()) * (from.y() - to.y()) + (from.x() - to.x()) * (from.x() - to.x());
         if below_or_unordered(d, start) {
             if d < range.squared().get() {
-                result = 1;
+                result = ShortFound::Reached;
             }
         } else {
             path.points.clear();
-            result = 3;
+            result = ShortFound::Blocked;
         }
         result
     }
