@@ -1049,11 +1049,15 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
         TerrainMask::of_bits(6),
         Distance::new(0.2),
     );
-    assert_eq!(p.player, 1);
+    assert_eq!(p.player, Some(PlayerId::from(1)));
     p.hulls = vec![far.clone()];
     assert!(
-        p.add_tile_objects(Tile::new(5, 5), Some(HullIndex::new(0)), 1)
-            .is_err()
+        p.add_tile_objects(
+            Tile::new(5, 5),
+            Some(HullIndex::new(0)),
+            Some(PlayerId::from(1))
+        )
+        .is_err()
     );
     // player 1 passes the gate
     let passes = BTreeSet::from([object_id(3)]);
@@ -1066,8 +1070,12 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
     )
     .with_gates(&passes);
     p.hulls = vec![far.clone()];
-    p.add_tile_objects(Tile::new(5, 5), Some(HullIndex::new(0)), 1)
-        .unwrap();
+    p.add_tile_objects(
+        Tile::new(5, 5),
+        Some(HullIndex::new(0)),
+        Some(PlayerId::from(1)),
+    )
+    .unwrap();
     assert_eq!(
         hull_ids(&p),
         [
@@ -1078,8 +1086,12 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
     assert_eq!(p.hulls[0].objects[0].bounds, Rect::new(4.8, 4.8, 6.2, 6.2));
     assert_eq!(p.hulls[1].objects[0].bounds, Rect::new(4.3, 4.3, 6.7, 6.7));
     // once per hull
-    p.add_tile_objects(Tile::new(5, 5), Some(HullIndex::new(0)), 1)
-        .unwrap();
+    p.add_tile_objects(
+        Tile::new(5, 5),
+        Some(HullIndex::new(0)),
+        Some(PlayerId::from(1)),
+    )
+    .unwrap();
     assert_eq!(
         hull_ids(&p),
         [
@@ -1097,7 +1109,7 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
     )
     .including(&[object_id(5), object_id(10)]);
     p.hulls = vec![far];
-    p.add_tile_objects(Tile::new(5, 5), Some(HullIndex::new(0)), -1)
+    p.add_tile_objects(Tile::new(5, 5), Some(HullIndex::new(0)), None)
         .unwrap();
     assert_eq!(
         hull_ids(&p),
@@ -1112,7 +1124,7 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
         ]
     );
     // an unordered radius takes the given hull
-    p.add_tile_objects(Tile::new(8, 8), Some(HullIndex::new(0)), -1)
+    p.add_tile_objects(Tile::new(8, 8), Some(HullIndex::new(0)), None)
         .unwrap();
     assert_eq!(
         hull_ids(&p)[0],
@@ -1133,7 +1145,8 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
         Distance::new(0.2),
     )
     .with_gates(&passes);
-    p.add_tile_objects(Tile::new(5, 5), None, 1).unwrap();
+    p.add_tile_objects(Tile::new(5, 5), None, Some(PlayerId::from(1)))
+        .unwrap();
     assert_eq!(
         hull_ids(&p),
         [vec![
@@ -1605,7 +1618,7 @@ fn a_new_pather_holds_the_constructor_s_state() {
     assert_eq!(
         (p.player, p.ignore.clone()),
         (
-            1,
+            Some(PlayerId::from(1)),
             vec![
                 RecordId::from(object_id(9171)),
                 RecordId::from(object_id(9149))
@@ -1913,7 +1926,10 @@ fn a_walk_out_of_a_hull_keeps_its_ways_out_or_reaches_the_goal() {
             count: &mut count,
         })
         .unwrap();
-    assert_eq!((walk.result, walk.left_boxes, count), (5, true, 4));
+    assert_eq!(
+        (walk.result, walk.left_boxes, count),
+        (WalkResult::WaysFromBox, true, 4)
+    );
     let n = 4.8 - NUDGE;
     assert_eq!(paths[0].points, [Point::new(4.9, 5.5), Point::new(n, 5.5)]);
     assert_eq!(paths[3].points, [Point::new(4.9, 5.5), Point::new(n, 5.6)]);
@@ -1943,7 +1959,10 @@ fn a_walk_out_of_a_hull_keeps_its_ways_out_or_reaches_the_goal() {
             count: &mut count,
         })
         .unwrap();
-    assert_eq!((walk.result, walk.left_boxes, count), (0, false, 0));
+    assert_eq!(
+        (walk.result, walk.left_boxes, count),
+        (WalkResult::Reached, false, 0)
+    );
     assert_eq!(
         paths[0].points,
         [Point::new(4.9, 5.5), Point::new(3.0, 5.5)]
@@ -2064,11 +2083,17 @@ fn a_walk_out_from_outside_its_boxes_ends_by_its_ways_out_or_at_a_goal_in_range(
         (walk.result, walk.left_boxes, count, paths[0].points.clone())
     };
     let (result, left, count, _) = walk(None, Distance::new(0.1), PATHS);
-    assert_eq!((result, left), (4, true));
+    assert_eq!((result, left), (WalkResult::Ways, true));
     assert!(0 < count);
-    assert_eq!(walk(None, Distance::new(0.1), 0), (2, false, 0, vec![]));
+    assert_eq!(
+        walk(None, Distance::new(0.1), 0),
+        (WalkResult::NoWay, false, 0, vec![])
+    );
     let (result, _, count, points) = walk(Some(Point::new(4.4, 5.5)), Distance::new(0.5), 1);
-    assert_eq!((result, count, points), (0, 0, vec![Point::new(4.2, 5.5)]));
+    assert_eq!(
+        (result, count, points),
+        (WalkResult::Reached, 0, vec![Point::new(4.2, 5.5)])
+    );
 }
 
 /// `pathWithinHull` into a hull (`FUN_140f88ee0`): the walk out of the hull from the goal
@@ -2107,7 +2132,10 @@ fn a_walk_into_a_hull_keeps_its_entrances_and_their_sides() {
             count: &mut count,
         })
         .unwrap();
-    assert_eq!((walk.result, walk.left_boxes, count), (5, true, 4));
+    assert_eq!(
+        (walk.result, walk.left_boxes, count),
+        (WalkResult::WaysFromBox, true, 4)
+    );
     // all four leave by side 3, the hull's left (its points 2 to 3)
     assert_eq!(sides, [3; 4]);
     let x = 4.8 + NUDGE;
@@ -2361,7 +2389,7 @@ fn the_ignore_list_takes_the_ids_then_the_tiles_of_one_tile_objects_on_a_centre(
         ],
         TerrainMask::of_bits(6),
         Distance::new(0.6),
-        2,
+        Some(PlayerId::from(2)),
     );
     assert_eq!(
         p.ignore,
@@ -2376,11 +2404,22 @@ fn the_ignore_list_takes_the_ids_then_the_tiles_of_one_tile_objects_on_a_centre(
     );
     assert_eq!(
         (p.player, p.mask, p.radius),
-        (2, TerrainMask::of_bits(6), Distance::new(0.6))
+        (
+            Some(PlayerId::from(2)),
+            TerrainMask::of_bits(6),
+            Distance::new(0.6)
+        )
     );
     // an empty list ignores nothing
     assert_eq!(
-        HullPather::for_list(&mut w, &[], TerrainMask::of_bits(6), Distance::new(0.6), 2).ignore,
+        HullPather::for_list(
+            &mut w,
+            &[],
+            TerrainMask::of_bits(6),
+            Distance::new(0.6),
+            Some(PlayerId::from(2))
+        )
+        .ignore,
         Vec::<RecordId>::new()
     );
     // slot 0x3e8's pather: the unit and its target
@@ -2413,7 +2452,7 @@ fn a_walk_to_a_point_goes_around_a_wall_without_a_target() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.2),
-        1,
+        Some(PlayerId::from(1)),
     );
     let (result, path) = p
         .find(
@@ -2439,7 +2478,7 @@ fn a_walk_to_a_point_goes_around_a_wall_without_a_target() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.2),
-        1,
+        Some(PlayerId::from(1)),
     );
     assert_eq!(
         q.find(
@@ -2469,7 +2508,7 @@ fn a_goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.2),
-        1,
+        Some(PlayerId::from(1)),
     );
     let (result, path) = p
         .find(
@@ -2493,7 +2532,7 @@ fn a_goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
         &[object_id(9171), object_id(48)],
         TerrainMask::of_bits(6),
         Distance::new(0.2),
-        1,
+        Some(PlayerId::from(1)),
     );
     let (result, path) = q
         .find(
@@ -2517,7 +2556,7 @@ fn a_goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.2),
-        1,
+        Some(PlayerId::from(1)),
     );
     assert!(
         r.find(
@@ -2557,7 +2596,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.6),
-        1,
+        Some(PlayerId::from(1)),
     );
     p.buffer = Some(0.3);
     assert!(
@@ -2584,7 +2623,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.6),
-        1,
+        Some(PlayerId::from(1)),
     )
     .including(&[object_id(50)]);
     p.buffer = Some(0.3);
@@ -2624,7 +2663,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         &[object_id(9171), object_id(50)],
         TerrainMask::of_bits(6),
         Distance::new(0.6),
-        1,
+        Some(PlayerId::from(1)),
     )
     .including(&[object_id(50)]);
     q.buffer = Some(0.3);

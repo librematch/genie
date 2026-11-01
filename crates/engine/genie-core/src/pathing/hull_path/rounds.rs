@@ -9,7 +9,7 @@ use crate::pathing::hull_path::walk_in::WalkIn;
 use crate::pathing::hull_path::walks::WalkOut;
 use crate::pathing::hull_path::{
     GROWTHS, HullIndex, HullPather, HullQuery, ITERATION_CAP, MOST, NUDGE, NodeIndex, NodeList,
-    PATHS, Point, Waypoints,
+    PATHS, Point, WalkResult, Waypoints,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -166,7 +166,7 @@ impl HullPather<'_> {
                 most: 1,
                 count: &mut count,
             })?;
-            if walk.result == 0 {
+            if walk.result == WalkResult::Reached {
                 let partial = q.target.is_some() && q.target_id.is_none_or(|t| t.get() < 1);
                 return Ok(Some(if partial {
                     ShortFound::Partial
@@ -174,10 +174,10 @@ impl HullPather<'_> {
                     ShortFound::Reached
                 }));
             }
-            if walk.result == 3 || !walk.left_boxes {
+            if walk.result == WalkResult::Stuck || !walk.left_boxes {
                 return Ok(Some(ShortFound::Blocked));
             }
-            rounds.within = walk.result == 1;
+            rounds.within = walk.result == WalkResult::Nearest;
         }
         let count = self.exit_paths(sh, q.from, q.range)?;
         if count < 1 {
@@ -282,7 +282,7 @@ impl HullPather<'_> {
             count: &mut count,
         });
         self.entrances = entrances;
-        let entered_box = walk?.result == 5;
+        let entered_box = walk?.result == WalkResult::WaysFromBox;
         self.join_entrances(hull, count, &sides)?;
         Ok(entered_box)
     }

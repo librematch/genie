@@ -5,7 +5,7 @@ use crate::map::Rect;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
     ENTRANCE_STEP, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, NodeIndex, NodeList, PATHS,
-    Point, SIDES, Target, Waypoints, Within,
+    Point, SIDES, Target, WalkResult, Waypoints, Within,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -63,7 +63,7 @@ impl HullPather<'_> {
         let (inside, stuck) = self.begin_walk_in(hull, (from, to), target)?;
         if stuck {
             return Ok(Within {
-                result: 3,
+                result: WalkResult::Stuck,
                 left_boxes,
             });
         }
@@ -95,11 +95,11 @@ impl HullPather<'_> {
             left_boxes |= self.cast_into(hull, node, to, &mut ways)?;
         }
         let result = if *ways.count < 1 {
-            2
+            WalkResult::NoWay
         } else if inside.is_some() {
-            5
+            WalkResult::WaysFromBox
         } else {
-            4
+            WalkResult::Ways
         };
         Ok(Within { result, left_boxes })
     }

@@ -12,6 +12,7 @@ use crate::math::fmath::at_most_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::masters::class;
 use crate::pathing::hull_path::{HALF, Hull, HullIndex, HullPather, Point, Shape};
+use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
 
 impl HullPather<'_> {
@@ -137,7 +138,7 @@ impl HullPather<'_> {
         &mut self,
         tile: Tile,
         hull: Option<HullIndex>,
-        player: i32,
+        player: Option<PlayerId>,
     ) -> Result<(), GenieError> {
         let world = &*self.world;
         for &id in world.tiles().list(tile) {
@@ -158,12 +159,17 @@ impl HullPather<'_> {
         Ok(())
     }
 
-    /// Slot 0x678 of object `id` for `player` (the pather's, or -1): only a gate's
+    /// Slot 0x678 of object `id` for `player` (the pather's, or none: -1): only a gate's
     /// (`FUN_1411d4a30`) answers yes, one of the gates the caller gave
-    /// ([`HullPather::with_gates`]), and never for player -1 (`processCliffs`'): its ally test
+    /// ([`HullPather::with_gates`]), and never for no player (-1, `processCliffs`'): its ally test
     /// `FUN_141663dc0` takes no number at or above the player count, unsigned.
-    pub(super) fn passes(&self, id: ObjectId, p: &Placed, player: i32) -> Result<bool, GenieError> {
-        if p.class != class::GATE || player < 0 {
+    pub(super) fn passes(
+        &self,
+        id: ObjectId,
+        p: &Placed,
+        player: Option<PlayerId>,
+    ) -> Result<bool, GenieError> {
+        if p.class != class::GATE || player.is_none() {
             return Ok(false);
         }
         let gates = self.gates.ok_or(GenieError::unsupported(
@@ -325,11 +331,11 @@ impl HullPather<'_> {
     }
 
     /// `FUN_140f8a890`: a cliff tile's objects (its word's static class 6), each to its own place
-    /// ([`HullPather::add_tile_objects`] with no hull and player -1: no gate passes).
+    /// ([`HullPather::add_tile_objects`] with no hull and no player, the game's -1: no gate passes).
     pub(super) fn cliff(&mut self, tile: Tile) -> Result<(), GenieError> {
         let word = self.world.tiles().word(tile).unwrap_or(0);
         if word & 0x3f00 == 0x600 {
-            self.add_tile_objects(tile, None, -1)?;
+            self.add_tile_objects(tile, None, None)?;
         }
         Ok(())
     }

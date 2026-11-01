@@ -6,6 +6,7 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::objects::ObjectId;
 use crate::pathing::hull_path::NO_AREA;
+use crate::players::PlayerId;
 use std::collections::BTreeSet;
 
 use crate::GenieError;
@@ -103,7 +104,7 @@ impl<'w> HullPather<'w> {
         mask: crate::map::TerrainMask,
         radius: Distance,
     ) -> Self {
-        let player = world.get(unit).map_or(-1, |p| i32::from(p.player.get()));
+        let player = world.get(unit).map(|p| p.player);
         let ids: Vec<ObjectId> = [Some(unit), target].into_iter().flatten().collect();
         Self::for_list(world, &ids, mask, radius, player)
     }
@@ -122,7 +123,7 @@ impl<'w> HullPather<'w> {
         ids: &[ObjectId],
         mask: crate::map::TerrainMask,
         radius: Distance,
-        player: i32,
+        player: Option<PlayerId>,
     ) -> Self {
         let mut ignore: Vec<RecordId> = ids.iter().copied().map(RecordId::from).collect();
         for &id in ids {

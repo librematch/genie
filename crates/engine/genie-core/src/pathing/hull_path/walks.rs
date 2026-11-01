@@ -10,7 +10,8 @@ use crate::objects::ObjectId;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
     DIRECTIONS, EXIT_STEP, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, NodeIndex,
-    NodeList, ONE, Point, SAME_END, SIDES, SQRT_2, Target, Waypoints, Within, walk_length,
+    NodeList, ONE, Point, SAME_END, SIDES, SQRT_2, Target, WalkResult, Waypoints, Within,
+    walk_length,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -377,7 +378,7 @@ impl HullPather<'_> {
         let (inside, stuck) = self.begin_walk_out(hull, from, goal)?;
         if stuck {
             return Ok(Within {
-                result: 3,
+                result: WalkResult::Stuck,
                 left_boxes,
             });
         }
@@ -444,9 +445,9 @@ impl HullPather<'_> {
         // without a goal the walk's ways out are its answer, even past a target within range
         let Some(_) = goal else {
             let result = match (*count, inside) {
-                (0, _) => 2,
-                (_, Some(_)) => 5,
-                (_, None) => 4,
+                (0, _) => WalkResult::NoWay,
+                (_, Some(_)) => WalkResult::WaysFromBox,
+                (_, None) => WalkResult::Ways,
             };
             return Ok(Within { result, left_boxes });
         };
@@ -523,13 +524,17 @@ impl HullPather<'_> {
     ) -> Result<Within, GenieError> {
         let Some(n) = end.or(nearest) else {
             return Ok(Within {
-                result: 2,
+                result: WalkResult::NoWay,
                 left_boxes,
             });
         };
         self.build_path(paths.checked_mut(0)?, n)?;
         Ok(Within {
-            result: u8::from(end.is_none()),
+            result: if end.is_some() {
+                WalkResult::Reached
+            } else {
+                WalkResult::Nearest
+            },
             left_boxes,
         })
     }

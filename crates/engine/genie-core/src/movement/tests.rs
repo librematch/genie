@@ -558,7 +558,7 @@ fn a_big_unit_s_short_path_takes_the_old_pather() {
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.6),
-        2,
+        Some(PlayerId::from(2)),
     );
     let (result, path) = pather
         .find(

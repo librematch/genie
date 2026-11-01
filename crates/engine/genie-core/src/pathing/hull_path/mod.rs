@@ -32,6 +32,7 @@ use crate::map::spatial::{RecordId, Spatial};
 use crate::math::fmath::sqrt;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
 use genie_error::GenieError;
 use std::collections::BTreeSet;
@@ -356,8 +357,25 @@ struct HullQuery {
 /// A walk out of a hull or into one (`pathWithinHull`): its result and whether a ray left the
 /// hull's boxes (`*param_18`).
 struct Within {
-    result: u8,
+    result: WalkResult,
     left_boxes: bool,
+}
+
+/// How a walk within a hull ended: `pathWithinHull`'s result, each variant's number given.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WalkResult {
+    /// A node saw the goal, or was within range of it or of the target (0).
+    Reached,
+    /// No node did; the path goes to the one nearest the goal (1).
+    Nearest,
+    /// No way found (2).
+    NoWay,
+    /// No first step made (3).
+    Stuck,
+    /// Ways kept, the walk's start (out) or goal (in) outside the hull's boxes (4).
+    Ways,
+    /// Ways kept, that point inside a box (5).
+    WaysFromBox,
 }
 
 /// What the obstruction manager's one old pather (`+0x380`) carries from a search to the next:
@@ -390,8 +408,8 @@ pub struct HullPather<'w> {
     mask: crate::map::TerrainMask,
     radius: Distance,
     /// `FindShortPath`'s player (its argument 12, the unit's player's number `+0x718`), whom slot
-    /// 0x678 asks about a gate.
-    player: i32,
+    /// 0x678 asks about a gate; none (-1) for a unit the world does not hold.
+    player: Option<PlayerId>,
     /// The gates its player may pass (slot 0x678, `FUN_1411d4a30`, a gate's), by id, when the
     /// caller gives them ([`HullPather::with_gates`]): the world's update knows the gates'
     /// states and the players' diplomacy; the pather does not.
