@@ -4,6 +4,7 @@
 //! (`FUN_14103fd00`) makes them.
 
 use crate::GenieError;
+use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
@@ -44,7 +45,7 @@ pub struct MemberPlace {
     /// Slot 0x520.
     pub at: BVector,
     /// `FUN_141011300(unit, 0)`.
-    pub category: i32,
+    pub category: FormationCategory,
 }
 
 /// A slot's 3D length as the layouts take it (`x² + y² + z²` in that order).
@@ -165,10 +166,10 @@ fn next_statistic(group: &UnitGroup, current: Option<usize>, placed: &mut usize)
     }
     *placed = 0;
     let mut c = match current {
-        Some(i) => group.unit_types.get(i)?.formation_category + 1,
-        None => 0,
+        Some(i) => group.unit_types.get(i)?.formation_category.next(),
+        None => FormationCategory::named(0),
     };
-    while c <= 5 {
+    while c <= FormationCategory::PROTECTED {
         if let Some(i) = group
             .unit_types
             .iter()
@@ -177,7 +178,7 @@ fn next_statistic(group: &UnitGroup, current: Option<usize>, placed: &mut usize)
         {
             return Some(i);
         }
-        c += 1;
+        c = c.next();
     }
     None
 }
@@ -251,7 +252,7 @@ pub(crate) fn phalanx_slots(
                 active: 1,
                 desired_category: match statistic {
                     Some(i) => group.unit_types.checked(i)?.formation_category,
-                    None => -1,
+                    None => FormationCategory::ANY,
                 },
                 desired_sub_category: -1,
                 transformed: formation.slot_mut(slot)?.transformed,
@@ -473,7 +474,7 @@ pub(crate) fn box_slots(
     formation.use_slots(0);
     let mut positions = [BVector::ZERO; BOX_POSITIONS];
     let mut used = 0usize;
-    for c in (0..=5).rev() {
+    for c in FormationCategory::EACH.into_iter().rev() {
         let Some(stat) = group
             .unit_types
             .iter()
@@ -653,7 +654,7 @@ mod tests {
         g.unit_types = stats
             .iter()
             .map(|&(category, n)| UnitTypeStatistic {
-                formation_category: category,
+                formation_category: FormationCategory::named(category),
                 units: object_id_list(0..n as i32),
                 ..UnitTypeStatistic::default()
             })
@@ -665,7 +666,7 @@ mod tests {
         MemberPlace {
             id: object_id(id),
             at: BVector::new(x, 0.0, z),
-            category,
+            category: FormationCategory::named(category),
         }
     }
 
@@ -708,7 +709,7 @@ mod tests {
                 s.time,
                 s.position_filled,
                 s.active,
-                s.desired_category
+                s.desired_category.get()
             ),
             (1, WorldTime::from_millis(640), 1, 1, 1)
         );
@@ -824,13 +825,13 @@ mod tests {
         g.motion.position[0] = BVector::new(6.0, 0.0, 6.0);
         g.unit_types = vec![
             UnitTypeStatistic {
-                formation_category: 1,
+                formation_category: FormationCategory::named(1),
                 units: vec![object_id(10), object_id(11)],
                 desired_spacing: Distance::new(1.0),
                 ..UnitTypeStatistic::default()
             },
             UnitTypeStatistic {
-                formation_category: 3,
+                formation_category: FormationCategory::named(3),
                 units: vec![object_id(12)],
                 desired_spacing: Distance::new(1.0),
                 ..UnitTypeStatistic::default()
@@ -913,7 +914,7 @@ mod tests {
                 (
                     s.unit_id,
                     s.transform_position,
-                    s.desired_category,
+                    s.desired_category.get(),
                     s.active,
                 )
             })
@@ -963,7 +964,7 @@ mod tests {
         let slots: Vec<(BVector, i32, i32)> = f
             .slots
             .iter()
-            .map(|s| (s.offset, s.depth, s.desired_category))
+            .map(|s| (s.offset, s.depth, s.desired_category.get()))
             .collect();
         assert_eq!(
             slots,
@@ -988,7 +989,11 @@ mod tests {
         // without statistics the slots take no category
         let mut f = Formation::new();
         assert!(phalanx_slots(&mut f, &group(2, 2.0, &[]), WorldTime::ZERO).unwrap());
-        assert!(f.slots.iter().all(|s| s.desired_category == -1));
+        assert!(
+            f.slots
+                .iter()
+                .all(|s| s.desired_category == FormationCategory::named(-1))
+        );
     }
 
     /// `FUN_14102ab30`'s fixed places for 3 units, a box too small for 2 units of spacing 10
@@ -1129,7 +1134,7 @@ mod tests {
         let slots: Vec<(BVector, i32)> = f
             .slots
             .iter()
-            .map(|s| (s.offset, s.desired_category))
+            .map(|s| (s.offset, s.desired_category.get()))
             .collect();
         assert_eq!(
             slots,

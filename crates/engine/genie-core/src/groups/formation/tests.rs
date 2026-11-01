@@ -169,7 +169,7 @@ pub(crate) fn slot_at(at: BVector, category: i32) -> Slot {
     Slot {
         unit_id: None,
         transform_position: at,
-        desired_category: category,
+        desired_category: FormationCategory::named(category),
         desired_sub_category: -1,
         active: 1,
         transformed: 1,
@@ -269,16 +269,28 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
         seen: false,
         state: ObjectState::Alive,
     }];
-    assert_eq!(t.unit_category(None).unwrap(), -1);
-    assert_eq!(t.unit_category(t.world_object(object_id(99))).unwrap(), -1);
+    assert_eq!(t.unit_category(None).unwrap(), FormationCategory::named(-1));
+    assert_eq!(
+        t.unit_category(t.world_object(object_id(99))).unwrap(),
+        FormationCategory::named(-1)
+    );
     let ghost = t.world_object(object_id(-2));
     assert!(matches!(
         ghost,
         Some(crate::groups::WorldObject::Ghost(p, _)) if p == PlayerId::new(1)
     ));
-    assert_eq!(t.unit_category(ghost).unwrap(), -1);
-    assert_eq!(t.unit_category(t.world_object(object_id(35))).unwrap(), 2);
-    assert_eq!(t.unit_category(t.world_object(object_id(10))).unwrap(), 5);
+    assert_eq!(
+        t.unit_category(ghost).unwrap(),
+        FormationCategory::named(-1)
+    );
+    assert_eq!(
+        t.unit_category(t.world_object(object_id(35))).unwrap(),
+        FormationCategory::named(2)
+    );
+    assert_eq!(
+        t.unit_category(t.world_object(object_id(10))).unwrap(),
+        FormationCategory::named(5)
+    );
     // the world's table holds ghosts only in its negative half, none for −1 (no object takes
     // it) and none for i32::MIN
     assert!(t.world_object(None).is_none());
@@ -296,22 +308,36 @@ fn the_closest_unit_matches_its_slots_category_and_type() {
     let g = t.groups.get(group_id(1)).unwrap();
     let o = BVector::ZERO;
     assert_eq!(
-        t.closest_unit(g, o, -1, -1, &[]).unwrap(),
+        t.closest_unit(g, o, FormationCategory::named(-1), -1, &[])
+            .unwrap(),
         Some(object_id(12))
     );
     assert_eq!(
-        t.closest_unit(g, o, 1, -1, &[]).unwrap(),
+        t.closest_unit(g, o, FormationCategory::named(1), -1, &[])
+            .unwrap(),
         Some(object_id(11))
     );
     assert_eq!(
-        t.closest_unit(g, o, 1, 4, &[]).unwrap(),
+        t.closest_unit(g, o, FormationCategory::named(1), 4, &[])
+            .unwrap(),
         Some(object_id(10))
     );
     assert_eq!(
-        t.closest_unit(g, o, 1, -1, &[Some(object_id(11))]).unwrap(),
+        t.closest_unit(
+            g,
+            o,
+            FormationCategory::named(1),
+            -1,
+            &[Some(object_id(11))]
+        )
+        .unwrap(),
         Some(object_id(10))
     );
-    assert_eq!(t.closest_unit(g, o, 2, -1, &[]).unwrap(), None);
+    assert_eq!(
+        t.closest_unit(g, o, FormationCategory::named(2), -1, &[])
+            .unwrap(),
+        None
+    );
 }
 
 /// `FUN_141009760`: slots at 0 and 3 on x, units at 1 and -5. In order the first takes the
@@ -814,7 +840,7 @@ fn one_statistic(t: &mut World, units: &[ObjectId]) {
     let g = &mut t.groups.groups[0];
     g.desired_spacing = Distance::new(1.0);
     g.unit_types = vec![crate::groups::UnitTypeStatistic {
-        formation_category: 1,
+        formation_category: FormationCategory::named(1),
         units: units.to_vec(),
         desired_spacing: Distance::new(1.0),
         number_unit_types: 1,
@@ -1074,7 +1100,7 @@ fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> 
             })
             .collect(),
         unit_types: vec![crate::groups::UnitTypeStatistic {
-            formation_category: category,
+            formation_category: FormationCategory::named(category),
             units: object_id_list(0..count as i32),
             desired_spacing: Distance::new(spacing),
             number_unit_types: types.len() as i32,
@@ -1174,7 +1200,7 @@ fn a_narrow_sub_formation_takes_one_line_ahead_of_a_wider_one() {
     assert_eq!((f.maximum_width, f.maximum_depth), (5, 3));
     let first: Vec<(f32, i32)> = f.slots[..3]
         .iter()
-        .map(|s| (s.offset.y(), s.desired_category))
+        .map(|s| (s.offset.y(), s.desired_category.get()))
         .collect();
     assert_eq!(first, [(-1.0, 0), (0.0, 0), (1.0, 0)]);
     assert_eq!(f.lines[0].indices, [0, 1, 2]);

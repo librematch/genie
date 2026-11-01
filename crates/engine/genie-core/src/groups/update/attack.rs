@@ -2,6 +2,7 @@
 //! the group's current command is an attack (9).
 
 use crate::GenieError;
+use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::attack::AttackOrder;
@@ -21,7 +22,7 @@ use crate::players::PlayerId;
 use crate::world::World;
 
 /// The formation categories a group keeps its units by, which the update walks in order.
-const CATEGORIES: std::ops::RangeInclusive<i32> = 0..=5;
+const CATEGORIES: [FormationCategory; 6] = FormationCategory::EACH;
 
 impl World {
     /// `FUN_14103f4e0` of group `group`: the attack command's update. True when the command is

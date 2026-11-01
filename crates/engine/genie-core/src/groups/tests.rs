@@ -219,15 +219,15 @@ fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(master_type::COMBAT, HeroFlags::NONE, 3),
-        Some(3)
+        Some(FormationCategory::named(3))
     );
     assert_eq!(
         sub_formation(master_type::COMBAT, HeroFlags::NONE, 0),
-        Some(5)
+        Some(FormationCategory::PROTECTED)
     );
     assert_eq!(
         sub_formation(master_type::COMBAT, HeroFlags::NONE, 6),
-        Some(0)
+        Some(FormationCategory::named(0))
     );
     assert_eq!(
         sub_formation(master_type::COMBAT, HeroFlags::NONE, 255),
@@ -235,7 +235,7 @@ fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(master_type::COMBAT, HeroFlags::FULL_HERO, 3),
-        Some(5)
+        Some(FormationCategory::PROTECTED)
     );
     assert_eq!(
         sub_formation(
@@ -243,11 +243,11 @@ fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
             HeroFlags::PROTECTED_FORMATION | HeroFlags::INVERTED,
             3
         ),
-        Some(3)
+        Some(FormationCategory::named(3))
     );
     assert_eq!(
         sub_formation(master_type::BUILDING, HeroFlags::FULL_HERO, 3),
-        Some(3)
+        Some(FormationCategory::named(3))
     );
 }
 
@@ -1045,19 +1045,19 @@ fn the_categories_attack_ranges_rise_to_their_members_ranges() {
     let mut t = attack_world(&[(7, 4, 0.0, 0.0), (8, 4, 0.0, 0.0)]);
     t.groups.get_mut(group_id(1)).unwrap().unit_types = vec![
         UnitTypeStatistic {
-            formation_category: 1,
+            formation_category: FormationCategory::named(1),
             units: vec![object_id(7), object_id(8)],
             attack_range: Distance::new(1.0),
             ..UnitTypeStatistic::default()
         },
         UnitTypeStatistic {
-            formation_category: 2,
+            formation_category: FormationCategory::named(2),
             units: vec![object_id(7)],
             attack_range: Distance::new(9.0),
             ..UnitTypeStatistic::default()
         },
         UnitTypeStatistic {
-            formation_category: 3,
+            formation_category: FormationCategory::named(3),
             attack_range: Distance::new(0.5),
             ..UnitTypeStatistic::default()
         },
@@ -1315,12 +1315,12 @@ fn the_special_units_of_masters_6_and_7_and_of_the_category_classes() {
     let mut t = world(class::VILLAGER, ids::HOUSE);
     t.groups.get_mut(group_id(1)).unwrap().unit_types = vec![
         UnitTypeStatistic {
-            formation_category: 2,
+            formation_category: FormationCategory::named(2),
             units: vec![object_id(9), object_id(10)],
             ..UnitTypeStatistic::default()
         },
         UnitTypeStatistic {
-            formation_category: 1,
+            formation_category: FormationCategory::named(1),
             units: vec![object_id(7), object_id(8), object_id(11)],
             ..UnitTypeStatistic::default()
         },

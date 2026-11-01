@@ -2,6 +2,7 @@
 //! (`FUN_141008d90`, `FUN_1410116c0`) and a unit's radius in a formation (`FUN_141025920`).
 
 use crate::GenieError;
+use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MotionFlags;
@@ -111,7 +112,7 @@ impl UnitGroup {
     /// widest member's two radii, and its unit types are counted again ([`count_unit_types`]).
     fn join_statistic(
         &mut self,
-        sub: i32,
+        sub: FormationCategory,
         id: ObjectId,
         unit: FormationUnit,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
@@ -148,7 +149,7 @@ impl UnitGroup {
     fn drop_from_statistic(
         &mut self,
         id: ObjectId,
-        category: Option<i32>,
+        category: Option<FormationCategory>,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
         scratch: &mut Vec<u32>,
     ) -> bool {
@@ -161,7 +162,7 @@ impl UnitGroup {
             true
         };
         match category {
-            Some(-1) => false,
+            Some(FormationCategory::ANY) => false,
             Some(c) => self
                 .unit_types
                 .iter_mut()
@@ -354,7 +355,7 @@ impl World {
         let crate::groups::WorldObject::Unit(p, u) = object else {
             return Ok(false);
         };
-        if sub == -1 {
+        if sub == FormationCategory::ANY {
             return Ok(false);
         }
         let unit = FormationUnit::of(u.master(&self.masters, p)?);
@@ -429,6 +430,7 @@ impl World {
 
 #[cfg(test)]
 mod tests {
+    use crate::groups::FormationCategory;
     use crate::groups::FormationKind;
     use crate::groups::GroupFlags;
     use crate::groups::MotionFlags;
@@ -516,12 +518,12 @@ mod tests {
         g.spare_seconds = vec![Seconds::MAX];
         g.unit_types = vec![
             UnitTypeStatistic {
-                formation_category: 1,
+                formation_category: FormationCategory::named(1),
                 units: vec![object_id(10), object_id(11)],
                 ..UnitTypeStatistic::default()
             },
             UnitTypeStatistic {
-                formation_category: 3,
+                formation_category: FormationCategory::named(3),
                 units: vec![object_id(12)],
                 ..UnitTypeStatistic::default()
             },

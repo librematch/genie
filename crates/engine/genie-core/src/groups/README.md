@@ -35,6 +35,7 @@ The world runs the update of each group that a player owns, before the player's 
 | [`command.rs`](command.rs) | A group's orders (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), `commandMoveTo` (`FUN_141010a80`) and `stopAllUnits` (`FUN_14103a0d0`), the HD PDB's names. |
 | [`command_kind.rs`](command_kind.rs) | A group command's kind (`GroupCommandKind`): a move, a follow, or the action type of the task the group's members carry out. |
 | [`create.rs`](create.rs) | A group's members (FD-036): `AddUnit` (`FUN_1410083c0`) with its sub-formation statistics (`FUN_141008d90`, `FUN_1410116c0`) and a unit's radius in a formation (`FUN_141025920`). |
+| [`formation_category.rs`](formation_category.rs) | A unit's formation category in its group (`FormationCategory`): the sub-formation its master's type, hero flag and formation category put it in. |
 | [`formation_kind.rs`](formation_kind.rs) | A formation's type as one type: `BFormation`'s `mType`, a group's lock, a unit AI's formation type and the `FORM_FORMATION` command's. |
 | [`group_flags.rs`](group_flags.rs) | A group's flags (`GroupFlags`, `mGroupFlags`). |
 | [`group_id.rs`](group_id.rs) | A unit group's id as one type: the id the world gives each group it creates, which a unit's group link, a group's differentiator groups and the lookups by id name. |

@@ -29,6 +29,7 @@ use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
 
 mod command_kind;
+mod formation_category;
 mod formation_kind;
 mod group_flags;
 mod group_id;
@@ -38,6 +39,7 @@ mod objects;
 mod slot_state;
 
 pub use self::command_kind::GroupCommandKind;
+pub use self::formation_category::FormationCategory;
 pub use self::formation_kind::FormationKind;
 pub use self::group_flags::GroupFlags;
 pub use self::group_id::GroupId;
@@ -160,7 +162,7 @@ pub struct Slot {
     /// `mPositionFilled`.
     pub position_filled: u32,
     /// `mDesiredCategory`.
-    pub desired_category: i32,
+    pub desired_category: FormationCategory,
     /// `mActive`.
     pub active: u32,
     /// `mDesiredSubCategory`.
@@ -285,7 +287,7 @@ fn stretch(a: &LinePoint, b: &LinePoint) -> Distance {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnitTypeStatistic {
     /// `mFormationCategory`.
-    pub formation_category: i32,
+    pub formation_category: FormationCategory,
     /// `mUnits` (as many as `mNumberUnits`).
     pub units: Vec<ObjectId>,
     /// `mUsed`.

@@ -2,6 +2,7 @@
 //! them (createColumnLine `FUN_141012280`, ...).
 
 use crate::GenieError;
+use crate::groups::FormationCategory;
 use crate::groups::{Formation, FormationLine, Slot};
 use crate::math::fmath::BVector;
 use crate::world::slots::CheckedIndex;
@@ -67,7 +68,7 @@ impl Formation {
         }
         let fresh = Slot {
             unit_id: None,
-            desired_category: -1,
+            desired_category: FormationCategory::ANY,
             desired_sub_category: -1,
             ..Slot::default()
         };

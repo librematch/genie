@@ -2,6 +2,7 @@
 //! population in order and a line after a column.
 
 use crate::GenieError;
+use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::{Formation, UnitGroup, sub_formation};
@@ -47,12 +48,15 @@ impl World {
     pub(crate) fn unit_category(
         &self,
         object: Option<crate::groups::WorldObject<'_>>,
-    ) -> Result<i32, GenieError> {
+    ) -> Result<FormationCategory, GenieError> {
         let Some(object) = object else {
-            return Ok(-1);
+            return Ok(FormationCategory::ANY);
         };
         let master = self.master(object.player(), object.master_id())?;
-        Ok(sub_formation(master.kind, master.hero_flag, master.formation_category).unwrap_or(-1))
+        Ok(
+            sub_formation(master.kind, master.hero_flag, master.formation_category)
+                .unwrap_or(FormationCategory::ANY),
+        )
     }
 
     /// `ClosestUnit` (`FUN_14100e370`) of group `g` to `point`: of the members the world holds
@@ -67,7 +71,7 @@ impl World {
         &self,
         g: &UnitGroup,
         point: BVector,
-        category: i32,
+        category: FormationCategory,
         sub_category: i32,
         used: &[Option<ObjectId>],
     ) -> Result<Option<ObjectId>, GenieError> {
@@ -77,7 +81,7 @@ impl World {
             let Some(object) = self.world_object(m.id) else {
                 continue;
             };
-            if category != -1 && self.unit_category(Some(object))? != category {
+            if category != FormationCategory::ANY && self.unit_category(Some(object))? != category {
                 continue;
             }
             if sub_category != -1
@@ -133,7 +137,7 @@ impl World {
         g: &UnitGroup,
     ) -> Result<(), GenieError> {
         // what the slots ask for (the assignments change only their units)
-        let asks: Vec<(BVector, i32, i32)> = formation
+        let asks: Vec<(BVector, FormationCategory, i32)> = formation
             .slots
             .iter()
             .map(|s| {
@@ -258,7 +262,9 @@ impl World {
             let at = object.moved_vector();
             for (j, slot) in formation.slots.iter().enumerate() {
                 let mut skip = slot.transformed == 0 || slot.active == 0;
-                if slot.desired_category != -1 && category != slot.desired_category {
+                if slot.desired_category != FormationCategory::ANY
+                    && category != slot.desired_category
+                {
                     skip = true;
                 }
                 let other_master =
@@ -321,7 +327,9 @@ impl World {
                 let Some(object) = g.members.get(u).and_then(|m| self.world_object(m.id)) else {
                     continue;
                 };
-                if category != -1 && self.unit_category(Some(object))? != category {
+                if category != FormationCategory::ANY
+                    && self.unit_category(Some(object))? != category
+                {
                     continue;
                 }
                 if sub_category != -1

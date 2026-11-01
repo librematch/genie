@@ -570,6 +570,7 @@ pub(crate) fn weapon_range(master: &crate::objects::masters::Master) -> Distance
 mod tests {
     use super::*;
     use crate::combat::Charge;
+    use crate::groups::FormationCategory;
     use crate::groups::GroupTarget;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
     use crate::map::Footprint;
@@ -742,7 +743,7 @@ mod tests {
             ..Member::default()
         }];
         g.unit_types = vec![UnitTypeStatistic {
-            formation_category: 1,
+            formation_category: FormationCategory::named(1),
             units: vec![object_id(10)],
             ..UnitTypeStatistic::default()
         }];

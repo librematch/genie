@@ -1,6 +1,7 @@
 //! createColumnLine (`FUN_141012280`): the sizes and the slots of its sub-formations.
 
 use crate::GenieError;
+use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
@@ -131,11 +132,10 @@ pub(crate) fn column_line_slots(
         world_time,
     };
     let mut at = Cursor::default();
-    for c in 0..CATEGORIES {
+    for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
         let Some(cat) = category(group, c).filter(|cat| 0 < cat.types) else {
             continue;
         };
-        let k = c as usize;
         lay_category(
             formation,
             &cat,
@@ -150,7 +150,7 @@ pub(crate) fn column_line_slots(
 }
 
 /// The statistic of the group's sub-formation of formation category `c`, none without one.
-fn category(group: &UnitGroup, c: i32) -> Option<Category> {
+fn category(group: &UnitGroup, c: FormationCategory) -> Option<Category> {
     let stat = group
         .unit_types
         .iter()
@@ -174,31 +174,30 @@ fn category_sizes(
     let mut lines_of = [0i32; CATEGORY_COUNT];
     let mut columns_of = [0i32; CATEGORY_COUNT];
     let mut widest = 0.0f32;
-    let mut widest_index = -1;
+    let mut widest_index = FormationCategory::ANY;
     let mut valid = 0;
-    for c in 0..CATEGORIES {
+    for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
         let Some(cat) = category(group, c).filter(|cat| 0 < cat.count) else {
             continue;
         };
         valid += 1;
         let (lines, columns) = sizes(cat.count, !column);
-        *lines_of.checked_mut(c as usize)? = lines;
-        *columns_of.checked_mut(c as usize)? = columns;
+        *lines_of.checked_mut(k)? = lines;
+        *columns_of.checked_mut(k)? = columns;
         let width = columns as f32 * cat.spacing.get();
-        if widest_index == -1 || widest < width {
+        if widest_index == FormationCategory::ANY || widest < width {
             widest = width;
             widest_index = c;
         }
     }
-    if widest_index != -1 && 2 <= valid {
-        for c in 0..CATEGORIES {
+    if widest_index != FormationCategory::ANY && 2 <= valid {
+        for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
             if c == widest_index {
                 continue;
             }
             let Some(cat) = category(group, c).filter(|cat| 0 < cat.count) else {
                 continue;
             };
-            let k = c as usize;
             (*lines_of.checked_mut(k)?, *columns_of.checked_mut(k)?) = fit_to_widest(&cat, widest);
         }
     }
@@ -290,7 +289,7 @@ impl SubTypes {
 fn lay_category(
     formation: &mut Formation,
     cat: &Category,
-    c: i32,
+    c: FormationCategory,
     (lines, columns): (i32, i32),
     style: Style,
     at: &mut Cursor,
@@ -376,7 +375,7 @@ fn line_start(single: BVector, actual: i32, line_index: i32, staggered: bool) ->
 fn lay_line(
     formation: &mut Formation,
     cat: &Category,
-    c: i32,
+    c: FormationCategory,
     (actual, mut total, single): (i32, BVector, BVector),
     style: Style,
     at: &mut Cursor,

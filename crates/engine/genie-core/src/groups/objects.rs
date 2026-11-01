@@ -1,6 +1,7 @@
 //! An object of the world's id table ([`WorldObject`]) as the groups read it, and a unit's
 //! sub-formation.
 
+use crate::groups::FormationCategory;
 use crate::map::Position;
 use crate::math::fmath::BVector;
 use crate::objects::masters::HeroFlags;
@@ -134,17 +135,17 @@ pub fn sub_formation(
     kind: MasterKind,
     hero_flag: HeroFlags,
     formation_category: u8,
-) -> Option<i32> {
+) -> Option<FormationCategory> {
     if kind < COMBAT {
         return None;
     }
     if kind == COMBAT && hero_flag.grants(HeroFlags::PROTECTED_FORMATION) {
-        return Some(5);
+        return Some(FormationCategory::PROTECTED);
     }
     match formation_category {
-        0 | 5 => Some(5),
-        c @ 1..=4 => Some(i32::from(c)),
-        6 => Some(0),
+        0 | 5 => Some(FormationCategory::PROTECTED),
+        c @ 1..=4 => Some(FormationCategory::named(i32::from(c))),
+        6 => Some(FormationCategory::named(0)),
         _ => None,
     }
 }

@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::groups::FormationCategory;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -31,7 +32,7 @@ use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
 /// The formation categories a group keeps its units by (`FUN_141007ba0`, `FUN_14100c6c0`).
-const CATEGORIES: std::ops::RangeInclusive<i32> = 0..=5;
+const CATEGORIES: [FormationCategory; 6] = FormationCategory::EACH;
 /// What the special units list holds at most for a group of five members or more
 /// (`FUN_14100c6c0`); a smaller group's holds one.
 const SPECIAL_MOST: usize = 4;

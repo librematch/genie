@@ -9,9 +9,9 @@ use genie_core::GenieError;
 use genie_core::groups::GroupFlags;
 use genie_core::groups::MotionFlags;
 use genie_core::groups::{
-    Formation, FormationKind, FormationLine, GroupCommand, GroupCommandKind, GroupId, GroupOrder,
-    GroupTarget, LinePoint, Member, Motion, PointLine, Slot, SlotState, SpecificMove, TargetData,
-    UnitGroup, UnitGroups, UnitTypeStatistic,
+    Formation, FormationCategory, FormationKind, FormationLine, GroupCommand, GroupCommandKind,
+    GroupId, GroupOrder, GroupTarget, LinePoint, Member, Motion, PointLine, Slot, SlotState,
+    SpecificMove, TargetData, UnitGroup, UnitGroups, UnitTypeStatistic,
 };
 use genie_core::map::Distance;
 use genie_core::math::fmath::BVector;
@@ -92,7 +92,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
                     depth: s.slots_depth,
                     desired_transform_position: vec3(&s.slots_desired_transform_position),
                     position_filled: s.slots_position_filled,
-                    desired_category: s.slots_desired_category,
+                    desired_category: FormationCategory::named(s.slots_desired_category),
                     active: s.slots_active,
                     desired_sub_category: s.slots_desired_sub_category,
                     transformed: 0,
@@ -195,7 +195,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
             .iter()
             .map(|u| {
                 Ok(UnitTypeStatistic {
-                    formation_category: u.formation_category,
+                    formation_category: FormationCategory::named(u.formation_category),
                     units: object_ids(&u.units)?,
                     used: u.used,
                     attack_range: Distance::new(u.attack_range),
@@ -423,7 +423,6 @@ flat_value!(
     GroupId,
     GroupTarget,
     ActionType,
-    PlayerId,
     FormationKind,
     SlotState,
     UnitStance
@@ -481,6 +480,20 @@ impl Flat for TurnRate {
 
 /// A vector flattens as its three components in the game's order, as the save holds them.
 impl Flat for BVector {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A player flattens as its number, as the save holds it.
+impl Flat for PlayerId {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.get().flat(path, out);
+    }
+}
+
+/// A formation category flattens as its value, as the save holds it.
+impl Flat for FormationCategory {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }

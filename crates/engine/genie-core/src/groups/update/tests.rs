@@ -1,5 +1,6 @@
 use crate::combat::Charge;
 use crate::combat::attack::AttackState;
+use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
@@ -1749,7 +1750,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
             unit_id: ObjectId::of_field(9 + x as i32),
             offset: BVector::new(x - 2.0, 0.0, 0.0),
             transform_position: BVector::new(x + 2.0, 0.0, 4.0),
-            desired_category: 1,
+            desired_category: FormationCategory::named(1),
             desired_sub_category: -1,
             active: 1,
             transformed: 1,
@@ -1847,7 +1848,7 @@ fn attacking(t: &mut World) {
         ..crate::groups::TargetData::default()
     };
     g.unit_types = vec![crate::groups::UnitTypeStatistic {
-        formation_category: 1,
+        formation_category: FormationCategory::named(1),
         units: vec![object_id(10), object_id(11), object_id(12)],
         ..crate::groups::UnitTypeStatistic::default()
     }];
