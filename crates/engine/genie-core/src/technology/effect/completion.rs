@@ -17,7 +17,7 @@ use crate::technology::DisabledTech;
 use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
-use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER, MODE_WITHOUT_0X26D};
+use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER};
 use crate::technology::{EffectCommand, ObjectsKind, Party};
 use crate::world::Seconds;
 use crate::world::World;
@@ -448,7 +448,7 @@ impl World {
         if enable == 1 && master == MODE_TESTED_MASTER {
             // game mode 11 never enables it; any other asks a settings flag (their `+0x18`'s
             // `+0x7c`, bit 1, FUN_141324b60), which is not held
-            if self.settings.game_mode == MODE_WITHOUT_0X26D {
+            if self.settings.game_mode == crate::world::GameMode::SUDDEN_DEATH {
                 return Ok(());
             }
             return Err(GenieError::unsupported(

@@ -59,6 +59,7 @@ mod ai_values;
 mod clock;
 mod forced;
 mod object_step;
+mod options;
 pub mod schedule;
 pub mod settings;
 mod setup;
@@ -67,7 +68,9 @@ mod world_update;
 pub use self::ai_values::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 pub use self::clock::{Millis, Seconds, WholeSeconds, WorldTime};
 pub use self::forced::GameState;
-pub use self::world_update::{scenario_mode, standard_mode};
+pub use self::options::{
+    Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
+};
 
 /// What every building holds of a gate: `mGateLocked` (`+0xc7c`; a lock also sets the
 /// building's last move time, [`Mover::last_move`], slot 0x670, `FUN_1411dba30`), `mFirstUpdate`
@@ -199,9 +202,6 @@ pub(crate) const DROP_SITE_MASTERS: [MasterId; 8] = [
 pub(crate) const QUEUE_LIMIT: usize = 15;
 /// A computer player's QUEUE fills a building's queue to at most 2 (`FUN_141614450`).
 pub(crate) const COMPUTER_QUEUE_LIMIT: usize = 2;
-/// The game mode whose QUEUE trains one military unit at a time in the first age
-/// (`FUN_141614450`, the settings' `+0x34`).
-pub(crate) const ONE_UNIT_GAME: i32 = 0x10;
 /// The Hunt's search timer: it tells its unit AI again every 10 seconds (`0xc1200000`, in
 /// `0x140ac60e0` and `0x140ac7a00`).
 pub(crate) const SEARCH_AGAIN: Seconds = Seconds::new(-10.0);

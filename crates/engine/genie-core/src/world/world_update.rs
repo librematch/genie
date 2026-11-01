@@ -315,18 +315,3 @@ impl World {
         Ok(())
     }
 }
-
-/// `FUN_141302540`: the game mode (options `+0x34`) is Scenario (3), Campaign (4), King of the
-/// Hill (5) or Co-op Campaign (15), by aoc-mgz's game types.
-#[must_use]
-pub const fn scenario_mode(game_mode: i32) -> bool {
-    matches!(game_mode, 3 | 4 | 5 | 15)
-}
-
-/// `FUN_141302450`: the game mode's descriptor (`DAT_143f6b330[mode]`, the first for a mode above
-/// 16) has `+0x9c` 1, as `FUN_1412d99e0` makes them (`FUN_1412d9360`'s fifth argument): all but
-/// the scenario modes 3, 4, 5, 14 and 15.
-#[must_use]
-pub const fn standard_mode(game_mode: i32) -> bool {
-    !matches!(game_mode, 3 | 4 | 5 | 14 | 15)
-}

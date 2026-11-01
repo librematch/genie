@@ -262,10 +262,9 @@ const ONE_UNIT_AGE: f32 = crate::math::image::turn::ONE_UNIT_AGE;
 pub(crate) const FOUNDATION_GONE: GenieError =
     GenieError::unsupported("a build order on a foundation that is gone");
 
-/// Castle Age (`0x66`), whose RESEARCH marks the treaty monitor in [`CASTLE_AGE_MODE`].
+/// Castle Age (`0x66`), whose RESEARCH marks the treaty monitor in game mode 16
+/// ([`crate::world::GameMode::ONE_UNIT`]).
 const CASTLE_AGE: i16 = 0x66;
-/// The game mode (`0x10`) in which a Castle Age queued marks the world's treaty monitor.
-const CASTLE_AGE_MODE: i32 = 0x10;
 
 /// The units a human player's command names at most (`FUN_140e6b290`'s `0x3c`).
 const HUMAN_UNITS: usize = 60;

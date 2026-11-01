@@ -4,7 +4,7 @@ use crate::GenieError;
 use crate::commands::GatherPointState;
 use crate::commands::gather_point::GatherPointCommand;
 use crate::commands::research::ResearchCommand;
-use crate::commands::{CASTLE_AGE, CASTLE_AGE_MODE, GatherPoint};
+use crate::commands::{CASTLE_AGE, GatherPoint};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -382,7 +382,7 @@ impl World {
         )? {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
-            if r.tech == CASTLE_AGE && self.settings.game_mode == CASTLE_AGE_MODE {
+            if r.tech == CASTLE_AGE && self.settings.game_mode == crate::world::GameMode::ONE_UNIT {
                 return Err(GenieError::unsupported(
                     "RESEARCH of Castle Age in game mode 16 (the treaty monitor's +0x17)",
                 ));

@@ -158,7 +158,7 @@ fn attribute_22_is_the_explored_share_in_percent() {
         t.players[1].attributes[22],
         Amount::new(37.0 / 100.0 * 100.0)
     );
-    t.settings.visibility_type = 2;
+    t.settings.visibility_type = crate::world::Visibility::of_data(2);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].attributes[22], Amount::new(100.0));
 }
@@ -327,7 +327,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
     let keeps = |objects: Vec<Unit>, game_mode: i32| {
         let mut t = world();
         t.masters = vec![masters.clone(); 4];
-        t.settings.game_mode = game_mode;
+        t.settings.game_mode = crate::world::GameMode::of_data(game_mode);
         t.players[1].objects = objects.into();
         let p = &t.players[1];
         let kept: Vec<bool> = p
@@ -471,7 +471,7 @@ fn sudden_death_and_regicide_end_a_player_their_ways() {
     };
     let mut t = world();
     t.masters = vec![masters.clone(); 4];
-    t.settings.game_mode = 11;
+    t.settings.game_mode = crate::world::GameMode::of_data(11);
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![
         object(1, ids::VILLAGER_MALE, ObjectState::Alive),
@@ -491,12 +491,12 @@ fn sudden_death_and_regicide_end_a_player_their_ways() {
     // regicide (sub-mode bit 2): no king, a villager notwithstanding
     let mut t = world();
     t.masters = vec![masters; 4];
-    t.settings.sub_game_mode_flag = 4;
+    t.settings.sub_game_mode_flag = crate::world::SubModeFlags::from_bits_retain(4);
     t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, GameStatus::LOST);
     let mut t2 = world();
-    t2.settings.game_mode = 1;
+    t2.settings.game_mode = crate::world::GameMode::of_data(1);
     t2.players[1].tracker.add(
         object_id(7),
         Key {
@@ -582,11 +582,14 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
         civs: vec![
             vec![TreeBuilding {
                 id: 12,
-                units: vec![unit(74, 75, 1, 87), unit(93, -1, 3, 197)],
+                units: vec![
+                    unit(74, 75, crate::world::Age::of_data(1), 87),
+                    unit(93, -1, crate::world::Age::of_data(3), 197),
+                ],
             }],
             vec![TreeBuilding {
                 id: 87,
-                units: vec![unit(4, 24, 2, -1)],
+                units: vec![unit(4, 24, crate::world::Age::of_data(2), -1)],
             }],
         ],
         unique_units: Vec::new(),
@@ -621,7 +624,7 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     );
     // the last age 3: age 3 is out
     let early = crate::world::settings::Settings {
-        ending_age: 3,
+        ending_age: crate::world::Age::of_data(3),
         ..crate::world::settings::Settings::default()
     };
     let late = TreeQuery {
@@ -671,13 +674,13 @@ fn the_upgradable_count_follows_the_tech_tree() {
                 TreeUnit {
                     id: 74,
                     link: -1,
-                    age: 1,
+                    age: crate::world::Age::of_data(1),
                     tech: -1,
                 },
                 TreeUnit {
                     id: 75,
                     link: 74,
-                    age: 2,
+                    age: crate::world::Age::of_data(2),
                     tech: 150,
                 },
             ],

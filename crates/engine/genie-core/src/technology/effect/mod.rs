@@ -37,10 +37,9 @@ const OBJECT_GONE: crate::GenieError =
 
 /// The attribute the dependents' update sets to 1 when none of them is left (`+0x138`).
 const ATTRIBUTE_39: usize = 39;
-/// The master whose enabling first asks the game's mode (`0x26d`, `FUN_1416665b0`), and the
-/// mode that never enables it (11).
+/// The master whose enabling first asks the game's mode (`0x26d`, `FUN_1416665b0`); Sudden Death
+/// (11) never enables it.
 const MODE_TESTED_MASTER: MasterId = MasterId::named(0x26d);
-const MODE_WITHOUT_0X26D: i32 = 11;
 /// How slot 0x148 changes an attribute (its second argument): set (0, slot 0x150), add (1, slot
 /// 0x158) or multiply (2, slot 0x160); the masters' slots 0x18, 0x20, 0x28 and the objects' slots
 /// 0x78, 0x80, 0x88 follow it.

@@ -36,9 +36,6 @@ use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
-/// The game mode that puts the villagers to work at the start (`+0x34` 13, Empire Wars).
-pub const EMPIRE_WARS: i32 = 13;
-
 /// The gather groups the resource search tries, in order (0 to 4).
 const GROUPS: [GatherGroup; 5] = [
     GatherGroup::WOOD,

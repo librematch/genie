@@ -28,9 +28,7 @@ use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::slots::PlayerSlots;
-use crate::world::{
-    COMPUTER_QUEUE_LIMIT, ONE_UNIT_GAME, QUEUE_LIMIT, VILLAGER_ANY, World, villager,
-};
+use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, VILLAGER_ANY, World, villager};
 
 impl World {
     /// QUEUE, the player's part (`FUN_141614450`) after the packet's check of its buildings
@@ -129,7 +127,7 @@ impl World {
         }
         // game mode 16: with attribute 6 at most 1 (COMISS, JC: a NaN is not) a military unit
         // (its key's +9) is queued one at a time, the player's +0x1378 its flag
-        if self.settings.game_mode == ONE_UNIT_GAME
+        if self.settings.game_mode == crate::world::GameMode::ONE_UNIT
             // The player's attribute game mode 16's QUEUE reads (6, `+0x30`), and its bound
             // (`DAT_14330eb8c`).
             && crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)? <= Amount::new(ONE_UNIT_AGE)

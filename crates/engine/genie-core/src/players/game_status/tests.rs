@@ -865,7 +865,7 @@ fn a_research_gives_the_effect_attribute_269_names() {
 fn a_cancel_in_game_mode_16_clears_the_military_flag() {
     let run = |age: f32| {
         let mut t = game();
-        t.settings.game_mode = 16;
+        t.settings.game_mode = crate::world::GameMode::of_data(16);
         t.players[1].attributes[6] = Amount::new(age);
         t.players[1].one_military_queued = true;
         let ms = &mut t.masters[1];

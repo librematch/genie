@@ -6,9 +6,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::game_status::VictoryState;
-use crate::players::game_status::{
-    BATTLE_ROYALE, Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_AFTER_MS,
-};
+use crate::players::game_status::{Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_AFTER_MS};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -89,7 +87,7 @@ impl World {
             // refresh (FUN_140c80bb0) is not held
             self.spatial.reveal_to(p);
         }
-        if self.settings.game_mode == BATTLE_ROYALE {
+        if self.settings.game_mode == crate::world::GameMode::BATTLE_ROYALE {
             return Err(GenieError::unsupported(
                 "a status change in a battle royale (game mode 12)",
             ));

@@ -11,7 +11,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::QUEUED;
-use crate::players::game_status::{ONE_UNIT_AGE, ONE_UNIT_MODE};
+use crate::players::game_status::ONE_UNIT_AGE;
 use crate::players::tracker::Key;
 use crate::production::{Making, refund, refund_research};
 use crate::technology::CostPaid;
@@ -404,7 +404,7 @@ impl World {
         idx: ListIndex,
         index: u32,
     ) -> Result<(), GenieError> {
-        if self.settings.game_mode != ONE_UNIT_MODE {
+        if self.settings.game_mode != crate::world::GameMode::ONE_UNIT {
             return Ok(());
         }
         let attribute =

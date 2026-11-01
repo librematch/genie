@@ -104,8 +104,6 @@ impl Fealty {
     }
 }
 
-/// The game mode whose status changes shrink the map (battle royale, 12).
-const BATTLE_ROYALE: i32 = 12;
 /// A defeated player's objects stop once the game is this old, in milliseconds (`FUN_141639860`;
 /// in a recording's playback the session check that would stop them earlier passes).
 const STOP_AFTER_MS: WorldTime = WorldTime::from_millis(60_000);
@@ -125,9 +123,6 @@ const UNSTOPPED_BUILDINGS: [MasterId; 4] = [
     MasterId::named(276),
     MasterId::named(1187),
 ];
-/// The game mode whose QUEUE trains one military unit at a time early on (16, the settings'
-/// `+0x34`).
-const ONE_UNIT_MODE: i32 = 16;
 /// That attribute's bound (`DAT_14330eb8c`).
 const ONE_UNIT_AGE: f32 = crate::math::image::game_status::ONE_UNIT_AGE;
 

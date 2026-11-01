@@ -22,9 +22,7 @@ use crate::unit_ai::UnitAiType;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
 use crate::world::others::OthersRef;
-use crate::world::scenario_mode;
 use crate::world::slots::PlayerSlots;
-use crate::world::standard_mode;
 use crate::world::step::Step;
 
 /// A unit that runs its unit AI's side where it has none.
@@ -53,7 +51,7 @@ impl Unit {
             && let Some(q) = crate::vision::visibility::sight_taker(
                 mask,
                 c.player,
-                standard_mode(c.w.settings.game_mode),
+                c.w.settings.game_mode.standard(),
                 &c.w.players,
                 &c.w.allow_gaia_capture,
             )
@@ -145,7 +143,7 @@ impl Unit {
             firepower: self.firepower,
             capture: self.capture_kind(c),
             master: self.life.master_id,
-            scenario: scenario_mode(c.w.settings.game_mode),
+            scenario: c.w.settings.game_mode.scenario(),
             task_0x69: master
                 .is_some_and(|m| m.tasks.iter().any(|t| t.action_type == action_type::HEAL)),
             // a new owner sees the target with its own map
@@ -296,7 +294,7 @@ impl Unit {
             ai_type,
             master,
             (player, computer),
-            scenario_mode(c.w.settings.game_mode),
+            c.w.settings.game_mode.scenario(),
             at.capture,
         );
         self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
@@ -333,7 +331,7 @@ impl Unit {
             ai_type,
             master,
             (player, computer),
-            scenario_mode(c.w.settings.game_mode),
+            c.w.settings.game_mode.scenario(),
             self.capture_kind(c),
         );
         self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
@@ -427,7 +425,7 @@ impl Unit {
             ai_type,
             master,
             (player, computer),
-            scenario_mode(c.w.settings.game_mode),
+            c.w.settings.game_mode.scenario(),
             at.capture,
         );
         self.with_side(

@@ -3,43 +3,23 @@
 //! option's member and offset as the load reads it (`&mWalkableFarms` into `+0x69`, …); the
 //! recording's header holds them all (genie-save's `GameOptions`).
 
-use crate::world::standard_mode;
-
-/// The game mode King of the Hill (5), which [`Settings::carry_rule`] passes over.
-const KING_OF_THE_HILL: i32 = 5;
-/// The game mode Regicide (1), whose players lose with their last king ([`Settings::regicide`]).
-const REGICIDE: i32 = 1;
-/// The game mode Sudden Death (11), whose players lose with their last town centre
-/// ([`Settings::sudden_death`]).
-const SUDDEN_DEATH: i32 = 11;
-/// The game mode Empire Wars (13) ([`Settings::empire_wars`]).
-const EMPIRE_WARS: i32 = crate::orders::start_work::EMPIRE_WARS;
-/// `mSubGameModeFlag`'s bit of the Empire Wars rule (`FUN_141324b60(options + 0x18) & 1`).
-const EMPIRE_WARS_FLAG: i32 = 1;
-/// `mSubGameModeFlag`'s bit of the sudden death rule (`FUN_141324b60(options + 0x18) & 2`).
-const SUDDEN_DEATH_FLAG: i32 = 2;
-/// `mSubGameModeFlag`'s bit of the regicide rule (`FUN_141302520`: `+0x94 & 4`).
-const REGICIDE_FLAG: i32 = 4;
-/// `FUN_1412fc110`'s last age for an `mEndingAge` of 0.
-const DEFAULT_LAST_AGE: i32 = 5;
-/// The visibility types whose players have explored the whole map (`mVisibilityType` 1, explored,
-/// and 2, all visible): their attribute 22 is 100 ([`Settings::explored_all`]).
-const EXPLORED: i32 = 1;
-const ALL_VISIBLE: i32 = 2;
+use crate::world::{
+    Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
+};
 
 /// What the simulation reads of the game options.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Settings {
     /// `mGameMode` (`+0x34`).
-    pub game_mode: i32,
+    pub game_mode: GameMode,
     /// `mEndingAge` (`+0x40`): the last age of the game, 0 for the default
     /// ([`Settings::last_age`]).
-    pub ending_age: i32,
+    pub ending_age: Age,
     /// `mVisibilityType` (`+0x48`): 0 normal, 1 explored, 2 all visible.
-    pub visibility_type: i32,
+    pub visibility_type: Visibility,
     /// `mSubGameModeFlag` (`+0x94`): the rules a mode adds to another (bit 1 sudden death, bit 2
     /// regicide), read as an int (`FUN_141324b60` on `+0x18` reads `+0x18 + 0x7c`).
-    pub sub_game_mode_flag: i32,
+    pub sub_game_mode_flag: SubModeFlags,
     /// `mFullTechTreeEnabled` (`+0x63`): a civilisation's own technologies of a mode other than
     /// 1 are disabled like another civilisation's ([`crate::world::World::update_dependents`]).
     pub full_tech_tree: bool,
@@ -50,7 +30,7 @@ pub struct Settings {
     /// `FUN_140ec0cd0` (`+0x9c` the kind: 0 for the value itself, 1 for 2 where the value is 3,
     /// else 0); the load reads the value alone and the kind stays 0, as the object's
     /// constructor and `FUN_14130f2b0` leave it.
-    pub selected_content_mode: i32,
+    pub selected_content_mode: ContentMode,
     /// `mVillagerForceDrop` (`+0x1070`), which [`Settings::carry_rule`] reads.
     pub villager_force_drop: bool,
     /// `mCheatsEnabled` (`+0x1074`, `FUN_1412ffe00`): players may order each other's units, and
@@ -60,14 +40,14 @@ pub struct Settings {
     /// `mTreatyLength`: the treaty's minutes, 0 for none. The world's treaty monitor (`+0x820`,
     /// `FUN_141461190`) fills its players' zones only while a treaty holds (`FUN_141461c00`);
     /// the slice holds no treaty.
-    pub treaty_length: u32,
+    pub treaty_length: TreatyLength,
     /// `mTeamsLocked` (`+0x64`): the world's teams stay as the game began
     /// ([`crate::world::World::resolve_teams`]).
     pub teams_locked: bool,
     /// `mStartingAge` (`+0x3c`): 0 the mode's default, 2 to 6 the ages.
-    pub starting_age: i32,
+    pub starting_age: Age,
     /// `mResourceLevel` (`+0x54`).
-    pub resource_level: i32,
+    pub resource_level: ResourceLevel,
     /// `mTurboEnabled` (`+0x67`).
     pub turbo: bool,
     /// `mSharedExploration` (`+0x68`).
@@ -104,7 +84,7 @@ impl Settings {
     pub fn tech_mode_allows(&self, mode: i16) -> Result<bool, crate::GenieError> {
         let positive = match mode.unsigned_abs() {
             n @ 2..=18 => self.rule_mode(n)?,
-            n @ 19..=25 => self.resource_level == i32::from(n) - 19,
+            n @ 19..=25 => self.resource_level.get() == i32::from(n) - 19,
             26 => self.antiquity,
             32 if mode < 0 => return Ok(true),
             n @ 27..=34 => self.age_mode(n)?,
@@ -120,21 +100,21 @@ impl Settings {
     ///
     /// Mode 15 (the root's `+0x560` entry, not held).
     fn rule_mode(&self, n: u16) -> Result<bool, crate::GenieError> {
-        let (m, flags) = (self.game_mode, self.sub_game_mode_flag);
+        let (m, flags) = (self.game_mode.get(), self.sub_game_mode_flag);
         Ok(match n {
             2 => m == 0,
             3 => m == 2,
             4 => self.empire_wars(),
             5 => m == 7,
             6 => m == 8,
-            7 => m == 11 || flags & 2 != 0,
-            8 => m == 6 || flags & 8 != 0,
+            7 => m == 11 || flags.contains(SubModeFlags::SUDDEN_DEATH),
+            8 => m == 6 || flags.contains(SubModeFlags::WONDER_RACE),
             9 => m == 10,
             10 => m == 12,
             11 => m == 1,
             12 => self.turbo,
             13 => matches!(m, 4 | 3 | 5 | 15),
-            14 => flags & 4 != 0,
+            14 => flags.contains(SubModeFlags::REGICIDE),
             15 => return Err(ROOT_MODE),
             16 => m == 16,
             17 => !self.walkable_farms,
@@ -146,7 +126,7 @@ impl Settings {
     /// [`Settings::tech_mode_allows`]'s modes 27 to 34 (`n`), by the starting age, its default 0
     /// by the game mode.
     fn age_mode(&self, n: u16) -> Result<bool, crate::GenieError> {
-        let (m, age) = (self.game_mode, self.starting_age);
+        let (m, age) = (self.game_mode.get(), self.starting_age.get());
         let below = |n: u32| (age as u32) < n;
         let default_in = |modes: &[i32]| age == 0 && modes.contains(&m);
         Ok(match n {
@@ -166,18 +146,18 @@ impl Settings {
     /// Hill whose descriptor's `+0x9c` is not 1 (not [`standard_mode`]): a hunter drops another
     /// resource it carries.
     #[must_use]
-    pub const fn carry_rule(&self) -> bool {
+    pub fn carry_rule(&self) -> bool {
         self.villager_force_drop
-            && self.game_mode != KING_OF_THE_HILL
-            && !standard_mode(self.game_mode)
+            && self.game_mode != GameMode::KING_OF_THE_HILL
+            && !self.game_mode.standard()
     }
 
     /// `FUN_1412fc110`: the game's last age, `mEndingAge` or 5 for 0. A tech tree's unit of a
     /// later age than the one before it is not in the tree ([`crate::players::world_player`]).
     #[must_use]
-    pub const fn last_age(&self) -> i32 {
-        if self.ending_age == 0 {
-            DEFAULT_LAST_AGE
+    pub fn last_age(&self) -> Age {
+        if self.ending_age == Age::DEFAULT {
+            Age::POST_IMPERIAL
         } else {
             self.ending_age
         }
@@ -188,37 +168,40 @@ impl Settings {
     /// (`WorldPlayer::update`, `0x14163b100`).
     #[must_use]
     pub const fn explored_all(&self) -> bool {
-        matches!(self.visibility_type, EXPLORED | ALL_VISIBLE)
+        self.visibility_type.explored_all()
     }
 
     /// `FUN_141302520`: the regicide rule holds, the game mode Regicide (1) or the sub-mode's
     /// bit 2: a player without a king (master 434) loses.
     #[must_use]
-    pub const fn regicide(&self) -> bool {
-        self.game_mode == REGICIDE || self.sub_game_mode_flag & REGICIDE_FLAG != 0
+    pub fn regicide(&self) -> bool {
+        self.game_mode == GameMode::REGICIDE
+            || self.sub_game_mode_flag.contains(SubModeFlags::REGICIDE)
     }
 
     /// The Empire Wars rule holds (`BaseWorld::update` at `0x141550c1c`, `FUN_1413cf2f0`'s mode
     /// 4): the game mode Empire Wars (13) or the sub-mode's bit 0. Its first update puts the
     /// villagers to work ([`crate::orders::start_work`]).
     #[must_use]
-    pub const fn empire_wars(&self) -> bool {
-        self.game_mode == EMPIRE_WARS || self.sub_game_mode_flag & EMPIRE_WARS_FLAG != 0
+    pub fn empire_wars(&self) -> bool {
+        self.game_mode == GameMode::EMPIRE_WARS
+            || self.sub_game_mode_flag.contains(SubModeFlags::EMPIRE_WARS)
     }
 
     /// The sudden death rule holds (`WorldPlayer::update` at `0x14163b92a`): the game mode Sudden
     /// Death (11) or the sub-mode's bit 1: a player who had a town centre loses without one.
     #[must_use]
-    pub const fn sudden_death(&self) -> bool {
-        self.game_mode == SUDDEN_DEATH || self.sub_game_mode_flag & SUDDEN_DEATH_FLAG != 0
+    pub fn sudden_death(&self) -> bool {
+        self.game_mode == GameMode::SUDDEN_DEATH
+            || self.sub_game_mode_flag.contains(SubModeFlags::SUDDEN_DEATH)
     }
 
     /// The content mode read through `FUN_140ec0cd0` is 1 (`0x140ac8655`): a hunt whose Attack
     /// on a predator (class 10) ended ends too (`set_state` 1) when its unit AI has orders
     /// queued.
     #[must_use]
-    pub const fn predator_hunts_end(&self) -> bool {
-        self.selected_content_mode == 1
+    pub fn predator_hunts_end(&self) -> bool {
+        self.selected_content_mode == ContentMode::PREDATOR_HUNTS_END
     }
 }
 
@@ -230,8 +213,8 @@ mod tests {
     /// the standard modes, and in any mode without it, a hunter keeps what it carries.
     #[test]
     fn the_carry_rule_needs_the_force_drop_in_a_scenario_mode_but_king_of_the_hill() {
-        let with = |game_mode, villager_force_drop| Settings {
-            game_mode,
+        let with = |game_mode: i32, villager_force_drop| Settings {
+            game_mode: GameMode::of_data(game_mode),
             villager_force_drop,
             ..Settings::default()
         };
@@ -249,8 +232,8 @@ mod tests {
     /// the others do not.
     #[test]
     fn the_explored_and_all_visible_types_explore_the_whole_map() {
-        let with = |visibility_type| Settings {
-            visibility_type,
+        let with = |visibility_type: i32| Settings {
+            visibility_type: Visibility::of_data(visibility_type),
             ..Settings::default()
         };
         assert!(with(1).explored_all() && with(2).explored_all());
@@ -263,9 +246,9 @@ mod tests {
     /// Death (mode 11) or the sub-mode's bit 1. Each bit alone, in any mode.
     #[test]
     fn regicide_and_sudden_death_come_from_the_mode_or_the_sub_mode_s_bits() {
-        let with = |game_mode, sub_game_mode_flag| Settings {
-            game_mode,
-            sub_game_mode_flag,
+        let with = |game_mode: i32, sub_game_mode_flag: i32| Settings {
+            game_mode: GameMode::of_data(game_mode),
+            sub_game_mode_flag: SubModeFlags::from_bits_retain(sub_game_mode_flag),
             ..Settings::default()
         };
         assert!(with(1, 0).regicide() && !with(1, 0).sudden_death());
@@ -282,9 +265,9 @@ mod tests {
     /// bit, whose villagers start at work), alone or with the other bits.
     #[test]
     fn empire_wars_comes_from_the_mode_or_the_sub_mode_s_bit_0() {
-        let with = |game_mode, sub_game_mode_flag| Settings {
-            game_mode,
-            sub_game_mode_flag,
+        let with = |game_mode: i32, sub_game_mode_flag: i32| Settings {
+            game_mode: GameMode::of_data(game_mode),
+            sub_game_mode_flag: SubModeFlags::from_bits_retain(sub_game_mode_flag),
             ..Settings::default()
         };
         assert!(with(13, 0).empire_wars());
@@ -298,21 +281,21 @@ mod tests {
     /// `FUN_1412fc110`: an ending age of 0 is the fifth; any other is itself.
     #[test]
     fn the_last_age_is_the_ending_age_or_5() {
-        let with = |ending_age| Settings {
-            ending_age,
+        let with = |ending_age: i32| Settings {
+            ending_age: Age::of_data(ending_age),
             ..Settings::default()
         };
-        assert_eq!(with(0).last_age(), 5);
+        assert_eq!(with(0).last_age(), Age::POST_IMPERIAL);
         for age in [1, 2, 4, 6, -1] {
-            assert_eq!(with(age).last_age(), age);
+            assert_eq!(with(age).last_age(), Age::of_data(age));
         }
     }
 
     /// The content mode 1 alone ends a predator's hunt.
     #[test]
     fn a_predator_s_hunt_ends_in_content_mode_1() {
-        let with = |selected_content_mode| Settings {
-            selected_content_mode,
+        let with = |selected_content_mode: i32| Settings {
+            selected_content_mode: ContentMode::of_data(selected_content_mode),
             ..Settings::default()
         };
         assert!(with(1).predator_hunts_end());
@@ -325,16 +308,16 @@ mod tests {
     /// mode 9 at the default age, which none of these allows.
     #[test]
     fn each_technology_mode_takes_its_game_mode_flag_option_or_age() {
-        let mode = |game_mode| Settings {
-            game_mode,
+        let mode = |game_mode: i32| Settings {
+            game_mode: GameMode::of_data(game_mode),
             ..Settings::default()
         };
-        let flag = |sub_game_mode_flag| Settings {
-            sub_game_mode_flag,
+        let flag = |sub_game_mode_flag: i32| Settings {
+            sub_game_mode_flag: SubModeFlags::from_bits_retain(sub_game_mode_flag),
             ..mode(9)
         };
-        let age = |starting_age| Settings {
-            starting_age,
+        let age = |starting_age: i32| Settings {
+            starting_age: Age::of_data(starting_age),
             ..mode(9)
         };
         let cases = [
@@ -397,8 +380,8 @@ mod tests {
         assert_eq!(mode(9).tech_mode_allows(27), Ok(true));
         assert_eq!(mode(13).tech_mode_allows(27), Ok(false));
         assert_eq!(age(2).tech_mode_allows(27), Ok(true));
-        let level = |resource_level| Settings {
-            resource_level,
+        let level = |resource_level: i32| Settings {
+            resource_level: ResourceLevel::of_data(resource_level),
             ..mode(9)
         };
         for n in 19..=25 {
@@ -427,7 +410,7 @@ mod tests {
     #[test]
     fn a_technology_s_mode_reads_the_game_s_options() {
         let s = Settings {
-            game_mode: 2,
+            game_mode: GameMode::of_data(2),
             ..Settings::default()
         };
         assert_eq!(s.tech_mode_allows(0), Ok(true));
@@ -447,7 +430,7 @@ mod tests {
         );
         assert_eq!(s.tech_mode_allows(-32), Ok(true));
         let feudal = Settings {
-            starting_age: 2,
+            starting_age: Age::of_data(2),
             ..Settings::default()
         };
         assert_eq!(
@@ -457,8 +440,8 @@ mod tests {
         // the default age in the random map mode (0) is Feudal's (27)
         assert_eq!(Settings::default().tech_mode_allows(27), Ok(true));
         let options = Settings {
-            sub_game_mode_flag: 1,
-            resource_level: 3,
+            sub_game_mode_flag: SubModeFlags::from_bits_retain(1),
+            resource_level: ResourceLevel::of_data(3),
             walkable_farms: true,
             antiquity: true,
             ..Settings::default()

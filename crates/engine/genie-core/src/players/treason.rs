@@ -157,7 +157,7 @@ mod tests {
             t.players[1].attributes[attribute::GOLD.index()],
             Amount::new(500.0)
         );
-        t.settings.game_mode = 1;
+        t.settings.game_mode = crate::world::GameMode::of_data(1);
         t.players[1].attributes[attribute::GOLD.index()] = Amount::new(399.0);
         t.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn treason_without_kings_only_pays() {
         let mut t = world();
-        t.settings.game_mode = 1;
+        t.settings.game_mode = crate::world::GameMode::of_data(1);
         let before = t.players[3].objects.len();
         t.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn treason_flares_the_kings_for_the_player_and_its_allies() {
         let mut t = world();
-        t.settings.game_mode = 1;
+        t.settings.game_mode = crate::world::GameMode::of_data(1);
         with_flares(&mut t);
         t.next_object_id = object_id(100);
         t.players[2].objects = vec![
@@ -241,7 +241,7 @@ mod tests {
         assert_eq!(flares(&t, 2), []);
         // a king inside a building: the flares go to the building's place
         let mut t = world();
-        t.settings.game_mode = 1;
+        t.settings.game_mode = crate::world::GameMode::of_data(1);
         with_flares(&mut t);
         let mut castle = king(40, Position::new(12.0, 13.0, 0.0), None);
         castle.life.master_id = CASTLE;

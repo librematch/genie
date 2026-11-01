@@ -220,6 +220,6 @@ impl World {
         }
         Ok(master.id == WONDER
             && state != ObjectState::Foundation
-            && crate::world::scenario_mode(self.settings.game_mode))
+            && self.settings.game_mode.scenario())
     }
 }

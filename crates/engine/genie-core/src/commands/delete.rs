@@ -313,7 +313,7 @@ impl World {
     /// A game with a treaty ([`crate::world::settings::Settings::treaty_length`]), whose zones the slice
     /// does not hold.
     const fn clear_treaty_zones(&self) -> Result<(), GenieError> {
-        if self.settings.treaty_length != 0 {
+        if self.settings.treaty_length.holds() {
             return Err(GenieError::unsupported(
                 "a deleted town centre 621 during a treaty (its owner's treaty zones)",
             ));
@@ -780,7 +780,7 @@ mod tests {
         );
         let mut t = game(0.0, true);
         town_centre(&mut t);
-        t.settings.treaty_length = 10;
+        t.settings.treaty_length = crate::world::TreatyLength::of_minutes(10);
         assert_eq!(
             t.delete(player_id(1), object_id(11)),
             Err(GenieError::unsupported(

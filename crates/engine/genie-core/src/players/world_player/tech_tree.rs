@@ -8,7 +8,7 @@ pub struct TreeUnit {
     /// `+0x4`: the master it links to ([`TechTree::link`]).
     pub link: i32,
     /// `+0x8`: its age (2 Feudal, 3 Castle, 4 Imperial).
-    pub age: i32,
+    pub age: crate::world::Age,
     /// `+0xc`: the technology that brings it ([`TechTree::tech`]).
     pub tech: i32,
 }
@@ -101,15 +101,15 @@ impl TechTree {
             };
             if let Some(b) = buildings.iter().find(|b| b.id == q.building) {
                 let unit = b.units.iter().find(|u| u.id == q.unit);
-                let age = unit.map_or(0, |u| u.age);
-                if q.settings.last_age() - 1 < age {
+                let age = unit.map_or(crate::world::Age::DEFAULT, |u| u.age);
+                if q.settings.last_age().before() < age {
                     return Found::OutOfAges;
                 }
                 let [feudal, castle, imperial] = q.ages_out;
                 let out = unit.is_some_and(|u| {
-                    (u.age == 2 && feudal)
-                        || (u.age == 3 && (feudal || castle))
-                        || (u.age == 4 && (feudal || castle || imperial))
+                    (u.age == crate::world::Age::FEUDAL && feudal)
+                        || (u.age == crate::world::Age::CASTLE && (feudal || castle))
+                        || (u.age == crate::world::Age::IMPERIAL && (feudal || castle || imperial))
                 });
                 if out {
                     return Found::OutOfAges;

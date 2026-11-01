@@ -29,7 +29,6 @@ use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::world::World;
 use crate::world::others::OthersRef;
-use crate::world::scenario_mode;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -67,7 +66,7 @@ impl Unit {
             target: repairee,
             counted_in,
             radius: own.radius,
-            scenario: scenario_mode(c.w.settings.game_mode),
+            scenario: c.w.settings.game_mode.scenario(),
             rate: self.work_rate_powerup + own.work_rate,
             waits: own.class == class::VILLAGER && !c.w.players.player(c.player)?.computer,
             stance: self

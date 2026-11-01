@@ -1556,11 +1556,11 @@ fn the_enable_command_sets_available_unless_disabled() {
     .unwrap();
     let available: Vec<bool> = t.masters[0].iter().map(|m| m.available).collect();
     assert_eq!(available, [true, false, false]);
-    t.settings.game_mode = 11;
+    t.settings.game_mode = crate::world::GameMode::of_data(11);
     t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
         .unwrap();
     assert!(!t.masters[0].get(master_id(0x26d)).unwrap().available);
-    t.settings.game_mode = 0;
+    t.settings.game_mode = crate::world::GameMode::of_data(0);
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
             .is_err()

@@ -9063,9 +9063,9 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
             .map_or(0, |p| p.queue.total);
         (r, queued)
     };
-    let (r, queued) = castle(0);
+    let (r, queued) = castle(GameMode::of_data(0));
     assert_eq!((r.is_ok(), queued), (true, 1));
-    assert!(castle(16).0.is_err());
+    assert!(castle(GameMode::of_data(16)).0.is_err());
 }
 
 /// [`one_player`]'s town centre 9 with a unit AI and technology 5, available (state 1) at the
@@ -9386,7 +9386,7 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
 #[test]
 fn game_mode_16_queues_one_military_unit_at_a_time() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.settings.game_mode = 16;
+    t.settings.game_mode = GameMode::of_data(16);
     t.tick_with(Millis::new(104), &[queue(9, 99, 3)]);
     t.tick_with(Millis::new(104), &[queue(9, 99, 2)]);
     let q = &t.players[0].objects[ListIndex::new(0)]
@@ -10204,7 +10204,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
                 },
             ],
         );
-        t.settings.game_mode = mode;
+        t.settings.game_mode = GameMode::of_data(mode);
         t.players[0].attributes[40] = Amount::new(1.0);
         t.masters = masters;
         t.spatial = hands_world(
@@ -12014,6 +12014,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
 /// first descriptor's.
 #[test]
 fn the_standard_modes_are_all_but_the_scenario_ones() {
+    let standard_mode = |m| GameMode::of_data(m).standard();
     let standard: Vec<i32> = (0..=17).filter(|&m| standard_mode(m)).collect();
     assert_eq!(standard, [0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17]);
     assert!(standard_mode(-1));
