@@ -511,8 +511,8 @@ impl World {
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
         let rng = self.streams.get(crate::math::rng::Stream::Sprite);
         let u = match place {
-            crate::orders::Place::Live(p, i) => self.players.live_mut(p, i)?,
-            crate::orders::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
+            crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
+            crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
         };
         crate::objects::sprite::new_sprite(&mut u.sprite, u.body.move_stats_mut(), g, rng);
         Ok(true)

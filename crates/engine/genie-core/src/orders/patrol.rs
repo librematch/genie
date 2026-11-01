@@ -112,13 +112,10 @@ impl World {
     /// or not, resets as for an order.
     pub(super) fn reset_for_attack_move(&mut self, ids: &[Option<ObjectId>]) {
         for &id in ids {
-            let ai = self.players.iter_mut().find_map(|player| {
-                let unit = player
-                    .objects
-                    .by_id_mut(id)
-                    .or_else(|| player.sleeping.by_id_mut(id))?;
-                unit.combat.ai.as_mut()
-            });
+            let place = self.place(id);
+            let ai = place
+                .and_then(|place| self.players.at_mut(place).ok())
+                .and_then(|unit| unit.combat.ai.as_mut());
             if let Some(ai) = ai {
                 ai.reset_for_order(self.streams.get(Stream::Ai));
             }

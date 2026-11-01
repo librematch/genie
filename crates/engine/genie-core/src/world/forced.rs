@@ -230,7 +230,7 @@ impl World {
                     i = i.next();
                     continue;
                 }
-                let gone = self.players.player_mut(p)?.objects.swap_remove(i)?;
+                let gone = self.swap_remove_live(p, i)?;
                 if let Err(e) = self.leave_world(p, &gone) {
                     notes.push((p, Some(id), e));
                 }

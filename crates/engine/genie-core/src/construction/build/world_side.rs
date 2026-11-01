@@ -14,9 +14,9 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, player_master};
-use crate::orders::Place;
 use crate::players::PlayerId;
 use crate::world::Seconds;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl crate::world::World {

@@ -214,7 +214,7 @@ impl Unit {
         by: Releaser,
     ) -> Result<(), GenieError> {
         let (owner, resource) =
-            self.found_resource(c, OthersRef::of(&c.w.players, c.player)?, found)?;
+            self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
         let master = self.master(&c.w.masters, c.player)?;
         let (computer, farm_stops) = (
             c.w.players.player(c.player)?.computer,
@@ -262,11 +262,9 @@ impl Unit {
             }
             if owner == c.player.index() && new == Some(found) {
                 // one of its own player's: allied, never listed
+                let _ = c.w.players.player(c.player)?;
                 let u =
-                    c.w.players
-                        .player_mut(c.player)?
-                        .objects
-                        .by_id_mut(found)
+                    c.w.live_object_mut(c.player, found)
                         .ok_or(GenieError::unreachable(
                             "an object found above its player lost",
                         ))?;
@@ -331,7 +329,7 @@ impl Unit {
             computer: c.w.players.player(c.player)?.computer,
             groups: &c.w.groups,
         };
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         if let Some(site) = self.gather_drop_off_in(w, others, &c.w.graphics)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;

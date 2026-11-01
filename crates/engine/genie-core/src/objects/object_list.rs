@@ -1,39 +1,25 @@
-//! One of a player's object lists (FD-045-D11, D20): its objects in update order and the place
-//! of each by id, which the game's table by id (`FUN_1415417a0`, `world+0x168` and `+0x178`)
-//! answers.
+//! One of a player's object lists (FD-045-D11, D20): its objects in update order. The world's
+//! table by id (`FUN_1415417a0`, [`crate::world::index`]) holds each object's slot; the world's
+//! list operations change a list and file what moved, and a list's own lookup by id scans it.
 //!
-//! The list's own mutators keep the index. An object out for its update ([`ObjectList::take_out`])
-//! leaves its stand-in ([`TAKEN_OUT`]) in its slot, and the list keeps that slot as its
-//! removals move the stand-in, so the object goes back where the game's list holds it
-//! ([`ObjectList::put_back`]; `FUN_1411664a0` swap-removes, the object's `+0x668` following its
-//! slot). A lookup checks the slot's id, so a stand-in answers none. A list that ever held one id
-//! twice (a test's default units) looks up by scanning, the first slot first.
-
-use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, DefaultHasher};
+//! An object out for its update ([`ObjectList::take_out`]) leaves its stand-in ([`TAKEN_OUT`])
+//! in its slot, and the list keeps that slot as its removals move the stand-in, so the object
+//! goes back where the game's list holds it ([`ObjectList::put_back`]; `FUN_1411664a0`
+//! swap-removes, the object's `+0x668` following its slot). A stand-in is no object: a lookup
+//! by id never answers it.
 
 use crate::GenieError;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::objects::{ListIndex, ObjectId, ObjectKey, Places};
 
-/// The index's hasher: `SipHash` with fixed keys, so a run hashes the same everywhere.
-type Fixed = BuildHasherDefault<DefaultHasher>;
-
-/// A player's live or sleeping objects in their list's order, with each one's slot by id.
+/// A player's live or sleeping objects in their list's order.
 #[derive(Clone, Debug, Default)]
 pub struct ObjectList {
     units: Vec<Unit>,
-    slots: HashMap<ObjectId, ListIndex, Fixed>,
-    /// The list held one id in two slots: the index does not answer, a scan does.
-    twice: bool,
     /// The objects out of the list ([`ObjectList::take_out`]): each one's id and the slot its
     /// stand-in holds now.
     outs: Vec<(ObjectId, ListIndex)>,
 }
-
-/// A list empty right after its push.
-pub(crate) const NOTHING_PUSHED: GenieError =
-    GenieError::unreachable("a live list empty right after a push");
 
 /// A slot the list does not hold.
 fn no_slot(i: ListIndex) -> GenieError {
@@ -41,22 +27,25 @@ fn no_slot(i: ListIndex) -> GenieError {
 }
 
 impl ObjectList {
-    /// The slot of object `id`, if the list holds it (not while it is out for its update).
+    /// The slot of object `id`, if the list holds it (not while it is out for its update), the
+    /// first one first: a scan of the list (the world's table by id answers a lookup in the
+    /// world, [`crate::world::World::place`]).
     #[must_use]
     pub fn position_of(&self, id: impl ObjectKey) -> Option<ListIndex> {
         let id = id.key()?;
         if id == TAKEN_OUT {
             return None;
         }
-        if self.twice {
-            return self
-                .units
-                .iter()
-                .position(|u| u.id == id)
-                .map(ListIndex::new);
-        }
-        let &i = self.slots.get(&id)?;
-        self.get(i).is_some_and(|u| u.id == id).then_some(i)
+        self.units
+            .iter()
+            .position(|u| u.id == id)
+            .map(ListIndex::new)
+    }
+
+    /// The object whose stand-in holds slot `i` now, if one does.
+    #[must_use]
+    pub fn out_at(&self, i: ListIndex) -> Option<ObjectId> {
+        self.outs.iter().find(|o| o.1 == i).map(|o| o.0)
     }
 
     /// The object in slot `i`, if the list holds the slot.
@@ -205,18 +194,16 @@ impl ObjectList {
         let Some(n) = self.outs.iter().rposition(|&(id, _)| id == unit.id) else {
             return Err(Box::new(unit));
         };
-        let (id, slot) = self.outs.swap_remove(n);
+        let (_, slot) = self.outs.swap_remove(n);
         let Some(held) = self.units.get_mut(slot.get()) else {
             return Err(Box::new(unit));
         };
-        let _ = self.slots.insert(id, slot);
         *held = unit;
         Ok(slot)
     }
 
     /// `unit` goes to the end of the list.
     pub fn push(&mut self, unit: Unit) {
-        self.file(unit.id, self.next_place());
         self.units.push(unit);
     }
 
@@ -239,12 +226,8 @@ impl ObjectList {
         let last = ListIndex::new(self.units.len().wrapping_sub(1));
         let gone = self.units.swap_remove(i.get());
         self.forget(gone.id, i);
-        match self.get(i).map(|u| u.id) {
-            Some(TAKEN_OUT) => self.moved_out(last, i),
-            Some(moved) => {
-                let _ = self.slots.insert(moved, i);
-            }
-            None => {}
+        if self.get(i).is_some_and(|u| u.id == TAKEN_OUT) {
+            self.moved_out(last, i);
         }
         Ok(gone)
     }
@@ -267,9 +250,6 @@ impl ObjectList {
         }
         let gone = self.units.remove(i.get());
         self.forget(gone.id, i);
-        for (k, u) in self.units.iter().enumerate().skip(i.get()) {
-            let _ = self.slots.insert(u.id, ListIndex::new(k));
-        }
         for o in self.outs.iter_mut().filter(|o| o.1 > i) {
             o.1 = ListIndex::new(o.1.get() - 1);
         }
@@ -315,48 +295,18 @@ impl ObjectList {
             .collect();
         let mut k = kept.into_iter();
         self.units.retain(|_| k.next().unwrap_or(false));
-        self.reindex();
     }
 
     /// Every object leaves the list.
     pub fn clear(&mut self) {
         self.units.clear();
-        self.slots.clear();
-        self.twice = false;
         self.outs.clear();
     }
 
-    /// The index again from the list's slots (after a test wrote an id in place).
-    pub fn reindex(&mut self) {
-        self.slots.clear();
-        self.twice = false;
-        for i in 0..self.units.len() {
-            if let Some(id) = self.units.get(i).map(|u| u.id) {
-                self.file(id, ListIndex::new(i));
-            }
-        }
-    }
-
-    /// The index files object `id` in slot `i`, unless it holds the id already (a stand-in is
-    /// no object).
-    fn file(&mut self, id: ObjectId, i: ListIndex) {
-        if id == TAKEN_OUT {
-            return;
-        }
-        match self.slots.entry(id) {
-            std::collections::hash_map::Entry::Occupied(_) => self.twice = true,
-            std::collections::hash_map::Entry::Vacant(v) => {
-                let _ = v.insert(i);
-            }
-        }
-    }
-
-    /// The index forgets object `id`'s slot `i`; a stand-in's object stays out for good.
+    /// Object `id` left slot `i`: a stand-in's object stays out for good.
     fn forget(&mut self, id: ObjectId, i: ListIndex) {
         if id == TAKEN_OUT {
             self.outs.retain(|o| o.1 != i);
-        } else if self.slots.get(&id) == Some(&i) {
-            let _ = self.slots.remove(&id);
         }
     }
 
@@ -370,14 +320,10 @@ impl ObjectList {
 
 impl From<Vec<Unit>> for ObjectList {
     fn from(units: Vec<Unit>) -> Self {
-        let mut list = Self {
+        Self {
             units,
-            slots: HashMap::default(),
-            twice: false,
             outs: Vec::new(),
-        };
-        list.reindex();
-        list
+        }
     }
 }
 
@@ -632,14 +578,12 @@ mod tests {
     }
 
     #[test]
-    fn two_stand_ins_leave_the_index_answering() {
+    fn two_stand_ins_leave_the_lookup_answering() {
         let mut l = list(&[1, 2, 3]);
         let (a, b) = (
             l.take_out(ListIndex::new(0)).unwrap(),
             l.take_out(ListIndex::new(2)).unwrap(),
         );
-        l.reindex();
-        assert!(!l.twice, "the stand-ins are no id held twice");
         assert_eq!(l.position_of(object_id(2)), Some(ListIndex::new(1)));
         assert_eq!(
             (l.put_back(a).ok(), l.put_back(b).ok()),
@@ -662,11 +606,10 @@ mod tests {
         assert_eq!(l.position_of(object_id(0)), None);
         assert_eq!(l.position_of(object_id(4)), Some(ListIndex::new(0)));
         l[ListIndex::new(0)].id = object_id(6);
-        l.reindex();
         assert_eq!(
             l.position_of(object_id(6)),
             Some(ListIndex::new(0)),
-            "an id written in place counts once reindexed"
+            "an id written in place counts"
         );
     }
 

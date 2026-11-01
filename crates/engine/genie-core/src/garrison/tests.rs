@@ -196,15 +196,15 @@ fn garrison_world() -> World {
         players,
     );
     t.masters = (0..4).map(|_| garrison_masters()).collect();
-    t.players[1]
-        .objects
-        .push(unit(100, TC, HitPoints::new(2400.0)));
-    t.players[1]
-        .objects
-        .push(unit(200, SHIP, HitPoints::new(100.0)));
+    let _ = t
+        .push_live(PlayerId::new(1), unit(100, TC, HitPoints::new(2400.0)))
+        .unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), unit(200, SHIP, HitPoints::new(100.0)))
+        .unwrap();
     let mut gate = unit(300, GATE, HitPoints::new(2750.0));
     gate.building.annex_of = Some(MainBuildingId::new(object_id(100)));
-    t.players[1].objects.push(gate);
+    let _ = t.push_live(PlayerId::new(1), gate).unwrap();
     t
 }
 
@@ -237,9 +237,9 @@ fn walks_at(t: &mut World, idx: ListIndex, speed: f32) {
 /// [`garrison_world`] with villager 9149 of player 1, and its index.
 fn walk_again_world() -> (World, ListIndex) {
     let mut t = garrison_world();
-    t.players[1]
-        .objects
-        .push(unit(9149, VILLAGER, HitPoints::new(25.0)));
+    let _ = t
+        .push_live(PlayerId::new(1), unit(9149, VILLAGER, HitPoints::new(25.0)))
+        .unwrap();
     let idx = t.players[1].objects.last_place().unwrap();
     (t, idx)
 }
@@ -1536,7 +1536,7 @@ fn a_building_takes_a_unit_in_by_its_player_state_hit_points_room_and_garrison_t
     for k in 0..15 {
         let mut v = unit(1000 + k, VILLAGER, HitPoints::new(25.0));
         v.life.inside = Some(ContainerId::new(object_id(100)));
-        t.players[1].objects.push(v);
+        let _ = t.push_live(PlayerId::new(1), v).unwrap();
     }
     assert!(takes(&t, 100, PlayerId::new(1), VILLAGER, true, true));
     assert!(!takes(&t, 100, PlayerId::new(1), VILLAGER, true, false));
@@ -1559,7 +1559,7 @@ fn a_transport_takes_a_combat_unit_with_a_task_on_its_class_and_room() {
     assert_eq!(takes(&t, ARCHER, true), Ok(false));
     let mut v = unit(1000, VILLAGER, HitPoints::new(25.0));
     v.life.inside = Some(ContainerId::new(object_id(200)));
-    t.players[1].objects.push(v);
+    let _ = t.push_live(PlayerId::new(1), v).unwrap();
     assert_eq!(takes(&t, VILLAGER, false), Ok(false));
     assert_eq!(takes(&t, VILLAGER, true), Ok(true));
     // a unit of another type with no class flags 0x10002 (FUN_1411205e0) goes on as for a
@@ -1614,9 +1614,9 @@ fn the_class_flags_are_the_images_table_by_class() {
 fn a_room_test_counts_the_unit_and_what_it_holds_or_one_for_none() {
     // FUN_1412169b0: slot 0x498 of the building plus that of the unit and 1
     let mut t = garrison_world();
-    t.players[1]
-        .objects
-        .push(unit(1000, VILLAGER, HitPoints::new(25.0)));
+    let _ = t
+        .push_live(PlayerId::new(1), unit(1000, VILLAGER, HitPoints::new(25.0)))
+        .unwrap();
     let room = |t: &World, unit| {
         let (bp, b) = t.object(object_id(200)).unwrap();
         t.has_room(bp, b, unit).unwrap()
@@ -1626,7 +1626,7 @@ fn a_room_test_counts_the_unit_and_what_it_holds_or_one_for_none() {
     // a unit holding one more needs room for two
     let mut held = unit(1001, ARCHER, HitPoints::new(25.0));
     held.life.inside = Some(ContainerId::new(object_id(1000)));
-    t.players[1].objects.push(held);
+    let _ = t.push_live(PlayerId::new(1), held).unwrap();
     assert!(!room(&t, Some(object_id(1000))));
     assert!(room(&t, None));
 }
@@ -1653,7 +1653,7 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
     ] {
         let mut u = unit(id, m, HitPoints::new(25.0));
         u.life.inside = (p != 3).then_some(ContainerId::new(object_id(100)));
-        t.players[p].objects.push(u);
+        let _ = t.push_live(PlayerId::new(p), u).unwrap();
     }
     let picks = |t: &World, flag, param| {
         [1000, 1001, 1002, 2000]
@@ -1844,7 +1844,7 @@ fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
     v.body.put_mover(Some(walker));
     v.group.id = Some(group_id(7));
     v.combat.town_bell.flag = true;
-    t.players[1].objects.push(v);
+    let _ = t.push_live(PlayerId::new(1), v).unwrap();
     t.spatial.insert(
         object_id(400),
         crate::map::spatial::Placed {
@@ -1909,7 +1909,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
         current_target: None,
         ..crate::unit_ai::UnitAi::default()
     });
-    t.players[1].objects.push(v);
+    let _ = t.push_live(PlayerId::new(1), v).unwrap();
     t.players[1].attributes = vec![Amount::ZERO; 250];
     let placed = crate::map::spatial::Placed {
         position: Position::new(12.5, 10.0, 0.0),
@@ -2023,7 +2023,7 @@ pub(crate) fn inside_tc(t: &mut World, p: PlayerId, id: i32, m: MasterId) {
     let mut u = unit(id, m, HitPoints::new(25.0));
     u.place_for_test(Position::new(10.0, 10.0, 0.0));
     u.life.inside = Some(ContainerId::new(object_id(100)));
-    t.players[p.index()].objects.push(u);
+    let _ = t.push_live(p, u).unwrap();
     t.spatial.insert(
         object_id(id),
         crate::map::spatial::Placed {
@@ -2191,9 +2191,12 @@ fn a_unit_ais_test_takes_a_building_or_transport_that_takes_its_unit_in() {
         ..Master::default()
     }]));
     t.masters = (0..4).map(|_| masters.clone()).collect();
-    t.players[1]
-        .objects
-        .push(unit(400, master_id(59), HitPoints::new(10.0)));
+    let _ = t
+        .push_live(
+            PlayerId::new(1),
+            unit(400, master_id(59), HitPoints::new(10.0)),
+        )
+        .unwrap();
     let takes = |t: &World, b, p, m| {
         let (bp, bu) = t.object(object_id(b)).unwrap();
         t.ai_takes(bp, bu, p, m)
@@ -2244,7 +2247,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
         in_the_way: Vec::new(),
         sprite_facets: None,
     }));
-    t.players[p.index()].objects.push(v);
+    let _ = t.push_live(p, v).unwrap();
     t.spatial.insert(
         object_id(id),
         crate::map::spatial::Placed {
@@ -2274,7 +2277,7 @@ pub(crate) fn building_at(
     let mut b = unit(id, m, HitPoints::new(2400.0));
     b.place_for_test(at.with_height(0.0));
     b.building.annex_of = annex_of.map(MainBuildingId::new);
-    t.players[1].objects.push(b);
+    let _ = t.push_live(PlayerId::new(1), b).unwrap();
     t.spatial.insert(
         object_id(id),
         crate::map::spatial::Placed {
@@ -2321,7 +2324,7 @@ fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_ga
     );
     let mut inside = unit(500, VILLAGER, HitPoints::new(25.0));
     inside.life.inside = Some(ContainerId::new(object_id(104)));
-    t.players[1].objects.push(inside);
+    let _ = t.push_live(PlayerId::new(1), inside).unwrap();
     tracked(&mut t, TC, &[104, 102, 101, 100]);
     assert_eq!(
         t.shelters_near(player_id(1), object_id(100), TC).unwrap(),
@@ -2368,7 +2371,7 @@ fn a_garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
         );
         let mut inside = unit(500, VILLAGER, HitPoints::new(25.0));
         inside.life.inside = Some(ContainerId::new(object_id(104)));
-        t.players[1].objects.push(inside);
+        let _ = t.push_live(PlayerId::new(1), inside).unwrap();
         let listed: &[i32] = if with_annex {
             &[104, 101, 100]
         } else {
@@ -3394,8 +3397,8 @@ fn a_unit_inside_an_ally_s_transport_unloaded_goes_ashore() {
     let ally = |both_ways: bool| {
         let mut t = coast_world(Point::new(14.5, 10.5));
         let i = t.players[1].objects.position_of(object_id(200)).unwrap();
-        let ship = t.players[1].objects.remove(i).unwrap();
-        t.players[2].objects.push(ship);
+        let ship = t.remove_live(PlayerId::new(1), i).unwrap();
+        let _ = t.push_live(PlayerId::new(2), ship).unwrap();
         t.players[1].relations = relation_row([3, 0, 0, 3]);
         t.players[2].relations = ByPlayer::new(vec![
             Relation::ENEMY,
@@ -3487,8 +3490,8 @@ fn a_villager_enters_an_allys_ship_with_its_owners_masters() {
     // it (both ways allied), and the enter adds the villager to the ship's list
     let mut t = shore_world(Point::new(5.5, 19.0), Point::new(5.5, 20.5));
     let k = t.players[1].objects.position_of(object_id(200)).unwrap();
-    let ship = t.players[1].objects.remove(k).unwrap();
-    t.players[2].objects.push(ship);
+    let ship = t.remove_live(PlayerId::new(1), k).unwrap();
+    let _ = t.push_live(PlayerId::new(2), ship).unwrap();
     let mut placed = *t.spatial.get(object_id(200)).unwrap();
     placed.player = PlayerId::new(2);
     t.spatial.insert(object_id(200), placed);
@@ -3511,8 +3514,8 @@ fn a_villager_enters_an_allys_ship_with_its_owners_masters() {
     // an enemy's ship takes no one in (player 3)
     let mut t = shore_world(Point::new(5.5, 19.0), Point::new(5.5, 20.5));
     let k = t.players[1].objects.position_of(object_id(200)).unwrap();
-    let ship = t.players[1].objects.remove(k).unwrap();
-    t.players[3].objects.push(ship);
+    let ship = t.remove_live(PlayerId::new(1), k).unwrap();
+    let _ = t.push_live(PlayerId::new(3), ship).unwrap();
     t.garrison_order(
         player_id(1),
         &object_ids([1000]),
@@ -3776,7 +3779,7 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     ] {
         let mut u = unit(id, m, HitPoints::new(25.0));
         u.life.inside = Some(ContainerId::new(object_id(100)));
-        t.players[p].objects.push(u);
+        let _ = t.push_live(PlayerId::new(p), u).unwrap();
     }
     assert_eq!(t.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
     // a raider inside a building: its +0xc2c share is not kept
@@ -3790,7 +3793,7 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     let mut u = unit(3000, VILLAGER, HitPoints::new(25.0));
     u.life.inside = Some(ContainerId::new(object_id(200)));
     u.combat.raider_countdown = RaiderCountdown::of_data(20);
-    t.players[1].objects.push(u);
+    let _ = t.push_live(PlayerId::new(1), u).unwrap();
     assert_eq!(t.garrisoned(object_id(200)), Ok(InsideCount::ONE));
 }
 
@@ -3998,7 +4001,7 @@ fn let_out_beside_a_second_centre(
     });
     let mut second = unit(101, TC, HitPoints::new(2400.0));
     second.place_for_test(Position::new(16.0, 4.0, 0.0));
-    t.players[1].objects.push(second);
+    let _ = t.push_live(PlayerId::new(1), second).unwrap();
     let placed = *t.spatial.get(object_id(100)).unwrap();
     t.spatial.insert(
         object_id(101),

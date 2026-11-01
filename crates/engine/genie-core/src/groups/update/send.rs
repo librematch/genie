@@ -28,6 +28,7 @@ use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::Millis;
 use crate::world::World;
+use crate::world::slots::PlayerSlots;
 
 /// The retarget timer of a unit sent at a target is the milliseconds it needs to get there at
 /// its speed, drawn around (the immediate `2000`, as a 32-bit product).
@@ -146,11 +147,10 @@ impl World {
                 )
             }
         };
+        let slot = self.live_index(player, id);
         let rng = self.streams.get(Stream::Ai);
-        if let Some(ai) = self
-            .players
-            .get_mut(player.index())
-            .and_then(|p| p.objects.by_id_mut(id))
+        if let Some(ai) = slot
+            .and_then(|i| self.players.live_mut(player, i).ok())
             .and_then(|u| u.combat.ai.as_mut())
         {
             ai.set_randomized_retarget_timer(span, rng);

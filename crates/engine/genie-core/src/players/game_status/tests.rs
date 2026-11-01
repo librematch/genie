@@ -170,6 +170,7 @@ fn a_defeat_names_the_player_with_the_most_of_its_own_attribute() {
     let mut t = game();
     let other = t.players[1].clone();
     t.players.push(other);
+    t.reindex();
     t.players[2].attributes.resize(310, Amount::ZERO);
     t.players[3].attributes.resize(310, Amount::ZERO);
     t.players[1].attributes.resize(310, Amount::ZERO);
@@ -216,7 +217,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     let mut add = |unit: Unit| {
         let mut unit = unit;
         unit.life.master_id = ids::TOWN_CENTRE;
-        t.players[1].objects.push(unit);
+        let _ = t.push_live(PlayerId::new(1), unit).unwrap();
         t.players[1].objects.last_place().unwrap()
     };
     let task = crate::gathering::hunt::HuntTask {
@@ -444,7 +445,7 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
     // game()'s villager master
     hunter.life.master_id = ids::TOWN_CENTRE;
     hunter.my_pasture = None;
-    t.players[1].objects.push(hunter);
+    let _ = t.push_live(PlayerId::new(1), hunter).unwrap();
     let idx = t.players[1].objects.last_place().unwrap();
     let mut without_ai = t.clone();
     // the unit AI's stopAction (slot 0x3c0) then empties the list

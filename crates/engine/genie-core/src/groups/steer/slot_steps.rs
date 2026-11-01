@@ -324,8 +324,8 @@ impl World {
         };
         let kind = self.master(p, master_id)?.kind;
         let u = match place {
-            crate::orders::Place::Live(p, i) => self.players.live_mut(p, i)?,
-            crate::orders::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
+            crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
+            crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
         };
         let Some(mover) = u.body.mover_mut() else {
             return Ok(());

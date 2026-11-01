@@ -440,7 +440,7 @@ impl World {
         work_on: Option<ObjectId>,
         point: Point,
     ) -> Result<bool, GenieError> {
-        let Some(crate::orders::Place::Live(up, ui)) = self.place(id) else {
+        let Some(crate::world::index::Place::Live(up, ui)) = self.place(id) else {
             return Ok(false);
         };
         if !self.players.live(up, ui)?.combat.town_bell.flag {

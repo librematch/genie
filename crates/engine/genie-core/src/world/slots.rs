@@ -1,7 +1,7 @@
 //! The checked reach into the world's player table and the players' object lists.
 //!
 //! An index into either comes from the world's own places (a loop over the players, a
-//! [`crate::orders::Place`], a `position_of`), so a miss is an invariant broken, not an input
+//! [`crate::world::index::Place`], a `position_of`), so a miss is an invariant broken, not an input
 //! the recording got wrong: each lookup returns an `unreachable` error that names the index.
 //! The trait is implemented for the slice, not for [`crate::world::World`], so a caller keeps
 //! the borrow of the one field (`self.players`) and still reads the others.
@@ -10,6 +10,7 @@ use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
+use crate::world::index::Place;
 use crate::world::player::Player;
 
 /// A player the world does not hold.
@@ -77,6 +78,30 @@ pub(crate) trait PlayerSlots {
         self.player_mut(p)?
             .asleep_mut(i)
             .map_err(|e| e.with("player", p))
+    }
+
+    /// The object at `place` (the world's table by id gave it).
+    ///
+    /// # Errors
+    ///
+    /// A player or a position the lists do not hold.
+    fn at(&self, place: Place) -> Result<&Unit, GenieError> {
+        match place {
+            Place::Live(p, i) => self.live(p, i),
+            Place::Sleeping(p, i) => self.asleep(p, i),
+        }
+    }
+
+    /// The object at `place`, to change.
+    ///
+    /// # Errors
+    ///
+    /// A player or a position the lists do not hold.
+    fn at_mut(&mut self, place: Place) -> Result<&mut Unit, GenieError> {
+        match place {
+            Place::Live(p, i) => self.live_mut(p, i),
+            Place::Sleeping(p, i) => self.asleep_mut(p, i),
+        }
     }
 }
 

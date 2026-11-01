@@ -632,7 +632,7 @@ fn the_members_moves_end_wait_or_stop() {
         velocity: BVector::new(0.0, 0.0, 0.5),
         acceleration: BVector::ZERO,
     });
-    t.players[1].objects.push(stray);
+    let _ = t.push_live(PlayerId::new(1), stray).unwrap();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.members.push(Member {
         id: object_id(12),

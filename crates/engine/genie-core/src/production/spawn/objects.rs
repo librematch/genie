@@ -25,7 +25,6 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::master_type::STATIC;
-use crate::objects::object_list::NOTHING_PUSHED;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -292,7 +291,7 @@ impl World {
         } else {
             None
         };
-        owner.objects.push(Unit {
+        let unit = Unit {
             id,
             life: Lifecycle {
                 class: if made.kind == STATIC {
@@ -325,8 +324,8 @@ impl World {
             my_pasture: None,
             sprite: sprite.filter(|_| facing == Facing::Drawn),
             ..Unit::default()
-        });
-        let idx = owner.objects.last_place().ok_or(NOTHING_PUSHED)?;
+        };
+        let idx = self.push_live(p, unit)?;
         // the static init's add to its player (slot 0x2d0) files it in the tracker
         self.track_add(p, id, master).map(|()| idx)
     }

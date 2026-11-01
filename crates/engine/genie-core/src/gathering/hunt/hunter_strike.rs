@@ -55,7 +55,7 @@ impl Unit {
         let own = own.take().ok_or(crate::world::HUNTER_MASTER)?;
         let herd = self.herd_for(
             c,
-            OthersRef::of(&c.w.players, c.player)?,
+            OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             &hunt,
             master,
             &victim,

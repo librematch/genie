@@ -105,7 +105,7 @@ impl Rig {
             ..Unit::default()
         };
         house.life.state = state;
-        self.t.players[0].objects.push(house);
+        let _ = self.t.push_live(PlayerId::new(0), house).unwrap();
         self
     }
 

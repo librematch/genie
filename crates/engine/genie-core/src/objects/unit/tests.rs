@@ -181,7 +181,7 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
     ];
     let paused = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
         u.after_actions(c)?;
-        let (_, bush) = OthersRef::of(&c.w.players, c.player)
+        let (_, bush) = OthersRef::of(&c.w.players, &c.w.index, c.player)
             .unwrap()
             .find(object_id(600))
             .unwrap();

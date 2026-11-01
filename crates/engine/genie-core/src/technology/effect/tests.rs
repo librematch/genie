@@ -1446,9 +1446,12 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
         MasterHitPoints::of_data(45)
     );
     // with an object: its slot 0x98 keeps its share of the hit points (45 of 45: 50 of 50)
-    t.players[0]
-        .objects
-        .push(unit_of(1, master_id(74), HitPoints::new(45.0)));
+    let _ = t
+        .push_live(
+            PlayerId::new(0),
+            unit_of(1, master_id(74), HitPoints::new(45.0)),
+        )
+        .unwrap();
     t.do_effect(PlayerId::new(0), &[attribute(3, 74, 75, -1, 0.0)], None)
         .unwrap();
     let u = &t.players[0].objects[ListIndex::new(0)];
@@ -1985,6 +1988,7 @@ fn the_last_building_of_a_master_withdraws_its_technology() {
         .unwrap();
     assert_eq!(t.players[0].techs[0].state, ResearchState::Researched);
     t.players[0].objects.truncate(1);
+    t.reindex();
     t.withdraw_tech(PlayerId::new(0), master_id(1640), tech_id(0))
         .unwrap();
     assert_eq!(t.players[0].techs[0].state, ResearchState::Unavailable);

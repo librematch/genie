@@ -57,12 +57,11 @@ impl Unit {
         else {
             return Ok(false);
         };
-        let (tp, t) =
-            OthersRef::of(&c.w.players, c.player)?
-                .find(found)
-                .ok_or(GenieError::unsupported(
-                    "a hunt's next tree the slice does not hold",
-                ))?;
+        let (tp, t) = OthersRef::of(&c.w.players, &c.w.index, c.player)?
+            .find(found)
+            .ok_or(GenieError::unsupported(
+                "a hunt's next tree the slice does not hold",
+            ))?;
         if let Some(near) = near {
             let (dx, dz, dy) = (
                 self.position().x() - t.position().x(),

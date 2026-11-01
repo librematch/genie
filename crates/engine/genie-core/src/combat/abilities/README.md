@@ -35,5 +35,5 @@ generation tasks, and the civilisations' bonuses add more.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`vision`](../../vision/), [`world`](../../world/).
+- Uses: [`construction`](../../construction/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`vision`](../../vision/), [`world`](../../world/).
 <!-- /uses -->

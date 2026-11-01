@@ -27,7 +27,12 @@ impl UnitView<'_, '_> {
     /// foundation the world does not hold (`FUN_1415417a0`), 1 with a Build on top (its slot
     /// 0x48), else whether slot 0x820 finds a task ([`UnitView::build_found`]).
     pub(crate) fn builds_on(&self, foundation: FoundationId) -> Result<bool, GenieError> {
-        let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+        let view = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?;
         if self.find_in(view, foundation.id()).is_none() {
             return Ok(false);
         }
@@ -52,7 +57,12 @@ impl UnitView<'_, '_> {
     /// hold it), then slot 0x820 with any action type and the switch ([`task_search`] on the
     /// foundation and its main building); false without a task.
     fn build_found(&self, foundation: FoundationId) -> Result<bool, GenieError> {
-        let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+        let view = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?;
         let find = |id: ObjectId| self.find_in(view, id);
         let Some((_, f)) = find(foundation.id()) else {
             return Ok(false);
@@ -90,7 +100,13 @@ impl UnitView<'_, '_> {
         let dip = SideWorld {
             player: self.player,
             relations: &self.c.w.players.player(self.player)?.relations,
-            foreign: owner_view(&self.c.w.players, self.c.player, self.new_owner)?.players(),
+            foreign: owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .players(),
             drop_sites: &self.c.w.drop_sites,
         };
         // slot 0x820's point: the foundation's place
@@ -114,7 +130,12 @@ impl UnitView<'_, '_> {
         let (ux, uy) = (unit.position().x() as i32, unit.position().y() as i32);
         let (player, others, every, spatial) = (
             self.player,
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
             &self.c.w.masters,
             &self.c.w.spatial,
         );
@@ -150,7 +171,12 @@ impl UnitView<'_, '_> {
         let master = unit.master(&self.c.w.masters, self.player)?;
         let (player, others) = (
             self.player,
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
         );
         let named = |id: ObjectId| {
             let found = if id == unit.id {

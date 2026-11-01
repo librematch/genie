@@ -67,7 +67,7 @@ impl Unit {
                 held,
                 state_of(
                     site.map(DropSiteId::id),
-                    OthersRef::of(&c.w.players, c.player)?,
+                    OthersRef::of(&c.w.players, &c.w.index, c.player)?,
                 ),
             );
             if let Some(h) = self.actions.list.hunt_mut() {

@@ -212,8 +212,8 @@ impl World {
         let group_id = g.id;
         if let Some(place) = self.place(id) {
             let u = match place {
-                crate::orders::Place::Live(p, i) => self.players.live_mut(p, i)?,
-                crate::orders::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
+                crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
+                crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
             };
             if u.group.id == Some(group_id) {
                 if !keep_moving && let Some(m) = u.body.mover_mut() {
@@ -382,8 +382,8 @@ impl World {
         let ai_rng = self.streams.get(crate::math::rng::Stream::Ai);
         // a sleeping unit joins as a live one
         let u = match place {
-            crate::orders::Place::Live(q, i) => self.players.live_mut(q, i)?,
-            crate::orders::Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
+            crate::world::index::Place::Live(q, i) => self.players.live_mut(q, i)?,
+            crate::world::index::Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
         u.group.id = Some(group);
         if let Some(ai) = u.combat.ai.as_mut() {
@@ -581,7 +581,7 @@ mod tests {
             ..Unit::default()
         };
         asleep.life.master_id = master_id(4);
-        t.players[1].sleeping.push(asleep);
+        let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
         assert!(t.add_to_group(group_id(1), object_id(13)).unwrap());
         assert_eq!(
             t.players[1].sleeping[ListIndex::new(0)].group.id,
@@ -610,8 +610,10 @@ mod tests {
             u.life.master_id = master;
             u
         };
-        t.players[1].objects.push(unit(14, ids::ID_7));
-        t.players[1].objects.push(unit(15, master_id(8)));
+        let _ = t.push_live(PlayerId::new(1), unit(14, ids::ID_7)).unwrap();
+        let _ = t
+            .push_live(PlayerId::new(1), unit(15, master_id(8)))
+            .unwrap();
         for masters in &mut t.masters {
             let extra = [
                 Master {
@@ -743,8 +745,8 @@ mod tests {
         for u in &mut t.players[1].objects {
             u.combat.ai = Some(crate::unit_ai::UnitAi::default());
         }
-        let asleep = t.players[1].objects.remove(ListIndex::new(2)).unwrap();
-        t.players[1].sleeping.push(asleep);
+        let asleep = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
+        let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
         t.stances_state(group_id(1), FormationKind::USER_DEFINED)
             .unwrap();
         assert_eq!(
@@ -844,7 +846,7 @@ mod tests {
             PathState::Walking
         );
         let mut t = three();
-        let _ = t.players[1].objects.remove(ListIndex::new(2)).unwrap();
+        let _ = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
         assert!(
             t.remove_unit(group_id(1), object_id(12), None, false)
                 .unwrap()

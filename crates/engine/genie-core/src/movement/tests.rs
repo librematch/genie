@@ -2091,7 +2091,7 @@ pub(crate) fn path_world(owner: crate::world::Player) -> crate::world::World {
         ..Unit::default()
     };
     unit.life.state = ObjectState::Alive;
-    t.players[1].objects.push(unit);
+    let _ = t.push_live(PlayerId::new(1), unit).unwrap();
     // the villager's master (the gatherer tests set it) and the default one
     let master = |id| crate::objects::masters::Master {
         id,

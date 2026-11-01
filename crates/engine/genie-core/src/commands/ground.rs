@@ -96,7 +96,7 @@ impl World {
                 continue;
             }
             let state = u.life.state;
-            let Some(crate::orders::Place::Live(q, i)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(q, i)) = self.place(id) else {
                 return Err(GenieError::unsupported(
                     "a sleeping unit sent off a footprint",
                 ));
@@ -156,7 +156,7 @@ impl World {
         let listed: Vec<Option<ObjectId>> = units.iter().map(|&id| Some(id)).collect();
         let loose = self.loose_units(&listed)?;
         for id in loose {
-            let Some(crate::orders::Place::Live(q, i)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(q, i)) = self.place(id) else {
                 continue;
             };
             let z = self.players.live(q, i)?.position().z();
@@ -166,7 +166,7 @@ impl World {
             self.move_point_order(q, i, Position::new(x, y, z))?;
         }
         for &id in units {
-            let Some(crate::orders::Place::Live(q, i)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(q, i)) = self.place(id) else {
                 continue;
             };
             let unit = self.players.live_mut(q, i)?;

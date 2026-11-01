@@ -55,14 +55,11 @@ impl World {
     ///
     /// The object left the list in its own step.
     fn slot_of(&self, p: PlayerId, id: ObjectId) -> Result<ListIndex, GenieError> {
-        self.players
-            .player(p)?
-            .objects
-            .position_of(id)
-            .ok_or_else(|| {
-                GenieError::unreachable("a stepped object left its list in its outcome")
-                    .with("object", id)
-            })
+        let _ = self.players.player(p)?;
+        self.live_index(p, id).ok_or_else(|| {
+            GenieError::unreachable("a stepped object left its list in its outcome")
+                .with("object", id)
+        })
     }
 
     /// The parts of the object's own update after its actions, once, with the update's unit AI

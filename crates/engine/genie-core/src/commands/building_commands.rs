@@ -33,8 +33,8 @@ impl World {
         player: PlayerId,
         id: Option<ObjectId>,
     ) -> Result<Option<ListIndex>, GenieError> {
-        let held = self.players.player(player)?;
-        Ok(id.and_then(|id| held.objects.position_of(id)))
+        let _ = self.players.player(player)?;
+        Ok(id.and_then(|id| self.live_index(player, id)))
     }
 
     /// Whether the player's object `i` takes a gather point: its master garrisons (`+0xb53`) or
@@ -204,7 +204,7 @@ impl World {
             })
         };
         for &id in ids {
-            let Some(crate::orders::Place::Live(p, i)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(p, i)) = self.place(id) else {
                 if self.place(id).is_some() {
                     return Err(GenieError::unsupported(
                         "a command queue on a sleeping object",
@@ -373,14 +373,8 @@ impl World {
         state: &crate::technology::TechState,
     ) -> Result<Option<ListIndex>, GenieError> {
         let owner = self.players.player(player)?;
-        let Some(i) = owner.objects.position_of(building_id) else {
-            let elsewhere = self.players.iter().any(|q| {
-                q.objects
-                    .iter()
-                    .chain(&q.sleeping)
-                    .any(|u| Some(u.id) == building_id)
-            });
-            return if elsewhere {
+        let Some(i) = self.live_index(player, building_id) else {
+            return if self.place(building_id).is_some() {
                 Err(GenieError::unsupported(
                     "RESEARCH at another player's object",
                 ))

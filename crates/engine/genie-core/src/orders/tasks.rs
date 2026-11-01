@@ -11,11 +11,12 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::orders::gather::HuntOrder;
-use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK, Place};
+use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 /// A repairer whose top action is no Repair where the order retargets it.

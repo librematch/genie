@@ -32,7 +32,8 @@ impl World {
         id: ObjectId,
         state: ObjectState,
     ) -> Result<(), GenieError> {
-        let Some(idx) = self.players.player(p)?.objects.position_of(id) else {
+        let _ = self.players.player(p)?;
+        let Some(idx) = self.live_index(p, id) else {
             return Ok(());
         };
         let Some(current) = self
@@ -131,7 +132,7 @@ impl World {
             };
             kinds.push(kind);
         }
-        let cart = self.players.player_mut(p)?.objects.take_out(idx)?;
+        let cart = self.take_out(p, idx)?;
         let result = (|| {
             let (before, rest) = self.players.split_at_mut(p.index());
             let (player, after) = rest.split_first_mut().ok_or(GenieError::unreachable(
@@ -156,7 +157,7 @@ impl World {
                     groups: &self.groups,
                 },
             };
-            let others = OthersRef::new(p, &player.objects, w.foreign);
+            let others = OthersRef::new(p, &player.objects, w.foreign, &self.index);
             let mut found = Vec::new();
             for kind in kinds {
                 let (f, _) = closest_resource_of(

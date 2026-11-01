@@ -100,7 +100,7 @@ impl Unit {
             held,
             state_of(
                 site.map(DropSiteId::id),
-                OthersRef::of(&c.w.players, c.player)?,
+                OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             ),
         );
         self.actions.list.gather_mut().ok_or(NO_GATHER)?.carry_to = kept;
@@ -383,7 +383,7 @@ impl Unit {
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
     /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
     pub(crate) fn gather_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
         let master = self.master(&c.w.masters, c.player)?;

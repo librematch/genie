@@ -29,5 +29,5 @@ Each member of a formation walks to its slot. This folder holds that part of the
 ## How it connects
 
 <!-- uses -->
-- Uses: [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`orders`](../../orders/), [`pathing`](../../pathing/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`pathing`](../../pathing/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

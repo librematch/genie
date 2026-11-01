@@ -27,8 +27,19 @@ impl UnitView<'_, '_> {
             seeker,
             me: self.unit.id,
             player: self.player,
-            others: owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
-            foreign: owner_view(&self.c.w.players, self.c.player, self.new_owner)?.players(),
+            others: owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
+            foreign: owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .players(),
             every: &self.c.w.masters,
             restriction: None,
             unit: &*self.unit,
@@ -57,11 +68,14 @@ impl UnitView<'_, '_> {
 
     /// Whether the unit's view of the world (live objects, owner-first) holds object `id`.
     pub(super) fn view_holds(&self, id: ObjectId) -> Result<bool, GenieError> {
-        Ok(
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?
-                .get(id)
-                .is_some(),
-        )
+        Ok(owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?
+        .get(id)
+        .is_some())
     }
 
     /// `AskForHelp`'s tests of a helper `u` (of player `owner`, master `m`) that passed its
@@ -81,7 +95,12 @@ impl UnitView<'_, '_> {
         m: &crate::objects::masters::Master,
         attacker: ObjectId,
     ) -> Result<bool, GenieError> {
-        let others = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+        let others = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?;
         let find = |id: ObjectId| others.find(id);
         let Some(ai) = u.combat.ai.as_ref() else {
             return Ok(false);
@@ -114,10 +133,15 @@ impl UnitView<'_, '_> {
         let computer = if owner == self.player {
             self.computer
         } else {
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?
-                .players()
-                .player(owner)
-                .is_some_and(|q| q.computer)
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .players()
+            .player(owner)
+            .is_some_and(|q| q.computer)
         };
         let capture = self
             .c

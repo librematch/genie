@@ -245,6 +245,7 @@ fn a_mill_s_livestock_makes_food() {
     }
     p.attributes[254] = Amount::new(15.0);
     p.update_time = Seconds::new(0.5);
+    t.reindex();
     t.update_world_player(PlayerId::new(1)).unwrap();
     let grows = crate::math::fmath::log(400.0 / 200.0 + 1.0);
     let food = 15.0 / 60.0 * (1.5 * grows);
@@ -342,6 +343,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
         t.masters = vec![masters.clone(); 4];
         t.settings.game_mode = crate::world::GameMode::of_data(game_mode);
         t.players[1].objects = objects.into();
+        t.reindex();
         let p = &t.players[1];
         let kept: Vec<bool> = p
             .objects
@@ -384,6 +386,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
     t.masters = vec![masters.clone(); 4];
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![object(3, master_id(117), ObjectState::Alive)].into();
+    t.reindex();
     t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, GameStatus::LOST);
@@ -397,6 +400,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
         object(1, ids::VILLAGER_MALE, ObjectState::Alive),
     ]
     .into();
+    t.reindex();
     t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, GameStatus::PLAYING);
@@ -447,6 +451,7 @@ fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
         object(6, ids::TOWN_CENTRE, ObjectState::Alive),
     ]
     .into();
+    t.reindex();
     // 9 is filed but gone from the world
     for (id, master) in [(5, 109), (9, 109), (6, 109), (7, 444)] {
         t.players[1]
@@ -491,6 +496,7 @@ fn sudden_death_and_regicide_end_a_player_their_ways() {
         object(5, ids::TOWN_CENTRE, ObjectState::Alive),
     ]
     .into();
+    t.reindex();
     t.players[1].tracker.add(object_id(5), tc_key);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert!(t.players[1].sudden_death_eliminable);
@@ -506,6 +512,7 @@ fn sudden_death_and_regicide_end_a_player_their_ways() {
     t.masters = vec![masters; 4];
     t.settings.sub_game_mode_flag = crate::world::SubModeFlags::from_bits_retain(4);
     t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
+    t.reindex();
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, GameStatus::LOST);
     let mut t2 = world();

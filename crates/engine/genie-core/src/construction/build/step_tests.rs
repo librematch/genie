@@ -359,7 +359,7 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.life.hp = HitPoints::new(1.0);
     annex.building.construction = Some(construction(1.0, 0, false));
-    t.players[1].objects.push(annex);
+    let _ = t.push_live(PlayerId::new(1), annex).unwrap();
     t.spatial.insert(
         ANNEX,
         placed(
@@ -904,19 +904,24 @@ fn stump(t: &mut World) {
     for masters in &mut t.masters {
         *masters = Masters::new(masters.iter().cloned().chain([m.clone()]));
     }
-    t.players[0].objects.push(Unit {
-        id: object_id(77),
-        body: Body::at(Position::new(10.2, 10.2, 0.0)),
-        life: Lifecycle {
-            state: ObjectState::Alive,
-            hp: HitPoints::new(0.5),
-            master_id: master_id(349),
-            ..Lifecycle::default()
-        },
-        pasture: None,
-        my_pasture: None,
-        ..Unit::default()
-    });
+    let _ = t
+        .push_live(
+            PlayerId::new(0),
+            Unit {
+                id: object_id(77),
+                body: Body::at(Position::new(10.2, 10.2, 0.0)),
+                life: Lifecycle {
+                    state: ObjectState::Alive,
+                    hp: HitPoints::new(0.5),
+                    master_id: master_id(349),
+                    ..Lifecycle::default()
+                },
+                pasture: None,
+                my_pasture: None,
+                ..Unit::default()
+            },
+        )
+        .unwrap();
     t.spatial.insert(
         object_id(77),
         Placed {
@@ -1032,7 +1037,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         other.id = object_id(6);
         other.actions.list = ActionList::default();
         other.place_for_test(Position::new(10.6, 10.6, 0.0));
-        t.players[1].objects.push(other);
+        let _ = t.push_live(PlayerId::new(1), other).unwrap();
         let me = *t.spatial.get(BUILDER).unwrap();
         t.spatial.insert(
             object_id(6),
@@ -1280,7 +1285,7 @@ fn with_mill(t: &mut World) {
     mill.workers = crate::objects::WorkerCount::of_data(0);
     mill.building.construction = Some(construction(25.0, 0, false));
     mill.place_for_test(Position::new(15.5, 10.5, 0.0));
-    t.players[1].objects.push(mill);
+    let _ = t.push_live(PlayerId::new(1), mill).unwrap();
     t.spatial.insert(
         object_id(300),
         placed(
@@ -1634,7 +1639,7 @@ fn camp(t: &mut World, at: Position) {
     camp.life.state = ObjectState::Alive;
     camp.building.construction = Some(construction(25.0, 0, false));
     camp.place_for_test(at);
-    t.players[1].objects.push(camp);
+    let _ = t.push_live(PlayerId::new(1), camp).unwrap();
     t.spatial.insert(
         object_id(30),
         placed(at, 1.0, class::BUILDING, master_id(562)),
@@ -1647,7 +1652,7 @@ fn villager(t: &mut World, at: Position) {
     other.id = object_id(6);
     other.actions.list = ActionList::default();
     other.place_for_test(at);
-    t.players[1].objects.push(other);
+    let _ = t.push_live(PlayerId::new(1), other).unwrap();
     let me = *t.spatial.get(BUILDER).unwrap();
     t.spatial.insert(
         object_id(6),
@@ -1666,7 +1671,7 @@ fn annex(t: &mut World, at: Position) -> i32 {
     annex.id = object_id(ANNEX);
     annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.place_for_test(at);
-    t.players[1].objects.push(annex);
+    let _ = t.push_live(PlayerId::new(1), annex).unwrap();
     t.spatial.insert(
         object_id(ANNEX),
         placed(at, 1.0, class::BUILDING, ids::HOUSE),

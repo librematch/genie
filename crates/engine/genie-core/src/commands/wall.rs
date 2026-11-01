@@ -31,9 +31,9 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{MasterId, player_master};
-use crate::orders::Place;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 

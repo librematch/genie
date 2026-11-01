@@ -417,7 +417,7 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(true);
         };
-        let crate::orders::Place::Live(p, idx) = place else {
+        let crate::world::index::Place::Live(p, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
         // the walk meets the group's members as its update left them so far

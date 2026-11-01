@@ -564,10 +564,11 @@ impl Unit {
             id,
             crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, made.id),
         );
-        c.w.players.player_mut(c.player)?.objects.push(missile);
+        let class = made.class;
+        let _ = c.w.push_live(c.player, missile)?;
         let missile = Releaser {
             id,
-            class: Some(made.class),
+            class: Some(class),
             player: c.player,
         };
         crate::world::lets::take(c, self, aimed.target, missile)?;

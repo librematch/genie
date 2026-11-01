@@ -15,11 +15,12 @@ use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::masters::master_type::BUILDING;
 use crate::orders::object_gone;
-use crate::orders::{HERD_MOST, NO_POINT, Place};
+use crate::orders::{HERD_MOST, NO_POINT};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::UnitIndex;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -355,7 +356,7 @@ impl World {
         idx: ListIndex,
         by: DropOffBy,
     ) -> Result<(), GenieError> {
-        let mut unit = self.players.player_mut(p)?.objects.take_out(idx)?;
+        let mut unit = self.take_out(p, idx)?;
         let player = &self.players.player(p)?;
         let world = crate::unit_ai::world_view::DropWorld {
             masters: self.masters.of(p),
@@ -367,7 +368,7 @@ impl World {
             computer: player.computer,
             groups: &self.groups,
         };
-        let others = crate::world::others::OthersRef::of(&self.players, p)?;
+        let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         let result = if by == DropOffBy::Hunt {
             unit.drop_off_in(world, others, &self.graphics)
         } else {

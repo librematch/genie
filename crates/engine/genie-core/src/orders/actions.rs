@@ -13,11 +13,10 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
-use crate::objects::object_list::NOTHING_PUSHED;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
-use crate::orders::{Place, TROPHIES, TROPHY, clear_powerups, damage_share};
+use crate::orders::{TROPHIES, TROPHY, clear_powerups, damage_share};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -26,6 +25,7 @@ use crate::unit_ai::OrderKind;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -270,16 +270,12 @@ impl World {
         let unit = match self.place(id).ok_or_else(|| object_gone(id))? {
             Place::Live(p, i) => self.players.live_mut(p, i)?,
             Place::Sleeping(p, i) => {
-                let woken = self.players.player_mut(p)?.sleeping.swap_remove(i)?;
+                let woken = self.swap_remove_asleep(p, i)?;
                 let (id, master) = (woken.id, woken.life.master_id);
-                self.players.player_mut(p)?.objects.push(woken);
+                let i = self.push_live(p, woken)?;
                 // the wake's remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
                 self.track_relist(p, id, master)?;
-                self.players
-                    .player_mut(p)?
-                    .objects
-                    .last_mut()
-                    .ok_or(NOTHING_PUSHED)?
+                self.players.live_mut(p, i)?
             }
         };
         unit.life.goto_sleep = false;

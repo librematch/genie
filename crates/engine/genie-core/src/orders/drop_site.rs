@@ -125,7 +125,7 @@ impl World {
             computer: player.computer,
             groups: &self.groups,
         };
-        let others = crate::world::others::OthersRef::of(&self.players, p)?;
+        let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         player
             .live(idx)?
             .drop_site_with(&mut world, others, state, (false, false, None))

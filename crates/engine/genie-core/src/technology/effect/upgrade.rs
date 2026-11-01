@@ -141,8 +141,8 @@ impl World {
         (from, mode, keep): (MasterId, UpgradeMode, bool),
         Masters { old, new, dead }: Masters<'_>,
     ) -> Result<(), GenieError> {
-        use crate::orders::Place;
         use crate::technology::upgrade::upgradable;
+        use crate::world::index::Place;
         for i in self.players.player(p)?.objects.places() {
             let place = Place::Live(p, i);
             let u = &self.players.live(p, i)?;
@@ -293,13 +293,13 @@ impl World {
                     break;
                 };
                 if self.has_room(bp, bu, None)? {
-                    let Some(crate::orders::Place::Live(np, ni)) = self.place(new) else {
+                    let Some(crate::world::index::Place::Live(np, ni)) = self.place(new) else {
                         continue;
                     };
                     self.enter_forced(np, ni, ContainerId::new(b))?;
                 }
                 if attribute(self.players.player(p)?, 283) <= Amount::ZERO {
-                    let Some(crate::orders::Place::Live(bp, bi)) = self.place(b) else {
+                    let Some(crate::world::index::Place::Live(bp, bi)) = self.place(b) else {
                         break;
                     };
                     let _ = self.let_out(bp, bi, new, Point::new(-1.0, -1.0), (None, false))?;

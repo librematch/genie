@@ -216,9 +216,7 @@ impl World {
         };
         if work.notified
             && let Some(ai) = self
-                .players
-                .get_mut(player.index())
-                .and_then(|p| p.objects.by_id_mut(id))
+                .live_object_mut(player, id)
                 .and_then(|u| u.combat.ai.as_mut())
         {
             ai.orders.clear();

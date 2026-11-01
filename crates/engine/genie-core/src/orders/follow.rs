@@ -13,12 +13,13 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::MOVING;
-use crate::orders::{Followed, GUARD_RANGE, Place, follow_axis, follow_spread, ignore_unit};
+use crate::orders::{Followed, GUARD_RANGE, follow_axis, follow_spread, ignore_unit};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 

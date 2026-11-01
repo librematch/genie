@@ -24,6 +24,7 @@
 //! [`Mover::step_velocity`]: crate::movement::Mover::step_velocity
 
 pub mod checkpoint;
+pub mod index;
 pub(crate) mod lets;
 pub(crate) mod others;
 pub(crate) mod player;
@@ -251,6 +252,9 @@ pub struct World {
     pub player_time: Vec<Millis>,
     /// Every player, Gaia first.
     pub players: Vec<Player>,
+    /// The table by id (`FUN_1415417a0`): each object's place, written by the world's list
+    /// operations ([`index`]); a list changed in place indexes again ([`World::reindex`]).
+    pub index: index::ObjectIndex,
     /// The updates run so far.
     pub ticks: Tick,
     /// `mNextObjectId`, the id the next new object gets.

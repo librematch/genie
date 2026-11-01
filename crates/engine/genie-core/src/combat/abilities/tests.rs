@@ -682,7 +682,7 @@ fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Poin
     u.life.master_id = m;
     u.life.hp = hp;
     u.life.state = ObjectState::Alive;
-    t.players[p.index()].objects.push(u);
+    let _ = t.push_live(p, u).unwrap();
     let radius = t.masters[p.index()]
         .get(m)
         .map_or(Footprint::new(0.5, 0.5), |m| m.radius);

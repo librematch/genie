@@ -77,7 +77,12 @@ impl World {
             tracker,
             ..
         } = own;
-        let mut others = Others::new(player, (objects, sleeping), (before, after));
+        let mut others = Others::new(
+            player,
+            (objects, sleeping),
+            (before, after),
+            &mut self.index,
+        );
         let mut lets = Lets {
             player,
             relations,

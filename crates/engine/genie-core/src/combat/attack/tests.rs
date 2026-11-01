@@ -607,15 +607,20 @@ impl Rig {
             players,
         );
         t.spatial = map;
-        t.players[1].objects.push(Unit {
-            id: object_id(1),
-            body: Body::new(
-                Position::new(10.0, 10.0, 0.0),
-                None,
-                Some(soldier_mover(speed)),
-            ),
-            ..Unit::default()
-        });
+        let _ = t
+            .push_live(
+                PlayerId::new(1),
+                Unit {
+                    id: object_id(1),
+                    body: Body::new(
+                        Position::new(10.0, 10.0, 0.0),
+                        None,
+                        Some(soldier_mover(speed)),
+                    ),
+                    ..Unit::default()
+                },
+            )
+            .unwrap();
         Self::with_unit(t, victim, soldier())
     }
 
@@ -664,7 +669,7 @@ impl Rig {
         };
         u.life.state = ObjectState::Alive;
         u.life.master_id = master_id(4);
-        self.t.players[player.index()].objects.push(u);
+        let _ = self.t.push_live(player, u).unwrap();
         self
     }
 

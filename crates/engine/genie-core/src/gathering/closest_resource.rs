@@ -211,7 +211,13 @@ impl UnitView<'_, '_> {
             player: self.player,
             spatial: &mut self.c.w.spatial,
             zones: &mut self.c.w.zones,
-            foreign: owner_view(&self.c.w.players, self.c.player, self.new_owner)?.players(),
+            foreign: owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .players(),
             every: &self.c.w.masters,
             masters: self.c.w.masters.of(self.player),
             plan: Planning {
@@ -225,18 +231,28 @@ impl UnitView<'_, '_> {
         let (id, _) = closest_resource_of(
             self.unit,
             &mut w,
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
             (search.kind, search.cap, search.site),
             (search.current, search.min_state, search.point),
         )?;
         let Some(id) = id else {
             return Ok(None);
         };
-        let (owner, u) = owner_view(&self.c.w.players, self.c.player, self.new_owner)?
-            .find(id)
-            .ok_or(GenieError::unsupported(
-                "a resource found that the slice does not hold",
-            ))?;
+        let (owner, u) = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?
+        .find(id)
+        .ok_or(GenieError::unsupported(
+            "a resource found that the slice does not hold",
+        ))?;
         let class = u.master(&self.c.w.masters, owner)?.class;
         Ok(Some(crate::unit_ai::Gatherable {
             id,
@@ -272,7 +288,7 @@ impl Unit {
         cap: crate::objects::WorkerCount,
         site: Option<crate::gathering::DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current = self
             .combat
             .ai

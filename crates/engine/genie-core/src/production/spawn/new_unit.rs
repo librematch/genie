@@ -20,7 +20,6 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::COMBAT;
-use crate::objects::object_list::NOTHING_PUSHED;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -386,7 +385,7 @@ impl World {
         }
         // the combat setup's class counters (FUN_141226060)
         crate::objects::lifecycle::death_parts::count_class(&mut owner.attributes, made, 1.0);
-        owner.objects.push(Unit {
+        let unit = Unit {
             id,
             life: Lifecycle {
                 class: Class::Animated,
@@ -430,8 +429,8 @@ impl World {
                 ..Default::default()
             },
             ..Unit::default()
-        });
-        let idx = owner.objects.last_place().ok_or(NOTHING_PUSHED)?;
+        };
+        let idx = self.push_live(p, unit)?;
         // the static init's add to its player (slot 0x2d0) files it in the tracker
         self.track_add(p, id, master)?;
         Ok(idx)

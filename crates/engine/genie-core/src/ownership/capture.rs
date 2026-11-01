@@ -250,7 +250,7 @@ pub(crate) fn scan_livestock(
 /// player's list whose centre is on the tile, not yet `taken`.
 fn livestock_on(c: &Step<'_>, tile: Tile, taken: &[ObjectId]) -> Result<Vec<ObjectId>, GenieError> {
     let (x, y) = (tile.x(), tile.y());
-    Ok(OthersRef::of(&c.w.players, c.player)?
+    Ok(OthersRef::of(&c.w.players, &c.w.index, c.player)?
         .own_iter()
         .filter(|u| {
             let (ux, uy) = (u.position().x(), u.position().y());

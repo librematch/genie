@@ -41,6 +41,8 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::index::Place;
+use crate::world::slots::PlayerSlots;
 
 mod actions;
 mod attack;
@@ -143,22 +145,6 @@ const GUARD_RANGE: f32 = crate::math::image::order::GUARD_RANGE;
 pub(crate) const GARRISON: ActionType = ActionType::named(3);
 /// A task's action type of attacking (7), whose factory makes an Attack (type 9).
 const ATTACK_TASK: ActionType = ActionType::named(7);
-
-/// Where an object is: its player and its index in the live or the sleeping list.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Place {
-    Live(PlayerId, ListIndex),
-    Sleeping(PlayerId, ListIndex),
-}
-
-impl Place {
-    /// The object's player (`+0x138`'s number).
-    pub(crate) const fn player(self) -> PlayerId {
-        match self {
-            Self::Live(p, _) | Self::Sleeping(p, _) => p,
-        }
-    }
-}
 
 /// What the order splitter reads of a unit: its master's type, formation category (not 0),
 /// object flags' bit 1, its top speed (slot 0x208), its place and where it last moved to (slot
@@ -321,19 +307,6 @@ pub(crate) const NO_QUEUE: GenieError =
     GenieError::unreachable("a building without a production queue where one is read");
 
 impl World {
-    pub(crate) fn place(&self, id: impl ObjectKey) -> Option<Place> {
-        let id = id.key()?;
-        PlayerId::each(self.players.len())
-            .zip(&self.players)
-            .find_map(|(p, player)| {
-                if let Some(i) = player.objects.position_of(id) {
-                    return Some(Place::Live(p, i));
-                }
-                let i = player.sleeping.position_of(id)?;
-                Some(Place::Sleeping(p, i))
-            })
-    }
-
     /// The live slot of object `id` when its own update knows it, `(p, i)`: that slot while it
     /// still holds the object (the game's update works on the object itself, not its id), else
     /// the live slot [`World::place`] finds.
@@ -354,17 +327,11 @@ impl World {
         }
     }
 
+    /// The object `id`, live or sleeping, with its player (the table by id's object,
+    /// [`World::place`]).
     pub(crate) fn object(&self, id: impl ObjectKey) -> Option<(PlayerId, &Unit)> {
-        let id = id.key()?;
-        PlayerId::each(self.players.len())
-            .zip(&self.players)
-            .find_map(|(p, player)| {
-                let u = player
-                    .objects
-                    .by_id(id)
-                    .or_else(|| player.sleeping.by_id(id))?;
-                Some((p, u))
-            })
+        let (p, u, _) = self.locate(id)?;
+        Some((p, u))
     }
 
     /// The object state (`+0x640`) of the object `id`, live or sleeping, None for −1 or an id the
@@ -376,16 +343,9 @@ impl World {
 
     /// The object `id`, live or sleeping, to change (`FUN_1415417a0`'s object).
     pub(crate) fn object_mut(&mut self, id: impl ObjectKey) -> Option<(PlayerId, &mut Unit)> {
-        let id = id.key()?;
-        PlayerId::each(self.players.len())
-            .zip(&mut self.players)
-            .find_map(|(p, player)| {
-                let crate::world::player::Player {
-                    objects, sleeping, ..
-                } = player;
-                let u = objects.by_id_mut(id).or_else(|| sleeping.by_id_mut(id))?;
-                Some((p, u))
-            })
+        let place = self.place(id)?;
+        let u = self.players.at_mut(place).ok()?;
+        Some((place.player(), u))
     }
 
     /// Player `player`'s master `master` ([`player_master`]), which the caller's object or

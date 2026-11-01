@@ -52,12 +52,13 @@ impl World {
                 continue;
             };
             let (p, i) = match place {
-                crate::orders::Place::Live(p, i) | crate::orders::Place::Sleeping(p, i) => (p, i),
+                crate::world::index::Place::Live(p, i)
+                | crate::world::index::Place::Sleeping(p, i) => (p, i),
             };
             let player = self.players.player_mut(p)?;
             let unit = match place {
-                crate::orders::Place::Live(..) => player.objects.checked_mut(i)?,
-                crate::orders::Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
+                crate::world::index::Place::Live(..) => player.objects.checked_mut(i)?,
+                crate::world::index::Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
             };
             if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.reset_for_order(self.streams.get(Stream::Ai));

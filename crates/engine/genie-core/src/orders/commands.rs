@@ -12,11 +12,12 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
 use crate::orders::object_gone;
-use crate::orders::{Place, lock_gate, set_stance};
+use crate::orders::{lock_gate, set_stance};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl World {

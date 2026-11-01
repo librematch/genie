@@ -83,8 +83,19 @@ impl UnitView<'_, '_> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?.players(),
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .players(),
         );
         let find = |id: ObjectId| {
             if id == unit.id {

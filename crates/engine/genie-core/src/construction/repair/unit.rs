@@ -63,8 +63,11 @@ impl Unit {
         target: Option<ObjectId>,
     ) -> Result<RepairReads, GenieError> {
         let own = repair_master(&c.w.masters, c.player, self)?;
-        let (repairee, counted_in) =
-            repairee_of(c, OthersRef::of(&c.w.players, c.player)?, target)?;
+        let (repairee, counted_in) = repairee_of(
+            c,
+            OthersRef::of(&c.w.players, &c.w.index, c.player)?,
+            target,
+        )?;
         Ok(RepairReads {
             target: repairee,
             counted_in,
@@ -254,7 +257,7 @@ pub(crate) fn repair_target(
 ) -> Result<(RepairOutcome, MasterKind), GenieError> {
     let player = c.player;
     let mut set = Vec::new();
-    let others = OthersRef::of(&c.w.players, player)?;
+    let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
     if let Some(target) = target
         && let Some((q, t)) = others.find(target)
     {

@@ -842,7 +842,8 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
             notified,
         )
         .unwrap();
-        t.players[1].objects.swap_remove(ListIndex::new(0)).unwrap()
+        t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
+            .unwrap()
     };
     let u = walked(true);
     assert_eq!(u.body.mover().unwrap().waiting, 1);

@@ -25,11 +25,11 @@ use crate::movement::WaypointLevel;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::{ObjectId, ObjectKey};
-use crate::orders::Place;
 use crate::pathing::tile_path::Path;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// A group whose top speed is below this does not move (`commandMoveTo`, `DAT_142eb0c60`); nor is
@@ -884,14 +884,19 @@ mod tests {
         top.has_path = true;
         top.path_flags = PathFlags::LOOPS;
         t.groups.get_mut(group_id(1)).unwrap().motion.paths = vec![walked, top];
-        let asleep = t.players[1].objects.remove(ListIndex::new(0)).unwrap();
-        t.players[1].sleeping.push(Unit {
-            combat: crate::objects::layers::Combat {
-                ai: Some(crate::unit_ai::UnitAi::default()),
-                ..asleep.combat
-            },
-            ..asleep
-        });
+        let asleep = t.remove_live(PlayerId::new(1), ListIndex::new(0)).unwrap();
+        let _ = t
+            .push_asleep(
+                PlayerId::new(1),
+                Unit {
+                    combat: crate::objects::layers::Combat {
+                        ai: Some(crate::unit_ai::UnitAi::default()),
+                        ..asleep.combat
+                    },
+                    ..asleep
+                },
+            )
+            .unwrap();
         assert!(
             t.command_move_to(group_id(1), None, Point::new(2.0, 3.0), MoveTo::default())
                 .unwrap()

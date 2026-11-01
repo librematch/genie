@@ -17,7 +17,7 @@ use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
-use crate::orders::{MoveOrder, Place, Work, ignore_unit, packs, readiness, work_reach};
+use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::PASTURE_WORKERS;
@@ -27,6 +27,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).

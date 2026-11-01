@@ -49,14 +49,15 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError>
     }
     let released = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
         u.capture_stop(c, class)?;
-        let gone = OthersRef::of(&c.w.players, c.player)
+        let gone = OthersRef::of(&c.w.players, &c.w.index, c.player)
             .unwrap()
             .foreign_iter()
             .filter(|(_, b)| b.workers == crate::objects::WorkerCount::of_data(0));
         Ok(gone.map(|(_, b)| b.id.get()).collect())
     })?;
     Ok((
-        t.players[1].objects.swap_remove(ListIndex::new(0)).unwrap(),
+        t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
+            .unwrap(),
         released,
     ))
 }

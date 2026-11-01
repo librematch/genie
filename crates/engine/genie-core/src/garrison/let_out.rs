@@ -29,7 +29,7 @@ impl World {
     /// it is.
     pub(crate) fn live_inside(&self, id: ObjectId) -> Result<(PlayerId, ListIndex), GenieError> {
         match self.place(id) {
-            Some(crate::orders::Place::Live(p, i)) => Ok((p, i)),
+            Some(crate::world::index::Place::Live(p, i)) => Ok((p, i)),
             _ => Err(GenieError::unsupported(
                 "a unit inside a building outside the live lists",
             )),

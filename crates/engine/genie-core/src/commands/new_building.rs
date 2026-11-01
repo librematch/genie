@@ -257,8 +257,7 @@ impl World {
         let desolid = WholeSeconds::ZERO < made.build_time
             && !matches!(made.class, class::CLASS_51 | class::CLASS_54)
             && progress == Seconds::ZERO;
-        let owner = self.players.player_mut(player)?;
-        owner.objects.push(Unit {
+        let unit = Unit {
             id,
             footprint_waits: crate::construction::FootprintWaits::NONE,
             life: Lifecycle {
@@ -366,7 +365,8 @@ impl World {
             roo_called: false,
             own_master: None,
             dead_master: None,
-        });
+        };
+        let _ = self.push_live(player, unit)?;
         self.settle_building(player, id, &made, (position, desolid), foundation)?;
         for (&annex, &off) in building.annexes.iter().zip(&building.annex_offsets) {
             let Some(annex) = annex else {

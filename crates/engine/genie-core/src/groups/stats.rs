@@ -809,7 +809,7 @@ mod tests {
             let mut far = t.players[2].objects[ListIndex::new(0)].clone();
             far.id = object_id(22);
             far.place_for_test(Position::new(13.0, 5.0, 0.0));
-            t.players[2].objects.push(far);
+            let _ = t.push_live(PlayerId::new(2), far).unwrap();
             let sight = t.spatial.sight.as_mut().unwrap();
             sight
                 .registry
@@ -870,7 +870,7 @@ mod tests {
             ..Unit::default()
         };
         far.life.master_id = ids::ID_7;
-        t.players[1].objects.push(far);
+        let _ = t.push_live(PlayerId::new(1), far).unwrap();
         for masters in &mut t.masters {
             let archer = Master {
                 id: ids::ID_7,
@@ -929,7 +929,7 @@ mod tests {
             stray.body.mover_mut().unwrap().moved_at = Position::new(6.0, 6.0, 0.0);
             stray.group.id = Some(group_id(1));
             t.players[1].objects[ListIndex::new(0)].group.id = Some(group_id(1));
-            t.players[1].objects.push(stray);
+            let _ = t.push_live(PlayerId::new(1), stray).unwrap();
             let g = t.groups.get_mut(group_id(1)).unwrap();
             g.flags = GroupFlags::NONE;
             g.members = order

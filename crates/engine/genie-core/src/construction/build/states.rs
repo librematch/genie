@@ -32,8 +32,8 @@ impl BuildAction {
         c: &'w Step<'_>,
         reads: &BuildReads,
     ) -> Result<Option<&'w Unit>, GenieError> {
-        let held = c.w.players.player(c.player)?;
-        Ok(reads.site.and_then(|id| held.objects.by_id(id)))
+        let _ = c.w.players.player(c.player)?;
+        Ok(reads.site.and_then(|id| c.w.live_object(c.player, id)))
     }
 
     /// The builder count (`+0x9e8`) of the building `FUN_140aaddb0` gives a Build on `site`

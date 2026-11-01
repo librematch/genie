@@ -382,7 +382,7 @@ impl World {
         let going: Vec<Option<ObjectId>> = going.iter().copied().map(Some).collect();
         let loose = self.loose_units_kept(&going, &|id| kept.contains(&id))?;
         for id in loose {
-            let Some(crate::orders::Place::Live(p, idx)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(p, idx)) = self.place(id) else {
                 return Err(GenieError::unsupported(
                     "a garrison of a unit the slice does not hold live",
                 ));

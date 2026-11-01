@@ -216,9 +216,14 @@ impl UnitView<'_, '_> {
         ai: &UnitAi,
     ) -> Result<(), GenieError> {
         let mark = |id: ObjectId, p: &Placed| -> Result<crate::combat::attack::Mark, GenieError> {
-            let u = owner_view(&self.c.w.players, self.c.player, self.new_owner)?
-                .get(id)
-                .ok_or(NOT_HELD)?;
+            let u = owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .get(id)
+            .ok_or(NOT_HELD)?;
             let m = player_master(&self.c.w.masters, p.player, p.master).ok_or(NOT_HELD)?;
             Ok(crate::combat::attack::Mark {
                 id,
@@ -230,9 +235,14 @@ impl UnitView<'_, '_> {
             })
         };
         let target_mark = mark(target, t)?;
-        let main = match owner_view(&self.c.w.players, self.c.player, self.new_owner)?
-            .get(target)
-            .and_then(|u| u.building.annex_of)
+        let main = match owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?
+        .get(target)
+        .and_then(|u| u.building.annex_of)
         {
             Some(m) => match self.c.w.spatial.get(m).copied() {
                 Some(p) => Some(mark(m.id(), &p)?),
@@ -276,7 +286,12 @@ impl UnitView<'_, '_> {
     /// sleeping objects, or the old owner's of a unit taken over in its update, whose attributes
     /// it does not hold).
     fn victim_of_target(&self, id: ObjectId) -> Result<Option<Victim>, GenieError> {
-        let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+        let view = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?;
         let Some((q, t)) = view.find(id) else {
             return Ok(None);
         };

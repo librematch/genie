@@ -394,7 +394,7 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let Some(crate::orders::Place::Live(tp, ti)) = self.place(transport) else {
+        let Some(crate::world::index::Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };
         let ship = self.players.live(tp, ti)?;
@@ -418,7 +418,7 @@ impl World {
         ship: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let Some(crate::orders::Place::Live(p, i)) = self.place(ship) else {
+        let Some(crate::world::index::Place::Live(p, i)) = self.place(ship) else {
             return Err(UNREACHED);
         };
         let walk = crate::unit_ai::AiMove {
@@ -445,7 +445,7 @@ impl World {
             .flat_map(|p| p.objects.iter().chain(&p.sleeping))
             .filter(|u| u.life.inside == Some(target))
             .count();
-        let Some(crate::orders::Place::Live(..)) = self.place(target) else {
+        let Some(crate::world::index::Place::Live(..)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
         self.run_on_step(player, idx, |unit, c| {
@@ -468,7 +468,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(), GenieError> {
-        let Some(crate::orders::Place::Live(tp, ti)) = self.place(target) else {
+        let Some(crate::world::index::Place::Live(tp, ti)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
         let me = self
@@ -492,11 +492,11 @@ impl World {
 /// [`UNPLACED`] for an object the world does not place.
 fn placed_object(
     players: &[crate::world::Player],
-    place: Option<crate::orders::Place>,
+    place: Option<crate::world::index::Place>,
 ) -> Result<&crate::objects::unit::Unit, GenieError> {
     match place {
-        Some(crate::orders::Place::Live(p, i)) => players.live(p, i),
-        Some(crate::orders::Place::Sleeping(p, i)) => players.asleep(p, i),
+        Some(crate::world::index::Place::Live(p, i)) => players.live(p, i),
+        Some(crate::world::index::Place::Sleeping(p, i)) => players.asleep(p, i),
         None => Err(UNPLACED),
     }
 }

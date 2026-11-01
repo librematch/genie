@@ -213,7 +213,7 @@ impl World {
         }
         let holder_master = h.master(&self.masters, hp)?;
         if holder_master.kind == master_type::BUILDING {
-            let hi = self.live_index(hp, holder.id())?;
+            let hi = self.housed_index(hp, holder.id())?;
             if !self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? {
                 self.destroy(p, id)?;
             }
@@ -261,7 +261,7 @@ impl World {
         q: PlayerId,
         garrison: &[ObjectId],
     ) -> Result<(), GenieError> {
-        let bi = self.live_index(p, id)?;
+        let bi = self.housed_index(p, id)?;
         for &g in garrison.iter().rev() {
             if self.object(g).is_some_and(|(gp, _)| gp == q)
                 && !self.let_out(p, bi, g, Point::from([NO_POINT; 2]), (None, true))?
@@ -272,15 +272,11 @@ impl World {
         Ok(())
     }
 
-    /// The index of object `id` in player `p`'s live list.
-    fn live_index(&self, p: PlayerId, id: ObjectId) -> Result<ListIndex, GenieError> {
-        self.players
-            .player(p)?
-            .objects
-            .position_of(id)
-            .ok_or(GenieError::unsupported(
-                "a unit inside a building outside the live lists",
-            ))
+    /// The index of the unit `id` inside a building in player `p`'s live list.
+    fn housed_index(&self, p: PlayerId, id: ObjectId) -> Result<ListIndex, GenieError> {
+        self.live_index(p, id).ok_or(GenieError::unsupported(
+            "a unit inside a building outside the live lists",
+        ))
     }
 
     /// `FUN_141285cb0` on player `p`'s map: each tile of the map (rows, then columns) whose

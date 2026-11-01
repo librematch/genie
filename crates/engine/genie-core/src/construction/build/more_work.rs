@@ -38,7 +38,7 @@ impl Unit {
         use crate::math::image::gather_search::{REACH_CAP, REACH_FLOOR};
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
         const REACH_LOW: f32 = 4.0;
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let masters =
             c.w.masters
                 .get(c.player.index())

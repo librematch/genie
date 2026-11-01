@@ -206,7 +206,7 @@ impl World {
         let i = match self.players.player(p)?.objects.get(i) {
             Some(u) if u.id == id => i,
             _ => match self.place(id) {
-                Some(crate::orders::Place::Live(q, j)) if q == p => j,
+                Some(crate::world::index::Place::Live(q, j)) if q == p => j,
                 _ => return Ok(Vec::new()),
             },
         };

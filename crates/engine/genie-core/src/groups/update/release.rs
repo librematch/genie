@@ -10,8 +10,9 @@ use crate::groups::SpecificMove;
 use crate::groups::group_list::member_gone;
 use crate::groups::update::send::Travel;
 use crate::objects::{ObjectId, ObjectKey};
-use crate::orders::{Place, Work};
+use crate::orders::Work;
 use crate::world::World;
+use crate::world::index::Place;
 
 impl World {
     /// `FUN_14103d460` of group `group` for the units `units` (the ids a category lists) and

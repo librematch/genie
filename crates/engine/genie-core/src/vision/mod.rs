@@ -296,16 +296,21 @@ mod tests {
             t.spatial.vision.get(PlayerId::new(2)),
             Some(&masks(0x2000_0014, 0x2000_0014_0000_0000))
         );
-        t.players[1].objects.push(crate::objects::unit::Unit {
-            id: object_id(50),
-            body: crate::objects::layers::Body::at(Position::new(7.0, 8.0, 0.0)),
-            life: crate::objects::lifecycle::Lifecycle {
-                master_id: TOWN_CENTRE,
-                state: ObjectState::Alive,
-                ..crate::objects::lifecycle::Lifecycle::default()
-            },
-            ..crate::objects::unit::Unit::default()
-        });
+        let _ = t
+            .push_live(
+                PlayerId::new(1),
+                crate::objects::unit::Unit {
+                    id: object_id(50),
+                    body: crate::objects::layers::Body::at(Position::new(7.0, 8.0, 0.0)),
+                    life: crate::objects::lifecycle::Lifecycle {
+                        master_id: TOWN_CENTRE,
+                        state: ObjectState::Alive,
+                        ..crate::objects::lifecycle::Lifecycle::default()
+                    },
+                    ..crate::objects::unit::Unit::default()
+                },
+            )
+            .unwrap();
         t.tick_with(Millis::new(50), &[]);
         assert_eq!(flares(&t), [(100, Position::new(7.0, 8.0, 0.0))]);
         assert_eq!(t.players[2].tc_flared.get(1), Some(&true));

@@ -37,16 +37,7 @@ impl World {
         id: impl ObjectKey,
         attacker: PlayerId,
     ) -> Result<Option<Victim>, GenieError> {
-        let Some((p, u)) = PlayerId::each(self.players.len())
-            .zip(&self.players)
-            .find_map(|(p, player)| {
-                player
-                    .objects
-                    .by_id(id)
-                    .or_else(|| player.sleeping.by_id(id))
-                    .map(|u| (p, u))
-            })
-        else {
+        let Some((p, u, _)) = self.locate(id) else {
             return Ok(None);
         };
         let master = u.master(&self.masters, p)?;
@@ -72,14 +63,8 @@ impl World {
         id: impl ObjectKey,
         viewer: PlayerId,
     ) -> Result<Option<crate::unit_ai::Seen>, GenieError> {
-        for (p, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            if let Some(u) = player
-                .objects
-                .by_id(id)
-                .or_else(|| player.sleeping.by_id(id))
-            {
-                return self.seen_of(u, p, viewer).map(Some);
-            }
+        if let Some((p, u, _)) = self.locate(id) {
+            return self.seen_of(u, p, viewer).map(Some);
         }
         match self.spatial.get(id) {
             Some(_) => Err(GenieError::unsupported(
@@ -223,7 +208,7 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
     let Some((p, u, master)) = readable(c, id)? else {
         return Ok(None);
     };
-    let view = OthersRef::of(&c.w.players, c.player)?;
+    let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
     let attributes = if p == c.player {
         &c.w.players.player(c.player)?.attributes[..]
     } else {
@@ -391,7 +376,7 @@ impl World {
     ///
     /// What the kill does not model, or an attribute a player lacks.
     pub(crate) fn kill_left(&mut self, k: &KillLeft) -> Result<(), GenieError> {
-        let Some(crate::orders::Place::Live(q, j)) = self.place(k.id) else {
+        let Some(crate::world::index::Place::Live(q, j)) = self.place(k.id) else {
             return Ok(());
         };
         if let Some(kill) = k.kill {

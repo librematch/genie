@@ -39,7 +39,12 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
         let class = self.unit.master(&self.c.w.masters, self.player)?.class;
         let at = self.unit.position().ground();
-        let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+        let view = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?;
         let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
         Ok(crate::orders::nearest_table_site(
             (
@@ -98,7 +103,12 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
             "a search that reads the registry's last answer (before any query)",
         ))?;
-        let others = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+        let others = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?;
         let find = |id: ObjectId| others.find(id);
         let gaia_attacker = find(attacker).is_some_and(|(owner, _)| owner == PlayerId::GAIA);
         let me = self.unit.id;
@@ -159,9 +169,10 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let Some(p) = self.c.w.spatial.get(id) else {
             return Ok(None);
         };
-        let (owner, u) = crate::world::others::OthersRef::of(&self.c.w.players, self.c.player)?
-            .find(id)
-            .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
+        let (owner, u) =
+            crate::world::others::OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
+                .find(id)
+                .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
         let m = u.master(&self.c.w.masters, owner)?;
         let me = self.unit.master(&self.c.w.masters, self.player)?;
         Ok(Some(crate::unit_ai::UnitSeen {
@@ -254,8 +265,19 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             seeker,
             me: self.unit.id,
             player: self.player,
-            others: owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
-            foreign: owner_view(&self.c.w.players, self.c.player, self.new_owner)?.players(),
+            others: owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
+            foreign: owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?
+            .players(),
             every: &self.c.w.masters,
             restriction: self
                 .unit
@@ -269,7 +291,12 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             mode_680: self.c.w.mode_680,
         };
         let (others, every) = (
-            owner_view(&self.c.w.players, self.c.player, self.new_owner)?,
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
             &self.c.w.masters,
         );
         // ClosestObject's reachability check (slot 0x3d0) walks the unit's paths
@@ -388,6 +415,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     ) -> Result<Option<Tile>, GenieError> {
         let tc = town_centre(owner_view(
             &self.c.w.players,
+            &self.c.w.index,
             self.c.player,
             self.new_owner,
         )?)?;
@@ -520,9 +548,14 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let Some(seen) = self.seen_unit(id)? else {
             return Ok(None);
         };
-        let u = owner_view(&self.c.w.players, self.c.player, self.new_owner)?
-            .get(id)
-            .ok_or_else(|| object_gone(id))?;
+        let u = owner_view(
+            &self.c.w.players,
+            &self.c.w.index,
+            self.c.player,
+            self.new_owner,
+        )?
+        .get(id)
+        .ok_or_else(|| object_gone(id))?;
         let kind = u.master(&self.c.w.masters, seen.owner)?.kind;
         Ok(Some(crate::unit_ai::TargetFlags {
             owner: seen.owner,

@@ -79,7 +79,7 @@ impl World {
                 .ai
                 .as_ref()
                 .is_some_and(|ai| queued || (commits && ai.has_unready_order()));
-            let Some(crate::orders::Place::Live(q, idx)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(q, idx)) = self.place(id) else {
                 // a sleeping object is a static one without a unit AI: its slot 0x128 does
                 // nothing
                 continue;
@@ -195,9 +195,8 @@ impl World {
             drop_sites: &self.drop_sites,
         };
         let owner = world.players.player(q)?;
-        let unit = owner
-            .objects
-            .by_id(id)
+        let unit = self
+            .live_object(q, id)
             .ok_or(GenieError::unsupported("a builder the slice does not have"))?;
         if unit.actions.list.artifact().is_some()
             || unit.building.production.is_some()

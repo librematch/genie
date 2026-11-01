@@ -98,7 +98,12 @@ impl UnitView<'_, '_> {
         let now = self.c.w.world_time;
         let slot = module.tactical.slot(WAIT_SLOT);
         let (explorer_alive, centre) = {
-            let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
+            let view = owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?;
             let alive = module
                 .info
                 .explorer

@@ -161,12 +161,13 @@ impl OwnerView {
 /// The objects as the unit AI of player `p`'s updating unit reads them: the update's view of
 /// `players`, or for a unit player `new` took over in its update, that player's live list as its
 /// own and the old owner's among the others' ([`OthersRef::changed_hands`]).
-pub(crate) fn owner_view(
-    players: &[Player],
+pub(crate) fn owner_view<'a>(
+    players: &'a [Player],
+    index: &'a crate::world::index::ObjectIndex,
     p: PlayerId,
     new: Option<PlayerId>,
-) -> Result<OthersRef<'_>, GenieError> {
-    Ok(changed_view(OthersRef::of(players, p)?, new))
+) -> Result<OthersRef<'a>, GenieError> {
+    Ok(changed_view(OthersRef::of(players, index, p)?, new))
 }
 
 /// `view` as the unit AI of a unit player `new` took over reads it ([`owner_view`]).

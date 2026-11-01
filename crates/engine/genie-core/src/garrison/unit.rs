@@ -84,7 +84,7 @@ impl Unit {
         c: &mut Step<'_>,
         enter: &crate::garrison::EnterAction,
     ) -> Result<crate::garrison::EnterReads, GenieError> {
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {
                 let master = t.master(&c.w.masters, tp)?;
@@ -138,7 +138,10 @@ impl Unit {
         let target = target.ok_or(GenieError::unreachable(
             "an Enter's enter without its target",
         ))?;
-        let inside = units_inside(OthersRef::of(&c.w.players, c.player)?, target.id());
+        let inside = units_inside(
+            OthersRef::of(&c.w.players, &c.w.index, c.player)?,
+            target.id(),
+        );
         if !self.enter_building(c, target, inside)? {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",

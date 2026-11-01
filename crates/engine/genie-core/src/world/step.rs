@@ -126,11 +126,10 @@ impl Step<'_> {
         }
         let lent = std::mem::replace(me, Unit::taken_out());
         let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
-        let own = &mut self.w.players.player_mut(p)?.objects;
-        let i = own.position_of(self.me).ok_or_else(|| {
+        let i = self.w.live_index(p, self.me).ok_or_else(|| {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
         })?;
-        *me = own.take_out(i)?;
+        *me = self.w.take_out(p, i)?;
         let stand_in = if side { me.combat.ai.take() } else { None };
         let answer = answer?;
         if side && stand_in != Some(UnitAi::default()) {
@@ -155,14 +154,9 @@ impl Step<'_> {
     ) -> Result<R, GenieError> {
         let (p, id) = (self.player, self.me);
         self.lend(me, |w| {
-            let i = w
-                .players
-                .player(p)?
-                .objects
-                .position_of(id)
-                .ok_or_else(|| {
-                    GenieError::unreachable("a lent object left its list").with("object", id)
-                })?;
+            let i = w.live_index(p, id).ok_or_else(|| {
+                GenieError::unreachable("a lent object left its list").with("object", id)
+            })?;
             f(w, p, i)
         })
     }

@@ -56,7 +56,7 @@ impl Unit {
     /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
     /// of at most 0).
     pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let master = self.master(&c.w.masters, c.player)?;
         let transforms = master
             .building
@@ -111,14 +111,9 @@ impl Unit {
         }
         let (p, id) = (c.player, self.id);
         c.lend(self, |w| {
-            let i = w
-                .players
-                .player(p)?
-                .objects
-                .position_of(id)
-                .ok_or_else(|| {
-                    GenieError::unreachable("a lent gate left its list").with("object", id)
-                })?;
+            let i = w.live_index(p, id).ok_or_else(|| {
+                GenieError::unreachable("a lent gate left its list").with("object", id)
+            })?;
             w.toggle_gate(p, i)
         })
     }
@@ -282,7 +277,7 @@ impl Unit {
             ));
         }
         for &id in self.garrison.iter().rev() {
-            let Some(u) = OthersRef::of(&c.w.players, c.player)?.own(id) else {
+            let Some(u) = OthersRef::of(&c.w.players, &c.w.index, c.player)?.own(id) else {
                 continue;
             };
             let kind = u.master(&c.w.masters, c.player)?.kind;
@@ -295,9 +290,11 @@ impl Unit {
         let rate = bm.garrison_heal_rate;
         let mut villagers = 0;
         for &id in &self.garrison {
-            let Some(u) = c.w.players.player_mut(c.player)?.objects.by_id_mut(id) else {
+            let _ = c.w.players.player(c.player)?;
+            let Some(i) = c.w.live_index(c.player, id) else {
                 continue;
             };
+            let u = c.w.players.live_mut(c.player, i)?;
             let m = object_master(
                 u.own_master.as_deref(),
                 (u.id, u.life.master_id),

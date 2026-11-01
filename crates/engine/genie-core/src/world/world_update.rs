@@ -79,7 +79,8 @@ impl World {
         });
     }
 
-    /// The spatial index's view of a world made from its parts (a load, a test's world): the
+    /// The world's table by id ([`World::reindex`]) and the spatial index's view of a world
+    /// made from its parts (a load, a test's world): the
     /// annexes' main buildings (their one writer after it: the routines that link and unlink an
     /// annex), how the players stand to each other (after it: the diplomacy change,
     /// [`World::set_relation`]), each player's masters with a task of action type 0x99, and the
@@ -87,6 +88,7 @@ impl World {
     ///
     /// [`Spatial::walk_hits`]: crate::map::spatial::Spatial::walk_hits
     pub fn sync_world(&mut self) {
+        self.reindex();
         for p in &self.players {
             for u in p.objects.iter().chain(&p.sleeping) {
                 self.spatial.set_annex(u.id, u.building.annex_of);
@@ -194,10 +196,9 @@ impl World {
         i: ListIndex,
         outcome: Outcome,
     ) -> Result<bool, GenieError> {
-        let player = self.players.player_mut(p)?;
         match outcome {
             Outcome::Leave => {
-                let gone = player.objects.swap_remove(i)?;
+                let gone = self.swap_remove_live(p, i)?;
                 if let Err(e) = self.leave_world(p, &gone) {
                     crate::trace::player_unsupported(self.ticks, p, &e);
                     let _ = self
@@ -214,20 +215,22 @@ impl World {
                 // and the list's loop (0x141166550) goes on past it: that object's update waits
                 // for the next tick; the player's remove and add (slots 0x2d8, 0x2d0) file it last
                 // in the tracker
-                let asleep = player.objects.swap_remove(i)?;
+                let asleep = self.swap_remove_live(p, i)?;
                 let k = crate::players::tracker::key(
                     self.masters.of(p),
                     &self.lines,
                     asleep.life.master_id,
                 );
-                player.tracker.remove(asleep.id, k);
-                player.tracker.add(asleep.id, k);
-                player.sleeping.push(asleep);
+                let tracker = &mut self.players.player_mut(p)?.tracker;
+                tracker.remove(asleep.id, k);
+                tracker.add(asleep.id, k);
+                let _ = self.push_asleep(p, asleep)?;
                 Ok(true)
             }
             Outcome::Captured(Captured { new, building, .. }) if building => {
                 // a building's slot 0x70 (FUN_1411cd860), whole: its annexes, its lists' moves
                 // and its new owner's parts
+                let player = self.players.player(p)?;
                 let id = player.live(i)?.id;
                 let watched = player.watched.iter().any(|w| w.id == id);
                 if let Err(e) = self.building_changes_hands(p, id, new, watched) {
@@ -267,14 +270,13 @@ impl World {
         let Captured {
             new, main, also, ..
         } = taken;
-        let player = self.players.player_mut(p)?;
         let mut moved = Vec::new();
         if main {
-            moved.push(player.objects.swap_remove(i)?);
+            moved.push(self.swap_remove_live(p, i)?);
         }
         for id in also {
-            if let Some(k) = player.objects.position_of(id) {
-                moved.push(player.objects.swap_remove(k)?);
+            if let Some(k) = self.live_index(p, id) {
+                moved.push(self.swap_remove_live(p, k)?);
             }
         }
         let mut failed = None;
@@ -300,8 +302,7 @@ impl World {
             let k = crate::players::tracker::key(self.masters.of(new), &self.lines, m);
             self.players.player_mut(new)?.tracker.add(u.id, k);
         }
-        self.players.player_mut(new)?.objects.extend(moved);
-        Ok(())
+        self.extend_live(new, moved)
     }
 
     /// Object `id` of player `p`, whose step at the loop's count `i` failed with `e`, freezes:
@@ -317,8 +318,8 @@ impl World {
         (i, id): (ListIndex, ObjectId),
         e: GenieError,
     ) -> Result<(), GenieError> {
+        let slot = self.live_index(p, id);
         let player = self.players.player_mut(p)?;
-        let slot = player.objects.position_of(id);
         let e = match slot {
             Some(k) => player.live(k)?.in_context(e),
             None => e.with("object", id),

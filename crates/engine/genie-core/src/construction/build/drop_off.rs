@@ -74,7 +74,7 @@ impl BuildAction {
         builder: &Unit,
         task_range: Distance,
     ) -> Result<DropSearch, GenieError> {
-        let view = OthersRef::of(&c.w.players, c.player)?;
+        let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let masters =
             c.w.masters
                 .get(c.player.index())

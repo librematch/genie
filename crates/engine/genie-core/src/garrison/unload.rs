@@ -70,7 +70,8 @@ impl World {
         let mut last = None;
         for (&id, place) in checked.iter().zip(self.lookup(&checked)) {
             // any player's object the check kept; a sleeping one (below type 30) is not held
-            let (Some(id), Some(crate::orders::Place::Live(player, idx))) = (id, place) else {
+            let (Some(id), Some(crate::world::index::Place::Live(player, idx))) = (id, place)
+            else {
                 continue;
             };
             let unit = self.players.live(player, idx)?;
@@ -129,7 +130,7 @@ impl World {
         id: ObjectId,
         point: Point,
     ) -> Result<(), GenieError> {
-        let Some(crate::orders::Place::Live(cp, ci)) = self.place(c) else {
+        let Some(crate::world::index::Place::Live(cp, ci)) = self.place(c) else {
             return Err(GenieError::unreachable(
                 "a building that holds units outside the live lists",
             ));
@@ -235,7 +236,7 @@ impl World {
             return Ok(());
         }
         let made = unit.master(&self.masters, ip)?.clone();
-        let Some(crate::orders::Place::Live(hp, hi)) = self.place(holder) else {
+        let Some(crate::world::index::Place::Live(hp, hi)) = self.place(holder) else {
             return Err(GenieError::unreachable(
                 "a transport that holds units outside the live lists",
             ));
@@ -335,7 +336,8 @@ impl World {
             let Some((p, _)) = self.object(id) else {
                 continue;
             };
-            let Some(idx) = self.players.player(p)?.objects.position_of(id) else {
+            let _ = self.players.player(p)?;
+            let Some(idx) = self.live_index(p, id) else {
                 return Err(GenieError::unsupported(
                     "a GO_BACK_TO_WORK of a sleeping object",
                 ));
@@ -384,7 +386,7 @@ impl World {
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
             None => match self.place(id) {
-                Some(crate::orders::Place::Live(p, i)) => (p, i),
+                Some(crate::world::index::Place::Live(p, i)) => (p, i),
                 // the callers pass an object of type 70 or more the world holds, which never
                 // sleeps
                 _ => return Ok(false),

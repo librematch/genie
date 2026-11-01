@@ -126,7 +126,7 @@ impl Unit {
     /// the closest (`FUN_1411671e0` as `set_state(8)` searches, [`Unit::drop_site`]), with none
     /// found 0, and the hunt's class goes (−1).
     pub(crate) fn hunt_search_notify(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let hunt = self
             .actions
             .list
@@ -373,7 +373,7 @@ impl Unit {
         c: &mut Step<'_>,
         class: Option<ClassId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         if self.my_pasture.is_some() {
             return Err(GenieError::unsupported(
                 "a hunter tending a pasture (FUN_1411c7670)",
@@ -490,12 +490,11 @@ impl Unit {
     /// carries nothing now).
     fn hunt_take_found(&mut self, c: &mut Step<'_>, found: ObjectId) -> Result<(), GenieError> {
         let master = self.master(&c.w.masters, c.player)?;
-        let (owner, t) =
-            OthersRef::of(&c.w.players, c.player)?
-                .find(found)
-                .ok_or(GenieError::unsupported(
-                    "a hunt's new target the slice does not hold",
-                ))?;
+        let (owner, t) = OthersRef::of(&c.w.players, &c.w.index, c.player)?
+            .find(found)
+            .ok_or(GenieError::unsupported(
+                "a hunt's new target the slice does not hold",
+            ))?;
         let t_master = t.master(&c.w.masters, owner)?;
         let relations =
             c.w.spatial
@@ -635,7 +634,7 @@ impl Unit {
             computer: c.w.players.player(c.player)?.computer,
             groups: &c.w.groups,
         };
-        let others = OthersRef::of(&c.w.players, c.player)?;
+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         if let Some(site) = self.drop_off_in(w, others, &c.w.graphics)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;

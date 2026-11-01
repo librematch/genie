@@ -37,7 +37,7 @@ impl World {
     /// Gaia's add does not take into its list of class 10 of combat level 4 (`+0x14a0`, a draw
     /// on the Player stream).
     pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> Result<(), GenieError> {
-        let mut unit = self.players.player_mut(q)?.objects.take_out(j)?;
+        let mut unit = self.take_out(q, j)?;
         let changed = change_hands(
             &mut unit,
             (q.index(), PlayerId::GAIA),
@@ -49,7 +49,7 @@ impl World {
         if !changed? {
             return Ok(());
         }
-        let unit = self.players.player_mut(q)?.objects.swap_remove(j)?;
+        let unit = self.swap_remove_live(q, j)?;
         let handed = self.hand_over_attributes(q, PlayerId::GAIA, &unit);
         // the old owner's remove and Gaia's add (slots 0x2d8, 0x2d0) move it between the
         // trackers; a building whose build points reach its build time completes in Gaia's
@@ -64,7 +64,7 @@ impl World {
                 .building
                 .construction
                 .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
-        self.players.player_mut(PlayerId::GAIA)?.objects.push(unit);
+        let _ = self.push_live(PlayerId::GAIA, unit)?;
         self.track_remove(q, id, master_id)?;
         self.track_add(PlayerId::GAIA, id, master_id)?;
         if built {
@@ -116,7 +116,7 @@ impl World {
         watched: bool,
     ) -> Result<(), GenieError> {
         self.annexes_change_hands(old, id, new)?;
-        let Some(crate::orders::Place::Live(_, idx)) = self.place(id) else {
+        let Some(crate::world::index::Place::Live(_, idx)) = self.place(id) else {
             return Err(crate::ownership::capture::HANDS_LEFT);
         };
         let u = self.players.player(old)?.objects.checked(idx)?;
@@ -289,7 +289,7 @@ impl World {
         new: PlayerId,
         id: ObjectId,
     ) -> Result<PlayerId, GenieError> {
-        let mut unit = self.players.player_mut(old)?.objects.take_out(idx)?;
+        let mut unit = self.take_out(old, idx)?;
         let changed = change_hands(
             &mut unit,
             (old.index(), new),
@@ -299,10 +299,10 @@ impl World {
         );
         let idx = self.put_back_own(old, unit)?;
         Ok(if changed? {
-            let unit = self.players.player_mut(old)?.objects.swap_remove(idx)?;
+            let unit = self.swap_remove_live(old, idx)?;
             let handed = self.hand_over_attributes(old, new, &unit);
             let master_id = unit.life.master_id;
-            self.players.player_mut(new)?.objects.push(unit);
+            let _ = self.push_live(new, unit)?;
             self.track_remove(old, id, master_id)?;
             self.track_add(new, id, master_id)?;
             handed?;
@@ -362,7 +362,7 @@ impl World {
             .map_or_else(Vec::new, |(_, u)| u.garrison.clone());
         let mut stayed = Vec::new();
         for &g in inside.iter().rev() {
-            let Some(crate::orders::Place::Live(_, bi)) = self.place(id) else {
+            let Some(crate::world::index::Place::Live(_, bi)) = self.place(id) else {
                 break;
             };
             if !self.let_out(

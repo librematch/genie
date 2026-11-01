@@ -538,7 +538,7 @@ fn a_repair_ends_with_its_target_gone_foreign_or_dead() {
     type Change = fn(&mut crate::world::World);
     let cases: [(Change, bool); 4] = [
         (
-            |t| drop(t.players[1].objects.remove(ListIndex::new(1)).unwrap()),
+            |t| drop(t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap()),
             false,
         ),
         (
@@ -551,13 +551,14 @@ fn a_repair_ends_with_its_target_gone_foreign_or_dead() {
         ),
         (
             |t| {
-                let house = t.players[1].objects.remove(ListIndex::new(1)).unwrap();
+                let house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
                 t.players.push(crate::world::Player {
                     objects: vec![house].into(),
                     attributes: vec![Amount::ZERO; 300],
                     relations: relation_row([1, 0, 0]),
                     ..crate::world::Player::default()
                 });
+                t.reindex();
                 t.players[1].relations = relation_row([1, 0, 3]);
                 t.masters.push(t.masters[1].clone());
             },
@@ -597,7 +598,7 @@ fn a_repair_whose_move_to_target_died_lets_go_and_ends() {
         ..crate::objects::unit::Unit::default()
     };
     dying.life.state = ObjectState::Removed;
-    t.players[1].objects.push(dying);
+    let _ = t.push_live(PlayerId::new(1), dying).unwrap();
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     let r = repair_of(&t);
     assert_eq!(
@@ -612,8 +613,8 @@ fn a_repair_whose_move_to_target_died_lets_go_and_ends() {
 #[test]
 fn gaia_s_object_is_repaired() {
     let mut t = repair_at(NEAR, |r| (r.state, r.move_to) = (RepairState::Face, None));
-    let house = t.players[1].objects.remove(ListIndex::new(1)).unwrap();
-    t.players[0].objects.push(house);
+    let house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
+    let _ = t.push_live(PlayerId::new(0), house).unwrap();
     t.players[0].attributes = vec![Amount::ZERO; 300];
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     assert_eq!(

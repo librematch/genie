@@ -42,6 +42,7 @@ impl World {
             frame_seed,
             player_turn,
             player_time,
+            index: crate::world::index::ObjectIndex::of(&players),
             players,
             ticks: crate::world::Tick::ZERO,
             next_object_id: ObjectId::default(),

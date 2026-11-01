@@ -193,12 +193,12 @@ fn lost_members_leave_the_group_and_stop() {
     t.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::new(0.5);
     let mut stray = soldier(12, 1.0, 2.0);
     stray.group.id = Some(group_id(1));
-    let _ = t.players[1].objects.remove(ListIndex::new(2)).unwrap();
-    t.players[2].objects.push(stray);
+    let _ = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
+    let _ = t.push_live(PlayerId::new(2), stray).unwrap();
     let mut mute = soldier(13, 2.0, 2.0);
     mute.combat.ai = None;
     mute.group.id = Some(group_id(1));
-    t.players[1].objects.push(mute);
+    let _ = t.push_live(PlayerId::new(1), mute).unwrap();
     for u in &mut t.players[1].objects {
         u.body
             .put_mover(Some(crate::gathering::hunt::tests::walker()));
@@ -374,7 +374,7 @@ fn relic_carriers_keep_their_command_pending() {
     r.life.master_id = ids::RELIC;
     let mut m = soldier(41, 7.0, 7.0);
     m.life.master_id = ids::MONASTERY;
-    t.players[0].objects.extend([r, m]);
+    t.extend_live(PlayerId::new(0), [r, m]).unwrap();
     let ai = |t: &mut World, order: Option<OrderKind>, action: Option<ActionKind>, target: i32| {
         let a = t.players[1].objects[ListIndex::new(0)]
             .combat
@@ -538,7 +538,8 @@ fn kept_apart_units_leave_unless_busy() {
         .put_mover(Some(crate::gathering::hunt::tests::walking()));
     let mut attacker = soldier(17, 7.0, 7.0);
     attacker.combat.ai.as_mut().unwrap().current_action = Some(ActionKind::Attack);
-    t.players[1].objects.extend([apart, free, attacker]);
+    t.extend_live(PlayerId::new(1), [apart, free, attacker])
+        .unwrap();
     t.groups.get_mut(group_id(1)).unwrap().objects =
         vec![object_id(99), object_id(15), object_id(16), object_id(17)];
     t.keep_apart(group_id(1)).unwrap();
@@ -2102,7 +2103,7 @@ fn gate_world() -> World {
     let mut annex = soldier(21, 2.5, 2.5);
     annex.life.master_id = master_id(5);
     annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
-    t.players[2].objects.push(annex);
+    let _ = t.push_live(PlayerId::new(2), annex).unwrap();
     t.spatial
         .set_annex(object_id(21), Some(MainBuildingId::new(object_id(20))));
     t

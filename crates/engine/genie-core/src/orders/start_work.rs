@@ -237,22 +237,13 @@ impl World {
         ))?;
         let (seeker, me_walk) = self.search_seeker(p, unit)?;
         let (mask, master_id) = (mover.stats.restriction_mask, unit.life.master_id);
-        let (players, masters) = (&self.players, &self.masters);
+        let (players, masters, index) = (&self.players, &self.masters, &self.index);
         let candidate = |spatial: &crate::map::spatial::Spatial,
                          id: ObjectId|
          -> Result<Candidate, GenieError> {
-            let (owner, u) = PlayerId::each(players.len())
-                .zip(players)
-                .find_map(|(q, player)| {
-                    player
-                        .objects
-                        .by_id(id)
-                        .or_else(|| player.sleeping.by_id(id))
-                        .map(|u| (q, u))
-                })
-                .ok_or(GenieError::unsupported(
-                    "an object on a tile the slice does not hold",
-                ))?;
+            let (owner, u, _) = index.locate(players, id).ok_or(GenieError::unsupported(
+                "an object on a tile the slice does not hold",
+            ))?;
             let m = u.master(masters, owner)?;
             let position = spatial.get(id).map_or_else(|| u.position(), |o| o.position);
             Ok(Candidate {

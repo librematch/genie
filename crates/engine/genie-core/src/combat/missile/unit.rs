@@ -68,7 +68,7 @@ impl Unit {
     ) -> Result<(), GenieError> {
         let dead = |state: ObjectState| ObjectState::Alive < state && state != ObjectState::Undead;
         let target_state = readable(c, action.target)?.map(|(_, u, _)| u.life.state);
-        let shooter_state = OthersRef::of(&c.w.players, c.player)?
+        let shooter_state = OthersRef::of(&c.w.players, &c.w.index, c.player)?
             .own(action.fired_from)
             .map(|u| u.life.state);
         if action.target.is_some() && target_state.is_none() {
@@ -342,6 +342,7 @@ impl Unit {
         }
         let mut victim = victim(c, action.target)?;
         let (p, mode_680) = (c.player, c.w.mode_680);
+        let shooter_slot = c.w.live_index(p, action.fired_from);
         let World {
             players,
             masters,
@@ -354,11 +355,12 @@ impl Unit {
             attributes,
             ..
         } = players.player_mut(p)?;
-        let shooter = objects
-            .by_id_mut(action.fired_from)
-            .ok_or(GenieError::unsupported(
-                "a missile's shooter outside its list",
-            ))?;
+        let shooter =
+            shooter_slot
+                .and_then(|i| objects.get_mut(i))
+                .ok_or(GenieError::unsupported(
+                    "a missile's shooter outside its list",
+                ))?;
         let master = shooter.master(masters, p)?;
         if Distance::ZERO < master.area_effect {
             return Err(GenieError::unsupported(
@@ -476,7 +478,7 @@ impl Unit {
         }
         if action.result != StrikeResult::SHIELDED {
             let blaster = if !charge && action.fired_from.is_some() {
-                OthersRef::of(&c.w.players, c.player)?
+                OthersRef::of(&c.w.players, &c.w.index, c.player)?
                     .own(action.fired_from)
                     .map(|u| u.life.master_id)
             } else {

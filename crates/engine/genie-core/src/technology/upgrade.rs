@@ -18,12 +18,12 @@ use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
 use crate::objects::masters::{Master, Task, master_type, player_master};
 use crate::objects::unit::Unit;
-use crate::orders::Place;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::vision::SightTiles;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 /// A master's hit points this near 0 give no share (`ABS(x) <= 1.1920929e-07`).

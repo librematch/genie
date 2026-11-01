@@ -228,6 +228,7 @@ mod tests {
         ]
         .into();
         t.players[3].objects = vec![king(30, Position::new(1.0, 1.0, 0.0), None)].into();
+        t.reindex();
         t.treason(PlayerId::new(1)).unwrap();
         let flares = |t: &World, p: usize| -> Vec<(i32, Position)> {
             t.players[p]
@@ -251,6 +252,7 @@ mod tests {
             castle,
         ]
         .into();
+        t.reindex();
         t.treason(PlayerId::new(1)).unwrap();
         assert_eq!(flares(&t, 1)[0].1, Position::new(12.0, 13.0, 0.0));
     }

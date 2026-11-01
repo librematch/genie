@@ -5,10 +5,11 @@ use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::objects::ObjectId;
-use crate::orders::{LISTED, Place, set_differentiator_groups};
+use crate::orders::{LISTED, set_differentiator_groups};
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::index::Place;
 
 impl World {
     /// `FORM_FORMATION` (`FUN_14161dba0`) of the units `ids` of `player` (the handler's vector:
@@ -126,11 +127,7 @@ impl World {
         let Some(Place::Live(p, idx)) = self.place(id) else {
             return Ok(());
         };
-        let Some(unit) = self
-            .players
-            .get_mut(p.index())
-            .and_then(|pl| pl.objects.by_id_mut(id))
-        else {
+        let Some(unit) = self.live_object_mut(p, id) else {
             return Ok(());
         };
         let marching = unit.combat.ai.as_ref().is_some_and(|ai| {
@@ -146,12 +143,7 @@ impl World {
             m.ignore_units.clear();
         }
         self.object_stop(p, idx)?;
-        if let Some(m) = self
-            .players
-            .get_mut(p.index())
-            .and_then(|pl| pl.objects.by_id_mut(id))
-            .and_then(|u| u.body.mover_mut())
-        {
+        if let Some(m) = self.live_object_mut(p, id).and_then(|u| u.body.mover_mut()) {
             m.stand()?;
         }
         Ok(())

@@ -22,8 +22,6 @@ use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
-use crate::objects::object_list::NOTHING_PUSHED;
-use crate::orders::Place;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -31,6 +29,7 @@ use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 /// The classes no delete takes (`DAT_142f925c0`, and `FUN_14120f620`'s own test): livestock,
@@ -572,17 +571,13 @@ impl World {
                 i
             }
             Place::Sleeping(p, i) => {
-                let mut woken = self.players.player_mut(p)?.sleeping.swap_remove(i)?;
+                let mut woken = self.swap_remove_asleep(p, i)?;
                 woken.life.goto_sleep = false;
                 let (id, master) = (woken.id, woken.life.master_id);
-                self.players.player_mut(p)?.objects.push(woken);
+                let i = self.push_live(p, woken)?;
                 // the remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
                 self.track_relist(p, id, master)?;
-                self.players
-                    .player(p)?
-                    .objects
-                    .last_place()
-                    .ok_or(NOTHING_PUSHED)?
+                i
             }
         })
     }

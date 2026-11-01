@@ -748,18 +748,18 @@ mod tests {
             players,
         );
         t.masters = (0..3).map(|_| masters(recyclable)).collect();
-        t.players[0].objects.push(object(
-            5,
-            MINE,
-            ObjectState::Alive,
-            Position::new(1.5, 2.5, 0.0),
-        ));
-        t.players[1].objects.push(object(
-            9,
-            HOUSE,
-            ObjectState::Alive,
-            Position::new(2.5, 1.5, 0.0),
-        ));
+        let _ = t
+            .push_live(
+                PlayerId::new(0),
+                object(5, MINE, ObjectState::Alive, Position::new(1.5, 2.5, 0.0)),
+            )
+            .unwrap();
+        let _ = t
+            .push_live(
+                PlayerId::new(1),
+                object(9, HOUSE, ObjectState::Alive, Position::new(2.5, 1.5, 0.0)),
+            )
+            .unwrap();
         let mut sight = Visibility::new(
             GridSize::new(4, 4),
             Vec::new(),
@@ -878,6 +878,7 @@ mod tests {
         let mut t = world(true);
         set_tile(&mut t, 1, 2, 0x0000_0004_0000_0000);
         t.players[0].objects[ListIndex::new(0)].id = object_id(-5);
+        t.reindex();
         assert_eq!(t.ghosts_at_death(0, object_id(-5)), Ok(()));
         assert!(t.players[2].ghosts.is_empty() && t.players[0].watched.is_empty());
     }
@@ -1133,6 +1134,7 @@ mod tests {
         let mut t = world(true);
         for _ in 0..2 {
             t.players.push(Player::default());
+            t.reindex();
             t.masters.push(masters(true));
         }
         let own = |p| crate::vision::own_masks(p, false);
@@ -1246,6 +1248,7 @@ mod tests {
             Ok(true)
         );
         t.players[0].objects.clear();
+        t.reindex();
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0001);
         t.watch_pass(PlayerId::new(0)).unwrap();
         assert_eq!(t.players[0].watched.len(), 0);
@@ -1308,22 +1311,26 @@ mod tests {
             Position::new(3.5, 2.5, 0.0),
         );
         a.building.annex_of = Some(MainBuildingId::new(object_id(9)));
-        t.players[1].objects.extend([
-            g,
-            a,
-            object(
-                12,
-                ids::WONDER,
-                ObjectState::Alive,
-                Position::new(0.5, 0.5, 0.0),
-            ),
-            object(
-                13,
-                MASTER_1808,
-                ObjectState::Alive,
-                Position::new(0.5, 1.5, 0.0),
-            ),
-        ]);
+        t.extend_live(
+            PlayerId::new(1),
+            [
+                g,
+                a,
+                object(
+                    12,
+                    ids::WONDER,
+                    ObjectState::Alive,
+                    Position::new(0.5, 0.5, 0.0),
+                ),
+                object(
+                    13,
+                    MASTER_1808,
+                    ObjectState::Alive,
+                    Position::new(0.5, 1.5, 0.0),
+                ),
+            ],
+        )
+        .unwrap();
         let mut foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
         foundation.building.construction = Some(crate::construction::build::Construction {
             progress: Seconds::ZERO,
@@ -1338,7 +1345,7 @@ mod tests {
             snow: false,
             sprite_override: false,
         });
-        t.players[1].sleeping.push(foundation);
+        let _ = t.push_asleep(PlayerId::new(1), foundation).unwrap();
         t.build_watched().unwrap();
         let ids = |t: &World, p: usize| {
             t.players[p]

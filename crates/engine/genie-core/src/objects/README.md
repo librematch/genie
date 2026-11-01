@@ -50,7 +50,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`list_index.rs`](list_index.rs) | An object's place in its player's list (`ListIndex`) and a list's places (`Places`). |
 | [`mod.rs`](mod.rs) | One object and what every object has and runs: the object the engine tracks (`unit::Unit`) with its update, its actions' holdings and stops, its life and death, its release, its sprite and facing, and the masters it is made from. |
 | [`object_id.rs`](object_id.rs) | An object's id as one type: the id that names an object across ticks, as the commands, their unit lists and their targets hold it. |
-| [`object_list.rs`](object_list.rs) | One of a player's object lists (FD-045-D11, D20): its objects in update order and the place of each by id, which the game's table by id (`FUN_1415417a0`, `world+0x168` and `+0x178`) answers. |
+| [`object_list.rs`](object_list.rs) | One of a player's object lists (FD-045-D11, D20): its objects in update order. |
 | [`regeneration.rs`](regeneration.rs) | A regeneration rate: the hit points an object gains a minute. |
 | [`release.rs`](release.rs) | An object's leave of the world and its release by the action that held it (slot 0x180); the update's regeneration and hit point check, and a walk's pause. |
 | [`relic_count.rs`](relic_count.rs) | A count of relics. |
