@@ -24,10 +24,10 @@ pub struct Formations {
     pub by_speed: bool,
     /// `mMinColumnDistance` (`+0x6b8`): a group's move along a longer path forms a column
     /// (`commandMoveTo`).
-    pub min_column_distance: i32,
+    pub min_column_distance: crate::map::WholeDistance,
     /// `mColumnToLineDistance` (`+0x6bc`): where a column on its last waypoint turns to a line
     /// (`UpdateDesiredPositions`).
-    pub column_to_line_distance: i32,
+    pub column_to_line_distance: crate::map::WholeDistance,
 }
 
 /// The settings of a player's AI the GAME command's sub-command 0xb sets one by one
@@ -54,7 +54,7 @@ pub struct AiSettings {
     /// `targeting_factor_scalar` (`+0x618`, setting 10).
     pub targeting_factor_scalar: i32,
     /// `preferredTradeDistance` (`+0x61c`, setting 0xd).
-    pub preferred_trade_distance: f32,
+    pub preferred_trade_distance: Distance,
     /// `disableTowerPriority` (`+0x620`, setting 0xe).
     pub disable_tower_priority: bool,
     /// `tradeAttackEvasion` (`+0x621`, setting 0xb).
@@ -64,7 +64,7 @@ pub struct AiSettings {
     /// `boarLureDestination` (`+0x623`, setting 0xc).
     pub boar_lure_destination: u8,
     /// `mAttackMoveMaxDistance` (`+0x624`, setting 0xf).
-    pub attack_move_max_distance: i32,
+    pub attack_move_max_distance: crate::map::WholeDistance,
     /// `mDisableVillagerGarrison` (`+0x650`, setting 0x11).
     pub disable_villager_garrison: i32,
     /// `mAllowSerjeantBuilding` (`+0x660`, setting 0x12).
@@ -101,10 +101,10 @@ pub struct Player {
     pub auto_fishtrap_queue: bool,
     /// `farm_queue_count` (`+0x141c`, saved): the farms and pastures the mill's queue paid for
     /// (GAME 0xd and 0x15 buy, 0xe and 0x16 take back, [`crate::gathering::farm_queue`]).
-    pub farm_queue: i32,
+    pub farm_queue: crate::gathering::QueueCount,
     /// `fishTrapQueueCount` (`+0x1420`, saved): the fish traps the dock's queue paid for (GAME
     /// 0x11 buys, 0x12 takes back).
-    pub fish_trap_queue: i32,
+    pub fish_trap_queue: crate::gathering::QueueCount,
     /// `prod_queue_on` (`+0x1358`, saved): GAME 9 sets it; nothing in the simulation reads it.
     pub production_queue_on: u8,
     /// `diplomacy[i]` (`+0xe12`, saved, 9 entries): the stance toward player i a diplomacy change
@@ -117,7 +117,7 @@ pub struct Player {
     pub formations: Formations,
     /// `mPendingDebit` (`+0x6cc`): what the player's BUILD and RESEARCH commands listed as their
     /// costs, food, wood, stone and gold, taken off (`FUN_141630d10`); nothing modelled reads it.
-    pub pending_debit: [f32; 4],
+    pub pending_debit: [Amount; 4],
     /// The player's state of each technology (`player+0x760`'s, saved).
     pub techs: Vec<crate::technology::TechState>,
     /// The first update this slice could not model, with the tick (1-based) and object index.
@@ -137,20 +137,20 @@ pub struct Player {
     pub allied_victory: u8,
     /// Its victory conditions' state (`player+0x68`'s `+0x20`, the save's `victory`): 2 when
     /// they are met (`FUN_1414f35d0`).
-    pub victory: u8,
+    pub victory: crate::players::game_status::VictoryState,
     /// `fealty` (`+0x12f8`, saved): the player a defeated player's resources and units would go
     /// to.
-    pub fealty: i16,
+    pub fealty: crate::players::game_status::Fealty,
     /// `+0x71c`, the offensive posture (0 or 1, GAME 0x14): not saved, a load sets 0; new soldiers
     /// and scorpions read it (their unit AI's constructor, [`crate::unit_ai::NewObject`]).
     pub posture: i32,
     /// `chance_to_dodge_missiles` (`+0xe10`, saved): a ship's unit AI dodges a missile's warning
     /// (`0x20f`) on a draw below it ([`crate::unit_ai::Surroundings::dodge_chance`]).
-    pub dodge_chance: u8,
+    pub dodge_chance: crate::players::Chance,
     /// `chance_for_archers_to_maintain_distance` (`+0xe11`, saved): a computer player's siege
     /// unit backs up from its target after a shot on a draw at least this
     /// ([`crate::unit_ai::Surroundings::keep_distance_chance`]).
-    pub keep_distance_chance: u8,
+    pub keep_distance_chance: crate::players::Chance,
     /// `allied_LOS_Enable` (`+0x2cc`, saved): the player shares its mutual allies' sight
     /// ([`crate::vision`]).
     pub allied_vision: bool,
@@ -186,7 +186,7 @@ pub struct Player {
     pub escrow: [Amount; 4],
     /// `escrow_percentage` (`+0x6ec`, saved): the shares of its income a computer player sets
     /// aside.
-    pub escrow_percentage: [f32; 4],
+    pub escrow_percentage: [crate::players::EscrowShare; 4],
     /// `mSuddenDeathCanBeEliminated` (`+0x1380`, saved): under the sudden death rule the player
     /// had a town centre, and loses without one.
     pub sudden_death_eliminable: bool,

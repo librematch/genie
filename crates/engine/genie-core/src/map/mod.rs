@@ -17,7 +17,7 @@ mod terrain_id;
 mod terrain_mask;
 mod tile;
 
-pub use self::distance::{Distance, DistanceSquared};
+pub use self::distance::{Distance, DistanceSquared, WholeDistance};
 pub use self::grid_size::GridSize;
 pub use self::offset::{GroundOffset, Offset};
 pub use self::point::{Axis, Point};

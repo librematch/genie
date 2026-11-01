@@ -252,7 +252,7 @@ fn a_mill_s_livestock_makes_food() {
 fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
     let mut t = world();
     t.players[1].kind = PlayerType::COMPUTER;
-    t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0];
+    t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(crate::players::EscrowShare::of_data);
     t.add_resource(
         PlayerId::new(1),
         attribute::FOOD,

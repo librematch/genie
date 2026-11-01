@@ -29,7 +29,7 @@ pub struct GameState {
     /// compares; forcing leaves them alone.
     pub attributes: Vec<Vec<f32>>,
     /// The players' pending debits and technology states.
-    pub pending_debit: Vec<[f32; 4]>,
+    pub pending_debit: Vec<[Amount; 4]>,
     /// Every player's technology states.
     pub techs: Vec<Vec<crate::technology::TechState>>,
     /// Every player's game status and resignation (`+0x89`, `+0x8b`).
@@ -347,7 +347,7 @@ mod tests {
     fn a_stopped_player_takes_the_game_s_resources_and_runs_again() {
         let game = GameState {
             resources: vec![[0.0; 4], [1.0, 2.0, 3.0, 4.0]],
-            pending_debit: vec![[0.0; 4], [5.0; 4]],
+            pending_debit: vec![[Amount::ZERO; 4], [Amount::new(5.0); 4]],
             techs: vec![vec![], vec![crate::technology::TechState::default(); 2]],
             statuses: vec![(GameStatus::PLAYING, false), (GameStatus::LOST, true)],
             ..GameState::default()
@@ -372,7 +372,7 @@ mod tests {
                 player.pending_debit,
                 player.techs.len()
             ),
-            ([1.0, 2.0, 3.0, 4.0], [5.0; 4], 2)
+            ([1.0, 2.0, 3.0, 4.0], [Amount::new(5.0); 4], 2)
         );
         assert!(!player.stopped);
     }

@@ -88,8 +88,8 @@ impl World {
                 .and_then(|o| self.players.get(o.index()))
                 .map(|p| p.formations)
                 .unwrap_or_default();
-            let mut column_to_line = formations.column_to_line_distance as f32;
-            let min_column = formations.min_column_distance as f32;
+            let mut column_to_line = formations.column_to_line_distance.distance().get();
+            let min_column = formations.min_column_distance.distance().get();
             if g.current_target.target.key().is_some() {
                 column_to_line = column_to_line
                     + g.current_target.target_radius.get()

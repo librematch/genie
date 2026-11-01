@@ -134,8 +134,8 @@ impl World {
         *player.attributes.checked_mut(k)? += amount;
         if player.kind == PlayerType::COMPUTER && kind.is_resource() {
             let pct = *player.escrow_percentage.checked(k)?;
-            if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(pct, 0.0) {
-                *player.escrow.checked_mut(k)? += pct * amount;
+            if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(pct.get(), 0.0) {
+                *player.escrow.checked_mut(k)? += pct.of(amount);
             }
             let held = *player.attributes.checked(k)?;
             if !at_most_or_unordered(player.escrow.checked(k)?.get(), held.get()) {

@@ -189,12 +189,12 @@ impl Unit {
                 .w
                 .players
                 .get(player.index())
-                .map_or(0, |q| q.dodge_chance),
+                .map_or(crate::players::Chance::NONE, |q| q.dodge_chance),
             keep_distance_chance: c
                 .w
                 .players
                 .get(player.index())
-                .map_or(0, |q| q.keep_distance_chance),
+                .map_or(crate::players::Chance::NONE, |q| q.keep_distance_chance),
             disable_tower_priority: view.ai_settings.disable_tower_priority,
             guest_computer: self.garrison.iter().any(|&g| {
                 c.w.spatial.get(g).is_some_and(|p| {

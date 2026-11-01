@@ -57,6 +57,53 @@ impl genie_diff::Diff for GameStatus {
     }
 }
 
+/// The state of a player's victory conditions (`player+0x68`'s `+0x20`, the save's `victory`):
+/// [`VictoryState::MET`] once they are met (`FUN_1414f35d0`). Every byte is kept.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct VictoryState(u8);
+
+impl VictoryState {
+    /// 2: the conditions are met.
+    pub const MET: Self = Self(2);
+
+    /// The state of the save's byte `value`.
+    #[must_use]
+    pub const fn of_data(value: u8) -> Self {
+        Self(value)
+    }
+
+    /// The byte, as the save holds it.
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+/// A player's fealty (`fealty`, `+0x12f8`, saved): the player a defeated player's resources and
+/// units would go to, when above 0. Every short is kept.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Fealty(i16);
+
+impl Fealty {
+    /// The fealty of the save's short `value`.
+    #[must_use]
+    pub const fn of_data(value: i16) -> Self {
+        Self(value)
+    }
+
+    /// Whether it names a player: above 0.
+    #[must_use]
+    pub const fn names_player(self) -> bool {
+        0 < self.0
+    }
+
+    /// The short, as the save holds it.
+    #[must_use]
+    pub const fn get(self) -> i16 {
+        self.0
+    }
+}
+
 /// The game mode whose status changes shrink the map (battle royale, 12).
 const BATTLE_ROYALE: i32 = 12;
 /// A defeated player's objects stop once the game is this old, in milliseconds (`FUN_141639860`;

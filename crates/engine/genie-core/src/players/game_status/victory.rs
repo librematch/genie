@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
+use crate::players::game_status::VictoryState;
 use crate::players::game_status::{
     BATTLE_ROYALE, Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_AFTER_MS,
 };
@@ -100,7 +101,9 @@ impl World {
             if old != GameStatus::LOST {
                 self.defeat_event(p)?;
             }
-            if old != GameStatus::LOST && 0 < self.players.player(p)?.fealty && self.game_state == 0
+            if old != GameStatus::LOST
+                && self.players.player(p)?.fealty.names_player()
+                && self.game_state == 0
             {
                 return Err(GenieError::unsupported(
                     "a defeated player's fealty (its resources and units given away)",
@@ -151,7 +154,7 @@ impl World {
     /// 2, is not held); one counting its allies' victory as its own is not modelled.
     pub(super) fn own_victory(&mut self, i: PlayerId) -> Result<GameStatus, GenieError> {
         let p = &self.players.player(i)?;
-        if p.game_status == GameStatus::LOST || p.victory != 2 {
+        if p.game_status == GameStatus::LOST || p.victory != VictoryState::MET {
             return Ok(p.game_status);
         }
         if p.allied_victory != 0 {

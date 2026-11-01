@@ -130,6 +130,35 @@ impl genie_diff::Diff for Distance {
     }
 }
 
+/// A distance in whole tiles as the game's `int` holds it: a player's formation distances
+/// (`mMinColumnDistance`, `mColumnToLineDistance`) and its attack-move setting
+/// (`mAttackMoveMaxDistance`); the readers convert it (`CVTSI2SS`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WholeDistance(i32);
+
+impl WholeDistance {
+    /// No distance.
+    pub const ZERO: Self = Self(0);
+
+    /// The distance of the save's or the command's int `value`.
+    #[must_use]
+    pub const fn of_data(value: i32) -> Self {
+        Self(value)
+    }
+
+    /// The distance as a float (`CVTSI2SS`, rounding beyond 2^24).
+    #[must_use]
+    pub const fn distance(self) -> Distance {
+        Distance(self.0 as f32)
+    }
+
+    /// The int, as the save holds it.
+    #[must_use]
+    pub const fn get(self) -> i32 {
+        self.0
+    }
+}
+
 /// A distance squared, in square tiles, as the game's `f32` holds it (a `gap_squared`): the game
 /// compares squares where it saves the root. A comparison is `f32`'s (a NaN compares false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
@@ -217,5 +246,19 @@ mod tests {
         assert_eq!(d.squared().get().to_bits(), (1.1_f32 * 1.1).to_bits());
         assert!(DistanceSquared::ZERO < d.squared());
         assert_eq!(DistanceSquared::new(2.25).to_string(), "2.25");
+    }
+
+    /// A whole distance converts to its float, rounding beyond 2^24 as `CVTSI2SS`.
+    #[test]
+    fn a_whole_distance_converts_to_its_float() {
+        use crate::map::WholeDistance;
+        assert_eq!(WholeDistance::of_data(10).distance(), Distance::new(10.0));
+        assert_eq!(WholeDistance::of_data(-16).distance().get(), -16.0);
+        assert_eq!(
+            WholeDistance::of_data(16_777_217).distance().get(),
+            16_777_216.0
+        );
+        assert_eq!(WholeDistance::ZERO.get(), 0);
+        assert!(WholeDistance::of_data(3) < WholeDistance::of_data(4));
     }
 }

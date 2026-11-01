@@ -13,6 +13,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::master_type::BUILDING;
 use crate::orders::tech_outside;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
@@ -425,6 +426,6 @@ fn debit_listed(owner: &mut crate::world::player::Player, listed: [(Option<Attri
         }
     }
     for (debit, amount) in owner.pending_debit.iter_mut().zip(sums) {
-        *debit -= f32::from(amount);
+        *debit -= Amount::new(f32::from(amount));
     }
 }

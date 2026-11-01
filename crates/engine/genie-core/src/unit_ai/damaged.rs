@@ -209,8 +209,7 @@ impl UnitAi {
         {
             return false;
         }
-        let r = ai.rand15() as i32;
-        i32::from(at.keep_distance_chance) <= r * 100 / 0x7fff
+        !at.keep_distance_chance.passes(ai.rand15())
     }
 
     /// The trade ship's case 0x202 (`FUN_140c29bf0`, "Action %d has failed, been invalidated,

@@ -18,6 +18,7 @@ use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildTask, Construction};
 use crate::construction::gates::gate_units;
 use crate::construction::repair::RepairState;
+use crate::gathering::QueueCount;
 use crate::gathering::closest_resource::search_origin;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::unit::give_load;
@@ -9027,7 +9028,10 @@ fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
     let mut t = research_world();
     research_listed(&mut t, &research_at(5, -1)).unwrap();
     assert_eq!(queued(&t), 1);
-    assert_eq!(t.players[0].pending_debit, [-50.0, 0.0, 0.0, 0.0]);
+    assert_eq!(
+        t.players[0].pending_debit,
+        [-50.0, 0.0, 0.0, 0.0].map(Amount::new)
+    );
     let ai = t.players[0].objects[ListIndex::new(0)].ai.as_ref().unwrap();
     assert_eq!(ai.current_action, Some(ActionKind::Research));
     let untouched = research_world();
@@ -9044,19 +9048,19 @@ fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
     };
     assert_eq!(
         refused(&|t| t.players[0].techs[5].state = ResearchState::Researching),
-        (0, -50.0)
+        (0, Amount::new(-50.0))
     );
     assert_eq!(
         refused(&|t| t.players[0].objects[ListIndex::new(0)].id = object_id(8)),
-        (0, -50.0)
+        (0, Amount::new(-50.0))
     );
     assert_eq!(
         refused(&|t| t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying),
-        (0, -50.0)
+        (0, Amount::new(-50.0))
     );
     assert_eq!(
         refused(&|t| t.players[0].techs[5].locations[0].building = Some(master_id(110))),
-        (0, -50.0)
+        (0, Amount::new(-50.0))
     );
 }
 
@@ -15200,7 +15204,7 @@ fn a_farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
         .unwrap();
     let p = &t.players[1];
     assert_eq!(p.attributes[1], Amount::new(40.0));
-    assert_eq!(p.farm_queue, 0);
+    assert_eq!(p.farm_queue, QueueCount::of_data(0));
     let foundation = p.objects.last().unwrap();
     assert_eq!(
         (
@@ -15227,11 +15231,14 @@ fn a_reseed_takes_a_queued_farm() {
         let mut t = reseed_world();
         t.players[1].auto_farm_queue = auto;
         t.players[1].attributes[1] = Amount::new(wood);
-        t.players[1].farm_queue = 2;
+        t.players[1].farm_queue = QueueCount::of_data(2);
         t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
             .unwrap();
         let p = &t.players[1];
-        assert_eq!((p.attributes[1], p.farm_queue), (Amount::new(wood), 1));
+        assert_eq!(
+            (p.attributes[1], p.farm_queue),
+            (Amount::new(wood), QueueCount::of_data(1))
+        );
         assert_eq!(p.objects.last().unwrap().life.master_id, ids::FARM);
     }
 }
@@ -15273,7 +15280,7 @@ fn without_a_farm_to_make_the_farmer_idles() {
 /// ([`World::reseed`]): its answer and the count of player 1's objects after it.
 fn reseeded(setup: impl FnOnce(&mut World)) -> (Result<bool, GenieError>, usize) {
     let mut t = reseed_world();
-    t.players[1].farm_queue = 1;
+    t.players[1].farm_queue = QueueCount::of_data(1);
     setup(&mut t);
     let made = t.reseed(PlayerId::new(1), ListIndex::new(0));
     (made, t.players[1].objects.len())
@@ -15297,7 +15304,10 @@ fn a_reseed_without_a_farm_to_make_makes_nothing() {
                 .unwrap();
             g.farm = Point::new(-1.0, -1.0);
         },
-        |t| (t.players[1].farm_queue, t.players[1].fish_trap_queue) = (0, 1),
+        |t| {
+            (t.players[1].farm_queue, t.players[1].fish_trap_queue) =
+                (QueueCount::ZERO, QueueCount::ONE);
+        },
         |t| t.masters[1].get_mut(master_id(259)).unwrap().class = class::FISHING_SHIP,
         |t| t.masters[1].get_mut(ids::FARM).unwrap().available = false,
     ];
@@ -15323,16 +15333,16 @@ fn a_fishing_ship_reseeds_a_fish_trap() {
         (ship.class, ship.task_by_group, ship.tasks) =
             (class::FISHING_SHIP, TaskGroup::NONE, tasks);
         *ms = Masters::new(ms.iter().cloned().chain([trap]));
-        t.players[1].farm_queue = 0;
+        t.players[1].farm_queue = QueueCount::of_data(0);
     };
     let mut t = reseed_world();
     ship(&mut t);
-    t.players[1].fish_trap_queue = 2;
+    t.players[1].fish_trap_queue = QueueCount::of_data(2);
     assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
     let p = &t.players[1];
     assert_eq!(
         (p.attributes[1], p.fish_trap_queue),
-        (Amount::new(100.0), 1)
+        (Amount::new(100.0), QueueCount::ONE)
     );
     let trap = p.objects.last().unwrap();
     assert_eq!(
@@ -15344,7 +15354,10 @@ fn a_fishing_ship_reseeds_a_fish_trap() {
     t.players[1].auto_fishtrap_queue = true;
     assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
     let p = &t.players[1];
-    assert_eq!((p.attributes[1], p.fish_trap_queue), (Amount::new(40.0), 0));
+    assert_eq!(
+        (p.attributes[1], p.fish_trap_queue),
+        (Amount::new(40.0), QueueCount::of_data(0))
+    );
 }
 
 /// The farm's placement test passes over the gather's old target (the spent farm 12557 on the

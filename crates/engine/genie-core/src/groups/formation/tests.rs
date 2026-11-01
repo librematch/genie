@@ -933,8 +933,8 @@ fn type_world(paths: Vec<PathData>) -> World {
     let player = crate::world::Player {
         objects: vec![u].into(),
         formations: crate::world::Formations {
-            min_column_distance: 10,
-            column_to_line_distance: 5,
+            min_column_distance: crate::map::WholeDistance::of_data(10),
+            column_to_line_distance: crate::map::WholeDistance::of_data(5),
             ..crate::world::Formations::default()
         },
         ..crate::world::Player::default()

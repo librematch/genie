@@ -290,7 +290,9 @@ impl World {
         let min_column = self
             .players
             .get(owner.index())
-            .map_or(0, |p| p.formations.min_column_distance);
+            .map_or(crate::map::WholeDistance::ZERO, |p| {
+                p.formations.min_column_distance
+            });
         let g = self.groups.held_mut(group)?;
         g.current_target.original_position = g
             .current_target
@@ -299,8 +301,9 @@ impl World {
             .with_y(point.y());
         g.current_command = MOVE_COMMAND;
         if !g.motion.flags.contains(MotionFlags::NEW) && !patrol {
-            let column = length
-                .is_none_or(|l| crate::math::fmath::below_or_unordered(min_column as f32, l.get()));
+            let column = length.is_none_or(|l| {
+                crate::math::fmath::below_or_unordered(min_column.distance().get(), l.get())
+            });
             self.update_desired_positions(
                 group,
                 Some(if column {

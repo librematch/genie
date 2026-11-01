@@ -165,7 +165,8 @@ pub(super) fn tech_differences(
     {
         out.push(format!(
             "pending debit slice {:?} game {:?}",
-            player.pending_debit, d
+            player.pending_debit.map(Amount::get),
+            d.map(Amount::get)
         ));
     }
     let Some(theirs) = game.techs.get(p) else {

@@ -2585,7 +2585,7 @@ fn a_villager_dodges_a_missile_s_warning_or_takes_it_as_damage() {
         kind: NotifyKind::MISSILE_WARNING,
         ..hit
     };
-    at.dodge_chance = u8::try_from(r + 1).unwrap();
+    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r + 1).unwrap());
     let mut side = DamageSide {
         units: vec![foe(30, class::CLASS_6)],
         ..DamageSide::default()
@@ -2604,7 +2604,7 @@ fn a_villager_dodges_a_missile_s_warning_or_takes_it_as_damage() {
         Ok(GO_ON)
     );
     assert_eq!((ai.draws, fx.len(), u.attackers.iter().count()), (1, 0, 0));
-    at.dodge_chance = u8::try_from(r).unwrap();
+    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r).unwrap());
     assert_eq!(
         u.handle(
             warning,
@@ -9825,7 +9825,7 @@ fn a_transport_ship_dodges_a_missile_s_warning_by_its_owner_s_chance() {
         tested: Vec::new(),
     };
     let (mut u, mut at) = attacked_transport();
-    at.dodge_chance = u8::try_from(r + 1).unwrap();
+    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r + 1).unwrap());
     let mut ai = rng();
     let mut fx = Vec::new();
     assert_eq!(
@@ -9841,7 +9841,7 @@ fn a_transport_ship_dodges_a_missile_s_warning_by_its_owner_s_chance() {
     );
     assert_eq!((ai.draws, fx.len()), (1, 0));
     let (mut u, mut at) = attacked_transport();
-    at.dodge_chance = u8::try_from(r).unwrap();
+    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r).unwrap());
     let mut fx = Vec::new();
     assert_eq!(
         u.handle(

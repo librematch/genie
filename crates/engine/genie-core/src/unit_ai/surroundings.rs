@@ -224,10 +224,10 @@ pub struct Surroundings {
     pub moved_at: BVector,
     /// Its owner's `chance_to_dodge_missiles` (`player+0xe10`, saved): a ship's handler takes a
     /// missile's warning (`0x20f`) as damage unless a draw below it dodges.
-    pub dodge_chance: u8,
+    pub dodge_chance: crate::players::Chance,
     /// Its owner's `chance_for_archers_to_maintain_distance` (`player+0xe11`, saved): a computer
     /// player's siege unit backs up after a shot on a draw at least this.
-    pub keep_distance_chance: u8,
+    pub keep_distance_chance: crate::players::Chance,
     /// Its owner's `disableTowerPriority` (`player+0x620`, GAME 0xb's setting 0xe): a computer
     /// player's unit but a siege weapon, unpacked trebuchet or warship ignores a tower's damage
     /// ([`UnitAi::damaged`]).

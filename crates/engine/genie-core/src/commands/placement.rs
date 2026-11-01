@@ -57,7 +57,7 @@ impl World {
             .iter_mut()
             .zip(listed)
         {
-            *debit -= f32::from(amount);
+            *debit -= Amount::new(f32::from(amount));
         }
         Ok(())
     }

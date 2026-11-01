@@ -399,8 +399,7 @@ pub(super) fn siege_stance(new: &NewObject) -> UnitStance {
 /// its owner's `chance_to_dodge_missiles` ([`Surroundings::dodge_chance`]) dodges it.
 pub(super) fn dodges(at: &Surroundings, ai: &mut Well512) -> bool {
     // IMUL by 100, then IDIV by 0x7fff: a 15-bit draw stays positive
-    let r = ai.rand15() as i32;
-    r * 100 / 0x7fff < i32::from(at.dodge_chance)
+    at.dodge_chance.passes(ai.rand15())
 }
 
 /// The owner's slot 0x2e8 with an alert of its unit's (0x201 under attack, 0x209 dead; 0x206

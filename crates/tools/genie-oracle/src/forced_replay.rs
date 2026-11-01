@@ -11,6 +11,7 @@ use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::objects::ObjectId;
+use genie_core::players::Amount;
 use genie_core::players::game_status::GameStatus;
 use genie_core::world::World;
 use genie_save::Header;
@@ -545,7 +546,8 @@ pub(super) fn game_state(
         let r = |i: usize| attributes.get(i).copied().unwrap_or_default();
         game.resources.push([r(0), r(1), r(2), r(3)]);
         game.attributes.push(attributes.clone());
-        game.pending_debit.push(p.world_player().base.pending_debit);
+        game.pending_debit
+            .push(p.world_player().base.pending_debit.map(Amount::new));
         let base = &p.world_player().base;
         game.statuses.push((
             GameStatus::of_data(base.game_status),

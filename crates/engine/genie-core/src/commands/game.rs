@@ -7,7 +7,11 @@
 
 use crate::GenieError;
 use crate::gathering::farm_queue::PASTURE;
+use crate::map::Distance;
+use crate::map::WholeDistance;
 use crate::objects::masters::ids::FARM;
+use crate::players::Amount;
+use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::world::World;
@@ -237,7 +241,7 @@ impl World {
     ///
     /// What the purchase and the refund do not model.
     fn game_queue(&mut self, p: PlayerId, g: &GameCommand) -> Result<(), GenieError> {
-        let count = i32::from(g.a);
+        let count = crate::gathering::QueueCount::of_data(i32::from(g.a));
         match g.sub {
             sub::FARM_QUEUE => {
                 let _ = self.queue_farms(p, count, FARM)?;
@@ -293,8 +297,8 @@ impl World {
         let owner = self.players.player_mut(p)?;
         let s = &mut owner.ai_settings;
         match setting {
-            1 => owner.dodge_chance = byte,
-            2 => owner.keep_distance_chance = byte,
+            1 => owner.dodge_chance = Chance::of_data(byte),
+            2 => owner.keep_distance_chance = Chance::of_data(byte),
             3 => s.easiest_reaction_percentage = i32::from(byte),
             4 => s.easier_reaction_percentage = i32::from(byte),
             5 => s.task_ungrouped_soldiers = byte,
@@ -305,9 +309,9 @@ impl World {
             10 => s.targeting_factor_scalar = i32::from(byte),
             0xb => s.trade_attack_evasion = value != 1,
             0xc => s.boar_lure_destination = byte,
-            0xd => s.preferred_trade_distance = value as f32,
+            0xd => s.preferred_trade_distance = Distance::new(value as f32),
             0xe => s.disable_tower_priority = value != 0,
-            0xf => s.attack_move_max_distance = value as i32,
+            0xf => s.attack_move_max_distance = WholeDistance::of_data(value as i32),
             0x10 => s.villager_attack_reset = value != 0,
             0x11 => s.disable_villager_garrison = value as i32,
             0x12 => s.allow_serjeant_building = value != 0,
@@ -319,11 +323,12 @@ impl World {
 
 /// What Treason's command takes off the pending debit of gold (`DAT_142eb5bd4`, 400.0, read at
 /// `0x140e7c73d`).
-const TREASON_COST: f32 = crate::math::image::turn::TREASON_COST;
+const TREASON_COST: Amount = Amount::new(crate::math::image::turn::TREASON_COST);
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gathering::QueueCount;
     use crate::objects::masters::class;
     use crate::objects::masters::ids::CASTLE;
     use crate::objects::masters::ids::FISH_TRAP;
@@ -393,7 +398,10 @@ mod tests {
         );
         // no castle: no treason
         t.game(&game(1, sub::TREASON, 1, 0, 0)).unwrap();
-        assert_eq!(t.players[1].pending_debit[attribute::GOLD.index()], 0.0);
+        assert_eq!(
+            t.players[1].pending_debit[attribute::GOLD.index()],
+            Amount::ZERO
+        );
         let castle = Master {
             id: CASTLE,
             class: class::TOWER,
@@ -438,27 +446,42 @@ mod tests {
         t.masters = vec![Masters::new([]), masters];
         let wood = |t: &World| t.players[1].attributes[1];
         t.game(&game(1, sub::FARM_QUEUE, 1, 2, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (2, Amount::new(880.0)));
+        assert_eq!(
+            (t.players[1].farm_queue, wood(&t)),
+            (QueueCount::of_data(2), Amount::new(880.0))
+        );
         t.game(&game(1, sub::PASTURE_QUEUE, 1, 1, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (3, Amount::new(780.0)));
+        assert_eq!(
+            (t.players[1].farm_queue, wood(&t)),
+            (QueueCount::of_data(3), Amount::new(780.0))
+        );
         t.game(&game(1, sub::PASTURE_UNQUEUE, 1, 1, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (2, Amount::new(880.0)));
+        assert_eq!(
+            (t.players[1].farm_queue, wood(&t)),
+            (QueueCount::of_data(2), Amount::new(880.0))
+        );
         t.game(&game(1, sub::FARM_UNQUEUE, 1, 1, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (1, Amount::new(940.0)));
+        assert_eq!(
+            (t.players[1].farm_queue, wood(&t)),
+            (QueueCount::of_data(1), Amount::new(940.0))
+        );
         t.game(&game(1, sub::FISH_TRAP_QUEUE, 1, 3, 0)).unwrap();
         assert_eq!(
             (t.players[1].fish_trap_queue, wood(&t)),
-            (3, Amount::new(640.0))
+            (QueueCount::of_data(3), Amount::new(640.0))
         );
         t.game(&game(1, sub::FISH_TRAP_UNQUEUE, 1, 2, 0)).unwrap();
         assert_eq!(
             (t.players[1].fish_trap_queue, wood(&t)),
-            (1, Amount::new(840.0))
+            (QueueCount::of_data(1), Amount::new(840.0))
         );
         // player 9 is outside the world: nothing
         t.settings.cheats_enabled = true;
         t.game(&game(1, sub::FARM_QUEUE, 9, 2, 0)).unwrap();
-        assert_eq!((t.players[1].farm_queue, wood(&t)), (1, Amount::new(840.0)));
+        assert_eq!(
+            (t.players[1].farm_queue, wood(&t)),
+            (QueueCount::of_data(1), Amount::new(840.0))
+        );
     }
 
     /// `do_command`'s gate: a sub-command for another player runs only with the game's cheats,
@@ -540,7 +563,7 @@ mod tests {
         t.players[2].computer = true;
         t.settings.cheats_enabled = true;
         t.game(&game(1, sub::AI_SETTING, 1, 1, 30)).unwrap();
-        assert_eq!(t.players[1].dodge_chance, 0);
+        assert_eq!(t.players[1].dodge_chance, Chance::NONE);
         let set = |t: &mut World, setting: i16, value: u32| {
             t.game(&game(1, sub::AI_SETTING, 2, setting, value))
                 .unwrap();
@@ -558,13 +581,16 @@ mod tests {
         set(&mut t, 0x13, 5);
         set(&mut t, 0x14, 5);
         let p = &t.players[2];
-        assert_eq!((p.dodge_chance, p.keep_distance_chance), (0x1e, 40));
+        assert_eq!(
+            (p.dodge_chance, p.keep_distance_chance),
+            (Chance::of_data(0x1e), Chance::of_data(40))
+        );
         let s = p.ai_settings;
         assert_eq!(s.easiest_reaction_percentage, 5);
         assert!(!s.may_attack_walls && s.livestock_only_to_tc && s.disable_build_help);
         assert!(!s.trade_attack_evasion && s.disable_tower_priority);
-        assert_eq!(s.preferred_trade_distance, 4_294_967_296.0);
-        assert_eq!(s.attack_move_max_distance, -16);
+        assert_eq!(s.preferred_trade_distance, Distance::new(4_294_967_296.0));
+        assert_eq!(s.attack_move_max_distance, WholeDistance::of_data(-16));
         assert!(t.allow_gaia_capture[2]);
     }
 }

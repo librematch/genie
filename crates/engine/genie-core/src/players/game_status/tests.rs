@@ -1009,3 +1009,14 @@ fn a_game_status_keeps_its_byte_and_knows_the_ended_ones() {
     assert!(GameStatus::WON.ended() && GameStatus::LOST.ended());
     assert!(!GameStatus::PLAYING.ended() && !GameStatus::of_data(3).ended());
 }
+
+/// The victory state and the fealty keep their saved values: met is 2, a fealty names a player
+/// above 0.
+#[test]
+fn the_victory_state_and_the_fealty_keep_their_values() {
+    assert_eq!(VictoryState::of_data(2), VictoryState::MET);
+    assert_eq!(VictoryState::default().get(), 0);
+    assert!(Fealty::of_data(3).names_player());
+    assert!(!Fealty::of_data(0).names_player() && !Fealty::of_data(-1).names_player());
+    assert_eq!(Fealty::of_data(-1).get(), -1);
+}
