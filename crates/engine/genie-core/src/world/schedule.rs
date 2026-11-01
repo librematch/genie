@@ -209,7 +209,7 @@ impl World {
         let _update = tracing::debug_span!(
             target: crate::trace::UPDATE,
             "update",
-            tick = self.ticks + 1,
+            tick = self.ticks.get() + 1,
             world_time = self.world_time.after(dt).millis()
         )
         .entered();
@@ -312,7 +312,10 @@ impl World {
                     PlayerId::try_from((self.player_turn.index() + 1) % self.players.len())?;
             }
             WorldStep::Victory => self.victory_check()?,
-            WorldStep::FrameSeed => self.frame_seed = self.streams.get(Stream::World).rand15(),
+            WorldStep::FrameSeed => {
+                self.frame_seed =
+                    crate::world::FrameSeed::of_data(self.streams.get(Stream::World).rand15());
+            }
             // setLastRandoms (0x140d3ce20): the multiplayer sync's draws
             WorldStep::LastRandoms => {
                 let _ = self.streams.set_last_randoms();
@@ -390,7 +393,7 @@ mod tests {
     fn bare(n: usize) -> World {
         World::new(
             WorldTime::ZERO,
-            29910,
+            crate::world::FrameSeed::of_data(29910),
             PlayerId::new(1),
             vec![Millis::ZERO; n],
             vec![Player::default(); n],

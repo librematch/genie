@@ -52,6 +52,7 @@ mod path_flags;
 mod path_points;
 mod path_state;
 pub use self::move_algorithm::MoveAlgorithm;
+pub use self::path_counts::{LinkedPathType, PlanTries, SubstituteCount, WaitDelays};
 pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;
 pub use self::waypoint_index::WaypointIndex;
@@ -64,6 +65,7 @@ pub use self::speed::Speed;
 pub use self::turn_rate::TurnRate;
 mod step;
 pub use self::step::GroupSpeed;
+mod path_counts;
 mod unit;
 mod walk;
 mod waypoint;
@@ -140,7 +142,7 @@ pub struct PathData {
     /// `+0x14`, `mWaypointLevel`: 0 is the path the unit walks.
     pub level: WaypointLevel,
     /// `+0x10`, `mLinkedPathType`: what a finished level hands its parent.
-    pub linked_type: i32,
+    pub linked_type: LinkedPathType,
     /// The path's waypoints (`+0x18`, the path's `+0x438`..`+0x440`).
     pub points: Vec<BVector>,
     /// The level holds a path (`+0x18`, or the one the world's table finds by its id `+0x20`): a
@@ -167,7 +169,7 @@ pub struct PathData {
     /// made.
     pub created: WorldTime,
     /// `+0x38`, `mContinueCounter`: the plans the level may still try before it gives up.
-    pub continue_counter: i32,
+    pub continue_counter: PlanTries,
     /// `+0x40`, `mRepathTime`.
     pub repath_time: f32,
     /// The path's hash set of ignored units (`+0x18`, `FUN_140f96120`), which the save writes as
@@ -259,7 +261,7 @@ pub struct Mover {
     /// `+0x7f9`, `waitingToMoveValue`.
     pub waiting: u8,
     /// `+0x7fa`, `numberWaitDelays`: plans that failed for want of budget (trade carts).
-    pub wait_delays: u8,
+    pub wait_delays: WaitDelays,
     /// `+0x7fb`, `mAttackMoving`: a level spends no try, and one without a path pauses.
     pub attack_moving: bool,
     /// `+0x870`, `lastMoveTimeValue`: the world's time when the unit last moved.
@@ -268,7 +270,7 @@ pub struct Mover {
     /// position setter compares the new place with (`FUN_141161950`).
     pub moved_at: Position,
     /// `+0x874`, `mConsecutiveSubstituteCount`: above 2 a walk counts its waypoint reached.
-    pub substitute_count: i32,
+    pub substitute_count: SubstituteCount,
     /// The unit's ignore list (`+0x670`, count `+0x678`; the save's `numberUnits` and `tempInt`
     /// of the static part): the other units of an order to several (`FUN_14118c790`), which the
     /// short pather ignores for a top path made this update. A stop empties it.
@@ -402,9 +404,6 @@ const PLANS: u32 = 3;
 /// What a gate's annex's gap loses against the gate's own (`XMM14`, the motion step's load at
 /// 0x1411510e7, the same as [`RANGE_FLOOR`]'s).
 const ANNEX_GAP: f32 = crate::math::image::movement::RANGE_FLOOR;
-/// A path level's plans before it gives up and the plans it may still try (`FUN_140f8f670`,
-/// `FUN_140f9b800`, `FUN_140f98e80`).
-pub(crate) const CONTINUE: i32 = 10;
 /// The widest unit the new short pather takes (`DAT_142e7f384`, `FUN_140f9e540`'s load at
 /// 0x140f9e713).
 const NEW_PATHER_RADIUS: f32 = crate::math::image::movement::NEW_PATHER_RADIUS;
@@ -458,7 +457,7 @@ impl PathData {
     pub(crate) const fn new(now: WorldTime) -> Self {
         Self {
             level: WaypointLevel::WALKED,
-            linked_type: 0,
+            linked_type: LinkedPathType::NONE,
             points: Vec::new(),
             has_path: true,
             path_flags: PathFlags::NEW,
@@ -470,7 +469,7 @@ impl PathData {
             flags: LevelFlags::NONE,
             length: Distance::ZERO,
             created: now,
-            continue_counter: CONTINUE,
+            continue_counter: PlanTries::FULL,
             repath_time: 0.0,
             ignore: Vec::new(),
             ignored: Vec::new(),
@@ -483,7 +482,7 @@ impl PathData {
     pub const fn without_path() -> Self {
         Self {
             level: WaypointLevel::WALKED,
-            linked_type: 0,
+            linked_type: LinkedPathType::NONE,
             points: Vec::new(),
             has_path: false,
             path_flags: PathFlags::NONE,
@@ -495,7 +494,7 @@ impl PathData {
             flags: LevelFlags::NONE,
             length: Distance::ZERO,
             created: WorldTime::ZERO,
-            continue_counter: CONTINUE,
+            continue_counter: PlanTries::FULL,
             repath_time: 0.0,
             ignore: Vec::new(),
             ignored: Vec::new(),

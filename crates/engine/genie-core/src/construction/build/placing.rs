@@ -2,10 +2,11 @@
 //! work, the walk off the footprint (state 223) and back.
 
 use crate::GenieError;
+use crate::construction::FootprintWaits;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
     BUILDER_UNMOVING, BuildAction, BuildReads, ClearingSite, EXTRA_BUILDER, FOREIGN_SITE,
-    MAX_WAITS, SITE_GONE, WONDER_RATE, footprint_clearing,
+    SITE_GONE, WONDER_RATE, footprint_clearing,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -229,11 +230,11 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        if MAX_WAITS <= builder.footprint_waits {
-            builder.footprint_waits = 0;
+        if FootprintWaits::MOST <= builder.footprint_waits {
+            builder.footprint_waits = FootprintWaits::NONE;
             return self.halt_placing(c, builder, reads);
         }
-        builder.footprint_waits += 1;
+        builder.footprint_waits = builder.footprint_waits.plus_one();
         self.state = BuildState::Wait;
         self.timer = Seconds::new(1.0);
         Ok(())

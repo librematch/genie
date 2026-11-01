@@ -30,7 +30,7 @@ pub(crate) struct Step<'a> {
     /// [`seconds`]: crate::objects::lifecycle::seconds
     pub(crate) dt: Millis,
     /// The ticks so far, this one included.
-    pub(crate) tick: u32,
+    pub(crate) tick: crate::world::Tick,
     /// The owner's accumulated time when it has the turn: the full unit-AI update runs.
     pub(crate) turn: Option<Millis>,
     /// The objects about the target of a unit with an area effect (or about the unit, for its

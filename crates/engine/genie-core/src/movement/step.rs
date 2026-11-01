@@ -177,11 +177,11 @@ impl Mover {
             factor: 1.0,
             stats,
             waiting: 0,
-            wait_delays: 0,
+            wait_delays: crate::movement::WaitDelays::NONE,
             attack_moving: false,
             last_move: now,
             moved_at: at,
-            substitute_count: 0,
+            substitute_count: crate::movement::SubstituteCount::NONE,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
@@ -511,7 +511,7 @@ impl Mover {
                 return Ok(Next::Again);
             }
             Reach::Reached => self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT,
-            Reach::Short if 2 < self.substitute_count => {
+            Reach::Short if 2 < self.substitute_count.get() => {
                 self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
             }
             Reach::Short => {}

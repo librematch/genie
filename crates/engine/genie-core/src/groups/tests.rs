@@ -355,7 +355,7 @@ fn tasked_world(masters: Vec<crate::objects::masters::Master>, owner_range: f32)
     attributes[90] = Amount::new(owner_range);
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -629,7 +629,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
     };
     let mut t = World::new(
         WorldTime::from_millis(50),
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![

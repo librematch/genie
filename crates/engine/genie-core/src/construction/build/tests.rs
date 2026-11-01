@@ -668,7 +668,7 @@ fn site_world(spatial: Spatial, masters: Vec<Master>, units: Vec<Unit>) -> World
     let ms = crate::objects::masters::Masters::new(masters);
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         vec![

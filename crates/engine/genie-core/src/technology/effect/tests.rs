@@ -188,7 +188,7 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
 fn a_population_set_moves_each_storage_entry_to_the_new_value() {
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -238,7 +238,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -383,7 +383,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -480,7 +480,7 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -535,7 +535,7 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -586,7 +586,7 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -638,7 +638,7 @@ fn a_team_effect_reaches_the_mutual_allies() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         vec![
@@ -691,7 +691,7 @@ fn a_storage_set_moves_the_player_s_attribute_by_each_object() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -735,7 +735,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            0,
+            crate::world::FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -890,7 +890,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -928,7 +928,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1050,7 +1050,7 @@ fn a_speed_change_reaches_the_units_movement() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1094,7 +1094,7 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1139,7 +1139,7 @@ fn a_farm_food_change_grows_the_farms_food() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1179,7 +1179,7 @@ fn the_resource_commands_side_effects() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         vec![
@@ -1244,7 +1244,7 @@ fn barracks_tech() -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1405,7 +1405,7 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     let player = Player::default();
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1467,7 +1467,7 @@ fn spawns_and_cost_entries() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1510,7 +1510,7 @@ fn spawns_and_cost_entries() {
 fn the_object_kinds_without_an_object_do_nothing() {
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player::default()],
@@ -1540,7 +1540,7 @@ fn the_object_kinds_without_an_object_do_nothing() {
 fn the_enable_command_sets_available_unless_disabled() {
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player::default()],
@@ -1591,7 +1591,7 @@ fn a_research_whose_effect_needs_its_building_stops() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1640,7 +1640,7 @@ fn an_age_adds_its_event_to_the_history() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1706,7 +1706,7 @@ fn a_dependent_technology_done_already_completes_with_its_requirement() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1741,7 +1741,7 @@ fn the_full_tech_tree_disables_a_civ_s_own_technologies_but_those_of_mode_1() {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            0,
+            crate::world::FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -1790,7 +1790,7 @@ fn the_technology_commands_disable_and_adjust_costs() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1875,7 +1875,7 @@ fn the_disable_command_reads_its_id_s_low_16_bits() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1903,7 +1903,7 @@ fn a_cost_change_past_the_i32_range_adds_nothing() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1963,7 +1963,7 @@ fn the_last_building_of_a_master_withdraws_its_technology() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -2019,7 +2019,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -2081,7 +2081,7 @@ fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],

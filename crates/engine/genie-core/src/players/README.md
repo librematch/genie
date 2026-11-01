@@ -40,6 +40,7 @@ A player has more than its objects. This folder holds the rest:
 | [`query_relation.rs`](query_relation.rs) | A search's relation number: which players' objects `ClosestObject` asks for or passes over. |
 | [`relation.rs`](relation.rs) | How a player stands to another as one type (`Relation`), and a player's row of them (`Relations`, `relation[i]`, `player+0x260`). |
 | [`stance.rs`](stance.rs) | A player's stance toward another as one type: `diplomacy[i]` (`+0xe12`). |
+| [`team.rs`](team.rs) | A player's team. |
 | [`tracker.rs`](tracker.rs) | The player's object tracker (`player+0x18`, the "Object Tracker"): lists of the player's object ids by key, in the order the ids came in. |
 | [`treason.rs`](treason.rs) | Treason (GAME's sub-command 0xa, the old Spies): a player with a castle pays gold to have its allies see the kings of the players it is not allied with, a flare at each king for each of them. |
 | [`tribute.rs`](tribute.rs) | A player's tribute: `TRIBE_COMMAND_GIVE_ATTRIBUTES` (0xc4, `TRIBE_Command::do_command`'s case, `FUN_140e7d040`). |

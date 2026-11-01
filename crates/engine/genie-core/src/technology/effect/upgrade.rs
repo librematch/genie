@@ -302,7 +302,7 @@ impl World {
                     let _ = self.let_out(bp, bi, new, Point::new(-1.0, -1.0), (None, false))?;
                 }
                 if master == RELIC {
-                    self.spawned_relics += 1;
+                    self.spawned_relics = self.spawned_relics.plus_one();
                 }
             }
         }

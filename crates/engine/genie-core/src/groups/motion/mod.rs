@@ -57,7 +57,7 @@ const PULL_KEEP: f32 = crate::math::image::group::PULL_KEEP;
 /// The passes of one step (`0x14 < local_7e0` ends it).
 const PASSES: u32 = 20;
 /// A level with fewer plans left than this gives up rather than wait (`FUN_140f95bf0 < 3`).
-const LAST_TRIES: i32 = 3;
+const LAST_TRIES: crate::movement::PlanTries = crate::movement::PlanTries::of_data(3);
 /// A patrolling group at its last waypoint pauses this long (the immediate `0x3f000000`).
 const PATROL_PAUSE: Seconds = Seconds::new(0.5);
 /// A group without a path left pauses this long (the immediate `0x3dcccccd`).
@@ -157,7 +157,7 @@ impl Motion {
         if level.level == WaypointLevel::TOP {
             level.waypoint = WaypointIndex::SECOND;
             level.state = PathState::WantsPath;
-            level.continue_counter = 10;
+            level.continue_counter = crate::movement::PlanTries::FULL;
         } else {
             reset_level(&mut self.paths)?;
         }

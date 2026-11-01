@@ -43,16 +43,16 @@ pub fn building_elevation_factor(
     victim_relics: Relics,
 ) -> f32 {
     let mut f = factor;
-    if 0 < relics.specific {
+    if crate::objects::RelicCount::ZERO < relics.specific {
         f *= SPECIFIC_RELIC_BOOST;
-    } else if 0 < relics.count {
+    } else if crate::objects::RelicCount::ZERO < relics.count {
         f *= RELIC_BOOST;
     }
     if kind == BUILDING {
-        if 0 < victim_relics.specific {
+        if crate::objects::RelicCount::ZERO < victim_relics.specific {
             return f / SPECIFIC_RELIC_BOOST;
         }
-        if 0 < victim_relics.count {
+        if crate::objects::RelicCount::ZERO < victim_relics.count {
             f /= RELIC_BOOST;
         }
     }

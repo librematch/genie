@@ -11,6 +11,7 @@ use genie_core::objects::masters::CostAmount;
 use genie_core::players::Amount;
 use genie_core::players::Chance;
 use genie_core::players::EscrowShare;
+use genie_core::players::Team;
 use genie_core::players::game_status::Fealty;
 use genie_core::players::game_status::GameStatus;
 use genie_core::players::game_status::VictoryState;
@@ -20,8 +21,11 @@ use genie_core::technology::EffectId;
 use genie_core::technology::OverrideUse;
 use genie_core::technology::ResearchCap;
 use genie_core::technology::ResearchCount;
+use genie_core::world::FrameSeed;
 use genie_core::world::Millis;
+use genie_core::world::PlayState;
 use genie_core::world::Seconds;
+use genie_core::world::Tick;
 use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
 
@@ -249,7 +253,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     let world = &header.world.base_world;
     let mut turns = World::new(
         WorldTime::from_millis(world.world_time),
-        world.current_frame_random_seed,
+        FrameSeed::of_data(world.current_frame_random_seed),
         PlayerId::try_from(world.player_turn.max(0) as usize).unwrap_or_default(),
         world
             .player_time_delta
@@ -291,7 +295,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     turns.alliance_locked = world.alliance_locked;
     // the world's teams (+0x984, `playerTeams[i]`, saved as bytes)
     for (team, &saved) in turns.teams.iter_mut().zip(&header.world.player_teams) {
-        *team = i32::from(saved);
+        *team = Team::of_data(i32::from(saved));
     }
     let none = TerrainTable::default();
     let terrain = masters.map_or(&none, |t| &t.terrain);
@@ -379,7 +383,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     // the Empire Wars start's pass, once in the game's first update (the world's +0x6c6): the
     // mode 13 or the sub-mode's bit 0
     turns.start_work_due = turns.settings.empire_wars() && turns.world_time == WorldTime::ZERO;
-    turns.game_state = u32::from(world.temp_game_state);
+    turns.game_state = PlayState::of_data(u32::from(world.temp_game_state));
     turns.victory_conquest = world.tribe_scenario.base_scenario.victory_conquest != 0;
     match groups::unit_groups(world) {
         Ok(g) => turns.groups = g,
@@ -450,7 +454,7 @@ fn stop_all(turns: &mut World, e: &genie_core::GenieError) {
     for p in &mut turns.players {
         let _ = p
             .unsupported
-            .get_or_insert_with(|| (0, ListIndex::new(0), e.clone()));
+            .get_or_insert_with(|| (Tick::ZERO, ListIndex::new(0), e.clone()));
         p.stopped = true;
     }
 }

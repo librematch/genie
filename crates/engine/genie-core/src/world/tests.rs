@@ -212,7 +212,7 @@ fn building() -> UnitAi {
 fn the_turn_rotates_and_only_the_turn_player_updates() {
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -262,7 +262,7 @@ fn the_turn_rotates_and_only_the_turn_player_updates() {
 fn the_frame_seed_chains_through_two_world_draws() {
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player(vec![])],
@@ -271,7 +271,10 @@ fn the_frame_seed_chains_through_two_world_draws() {
     // SeedAll(29910); s1 = World.rand15 = 19550 (see rng); SeedAll(19550); World.rand15
     let mut s = Streams::default();
     s.seed_all(19550);
-    assert_eq!(t.frame_seed, s.get(Stream::World).rand15());
+    assert_eq!(
+        t.frame_seed,
+        FrameSeed::of_data(s.get(Stream::World).rand15())
+    );
 }
 
 #[test]
@@ -292,7 +295,7 @@ fn artifacts_of_every_player_start_updating_in_the_second_tick() {
     ];
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         players,
@@ -326,7 +329,7 @@ fn an_unsupported_unit_stops_and_is_recorded() {
     odd.ai_type = UnitAiType::of_value(99);
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player(vec![Some(odd)])],
@@ -338,7 +341,7 @@ fn an_unsupported_unit_stops_and_is_recorded() {
     assert_eq!(
         t.players[0].unsupported,
         Some((
-            1,
+            Tick::new(1),
             ListIndex::new(0),
             GenieError::unsupported("unit-AI type not modelled")
         ))
@@ -389,7 +392,7 @@ fn a_removed_object_is_replaced_by_the_last_one_which_updates_in_the_same_tick()
     // takes its slot and updates there, so it draws before the object behind the slot
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -406,7 +409,7 @@ fn a_removed_object_is_replaced_by_the_last_one_which_updates_in_the_same_tick()
     // fall due in the fourth tick, so its draws depend only on the order
     let mut reordered = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -426,7 +429,7 @@ fn a_dead_objects_unit_ai_draws_nothing() {
     let one = |objects| {
         let mut t = World::new(
             WorldTime::ZERO,
-            29910,
+            FrameSeed::of_data(29910),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![Player {
@@ -652,7 +655,7 @@ fn an_order_on_a_target_joins_the_unit_ai_s_history() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -727,7 +730,7 @@ fn a_flare_at_a_point_stands_on_the_ground() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![player(), player(), player()],
@@ -761,7 +764,7 @@ fn a_hit_s_flare_lasts_twice_as_long_from_a_trebuchet() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![player(), player(), player()],
@@ -801,7 +804,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![player(), player()],
@@ -1340,7 +1343,7 @@ fn a_player_s_new_tiles_give_their_resources_to_its_lists() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -1439,7 +1442,7 @@ fn a_resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -1525,7 +1528,7 @@ fn a_new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![Player::default(), Player::default(), Player::default()],
@@ -1754,7 +1757,7 @@ fn build_world() -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -1871,7 +1874,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
     assert_eq!(
         p.unsupported,
         Some((
-            1,
+            Tick::new(1),
             ListIndex::new(1),
             crate::construction::build::BUILDER_UNMOVING
         ))
@@ -1954,7 +1957,7 @@ fn a_queued_build_queues_its_order_for_another_player_s_villager() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -2075,7 +2078,7 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -4293,7 +4296,7 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
         attributes[134] = Amount::new(count);
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             vec![
@@ -4380,7 +4383,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -7190,7 +7193,7 @@ fn a_build_creates_a_foundation_whose_unit_ai_draws_before_the_turn_players_unit
     let world = |objects: Vec<Unit>| {
         let mut t = World::new(
             WorldTime::ZERO,
-            29910,
+            FrameSeed::of_data(29910),
             PlayerId::new(1),
             vec![Millis::ZERO, Millis::ZERO],
             vec![
@@ -7283,7 +7286,7 @@ fn an_order_resets_the_idle_timeouts_of_its_units_wherever_they_are() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -7348,7 +7351,7 @@ fn an_unmodelled_action_stops_its_player_unless_the_object_dies_first() {
     let run = |unit| {
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player(vec![])],
@@ -7360,7 +7363,7 @@ fn an_unmodelled_action_stops_its_player_unless_the_object_dies_first() {
     };
     assert_eq!(
         run(with_task(Lifecycle::default())),
-        Some((1, ListIndex::new(0), task.clone()))
+        Some((Tick::new(1), ListIndex::new(0), task.clone()))
     );
     let dying = Lifecycle {
         class: Class::Animated,
@@ -7411,7 +7414,7 @@ fn livestock_without_actions_starts_its_artifact_again() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -7614,7 +7617,7 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![player(vec![].into()), player(vec![sheep].into())],
@@ -7671,7 +7674,7 @@ fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
     attributes[attribute::FARM_FOOD_AMOUNT.index()] = Amount::new(175.0);
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -7737,7 +7740,7 @@ fn a_building_s_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -7871,7 +7874,7 @@ fn an_order_resets_its_units_sleeping_ones_too() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![Player::default(), player],
@@ -7944,7 +7947,7 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         vec![
@@ -8005,7 +8008,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         vec![
@@ -8262,7 +8265,7 @@ fn gate_world() -> World {
         .put_mover(Some(crate::gathering::hunt::tests::walker()));
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -8492,7 +8495,7 @@ fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
         ..Unit::default()
     };
     let game = GameState {
-        frame_seed: 77,
+        frame_seed: FrameSeed::of_data(77),
         players: vec![vec![
             game_unit(object_id(7), Millis::new(900)),
             game_unit(object_id(8), Millis::new(901)),
@@ -8501,7 +8504,7 @@ fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
         ..GameState::default()
     };
     assert_eq!(t.force(&game), vec![]);
-    assert_eq!(t.frame_seed, 77);
+    assert_eq!(t.frame_seed, FrameSeed::of_data(77));
     assert_eq!(ids(&t), vec![7, 8]);
     assert_eq!(retarget(&t), vec![900, 40]);
     assert!(t.players[0].objects.iter().all(|u| !u.stopped));
@@ -8589,7 +8592,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
         (Amount::new(5.0), Amount::new(4.0), Amount::new(10.0));
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -9462,7 +9465,10 @@ fn an_unmodelled_command_stops_its_player() {
             why: why.clone(),
         })],
     );
-    assert_eq!(t.players[0].unsupported, Some((1, ListIndex::new(0), why)));
+    assert_eq!(
+        t.players[0].unsupported,
+        Some((Tick::new(1), ListIndex::new(0), why))
+    );
 }
 
 /// The masters of the ownership changes' tests, by player: Gaia's (0), player 1's and
@@ -10225,7 +10231,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     let world = |masters: Vec<Masters>, computer: bool, mode: i32| {
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
             vec![
@@ -10373,7 +10379,7 @@ fn teardown_world() -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -10726,7 +10732,7 @@ fn deaths_world() -> World {
     // player 1's turn: the boar's unit AI keeps its attackers
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -11100,7 +11106,7 @@ fn a_move_to_of_its_own_lets_a_dying_target_go_and_forgets_a_lost_one() {
 fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![Player::default(), Player::default()],
@@ -11372,7 +11378,7 @@ fn a_foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -11685,7 +11691,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -11841,7 +11847,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -11965,7 +11971,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -12079,7 +12085,7 @@ fn the_standard_modes_are_all_but_the_scenario_ones() {
 fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -12135,7 +12141,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
     let world = |attacker_kind| {
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             vec![
@@ -12248,7 +12254,7 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
     .into();
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -12548,7 +12554,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -12680,7 +12686,7 @@ fn a_hit_wakes_a_sleeping_object_only_below_1_hit_point() {
     let hit = |hp: HitPoints| {
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             vec![
@@ -13250,7 +13256,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -13450,7 +13456,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -13570,7 +13576,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -13861,7 +13867,7 @@ fn the_attack_timer_runs_down_at_the_object_s_rate() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -13947,7 +13953,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -14441,7 +14447,7 @@ fn on_side<R>(
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![gaia, scout],
@@ -15131,7 +15137,7 @@ fn a_build_command_s_foundation_holds_its_movement_state() {
     house.moving = Some(house_moves());
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -15220,7 +15226,7 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
         house.moving = Some(house_moves());
         let mut t = World::new(
             WorldTime::ZERO,
-            29910,
+            FrameSeed::of_data(29910),
             PlayerId::new(1),
             vec![Millis::ZERO, Millis::ZERO],
             vec![
@@ -15385,7 +15391,7 @@ fn reseed_world() -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -15628,7 +15634,7 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -15746,7 +15752,7 @@ fn a_stop_s_error_names_the_command_or_the_object_it_happened_on() {
     let task = GenieError::unsupported("a default task the slice does not model");
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player(vec![])],
@@ -16124,7 +16130,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
     players[1].relations = relation_row([3, 0]);
     let mut t = World::new(
         WorldTime::ZERO,
-        29910,
+        FrameSeed::of_data(29910),
         PlayerId::new(1),
         vec![Millis::ZERO; 2],
         players,

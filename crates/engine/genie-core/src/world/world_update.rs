@@ -27,11 +27,11 @@ impl World {
     /// `snapshot_at` at `0x141552990`); the schedule's first step
     /// ([`crate::world::schedule::WorldStep::Commands`]).
     pub fn command_phase(&mut self, dt: Millis, commands: &[Command]) {
-        self.ticks += 1;
+        self.ticks = self.ticks.next();
         self.world_time = self.world_time.after(dt);
         self.dt_seconds = dt.seconds();
         self.dt = dt;
-        self.streams.seed_all(self.frame_seed);
+        self.streams.seed_all(self.frame_seed.get());
         self.sync_moving();
         for command in commands {
             tracing::debug!(target: crate::trace::UPDATE, ?command, "command");

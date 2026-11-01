@@ -10,12 +10,13 @@ use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::WaitDelays;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::movement::{
-    AfterRequest, CONTINUE, EPSILON, Goal, LONG_PATH_GROW, LONG_PATH_MOVER, LongWalker, Me, Mover,
-    Planning, RANGE_FLOOR, SHORT_REACH, cut_path, footprint_gap, ground, long_path_for, may_plan,
+    AfterRequest, EPSILON, Goal, LONG_PATH_GROW, LONG_PATH_MOVER, LongWalker, Me, Mover, Planning,
+    RANGE_FLOOR, SHORT_REACH, cut_path, footprint_gap, ground, long_path_for, may_plan,
     point_or_zero,
 };
 use crate::objects::ObjectId;
@@ -155,14 +156,14 @@ impl Mover {
         let budget = owner.map(|o| plan.pathing.budget(o));
         if !may_plan(trade_cart, budget, self.wait_delays, *plans) {
             self.stop()?;
-            self.wait_delays = self.wait_delays.wrapping_add(1);
+            self.wait_delays = self.wait_delays.plus_one();
             return Ok(false);
         }
         if let Some(o) = owner {
             plan.pathing.count_plan(o);
         }
         *plans += 1;
-        self.wait_delays = 0;
+        self.wait_delays = WaitDelays::NONE;
         Ok(true)
     }
 
@@ -180,8 +181,8 @@ impl Mover {
         }
         let top_has_more = self.top_has_more();
         let level = &mut self.paths[0];
-        level.continue_counter -= 1;
-        if 1 <= level.continue_counter {
+        level.continue_counter = level.continue_counter.spent();
+        if level.continue_counter.left() {
             return Ok(None);
         }
         if WaypointLevel::PLANNED < level.level || !top_has_more {
@@ -189,7 +190,7 @@ impl Mover {
                 && !level.waypoint.at_or_past_last(level.points.len())
             {
                 level.flags |= LevelFlags::REACHED;
-                level.continue_counter = CONTINUE;
+                level.continue_counter = crate::movement::PlanTries::FULL;
                 return Ok(Some(AfterRequest::Again));
             }
             self.reset_level();

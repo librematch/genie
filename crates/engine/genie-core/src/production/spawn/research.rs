@@ -269,7 +269,7 @@ impl World {
     ) -> Result<(), GenieError> {
         use crate::technology::Attributes;
         let (t, _) = self.research_tech(p, r.tech)?;
-        if r.state != MakeTechState::Done && self.game_state == 0 {
+        if r.state != MakeTechState::Done && self.game_state == crate::world::PlayState::PLAYING {
             self.research_failed(p, i, r, t)?;
         }
         let def = &self.techs[t];

@@ -58,21 +58,27 @@ mod after_step;
 mod ai_values;
 mod clock;
 mod forced;
+mod frame_seed;
 mod mode_680;
 mod object_step;
 mod options;
+mod play_state;
 pub mod schedule;
 pub mod settings;
 mod setup;
+mod tick;
 mod world_update;
 
 pub use self::ai_values::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 pub use self::clock::{Millis, Seconds, WholeSeconds, WorldTime};
 pub use self::forced::GameState;
+pub use self::frame_seed::FrameSeed;
 pub use self::mode_680::Mode680;
 pub use self::options::{
     Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
 };
+pub use self::play_state::PlayState;
+pub use self::tick::Tick;
 
 /// What every building holds of a gate: `mGateLocked` (`+0xc7c`; a lock also sets the
 /// building's last move time, [`Mover::last_move`], slot 0x670, `FUN_1411dba30`), `mFirstUpdate`
@@ -239,7 +245,7 @@ pub struct World {
     /// The world's time (`world_time`).
     pub world_time: WorldTime,
     /// `world+0x7d0`.
-    pub frame_seed: u32,
+    pub frame_seed: FrameSeed,
     /// `world+0x188`, `player_turn` in the save.
     pub player_turn: PlayerId,
     /// `world+0x18c[p]`, the time each player accumulated since its last turn.
@@ -247,7 +253,7 @@ pub struct World {
     /// Every player, Gaia first.
     pub players: Vec<Player>,
     /// The updates run so far.
-    pub ticks: u32,
+    pub ticks: Tick,
     /// `mNextObjectId`, the id the next new object gets.
     pub next_object_id: ObjectId,
     /// Each player's masters, which BUILD reads; a player without them stops at its own BUILD.
@@ -280,9 +286,9 @@ pub struct World {
     /// The world's `+0x844`: the relics (master 0x11d) an effect's spawn made (`FUN_1416136f0`),
     /// which the relic victory's countdown reads (not modelled, [`crate::players::game_status`]); not
     /// saved here, 0 at a load.
-    pub spawned_relics: i32,
+    pub spawned_relics: crate::objects::RelicCount,
     /// The world's game state (`+0x88`, the save's `tempGameState`): 1 once the game is over.
-    pub game_state: u32,
+    pub game_state: PlayState,
     /// The scenario's `victory_conquest` (`world+0x7e0`'s `+0x2c0`, `FUN_140ca4d20`): the game
     /// ends when one side is left.
     pub victory_conquest: bool,
@@ -330,7 +336,7 @@ pub struct World {
     pub alliance_locked: i32,
     /// The world's teams (`+0x984`..`+0x9a0`, `playerTeams[i]`, saved as bytes): player i's
     /// team at i − 1, 1 alone ([`World::resolve_teams`]).
-    pub teams: [i32; 8],
+    pub teams: [crate::players::Team; 8],
     /// The game's `+0xc14` (`FUN_140c884c0`, saved as a byte): the player of the quick-build
     /// cheat (GAME 4), 0 without; while it is not 0 every work is done at once, which the work
     /// actions do not model (they take it as 0).

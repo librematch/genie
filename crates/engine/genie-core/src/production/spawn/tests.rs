@@ -58,7 +58,7 @@ fn a_gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![

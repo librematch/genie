@@ -302,7 +302,7 @@ impl UnitSide for HelpSide {
             position: None,
             fresh: true,
             players: 0,
-            distance: 0,
+            distance: crate::map::WholeDistance::of_data(0),
             retries: [None; 3],
         })
     }
@@ -1107,7 +1107,7 @@ fn found_at(id: i32) -> Found {
         position: (id != -1).then_some(Position::new(5.0, 6.0, 0.0)),
         fresh: true,
         players: 0,
-        distance: -1,
+        distance: crate::map::WholeDistance::of_data(-1),
         retries: [None; 3],
     }
 }
@@ -1841,7 +1841,7 @@ impl UnitSide for LionSide {
             position: Some(Position::ORIGIN),
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     }
@@ -1966,7 +1966,7 @@ impl UnitSide for SoldierSide {
             position: Some(Position::new(10.0, 11.0, 0.0)),
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     }
@@ -2033,7 +2033,7 @@ impl UnitSide for DamageSide {
             position: None,
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     }
@@ -4306,7 +4306,7 @@ impl ArtifactSide {
             found: Found {
                 id: ObjectId::of_field(id),
                 players,
-                distance: -1,
+                distance: crate::map::WholeDistance::of_data(-1),
                 position: Some(Position::new(140.0, 100.0, 0.0)),
                 ..Found::NONE
             },
@@ -5520,7 +5520,7 @@ fn a_deer_that_sees_an_object_evades_it() {
             position: Some(Position::new(33.5, 106.5, 0.0)),
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -6605,7 +6605,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
             position: Some(Position::ORIGIN),
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -7734,7 +7734,7 @@ fn a_no_attack_tower_only_searches() {
             position: None,
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -8245,7 +8245,7 @@ fn a_deer_evading_an_object_on_its_own_point_steps_off_by_one() {
             position: Some(Position::new(31.5, 106.5, 0.0)),
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -8274,7 +8274,7 @@ fn a_deer_evading_an_object_on_its_own_point_steps_off_by_one() {
             position: Some(Position::new(3.5, 4.5, 0.0)),
             fresh: true,
             players: 0,
-            distance: -1,
+            distance: crate::map::WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -10273,10 +10273,10 @@ fn a_fishing_ship_builds_the_nearest_foundation_it_reaches() {
     };
     let mut side = ShipSide {
         found: vec![
-            found(None, -1),
-            found(Some(object_id(41)), 6),
-            found(Some(object_id(42)), 3),
-            found(Some(object_id(43)), 3),
+            found(None, crate::map::WholeDistance::of_data(-1)),
+            found(Some(object_id(41)), crate::map::WholeDistance::of_data(6)),
+            found(Some(object_id(42)), crate::map::WholeDistance::of_data(3)),
+            found(Some(object_id(43)), crate::map::WholeDistance::of_data(3)),
             Found::NONE,
         ],
         reach: true,
@@ -10319,7 +10319,10 @@ fn a_fishing_ship_builds_the_nearest_foundation_it_reaches() {
     assert_eq!(groups, FISHING_BUILDS.map(Some).to_vec());
     // out of reach: the human's goes on, the computer's posts its completion
     let mut side = ShipSide {
-        found: vec![found(Some(object_id(41)), 6)],
+        found: vec![found(
+            Some(object_id(41)),
+            crate::map::WholeDistance::of_data(6),
+        )],
         ..ShipSide::default()
     };
     let mut fx = Vec::new();

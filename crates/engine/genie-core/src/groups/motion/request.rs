@@ -12,7 +12,7 @@ use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
-use crate::movement::CONTINUE;
+use crate::movement::LinkedPathType;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointIndex;
@@ -156,8 +156,8 @@ fn take_turn(
     let spends = top_loops.is_none_or(|loops| !loops && lead_group.is_some_and(|g| !g.patrols()));
     if spends {
         let level = motion.paths.checked_mut(0)?;
-        level.continue_counter -= 1;
-        if level.continue_counter <= 0 {
+        level.continue_counter = level.continue_counter.spent();
+        if !level.continue_counter.left() {
             give_up(motion)?;
             return Ok(Some(Pass::Done(false)));
         }
@@ -433,7 +433,7 @@ pub(super) fn link(
     level.state = PathState::Idle;
     // A level's plans (`FUN_140f8f670`, `FUN_140f9b800`).
     // A new path's flags (`FUN_14152eea0`).
-    level.continue_counter = CONTINUE;
+    level.continue_counter = crate::movement::PlanTries::FULL;
     let (range, target, top) = (level.range, level.target, level.level == WaypointLevel::TOP);
     let new = PathData {
         points: path.points,
@@ -454,7 +454,11 @@ pub(super) fn link(
         } else {
             WaypointLevel::WALKED
         },
-        linked_type: if found { 1 } else { 2 },
+        linked_type: if found {
+            LinkedPathType::REACHES_WAYPOINT
+        } else {
+            LinkedPathType::MOVES_ON
+        },
         ..PathData::without_path()
     };
     motion.paths.insert(0, new);

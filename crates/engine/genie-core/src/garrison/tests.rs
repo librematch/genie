@@ -184,7 +184,7 @@ fn garrison_world() -> World {
     players[3].relations = relation_row([1, 3, 3, 0]);
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         players,
@@ -2152,11 +2152,11 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
             ..standing()
         },
         waiting: 0,
-        wait_delays: 0,
+        wait_delays: crate::movement::WaitDelays::of_data(0),
         attack_moving: false,
         last_move: WorldTime::ZERO,
         moved_at: Position::ORIGIN,
-        substitute_count: 0,
+        substitute_count: crate::movement::SubstituteCount::of_data(0),
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,

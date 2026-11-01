@@ -44,7 +44,7 @@ pub struct Found {
     pub players: u32,
     /// What `ClosestObject` writes to its seventh argument: the object's search distance,
     /// truncated (`CVTTSS2SI`); −1 (`DAT_14330ec20`) without one and from the other picks.
-    pub distance: i32,
+    pub distance: crate::map::WholeDistance,
     /// The retarget entries `bestUnitToAttack`'s failed paths add (`FUN_140c42320`: a target and
     /// the world time until which it is ignored; at most three), the unit AI's.
     pub retries: [Option<(ObjectId, WorldTime)>; 3],
@@ -58,7 +58,7 @@ impl Found {
         position: None,
         fresh: true,
         players: 0,
-        distance: -1,
+        distance: crate::map::WholeDistance::NONE,
         retries: [None; 3],
     };
 }

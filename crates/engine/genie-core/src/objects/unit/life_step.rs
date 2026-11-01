@@ -85,7 +85,7 @@ impl Unit {
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
             self.died(c, before)?;
             if self.master(&c.w.masters, c.player)?.ghost_on_death == GhostMode::LEAVES
-                && c.w.game_state != 2
+                && c.w.game_state.leaves_ghosts()
             {
                 // the ghosts of the death (FUN_14118e990), the object lent to the world
                 let (p, id) = (c.player, self.id);

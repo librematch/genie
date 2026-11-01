@@ -24,6 +24,7 @@ use genie_core::objects::HpPowerup;
 use genie_core::objects::MasterHitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::Regeneration;
+use genie_core::objects::RelicCount;
 use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
 use genie_core::objects::WorkerCount;
@@ -148,7 +149,10 @@ pub(super) fn unit(
             .tribe_building_object
             .as_deref()
             .map_or(Relics::NONE, |b| {
-                Relics::new(b.relic_count, b.specific_relic_count)
+                Relics::new(
+                    RelicCount::of_data(b.relic_count),
+                    RelicCount::of_data(b.specific_relic_count),
+                )
             }),
         damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
         livestock_summation: object

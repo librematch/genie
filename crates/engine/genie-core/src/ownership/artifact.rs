@@ -452,7 +452,7 @@ impl Unit {
         me: Me,
     ) -> Result<Option<Captured>, GenieError> {
         let by = self.releaser(c)?;
-        if c.tick <= 1 {
+        if c.tick <= crate::world::Tick::new(1) {
             return Ok(None);
         }
         self.artifact_enter_part(c, me, by)?;

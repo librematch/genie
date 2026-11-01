@@ -43,7 +43,7 @@ fn a_top_target_below_minus_one_is_none() {
     };
     let t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![Player::default(), player],
@@ -140,7 +140,7 @@ fn the_walked_levels_below_the_high_level_go() {
         2,
         PathState::Arrived,
     );
-    top.continue_counter = 3;
+    top.continue_counter = crate::movement::PlanTries::of_data(3);
     m.paths = vec![
         level(0, &[Point::new(1.0, 1.0)], 1, PathState::Walking),
         level(1, &[Point::new(2.0, 2.0)], 1, PathState::Idle),
@@ -150,7 +150,12 @@ fn the_walked_levels_below_the_high_level_go() {
     assert_eq!(m.paths.len(), 1);
     let l = &m.paths[0];
     assert_eq!(
-        (l.level.get(), l.waypoint.get(), l.state, l.continue_counter),
+        (
+            l.level.get(),
+            l.waypoint.get(),
+            l.state,
+            l.continue_counter.get()
+        ),
         (2, 1, PathState::WantsPath, 10)
     );
     assert_eq!(l.points.len(), 3);
@@ -491,7 +496,7 @@ fn an_arrived_level_hands_over_and_a_pause_waits() {
         1,
         PathState::Arrived,
     );
-    walked.linked_type = 1;
+    walked.linked_type = crate::movement::LinkedPathType::of_data(1);
     let parent = level(
         2,
         &[Point::new(5.0, 5.0), Point::new(5.0, 9.0)],
@@ -609,7 +614,7 @@ fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     assert_eq!((m.number_wait_delays, m.velocity.y()), (1, 0.0));
     assert_eq!(fx.pathing.budgets[1].plans, 1);
     let mut m = requesting(0, 6.0);
-    m.paths[0].continue_counter = 1;
+    m.paths[0].continue_counter = crate::movement::PlanTries::of_data(1);
     m.number_wait_delays = 4;
     let p = fx.request(
         &mut m,
@@ -627,13 +632,13 @@ fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     // (a lead the short pather does not serve: the near waypoint counts as reached)
     for lead in [grouped(0x800), lead()] {
         let mut m = requesting(0, 6.0);
-        m.paths[0].continue_counter = 1;
+        m.paths[0].continue_counter = crate::movement::PlanTries::of_data(1);
         let lead = Lead {
             solid: false,
             ..lead
         };
         let _ = fx.request(&mut m, &lead, false, None, DistanceSquared::new(f32::MAX));
-        assert_eq!(m.paths.last().map(|l| l.continue_counter), Some(1));
+        assert_eq!(m.paths.last().map(|l| l.continue_counter.get()), Some(1));
     }
 }
 
@@ -644,7 +649,7 @@ fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
 fn a_top_level_without_a_planner_plans_the_straight_way() {
     let mut fx = Fixture::new();
     let mut m = requesting(2, 30.0);
-    m.paths[0].continue_counter = 4;
+    m.paths[0].continue_counter = crate::movement::PlanTries::of_data(4);
     assert!(matches!(
         fx.request(&mut m, &lead(), false, None, DistanceSquared::new(f32::MAX)),
         Some(Pass::Next)
@@ -655,7 +660,7 @@ fn a_top_level_without_a_planner_plans_the_straight_way() {
         (
             new.level.get(),
             new.state,
-            new.linked_type,
+            new.linked_type.get(),
             new.waypoint.get()
         ),
         (1, PathState::WantsPath, 1, 1)
@@ -668,7 +673,10 @@ fn a_top_level_without_a_planner_plans_the_straight_way() {
         (new.length, new.created),
         (Distance::new(25.0), WorldTime::from_millis(100))
     );
-    assert_eq!((top.state, top.continue_counter), (PathState::Idle, 10));
+    assert_eq!(
+        (top.state, top.continue_counter.get()),
+        (PathState::Idle, 10)
+    );
 }
 
 /// A near waypoint the short pather finds no way to: a group without a target counts it
@@ -743,7 +751,7 @@ fn a_near_target_takes_the_straight_way() {
     );
     let new = &m.paths[0];
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type),
+        (new.level.get(), new.state, new.linked_type.get()),
         (0, PathState::Walking, 1)
     );
     assert_eq!(
@@ -776,7 +784,7 @@ fn a_near_waypoint_takes_the_short_pather_s_path() {
     );
     let new = &m.paths[0];
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type),
+        (new.level.get(), new.state, new.linked_type.get()),
         (0, PathState::Walking, 1)
     );
     assert_eq!(new.points.first(), Some(&BVector::new(5.0, 0.0, 5.0)));
@@ -796,7 +804,7 @@ fn a_far_waypoint_takes_the_long_pather_s_path() {
     );
     let new = &m.paths[0];
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type),
+        (new.level.get(), new.state, new.linked_type.get()),
         (0, PathState::Walking, 1)
     );
     assert_eq!(
@@ -838,20 +846,20 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
         )
         .unwrap()
     };
-    let mut m = at(2, &last, 2);
+    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
     assert!(matches!(
         end(&mut m, &grouped(0x800), false),
         Some(Pass::Done(false))
     ));
     assert_eq!(m.paths[0].pause_time, PATROL_PAUSE);
-    let mut m = at(2, &last, 2);
+    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
     ));
     assert_eq!(m.paths[0].pause_time, PATROL_PAUSE);
-    let mut m = at(0, &last, 2);
+    let mut m = at(0, &last, crate::movement::PlanTries::of_data(2));
     m.paths.push(level(
         2,
         &[
@@ -864,7 +872,7 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
     ));
     assert!(matches!(end(&mut m, &lead(), false), Some(Pass::Next)));
     assert_eq!(m.paths[0].state, PathState::Unplanned);
-    let mut m = at(2, &last, 2);
+    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
@@ -873,19 +881,19 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
         (m.paths.clone(), m.velocity.y()),
         (vec![PathData::without_path()], 0.0)
     );
-    let mut m = at(2, &last, 2);
+    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
     m.paths[0].waypoint = WaypointIndex::of_data(0);
     assert!(matches!(end(&mut m, &lead(), false), Some(Pass::Reached)));
-    let mut m = at(2, &last, 3);
+    let mut m = at(2, &last, crate::movement::PlanTries::of_data(3));
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
     ));
     assert_eq!((m.paths[0].pause_time, m.velocity.y()), (STUCK_PAUSE, 0.0));
-    let mut m = at(0, &last, 5);
+    let mut m = at(0, &last, crate::movement::PlanTries::of_data(5));
     assert!(matches!(end(&mut m, &lead(), true), Some(Pass::Done(true))));
     assert_eq!(m.paths, vec![PathData::without_path()]);
-    let mut m = at(0, &last, 5);
+    let mut m = at(0, &last, crate::movement::PlanTries::of_data(5));
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(end(&mut m, &lead(), true), Some(Pass::Reached)));
 }
@@ -1035,19 +1043,43 @@ fn an_arrived_level_hands_over_by_its_link() {
         (m.paths[0].waypoint.get(), m.paths[0].state)
     };
     assert_eq!(
-        handed(&mut fx, 2, PathFlags::LOOPS, &lead(), 1),
+        handed(
+            &mut fx,
+            crate::movement::LinkedPathType::of_data(2),
+            PathFlags::LOOPS,
+            &lead(),
+            1
+        ),
         (2, PathState::WantsPath)
     );
     assert_eq!(
-        handed(&mut fx, 2, PathFlags::NONE, &grouped(0x800), 1),
+        handed(
+            &mut fx,
+            crate::movement::LinkedPathType::of_data(2),
+            PathFlags::NONE,
+            &grouped(0x800),
+            1
+        ),
         (2, PathState::WantsPath)
     );
     assert_eq!(
-        handed(&mut fx, 2, PathFlags::NONE, &grouped(0x800), 2),
+        handed(
+            &mut fx,
+            crate::movement::LinkedPathType::of_data(2),
+            PathFlags::NONE,
+            &grouped(0x800),
+            2
+        ),
         (3, PathState::Arrived)
     );
     assert_eq!(
-        handed(&mut fx, 3, PathFlags::LOOPS, &grouped(0x800), 1),
+        handed(
+            &mut fx,
+            crate::movement::LinkedPathType::of_data(3),
+            PathFlags::LOOPS,
+            &grouped(0x800),
+            1
+        ),
         (1, PathState::WantsPath)
     );
     // bit 0: the waypoint counts reached (past the last, 0.5 from the target: back to it, state

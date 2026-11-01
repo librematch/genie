@@ -296,7 +296,7 @@ pub fn objects_from_save(
             .filter(|u| listed(u))
             .cloned()
             .collect(),
-        unsupported: player.unsupported.clone(),
+        unsupported: player.unsupported.clone().map(|(t, i, e)| (t.get(), i, e)),
         unsupported_id: player
             .unsupported
             .as_ref()
@@ -304,7 +304,7 @@ pub fn objects_from_save(
         stopped: turns
             .players
             .iter()
-            .map(|p| p.unsupported.clone())
+            .map(|p| p.unsupported.clone().map(|(t, i, e)| (t.get(), i, e)))
             .collect(),
         visibility: turns.spatial.sight.take(),
         terrain: turns.spatial.terrain.take(),
@@ -314,7 +314,16 @@ pub fn objects_from_save(
             .flat_map(|p| p.objects.iter().filter(|u| p.stopped || u.stopped))
             .map(|u| u.id)
             .collect(),
-        freezes: turns.players.iter().map(|p| p.freezes.clone()).collect(),
+        freezes: turns
+            .players
+            .iter()
+            .map(|p| {
+                p.freezes
+                    .iter()
+                    .map(|(t, o, e)| (t.get(), *o, e.clone()))
+                    .collect()
+            })
+            .collect(),
     })
 }
 

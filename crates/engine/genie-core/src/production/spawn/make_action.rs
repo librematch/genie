@@ -384,7 +384,8 @@ impl World {
             Making::Unit(make) => make,
             Making::Research(r) => return self.research_destroyed(p, i, &r),
         };
-        if matches!(make.state, MakeObjState::Making | MakeObjState::NoSpot) && self.game_state == 0
+        if matches!(make.state, MakeObjState::Making | MakeObjState::NoSpot)
+            && self.game_state == crate::world::PlayState::PLAYING
         {
             let made = make.master.and_then(|m| player_master(&self.masters, p, m));
             let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));

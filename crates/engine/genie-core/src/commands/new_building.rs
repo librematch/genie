@@ -256,7 +256,7 @@ impl World {
         let owner = self.players.player_mut(player)?;
         owner.objects.push(Unit {
             id,
-            footprint_waits: 0,
+            footprint_waits: crate::construction::FootprintWaits::NONE,
             life: Lifecycle {
                 class: Class::Animated,
                 state: ObjectState::Foundation,

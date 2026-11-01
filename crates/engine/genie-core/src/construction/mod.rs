@@ -4,9 +4,11 @@
 pub mod build;
 mod builder_count;
 pub(crate) mod building_update;
+mod footprint_waits;
 pub(crate) mod gates;
 pub mod repair;
 pub mod wait_solidify;
 mod wait_solidify_state;
 
 pub use self::builder_count::BuilderCount;
+pub use self::footprint_waits::FootprintWaits;

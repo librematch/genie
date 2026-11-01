@@ -10,9 +10,13 @@ use genie_core::map::{Position, Radii};
 use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::LevelFlags;
+use genie_core::movement::LinkedPathType;
 use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::PathFlags;
+use genie_core::movement::PlanTries;
 use genie_core::movement::Speed;
+use genie_core::movement::SubstituteCount;
+use genie_core::movement::WaitDelays;
 use genie_core::movement::WaypointIndex;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
@@ -127,7 +131,7 @@ pub(super) fn path_level(
     };
     Ok(genie_core::movement::PathData {
         level: genie_core::movement::WaypointLevel::of_byte(d.waypoint_level),
-        linked_type: d.linked_path_type,
+        linked_type: LinkedPathType::of_data(d.linked_path_type),
         points: path.map_or_else(Vec::new, |p| p.m_waypoints.iter().map(vec3).collect()),
         has_path: path.is_some(),
         path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_m_bits)),
@@ -141,7 +145,7 @@ pub(super) fn path_level(
         created: path.map_or(WorldTime::ZERO, |p| {
             WorldTime::from_millis(p.creation_time_value)
         }),
-        continue_counter: d.continue_counter,
+        continue_counter: PlanTries::of_data(d.continue_counter),
         repath_time: d.repath_time,
         ignore: path.map_or_else(
             || Ok(Vec::new()),
@@ -299,7 +303,7 @@ pub(super) fn mover(
                 .map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
         },
         waiting: m.waiting_to_move_value,
-        wait_delays: m.number_wait_delays,
+        wait_delays: WaitDelays::of_data(m.number_wait_delays),
         attack_moving: m.attack_moving != 0,
         last_move: WorldTime::from_millis(m.last_move_time_value),
         // the save's x, height, y
@@ -310,7 +314,7 @@ pub(super) fn mover(
             };
             Position::new(f(0), f(8), f(4))
         },
-        substitute_count: m.consecutive_substitute_count,
+        substitute_count: SubstituteCount::of_data(m.consecutive_substitute_count),
         ignore_units,
         // the save's userDefinedWaypoints, in the game's layout (x, height, y)
         user_waypoints: m.user_defined_waypoints.iter().map(vec3).collect(),

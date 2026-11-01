@@ -172,7 +172,7 @@ mod tests {
         };
         World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 5],
             vec![

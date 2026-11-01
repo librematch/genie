@@ -20,7 +20,7 @@ use crate::world::slots::PlayerSlots;
 #[derive(Clone, Debug, Default)]
 pub struct GameState {
     /// `world+0x7d0`, the frame seed.
-    pub frame_seed: u32,
+    pub frame_seed: crate::world::FrameSeed,
     /// Every player's live objects.
     pub players: Vec<Vec<Unit>>,
     /// Every player's food, wood, stone and gold.
@@ -35,7 +35,7 @@ pub struct GameState {
     /// Every player's game status and resignation (`+0x89`, `+0x8b`).
     pub statuses: Vec<(crate::players::game_status::GameStatus, bool)>,
     /// The world's game state (`+0x88`).
-    pub game_state: u32,
+    pub game_state: crate::world::PlayState,
     /// Objects the slice modelled but got wrong this tick: they take the game's state too.
     pub resync: Vec<ObjectId>,
     /// The players' visible maps and the unified map, when the slice's differ.
@@ -323,8 +323,8 @@ mod tests {
             ..crate::groups::UnitGroups::default()
         };
         let game = GameState {
-            frame_seed: 7,
-            game_state: 3,
+            frame_seed: crate::world::FrameSeed::of_data(7),
+            game_state: crate::world::PlayState::of_data(3),
             next_reusable_id: object_id(-5),
             ghost_pool: Some(vec![object_id(-3)]),
             groups: Some(groups.clone()),
@@ -332,7 +332,11 @@ mod tests {
         };
         t.force_world_values(&game);
         assert_eq!(
-            (t.frame_seed, t.game_state, t.recycling.next_id.get()),
+            (
+                t.frame_seed.get(),
+                t.game_state.get(),
+                t.recycling.next_id.get()
+            ),
             (7, 3, -5)
         );
         assert_eq!(t.recycling.ghosts, [object_id(-3)]);
@@ -354,7 +358,11 @@ mod tests {
         };
         let mut t = forage_world();
         let before = t.players[1].resources();
-        t.players[1].unsupported = Some((1, ListIndex::new(0), GenieError::unsupported("a part")));
+        t.players[1].unsupported = Some((
+            crate::world::Tick::new(1),
+            ListIndex::new(0),
+            GenieError::unsupported("a part"),
+        ));
         assert!(!t.force_player_values(PlayerId::new(1), &game).unwrap());
         let player = &t.players[1];
         assert_eq!(player.resources(), before);

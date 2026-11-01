@@ -9,6 +9,7 @@ use genie_core::objects::ListIndex;
 use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::world::Millis;
+use genie_core::world::Tick;
 use genie_core::world::checkpoint::{ActionTerm, CheckpointObject, TopAction, player_block};
 use genie_core::world::{Player, World};
 use genie_rec::de;
@@ -70,7 +71,7 @@ pub(super) fn run(turns: &mut World, decoder: &mut Decoder, frames: &[Frame<'_>]
             .collect();
         if trace {
             for c in &commands {
-                eprintln!("update {}: {c:?}", turns.ticks + 1);
+                eprintln!("update {}: {c:?}", turns.ticks.get() + 1);
             }
         }
         turns.tick_with(Millis::new(frame.dt), &commands);
@@ -124,7 +125,10 @@ pub fn simulate_word9(
                 simulated: lane_block(section, id, simulated)[9],
                 checkpoint: lane[9],
                 group_command,
-                unsupported: simulated.unsupported.clone(),
+                unsupported: simulated
+                    .unsupported
+                    .clone()
+                    .map(|(t, i, e)| (t.get(), i, e)),
             })
         })
         .collect()
@@ -296,7 +300,7 @@ pub(super) fn watch_at_load(turns: &mut World) {
         for p in &mut turns.players {
             let _ = p
                 .unsupported
-                .get_or_insert_with(|| (0, ListIndex::new(0), e.clone()));
+                .get_or_insert_with(|| (Tick::ZERO, ListIndex::new(0), e.clone()));
             p.stopped = true;
         }
     }

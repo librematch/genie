@@ -16,7 +16,6 @@ use crate::groups::{GroupCommand, GroupTarget, SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::BVector;
-use crate::movement::CONTINUE;
 use crate::movement::PathData;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
@@ -647,7 +646,7 @@ fn move_level(
         level.target = target;
         level.waypoint = WaypointIndex::SECOND;
         level.state = PathState::WantsPath;
-        level.continue_counter = CONTINUE;
+        level.continue_counter = crate::movement::PlanTries::FULL;
     }
     level.level = WaypointLevel::TOP;
     level
@@ -693,7 +692,7 @@ mod tests {
         ];
         let mut t = World::new(
             WorldTime::from_millis(50),
-            0,
+            crate::world::FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             players,

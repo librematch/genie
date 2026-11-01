@@ -91,7 +91,10 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         (WorldTime::from_millis(1500), 300, PlayerId::new(1))
     );
     assert_eq!(turns.recycling.next_id, object_id(-5));
-    assert_eq!(turns.teams[..2], [0, 2]);
+    assert_eq!(
+        turns.teams[..2].iter().map(|t| t.get()).collect::<Vec<_>>(),
+        [0, 2]
+    );
     let p = &turns.players[1];
     assert_eq!(
         (p.civ, p.kind),

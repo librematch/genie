@@ -499,7 +499,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            0,
+            crate::world::FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), player],

@@ -8,14 +8,15 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::movement::LevelFlags;
+use crate::movement::LinkedPathType;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
-    AfterRequest, CONTINUE, LONG_PATHER, Me, Mover, PathData, Planning, RANGE_FLOOR, ReachAsk,
-    SHORT_PATHER, SPLIT, STUCK_PAUSE, ShortAsk, TileAsk, Walker, footprint_gap_squared,
-    owner_number, short_path_including, split, tile_plan_for,
+    AfterRequest, LONG_PATHER, Me, Mover, PathData, Planning, RANGE_FLOOR, ReachAsk, SHORT_PATHER,
+    SPLIT, STUCK_PAUSE, ShortAsk, TileAsk, Walker, footprint_gap_squared, owner_number,
+    short_path_including, split, tile_plan_for,
 };
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
@@ -50,7 +51,7 @@ impl Mover {
         let level = &mut self.paths[0];
         if !found || level.range < Distance::new(to_end) {
             if level.waypoint.at_or_past_last(level.points.len()) {
-                if 0 < level.continue_counter {
+                if level.continue_counter.left() {
                     // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
                     // (slot 0x5d0); the step returns 0
                     level.pause_time = STUCK_PAUSE;
@@ -95,7 +96,7 @@ impl Mover {
     ) -> AfterRequest {
         let level = &mut self.paths[0];
         level.state = PathState::Idle;
-        level.continue_counter = CONTINUE;
+        level.continue_counter = crate::movement::PlanTries::FULL;
         new.range = level.range;
         new.target = level.target;
         new.waypoint = WaypointIndex::SECOND;
@@ -104,7 +105,11 @@ impl Mover {
             new.points = path.points;
             new.state = PathState::WantsPath;
             new.level = WaypointLevel::PLANNED;
-            new.linked_type = if found { 1 } else { 2 };
+            new.linked_type = if found {
+                LinkedPathType::REACHES_WAYPOINT
+            } else {
+                LinkedPathType::MOVES_ON
+            };
             self.paths.insert(0, new);
             return if SHORT_PATHER || LONG_PATHER {
                 AfterRequest::Again
@@ -126,7 +131,11 @@ impl Mover {
         new.points = path.points;
         new.state = PathState::Walking;
         new.level = WaypointLevel::WALKED;
-        new.linked_type = if !found || partial { 2 } else { 1 };
+        new.linked_type = if !found || partial {
+            LinkedPathType::MOVES_ON
+        } else {
+            LinkedPathType::REACHES_WAYPOINT
+        };
         if !solid {
             // the walked level lets its path go (FUN_140f95b70): it holds none (path id -1),
             // which reads as no points, flags, length or time

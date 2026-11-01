@@ -740,7 +740,7 @@ mod tests {
         let players = (0..3).map(|_| Player::default()).collect();
         let mut t = World::new(
             WorldTime::ZERO,
-            0,
+            crate::world::FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             players,

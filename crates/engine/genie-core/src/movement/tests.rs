@@ -126,7 +126,7 @@ fn stats() -> MoveStats {
 fn level(level: u8, points: &[Point], state: PathState) -> PathData {
     PathData {
         level: WaypointLevel::of_byte(level),
-        linked_type: i32::from(level == 0),
+        linked_type: LinkedPathType::of_data(i32::from(level == 0)),
         points: points
             .iter()
             .map(|p| BVector::new(p.x(), 0.0, p.y()))
@@ -145,7 +145,7 @@ fn level(level: u8, points: &[Point], state: PathState) -> PathData {
         flags: LevelFlags::NONE,
         length: Distance::ZERO,
         created: WorldTime::from_millis(16360),
-        continue_counter: 10,
+        continue_counter: PlanTries::of_data(10),
         repath_time: 0.0,
         ignore: Vec::new(),
         ignored: Vec::new(),
@@ -198,11 +198,11 @@ pub(crate) fn builder_9177() -> Mover {
         factor: 1.0,
         stats: stats(),
         waiting: 0,
-        wait_delays: 0,
+        wait_delays: WaitDelays::of_data(0),
         attack_moving: false,
         last_move: WorldTime::ZERO,
         moved_at: Position::new(28.0, 89.0, 0.0),
-        substitute_count: 0,
+        substitute_count: SubstituteCount::of_data(0),
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
@@ -1213,7 +1213,7 @@ fn an_arrived_level_hands_a_looping_parent_its_next_waypoint() {
         to_end: FAR,
     };
     let mut m = builder_9177();
-    m.paths[0].linked_type = 2;
+    m.paths[0].linked_type = LinkedPathType::of_data(2);
     m.paths[1].path_flags = PathFlags::LOOPS;
     m.paths[1].waypoint = WaypointIndex::of_data(1);
     assert!(matches!(m.arrived(goal), Ok(Next::Again)));
@@ -1222,7 +1222,7 @@ fn an_arrived_level_hands_a_looping_parent_its_next_waypoint() {
         (1, PathState::WantsPath, 0)
     );
     let mut m = builder_9177();
-    m.paths[0].linked_type = 0;
+    m.paths[0].linked_type = LinkedPathType::of_data(0);
     assert!(matches!(m.arrived(goal), Ok(Next::Dispatch)));
     assert_eq!(m.paths.len(), 2);
 }
@@ -1623,14 +1623,19 @@ fn a_trade_cart_plans_within_its_owners_budget() {
         delay_cap: 2,
         plans: 6,
     };
-    assert!(!may_plan(true, Some(spent), 0, 0));
+    assert!(!may_plan(true, Some(spent), WaitDelays::of_data(0), 0));
     // a villager is not held to the budget
-    assert!(may_plan(false, Some(spent), 0, 0));
+    assert!(may_plan(false, Some(spent), WaitDelays::of_data(0), 0));
     // past the delay cap the budget lets the cart plan again
-    assert!(may_plan(true, Some(spent), 3, 0));
-    assert!(may_plan(true, Some(PlanBudget { plans: 5, ..spent }), 0, 0));
-    assert!(may_plan(true, None, 0, 0));
-    assert!(!may_plan(false, None, 0, PLANS));
+    assert!(may_plan(true, Some(spent), WaitDelays::of_data(3), 0));
+    assert!(may_plan(
+        true,
+        Some(PlanBudget { plans: 5, ..spent }),
+        WaitDelays::of_data(0),
+        0
+    ));
+    assert!(may_plan(true, None, WaitDelays::of_data(0), 0));
+    assert!(!may_plan(false, None, WaitDelays::of_data(0), PLANS));
 }
 
 /// `FUN_140f9eb70`'s list for `FUN_140f60440`: a walker in no group lists itself and its
@@ -1949,7 +1954,7 @@ fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
     );
     let out = |edit: &dyn Fn(&mut Mover)| {
         let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
-        m.paths[0].continue_counter = 0;
+        m.paths[0].continue_counter = PlanTries::of_data(0);
         edit(&mut m);
         let r = m.no_path(false, None, 0.5);
         (r, m)
@@ -2038,7 +2043,7 @@ pub(crate) fn path_world(owner: crate::world::Player) -> crate::world::World {
     let players = vec![crate::world::Player::default(), owner];
     let mut t = crate::world::World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         players,
@@ -2126,7 +2131,7 @@ fn a_walk_on_or_past_its_waypoint_counts_it_reached() {
     }
     let mut w = world();
     let mut m = builder_9177();
-    m.substitute_count = 3;
+    m.substitute_count = SubstituteCount::of_data(3);
     let (_, motion) = tick(&mut m, Position::new(28.0, 89.0, 0.0), &mut w);
     assert_eq!(motion, Motion::Moving);
     assert_eq!(
@@ -3053,18 +3058,18 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
 fn a_request_spends_a_try_and_gives_up_or_goes_on_without_more() {
     let mut m = builder_9177();
     assert_eq!(m.spend_try(), Ok(None));
-    assert_eq!(m.paths[0].continue_counter, 9);
+    assert_eq!(m.paths[0].continue_counter, PlanTries::of_data(9));
     let mut looping = builder_9177();
     looping.paths[1].path_flags |= PathFlags::LOOPS;
     let mut attacking = builder_9177();
     attacking.attack_moving = true;
     for mut m in [looping, attacking] {
         assert_eq!(m.spend_try(), Ok(None));
-        assert_eq!(m.paths[0].continue_counter, 10);
+        assert_eq!(m.paths[0].continue_counter, PlanTries::of_data(10));
     }
     let last_try = || {
         let mut m = builder_9177();
-        m.paths[0].continue_counter = 1;
+        m.paths[0].continue_counter = PlanTries::of_data(1);
         m
     };
     let mut m = last_try();
@@ -3084,7 +3089,7 @@ fn a_request_spends_a_try_and_gives_up_or_goes_on_without_more() {
     assert_eq!(m.spend_try(), Ok(Some(AfterRequest::Again)));
     assert_eq!(
         (m.paths[0].flags, m.paths[0].continue_counter),
-        (LevelFlags::REACHED, CONTINUE)
+        (LevelFlags::REACHED, PlanTries::FULL)
     );
 }
 

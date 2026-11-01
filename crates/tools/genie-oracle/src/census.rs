@@ -190,7 +190,7 @@ impl Census {
                 && let Some((tick, object, why)) =
                     turns.players.get(p).and_then(|q| q.unsupported.as_ref())
             {
-                player.stop = Some(CensusStop::of(*tick, *object, why));
+                player.stop = Some(CensusStop::of(tick.get(), *object, why));
             }
         }
         while let Some(&(at, lanes)) = self
@@ -328,7 +328,7 @@ pub(crate) fn stop_of(world: &World, p: u32) -> Option<CensusStop> {
     world.players[p as usize]
         .unsupported
         .as_ref()
-        .map(|(tick, object, why)| CensusStop::of(*tick, *object, why))
+        .map(|(tick, object, why)| CensusStop::of(tick.get(), *object, why))
 }
 
 /// The first update from `first` to `last` after which the world's next object id

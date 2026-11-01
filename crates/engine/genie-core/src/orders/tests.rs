@@ -73,7 +73,7 @@ fn an_object_s_own_slot_is_taken_while_it_holds_the_object() {
     };
     let t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -173,7 +173,7 @@ fn a_drop_off_order_leaves_a_livestock_without_a_drop_site_alone() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![crate::world::Player {
@@ -358,7 +358,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     let world = || {
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![crate::world::Player {
@@ -972,7 +972,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         .collect();
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -3306,7 +3306,7 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![

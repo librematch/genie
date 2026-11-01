@@ -55,7 +55,7 @@ pub struct Unit {
     pub id: ObjectId,
     /// `+0x889`: its waits as a builder for an occupied footprint (not saved; 0 at a load).
     #[diff(unsaved)]
-    pub footprint_waits: u8,
+    pub footprint_waits: crate::construction::FootprintWaits,
     /// Its life cycle: state, hit points, master, what it holds, its dying sprite.
     pub life: Lifecycle,
     /// Its unit AI, when it has one.

@@ -518,11 +518,11 @@ fn soldier_mover(speed: f32) -> Mover {
             weapon_range: Distance::ZERO,
         },
         waiting: 0,
-        wait_delays: 0,
+        wait_delays: crate::movement::WaitDelays::of_data(0),
         attack_moving: false,
         last_move: WorldTime::ZERO,
         moved_at: Position::ORIGIN,
-        substitute_count: 0,
+        substitute_count: crate::movement::SubstituteCount::of_data(0),
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
@@ -596,7 +596,7 @@ impl Rig {
         let players = (0..3).map(|_| Player::default()).collect();
         let mut t = World::new(
             WorldTime::ZERO,
-            0,
+            crate::world::FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             players,
@@ -893,9 +893,33 @@ fn a_building_s_relic_raises_its_missile_s_hit() {
         .unwrap();
         target.hp
     };
-    assert!(hit_by(Relics::new(0, 1)) < hit_by(Relics::new(0, 0)));
-    assert!(hit_by(Relics::new(1, 0)) < hit_by(Relics::new(0, 0)));
-    assert!(hit_by(Relics::new(0, 1)) < hit_by(Relics::new(1, 0)));
+    assert!(
+        hit_by(Relics::new(
+            crate::objects::RelicCount::of_data(0),
+            crate::objects::RelicCount::of_data(1)
+        )) < hit_by(Relics::new(
+            crate::objects::RelicCount::of_data(0),
+            crate::objects::RelicCount::of_data(0)
+        ))
+    );
+    assert!(
+        hit_by(Relics::new(
+            crate::objects::RelicCount::of_data(1),
+            crate::objects::RelicCount::of_data(0)
+        )) < hit_by(Relics::new(
+            crate::objects::RelicCount::of_data(0),
+            crate::objects::RelicCount::of_data(0)
+        ))
+    );
+    assert!(
+        hit_by(Relics::new(
+            crate::objects::RelicCount::of_data(0),
+            crate::objects::RelicCount::of_data(1)
+        )) < hit_by(Relics::new(
+            crate::objects::RelicCount::of_data(1),
+            crate::objects::RelicCount::of_data(0)
+        ))
+    );
 }
 
 /// `FUN_1412115e0`'s trample: its blast about the unit passes its target but reaches the

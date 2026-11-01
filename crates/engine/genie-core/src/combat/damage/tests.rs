@@ -6,9 +6,15 @@ fn a_building_s_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(0, 0),
+            Relics::new(
+                crate::objects::RelicCount::of_data(0),
+                crate::objects::RelicCount::of_data(0)
+            ),
             master_type::COMBAT,
-            Relics::new(5, 5)
+            Relics::new(
+                crate::objects::RelicCount::of_data(5),
+                crate::objects::RelicCount::of_data(5)
+            )
         )
         .to_bits(),
         up.to_bits()
@@ -16,9 +22,15 @@ fn a_building_s_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(3, 1),
+            Relics::new(
+                crate::objects::RelicCount::of_data(3),
+                crate::objects::RelicCount::of_data(1)
+            ),
             master_type::COMBAT,
-            Relics::new(0, 0)
+            Relics::new(
+                crate::objects::RelicCount::of_data(0),
+                crate::objects::RelicCount::of_data(0)
+            )
         )
         .to_bits(),
         (up * SPECIFIC_RELIC_BOOST).to_bits()
@@ -26,24 +38,66 @@ fn a_building_s_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(3, 0),
+            Relics::new(
+                crate::objects::RelicCount::of_data(3),
+                crate::objects::RelicCount::of_data(0)
+            ),
             master_type::COMBAT,
-            Relics::new(0, 0)
+            Relics::new(
+                crate::objects::RelicCount::of_data(0),
+                crate::objects::RelicCount::of_data(0)
+            )
         )
         .to_bits(),
         (up * RELIC_BOOST).to_bits()
     );
     assert_eq!(
-        building_elevation_factor(up, Relics::new(3, 0), BUILDING, Relics::new(0, 2)).to_bits(),
+        building_elevation_factor(
+            up,
+            Relics::new(
+                crate::objects::RelicCount::of_data(3),
+                crate::objects::RelicCount::of_data(0)
+            ),
+            BUILDING,
+            Relics::new(
+                crate::objects::RelicCount::of_data(0),
+                crate::objects::RelicCount::of_data(2)
+            )
+        )
+        .to_bits(),
         (up * RELIC_BOOST / SPECIFIC_RELIC_BOOST).to_bits()
     );
     assert_eq!(
-        building_elevation_factor(up, Relics::new(0, 0), BUILDING, Relics::new(1, -1)).to_bits(),
+        building_elevation_factor(
+            up,
+            Relics::new(
+                crate::objects::RelicCount::of_data(0),
+                crate::objects::RelicCount::of_data(0)
+            ),
+            BUILDING,
+            Relics::new(
+                crate::objects::RelicCount::of_data(1),
+                crate::objects::RelicCount::of_data(-1)
+            )
+        )
+        .to_bits(),
         (up / RELIC_BOOST).to_bits()
     );
     // the counts compare signed
     assert_eq!(
-        building_elevation_factor(up, Relics::new(-1, -1), BUILDING, Relics::new(-1, -1)).to_bits(),
+        building_elevation_factor(
+            up,
+            Relics::new(
+                crate::objects::RelicCount::of_data(-1),
+                crate::objects::RelicCount::of_data(-1)
+            ),
+            BUILDING,
+            Relics::new(
+                crate::objects::RelicCount::of_data(-1),
+                crate::objects::RelicCount::of_data(-1)
+            )
+        )
+        .to_bits(),
         up.to_bits()
     );
 }

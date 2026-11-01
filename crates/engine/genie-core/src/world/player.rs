@@ -121,9 +121,9 @@ pub struct Player {
     /// The player's state of each technology (`player+0x760`'s, saved).
     pub techs: Vec<crate::technology::TechState>,
     /// The first update this slice could not model, with the tick (1-based) and object index.
-    pub unsupported: Option<(u32, ListIndex, GenieError)>,
+    pub unsupported: Option<(crate::world::Tick, ListIndex, GenieError)>,
     /// Every object the slice stopped updating, with the tick and why.
-    pub freezes: Vec<(u32, ObjectId, GenieError)>,
+    pub freezes: Vec<(crate::world::Tick, ObjectId, GenieError)>,
     /// A command the slice could not model stopped the whole player: its objects freeze.
     pub stopped: bool,
     /// `game_status` (`+0x89`, saved): playing, won or lost ([`crate::players::game_status`]).
@@ -227,7 +227,7 @@ impl World {
 
 impl Player {
     /// A command the slice does not model for this player: the player stops.
-    pub(crate) fn stop(&mut self, tick: u32, why: GenieError) {
+    pub(crate) fn stop(&mut self, tick: crate::world::Tick, why: GenieError) {
         let _ = self
             .unsupported
             .get_or_insert((tick, ListIndex::FIRST, why));

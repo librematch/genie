@@ -21,6 +21,7 @@ mod player_type;
 mod query_relation;
 mod relation;
 mod stance;
+mod team;
 pub mod tracker;
 pub mod treason;
 pub mod tribute;
@@ -43,6 +44,7 @@ pub(crate) use self::relation::NO_RELATIONS;
 pub(crate) use self::relation::relation_row;
 pub use self::relation::{Relation, Relations};
 pub use self::stance::Stance;
+pub use self::team::Team;
 #[cfg(test)]
 pub(crate) use self::unit_relation::relations;
 pub use self::unit_relation::{ByRelation, UnitRelation, UnitRelations};

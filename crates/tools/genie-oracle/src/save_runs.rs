@@ -15,6 +15,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::masters::action_type;
 use genie_core::players::Amount;
 use genie_core::world::Millis;
+use genie_core::world::Tick;
 use genie_core::world::{Player, World};
 use genie_rec::de;
 use genie_save::Header;
@@ -39,7 +40,8 @@ pub(super) fn world_differences(turns: &World, after: &SavedStep, report: &mut T
     if turns.game_state != after.game.game_state {
         let d = format!(
             "game state slice {} game {}",
-            turns.game_state, after.game.game_state
+            turns.game_state.get(),
+            after.game.game_state.get()
         );
         report.differences.push((0, d));
     }
@@ -105,12 +107,14 @@ fn stops(player: &Player, id: u32, tick: Option<u32>, report: &mut TickReport) -
     if let Some((t, _, why)) = player
         .unsupported
         .clone()
-        .filter(|u| player.stopped && now(u.0))
+        .filter(|u| player.stopped && now(u.0.get()))
     {
-        report.unsupported.push((id, None, t, why));
+        report.unsupported.push((id, None, t.get(), why));
     }
-    for (t, o, why) in player.freezes.iter().filter(|f| now(f.0)) {
-        report.unsupported.push((id, Some(*o), *t, why.clone()));
+    for (t, o, why) in player.freezes.iter().filter(|f| now(f.0.get())) {
+        report
+            .unsupported
+            .push((id, Some(*o), t.get(), why.clone()));
     }
     player
         .objects
@@ -331,7 +335,7 @@ pub(super) fn played_frames<'a>(
 /// A decoder primed with the commands of the recording's first `updates` frames, the world's
 /// update count set to them and its last commanded units the frames' ([`Decoder::prime`]).
 pub(super) fn primed(turns: &mut World, all: &[Frame<'_>], updates: usize) -> Decoder {
-    turns.ticks = updates as u32;
+    turns.ticks = Tick::new(updates as u32);
     let mut decoder = Decoder::default();
     decoder.prime(&all[..updates.min(all.len())]);
     for (&p, units) in &decoder.last_commanded {

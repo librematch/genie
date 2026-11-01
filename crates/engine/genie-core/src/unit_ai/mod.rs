@@ -233,7 +233,7 @@ const SHIP_EVADE_REACH: f32 = crate::math::image::unit_ai::SHIP_EVADE_REACH;
 const FISHING_BUILDS: [ClassId; 5] = crate::objects::masters::class::classes([3, 27, 39, 52, 49]);
 /// The fishing ship's builder takes the nearest foundation nearer than this (`FUN_140c25ca0`'s
 /// 9999).
-const FISHING_BUILD_FAR: i32 = 9999;
+const FISHING_BUILD_FAR: crate::map::WholeDistance = crate::map::WholeDistance::of_data(9999);
 /// The seconds without a sighting after which enemies found are the owner's news
 /// (`DAT_142eb0f4c`).
 const ENEMY_SIGHTING_GAP: Seconds = Seconds::new(crate::math::image::unit_ai::ENEMY_SIGHTING_GAP);

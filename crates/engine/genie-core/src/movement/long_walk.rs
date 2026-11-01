@@ -261,10 +261,10 @@ pub(crate) fn tile_plan_for(
 pub(super) fn may_plan(
     trade_cart: bool,
     budget: Option<PlanBudget>,
-    wait_delays: u8,
+    wait_delays: crate::movement::WaitDelays,
     plans: u32,
 ) -> bool {
-    let allowed = !trade_cart || budget.is_none_or(|b| b.allows(i32::from(wait_delays)));
+    let allowed = !trade_cart || budget.is_none_or(|b| b.allows(i32::from(wait_delays.get())));
     allowed && plans < PLANS
 }
 

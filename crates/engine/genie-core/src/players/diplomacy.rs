@@ -35,8 +35,6 @@ pub(crate) const REVEAL_UNITS: GenieError =
 
 /// The attribute naming the units a player reveals to the others (204, `+0x660`).
 const REVEAL_UNIT: usize = 204;
-/// The teams a world has at most past the lone one (2 to 5, `FUN_1415e23f0`).
-const LAST_TEAM: i32 = 5;
 
 /// `FUN_141676b80`'s kind of player `q`'s objects for player `p` of relation `relation` toward
 /// it: Gaia's 0, its own 1, relations 0 and 4 an ally's (2), 1 a neutral's (3), any other an
@@ -326,10 +324,10 @@ impl World {
             return;
         }
         let players = PlayerId::each(self.players.len()).skip(1);
-        self.teams = [1; 8];
-        let mut team = 2;
+        self.teams = [crate::players::Team::ALONE; 8];
+        let mut team = crate::players::Team::FIRST;
         for i in players.clone() {
-            if 2 <= self.team(i) || team == 1 {
+            if crate::players::Team::FIRST <= self.team(i) || team == crate::players::Team::ALONE {
                 continue;
             }
             let mut joined = 0;
@@ -339,27 +337,31 @@ impl World {
                         pl.relations.get(b) == Some(&Relation::ALLY) && pl.allied_victory == 1
                     })
                 };
-                if j != i && self.team(j) < 2 && both(i, j) && both(j, i) {
+                if j != i && self.team(j) < crate::players::Team::FIRST && both(i, j) && both(j, i)
+                {
                     joined += 1;
                     self.set_team(j, team);
                 }
             }
             if 0 < joined {
                 self.set_team(i, team);
-                team += 1;
-                if LAST_TEAM < team {
-                    team = 1;
+                team = team.next();
+                if crate::players::Team::LAST < team {
+                    team = crate::players::Team::ALONE;
                 }
             }
         }
     }
 
     /// Player `i`'s team (`+0x984` at `i − 1`), 1 for a player past the eight.
-    fn team(&self, i: PlayerId) -> i32 {
-        self.teams.get(i.index() - 1).copied().unwrap_or(1)
+    fn team(&self, i: PlayerId) -> crate::players::Team {
+        self.teams
+            .get(i.index() - 1)
+            .copied()
+            .unwrap_or(crate::players::Team::ALONE)
     }
 
-    fn set_team(&mut self, i: PlayerId, team: i32) {
+    fn set_team(&mut self, i: PlayerId, team: crate::players::Team) {
         if let Some(t) = self.teams.get_mut(i.index() - 1) {
             *t = team;
         }
@@ -402,7 +404,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 4],
             (0..4).map(player).collect(),
@@ -533,21 +535,27 @@ mod tests {
         let mut t = world();
         t.set_diplomacy(PlayerId::new(1), 3, 0).unwrap();
         t.set_diplomacy(PlayerId::new(3), 1, 0).unwrap();
-        assert_eq!(t.teams, [1; 8]);
+        assert_eq!(t.teams.map(crate::players::Team::get), [1; 8]);
         t.players[1].allied_victory = 1;
         t.players[3].allied_victory = 2;
         t.resolve_teams();
-        assert_eq!(t.teams, [1; 8]);
+        assert_eq!(t.teams.map(crate::players::Team::get), [1; 8]);
         t.players[3].allied_victory = 1;
         t.resolve_teams();
-        assert_eq!(t.teams[..3], [2, 1, 2]);
+        assert_eq!(
+            t.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
+            [2, 1, 2]
+        );
         t.settings.teams_locked = true;
         t.players[3].allied_victory = 0;
         t.resolve_teams();
-        assert_eq!(t.teams[..3], [2, 1, 2]);
+        assert_eq!(
+            t.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
+            [2, 1, 2]
+        );
         t.settings.teams_locked = false;
         t.resolve_teams();
-        assert_eq!(t.teams, [1; 8]);
+        assert_eq!(t.teams.map(crate::players::Team::get), [1; 8]);
     }
 
     /// Teams run out past 5: the players after the fourth team stay alone.
@@ -559,7 +567,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 9],
             (0..9).map(|_| player()).collect(),
@@ -574,7 +582,10 @@ mod tests {
             }
         }
         t.resolve_teams();
-        assert_eq!(t.teams, [2, 2, 3, 3, 4, 4, 5, 5]);
+        assert_eq!(
+            t.teams.map(crate::players::Team::get),
+            [2, 2, 3, 3, 4, 4, 5, 5]
+        );
     }
 
     /// Attribute 204 truncated to 0 reveals nothing; 1 or more is not modelled.

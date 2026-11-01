@@ -186,7 +186,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -993,11 +993,18 @@ fn another_player_s_marks_on_the_footprint_halt_the_build() {
 /// halts the Build and its waits (`+0x889`) start again; before, it waits a second more.
 #[test]
 fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
-    for (waits, state, after) in [(MAX_WAITS, BuildState::Halted, 0), (3, BuildState::Wait, 4)] {
+    for (waits, state, after) in [
+        (
+            crate::construction::FootprintWaits::MOST.get(),
+            BuildState::Halted,
+            0,
+        ),
+        (3, BuildState::Wait, 4),
+    ] {
         let mut t = site_world(class::VILLAGER, Position::new(12.5, 10.5, 0.0), placing());
         stump(&mut t);
         sighted(&mut t);
-        own(&mut t, BUILDER).footprint_waits = waits;
+        own(&mut t, BUILDER).footprint_waits = crate::construction::FootprintWaits::of_data(waits);
         let mut other = own(&mut t, BUILDER).clone();
         other.id = object_id(6);
         other.actions = ActionList::default();
@@ -1014,7 +1021,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         );
         let _ = code(&mut t, 20);
         let b = build(&t);
-        assert_eq!((b.state, builder(&t).footprint_waits), (state, after));
+        assert_eq!((b.state, builder(&t).footprint_waits.get()), (state, after));
         let sent = t.players[1]
             .objects
             .by_id(object_id(6))
@@ -1698,7 +1705,10 @@ fn an_annex_s_test_sends_its_units_off_or_halts_the_build() {
                 (b.state, b.target, sent_off(&t)),
                 (BuildState::Wait, Some(HOUSE), 1)
             );
-            assert_eq!(builder(&t).footprint_waits, 1);
+            assert_eq!(
+                builder(&t).footprint_waits,
+                crate::construction::FootprintWaits::of_data(1)
+            );
         }
     }
 }

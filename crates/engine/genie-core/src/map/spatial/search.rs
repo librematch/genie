@@ -319,7 +319,9 @@ impl Spatial {
                     position: id.and_then(|id| self.objects.get(&id)).map(|p| p.position),
                     fresh,
                     players: players_seen(found),
-                    distance: crate::math::conversions::cvttss2si(distance),
+                    distance: crate::map::WholeDistance::of_data(
+                        crate::math::conversions::cvttss2si(distance),
+                    ),
                     retries: [None; 3],
                 })
             }
@@ -331,7 +333,7 @@ impl Spatial {
                     position: None,
                     fresh,
                     players: 0,
-                    distance: -1,
+                    distance: crate::map::WholeDistance::NONE,
                     retries: [None; 3],
                 })
             }
@@ -348,7 +350,7 @@ impl Spatial {
                     position: id.and_then(|id| self.objects.get(&id)).map(|p| p.position),
                     fresh,
                     players: 0,
-                    distance: -1,
+                    distance: crate::map::WholeDistance::NONE,
                     retries,
                 })
             }

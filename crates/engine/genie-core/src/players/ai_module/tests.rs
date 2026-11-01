@@ -85,7 +85,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
     use crate::vision::visibility::{Visibility, VisibleMap};
     let mut t = crate::world::World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         Vec::new(),

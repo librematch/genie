@@ -8,18 +8,24 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct Relics {
     /// `relic_count`.
-    pub count: i32,
+    pub count: crate::objects::RelicCount,
     /// `specific_relic_count`.
-    pub specific: i32,
+    pub specific: crate::objects::RelicCount,
 }
 
 impl Relics {
     /// No relics.
-    pub const NONE: Self = Self::new(0, 0);
+    pub const NONE: Self = Self::new(
+        crate::objects::RelicCount::ZERO,
+        crate::objects::RelicCount::ZERO,
+    );
 
     /// `count` and `specific`.
     #[must_use]
-    pub const fn new(count: i32, specific: i32) -> Self {
+    pub const fn new(
+        count: crate::objects::RelicCount,
+        specific: crate::objects::RelicCount,
+    ) -> Self {
         Self { count, specific }
     }
 }
@@ -31,8 +37,11 @@ mod tests {
     /// The counts keep their order: the relic count, then the specific one.
     #[test]
     fn relics_hold_the_count_then_the_specific_count() {
-        let r = Relics::new(2, -1);
-        assert_eq!((r.count, r.specific), (2, -1));
+        let r = Relics::new(
+            crate::objects::RelicCount::of_data(2),
+            crate::objects::RelicCount::of_data(-1),
+        );
+        assert_eq!((r.count.get(), r.specific.get()), (2, -1));
         assert_eq!(Relics::NONE, Relics::default());
     }
 }

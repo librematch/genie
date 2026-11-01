@@ -81,7 +81,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![crate::world::Player::default(), player],
@@ -903,7 +903,7 @@ fn a_line_after_a_column_takes_its_units_in_the_column_s_order() {
 fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
     PathData {
         level: WaypointLevel::WALKED,
-        linked_type: 0,
+        linked_type: crate::movement::LinkedPathType::of_data(0),
         points: points.to_vec(),
         has_path: !points.is_empty(),
         path_flags: PathFlags::from_bits_retain(flags),
@@ -915,7 +915,7 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
         flags: LevelFlags::NONE,
         length: Distance::ZERO,
         created: WorldTime::ZERO,
-        continue_counter: 10,
+        continue_counter: crate::movement::PlanTries::of_data(10),
         repath_time: 0.0,
         ignore: Vec::new(),
         ignored: Vec::new(),
@@ -941,7 +941,7 @@ fn type_world(paths: Vec<PathData>) -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![crate::world::Player::default(), player],

@@ -139,6 +139,8 @@ pub struct WholeDistance(i32);
 impl WholeDistance {
     /// No distance.
     pub const ZERO: Self = Self(0);
+    /// None at all (−1): a pick without a search distance.
+    pub const NONE: Self = Self(-1);
 
     /// The distance of the save's or the command's int `value`.
     #[must_use]

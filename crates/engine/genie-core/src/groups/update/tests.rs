@@ -104,7 +104,7 @@ fn world() -> World {
     ];
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         players,
@@ -1531,7 +1531,7 @@ fn the_lead_is_the_member_nearest_the_targets_place() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1572,7 +1572,7 @@ fn a_group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],

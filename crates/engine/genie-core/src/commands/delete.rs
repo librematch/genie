@@ -479,7 +479,7 @@ impl World {
         }
         if ObjectState::Alive < new && old < ObjectState::Dying {
             self.leave_storage(owner, master, |flag| matches!(flag, 2 | 16))?;
-            if master.ghost_on_death == GhostMode::LEAVES && self.game_state != 2 {
+            if master.ghost_on_death == GhostMode::LEAVES && self.game_state.leaves_ghosts() {
                 self.ghosts_at_death(owner.index(), id)?;
             }
         }
@@ -634,7 +634,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             vec![
@@ -915,7 +915,7 @@ mod clearing_tests {
         let ms = masters();
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![

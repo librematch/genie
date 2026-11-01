@@ -8,6 +8,7 @@ use crate::map::Rect;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
+use crate::movement::LinkedPathType;
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
@@ -345,11 +346,11 @@ impl Mover {
             return Ok(Next::Done(Motion::Arrived));
         }
         match level.linked_type {
-            1 => {
+            LinkedPathType::REACHES_WAYPOINT => {
                 let _ = self.paths.remove(0);
                 self.paths[0].flags |= LevelFlags::REACHED;
             }
-            2 => {
+            LinkedPathType::MOVES_ON => {
                 let _ = self.paths.remove(0);
                 let parent = &mut self.paths[0];
                 parent.state = PathState::WantsPath;
@@ -358,7 +359,7 @@ impl Mover {
                     parent.waypoint = parent.looping_next(parent.waypoint);
                 }
             }
-            3 => {
+            LinkedPathType::ASKS_AGAIN => {
                 let _ = self.paths.remove(0);
                 self.paths[0].state = PathState::WantsPath;
             }

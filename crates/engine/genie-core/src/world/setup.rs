@@ -32,7 +32,7 @@ impl World {
     #[must_use]
     pub fn new(
         world_time: WorldTime,
-        frame_seed: u32,
+        frame_seed: crate::world::FrameSeed,
         player_turn: PlayerId,
         player_time: Vec<Millis>,
         players: Vec<Player>,
@@ -43,7 +43,7 @@ impl World {
             player_turn,
             player_time,
             players,
-            ticks: 0,
+            ticks: crate::world::Tick::ZERO,
             next_object_id: ObjectId::default(),
             masters: Vec::new(),
             spatial: Spatial::default(),
@@ -55,8 +55,8 @@ impl World {
             settings: crate::world::settings::Settings::default(),
             start_work_due: false,
             mode_680: crate::world::Mode680::ZERO,
-            spawned_relics: 0,
-            game_state: 0,
+            spawned_relics: crate::objects::RelicCount::ZERO,
+            game_state: crate::world::PlayState::PLAYING,
             victory_conquest: false,
             zones: crate::pathing::zones::Zones::default(),
             recycling: Recycling::default(),
@@ -74,7 +74,7 @@ impl World {
             local_player: PlayerId::new(0),
             tech_tree: crate::players::world_player::TechTree::default(),
             alliance_locked: 0,
-            teams: [1; 8],
+            teams: [crate::players::Team::ALONE; 8],
             instant_work: 0,
         }
     }

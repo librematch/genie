@@ -13,6 +13,8 @@ use genie_core::map::Point;
 use genie_core::objects::ObjectId;
 use genie_core::players::Amount;
 use genie_core::players::game_status::GameStatus;
+use genie_core::world::FrameSeed;
+use genie_core::world::PlayState;
 use genie_core::world::World;
 use genie_save::Header;
 
@@ -245,7 +247,7 @@ pub fn forced_run(
                     ticks: 1,
                     ..TickReport::default()
                 };
-                let tick = turns.ticks;
+                let tick = turns.ticks.get();
                 compare_players(&turns, &after, Some(tick), &mut report)?;
                 let tiles = dump_after(start + k + 1, "tiles")
                     .map(|text| tile_lists_from_dump(&text))
@@ -313,7 +315,8 @@ pub fn forced_run(
                         0,
                         format!(
                             "frame seed slice {} game {}",
-                            turns.frame_seed, after.game.frame_seed
+                            turns.frame_seed.get(),
+                            after.game.frame_seed.get()
                         ),
                     ));
                 }
@@ -520,9 +523,9 @@ pub(super) fn game_state(
 ) -> Result<genie_core::world::GameState, GenieError> {
     let world = &header.world.base_world;
     let mut game = genie_core::world::GameState {
-        frame_seed: world.current_frame_random_seed,
+        frame_seed: FrameSeed::of_data(world.current_frame_random_seed),
         next_reusable_id: ObjectId::try_from(world.next_reusable_object_id)?,
-        game_state: u32::from(world.temp_game_state),
+        game_state: PlayState::of_data(u32::from(world.temp_game_state)),
         groups: groups::unit_groups(world).ok(),
         ..Default::default()
     };

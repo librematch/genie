@@ -10,6 +10,7 @@ use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
 use crate::movement::LevelFlags;
+use crate::movement::LinkedPathType;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
@@ -135,16 +136,16 @@ pub(super) fn pass(
             return Ok(Pass::Done(true));
         }
         let linked = motion.paths.checked(0)?.linked_type;
-        if linked == 1 || flags.contains(LevelFlags::MET_TARGET) {
+        if linked == LinkedPathType::REACHES_WAYPOINT || flags.contains(LevelFlags::MET_TARGET) {
             let _ = motion.paths.remove(0);
             return Ok(Pass::Reached);
         }
-        if linked == 2 || linked == 3 {
+        if linked == LinkedPathType::MOVES_ON || linked == LinkedPathType::ASKS_AGAIN {
             let _ = motion.paths.remove(0);
             let patrols = lead.group.as_ref().is_some_and(LeadGroup::patrols);
             let parent = motion.paths.checked_mut(0)?;
             parent.state = PathState::WantsPath;
-            if linked == 2 && parent.has_path {
+            if linked == LinkedPathType::MOVES_ON && parent.has_path {
                 if parent.path_flags.contains(PathFlags::LOOPS) {
                     let w = parent.waypoint;
                     parent.waypoint = parent.looping_next(w);

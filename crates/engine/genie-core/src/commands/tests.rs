@@ -260,7 +260,7 @@ fn a_trade_of_another_commodity_does_nothing() {
     let player = crate::world::Player::default();
     let mut w = crate::world::World::new(
         WorldTime::ZERO,
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO; 2],
         vec![player; 2],

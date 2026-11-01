@@ -315,9 +315,9 @@ fn a_saves_game_state_is_its_seed_next_id_state_and_groups() {
     let game = game_state(&save, None).unwrap();
     assert_eq!(
         (
-            game.frame_seed,
+            game.frame_seed.get(),
             game.next_reusable_id.get(),
-            game.game_state
+            game.game_state.get()
         ),
         (5, 9, 2)
     );

@@ -28,7 +28,7 @@ impl World {
     /// under the conquest victory, the players still playing form one side with someone lost,
     /// or nobody plays. A player's `+0x8a`, which would count it lost, is not held (0).
     pub(crate) fn game_ended(&self) -> bool {
-        if self.game_state == 1 {
+        if self.game_state == crate::world::PlayState::OVER {
             return true;
         }
         let mut count = Count::default();
@@ -101,7 +101,7 @@ impl World {
             }
             if old != GameStatus::LOST
                 && self.players.player(p)?.fealty.names_player()
-                && self.game_state == 0
+                && self.game_state == crate::world::PlayState::PLAYING
             {
                 return Err(GenieError::unsupported(
                     "a defeated player's fealty (its resources and units given away)",
@@ -194,7 +194,7 @@ impl World {
         } else {
             return Ok(());
         };
-        self.game_state = 1;
+        self.game_state = crate::world::PlayState::OVER;
         for i in PlayerId::each(self.players.len()).skip(1) {
             if self.players.player(i)?.game_status == GameStatus::PLAYING
                 && let Err(e) = self.set_status(i, outcome)

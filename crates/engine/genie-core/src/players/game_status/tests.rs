@@ -113,7 +113,7 @@ fn game() -> World {
     };
     let mut t = World::new(
         WorldTime::from_millis(61_000),
-        1,
+        crate::world::FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         vec![
@@ -964,9 +964,9 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
         (None, Some(ActionKind::Make))
     );
     assert_eq!(ai.notifies.len(), 1);
-    assert_eq!(t.game_state, 0);
+    assert_eq!(t.game_state, crate::world::PlayState::of_data(0));
     t.victory_check().unwrap();
-    assert_eq!(t.game_state, 1);
+    assert_eq!(t.game_state, crate::world::PlayState::of_data(1));
     assert_eq!(
         (t.players[1].game_status, t.players[2].game_status),
         (GameStatus::LOST, GameStatus::WON)

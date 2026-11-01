@@ -428,8 +428,6 @@ const EXTRA_BUILDER: f32 = crate::math::image::build::EXTRA_BUILDER;
 const STARTED: u32 = 0x2edb_e6ff;
 const WONDER_RATE: f32 = crate::math::image::build::WONDER_RATE;
 
-/// The waits a builder makes before it gives up (`0x15`).
-const MAX_WAITS: u8 = 21;
 /// The drop-off's wait after a drop site out of reach (`0xc0400000`).
 const DROP_WAIT: Seconds = Seconds::new(-3.0);
 /// The drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
@@ -620,7 +618,7 @@ mod stack_tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![

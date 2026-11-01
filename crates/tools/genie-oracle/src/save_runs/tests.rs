@@ -70,11 +70,13 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
     ]);
     let mut turns = slice(&save, None);
     let mut after = same(&save, &turns);
-    turns.game_state = 2;
+    turns.game_state = genie_core::world::PlayState::of_data(2);
     after.game.statuses = vec![(GameStatus::PLAYING, false), (GameStatus::WON, false)];
-    turns.players[1]
-        .freezes
-        .push((5, object_id(7), GenieError::unsupported("a test's freeze")));
+    turns.players[1].freezes.push((
+        genie_core::world::Tick::new(5),
+        object_id(7),
+        GenieError::unsupported("a test's freeze"),
+    ));
     for unit in &mut after.objects[1] {
         unit.life.hp += HitPoints::new(1.0);
     }
@@ -107,7 +109,7 @@ fn the_world_differs_by_its_game_state() {
     let save = save();
     let turns = slice(&save, None);
     let mut after = same(&save, &turns);
-    after.game.game_state = 3;
+    after.game.game_state = genie_core::world::PlayState::of_data(3);
     let mut report = TickReport::default();
     world_differences(&turns, &after, &mut report);
     assert_eq!(
@@ -124,13 +126,15 @@ fn stops_and_freezes_are_reported_by_their_update() {
     let player = &mut turns.players[1];
     player.stopped = true;
     player.unsupported = Some((
-        5,
+        genie_core::world::Tick::new(5),
         ListIndex::new(0),
         GenieError::unsupported("a test's stop"),
     ));
-    player
-        .freezes
-        .push((6, object_id(40), GenieError::unsupported("a test's freeze")));
+    player.freezes.push((
+        genie_core::world::Tick::new(6),
+        object_id(40),
+        GenieError::unsupported("a test's freeze"),
+    ));
     player.objects[ListIndex::new(0)].stopped = true;
     let mut report = TickReport::default();
     assert_eq!(
@@ -316,7 +320,7 @@ fn priming_sets_the_update_count_and_the_last_commanded_units() {
         commands: vec![&moved[..]],
     }];
     let _ = primed(&mut turns, &frames, 3);
-    assert_eq!(turns.ticks, 3);
+    assert_eq!(turns.ticks, genie_core::world::Tick::new(3));
     assert_eq!(turns.last_commanded, [vec![], vec![Some(object_id(7))]]);
 }
 
@@ -327,7 +331,7 @@ fn a_frames_command_phase_moves_the_time_on() {
     let mut turns = slice(&save, None);
     let mut decoder = Decoder::default();
     frame_commands(&mut turns, &mut decoder, None);
-    assert_eq!((turns.ticks, turns.world_time), (0, WorldTime::ZERO));
+    assert_eq!((turns.ticks.get(), turns.world_time), (0, WorldTime::ZERO));
     let frame = Frame {
         dt: 40,
         checkpoint: None,
@@ -335,7 +339,7 @@ fn a_frames_command_phase_moves_the_time_on() {
     };
     frame_commands(&mut turns, &mut decoder, Some(&frame));
     assert_eq!(
-        (turns.ticks, turns.world_time),
+        (turns.ticks.get(), turns.world_time),
         (1, WorldTime::from_millis(40))
     );
 }
@@ -370,10 +374,10 @@ fn three_syncs() -> Vec<u8> {
 fn a_run_from_a_save_starts_after_its_update() {
     let (save, rec) = (quiet_save(), three_syncs());
     let turns = crate::run_from_save(&save, &rec, 0, 2, None, Dumps::default()).unwrap();
-    assert_eq!(turns.ticks, 3);
+    assert_eq!(turns.ticks.get(), 3);
     let phase = crate::command_phase_from_save(&save, &rec, 1, None, Dumps::default()).unwrap();
     assert_eq!(
-        (phase.ticks, phase.world_time),
+        (phase.ticks.get(), phase.world_time),
         (3, WorldTime::from_millis(50))
     );
     let groups = crate::saved_groups(&save, Some("group_commands 3\n")).unwrap();

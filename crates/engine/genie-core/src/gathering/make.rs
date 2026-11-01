@@ -252,7 +252,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            1,
+            crate::world::FrameSeed::of_data(1),
             PlayerId::new(1),
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), owner],

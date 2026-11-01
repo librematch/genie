@@ -111,7 +111,7 @@ fn world() -> World {
     ];
     let mut t = World::new(
         WorldTime::ZERO,
-        0,
+        crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         players,
