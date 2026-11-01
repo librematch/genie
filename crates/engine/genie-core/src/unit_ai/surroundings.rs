@@ -195,7 +195,7 @@ pub struct Surroundings {
     pub id: ObjectId,
     /// The unit's slot 0x1f8 (`FUN_14106a6c0`): its animation speed (`+0x7b8`); None while the
     /// slice does not know it.
-    pub anim_speed: Option<f32>,
+    pub anim_speed: Option<Speed>,
     /// The unit's slot 0x2b0 (`RGE_Action_Object::actionState`): its top action's state, 0
     /// without one; None for an action the slice does not hold.
     pub action_state: Option<ActionState>,

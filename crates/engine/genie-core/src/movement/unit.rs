@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::MoveReason;
 use crate::math::rng::Stream;
+use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
@@ -58,7 +59,7 @@ impl Unit {
                 let [x, y, z] = v.velocity.get();
                 let speed = crate::math::fmath::sqrt(x * x + y * y + z * z);
                 if SPEED_EPSILON < speed {
-                    self.body.set_anim_speed(speed);
+                    self.body.set_anim_speed(Speed::new(speed));
                 }
             }
         }

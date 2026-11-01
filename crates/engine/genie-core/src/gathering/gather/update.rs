@@ -194,17 +194,17 @@ impl GatherAction {
         self.timer = Seconds::ZERO;
         let walks = r.walks(&c.w.graphics, unit);
         let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
-        if self.stops < 2 {
+        if self.stops.several() {
+            let rng = c.w.streams.get(Stream::Action);
+            let to = self.walk_to(target, Distance::ZERO);
+            self.set_walk(to, target.radius, mover, rng, &walks)?;
+        } else {
             let radius = if STOP_FARMS.contains(&target.master_id) {
                 0.0
             } else {
                 target.radius.x()
             };
             self.set_walk_back(Distance::new(radius), mover, &walks)?;
-        } else {
-            let rng = c.w.streams.get(Stream::Action);
-            let to = self.walk_to(target, Distance::ZERO);
-            self.set_walk(to, target.radius, mover, rng, &walks)?;
         }
         Ok(Next::Stay)
     }
@@ -265,13 +265,12 @@ impl GatherAction {
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
         let dt = c.dt.seconds();
-        if 1 < self.stops {
+        if self.stops.several() {
             self.time_at_stop += dt;
-            if self.time_per_stop <= self.time_at_stop
-                && u32::from(self.current_stop) + 1 < u32::from(self.stops)
+            if self.time_per_stop <= self.time_at_stop && self.current_stop.before_last(self.stops)
             {
-                if r.food_sold <= 0.0 {
-                    self.current_stop += 1;
+                if r.food_sold <= Amount::ZERO {
+                    self.current_stop = self.current_stop.next();
                 }
                 let walks = r.walks(&c.w.graphics, unit);
                 let mover = unit.body.mover_mut().ok_or(UNMOVING)?;

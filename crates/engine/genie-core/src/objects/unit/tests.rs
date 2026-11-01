@@ -3,6 +3,7 @@ use crate::combat::attack::AttackState;
 use crate::construction::wait_solidify::WaitSolidifyState;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
@@ -97,7 +98,7 @@ fn an_animated_object_s_sprite_runs_by_the_update_s_dt() {
         let at = u.position();
         u.body = speed.map_or_else(
             || Body::at(at),
-            |speed| Body::new(at, Some(Animated::new(speed)), None),
+            |speed| Body::new(at, Some(Animated::new(Speed::new(speed))), None),
         );
         let before = u.sprite;
         in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
@@ -139,7 +140,7 @@ fn an_object_past_state_2_loses_its_actions() {
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.actions.move_to().copied(), None);
-    assert_eq!(u.body.mover().unwrap().animated.speed, 0.0);
+    assert_eq!(u.body.mover().unwrap().animated.speed, Speed::new(0.0));
     let mut t = forage_world();
     t.players[1].objects[ListIndex::new(0)].unmodelled_action =
         Some(GenieError::unsupported("an action"));

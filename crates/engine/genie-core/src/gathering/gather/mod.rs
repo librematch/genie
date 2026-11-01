@@ -14,6 +14,8 @@
 //! `point_walks.rs`; the face, the work, the drop-off's update and the random waits after a failed
 //! walk or a drop-off out of reach (the Action stream's `"update"` draws) are in `work.rs`.
 
+use crate::gathering::FarmStops;
+use crate::gathering::StopIndex;
 use crate::gathering::hunt::{HuntSprites, HuntTask};
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -104,7 +106,7 @@ const SPECIAL_TARGETS: [MasterId; 2] = [MasterId::named(357), MasterId::named(11
 /// each update renews: the farm and the rice farm (the constructor's and the update's masters).
 const STOP_FARMS: [MasterId; 2] = [MasterId::named(50), MasterId::named(1187)];
 /// A farm's stops under the game's farm setting (the constructor's `mNumberStops`).
-const FARM_STOPS: u8 = 4;
+const FARM_STOPS: FarmStops = FarmStops::of_data(4);
 /// A stop's point lies this far into its tile (`DAT_142e7f384`).
 const STOP_CENTRE: f32 = crate::math::image::gather::STOP_CENTRE;
 /// The productivity of a task without a productivity attribute (`DAT_14330eb8c`).
@@ -133,9 +135,9 @@ pub struct GatherAction {
     /// `+0x68`, `mTargetType`: the target's class.
     pub target_class: Option<ClassId>,
     /// `+0x6c`, `mNumberStops`: 1, or a farm's stops.
-    pub stops: u8,
+    pub stops: FarmStops,
     /// `+0x6d`, `mCurrentStop`.
-    pub current_stop: u8,
+    pub current_stop: StopIndex,
     /// `+0x70`, `mTimePerStop`.
     pub time_per_stop: Seconds,
     /// `+0x74`, `mTimeAtCurrentStop`.
@@ -227,7 +229,7 @@ pub(crate) struct GatherReads {
     /// stop reads it.
     pub(crate) stop_productivity: Amount,
     /// The player's attribute 96: a farm's food is sold at once.
-    pub(crate) food_sold: f32,
+    pub(crate) food_sold: Amount,
 }
 
 /// What an update asks of the caller.

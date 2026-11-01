@@ -225,7 +225,7 @@ fn a_stopped_decay_goes_back_to_the_world_at_once() {
 /// [`walker`] in motion: its animation runs at speed 1 (`+0x7b8`), which a stop clears.
 pub(crate) fn walking() -> Mover {
     let mut m = walker();
-    m.animated.speed = 1.0;
+    m.animated.speed = Speed::new(1.0);
     m
 }
 
@@ -982,10 +982,13 @@ fn a_hunter_walks_to_its_drop_site_and_to_its_point() {
     }));
     assert_eq!(drop(&mut h, &mut rig), Ok(Dropped::Going));
     assert_eq!(state(&h), Some(MoveTo::Start));
-    rig.mover_mut().animated.speed = 1.0;
+    rig.mover_mut().animated.speed = Speed::new(1.0);
     let mut h = dropping(Some(to_house(MoveTo::Failed, CHOP.range)));
     assert_eq!(drop(&mut h, &mut rig), Ok(Dropped::Going));
-    assert_eq!((h.timer, rig.mover_mut().animated.speed), (DROP_WAIT, 0.0));
+    assert_eq!(
+        (h.timer, rig.mover_mut().animated.speed),
+        (DROP_WAIT, Speed::ZERO)
+    );
     h.timer = Seconds::new(-0.05);
     assert_eq!(drop(&mut h, &mut rig), Ok(Dropped::Again));
     assert_eq!(h.timer, Seconds::ZERO);
@@ -1650,7 +1653,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
         gap_squared: DistanceSquared::new(1.5),
         ..site
     };
-    rig.unit_mut().body.set_anim_speed(1.0);
+    rig.unit_mut().body.set_anim_speed(Speed::new(1.0));
     assert_eq!(
         drop(
             &mut rig,
@@ -1662,7 +1665,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
     );
     assert_eq!(
         (hunt.timer, rig.unit().body.anim_speed()),
-        (DROP_WAIT, Some(0.0))
+        (DROP_WAIT, Some(Speed::ZERO))
     );
     hunt.timer = Seconds::new(-0.01);
     assert_eq!(

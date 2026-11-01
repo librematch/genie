@@ -326,7 +326,7 @@ fn a_member_in_place_or_failing_too_often() {
     );
     assert_eq!(own.consecutive_move_failures, 11);
     assert_eq!(g.flags & GroupFlags::CATCHING_UP, GroupFlags::CATCHING_UP);
-    assert_eq!(mover(&t, 10).animated.speed, 0.0);
+    assert_eq!(mover(&t, 10).animated.speed, Speed::new(0.0));
     assert_eq!(
         unit(&t, 10).ai.as_ref().unwrap().state_position,
         Point::ORIGIN
@@ -378,7 +378,7 @@ fn a_busy_member_stops_and_its_slot_counts_it_there() {
                 .consecutive_move_failures,
             0
         );
-        assert_eq!(mover(&t, 10).animated.speed, 0.0);
+        assert_eq!(mover(&t, 10).animated.speed, Speed::new(0.0));
     }
 }
 
@@ -459,7 +459,7 @@ fn a_member_about_to_pass_its_slot_stops() {
     t.steer_to_slot(group_id(1), 0, 0, &[]).unwrap();
     assert_eq!(state(&t, 0), SlotState::Stopping);
     let m = mover(&t, 10);
-    assert_eq!(m.animated.speed, 0.0);
+    assert_eq!(m.animated.speed, Speed::new(0.0));
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.0);
     // the standing sprite has no factor: the top speed
     assert_eq!(m.stats.speed, Speed::new(0.8));
@@ -479,7 +479,7 @@ fn a_due_slot_takes_its_member() {
     s.state = SlotState::Arriving;
     t.steer_to_slot(group_id(1), 0, 0, &[]).unwrap();
     assert_eq!(state(&t, 0), SlotState::InPlace);
-    assert_eq!(mover(&t, 10).animated.speed, 0.0);
+    assert_eq!(mover(&t, 10).animated.speed, Speed::new(0.0));
     assert_eq!(unit(&t, 10).position(), Position::new(5.0, 5.0, 0.0));
     let mut t = world();
     let m = t.players[1].objects[ListIndex::new(0)]
@@ -618,10 +618,10 @@ fn the_members_moves_end_wait_or_stop() {
     t.spatial.insert(object_id(50), post(6.0, 7.0));
     // the members walk: a stop clears their animation speed
     for u in &mut t.players[1].objects {
-        u.body.set_anim_speed(1.0);
+        u.body.set_anim_speed(Speed::new(1.0));
     }
     let mut stray = member(12, 20.0, 20.0);
-    stray.body.set_anim_speed(1.0);
+    stray.body.set_anim_speed(Speed::new(1.0));
     stray.body.mover_mut().unwrap().velocity = Some(crate::movement::Velocity {
         velocity: BVector::new(0.0, 0.0, 0.5),
         acceleration: BVector::ZERO,
@@ -662,8 +662,8 @@ fn the_members_moves_end_wait_or_stop() {
         unit(&t, 11).ai.as_ref().unwrap().state_position,
         Point::ORIGIN
     );
-    assert_eq!(mover(&t, 12).animated.speed, 0.0);
-    assert_ne!(mover(&t, 11).animated.speed, 0.0);
+    assert_eq!(mover(&t, 12).animated.speed, Speed::new(0.0));
+    assert_ne!(mover(&t, 11).animated.speed, Speed::ZERO);
     // the timer run out (or the distance at 0) ends the move, and the member steers on
     let mut t2 = world();
     t2.spatial.insert(object_id(50), post(6.0, 7.0));
@@ -680,7 +680,7 @@ fn the_members_moves_end_wait_or_stop() {
         (own.active, own.path_id, own.reason),
         (0, MovePath::NONE, MoveReason::NONE)
     );
-    assert_eq!(mover(&t2, 11).animated.speed, 0.0);
+    assert_eq!(mover(&t2, 11).animated.speed, Speed::new(0.0));
     assert_eq!(
         unit(&t2, 11).ai.as_ref().unwrap().state_position,
         Point::new(6.0, 9.0)

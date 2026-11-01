@@ -1822,7 +1822,7 @@ fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
     .unwrap();
     let v = &t.players[1].objects[idx];
     assert_eq!((v.life.inside, v.group.id), (Some(object_id(100)), None));
-    assert_eq!(v.body.mover().unwrap().animated.speed, 0.0);
+    assert_eq!(v.body.mover().unwrap().animated.speed, Speed::new(0.0));
     let members: Vec<ObjectId> = t.groups.groups[0].members.iter().map(|m| m.id).collect();
     assert_eq!(members, [object_id(401)]);
 }

@@ -447,7 +447,7 @@ impl World {
 
 /// The unit's animation speed (`+0x7b8`) as the Attack sets it: a mover's; a building's stays
 /// (MISSING.md, "The Attack's animation speed of a building").
-pub(crate) const fn set_walker_anim(body: &mut Body, speed: f32) {
+pub(crate) const fn set_walker_anim(body: &mut Body, speed: Speed) {
     if let Some(m) = body.mover_mut() {
         m.animated.speed = speed;
     }

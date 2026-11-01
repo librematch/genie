@@ -346,7 +346,7 @@ impl MoveToAction {
             if let Some(g) = shows.standing.or(shows.master_standing) {
                 new_sprite(shows.sprite, walk.body.move_stats_mut(), g, shows.rng);
             }
-            walk.set_anim_speed(0.0);
+            walk.set_anim_speed(Speed::ZERO);
         }
     }
 
@@ -691,7 +691,7 @@ mod tests {
         );
         // at the point already: state 1, which shows the standing sprite
         let mut rig = WalkRig::on_the_path();
-        rig.body.set_anim_speed(1.0);
+        rig.body.set_anim_speed(Speed::new(1.0));
         let mut looks = Looks::default();
         let mut at = own_move_to(MoveTo::Start, Some(RUNNING), -1);
         at.point = Position::new(28.0, 89.0, 0.0);
@@ -703,7 +703,7 @@ mod tests {
         assert_eq!(at.state, MoveTo::Arrived);
         assert_eq!(looks.shown(), Some(SpriteId::named(13151)));
         assert_eq!(rig.mover_mut().stats.speed, Speed::new(0.8 * 1.25));
-        assert_eq!(rig.mover_mut().animated.speed, 0.0);
+        assert_eq!(rig.mover_mut().animated.speed, Speed::new(0.0));
     }
 
     /// The sprite a `MoveTo` takes when its maker gives none: `FUN_140aa0d30`'s slot 0x7c8 (a

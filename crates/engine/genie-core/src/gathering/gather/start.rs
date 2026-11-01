@@ -2,6 +2,8 @@
 //! the idle and the halt; a farm's stops and their productivity.
 
 use crate::GenieError;
+use crate::gathering::FarmStops;
+use crate::gathering::StopIndex;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
     DEFAULT_PRODUCTIVITY, FARM_STOPS, GatherAction, GatherReads, Resource, SPECIAL_TARGETS,
@@ -85,11 +87,11 @@ impl StopRate {
     pub fn time_per_stop(
         self,
         work_value: crate::objects::masters::WorkValue,
-        stops: u8,
+        stops: FarmStops,
     ) -> Seconds {
         Seconds::new(
             ((self.capacity.get() * self.productivity.get()) / (self.work_rate * work_value).get())
-                / f32::from(stops),
+                / stops.as_f32(),
         )
     }
 }
@@ -175,7 +177,7 @@ impl GatherAction {
             if farm_stops && target.class == class::FARM && STOP_FARMS.contains(&target.master) {
                 (FARM_STOPS, rate.time_per_stop(task.work_value, FARM_STOPS))
             } else {
-                (1, Seconds::ZERO)
+                (FarmStops::ONE, Seconds::ZERO)
             };
         Ok(Self {
             target: Some(target.id),
@@ -186,7 +188,7 @@ impl GatherAction {
             task,
             target_class: target.class.or_none(),
             stops,
-            current_stop: 0,
+            current_stop: StopIndex::FIRST,
             time_per_stop,
             time_at_stop: Seconds::ZERO,
             last_stop: Point::ORIGIN,
@@ -325,7 +327,7 @@ impl GatherAction {
             if STOP_FARMS.contains(&target.master) {
                 self.farm = target.position.ground();
                 self.stops = FARM_STOPS;
-                self.current_stop = 0;
+                self.current_stop = StopIndex::FIRST;
                 self.time_per_stop = rate.time_per_stop(self.task.work_value, FARM_STOPS);
                 self.time_at_stop = Seconds::ZERO;
             } else if target.master == ids::FISH_TRAP {
@@ -378,7 +380,7 @@ impl GatherAction {
             ));
         }
         self.point = position;
-        let walk = if 1 < self.stops {
+        let walk = if self.stops.several() {
             let (x, y) = {
                 let p = stop_point(position, radius, self.last_stop, rng);
                 (p.x(), p.y())
@@ -410,7 +412,7 @@ impl GatherAction {
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
         self.state = GatherState::Drop;
-        self.current_stop = 0;
+        self.current_stop = StopIndex::FIRST;
         if self.carry_to.is_none() {
             return Err(GenieError::unsupported(
                 "a gather's drop-off without a drop site (notify 0x203)",

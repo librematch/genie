@@ -169,7 +169,7 @@ impl Mover {
     ) -> Self {
         Self {
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            animated: crate::objects::layers::Animated::at(0.0, at),
+            animated: crate::objects::layers::Animated::at(Speed::ZERO, at),
             forward: BVector::new(1.0, 0.0, 0.0),
             right: BVector::new(0.0, 0.0, crate::production::spawn::START_RIGHT_Z),
             velocity: None,

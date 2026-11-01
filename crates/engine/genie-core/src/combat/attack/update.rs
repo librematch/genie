@@ -13,6 +13,7 @@ use crate::map::DistanceSquared;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::rng::{Stream, Well512};
+use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap};
 use crate::objects::ObjectId;
@@ -54,7 +55,7 @@ impl Attack {
                 "an Attack without a target in a state but 1",
             ));
         }
-        body.set_anim_speed(0.0);
+        body.set_anim_speed(Speed::ZERO);
         Ok((1, false))
     }
 
@@ -109,7 +110,7 @@ impl Attack {
         if self.move_to.is_some() {
             return Err(GenieError::unsupported("a building's Attack with a MoveTo"));
         }
-        body.set_anim_speed(1.0);
+        body.set_anim_speed(Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
@@ -160,7 +161,7 @@ impl Attack {
         match self.state {
             // case 0: the unit's animation stops; the list deletes the Attack
             AttackState::Done => {
-                set_walker_anim(&mut unit.body, 0.0);
+                set_walker_anim(&mut unit.body, Speed::new(0.0));
                 Ok(1)
             }
             // case 3 (state 4) walks the MoveTo to the target, cases 4 and 10 (states 5 and
@@ -175,7 +176,7 @@ impl Attack {
             // unit's animation stops and the update returns 3
             AttackState::Failed => {
                 unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
-                set_walker_anim(&mut unit.body, 0.0);
+                set_walker_anim(&mut unit.body, Speed::new(0.0));
                 Ok(3)
             }
             // the states without a case (0; 3, 8 to 10, 12, 14 and above, which no step sets)

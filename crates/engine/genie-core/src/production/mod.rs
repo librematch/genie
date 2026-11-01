@@ -36,6 +36,7 @@ mod make_obj_state;
 mod make_tech_state;
 mod queue_counts;
 pub mod spawn;
+mod unit_index;
 
 pub use self::button::{LocationButton, QueueButton};
 pub use self::costs::{
@@ -46,6 +47,7 @@ pub use self::hotkey::HotkeyId;
 pub use self::make_obj_state::MakeObjState;
 pub use self::make_tech_state::MakeTechState;
 pub use self::queue_counts::{EntrySerial, QueueChanges, QueueLength, QueuedUnits};
+pub use self::unit_index::UnitIndex;
 
 /// One slot of a building's queue (`+0xbe8`, 0x30 bytes; the save's `mProductionQueue[i]`). A
 /// slot the buffer's growth adds is zeroed (`calloc`), as [`Entry::default`] is.
@@ -173,13 +175,13 @@ impl Queue {
     /// `FUN_1411d66b0`'s walk: the entry of the `index`-th unit, counting each entry's units in
     /// turn; None for an empty queue or an index past the last unit.
     #[must_use]
-    pub fn entry_of_unit(&self, index: u32) -> Option<usize> {
+    pub fn entry_of_unit(&self, index: UnitIndex) -> Option<usize> {
         let entries = self.entries();
         if entries.is_empty() {
             return None;
         }
         let (mut e, mut k) = (0usize, 0i32);
-        for _ in 0..index {
+        for _ in 0..index.get() {
             k += 1;
             if i32::from(entries[e].count.get()) <= k {
                 e += 1;
@@ -533,9 +535,11 @@ mod tests {
             unit(master_id(4), 3, 25.0),
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
-        let at: Vec<_> = (0..6).map(|i| q.entry_of_unit(i)).collect();
+        let at: Vec<_> = (0..6)
+            .map(|i| q.entry_of_unit(UnitIndex::of_data(i)))
+            .collect();
         assert_eq!(at, [Some(0), Some(0), Some(0), Some(1), Some(1), None]);
-        assert_eq!(Queue::default().entry_of_unit(0), None);
+        assert_eq!(Queue::default().entry_of_unit(UnitIndex::of_data(0)), None);
     }
 
     /// An emptied entry goes: the later ones move down field by field, the serials stay, the

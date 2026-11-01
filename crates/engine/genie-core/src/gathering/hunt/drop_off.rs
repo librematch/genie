@@ -11,6 +11,7 @@ use crate::gathering::hunt::{
 };
 use crate::map::Distance;
 use crate::map::Position;
+use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
@@ -116,7 +117,7 @@ impl HuntAction {
             // failed or its target let go: the hunt waits and the unit's animation stops
             3..=5 => {
                 self.timer = DROP_WAIT;
-                set_walker_anim(&mut unit.body, 0.0);
+                set_walker_anim(&mut unit.body, Speed::new(0.0));
                 return Ok(Dropped::Going);
             }
             1 | 2 => self.tear_down(unit.body.mover_mut())?,
@@ -132,7 +133,7 @@ impl HuntAction {
         }
         if DROP_REACH < site.gap_squared.get() {
             self.timer = DROP_WAIT;
-            set_walker_anim(&mut unit.body, 0.0);
+            set_walker_anim(&mut unit.body, Speed::new(0.0));
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();

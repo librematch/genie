@@ -11,6 +11,7 @@ use crate::gathering::gather::{
 use crate::gathering::hunt::Dropped;
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::movement::Speed;
 use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::sprite::{Graphic, new_sprite};
@@ -138,7 +139,7 @@ impl GatherAction {
         }
         // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
         // 0xf8 with 1), the unit holds none, and the gathering goes on
-        if 0.0 < r.food_sold
+        if Amount::ZERO < r.food_sold
             && target.class == class::FARM
             // The food kind a farm holds (`+0x308` 16): the food sold at once.
             && unit.life.attribute_type == Some(attribute::FARM_FOOD)
@@ -219,6 +220,6 @@ impl GatherAction {
     /// half, and the unit's animation stops at once (`FUN_141161850`: its `+0x7b8` 0).
     pub(super) fn random_wait(&mut self, c: &mut Step<'_>, unit: &mut Unit) {
         self.timer = Seconds::new(c.w.streams.get(Stream::Action).float01() - WAIT_SHIFT);
-        unit.body.set_anim_speed(0.0);
+        unit.body.set_anim_speed(Speed::ZERO);
     }
 }

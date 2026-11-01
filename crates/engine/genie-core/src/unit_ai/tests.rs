@@ -2119,7 +2119,7 @@ fn hit_villager() -> (UnitAi, Surroundings, Notify) {
         player: PlayerId::new(1),
         state: ObjectState::Alive,
         map: GridSize::new(100, 100),
-        anim_speed: Some(1.0),
+        anim_speed: Some(Speed::new(1.0)),
         action_state: Some(ActionState::new(5)),
         units: vec![foe(30, class::CLASS_6)],
         ..Surroundings::default()
@@ -2670,7 +2670,7 @@ fn a_moving_villager_keeps_its_way() {
     assert_eq!(r, Ok(BREAK));
     assert!(fx.is_empty() && u.orders.is_empty());
     let nan = Surroundings {
-        anim_speed: Some(f32::NAN),
+        anim_speed: Some(Speed::new(f32::NAN)),
         ..at.clone()
     };
     let mut u = walking.clone();
@@ -2685,7 +2685,7 @@ fn a_moving_villager_keeps_its_way() {
     assert_eq!(r, Ok(BREAK));
     assert!(fx.is_empty() && u.orders.is_empty());
     let still = Surroundings {
-        anim_speed: Some(0.0),
+        anim_speed: Some(Speed::ZERO),
         ..at.clone()
     };
     let mut u = walking.clone();

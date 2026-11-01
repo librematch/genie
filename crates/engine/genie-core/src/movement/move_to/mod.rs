@@ -12,6 +12,7 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
+use crate::movement::Speed;
 use crate::movement::{Me, Motion, Planning, footprint_gap, footprint_gap_squared};
 use crate::movement::{MoveStats, PathAsk};
 use crate::objects::ObjectId;
@@ -187,7 +188,7 @@ impl Walk<'_> {
     }
 
     /// Sets the walking unit's animation speed (`+0x7b8`, the animated layer in its mover).
-    pub const fn set_anim_speed(&mut self, speed: f32) {
+    pub const fn set_anim_speed(&mut self, speed: Speed) {
         if let Some(m) = self.body.mover_mut() {
             m.animated.speed = speed;
         }

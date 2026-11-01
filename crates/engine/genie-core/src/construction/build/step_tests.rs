@@ -1454,7 +1454,7 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
         (b.state, b.timer, walk_state(&t)),
         (BuildState::Drop, Seconds::new(-3.0), Some(MoveTo::Arrived))
     );
-    assert_eq!(builder(&t).body.anim_speed(), Some(0.0));
+    assert_eq!(builder(&t).body.anim_speed(), Some(Speed::ZERO));
     assert_eq!(wood(&t).0, 10.0);
     let _ = code(&mut t, 250);
     assert_eq!(build(&t).timer, Seconds::new(-2.75));

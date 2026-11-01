@@ -14,6 +14,7 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::rng::{Stream, Well512};
+use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::Frame;
@@ -306,7 +307,7 @@ impl Attack {
             if changed && let Some(current) = unit.sprite.map(|sp| sp.graphic) {
                 let _ = reset_sprite(&mut unit.sprite, current);
             }
-            set_walker_anim(&mut unit.body, 1.0);
+            set_walker_anim(&mut unit.body, Speed::new(1.0));
         }
         self.ready(unit, &mut g, f, r)
     }

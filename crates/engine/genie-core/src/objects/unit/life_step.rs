@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::math::rng::Stream;
+use crate::movement::Speed;
 use crate::objects::AnimateState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -164,7 +165,7 @@ impl Unit {
     /// below type 80 leaves its remains (`FUN_1411a4e90`) with its facet (`+0xe`) as its angle
     /// left it ([`crate::objects::facing::facet_of_angle`]).
     pub(crate) fn dying_sprite_ended(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        self.body.set_anim_speed(0.0);
+        self.body.set_anim_speed(Speed::ZERO);
         let kind = self.master(&c.w.masters, c.player)?.kind;
         if kind < BUILDING
             && let Some(remains) = self.life.remains

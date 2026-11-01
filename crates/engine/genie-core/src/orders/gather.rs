@@ -591,7 +591,7 @@ impl World {
                 g,
                 self.streams.get(Stream::Sprite),
             );
-            unit.body.set_anim_speed(0.0);
+            unit.body.set_anim_speed(Speed::ZERO);
         }
         let drops = hunt.target.is_none() && hunt.carry_to == Some(target);
         unit.actions.set_hunt(Some(hunt));

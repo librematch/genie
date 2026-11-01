@@ -172,7 +172,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
     a.move_to = Some(walking(MoveTo::Moving));
     a.arms.idle_sprite = Some(stand);
     let mut body = Body::Moving(crate::gathering::hunt::tests::walker());
-    body.set_anim_speed(0.5);
+    body.set_anim_speed(Speed::new(0.5));
     let (mut sprite, mut rng) = (None, Well512::default());
     a.halt(&mut body, &mut sprite, &mut rng).unwrap();
     // the MoveTo's teardown stops the unit (its speed 0 at once), then set_state(1) sets 1
@@ -183,7 +183,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
             ObjectId::field(a.target),
             body.anim_speed()
         ),
-        (AttackState::Done, None, 77, Some(1.0))
+        (AttackState::Done, None, 77, Some(Speed::new(1.0)))
     );
     assert_eq!(sprite.map(|s| s.graphic.id), Some(SpriteId::named(1)));
     assert_eq!(body.mover().unwrap().velocity.unwrap().velocity.y(), 0.0);
@@ -1075,7 +1075,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
             (state, vec![(NotifyKind::TOO_CLOSE, [-1; 3])])
         );
         if state == AttackState::Failed {
-            assert_eq!(rig.mover().animated.speed, 1.0);
+            assert_eq!(rig.mover().animated.speed, Speed::new(1.0));
             assert_eq!(rig.sprite(), Some(STANDING.id));
         }
     }
@@ -1589,7 +1589,7 @@ fn a_sub_action_s_attack_after_its_kill_posts_0x1fb_and_returns_5() {
         rig.posted(),
         vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])]
     );
-    assert_eq!(rig.mover().animated.speed, 1.0);
+    assert_eq!(rig.mover().animated.speed, Speed::new(1.0));
     assert_eq!(rig.workers(7, PlayerId::new(0)), Some(1));
 }
 
@@ -1732,7 +1732,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         on_target_moved: TargetMoved::Follows,
         same_owner: false,
     };
-    let mut body = Body::Animated(Animated::new(0.5));
+    let mut body = Body::Animated(Animated::new(Speed::new(0.5)));
     assert_eq!(
         a.clone()
             .update_targetless(Seconds::new(0.028), true, &mut body),
@@ -1750,7 +1750,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
     assert_eq!(posted, Some((NotifyKind::ACTION_INVALIDATED, [600, -1, 0])));
     assert_eq!(
         (body.anim_speed(), sprite.map(|s| s.graphic.id)),
-        (Some(1.0), Some(SpriteId::named(418)))
+        (Some(Speed::new(1.0)), Some(SpriteId::named(418)))
     );
     // the Hunt's Attack, a sub-action, posts nothing
     a.sub_action = true;
@@ -1950,7 +1950,7 @@ fn the_start_of_a_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it(
 fn the_start_of_a_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_found() {
     let start = |e: Engagement, visible: bool| {
         let mut mover = soldier_mover(e.speed.get());
-        mover.animated.speed = 1.0;
+        mover.animated.speed = Speed::new(1.0);
         let world = world_with(7, PlayerId::new(2), class::CLASS_6, e.target_position);
         let c = own_start(
             &world,
@@ -1966,7 +1966,11 @@ fn the_start_of_a_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_f
             (AttackState::Move, false, false)
         );
         assert_eq!(c.attack.move_to.map(|m| m.state), Some(MoveTo::Start));
-        (c.failed_first, c.posted, mover.animated.speed == 0.0)
+        (
+            c.failed_first,
+            c.posted,
+            mover.animated.speed == Speed::new(0.0),
+        )
     };
     assert_eq!(
         start(
@@ -2341,7 +2345,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
             centre.sprite.map(|s| s.graphic.id),
             centre.body.anim_speed()
         ),
-        (Some(SpriteId::named(9)), Some(1.0))
+        (Some(SpriteId::named(9)), Some(Speed::new(1.0)))
     );
     let posted = &centre.ai.as_ref().unwrap().notifies;
     assert!(
@@ -2585,7 +2589,7 @@ fn a_swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
             looped,
             Seconds::new(0.5)
         ),
-        (AttackState::GotoSeen, 1.0)
+        (AttackState::GotoSeen, Speed::new(1.0))
     );
 }
 
@@ -2614,7 +2618,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
     };
     let start = |range| {
         let mut rig = Rig::on_the_path(Victim::default());
-        rig.mover_mut().animated.speed = 1.0;
+        rig.mover_mut().animated.speed = Speed::new(1.0);
         let mut a = own_attack(10028, AttackState::Move, range);
         let wait = MoveWait {
             state: MoveWaitState::Waiting,
@@ -2646,7 +2650,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
             0,
             Some((MoveTo::Moving, MoveWaitState::AskedAgain)),
             Some(SpriteId::named(301)),
-            1.0,
+            Speed::new(1.0),
             Speed::new(1.2)
         )
     );
@@ -2657,7 +2661,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
             0,
             Some((MoveTo::Arrived, MoveWaitState::AskedAgain)),
             None,
-            1.0
+            Speed::new(1.0)
         )
     );
 }
@@ -2816,7 +2820,12 @@ fn an_attack_s_walk_walks_waits_arrives_or_fails() {
                 )
             })
             .map_err(|e| e.reason().to_owned());
-        (code, a, rig.posted(), rig.mover().animated.speed == 0.0)
+        (
+            code,
+            a,
+            rig.posted(),
+            rig.mover().animated.speed == Speed::new(0.0),
+        )
     };
     let (code, a, posted, _) = walked(Some(MoveTo::Moving), 0.0);
     assert_eq!(

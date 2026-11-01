@@ -217,7 +217,7 @@ fn lost_members_leave_the_group_and_stop() {
     }
     let stopped = unit(&t, object_id(11));
     let stopped = stopped.body.mover().unwrap();
-    assert_eq!(stopped.animated.speed, 0.0);
+    assert_eq!(stopped.animated.speed, Speed::new(0.0));
     assert_eq!(stopped.velocity.unwrap().velocity.y(), 0.0);
     // a NaN's hit points stay (COMISS then JA)
     let mut t = world();
@@ -527,11 +527,11 @@ fn kept_apart_units_leave_unless_busy() {
     assert_eq!(t.groups.get(group_id(1)).unwrap().objects, [object_id(15)]);
     assert_eq!(
         t.object(object_id(16)).unwrap().1.body.anim_speed(),
-        Some(0.0)
+        Some(Speed::ZERO)
     );
     assert_ne!(
         t.object(object_id(15)).unwrap().1.body.anim_speed(),
-        Some(0.0)
+        Some(Speed::ZERO)
     );
     // a member's group moving keeps the unit too
     t.players[1].objects[ListIndex::new(3)]
@@ -573,15 +573,15 @@ fn a_deleted_group_lets_its_members_go() {
     );
     assert_eq!(
         unit(&t, object_id(10)).body.mover().unwrap().animated.speed,
-        0.0
+        Speed::new(0.0)
     );
     assert_ne!(
         unit(&t, object_id(11)).body.mover().unwrap().animated.speed,
-        0.0
+        Speed::ZERO
     );
     assert_ne!(
         unit(&t, object_id(12)).body.mover().unwrap().animated.speed,
-        0.0
+        Speed::ZERO
     );
     // the update of a group without members deletes it
     let mut t = world();
@@ -672,7 +672,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
         changed: false,
         looped: false,
         animate: crate::objects::AnimateState::of_data(0),
-        speed: 0.0,
+        speed: Speed::new(0.0),
     });
     assert!(t.show_walking(object_id(10)).is_err());
     master(&mut t, class::TRADE_CART, [6, 7, 8]);
@@ -1141,11 +1141,11 @@ fn a_member_moved_aside_waits_out_its_timer() {
     assert_eq!(g.members[1].specific_move, aside);
     assert_eq!(
         t.object(object_id(10)).unwrap().1.body.anim_speed(),
-        Some(0.0)
+        Some(Speed::ZERO)
     );
     assert_ne!(
         t.object(object_id(11)).unwrap().1.body.anim_speed(),
-        Some(0.0)
+        Some(Speed::ZERO)
     );
     t.specific_moves_step(group_id(1)).unwrap();
     let g = t.groups.get(group_id(1)).unwrap();

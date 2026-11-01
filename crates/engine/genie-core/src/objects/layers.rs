@@ -11,6 +11,7 @@ use crate::GenieError;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::movement::Mover;
+use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use genie_diff::Diff;
@@ -107,7 +108,7 @@ impl Static {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Animated {
     /// `mCurrentSpeed` (`+0x7b8`).
-    pub speed: f32,
+    pub speed: Speed,
     /// The static layer below it: the object's place.
     base: Static,
 }
@@ -116,7 +117,7 @@ impl Animated {
     /// An animated layer at `speed`, its place the origin until its body places it
     /// ([`Body::new`]).
     #[must_use]
-    pub const fn new(speed: f32) -> Self {
+    pub const fn new(speed: Speed) -> Self {
         Self {
             speed,
             base: Static::at(Position::ORIGIN),
@@ -125,7 +126,7 @@ impl Animated {
 
     /// An animated layer at `speed` whose object stands at `position`.
     #[must_use]
-    pub const fn at(speed: f32, position: Position) -> Self {
+    pub const fn at(speed: Speed, position: Position) -> Self {
         Self {
             speed,
             base: Static::at(position),
@@ -274,12 +275,12 @@ impl Body {
 
     /// The animation speed (`+0x7b8`), None for a static object.
     #[must_use]
-    pub fn anim_speed(&self) -> Option<f32> {
+    pub fn anim_speed(&self) -> Option<Speed> {
         self.animated().map(|a| a.speed)
     }
 
     /// Sets the animation speed (`+0x7b8`) of an object that has one; a static object has none.
-    pub const fn set_anim_speed(&mut self, speed: f32) {
+    pub const fn set_anim_speed(&mut self, speed: Speed) {
         if let Some(a) = self.animated_mut() {
             a.speed = speed;
         }
@@ -351,17 +352,23 @@ mod tests {
     #[test]
     fn a_body_holds_the_layers_its_type_has() {
         let at = Position::new(1.5, 2.5, 0.0);
-        let a = Animated::new(0.5);
+        let a = Animated::new(Speed::new(0.5));
         assert_eq!(Body::new(at, None, None), Body::at(at));
-        assert_eq!(Body::new(at, Some(a), None).anim_speed(), Some(0.5));
+        assert_eq!(
+            Body::new(at, Some(a), None).anim_speed(),
+            Some(Speed::new(0.5))
+        );
         let moving = Body::new(at, Some(a), Some(mover()));
-        assert_eq!(moving.mover().map(|m| m.animated.speed), Some(0.5));
-        assert_eq!(moving.anim_speed(), Some(0.5));
+        assert_eq!(
+            moving.mover().map(|m| m.animated.speed),
+            Some(Speed::new(0.5))
+        );
+        assert_eq!(moving.anim_speed(), Some(Speed::new(0.5)));
         let mut own = mover();
-        own.animated.speed = 0.25;
+        own.animated.speed = Speed::new(0.25);
         assert_eq!(
             Body::new(at, None, Some(own)).anim_speed(),
-            Some(0.25),
+            Some(Speed::new(0.25)),
             "a mover always has an animated layer, its own without another"
         );
     }
@@ -371,7 +378,7 @@ mod tests {
         let at = Position::new(1.5, 2.5, 0.25);
         for body in [
             Body::at(at),
-            Body::new(at, Some(Animated::new(1.0)), None),
+            Body::new(at, Some(Animated::new(Speed::new(1.0))), None),
             Body::new(at, None, Some(mover())),
         ] {
             assert_eq!(body.position(), at, "{body:?}");
@@ -384,26 +391,38 @@ mod tests {
     #[test]
     fn only_a_static_object_has_no_animation_speed() {
         let mut still = Body::default();
-        still.set_anim_speed(1.0);
+        still.set_anim_speed(Speed::new(1.0));
         assert_eq!((still.anim_speed(), still.mover()), (None, None));
         let mut flag = Body::Animated(Animated::default());
-        flag.set_anim_speed(1.0);
-        assert_eq!((flag.anim_speed(), flag.mover()), (Some(1.0), None));
+        flag.set_anim_speed(Speed::new(1.0));
+        assert_eq!(
+            (flag.anim_speed(), flag.mover()),
+            (Some(Speed::new(1.0)), None)
+        );
         let mut walker = Body::new(Position::ORIGIN, None, Some(mover()));
-        walker.set_anim_speed(2.0);
-        assert_eq!(walker.mover_mut().map(|m| m.animated.speed), Some(2.0));
-        assert_eq!(walker.animated_mut().map(|a| a.speed), Some(2.0));
+        walker.set_anim_speed(Speed::new(2.0));
+        assert_eq!(
+            walker.mover_mut().map(|m| m.animated.speed),
+            Some(Speed::new(2.0))
+        );
+        assert_eq!(
+            walker.animated_mut().map(|a| a.speed),
+            Some(Speed::new(2.0))
+        );
     }
 
     #[test]
     fn a_taken_mover_leaves_the_animated_layer_and_comes_back_with_it() {
         let at = Position::new(3.0, 4.0, 0.0);
-        let mut body = Body::new(at, Some(Animated::new(1.0)), Some(mover()));
+        let mut body = Body::new(at, Some(Animated::new(Speed::new(1.0))), Some(mover()));
         let taken = body.take_mover();
-        assert_eq!(body, Body::new(at, Some(Animated::new(1.0)), None));
-        body.set_anim_speed(0.0);
+        assert_eq!(
+            body,
+            Body::new(at, Some(Animated::new(Speed::new(1.0))), None)
+        );
+        body.set_anim_speed(Speed::ZERO);
         body.put_mover(taken);
-        assert_eq!(body.mover().map(|m| m.animated.speed), Some(0.0));
+        assert_eq!(body.mover().map(|m| m.animated.speed), Some(Speed::ZERO));
         assert_eq!(body.position(), at, "the place stays the body's");
         let mut still = Body::at(at);
         assert_eq!(still.take_mover(), None);

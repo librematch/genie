@@ -679,7 +679,7 @@ fn a_kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
 #[test]
 fn a_stop_clears_the_animation_speed_within_the_call() {
     let mut m = builder_9177();
-    m.animated.speed = 0.8;
+    m.animated.speed = Speed::new(0.8);
     m.waiting = 1;
     m.ignore_units = vec![object_id(9175)];
     if let Some(v) = m.velocity.as_mut() {
@@ -689,7 +689,7 @@ fn a_stop_clears_the_animation_speed_within_the_call() {
     m.stop().unwrap();
     assert_eq!(
         (m.animated.speed, m.waiting, m.ignore_units.len()),
-        (0.0, 0, 0)
+        (Speed::ZERO, 0, 0)
     );
     assert_eq!(
         m.velocity.map(|v| (v.velocity.y(), v.acceleration.y())),
@@ -721,12 +721,12 @@ fn kept_hits_replan_the_parent_or_stop_a_walk_without_one() {
     assert_eq!((m.paths.len(), m.paths[0].state), (1, PathState::WantsPath));
     let mut lone = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     lone.paths.truncate(1);
-    lone.animated.speed = 1.0;
+    lone.animated.speed = Speed::new(1.0);
     assert!(matches!(
         lone.go_round(&me, &w, &[RecordId::from(object_id(9175))], false),
         Ok(Next::Done(Motion::Done))
     ));
-    assert_eq!(lone.animated.speed, 0.0);
+    assert_eq!(lone.animated.speed, Speed::new(0.0));
     assert_eq!(lone.velocity.map(|v| v.velocity.y()), Some(0.0));
 }
 
@@ -3079,7 +3079,7 @@ fn a_request_spends_a_try_and_gives_up_or_goes_on_without_more() {
     let mut m = last_try();
     assert_eq!(m.spend_try(), Ok(Some(AfterRequest::GaveUp)));
     assert_eq!((m.paths.len(), m.paths[0].state), (1, PathState::GaveUp));
-    assert_eq!(m.animated.speed, 0.0);
+    assert_eq!(m.animated.speed, Speed::new(0.0));
     let mut m = last_try();
     m.paths[0].level = WaypointLevel::TOP;
     assert_eq!(m.spend_try(), Ok(Some(AfterRequest::GaveUp)));

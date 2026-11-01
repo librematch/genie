@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::map::Position;
 use crate::math::image::unit_ai::{ATTACKER_FAR, ATTACKER_TIE};
 use crate::math::rng::Well512;
+use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -89,7 +90,7 @@ impl UnitAi {
             // neither immediate nor in front), the action stops (slot 0xb0 with 1) and it runs
             // from its attackers (slot 0x160 with 1 and no unit)
             if self.current_action == Some(ActionKind::Move)
-                && at.anim_speed.ok_or(NO_ANIM_SPEED)? != 0.0
+                && at.anim_speed.ok_or(NO_ANIM_SPEED)? != Speed::ZERO
             {
                 return Ok(BREAK);
             }
@@ -135,7 +136,7 @@ impl UnitAi {
             Some(OrderKind::Hunt | OrderKind::Gather | OrderKind::AutoBoarLuring)
         );
         let moves = matches!(order, Some(OrderKind::Move | OrderKind::Enter))
-            && 0.0 < at.anim_speed.ok_or(NO_ANIM_SPEED)?;
+            && Speed::ZERO < at.anim_speed.ok_or(NO_ANIM_SPEED)?;
         Ok(moves
             || order == Some(OrderKind::Attack)
             || (gathers

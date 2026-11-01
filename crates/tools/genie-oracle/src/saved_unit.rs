@@ -213,9 +213,11 @@ pub(super) fn unit(
         // the animated layer (types 20 and up); a moving object's mover takes it below
         body: genie_core::objects::layers::Body::new(
             Position::new(s.t_x, s.t_y, s.t_z),
-            object
-                .animated_part()
-                .map(|a| genie_core::objects::layers::Animated::new(a.current_speed)),
+            object.animated_part().map(|a| {
+                genie_core::objects::layers::Animated::new(genie_core::movement::Speed::new(
+                    a.current_speed,
+                ))
+            }),
             None,
         ),
         // every animated object's current sprite, which slot 0x68 and the sprite list read

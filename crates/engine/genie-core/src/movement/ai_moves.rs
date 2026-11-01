@@ -5,6 +5,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
@@ -433,7 +434,7 @@ impl Unit {
                 sprite_rng,
             );
         }
-        self.body.set_anim_speed(0.0);
+        self.body.set_anim_speed(Speed::ZERO);
         Ok(())
     }
 }

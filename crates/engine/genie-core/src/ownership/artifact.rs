@@ -1026,7 +1026,7 @@ mod tests {
             (a.move_to.map(|m| m.state), rig.posted()),
             (Some(MoveTo::Failed), vec![])
         );
-        rig.mover_mut().animated.speed = 1.0;
+        rig.mover_mut().animated.speed = Speed::new(1.0);
         rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         let failed = (
@@ -1034,7 +1034,7 @@ mod tests {
             [ActionKind::Move.value(), 0, 0],
         );
         assert_eq!((a.move_to, rig.posted()), (None, vec![failed]));
-        assert_eq!(rig.mover().animated.speed, 0.0);
+        assert_eq!(rig.mover().animated.speed, Speed::new(0.0));
     }
 
     /// The Artifact's reads in [`Rig`]'s world: a searching animal, released by itself.
@@ -1366,7 +1366,7 @@ mod tests {
         e = e.walking(MoveTo::Moving);
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default())
             .holding(11970, PlayerId::new(1));
-        rig.mover_mut().animated.speed = 1.0;
+        rig.mover_mut().animated.speed = Speed::new(1.0);
         let mut b = Artifact::new(false, None);
         b.enter = Some(e);
         let found = b.step(Millis::new(50), Some(PlayerId::new(2))).unwrap();
@@ -1376,7 +1376,7 @@ mod tests {
         assert_eq!(new, PlayerId::new(2));
         rig.run(50, |c, u, _, _| let_go_gone(c, u, gone, by()))
             .unwrap();
-        assert_eq!(rig.mover().animated.speed, 0.0);
+        assert_eq!(rig.mover().animated.speed, Speed::new(0.0));
         assert_eq!(rig.workers(11970, PlayerId::new(1)), Some(0));
     }
 }

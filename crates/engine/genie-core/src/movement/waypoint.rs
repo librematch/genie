@@ -12,6 +12,7 @@ use crate::movement::LinkedPathType;
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::Speed;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
@@ -435,7 +436,7 @@ impl Mover {
         }
         self.waiting = 0;
         self.ignore_units.clear();
-        self.animated.speed = 0.0;
+        self.animated.speed = Speed::ZERO;
         Ok(())
     }
 

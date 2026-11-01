@@ -17,6 +17,7 @@ use crate::orders::object_gone;
 use crate::orders::{HERD_MOST, NO_POINT, Place};
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::production::UnitIndex;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -189,7 +190,7 @@ impl World {
     pub(crate) fn cancel_order(
         &mut self,
         ids: &[Option<ObjectId>],
-        index: u32,
+        index: UnitIndex,
         all: bool,
     ) -> Result<(), GenieError> {
         for &id in ids.iter().flatten() {

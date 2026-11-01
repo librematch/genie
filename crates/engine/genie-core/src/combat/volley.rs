@@ -12,6 +12,7 @@ use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
+use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -482,7 +483,7 @@ impl Unit {
             point: shot.point,
             timer: Distance::ZERO,
             direction: Offset::ZERO,
-            ballistic_velocity: crate::movement::Speed::ZERO,
+            ballistic_velocity: Speed::ZERO,
             ballistic_acceleration: crate::movement::Acceleration::ZERO,
             distance: Distance::ZERO,
             hit_mode: stats.hit_mode,

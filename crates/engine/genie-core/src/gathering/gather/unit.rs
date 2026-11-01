@@ -176,8 +176,7 @@ impl Unit {
             food_sold: attributes
                 .get(crate::gathering::gather::FARM_FOOD_SOLD)
                 .copied()
-                .unwrap_or(Amount::ZERO)
-                .get(),
+                .unwrap_or(Amount::ZERO),
         })
     }
 

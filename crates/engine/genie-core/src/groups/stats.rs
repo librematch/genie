@@ -959,7 +959,7 @@ mod tests {
         assert_eq!(ids(&t), [object_id(10)]);
         let u = t.object(object_id(11)).unwrap().1;
         assert_eq!(u.group.id, None);
-        assert_eq!(u.body.mover().unwrap().animated.speed, 0.0);
+        assert_eq!(u.body.mover().unwrap().animated.speed, Speed::new(0.0));
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(g.centroid, BVector::new(5.0, 0.0, 5.0));
         assert_eq!(g.largest_unit_radius, Distance::new(0.2));

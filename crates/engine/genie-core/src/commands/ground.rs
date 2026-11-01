@@ -70,7 +70,7 @@ impl World {
             {
                 continue;
             }
-            let walking = u.body.anim_speed().is_some_and(|s| 0.0 < s);
+            let walking = u.body.anim_speed().is_some_and(|s| Speed::ZERO < s);
             let level = u
                 .body
                 .mover()

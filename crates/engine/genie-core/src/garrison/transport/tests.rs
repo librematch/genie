@@ -79,7 +79,7 @@ const STANDING: Graphic = Graphic {
 /// speed 1), a sprite ([`SHOWN`]) and a unit AI that takes its notifies (state 2).
 fn hull() -> crate::objects::unit::Unit {
     let mut mover = crate::gathering::hunt::tests::walker();
-    mover.animated.speed = 1.0;
+    mover.animated.speed = Speed::new(1.0);
     let mut unit = crate::objects::unit::Unit {
         id: object_id(9),
         body: crate::objects::layers::Body::new(Position::new(12.5, 8.5, 0.0), None, Some(mover)),
@@ -108,7 +108,7 @@ struct Left {
 /// What a state change left `unit`.
 fn left(unit: &crate::objects::unit::Unit) -> Left {
     Left {
-        stopped: unit.body.anim_speed() == Some(0.0),
+        stopped: unit.body.anim_speed() == Some(Speed::new(0.0)),
         stands: unit.sprite.map(|s| s.graphic.id) == Some(STANDING.id),
         posted: unit.ai.as_ref().map_or_else(Vec::new, |ai| {
             ai.notifies.iter().map(|n| (n.kind, n.p)).collect()

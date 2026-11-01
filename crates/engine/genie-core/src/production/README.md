@@ -33,6 +33,7 @@ A building's update runs its production action after its combat update.
 | [`make_tech_state.rs`](make_tech_state.rs) | A research's state: researching a technology at its building. |
 | [`mod.rs`](mod.rs) | Training units and researching technologies: a building's production queue, the actions that work it off, and a trained unit's spawn. |
 | [`queue_counts.rs`](queue_counts.rs) | A production queue's counts: the units an entry makes, the entries, the serials and the changes. |
+| [`unit_index.rs`](unit_index.rs) | A unit's place among a queue's units. |
 | [`spawn/`](spawn/) | A trained unit's spawn: where the make action (`TRIBE_Action_Make_Obj`, `FUN_140ad0240`) puts the unit its building made. |
 <!-- /files -->
 
@@ -40,5 +41,5 @@ A building's update runs its production action after its combat update.
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`commands`](../commands/), [`garrison`](../garrison/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`players`](../players/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`movement`](../movement/), [`objects`](../objects/), [`players`](../players/), [`technology`](../technology/).
+- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`technology`](../technology/).
 <!-- /uses -->

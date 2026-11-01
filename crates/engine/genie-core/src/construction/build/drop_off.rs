@@ -5,6 +5,7 @@ use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildReads, DROP_REACH, DROP_WAIT, DROPPED_ORDERS};
 use crate::map::Distance;
 use crate::movement::Me;
+use crate::movement::Speed;
 use crate::movement::move_to::TargetMoved;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -244,7 +245,7 @@ impl BuildAction {
         }
         if DROP_REACH < drop.gap_squared.get() {
             self.timer = DROP_WAIT;
-            builder.body.set_anim_speed(0.0);
+            builder.body.set_anim_speed(Speed::ZERO);
             return Ok(HeadCode::Keeps);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();

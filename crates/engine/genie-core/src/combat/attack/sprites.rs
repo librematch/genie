@@ -5,6 +5,7 @@ use crate::combat::attack::{Arms, RELOAD_MS};
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::movement::Mover;
+use crate::movement::Speed;
 use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -80,7 +81,7 @@ pub(crate) fn show_arrived(
 ) -> Result<(), GenieError> {
     let g = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
     crate::objects::sprite::new_sprite(sprite, body.move_stats_mut(), g, rng);
-    body.set_anim_speed(0.0);
+    body.set_anim_speed(Speed::ZERO);
     Ok(())
 }
 

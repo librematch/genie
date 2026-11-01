@@ -8,6 +8,7 @@ use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
@@ -162,7 +163,7 @@ impl HuntAction {
     fn walk_failed(&mut self, unit: &mut Unit, r: &HuntReads) -> Result<(), GenieError> {
         self.no_tree_search(r)?;
         self.timer = Seconds::new(-3.0);
-        set_walker_anim(&mut unit.body, 0.0);
+        set_walker_anim(&mut unit.body, Speed::new(0.0));
         Ok(())
     }
 

@@ -116,6 +116,7 @@ use crate::players::relations;
 use crate::players::tracker::ListKey;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
+use crate::production::UnitIndex;
 use crate::technology::CostPaid;
 use crate::technology::ResearchState;
 use crate::test_ids::attack_category;
@@ -1867,7 +1868,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
     );
     // an animated object's constructor (FUN_141070cf0) sets its animation speed (+0x7b8) to 0:
     // its sprite's clock runs from its first update (a dying sprite plays out)
-    assert_eq!(foundation.body.anim_speed(), Some(0.0));
+    assert_eq!(foundation.body.anim_speed(), Some(Speed::ZERO));
     let builder = |i: ListIndex| {
         (
             p.objects[i].life.master_id.get(),
@@ -4233,7 +4234,7 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
     let mut t = footprint_world();
     t.players[1].objects[ListIndex::new(0)]
         .body
-        .set_anim_speed(1.0);
+        .set_anim_speed(Speed::new(1.0));
     t.evacuate(object_id(10028), &[object_id(9175)]).unwrap();
     assert_eq!(sent(&t), Vec::<[i32; 3]>::new());
     let mut t = footprint_world();
@@ -4867,7 +4868,7 @@ fn a_hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
     let mut t = dropping(MoveTo::Failed);
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
     let v = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(v.body.anim_speed(), Some(0.0));
+    assert_eq!(v.body.anim_speed(), Some(Speed::ZERO));
     assert!(v.actions.hunt().is_some_and(|h| h.timer < Seconds::ZERO));
     let mut t = dropping(MoveTo::Arrived);
     t.drop_sites.clear();
@@ -10478,7 +10479,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .unwrap();
     let sheep = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(sheep.actions.artifact().copied(), None);
-    assert_eq!(sheep.body.mover().unwrap().animated.speed, 0.0);
+    assert_eq!(sheep.body.mover().unwrap().animated.speed, Speed::new(0.0));
     assert_eq!(
         t.players[1].objects[ListIndex::new(3)].workers,
         crate::objects::WorkerCount::of_data(0)
@@ -10502,7 +10503,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
     let bird = &mut t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
         (bird.actions.fly().copied(), bird.body.anim_speed()),
-        (None, Some(0.0))
+        (None, Some(Speed::ZERO))
     );
     bird.actions
         .set_fly(flying.map(|f| Fly { move_to: None, ..f }));
@@ -10511,7 +10512,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
     let bird = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
         (bird.actions.fly().copied(), bird.body.anim_speed()),
-        (None, Some(1.3))
+        (None, Some(Speed::new(1.3)))
     );
     let villager = &mut t.players[1].objects[ListIndex::new(2)];
     villager
@@ -10528,12 +10529,12 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
             moving: None,
         }));
     // a walking villager: an Enter without a MoveTo does not stop it
-    villager.body.set_anim_speed(1.0);
+    villager.body.set_anim_speed(Speed::new(1.0));
     t.clear_actions(PlayerId::new(1), ListIndex::new(2))
         .unwrap();
     let villager = &mut t.players[1].objects[ListIndex::new(2)];
     assert_eq!(villager.actions.enter().copied(), None);
-    assert_ne!(villager.body.mover().unwrap().animated.speed, 0.0);
+    assert_ne!(villager.body.mover().unwrap().animated.speed, Speed::ZERO);
     villager.actions.set_wait_solidify(Some(
         crate::construction::wait_solidify::WaitSolidify::new(
             crate::objects::masters::Task::default(),
@@ -11622,7 +11623,7 @@ fn an_artifact_s_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].body.anim_speed(),
-        Some(0.0)
+        Some(Speed::ZERO)
     );
 }
 
@@ -14347,13 +14348,13 @@ fn an_ai_move_of_a_unit_without_speed_fails_at_its_start_standing() {
     let mut u = mover_unit(8);
     let m = u.body.mover_mut().unwrap();
     m.stats.speed = Speed::ZERO;
-    u.body.set_anim_speed(1.0);
+    u.body.set_anim_speed(Speed::new(1.0));
     assert_eq!(
         ai_move_of(&mut u, forced(false), class::CLASS_47),
         Ok(vec![])
     );
     assert_eq!(u.actions.move_to().map(|m| m.state), Some(MoveTo::Failed));
-    assert_eq!(u.body.anim_speed(), Some(0.0));
+    assert_eq!(u.body.anim_speed(), Some(Speed::ZERO));
 }
 
 /// The motion step gave up on a unit's own `MoveTo` (`LAB_140aa320c`): any unit but a human's
@@ -14394,7 +14395,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         m.stats.base = Speed::new(0.737);
         m.stats.speed = Speed::new(1.4003);
         u.sprite = Some(crate::objects::sprite::ActiveSprite::start(walking, rng));
-        u.body.set_anim_speed(1.0);
+        u.body.set_anim_speed(Speed::new(1.0));
         u.actions.set_move_to(Some(MoveToAction::to_point(
             Position::new(119.5, 172.5, 0.0),
             Distance::ZERO,
@@ -14416,7 +14417,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         Some(Speed::new(0.737))
     );
     assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(764)));
-    assert_eq!(u.body.anim_speed(), Some(0.0));
+    assert_eq!(u.body.anim_speed(), Some(Speed::ZERO));
     let mut v = deer(&mut rng);
     v.own_move_gave_up(
         true,
@@ -15122,7 +15123,7 @@ fn an_attack_command_of_a_unit_that_cannot_move_goes_ready_and_swings_at_once() 
         unit.actions.attack().map(|a| a.state),
         Some(AttackState::Failed)
     );
-    assert_eq!(unit.body.anim_speed(), Some(1.0));
+    assert_eq!(unit.body.anim_speed(), Some(Speed::new(1.0)));
 }
 
 /// A house's movement values: it never moves (speed 0).
@@ -19781,7 +19782,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             w.garrison_order(player_id(1), &v, Some(object_id(700)), true, false)
         }),
         routes(&t, &unit_order(4, false), PlayerId::new(1), |w| {
-            w.cancel_order(&v, 0, true)
+            w.cancel_order(&v, UnitIndex::of_data(0), true)
         }),
         routes(&t, &unit_order(9, true), PlayerId::new(1), |w| {
             w.human_order(&v);

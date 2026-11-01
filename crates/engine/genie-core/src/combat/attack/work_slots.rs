@@ -136,9 +136,9 @@ impl Attack {
         set_walker_anim(
             &mut unit.body,
             if self.rest < Seconds::ZERO && Seconds::ZERO < r.reload {
-                length / r.reload
+                Speed::new(length / r.reload)
             } else {
-                1.0
+                Speed::new(1.0)
             },
         );
         Ok(())

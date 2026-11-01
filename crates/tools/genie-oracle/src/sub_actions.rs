@@ -85,7 +85,7 @@ pub(super) fn saved_sprite(
         changed: node.frame_changed != 0,
         looped: node.frame_looped != 0,
         animate: AnimateState::of_data(node.animate_flag),
-        speed: node.last_speed_value,
+        speed: genie_core::movement::Speed::new(node.last_speed_value),
     })
 }
 

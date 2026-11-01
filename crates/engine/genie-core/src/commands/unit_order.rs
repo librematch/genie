@@ -5,6 +5,7 @@ use crate::commands::UnitList;
 use crate::map::Point;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
+use crate::production::UnitIndex;
 use crate::world::World;
 
 /// `UNIT_ORDER`'s action (`+0x1c`, the switch of `FUN_14161e370`).
@@ -111,7 +112,9 @@ impl UnitOrderCommand {
             UnitOrderAction::Garrison => {
                 w.garrison_order(self.player, ids, self.target, self.through_ai, self.nearby)
             }
-            UnitOrderAction::Cancel => w.cancel_order(ids, self.param, self.through_ai),
+            UnitOrderAction::Cancel => {
+                w.cancel_order(ids, UnitIndex::of_data(self.param), self.through_ai)
+            }
             action => w.unit_order(self.player, ids, action.byte()),
         }
     }

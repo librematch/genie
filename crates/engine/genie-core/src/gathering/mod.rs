@@ -8,6 +8,7 @@ pub(crate) mod closest_resource;
 pub(crate) mod drop_off;
 pub(crate) mod drop_sites;
 pub mod farm_queue;
+mod farm_stops;
 pub mod gather;
 pub mod gather_search;
 pub mod hunt;
@@ -17,6 +18,7 @@ pub(crate) mod mule_cart;
 pub mod pasture;
 mod queue_count;
 
+pub use self::farm_stops::{FarmStops, StopIndex};
 pub use self::queue_count::QueueCount;
 
 /// Both loads are food (0, or the foods a unit carries, 15 to 17; [`AttributeId::is_food_load`]):

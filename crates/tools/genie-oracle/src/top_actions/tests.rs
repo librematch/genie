@@ -939,7 +939,7 @@ fn a_gather_takes_its_stops_and_move_to() {
         (g.target_class, g.stops, g.task.id),
         (
             Some(genie_core::objects::masters::ClassId::try_from(5).unwrap()),
-            2,
+            genie_core::gathering::FarmStops::of_data(2),
             TaskId::of_task(0)
         )
     );

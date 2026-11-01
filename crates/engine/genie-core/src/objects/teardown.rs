@@ -2,6 +2,7 @@
 //! (its slot 0): what they leave the unit's world to apply.
 
 use crate::GenieError;
+use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::actions::{Action, ActionList};
@@ -80,7 +81,7 @@ impl Action {
                 stop_if_moving(body, gone.stops)?;
             }
             Self::Fly(f) => {
-                body.set_anim_speed(body.mover().map_or(0.0, |m| m.stats.speed.get()));
+                body.set_anim_speed(body.mover().map_or(Speed::ZERO, |m| m.stats.speed));
                 stop_if_moving(body, f.move_to.is_some())?;
             }
             Self::Enter(e) => {
@@ -234,7 +235,7 @@ mod tests {
             acceleration: BVector::new(0.0, 0.0, 1.0),
         });
         let mut body = Body::new(Position::ORIGIN, None, Some(m));
-        body.set_anim_speed(0.8);
+        body.set_anim_speed(Speed::new(0.8));
         body
     }
 

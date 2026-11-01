@@ -13,6 +13,7 @@ use crate::players::attribute;
 use crate::players::attribute::QUEUED;
 use crate::players::game_status::ONE_UNIT_AGE;
 use crate::players::tracker::Key;
+use crate::production::UnitIndex;
 use crate::production::{Making, refund, refund_research};
 use crate::technology::CostPaid;
 use crate::technology::ResearchState;
@@ -155,7 +156,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        index: u32,
+        index: UnitIndex,
         all: bool,
     ) -> Result<(), GenieError> {
         let Some(production) = self.players.live(p, idx)?.production.as_ref() else {
@@ -171,7 +172,7 @@ impl World {
             }
             self.give_back_one(p, &entry)?;
         } else if !self.players.player(p)?.techs.is_empty() {
-            if index == 0 {
+            if index == UnitIndex::FIRST {
                 let owner = self.players.player_mut(p)?;
                 let unit = owner.objects.checked_mut(idx)?;
                 if let Some(Some(action)) = unit.production.as_mut().map(|q| q.action.as_mut()) {
@@ -203,7 +204,7 @@ impl World {
         if queue.slots.checked(e)?.count < crate::production::QueuedUnits::ONE {
             queue.close(e, true);
         }
-        if index == 0 {
+        if index == UnitIndex::FIRST {
             self.end_production_action(p, idx)?;
         }
         Ok(())
@@ -252,7 +253,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        index: u32,
+        index: UnitIndex,
         e: usize,
     ) -> Result<(), GenieError> {
         fn queue(
@@ -295,7 +296,7 @@ impl World {
                 return Ok(());
             }
             let take = if left <= slot.count { left } else { slot.count };
-            self.cancel_some(p, idx, (master, take), index as i32, None)?;
+            self.cancel_some(p, idx, (master, take), index.signed(), None)?;
             gone = gone.wrapping_add(take.get() as u16);
             let q = queue(self, p, idx)?;
             let at = *q.slots.checked(e as usize)?;
@@ -417,7 +418,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        index: u32,
+        index: UnitIndex,
     ) -> Result<(), GenieError> {
         if self.settings.game_mode != crate::world::GameMode::ONE_UNIT {
             return Ok(());
@@ -433,7 +434,7 @@ impl World {
             .live(p, idx)?
             .production
             .as_ref()
-            .and_then(|q| q.queue.slots.get(index as i32 as usize))
+            .and_then(|q| q.queue.slots.get(index.signed() as usize))
             .and_then(|s| s.master);
         if let Some(master) = master
             && self.tracker_key(p, master).military

@@ -266,7 +266,9 @@ pub(super) fn mover(
     let ignore_units = object_ids(&s.temp_int)?;
     loaded_ignored(&mut levels, &ignore_units);
     Ok(Some(Mover {
-        animated: genie_core::objects::layers::Animated::new(m.rge_animated_object.current_speed),
+        animated: genie_core::objects::layers::Animated::new(Speed::new(
+            m.rge_animated_object.current_speed,
+        )),
         forward: vec3(&m.orientation_forward_value),
         right: vec3(&m.orientation_right_value),
         velocity,

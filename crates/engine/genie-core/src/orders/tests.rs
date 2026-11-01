@@ -560,7 +560,7 @@ fn a_work_attack_on_a_touching_target_starts_its_move_to_arrived() {
         unit.sprite.map(|s| s.graphic.id),
         Some(SpriteId::named(300))
     );
-    assert_eq!(unit.body.anim_speed(), Some(0.0));
+    assert_eq!(unit.body.anim_speed(), Some(Speed::ZERO));
     assert_eq!(
         unit.body.mover().map(|m| m.stats.speed),
         Some(Speed::new(0.8))
@@ -928,7 +928,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         },
         &mut rng,
     ));
-    unit.body.set_anim_speed(1.0);
+    unit.body.set_anim_speed(Speed::new(1.0));
     unit.ai = Some(crate::unit_ai::UnitAi {
         ai_type: UnitAiType::RANGED_6,
         current_order: None,
@@ -4652,7 +4652,7 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
         if !ai {
             unit.ai = None;
         }
-        unit.body.set_anim_speed(0.5);
+        unit.body.set_anim_speed(Speed::new(0.5));
         let mut wolf = *t.spatial.get(object_id(50)).unwrap();
         wolf.position = Position::new(at, 10.0, 0.0);
         t.spatial.insert(object_id(50), wolf);
@@ -4686,7 +4686,7 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
         (failed, speed, sprite),
         (
             Some(AttackState::Failed),
-            Some(1.0),
+            Some(Speed::new(1.0)),
             Some(SpriteId::named(300))
         )
     );

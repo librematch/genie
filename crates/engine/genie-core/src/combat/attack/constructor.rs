@@ -180,7 +180,7 @@ impl Attack {
             .ok_or(crate::world::ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) = Self::own_start(cmd, &c.w.spatial, mover, &reads)?;
         if begun.failed_first {
-            unit.body.set_anim_speed(1.0);
+            unit.body.set_anim_speed(Speed::new(1.0));
         }
         if begun.failed {
             attack.fail_at_start(
@@ -322,7 +322,7 @@ impl Attack {
     ) -> Result<(), GenieError> {
         // State 13 ("Failed"): the target went out of sight.
         self.state = AttackState::Failed;
-        body.set_anim_speed(1.0);
+        body.set_anim_speed(Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;

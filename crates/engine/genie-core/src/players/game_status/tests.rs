@@ -32,6 +32,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
+use crate::production::UnitIndex;
 use crate::production::{
     Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
 };
@@ -354,7 +355,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     );
     let a = &objects[attack];
     assert_eq!(a.actions.attack().map(|a| a.state), Some(AttackState::Done));
-    assert_eq!(a.body.anim_speed(), Some(1.0));
+    assert_eq!(a.body.anim_speed(), Some(Speed::new(1.0)));
     assert!(a.sprite.is_some());
     assert_eq!(
         objects[artifact].actions.artifact().map(|a| a.state),
@@ -442,7 +443,8 @@ fn a_cancel_gives_back_one_queued_unit() {
         villager(Some(ids::VILLAGER_MALE), 1, 45.0),
     ]);
     t.players[1].attributes[80] = Amount::new(2.0);
-    t.cancel_order(&object_ids([9]), 1, false).unwrap();
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), false)
+        .unwrap();
     let p = &t.players[1];
     assert_eq!(
         (p.attributes[0], p.attributes[80]),
@@ -453,9 +455,11 @@ fn a_cancel_gives_back_one_queued_unit() {
     assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (1, 1, 1));
     assert!(production.action.is_some());
     assert_eq!(p.tracker.queued, -1);
-    t.cancel_order(&object_ids([9]), 5, false).unwrap();
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(5), false)
+        .unwrap();
     assert_eq!(t.players[1].attributes[0], Amount::new(45.0));
-    t.cancel_order(&object_ids([9]), 0, false).unwrap();
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), false)
+        .unwrap();
     let p = &t.players[1];
     assert_eq!(
         (p.attributes[0], p.attributes[80], p.attributes[81]),
@@ -463,7 +467,10 @@ fn a_cancel_gives_back_one_queued_unit() {
     );
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     assert!(production.queue.entries().is_empty() && production.action.is_none());
-    assert!(t.cancel_order(&object_ids([9]), 0, true).is_ok());
+    assert!(
+        t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
+            .is_ok()
+    );
 }
 
 /// `TRIBE_Building_Object::update` after its combat update (`0x1411ca3e2`): a building past
@@ -543,8 +550,13 @@ fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
         .unwrap();
     tc.queue = queue(&[villager(Some(ids::VILLAGER_MALE), 3, 46.0)]);
     t.players[1].attributes[80] = Amount::new(3.0);
-    t.cancel_queued(PlayerId::new(1), ListIndex::new(0), 0, false)
-        .unwrap();
+    t.cancel_queued(
+        PlayerId::new(1),
+        ListIndex::new(0),
+        UnitIndex::of_data(0),
+        false,
+    )
+    .unwrap();
     let p = &t.players[1];
     let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
     assert_eq!(
@@ -592,7 +604,8 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
                 .clone()
         },
     ]);
-    t.cancel_order(&object_ids([9]), 0, true).unwrap();
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
+        .unwrap();
     let p = &t.players[1];
     assert_eq!(
         (p.attributes[0], p.attributes[80]),
@@ -624,7 +637,8 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
         villager(Some(ids::VILLAGER_FEMALE), 4, 46.0),
     ]);
     t2.players[1].attributes[80] = Amount::new(7.0);
-    t2.cancel_order(&object_ids([9]), 1, true).unwrap();
+    t2.cancel_order(&object_ids([9]), UnitIndex::of_data(1), true)
+        .unwrap();
     let production = t2.players[1].objects[ListIndex::new(0)]
         .production
         .as_ref()
@@ -671,8 +685,13 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
         .as_mut()
         .unwrap();
     tc.queue = queue(&[archer(2), villager(Some(ids::VILLAGER_MALE), 2, 46.0)]);
-    t.cancel_queued(PlayerId::new(1), ListIndex::new(0), 0, true)
-        .unwrap();
+    t.cancel_queued(
+        PlayerId::new(1),
+        ListIndex::new(0),
+        UnitIndex::of_data(0),
+        true,
+    )
+    .unwrap();
     let p = &t.players[1];
     assert_eq!(
         p.resources(),
@@ -702,8 +721,13 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
         .unwrap();
     tc.queue = queue(&[villager(Some(ids::VILLAGER_MALE), 2, 46.0), research]);
     t.players[1].attributes[80] = Amount::new(2.0);
-    t.cancel_queued(PlayerId::new(1), ListIndex::new(0), 0, true)
-        .unwrap();
+    t.cancel_queued(
+        PlayerId::new(1),
+        ListIndex::new(0),
+        UnitIndex::of_data(0),
+        true,
+    )
+    .unwrap();
     let q = &t.players[1].objects[ListIndex::new(0)]
         .production
         .as_ref()
@@ -797,7 +821,8 @@ fn researching(progress: f32) -> World {
 #[test]
 fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     let mut t = researching(10.0);
-    t.cancel_order(&object_ids([9]), 0, true).unwrap();
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
+        .unwrap();
     let p = &t.players[1];
     assert_eq!(p.attributes[3], Amount::new(150.0));
     let s = &p.techs[22];
@@ -818,7 +843,8 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     // one research of the second unit: 50 gold, the technology in state 1 though two stay
     // queued, the research going on
     let mut t = researching(10.0);
-    t.cancel_order(&object_ids([9]), 1, false).unwrap();
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), false)
+        .unwrap();
     let p = &t.players[1];
     assert_eq!(
         (
@@ -924,7 +950,8 @@ fn a_cancel_in_game_mode_16_clears_the_military_flag() {
             villager(Some(ids::VILLAGER_MALE), 1, 46.0),
             villager(Some(master_id(4)), 1, 0.0),
         ]);
-        t.cancel_order(&object_ids([9]), 1, false).unwrap();
+        t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), false)
+            .unwrap();
         t.players[1].one_military_queued
     };
     assert!(!run(1.0));

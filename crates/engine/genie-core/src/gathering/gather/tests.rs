@@ -1,4 +1,5 @@
 use super::*;
+use crate::gathering::FarmStops;
 use crate::map::DistanceSquared;
 use crate::math::Angle;
 use crate::math::rng::{Stream, Well512};
@@ -44,7 +45,7 @@ fn reads() -> GatherReads {
         farm_stops: false,
         computer: false,
         stop_productivity: Amount::new(1.0),
-        food_sold: 0.0,
+        food_sold: Amount::ZERO,
     }
 }
 
@@ -115,7 +116,7 @@ impl Rig {
         let mut rig = Self {
             t: crate::movement::tests::path_world(owner),
         };
-        rig.mover_mut().animated.speed = 1.0;
+        rig.mover_mut().animated.speed = Speed::new(1.0);
         let unit = rig.unit_mut();
         unit.life.master_id = ids::VILLAGER_MALE;
         (unit.life.attribute_type, unit.life.amount) =
@@ -176,7 +177,7 @@ impl Rig {
 
     /// Its animation stopped (`+0x7b8` 0).
     fn anim_stopped(&self) -> bool {
-        self.unit().body.anim_speed() == Some(0.0)
+        self.unit().body.anim_speed() == Some(Speed::new(0.0))
     }
 
     /// The next draw of the world's Action stream, less [`WAIT_SHIFT`]: a random wait's timer.
@@ -292,7 +293,7 @@ fn under_the_farm_setting_a_farm_s_gather_goes_in_four_timed_stops() {
     assert_eq!(
         (g.stops, g.time_per_stop, g.farm),
         (
-            4,
+            FarmStops::of_data(4),
             Seconds::new(((10.0f32 * 1.0) / (0.33 * 1.0)) / 4.0),
             Point::new(112.5, 173.5)
         )
@@ -306,7 +307,7 @@ fn under_the_farm_setting_a_farm_s_gather_goes_in_four_timed_stops() {
     let trap = GatherAction::new(task(), &trap, true, rate).unwrap();
     assert_eq!(
         (one.stops, one.time_per_stop, trap.stops),
-        (1, Seconds::ZERO, 1)
+        (FarmStops::ONE, Seconds::ZERO, FarmStops::ONE)
     );
 }
 
@@ -433,7 +434,7 @@ fn a_farm_s_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
     };
     let r = GatherReads {
         work_rate: WorkRate::new(0.5),
-        food_sold: 1.0,
+        food_sold: Amount::new(1.0),
         ..reads()
     };
     let gathered = rig.run(GatherState::Work, 500, |c, u, _| {
@@ -1207,7 +1208,7 @@ fn a_forager_walks_to_its_bush() {
     let mut g = GatherAction::new(task(), &bush(), true, rate()).unwrap();
     assert_eq!(
         (g.stops, g.gather_at, g.target_class),
-        (1, Point::from([-1.0; 2]), class_of(7))
+        (FarmStops::ONE, Point::from([-1.0; 2]), class_of(7))
     );
     let mut held = carrying(Some(attribute::STONE), 0.0);
     let carried = walks(held);

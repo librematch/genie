@@ -38,7 +38,7 @@ impl Attack {
             .idle_sprite
             .ok_or(crate::world::NO_STANDING_SPRITE)?;
         new_sprite(&mut unit.sprite, unit.body.move_stats_mut(), g, sprite_rng);
-        set_walker_anim(&mut unit.body, 0.0);
+        set_walker_anim(&mut unit.body, Speed::new(0.0));
         Ok(())
     }
 
@@ -238,7 +238,7 @@ impl Attack {
                 .stop()?;
         }
         self.state = AttackState::Done;
-        body.set_anim_speed(1.0);
+        body.set_anim_speed(Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
@@ -254,7 +254,7 @@ impl Attack {
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         self.enter(state, unit)?;
-        set_walker_anim(&mut unit.body, 1.0);
+        set_walker_anim(&mut unit.body, Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
