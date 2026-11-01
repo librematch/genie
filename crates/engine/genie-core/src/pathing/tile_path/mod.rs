@@ -98,6 +98,18 @@ impl Found {
             Self::Nothing => 3,
         }
     }
+
+    /// The game's `result < 2`: the goal, or off the map, which its readers do not tell apart.
+    #[must_use]
+    pub const fn reaches(self) -> bool {
+        matches!(self, Self::OffMap | Self::Goal)
+    }
+
+    /// A path that leads on (1 and 2): the goal or the node nearest it.
+    #[must_use]
+    pub const fn leads(self) -> bool {
+        matches!(self, Self::Goal | Self::Nearest)
+    }
 }
 
 /// A path's points and its length, as the game's path data holds them (`+0x438`..`+0x440`, `+4`).

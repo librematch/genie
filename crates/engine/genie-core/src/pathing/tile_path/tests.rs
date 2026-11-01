@@ -387,3 +387,13 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
     assert_eq!(order, [1, 2, 0, 4, 3]);
     assert!(open.is_empty());
 }
+
+/// A search's result keeps the game's code, and the tests its readers make by code: `result < 2`
+/// reaches (off the map too), 1 and 2 lead on.
+#[test]
+fn a_search_result_reads_by_the_game_s_code() {
+    let all = [Found::OffMap, Found::Goal, Found::Nearest, Found::Nothing];
+    assert_eq!(all.map(Found::code), [0, 1, 2, 3]);
+    assert_eq!(all.map(Found::reaches), [true, true, false, false]);
+    assert_eq!(all.map(Found::leads), [false, true, true, false]);
+}

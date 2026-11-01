@@ -22,7 +22,7 @@ use crate::objects::masters::class;
 use crate::pathing::FixedPoint;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::HullPather;
-use crate::pathing::tile_path::{Path, Request};
+use crate::pathing::tile_path::{Found, Path, Request};
 use crate::world::WorldTime;
 use crate::{GenieError, math::fmath, pathing::short_path};
 
@@ -323,7 +323,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: TileAsk<'_>,
         out: &mut Path,
-    ) -> Result<Option<u8>, GenieError> {
+    ) -> Result<Option<Found>, GenieError> {
         // the smoothing's ignore list: the unit and the level's target object (the planner's
         // argument 12, the object the world holds)
         let level_target = self
@@ -429,7 +429,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         to: Point,
         radii: f32,
-    ) -> Result<Option<(u8, Distance)>, GenieError> {
+    ) -> Result<Option<(Found, Distance)>, GenieError> {
         let full = !plan.computer;
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
             return Ok(None);
@@ -445,6 +445,6 @@ impl Mover {
         let mut path = Path::default();
         let found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
         path.measure();
-        Ok(Some((found.code(), path.length)))
+        Ok(Some((found, path.length)))
     }
 }

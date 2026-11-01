@@ -15363,20 +15363,20 @@ fn a_stop_s_error_names_the_command_or_the_object_it_happened_on() {
 }
 
 /// `FUN_1411671e0`'s planner results: a path to a drop site or into its range counts (0 and 1),
-/// a partial one never (2); one the planner does not reach (3 and up) counts only for a fishing
-/// ship seeking by path whose footprint gap to it is within 100 squared (429521544's p3 in
-/// update 5601).
+/// a partial one never (2); one the planner does not reach (3, the game's 3 and up) counts only
+/// for a fishing ship seeking by path whose footprint gap to it is within 100 squared
+/// (429521544's p3 in update 5601).
 #[test]
 fn a_fishing_ship_counts_a_near_drop_site_its_path_does_not_reach() {
     use crate::gathering::drop_sites::counted;
-    assert!(counted(0, true, false, || false));
-    assert!(counted(1, false, false, || false));
-    assert!(!counted(2, true, true, || true));
-    assert!(!counted(3, true, false, || true));
-    assert!(counted(3, true, true, || true));
-    assert!(!counted(3, true, true, || false));
-    assert!(!counted(3, false, true, || true));
-    assert!(counted(4, true, true, || true));
+    use crate::pathing::tile_path::Found;
+    assert!(counted(Found::OffMap, true, false, || false));
+    assert!(counted(Found::Goal, false, false, || false));
+    assert!(!counted(Found::Nearest, true, true, || true));
+    assert!(!counted(Found::Nothing, true, false, || true));
+    assert!(counted(Found::Nothing, true, true, || true));
+    assert!(!counted(Found::Nothing, true, true, || false));
+    assert!(!counted(Found::Nothing, false, true, || true));
 }
 
 /// `TRIBE_Building_Object::update`'s farm stage (`0x1411ca2ef`): a farm lays 29 to 31 by its

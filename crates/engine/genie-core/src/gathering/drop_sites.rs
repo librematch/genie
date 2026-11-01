@@ -14,6 +14,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::ACTION;
+use crate::pathing::tile_path::Found;
 
 use crate::map::spatial::Spatial;
 use crate::movement::{Me, Mover, Planning, footprint_gap_squared};
@@ -76,7 +77,7 @@ impl Seeker<'_, '_> {
         };
         let planned = self.mover.plan_length(self.spatial, self.plan, to, radii)?;
         Ok(match planned {
-            Some((code, length)) if counted(code, by_path, self.fishing(), near) => {
+            Some((found, length)) if counted(found, by_path, self.fishing(), near) => {
                 if !by_path {
                     return Ok(Some(squared));
                 }
@@ -126,11 +127,16 @@ impl Seeker<'_, '_> {
 pub(crate) const FISHING_REACH: DistanceSquared =
     DistanceSquared::new(crate::math::image::turn::FISHING_REACH);
 
-/// Whether the planner's result `code` lets a drop site count in [`drop_site_search`]: a path
+/// Whether the planner's result `found` lets a drop site count in [`drop_site_search`]: a path
 /// to it or into its range (below 2), or for a fishing ship seeking by path one the planner
-/// does not reach (3 and up) whose footprint lies `near` ([`FISHING_REACH`]).
-pub(crate) fn counted(code: u8, by_path: bool, fishing: bool, near: impl FnOnce() -> bool) -> bool {
-    code < 2 || (by_path && fishing && 3 <= code && near())
+/// does not reach (3, the game's `3 <= result`) whose footprint lies `near` ([`FISHING_REACH`]).
+pub(crate) fn counted(
+    found: Found,
+    by_path: bool,
+    fishing: bool,
+    near: impl FnOnce() -> bool,
+) -> bool {
+    found.reaches() || (by_path && fishing && found == Found::Nothing && near())
 }
 
 /// A search for drop sites (`FUN_1411671e0`: in state 2, not at work on the action type `at_work`

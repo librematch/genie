@@ -3431,15 +3431,17 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     // nearer than 20 tiles the planner's path decides: its goal reached (1) within the
     // influence distance
     let other = unit(9186, true, Position::new(44.0, 94.0, 0.0));
-    let mut short = |_: &Splittable, _: &Splittable| Ok(Some((1, Distance::new(2.5))));
+    let mut short = |_: &Splittable, _: &Splittable| Ok(Some((Found::Goal, Distance::new(2.5))));
     assert!(splits_together(&scout, &other, f, false, &mut short, &mut away).unwrap());
-    let mut long = |_: &Splittable, _: &Splittable| Ok(Some((1, Distance::new(3.5))));
+    let mut long = |_: &Splittable, _: &Splittable| Ok(Some((Found::Goal, Distance::new(3.5))));
     assert!(!splits_together(&scout, &other, f, false, &mut long, &mut away).unwrap());
-    let mut nearest = |_: &Splittable, _: &Splittable| Ok(Some((2, Distance::new(2.5))));
+    let mut nearest =
+        |_: &Splittable, _: &Splittable| Ok(Some((Found::Nearest, Distance::new(2.5))));
     assert!(!splits_together(&scout, &other, f, false, &mut nearest, &mut away).unwrap());
     // a path that did not join puts the unit among the far ones; a NaN length joins
     assert_eq!(away, [object_id(9186)].into());
-    let mut lost = |_: &Splittable, _: &Splittable| Ok(Some((1, Distance::new(f32::NAN))));
+    let mut lost =
+        |_: &Splittable, _: &Splittable| Ok(Some((Found::Goal, Distance::new(f32::NAN))));
     assert!(splits_together(&scout, &other, f, false, &mut lost, &mut away).unwrap());
     // a NaN distance takes no path and is within the influence distance
     let nowhere = Splittable {

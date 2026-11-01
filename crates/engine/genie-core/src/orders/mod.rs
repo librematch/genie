@@ -28,6 +28,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
+use crate::pathing::tile_path::Found;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -214,9 +215,9 @@ struct Followed {
 }
 
 /// The splitter's path from one unit to another (`FUN_140f7cb30` -> `FUN_140f7c530`): the
-/// planner's result code and the path's length; None without a planner for the restriction.
+/// planner's result and the path's length; None without a planner for the restriction.
 type SplitPath<'a> =
-    dyn FnMut(&Splittable, &Splittable) -> Result<Option<(u8, Distance)>, GenieError> + 'a;
+    dyn FnMut(&Splittable, &Splittable) -> Result<Option<(Found, Distance)>, GenieError> + 'a;
 
 /// The drop-site table's search starts beyond this squared distance (`FUN_141658e20`,
 /// `DAT_142f89ac4`).
@@ -282,10 +283,10 @@ fn splits_together(
     let d = crate::math::fmath::sqrt(dx * dx + 0.0 + dy * dy);
     if SPLIT_BY_PATH
         && d < SPLIT_PATH_REACH
-        && let Some((code, length)) = path(a, b)?
+        && let Some((found, length)) = path(a, b)?
     {
-        let joins =
-            code == 1 && crate::math::fmath::at_most_or_unordered(length.get(), f.influence.get());
+        let joins = found == Found::Goal
+            && crate::math::fmath::at_most_or_unordered(length.get(), f.influence.get());
         if !joins {
             let _ = far.insert(b.id);
         }

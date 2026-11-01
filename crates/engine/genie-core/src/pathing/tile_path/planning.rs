@@ -135,12 +135,13 @@ impl Planner {
         }
         levels.measure();
         tiles.measure();
-        let second_code = second.map_or(0, Found::code);
-        let (chosen, result) = if second_code != first.code() || levels.length < tiles.length {
-            (&levels, first)
-        } else {
-            (&tiles, second.unwrap_or(first))
-        };
+        // no second search reads as the game's 0, off the map
+        let (chosen, result) =
+            if second.unwrap_or(Found::OffMap) != first || levels.length < tiles.length {
+                (&levels, first)
+            } else {
+                (&tiles, second.unwrap_or(first))
+            };
         out.append(chosen);
         Ok(result)
     }

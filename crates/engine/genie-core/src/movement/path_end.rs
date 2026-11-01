@@ -106,7 +106,7 @@ impl Mover {
                 full: false,
             };
             let found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
-            if 1 < found.code() {
+            if !found.reaches() {
                 return Ok(false);
             }
         }

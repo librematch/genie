@@ -165,7 +165,7 @@ fn take_turn(
 
 /// The tile pathfinder for a top level (`DAT_1439e3cc4`) from the group's place to the
 /// waypoint, within the target's radius plus the lead's: without a planner for the lead's
-/// restriction the straight way is the plan; a result of 1, 2 or above 4 is a plan, dropped when
+/// restriction the straight way is the plan; a result of 1 or 2 is a plan, dropped when
 /// its end lies farther from the waypoint than the group does.
 fn tile_plan(
     lead: &Lead,
@@ -198,7 +198,8 @@ fn tile_plan(
             let _ = plan.path.push(leg.waypoint);
             (plan.planned, plan.has_plan, plan.found) = (true, true, true);
         }
-        Some(r) if (1..=2).contains(&r) || 4 < r => {
+        // the game's `1 <= result <= 2 || 4 < result`: above 4 the planner never returns
+        Some(r) if r.leads() => {
             (plan.planned, plan.found, plan.has_plan) = (true, true, true);
             let end = plan.path.points.last().copied().unwrap_or(BVector::ZERO);
             if leg.way < ground(leg.waypoint, end) {

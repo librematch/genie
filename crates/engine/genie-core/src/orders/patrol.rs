@@ -294,10 +294,8 @@ impl World {
                     full: false,
                 };
                 let mut path = crate::pathing::tile_path::Path::default();
-                if planner
-                    .plan::<GenieError>(&req, false, &mut path, None)?
-                    .code()
-                    != 1
+                if planner.plan::<GenieError>(&req, false, &mut path, None)?
+                    != crate::pathing::tile_path::Found::Goal
                 {
                     i += 1;
                     continue;

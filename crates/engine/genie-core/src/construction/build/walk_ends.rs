@@ -10,6 +10,7 @@ use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
+use crate::pathing::tile_path::Found;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -102,7 +103,7 @@ impl BuildAction {
             mover.stats.radius.x(),
             mover.moved_at,
         );
-        let mut code = 3;
+        let mut found = Found::Nothing;
         // the foundation's place and its master's radius, read before the planner's borrow
         let known = c.w.spatial.get_known(self.target).map(Option::<&_>::copied);
         let master_radius = match Self::site_unit(c, reads)? {
@@ -123,11 +124,9 @@ impl BuildAction {
                 full: false,
             };
             let mut path = crate::pathing::tile_path::Path::default();
-            code = planner
-                .plan::<GenieError>(&req, false, &mut path, None)?
-                .code();
+            found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
         }
-        if code < 2 {
+        if found.reaches() {
             self.restart(c, builder)
         } else {
             self.idle(c, builder, reads)

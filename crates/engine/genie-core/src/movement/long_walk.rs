@@ -16,7 +16,7 @@ use crate::movement::{
 };
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::short_path::{Call, Entry, Listed};
-use crate::pathing::tile_path::{Path, Request};
+use crate::pathing::tile_path::{Found, Path, Request};
 use crate::pathing::{Pathing, PlanBudget, ShortFound};
 use crate::{GenieError, math::fmath, pathing::short_path};
 
@@ -208,7 +208,7 @@ pub(crate) fn tile_plan_for(
     plan: &mut Planning<'_>,
     ask: TileAsk<'_>,
     out: &mut Path,
-) -> Result<Option<u8>, GenieError> {
+) -> Result<Option<Found>, GenieError> {
     let TileAsk {
         goal: to,
         radii,
@@ -251,7 +251,7 @@ pub(crate) fn tile_plan_for(
         // FUN_140f7dbb0 sets the manager's ignore list to it (FUN_1410562e0)
         world.set_manager_ignore(&ignore);
     }
-    Ok(Some(found.code()))
+    Ok(Some(found))
 }
 
 /// `0x141150f00`'s test before a solid unit's plan: a trade cart needs its owner's budget

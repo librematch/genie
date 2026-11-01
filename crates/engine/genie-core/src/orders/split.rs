@@ -8,6 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::master_type::MOVING;
 use crate::orders::{Interact, MAX_UNGROUPED, Split, Splittable, centroid, splits_together};
+use crate::pathing::tile_path::Found;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -221,7 +222,7 @@ impl World {
         let tiles = self.spatial.tiles();
         let pathing = &mut self.pathing;
         let mut path =
-            |a: &Splittable, b: &Splittable| -> Result<Option<(u8, Distance)>, GenieError> {
+            |a: &Splittable, b: &Splittable| -> Result<Option<(Found, Distance)>, GenieError> {
                 let Some(restriction) = b.restriction else {
                     return Ok(None);
                 };
@@ -239,7 +240,7 @@ impl World {
                 let mut p = crate::pathing::tile_path::Path::default();
                 let found = planner.plan::<GenieError>(&req, false, &mut p, None)?;
                 p.measure();
-                Ok(Some((found.code(), p.length)))
+                Ok(Some((found, p.length)))
             };
         // then the unit with the most others that join it, the first of equals, with them
         while !left.is_empty() {

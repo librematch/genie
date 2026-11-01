@@ -20,7 +20,7 @@ use crate::movement::{
 };
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
-use crate::pathing::tile_path::Path;
+use crate::pathing::tile_path::{Found, Path};
 
 /// The new level and its path, and what the request's planners found: a path (`local_19d0`),
 /// one partway (`bVar35`), one the tile pathfinder planned (`bVar6`), a failed short path
@@ -189,11 +189,12 @@ impl Mover {
         let r = self
             .tile_plan(me, world, plan, ask, &mut np.path)?
             .expect("the planner exists");
-        if r == 3 || r == 4 || r == 0 {
+        // the game also tests for 4, which the planner never returns
+        if !r.leads() {
             return Ok(());
         }
         let level = &mut self.paths[0];
-        if r == 2
+        if r == Found::Nearest
             && (level.level != WaypointLevel::TOP || level.flags.contains(LevelFlags::NEAREST))
         {
             return Ok(());
@@ -205,7 +206,7 @@ impl Mover {
             np.path.points.clear();
         }
         np.found = !farther;
-        if !target_moves && !farther && level.level == WaypointLevel::TOP && r == 2 {
+        if !target_moves && !farther && level.level == WaypointLevel::TOP && r == Found::Nearest {
             level.flags |= LevelFlags::NEAREST;
         }
         Ok(())
@@ -419,7 +420,8 @@ impl Mover {
         let last = point_or_zero(&other, other.points.len() as i32 - 1);
         let end = ground(w.waypoint, last);
         if end <= w.distance.get() {
-            if (r.wrapping_sub(1) < 2 || 4 < r) && end < np.end_gap {
+            // the game's `result - 1 < 2 || 4 < result`: above 4 the planner never returns
+            if r.leads() && end < np.end_gap {
                 np.path.points.clear();
                 for &p in &other.points {
                     let _ = np.path.push(p);
