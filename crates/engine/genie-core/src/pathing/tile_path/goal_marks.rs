@@ -28,8 +28,7 @@ pub struct Request {
 /// The goal of a search: its point on the map and both ranges.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Goal {
-    pub(super) x: f32,
-    pub(super) y: f32,
+    pub(super) at: Point,
     pub(super) radii: Distance,
     pub(super) range: Distance,
 }
@@ -37,8 +36,7 @@ pub(super) struct Goal {
 impl Request {
     pub(super) const fn goal(&self) -> Goal {
         Goal {
-            x: self.to.x(),
-            y: self.to.y(),
+            at: self.to,
             radii: self.radii,
             range: self.range,
         }
@@ -54,7 +52,8 @@ impl Planner {
     /// `FUN_140f7ba80`: whether `cell` of `level` lies within the goal's ranges of (`x`, `y`):
     /// one of its passable (or lone) tiles, measured from the tile's corner.
     pub(super) fn in_range(&self, level: GridLevel, cell: PlanTile, goal: Goal) -> bool {
-        let Goal { x, y, radii, range } = goal;
+        let Goal { at, radii, range } = goal;
+        let (x, y) = (at.x(), at.y());
         let radii = radii.get();
         if !self.region.holds_at(level, cell) {
             return false;
@@ -94,7 +93,8 @@ impl Planner {
     /// The square of tiles the goal's ranges may reach (`FUN_140f7d540`, `FUN_140f7a990`): the
     /// goal ± the radii and the range (+ 1 when the range is below 1); the far sides grow by `far`.
     pub(super) fn goal_square(&mut self, goal: Goal, far: f32) {
-        let Goal { x, y, radii, range } = goal;
+        let Goal { at, radii, range } = goal;
+        let (x, y) = (at.x(), at.y());
         let mut r = (radii + range).get();
         if range < Distance::new(ONE) {
             r += ONE;

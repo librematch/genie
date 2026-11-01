@@ -20265,10 +20265,8 @@ fn a_call_for_help_walks_the_lists_for_a_free_helper_in_reach() {
         id,
         distance: Distance::MAX,
         owner: PlayerId::new(1),
-        x,
-        y: 10.0,
-        rx: 0.2,
-        ry: 0.2,
+        at: Point::new(x, 10.0),
+        radius: Footprint::new(0.2, 0.2),
     };
     let lists = || {
         crate::players::ByRelation::new([

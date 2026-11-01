@@ -2094,10 +2094,8 @@ fn closest_object_keeps_the_nearest_record_and_on_a_tie_the_lower_id() {
         id,
         distance,
         owner: PlayerId::new(1),
-        x: 0.0,
-        y: 0.0,
-        rx: 0.5,
-        ry: 0.5,
+        at: Point::new(0.0, 0.0),
+        radius: Footprint::new(0.5, 0.5),
     };
     assert_eq!(
         nearer(None, &record(object_id(5), Distance::new(3.0))),

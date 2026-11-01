@@ -48,14 +48,10 @@ pub struct Record {
     pub distance: Distance,
     /// The owner's id (`player+0x718`).
     pub owner: PlayerId,
-    /// Its x.
-    pub x: f32,
-    /// Its y.
-    pub y: f32,
-    /// Its master's radius on x.
-    pub rx: f32,
-    /// Its master's radius on y.
-    pub ry: f32,
+    /// Its place (x, y).
+    pub at: Point,
+    /// Its master's radii on x and y.
+    pub radius: Footprint,
 }
 
 /// An object's part in the registry: its mask (`+0x8f8`) and, per player, its record's index in
@@ -154,8 +150,6 @@ impl Registry {
             old,
             new,
         } = unit;
-        let (x, y) = (position.x(), position.y());
-        let (rx, ry) = (radii.x(), radii.y());
         let mut changed = (old.bits() ^ new.bits()) & 0xffff;
         let mut seen = new.bits();
         let Some(class) = class.index() else {
@@ -207,10 +201,8 @@ impl Registry {
                         id,
                         distance: Distance::MAX,
                         owner,
-                        x,
-                        y,
-                        rx,
-                        ry,
+                        at: position,
+                        radius: radii,
                     });
                     let i = list.len() - 1;
                     if let Some(s) = self.entries.get_mut(&id).and_then(|e| e.slots.get_mut(p)) {
@@ -256,8 +248,7 @@ impl Registry {
         };
         for (p, slot) in e.slots.iter().enumerate().take(self.players) {
             if let Some(r) = slot.and_then(|i| self.lists.get_mut(p)?.get_mut(class)?.get_mut(i)) {
-                r.x = x;
-                r.y = y;
+                r.at = Point::new(x, y);
             }
         }
     }
@@ -313,11 +304,12 @@ impl Registry {
                 let Some(relation) = relation.filter(|r| wanted & r.bit() != 0) else {
                     continue;
                 };
-                if !(r.x <= x1 && x0 <= r.x && r.y <= y1 && y0 <= r.y) {
+                let (px, py) = (r.at.x(), r.at.y());
+                if !(px <= x1 && x0 <= px && py <= y1 && y0 <= py) {
                     continue;
                 }
-                let dx = (r.x - x).abs() - r.rx;
-                let dy = (r.y - y).abs() - r.ry;
+                let dx = (px - x).abs() - r.radius.x();
+                let dy = (py - y).abs() - r.radius.y();
                 let inside = match mode {
                     0 => {
                         if rx < dx {
@@ -399,7 +391,10 @@ mod tests {
         assert_eq!(r.entry(object_id(1)).unwrap().slots[0], None);
         assert_eq!(r.entry(object_id(1)).unwrap().slots[2], Some(0));
         r.moved(object_id(3), class::VILLAGER, Point::new(7.0, 7.0));
-        assert_eq!((r.lists[0][4][0].x, r.lists[2][4][2].y), (7.0, 7.0));
+        assert_eq!(
+            (r.lists[0][4][0].at.x(), r.lists[2][4][2].at.y()),
+            (7.0, 7.0)
+        );
     }
 
     #[test]

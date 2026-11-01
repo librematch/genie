@@ -245,10 +245,8 @@ pub fn registry_from_dump(text: &str) -> Result<genie_core::vision::registry::Re
                     id: object(w[1])?,
                     distance: Distance::new(bits(w[2])?),
                     owner: genie_core::players::PlayerId::new(number(w[3])? as u8),
-                    x: bits(w[4])?,
-                    y: bits(w[5])?,
-                    rx: bits(w[6])?,
-                    ry: bits(w[7])?,
+                    at: genie_core::map::Point::new(bits(w[4])?, bits(w[5])?),
+                    radius: genie_core::map::Footprint::new(bits(w[6])?, bits(w[7])?),
                 });
             }
             Some("mask") if w.len() == 3 + genie_core::vision::registry::SLOTS => {
