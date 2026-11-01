@@ -2,6 +2,7 @@
 //! walk of a new polygon.
 
 use crate::GenieError;
+use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
@@ -104,10 +105,10 @@ impl Search<'_> {
         let b = self.bounds;
         let w = side.prev();
         let (target, dir) = match w {
-            ShapeSide::LowY => (FixedPoint::new(b[0], b[3]), AxisDir::PlusY),
-            ShapeSide::HighX => (FixedPoint::new(b[0], b[1]), AxisDir::MinusX),
-            ShapeSide::HighY => (FixedPoint::new(b[2], b[1]), AxisDir::MinusY),
-            ShapeSide::LowX => (FixedPoint::new(b[2], b[3]), AxisDir::PlusX),
+            ShapeSide::LowY => (FixedPoint::new(b.x0(), b.y1()), AxisDir::PlusY),
+            ShapeSide::HighX => (FixedPoint::new(b.x0(), b.y0()), AxisDir::MinusX),
+            ShapeSide::HighY => (FixedPoint::new(b.x1(), b.y0()), AxisDir::MinusY),
+            ShapeSide::LowX => (FixedPoint::new(b.x1(), b.y1()), AxisDir::PlusX),
         };
         let sw = self.ctx.sweep(*pos, target, dir)?;
         let u_new = Self::along(*pos, w);
@@ -259,7 +260,7 @@ impl Search<'_> {
         let mut chosen = None;
         let mut best_key = 0x7fc0_0000_i32;
         for (k, c) in contacts.iter().enumerate() {
-            if (d >= c.half) || self.ctx.ignored(c.other) {
+            if (d.get() >= c.half) || self.ctx.ignored(c.other) {
                 continue;
             }
             let q = contact_point(c.at, c.side, d, c.flag);
@@ -268,10 +269,10 @@ impl Search<'_> {
             }
             // the sides 0 and 1 measure forward (the game's `side < 2`, and any side past 3)
             let forward = matches!(side, ShapeSide::LowY | ShapeSide::HighX);
-            let off = if side == c.side {
-                if c.flag != 0 { d.wrapping_neg() } else { d }
+            let off = if side == c.side && c.flag != 0 {
+                d.get().wrapping_neg()
             } else {
-                d
+                d.get()
             };
             let mut key = if forward {
                 c.along.wrapping_add(off)
@@ -299,7 +300,7 @@ impl Search<'_> {
         side: ShapeSide,
         mesh: &Mesh,
         shape: Option<ShapeId>,
-        d: i32,
+        d: FixedDistance,
     ) -> Option<u32> {
         let shape = shape?;
         let n = poly.vertices.len() as u32;
@@ -352,8 +353,9 @@ impl Search<'_> {
         mesh: &Mesh,
         (p, vc, vs): (FixedPoint, FixedPoint, Option<ShapeId>),
         shape: ShapeId,
-        d: i32,
+        d: FixedDistance,
     ) -> bool {
+        let d = d.get();
         let Some(vs) = vs.filter(|_| p == vc) else {
             return false;
         };
@@ -382,7 +384,7 @@ impl Search<'_> {
             vr.x0()
         };
         let o = FixedRect::new(x0 + d, y0 + d, x1, y1);
-        o.x0() < o.x1() && o.y0() < o.y1() && inside(o, p, 0)
+        o.x0() < o.x1() && o.y0() < o.y1() && inside(o, p, FixedDistance::ZERO)
     }
 
     /// `FUN_140fa77b0`'s edge test: `p` lies on the edge of side `s_cur` from `vc` to `vn`; the

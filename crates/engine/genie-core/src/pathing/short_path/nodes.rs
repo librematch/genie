@@ -5,7 +5,7 @@ use crate::GenieError;
 use crate::pathing::short_path::{
     FixedPoint, Kind, NONE, Node, RECT_HEURISTIC, Search, Token, WalkDir,
 };
-use crate::pathing::{ShapeId, ShapeSide};
+use crate::pathing::{FixedRect, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
 
 /// A polygon corner reached as a goal candidate (`FUN_140fa3860`'s arguments, [`Search::goal_test`]).
@@ -86,8 +86,9 @@ pub(super) fn corner_emits(
 pub(super) fn clip(
     mut a: FixedPoint,
     mut b: FixedPoint,
-    bx: [i32; 4],
+    bx: FixedRect,
 ) -> Option<(FixedPoint, FixedPoint)> {
+    let bx = bx.get();
     let (xmin, xmax) = if bx[2] < bx[0] {
         (bx[2], bx[0])
     } else {
@@ -153,12 +154,13 @@ pub(super) fn clip(
     Some((a, b))
 }
 
-pub(super) const fn in_box(p: FixedPoint, b: [i32; 4]) -> bool {
-    b[0] <= p.x() && b[1] <= p.y() && p.x() <= b[2] && p.y() <= b[3]
+pub(super) const fn in_box(p: FixedPoint, b: FixedRect) -> bool {
+    b.x0() <= p.x() && b.y0() <= p.y() && p.x() <= b.x1() && p.y() <= b.y1()
 }
 
 /// `p` held in the box `b` on each axis (`[x0, y0, x1, y1]`).
-pub(super) const fn clamp_to_box(p: FixedPoint, b: [i32; 4]) -> FixedPoint {
+pub(super) const fn clamp_to_box(p: FixedPoint, b: FixedRect) -> FixedPoint {
+    let b = b.get();
     FixedPoint::new(
         if b[0] <= p.x() {
             if b[2] < p.x() { b[2] } else { p.x() }
@@ -310,7 +312,9 @@ impl Search<'_> {
             self.best = n.idx;
         }
         let better = self.goal_node == NONE || n.g < self.arena.checked(self.goal_node as usize)?.g;
-        if (h < self.goal.range || self.goal.rect_distance2(n.at) <= self.goal.range2) && better {
+        if (h < self.goal.range.get() || self.goal.rect_distance2(n.at) <= self.goal.range2)
+            && better
+        {
             self.goal_node = n.idx;
             return Ok(true);
         }

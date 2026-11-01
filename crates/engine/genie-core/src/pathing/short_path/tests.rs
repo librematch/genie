@@ -11,22 +11,22 @@ use crate::test_ids::object_id;
 fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
     let goal = Goal {
         at,
-        r: 0,
+        r: FixedDistance::ZERO,
         rx: 0,
         ry: 0,
         rrx: 0,
         rry: 0,
-        range,
+        range: FixedDistance::new(range),
         range2: (i64::from(range) * i64::from(range)) >> 22,
     };
     let mut s = Search {
         ctx: Ctx {
             mesh,
             ignore: &[],
-            d: 0,
+            d: FixedDistance::ZERO,
         },
         goal,
-        bounds: [0, 0, 64 * ONE, 64 * ONE],
+        bounds: FixedRect::new(0, 0, 64 * ONE, 64 * ONE),
         open: Vec::new(),
         arena: Vec::new(),
         polys: Vec::new(),
@@ -133,7 +133,7 @@ fn a_contact_point_moves_off_its_side() {
     let p = FixedPoint::new(100, 200);
     let moved: Vec<FixedPoint> = ShapeSide::ALL
         .into_iter()
-        .flat_map(|side| [0, 1].map(|flag| contact_point(p, side, 3, flag)))
+        .flat_map(|side| [0, 1].map(|flag| contact_point(p, side, FixedDistance::new(3), flag)))
         .collect();
     assert_eq!(
         moved,
@@ -157,7 +157,7 @@ fn a_point_snaps_onto_a_side_within_its_corners() {
     let r = FixedRect::new(0, 0, 100, 50);
     let snap = |p: FixedPoint, side: usize| {
         let mut q = p;
-        snap_to_side(&mut q, r, ShapeSide::ALL[side], 5);
+        snap_to_side(&mut q, r, ShapeSide::ALL[side], FixedDistance::new(5));
         q
     };
     assert_eq!(snap(FixedPoint::new(-20, 30), 0), FixedPoint::new(5, 5));
@@ -307,7 +307,7 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
 /// box is none, one inside it stays; the box's corners may come in any order.
 #[test]
 fn a_segment_clipped_to_the_box_keeps_its_part_inside() {
-    let b = [0, 0, 2 * ONE, 2 * ONE];
+    let b = FixedRect::new(0, 0, 2 * ONE, 2 * ONE);
     assert_eq!(
         clip(FixedPoint::new(-ONE, ONE), FixedPoint::new(3 * ONE, ONE), b),
         Some((FixedPoint::new(0, ONE), FixedPoint::new(2 * ONE, ONE)))
@@ -338,7 +338,7 @@ fn a_segment_clipped_to_the_box_keeps_its_part_inside() {
         clip(
             FixedPoint::new(-ONE, ONE),
             FixedPoint::new(3 * ONE, ONE),
-            [2 * ONE, 2 * ONE, 0, 0]
+            FixedRect::new(2 * ONE, 2 * ONE, 0, 0)
         ),
         Some((FixedPoint::new(0, ONE), FixedPoint::new(2 * ONE, ONE)))
     );
@@ -613,7 +613,7 @@ fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
             ShapeSide::ALL[side],
             &mesh,
             Some(ShapeId::new(0)),
-            0,
+            FixedDistance::ZERO,
         )
     };
     let poly = square(false);
@@ -633,7 +633,7 @@ fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
             ShapeSide::LowY,
             &mesh,
             None,
-            0
+            FixedDistance::ZERO
         ),
         None
     );
@@ -665,12 +665,16 @@ fn a_vertex_holds_a_point_in_its_shape_s_overlap_with_the_other() {
     let held = |vc: FixedPoint, vs: Option<u32>, d| {
         Search::vertex_in_overlap(&mesh, (p, vc, vs.map(ShapeId::new)), ShapeId::new(0), d)
     };
-    assert!(held(p, Some(1), 0));
-    assert!(held(p, Some(1), ONE / 2));
-    assert!(!held(FixedPoint::new(3 * ONE, 2 * ONE), Some(1), 0));
-    assert!(!held(p, None, 0));
-    assert!(!held(p, Some(2), 0));
-    assert!(!held(p, Some(1), ONE));
+    assert!(held(p, Some(1), FixedDistance::ZERO));
+    assert!(held(p, Some(1), FixedDistance::new(ONE / 2)));
+    assert!(!held(
+        FixedPoint::new(3 * ONE, 2 * ONE),
+        Some(1),
+        FixedDistance::ZERO
+    ));
+    assert!(!held(p, None, FixedDistance::ZERO));
+    assert!(!held(p, Some(2), FixedDistance::ZERO));
+    assert!(!held(p, Some(1), FixedDistance::TILE));
 }
 
 /// `FUN_140fa77b0`'s edge test on each side: the point on the edge's line between its ends;
@@ -899,7 +903,7 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
         (FixedPoint::new(10 * ONE, 10 * ONE), Kind::Start)
     );
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.goal.r = ONE;
+    s.goal.r = FixedDistance::TILE;
     assert_eq!(s.start(FixedPoint::new(4 * ONE, 3 * ONE)).unwrap(), 1);
     assert_eq!(s.open.len(), 1);
     let n = s.open[0];
@@ -908,7 +912,7 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
     assert_eq!(n.f, s.goal.heuristic(n.at) + n.g);
     assert_eq!(s.arena[n.idx as usize].f, n.f);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.goal.r = ONE / 8;
+    s.goal.r = FixedDistance::new(ONE / 8);
     assert_eq!(s.start(FixedPoint::new(4 * ONE, 4 * ONE)).unwrap(), 2);
 }
 
@@ -920,10 +924,10 @@ fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     let mesh = shape_at_2_2();
     let p = FixedPoint::new(4 * ONE, 3 * ONE);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.goal.r = ONE;
+    s.goal.r = FixedDistance::TILE;
     s.escape_candidates(p, 0).unwrap();
     let mut one = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    one.goal.r = ONE;
+    one.goal.r = FixedDistance::TILE;
     for k in 0..4 {
         one.escape_side(
             p,
@@ -943,7 +947,7 @@ fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     let ignore = [true];
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.ctx.ignore = &ignore;
-    s.goal.r = ONE;
+    s.goal.r = FixedDistance::TILE;
     s.escape_candidates(p, 0).unwrap();
     assert_eq!(s.open.len(), 0);
 }
@@ -1044,8 +1048,8 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
     let corners = |k: usize| {
         let r = mesh.shapes[0];
         (
-            shrunk_corner(r, [0, 1, 3, 0][k], 0),
-            shrunk_corner(r, [1, 2, 2, 3][k], 0),
+            shrunk_corner(r, [0, 1, 3, 0][k], FixedDistance::ZERO),
+            shrunk_corner(r, [1, 2, 2, 3][k], FixedDistance::ZERO),
         )
     };
     let side = |side: usize| Kind::Side {
@@ -1085,7 +1089,7 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
     )
     .unwrap();
     assert_eq!(opened(&s), vec![]);
-    s.bounds = [0, 0, 64 * ONE, ONE];
+    s.bounds = FixedRect::new(0, 0, 64 * ONE, ONE);
     s.escape_foot(p, 0, (ShapeId::new(0), ShapeSide::ALL[0]), corners(0))
         .unwrap();
     let mut held = shape_at_2_2();

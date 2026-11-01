@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::map::Tile;
+use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
@@ -60,7 +61,7 @@ impl Ctx<'_> {
         &self,
         p: FixedPoint,
         excl: ShapeId,
-        d: i32,
+        d: FixedDistance,
     ) -> Result<Option<ShapeId>, GenieError> {
         for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
             if id != excl
@@ -83,7 +84,7 @@ impl Ctx<'_> {
             end: b,
             fraction: t,
         } = tile;
-        let d = self.d;
+        let d = self.d.get();
         let mut result = None;
         // B and C first test the shape against the ray's box
         let mut bx = [
@@ -258,10 +259,11 @@ impl Ctx<'_> {
         from: FixedPoint,
         end: FixedPoint,
         r: FixedRect,
-        d: i32,
+        d: FixedDistance,
         dir: AxisDir,
     ) -> Option<(FixedPoint, ShapeSide)> {
         let [x, y] = from.get();
+        let d = d.get();
         let met = match dir {
             AxisDir::PlusX => {
                 let h = d + r.x0();

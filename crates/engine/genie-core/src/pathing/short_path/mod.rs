@@ -7,6 +7,7 @@
 
 use crate::GenieError;
 use crate::math::fmath;
+use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
@@ -80,14 +81,16 @@ fn float_distance(a: FixedPoint, b: FixedPoint) -> i32 {
 }
 
 /// `FUN_14087c610`: `p` strictly inside `r` shrunk by `k`.
-const fn strictly_inside(r: FixedRect, p: FixedPoint, k: i32) -> bool {
+const fn strictly_inside(r: FixedRect, p: FixedPoint, k: FixedDistance) -> bool {
     let [x, y] = p.get();
+    let k = k.get();
     r.x0() + k < x && r.y0() + k < y && x < r.x1() - k && y < r.y1() - k
 }
 
 /// `FUN_14087c650`: `p` inside `r` shrunk by `k`, edges included.
-const fn inside(r: FixedRect, p: FixedPoint, k: i32) -> bool {
+const fn inside(r: FixedRect, p: FixedPoint, k: FixedDistance) -> bool {
     let [x, y] = p.get();
+    let k = k.get();
     r.x0() + k <= x && r.y0() + k <= y && x <= r.x1() - k && y <= r.y1() - k
 }
 
@@ -150,7 +153,7 @@ pub struct Ctx<'a> {
     /// Per shape id: ignored (`pather + 0xd8`).
     pub ignore: &'a [bool],
     /// How far the searches shrink a shape's box (`FUN_140fa8460`, `FUN_14087c650`).
-    pub d: i32,
+    pub d: FixedDistance,
 }
 
 /// `DAT_1439e60e5`: 1 in the image and at run time: the rectangle heuristic (0 is the Euclidean).
@@ -178,12 +181,12 @@ const OPEN_CORNER_WITHOUT_EMIT: GenieError =
 #[derive(Clone, Copy, Debug)]
 struct Goal {
     at: FixedPoint,
-    r: i32,
+    r: FixedDistance,
     rx: i32,
     ry: i32,
     rrx: i64,
     rry: i64,
-    range: i32,
+    range: FixedDistance,
     range2: i64,
 }
 
@@ -280,7 +283,7 @@ struct Poly {
 struct Search<'a> {
     ctx: Ctx<'a>,
     goal: Goal,
-    bounds: [i32; 4],
+    bounds: FixedRect,
     open: Vec<Node>,
     arena: Vec<Node>,
     polys: Vec<Poly>,

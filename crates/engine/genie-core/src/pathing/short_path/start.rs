@@ -89,7 +89,7 @@ impl Search<'_> {
         let mesh = self.ctx.mesh;
         let w = mesh.width as i32;
         let total = mesh.width * mesh.width;
-        let rr = ((i64::from(self.goal.r) << 23) >> 22) as i32;
+        let rr = ((i64::from(self.goal.r.get()) << 23) >> 22) as i32;
         let rr2 = i64::from(((i64::from(rr) * i64::from(rr)) >> 22) as i32);
         let [px, py] = p.get();
         let tile = |x: i32, y: i32| (tile_of(y).wrapping_mul(w)).wrapping_add(tile_of(x)) as u32;
@@ -224,7 +224,7 @@ impl Search<'_> {
         let d = self.ctx.d;
         let b = self.bounds;
         for &c in mesh.sides.checked(id.index())?.checked(side.index())? {
-            if (d >= c.half) || self.ctx.ignored(c.other) {
+            if (d.get() >= c.half) || self.ctx.ignored(c.other) {
                 continue;
             }
             let q = contact_point(c.at, c.side, d, c.flag);

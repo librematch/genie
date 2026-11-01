@@ -1,12 +1,14 @@
 //! The fixed-point geometry: a shrunk rectangle's corners and sides, a contact's point, the
 //! segment and ray hits.
 
+use crate::pathing::FixedDistance;
 use crate::pathing::FixedPoint;
 use crate::pathing::FixedRect;
 use crate::pathing::ShapeSide;
 
 /// `FUN_140fa8460`: corner `k` of `r` shrunk by `d`.
-pub(super) const fn shrunk_corner(r: FixedRect, k: u32, d: i32) -> FixedPoint {
+pub(super) const fn shrunk_corner(r: FixedRect, k: u32, d: FixedDistance) -> FixedPoint {
+    let d = d.get();
     match k {
         0 => FixedPoint::new(r.x0() + d, r.y0() + d),
         1 => FixedPoint::new(r.x1() - d, r.y0() + d),
@@ -17,8 +19,14 @@ pub(super) const fn shrunk_corner(r: FixedRect, k: u32, d: i32) -> FixedPoint {
 }
 
 /// `FUN_140fa8350`: a contact's junction moved by `d` into the free space beside its side.
-pub(super) const fn contact_point(p: FixedPoint, side: ShapeSide, d: i32, flag: u8) -> FixedPoint {
+pub(super) const fn contact_point(
+    p: FixedPoint,
+    side: ShapeSide,
+    d: FixedDistance,
+    flag: u8,
+) -> FixedPoint {
     let [x, y] = p.get();
+    let d = d.get();
     let f = flag == 1;
     match side {
         ShapeSide::HighX => {
@@ -53,7 +61,8 @@ pub(super) const fn contact_point(p: FixedPoint, side: ShapeSide, d: i32, flag: 
 }
 
 /// `FUN_140fa39f0`: `p` moved onto side `side` of `r` shrunk by `d`, held within the side.
-pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d: i32) {
+pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d: FixedDistance) {
+    let d = d.get();
     let hold = |v: i32, lo: i32, hi: i32| {
         if v < lo {
             lo

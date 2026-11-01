@@ -6,7 +6,7 @@ use crate::pathing::short_path::{
     OPEN_CORNER_WITHOUT_EMIT, Poly, RECT_HEURISTIC, Search, ShortPath, T_START, TO_FIXED, TO_FLOAT,
     UNSET, WalkDir, cheb, corner_emits, float_distance, in_box, isqrt, through_float,
 };
-use crate::pathing::{ShapeId, ShapeSide};
+use crate::pathing::{FixedDistance, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -370,13 +370,12 @@ impl Search<'_> {
             pts.push(start);
         }
         // the smoothing, with half the radius
-        let r2 = ((i64::from(self.goal.r) * 0x40_0000
-            + ((i64::from(self.goal.r) >> 63) & 0x7f_ffff))
-            >> 23) as i32;
+        let r = i64::from(self.goal.r.get());
+        let r2 = ((r * 0x40_0000 + ((r >> 63) & 0x7f_ffff)) >> 23) as i32;
         let sight = Ctx {
             mesh: self.ctx.mesh,
             ignore: self.ctx.ignore,
-            d: 0x20_0000 - r2,
+            d: FixedDistance::new(0x20_0000 - r2),
         };
         let mut i = 0;
         while i < pts.len() {
@@ -492,15 +491,23 @@ impl Search<'_> {
         );
         let b = self.bounds;
         let c = FixedPoint::new(
-            if b[0] <= centre.x() {
-                if b[2] < centre.x() { b[2] } else { centre.x() }
+            if b.x0() <= centre.x() {
+                if b.x1() < centre.x() {
+                    b.x1()
+                } else {
+                    centre.x()
+                }
             } else {
-                b[0]
+                b.x0()
             },
-            if b[1] <= centre.y() {
-                if b[3] < centre.y() { b[3] } else { centre.y() }
+            if b.y0() <= centre.y() {
+                if b.y1() < centre.y() {
+                    b.y1()
+                } else {
+                    centre.y()
+                }
             } else {
-                b[1]
+                b.y0()
             },
         );
         let delta = FixedPoint::new(c.x().wrapping_sub(p.x()), c.y().wrapping_sub(p.y()));
@@ -519,12 +526,13 @@ const fn touches(found: Option<(i32, Hit)>) -> bool {
 /// `FUN_140fa31b0`: the point on the circle of `range` around `goal` toward `p` (the goal itself
 /// for no range).
 pub(super) fn range_point(
-    range: i32,
+    range: FixedDistance,
     p: FixedPoint,
     goal: FixedPoint,
 ) -> Result<FixedPoint, GenieError> {
     let mut out = goal;
-    if range != 0 {
+    if range != FixedDistance::ZERO {
+        let range = range.get();
         let dx = i64::from(p.x().wrapping_sub(goal.x()));
         let dy = i64::from(p.y().wrapping_sub(goal.y()));
         let len = isqrt(((dy * dy) as u64 & !0x3f_ffff).wrapping_add((dx * dx) as u64 & !0x3f_ffff))

@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
+use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::ShapeId;
 use crate::pathing::mesh::{Mesh, ONE};
@@ -46,12 +47,12 @@ impl Query {
         Fixed {
             from: self.from,
             to: self.to,
-            radius: fixed(self.radius),
+            radius: FixedDistance::new(fixed(self.radius)),
             target_size: FixedPoint::new(
                 fixed(Distance::new(self.target_size.x())),
                 fixed(Distance::new(self.target_size.y())),
             ),
-            range: fixed(self.range),
+            range: FixedDistance::new(fixed(self.range)),
             blocked: self.blocked,
         }
     }
@@ -62,10 +63,10 @@ impl Query {
 pub(super) struct Fixed {
     pub(super) from: FixedPoint,
     pub(super) to: FixedPoint,
-    pub(super) radius: i32,
+    pub(super) radius: FixedDistance,
     /// The target's half sizes, x and y.
     pub(super) target_size: FixedPoint,
-    pub(super) range: i32,
+    pub(super) range: FixedDistance,
     pub(super) blocked: u64,
 }
 
@@ -228,8 +229,9 @@ impl Pather {
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
         blocked: u64,
-        b: [i32; 4],
+        b: FixedRect,
     ) {
+        let b = b.get();
         let mut ty = tile_of(b[1]) as u32;
         let mut y1 = (ty as i32).wrapping_mul(ONE).wrapping_add(0x60_0000);
         while ty <= tile_of(b[3]) as u32 {
@@ -316,7 +318,7 @@ impl Pather {
         if self.ignore.len() < mesh.shapes.len() {
             self.ignore.resize(mesh.shapes.len(), false);
         }
-        let r = q.radius;
+        let r = q.radius.get();
         let d = 0x20_0000 - r;
         let w = mesh.width as i32;
         let cap = w.wrapping_mul(ONE) - 1 - r;
@@ -336,30 +338,30 @@ impl Pather {
                 r
             }
         };
-        let bounds = [
+        let bounds = FixedRect::new(
             hold_low(if sx < gx { sx } else { gx }),
             hold_low(if sy < gy { sy } else { gy }),
             hold_high(if gx < sx { sx } else { gx }),
             hold_high(if gy < sy { sy } else { gy }),
-        ];
+        );
         self.remove_terrain(mesh);
         self.add_terrain(mesh, words, q.blocked, bounds);
         let goal = Goal {
             at: FixedPoint::new(gx, gy),
-            r,
+            r: q.radius,
             rx: q.target_size.x(),
             ry: q.target_size.y(),
             rrx: i64::from(r.wrapping_add(q.target_size.x())),
             rry: i64::from(r.wrapping_add(q.target_size.y())),
             range: q.range,
-            range2: (i64::from(q.range) * i64::from(q.range)) >> 22,
+            range2: (i64::from(q.range.get()) * i64::from(q.range.get())) >> 22,
         };
         let ignore = self.ignore.clone();
         let mut s = Search {
             ctx: Ctx {
                 mesh,
                 ignore: &ignore,
-                d,
+                d: FixedDistance::new(d),
             },
             goal,
             bounds,
@@ -382,7 +384,7 @@ impl Pather {
         words: &dyn Fn(u32, u32) -> u64,
         q: &Fixed,
     ) -> Result<ShortPath, GenieError> {
-        let r = q.radius;
+        let r = q.radius.get();
         let d = 0x20_0000 - r;
         let w = mesh.width as i32;
         let cap = w.wrapping_mul(ONE) - 1 - r;
@@ -402,20 +404,20 @@ impl Pather {
                 r
             }
         };
-        let bounds = [
+        let bounds = FixedRect::new(
             hold_low(if sx < gx { sx } else { gx }),
             hold_low(if sy < gy { sy } else { gy }),
             hold_high(if gx < sx { sx } else { gx }),
             hold_high(if gy < sy { sy } else { gy }),
-        ];
+        );
         let invalid = ShortPath {
             result: 4,
             points: Vec::new(),
         };
-        if sx < bounds[0] || sy < bounds[1] || bounds[2] < sx || bounds[3] < sy {
+        if sx < bounds.x0() || sy < bounds.y0() || bounds.x1() < sx || bounds.y1() < sy {
             return Ok(invalid);
         }
-        if gx < bounds[0] || gy < bounds[1] || bounds[2] < gx || bounds[3] < gy {
+        if gx < bounds.x0() || gy < bounds.y0() || bounds.x1() < gx || bounds.y1() < gy {
             match clip(q.from, FixedPoint::new(gx, gy), bounds) {
                 Some((_, end)) => [gx, gy] = end.get(),
                 None => return Ok(invalid),
@@ -425,20 +427,20 @@ impl Pather {
         self.add_terrain(mesh, words, q.blocked, bounds);
         let goal = Goal {
             at: FixedPoint::new(gx, gy),
-            r,
+            r: q.radius,
             rx: q.target_size.x(),
             ry: q.target_size.y(),
             rrx: i64::from(r.wrapping_add(q.target_size.x())),
             rry: i64::from(r.wrapping_add(q.target_size.y())),
             range: q.range,
-            range2: (i64::from(q.range) * i64::from(q.range)) >> 22,
+            range2: (i64::from(q.range.get()) * i64::from(q.range.get())) >> 22,
         };
         let ignore = self.ignore.clone();
         let mut s = Search {
             ctx: Ctx {
                 mesh,
                 ignore: &ignore,
-                d,
+                d: FixedDistance::new(d),
             },
             goal,
             bounds,
