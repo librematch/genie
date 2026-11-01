@@ -27,6 +27,7 @@ use crate::players::attribute::{self, AttributeId};
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
+use crate::world::slots::CheckedIndex;
 use genie_diff::Diff;
 
 mod button;
@@ -159,7 +160,7 @@ impl Queue {
     #[must_use]
     pub fn entries(&self) -> &[Entry] {
         let n = self.count.slots().min(self.slots.len());
-        &self.slots[..n]
+        self.slots.get(..n).unwrap_or_default()
     }
 
     /// The first entry, if any.
@@ -185,7 +186,7 @@ impl Queue {
         let (mut e, mut k) = (0usize, 0i32);
         for _ in 0..index.get() {
             k += 1;
-            if i32::from(entries[e].count.get()) <= k {
+            if i32::from(entries.get(e)?.count.get()) <= k {
                 e += 1;
                 k = 0;
                 if entries.len() <= e {
@@ -200,12 +201,16 @@ impl Queue {
     /// does): each later entry moves down a slot, its master, count, technology, costs and
     /// button, and its train time when `time` (`FUN_1411d61e0`'s research branch does not move
     /// it); the serials stay, and the slot of the old last entry keeps what it held.
-    pub fn close(&mut self, i: usize, time: bool) {
+    ///
+    /// # Errors
+    ///
+    /// A slot the buffer does not hold (the count past the buffer).
+    pub fn close(&mut self, i: usize, time: bool) -> Result<(), GenieError> {
         self.count = self.count.shrunk();
         let mut j = i;
         while (j as i32) < i32::from(self.count.get()) {
-            let next = self.slots[j + 1];
-            let slot = &mut self.slots[j];
+            let next = *self.slots.checked(j + 1)?;
+            let slot = self.slots.checked_mut(j)?;
             slot.master = next.master;
             slot.count = next.count;
             slot.tech = next.tech;
@@ -216,6 +221,7 @@ impl Queue {
             }
             j += 1;
         }
+        Ok(())
     }
 
     /// `FUN_1411cbc40`'s growth of a full buffer (`+0xbf0` at most `+0xbf2`): ten zeroed slots
@@ -241,40 +247,50 @@ impl Queue {
     /// master, count, technology, button and serial (`+0xcd8`, which grows), and `costs`; its
     /// train time is the caller's. The count, the total and the change counter are the
     /// caller's too. Returns the slot.
+    ///
+    /// # Errors
+    ///
+    /// A buffer without the slot after the last (not grown).
     pub fn open(
         &mut self,
         master: Option<MasterId>,
         count: QueuedUnits,
         tech: Option<TechId>,
         button: QueueButton,
-    ) -> usize {
+    ) -> Result<usize, GenieError> {
         let i = self.count.slots();
+        let slot = self.slots.checked_mut(i)?;
         let serial = self.next_serial;
         self.next_serial = serial.next();
-        let slot = &mut self.slots[i];
         slot.master = master;
         slot.count = count;
         slot.tech = tech;
         slot.button = button;
         slot.serial = serial;
         slot.costs = NO_COSTS;
-        i
+        Ok(i)
     }
 
     /// `FUN_1411e7dc0`'s release of the first entry's unit or research once its action is done
     /// or failed: its count, the total and the change counter; an emptied first entry goes
     /// ([`Queue::close`], the train times moved).
-    pub fn release_first(&mut self) {
+    ///
+    /// # Errors
+    ///
+    /// A count past the buffer.
+    pub fn release_first(&mut self) -> Result<(), GenieError> {
         if self.count == QueueLength::ZERO {
-            return;
+            return Ok(());
         }
-        let first = &mut self.slots[0];
+        let first = self.slots.checked_mut(0)?;
         first.count = first.count.minus(QueuedUnits::ONE);
+        let emptied = first.count < QueuedUnits::ONE;
         self.total = self.total.minus(QueuedUnits::ONE);
         self.changes = self.changes.bumped();
-        if self.slots[0].count < QueuedUnits::ONE {
-            self.close(0, true);
+        if emptied {
+            self.close(0, true)?;
         }
+        Ok(())
     }
 }
 
@@ -560,7 +576,7 @@ mod tests {
             unit(master_id(5), 1, 30.0),
         ]);
         q.slots[2].train_time = WholeSeconds::of_data(40);
-        q.close(0, true);
+        q.close(0, true).unwrap();
         assert_eq!(q.count.get(), 2);
         assert_eq!(
             q.slots[..3]
@@ -579,7 +595,7 @@ mod tests {
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
         q.slots[0].train_time = WholeSeconds::of_data(7);
-        q.close(0, false);
+        q.close(0, false).unwrap();
         assert_eq!(
             (q.slots[0].master, q.slots[0].train_time),
             (Some(ids::VILLAGER_MALE), WholeSeconds::of_data(7))
@@ -611,12 +627,14 @@ mod tests {
         );
         assert_eq!(q.slots[15], Entry::default());
         // a new entry takes the next serial and no costs
-        let i = q.open(
-            Some(master_id(5)),
-            QueuedUnits::of_data(2),
-            None,
-            QueueButton::of_data(3),
-        );
+        let i = q
+            .open(
+                Some(master_id(5)),
+                QueuedUnits::of_data(2),
+                None,
+                QueueButton::of_data(3),
+            )
+            .unwrap();
         assert_eq!(
             (i, q.slots[1].serial.get(), q.slots[1].costs),
             (1, 10, NO_COSTS)
@@ -630,7 +648,7 @@ mod tests {
             unit(ids::VILLAGER_MALE, 2, 50.0),
             unit(master_id(4), 1, 25.0),
         ]);
-        q.release_first();
+        q.release_first().unwrap();
         assert_eq!(
             (
                 q.count.get(),
@@ -640,7 +658,7 @@ mod tests {
             ),
             (2, 2, 1, 1)
         );
-        q.release_first();
+        q.release_first().unwrap();
         assert_eq!(
             (
                 q.count.get(),

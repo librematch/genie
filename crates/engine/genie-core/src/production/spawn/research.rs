@@ -16,6 +16,7 @@ use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
 /// A building the research step runs for, whose action is no Research.
@@ -84,7 +85,7 @@ impl World {
             ));
         }
         let owner = self.players.player(p)?;
-        let building = &owner.objects[i];
+        let building = owner.objects.checked(i)?;
         let Some(Some(Making::Research(r))) = building.production.as_ref().map(|q| q.action) else {
             return Err(NO_RESEARCH_ACTION);
         };
@@ -96,7 +97,7 @@ impl World {
         let (t, def) = self.research_tech(p, r.tech)?;
         let master = building.life.master_id;
         let rate = building.work_rate_powerup + self.master(p, master)?.work_rate;
-        let state = &owner.techs[t];
+        let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, false);
         let shared = def.kind == crate::technology::TechType::SHARED;
         let time_modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
@@ -108,7 +109,7 @@ impl World {
             ))?;
         let times = state.times_researched.get();
         let owner = self.players.player_mut(p)?;
-        let state = &mut owner.techs[t];
+        let state = owner.techs.checked_mut(t)?;
         if state.state != ResearchState::Researching && (repeatable || shared) {
             state.state = ResearchState::Researching;
         }
@@ -117,18 +118,8 @@ impl World {
             progress = Seconds::new(32767.0);
         }
         state.research_done = progress;
-        if let Some(Some(Making::Research(r))) = owner.objects[i]
-            .production
-            .as_mut()
-            .map(|q| q.action.as_mut())
-        {
-            r.progress = progress;
-        }
-        let mut time = Seconds::of_master(location.time).get();
-        if !crate::technology::is_age(r.tech) && Amount::ZERO < time_modifier {
-            time *= time_modifier.get();
-        }
-        if location.adjustment + Seconds::new(time) <= progress {
+        set_progress(owner.objects.checked_mut(i)?, progress);
+        if research_time(&location, r.tech, time_modifier) <= progress {
             if 0xff < times {
                 return Err(GenieError::unsupported(
                     "a research done 0x100 times (set_state 1)",
@@ -163,8 +154,8 @@ impl World {
         use crate::technology::Attributes;
         let (tech, t) = (t, t.index());
         let owner = self.players.player(p)?;
-        let state = &owner.techs[t];
-        let def = &self.techs[t];
+        let state = owner.techs.checked(t)?;
+        let def = self.techs.checked(t)?;
         if state.state == ResearchState::Researching || repeat {
             let mut time = def
                 .locations
@@ -228,11 +219,11 @@ impl World {
         t: usize,
     ) -> Result<(), GenieError> {
         if !r.paid {
-            let def = &self.techs[t];
+            let def = self.techs.checked(t)?;
             let owner = self.players.player_mut(p)?;
-            let mut state = std::mem::take(&mut owner.techs[t]);
+            let mut state = std::mem::take(owner.techs.checked_mut(t)?);
             let done = crate::production::refund_tech(&mut state, def, r.tech, owner);
-            owner.techs[t] = state;
+            *owner.techs.checked_mut(t)? = state;
             let _ = done?;
         }
         let building = self.players.live_mut(p, i)?;
@@ -273,11 +264,11 @@ impl World {
         if r.state != MakeTechState::Done && self.game_state == crate::world::PlayState::PLAYING {
             self.research_failed(p, i, r, t)?;
         }
-        let def = &self.techs[t];
+        let def = self.techs.checked(t)?;
         let owner = self.players.player(p)?;
-        let state = &owner.techs[t];
+        let state = owner.techs.checked(t)?;
         if def.kind == crate::technology::TechType::SHARED {
-            let state = &mut self.players.player_mut(p)?.techs[t];
+            let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
             state.state = ResearchState::Available;
             state.times_researched = crate::technology::ResearchCount::ZERO;
             state.pending = crate::technology::ResearchCount::ZERO;
@@ -288,7 +279,7 @@ impl World {
             return Ok(());
         }
         let once = !state.allow_multiple || def.upgrades();
-        let master = owner.objects[i].life.master_id;
+        let master = owner.objects.checked(i)?.life.master_id;
         let mut time = def
             .locations
             .iter()
@@ -302,7 +293,7 @@ impl World {
             time *= modifier.get();
         }
         let done = adjustment + Seconds::new(time) <= r.progress;
-        let state = &mut self.players.player_mut(p)?.techs[t];
+        let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
         state.research_done = r.progress;
         if done {
             state.times_researched = state.times_researched.plus(1);
@@ -317,4 +308,27 @@ impl World {
         }
         Ok(())
     }
+}
+
+/// The research action of `building` takes the progress `progress`.
+fn set_progress(building: &mut crate::objects::unit::Unit, progress: Seconds) {
+    if let Some(Some(Making::Research(r))) = building.production.as_mut().map(|q| q.action.as_mut())
+    {
+        r.progress = progress;
+    }
+}
+
+/// The progress a research of `tech` at `location` is done at: the location's time, times the
+/// research time modifier `time_modifier` (attribute 86, above 0 and not an age), plus its
+/// adjustment.
+fn research_time(
+    location: &crate::technology::Location,
+    tech: TechId,
+    time_modifier: Amount,
+) -> Seconds {
+    let mut time = Seconds::of_master(location.time).get();
+    if !crate::technology::is_age(tech) && Amount::ZERO < time_modifier {
+        time *= time_modifier.get();
+    }
+    location.adjustment + Seconds::new(time)
 }

@@ -201,7 +201,7 @@ impl World {
         queue.total = queue.total.minus(QueuedUnits::ONE);
         queue.changes = queue.changes.bumped();
         if queue.slots.checked(e)?.count < QueuedUnits::ONE {
-            queue.close(e, true);
+            queue.close(e, true)?;
         }
         if index == UnitIndex::FIRST {
             self.end_production_action(p, idx)?;
@@ -391,7 +391,7 @@ impl World {
             && i == 0
             && villager(queue.slots.checked(0)?.master)
             && queue.slots.get(1).is_some_and(|s| villager(s.master));
-        queue.close(i, tech.is_none());
+        queue.close(i, tech.is_none())?;
         if i != 0 {
             return Ok(());
         }

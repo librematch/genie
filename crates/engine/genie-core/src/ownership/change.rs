@@ -63,7 +63,7 @@ impl World {
             && unit
                 .construction
                 .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
-        self.players[0].objects.push(unit);
+        self.players.player_mut(PlayerId::GAIA)?.objects.push(unit);
         self.track_remove(q, id, master_id)?;
         self.track_add(PlayerId::GAIA, id, master_id)?;
         if built {
@@ -118,11 +118,8 @@ impl World {
         let Some(crate::orders::Place::Live(_, idx)) = self.place(id) else {
             return Err(crate::ownership::capture::HANDS_LEFT);
         };
-        let u = &self.players.player(old)?.objects[idx];
-        let master = match u.own_master.as_deref() {
-            Some(m) => m.clone(),
-            None => u.master(&self.masters, old)?.clone(),
-        };
+        let u = self.players.player(old)?.objects.checked(idx)?;
+        let master = u.master(&self.masters, old)?.clone();
         let (state, held, amount) = (u.life.state, u.life.attribute_type, u.life.amount);
         let built = u
             .construction
@@ -403,16 +400,16 @@ impl World {
             if let Some(kind) = kind
                 && matches!(flag, 2 | 16 | 32)
             {
-                self.players[old.index()].add_attribute(kind, -amount)?;
+                self.players.player_mut(old)?.add_attribute(kind, -amount)?;
             }
         }
-        count_class(&mut self.players[old.index()].attributes, m, -1.0);
-        count_class(&mut self.players[new.index()].attributes, m, 1.0);
+        count_class(&mut self.players.player_mut(old)?.attributes, m, -1.0);
+        count_class(&mut self.players.player_mut(new)?.attributes, m, 1.0);
         for &(kind, amount, flag) in &m.storage {
             if let Some(kind) = kind
                 && matches!(flag, 1 | 2 | 32)
             {
-                self.players[new.index()].add_attribute(kind, amount)?;
+                self.players.player_mut(new)?.add_attribute(kind, amount)?;
             }
         }
         Ok(())

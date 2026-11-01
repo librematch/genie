@@ -107,8 +107,9 @@ impl World {
         // its queue place goes (FUN_14104fb00 with -1, FUN_14104f330)
         owner.tracker.count_queued(QueuedUnits::ONE.negated());
         owner.tracker.unplace(Some(master), class);
-        let (building_id, state) = (owner.objects[i].id, owner.objects[i].life.state);
-        if let Some(ai) = owner.objects[i].ai.as_mut() {
+        let building = owner.objects.checked_mut(i)?;
+        let (building_id, state) = (building.id, building.life.state);
+        if let Some(ai) = building.ai.as_mut() {
             ai.post(
                 Notify::own(
                     building_id,

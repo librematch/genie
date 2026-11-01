@@ -114,11 +114,11 @@ pub fn refund_tech(
         // costs above 0.
         attributes.get(attribute::RESEARCH_COST_MODIFIER)?.get()
     };
-    for (j, c) in def.costs.iter().enumerate() {
+    for (c, adj) in def.costs.iter().zip(&state.cost_adj) {
         let Some(attribute) = c.attribute.filter(|_| c.paid.is_paid()) else {
             continue;
         };
-        let mut v = (i32::from(state.cost_adj[j].get()) + i32::from(c.amount.get())) as f32;
+        let mut v = (i32::from(adj.get()) + i32::from(c.amount.get())) as f32;
         if 0.0 < modifier {
             v = f32::from(cvttss2si(v * modifier) as i16);
         }

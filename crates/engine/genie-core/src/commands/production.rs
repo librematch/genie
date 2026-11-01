@@ -493,7 +493,7 @@ impl World {
         if let Some(refill) = refill {
             queue.grow(&refill);
         }
-        let k = queue.open(master, n, tech, button);
+        let k = queue.open(master, n, tech, button)?;
         let slot = queue.slots.checked_mut(k)?;
         slot.costs = costs;
         if let Some(time) = time {

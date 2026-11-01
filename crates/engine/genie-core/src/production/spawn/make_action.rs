@@ -21,6 +21,7 @@ use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
 /// A queue that is enabled and counts an entry, but holds none.
@@ -135,7 +136,7 @@ impl World {
             self.players.player_mut(p)?.add_attribute(QUEUED, -pop)?;
         }
         if let Some(production) = self.players.live_mut(p, i)?.production.as_mut() {
-            production.queue.release_first();
+            production.queue.release_first()?;
         }
         Ok(())
     }
@@ -248,18 +249,24 @@ impl World {
         let owner = self.players.player(p)?;
         let get = |k: AttributeId| owner.get(k);
         let factors = crate::technology::factors(r.tech, &get)?;
-        let paid = owner.objects[i]
+        let paid = owner
+            .objects
+            .checked(i)?
             .production
             .as_ref()
             .and_then(|q| q.queue.first())
             .map_or(crate::production::NO_COSTS, |e| e.costs);
-        if !owner.techs[t].start_test(def, factors, &paid, &get)? {
+        if !owner
+            .techs
+            .checked(t)?
+            .start_test(def, factors, &paid, &get)?
+        {
             return Err(GenieError::unsupported(
                 "a research whose start test fails (its refund)",
             ));
         }
-        let master = owner.objects[i].life.master_id;
-        let state = &mut self.players.player_mut(p)?.techs[t];
+        let master = owner.objects.checked(i)?.life.master_id;
+        let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
         state.state = ResearchState::Researching;
         state.building_master = Some(master);
         r.state = MakeTechState::Researching;
