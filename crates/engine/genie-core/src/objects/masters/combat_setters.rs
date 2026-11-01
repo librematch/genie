@@ -4,6 +4,7 @@ use crate::combat::missile::{SmartMode, VanishMode};
 use crate::map::Distance;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::CombatAbility;
+use crate::objects::masters::DamageShare;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::{
@@ -43,7 +44,7 @@ impl Master {
             a::TERRAIN_DEFENSE_BONUS => self.terrain_bonus = RestrictionField::of_data(low16(v)),
             a::MINIMUM_RANGE => self.min_range = Distance::new(v),
             a::BLAST_WIDTH => self.area_effect = Distance::new(v),
-            a::BONUS_DAMAGE_RESISTANCE => self.resistance = v,
+            a::BONUS_DAMAGE_RESISTANCE => self.resistance = DamageShare::new(v),
             a::FRAME_DELAY => self.fire_frame = low16(v),
             a::BLAST_ATTACK_LEVEL => self.blast_level = BlastLevel::from_bits_retain(low8(v)),
             a::SHOWN_ATTACK => self.shown.attack = low16(v),
@@ -52,9 +53,9 @@ impl Master {
             a::COMBAT_ABILITY => self.combat_ability = CombatAbility::from_bits_retain(low8(v)),
             a::ATTACK_DISPERSION => self.missed_spread = v,
             a::ATTACK_GRAPHIC => set_sprite(&mut self.attack_sprite, cvttss2si(v), world),
-            a::AREA_DAMAGE => self.area_damage = v,
-            a::DAMAGE_REFLECTION => self.reflection = v,
-            a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire = v,
+            a::AREA_DAMAGE => self.area_damage = DamageShare::new(v),
+            a::DAMAGE_REFLECTION => self.reflection = DamageShare::new(v),
+            a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire = DamageShare::new(v),
             a::GARRISON_FIREPOWER => self.garrison_firepower = v,
             a::DISPLACEMENT_X => self.weapon_offset = self.weapon_offset.with_x(v),
             a::DISPLACEMENT_Y => self.weapon_offset = self.weapon_offset.with_y(v),
@@ -117,7 +118,7 @@ impl Master {
             }
             a::MINIMUM_RANGE => self.min_range += Distance::new(v),
             a::BLAST_WIDTH => self.area_effect += Distance::new(v),
-            a::BONUS_DAMAGE_RESISTANCE => self.resistance += v,
+            a::BONUS_DAMAGE_RESISTANCE => self.resistance += DamageShare::new(v),
             a::FRAME_DELAY => self.fire_frame = self.fire_frame.wrapping_add(low16(v)),
             a::BLAST_ATTACK_LEVEL => {
                 self.blast_level =
@@ -135,9 +136,9 @@ impl Master {
             }
             a::ATTACK_DISPERSION => self.missed_spread += v,
             a::ATTACK_GRAPHIC => add_sprite(&mut self.attack_sprite, v, world),
-            a::AREA_DAMAGE => self.area_damage += v,
-            a::DAMAGE_REFLECTION => self.reflection += v,
-            a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire += v,
+            a::AREA_DAMAGE => self.area_damage += DamageShare::new(v),
+            a::DAMAGE_REFLECTION => self.reflection += DamageShare::new(v),
+            a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire += DamageShare::new(v),
             a::GARRISON_FIREPOWER => self.garrison_firepower += v,
             a::DISPLACEMENT_X => {
                 self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() + v);

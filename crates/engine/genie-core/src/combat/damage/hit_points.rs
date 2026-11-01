@@ -32,19 +32,7 @@ pub fn shield(v: &mut Victim, missile: bool) -> bool {
 /// `FUN_141202a80`: the hit points the master's `invulnerability_level` keeps (a share of its hit
 /// points when above 0, the level itself when below), 0 for none.
 pub(super) fn hp_floor(a: &Armored, master_hp: MasterHitPoints) -> HitPoints {
-    invulnerability_floor(a.invulnerability, master_hp)
-}
-
-/// [`hp_floor`] of a master's `invulnerability_level` and hit points.
-#[must_use]
-pub(crate) fn invulnerability_floor(level: f32, master_hp: MasterHitPoints) -> HitPoints {
-    if level == 0.0 {
-        HitPoints::ZERO
-    } else if 0.0 < level {
-        HitPoints::of_master(master_hp) * level
-    } else {
-        HitPoints::new(level.abs())
-    }
+    a.invulnerability.floor(master_hp)
 }
 
 /// Slot 0xc0: the hit points with the powerups' room.

@@ -7,6 +7,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
+use crate::objects::masters::DamageShare;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
@@ -211,8 +212,8 @@ pub fn armor_damage(
                 bonused = true;
             }
         }
-        if !pierce_or_melee && a.resistance != 0.0 && 0.0 < attack - armor_f {
-            resist = 1.0 - a.resistance;
+        if !pierce_or_melee && a.resistance != DamageShare::ZERO && 0.0 < attack - armor_f {
+            resist = 1.0 - a.resistance.get();
         }
         let mut armor_f = armor_f;
         let mut below = false;

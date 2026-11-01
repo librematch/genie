@@ -309,8 +309,8 @@ impl World {
             group: crate::groups::GroupLink::default(),
             hp_powerup: HpPowerup::default(),
             regen_timer: Seconds::ZERO,
-            regen_powerup: 0.0,
-            regen_stinger: 0.0,
+            regen_powerup: crate::objects::Regeneration::ZERO,
+            regen_stinger: crate::objects::Regeneration::ZERO,
             missile: None,
             attack_count: 0,
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire

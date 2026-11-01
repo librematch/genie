@@ -8,6 +8,7 @@ use crate::movement::MoveAlgorithm;
 use crate::movement::TurnRate;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::Regeneration;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::players::CivId;
@@ -426,7 +427,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         (a::BLAST_WIDTH, |m| m.area_effect.get(), [3.0, 5.0, 10.0]),
         (
             a::BONUS_DAMAGE_RESISTANCE,
-            |m| m.resistance,
+            |m| m.resistance.get(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -461,11 +462,15 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
             |m| sprite_value(m.attack_sprite),
             [3.0, 5.0, 5.0],
         ),
-        (a::AREA_DAMAGE, |m| m.area_damage, [3.0, 5.0, 10.0]),
-        (a::DAMAGE_REFLECTION, |m| m.reflection, [3.0, 5.0, 10.0]),
+        (a::AREA_DAMAGE, |m| m.area_damage.get(), [3.0, 5.0, 10.0]),
+        (
+            a::DAMAGE_REFLECTION,
+            |m| m.reflection.get(),
+            [3.0, 5.0, 10.0],
+        ),
         (
             a::FRIENDLY_FIRE_DAMAGE,
-            |m| m.friendly_fire,
+            |m| m.friendly_fire.get(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -569,7 +574,11 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
             |m| f32::from(m.max_volley),
             [3.0, 5.0, 10.0],
         ),
-        (a::REGENERATION_RATE, |m| m.regeneration, [3.0, 5.0, 10.0]),
+        (
+            a::REGENERATION_RATE,
+            |m| m.regeneration.get(),
+            [3.0, 5.0, 10.0],
+        ),
         (
             a::MIN_CONVERSION_TIME_MODIFIER,
             |m| m.conversion.min_time,
@@ -588,7 +597,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         // 10 hit points times the amount, set then added
         (
             a::REGENERATION_HP_PERCENT,
-            |m| m.regeneration,
+            |m| m.regeneration.get(),
             [30.0, 50.0, 50.0],
         ),
         (
@@ -603,7 +612,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::INVULNERABILITY_LEVEL,
-            |m| m.invulnerability,
+            |m| m.invulnerability.get(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -1003,12 +1012,12 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
         (b.garrison_heal_rate, b.foundation_terrain),
         (HitPoints::new(3.0), Some(TerrainId::named(2)))
     );
-    assert_eq!(m.regeneration, 300.0);
+    assert_eq!(m.regeneration, Regeneration::new(300.0));
     assert_eq!(m, {
         let mut same = of_type(master_type::BUILDING);
         same.building = Some(b);
         same.hit_points = MasterHitPoints::of_data(600);
-        same.regeneration = 300.0;
+        same.regeneration = Regeneration::new(300.0);
         same
     });
 }
@@ -1214,7 +1223,7 @@ fn the_combat_master_s_own_values_change() {
             chance: 0.0
         }
     );
-    assert_eq!(m.regeneration, 30.0);
+    assert_eq!(m.regeneration, Regeneration::new(30.0));
     assert_eq!(
         (m.volley_fire, m.max_volley, m.attack_sprite2),
         (2.0, 0, Some(SpriteId::named(12)))

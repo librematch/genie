@@ -758,7 +758,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
         armored: Some(damage::Armored {
             armors: vec![ClassAmount::new(4, 0)],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: 1.0,
+            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
             ..damage::Armored::default()
         }),
         building: Some(building),
@@ -911,7 +911,7 @@ fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
                 player: PlayerId::new(1),
                 area_effect: Distance::new(1.0),
                 blast_level: BlastLevel::from_bits_retain(2),
-                area_damage: 0.5,
+                area_damage: crate::objects::masters::DamageShare::new(0.5),
                 ..damage::Attacker::default()
             },
             ..soldier()

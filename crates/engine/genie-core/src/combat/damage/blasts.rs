@@ -309,10 +309,18 @@ pub(super) fn ledger_values(
     match ledger {
         Some(k) if k != i => {
             let m = &*targets[k];
-            (m.source.area_damage, m.blast_defense, taken(m))
+            (m.source.area_damage.get(), m.blast_defense, taken(m))
         }
-        Some(_) => (a.area_damage, targets[i].blast_defense, taken(&*targets[i])),
-        None => (a.area_damage, targets[i].blast_defense, HitPoints::ZERO),
+        Some(_) => (
+            a.area_damage.get(),
+            targets[i].blast_defense,
+            taken(&*targets[i]),
+        ),
+        None => (
+            a.area_damage.get(),
+            targets[i].blast_defense,
+            HitPoints::ZERO,
+        ),
     }
 }
 
@@ -357,7 +365,7 @@ pub(super) fn blast_falloff(
 ) -> f32 {
     let mut f = elevation_factor(attacker.position.z(), attacker.attack_elevation, t);
     if COMBAT <= t.kind && (t.player == attacker.player || t.allied.by_target) {
-        f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire);
+        f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire.get());
     }
     if a.missile.is_none() {
         if a.blast_level.contains(BlastLevel::FALLS_OFF) && !is_main {

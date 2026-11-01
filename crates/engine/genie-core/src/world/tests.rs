@@ -3825,8 +3825,11 @@ fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
         for masters in &mut t.masters {
             for id in [83, 118, 120] {
                 if let Some(m) = masters.get_mut(master_id(id)) {
-                    (m.kind, m.hit_points, m.regeneration) =
-                        (master_type::COMBAT, MasterHitPoints::of_data(25), 20.0);
+                    (m.kind, m.hit_points, m.regeneration) = (
+                        master_type::COMBAT,
+                        MasterHitPoints::of_data(25),
+                        crate::objects::Regeneration::new(20.0),
+                    );
                 }
             }
         }
@@ -13020,7 +13023,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         hit_points: MasterHitPoints::of_data(45),
         weapons: vec![ClassAmount::new(4, 100)],
         area_effect: Distance::new(2.0),
-        area_damage: 1.0,
+        area_damage: crate::objects::masters::DamageShare::new(1.0),
         missile: MasterField::NONE,
         death_sprite: Some(SpriteId::named(1751)),
         ..Master::default()
@@ -13493,7 +13496,7 @@ fn a_unit_regenerated_to_its_most_has_its_armor_back() {
         id: master_id(692),
         kind: master_type::COMBAT,
         hit_points: MasterHitPoints::of_data(54),
-        regeneration: 20.0,
+        regeneration: crate::objects::Regeneration::new(20.0),
         ..Master::default()
     };
     let unit = |hp| Unit {
@@ -13533,7 +13536,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         id: master_id(692),
         kind: master_type::COMBAT,
         hit_points: MasterHitPoints::of_data(54),
-        regeneration: 20.0,
+        regeneration: crate::objects::Regeneration::new(20.0),
         ..Master::default()
     };
     let unit = |hp| Unit {
@@ -13570,18 +13573,24 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..berserk.clone()
     };
     let mut powered = unit(HitPoints::new(10.0));
-    powered.regen_powerup = 5.0;
-    powered.regen_stinger = 5.0;
-    assert_eq!(regeneration_rate(&hero, &powered), 60.0);
+    powered.regen_powerup = crate::objects::Regeneration::new(5.0);
+    powered.regen_stinger = crate::objects::Regeneration::new(5.0);
+    assert_eq!(
+        regeneration_rate(&hero, &powered),
+        crate::objects::Regeneration::new(60.0)
+    );
     let not_hero = Master {
         hero_flag: HeroFlags::REGENERATES | HeroFlags::INVERTED,
         ..berserk.clone()
     };
-    assert_eq!(regeneration_rate(&not_hero, &powered), 30.0);
+    assert_eq!(
+        regeneration_rate(&not_hero, &powered),
+        crate::objects::Regeneration::new(30.0)
+    );
     // a gate of Aftermath's: -1000 a minute takes 1 hit point per 0.06 s, at most what it has
     let gate = Master {
         hit_points: MasterHitPoints::of_data(1650),
-        regeneration: -1000.0,
+        regeneration: crate::objects::Regeneration::new(-1000.0),
         kind: BUILDING,
         ..Master::default()
     };

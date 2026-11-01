@@ -113,12 +113,12 @@ pub struct Unit {
     /// ([`regeneration_rate`]).
     ///
     /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
-    pub regen_powerup: f32,
+    pub regen_powerup: crate::objects::Regeneration,
     /// `mRegenerationStinger` (`+0xb3c`), which the regeneration rate adds last
     /// ([`regeneration_rate`]).
     ///
     /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
-    pub regen_stinger: f32,
+    pub regen_stinger: crate::objects::Regeneration,
     /// A missile's own part with its action ([`crate::combat::missile`]).
     pub missile: Option<crate::combat::missile::Missile>,
     /// `+0x900`, `attack_count`: the swings that fired a missile (`FUN_141081020`); a missile's

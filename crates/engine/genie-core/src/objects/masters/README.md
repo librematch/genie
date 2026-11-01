@@ -46,6 +46,7 @@ file for what the save does not hold.
 | [`conversion_adjust.rs`](conversion_adjust.rs) | A master's adjustments of a conversion (`ConversionAdjust`). |
 | [`cost_slot.rs`](cost_slot.rs) | A master's cost (`+0x880`): three slots in their places, an empty one among them. |
 | [`damage_class.rs`](damage_class.rs) | An armor or attack entry's class as one type, and the entry: the `.dat`'s armor and attack classes. |
+| [`damage_share.rs`](damage_share.rs) | A master's share of a damage: resisted, reflected, dealt to its own or by its blast. |
 | [`derived.rs`](derived.rs) | The values the slice derives from a master after a change (`Master::follow`): the sprites' speed and facets, a moving unit's values. |
 | [`dispatch.rs`](dispatch.rs) | The attribute setters by master type (slots 0x18, 0x20 and 0x28), the master copy (slot 8), the loader's defaults and the selected entries. |
 | [`fly_mode.rs`](fly_mode.rs) | A master's fly mode (`+0x608`): where its objects' height goes on the ground. |
@@ -62,6 +63,7 @@ file for what the save does not hold.
 | [`ids.rs`](ids.rs) | The master ids (`i16`, `crate::objects::masters::Master::id`): the one definition of the masters the engine names, by the `.dat`'s unit id. |
 | [`interaction_mode.rs`](interaction_mode.rs) | A master's interaction mode (`+0x62d`): how a player may select and order its objects. |
 | [`interface_kind.rs`](interface_kind.rs) | A master's interface kind (`+0x62f`): which command panel its objects show. |
+| [`invulnerability.rs`](invulnerability.rs) | A master's invulnerability level: the hit points a hit cannot take. |
 | [`lookup.rs`](lookup.rs) | A player's masters by id (`Masters`) and the work command's choice of master and task. |
 | [`master_id.rs`](master_id.rs) | A master's id as one type: the master a command builds, trains or turns an object into, and a target's master. |
 | [`master_kind.rs`](master_kind.rs) | A master's type as one type: the byte at `+0x8` that tells a static object from a combat unit or a building, which the `.dat` names `unit_type`. |

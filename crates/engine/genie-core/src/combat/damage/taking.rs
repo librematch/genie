@@ -406,8 +406,8 @@ pub(super) fn after_hit(
         t.hp = before - HitPoints::new(1.0);
         lost = HitPoints::new(1.0);
     }
-    if EPSILON < a.reflection {
-        let d = a.reflection * lost;
+    if EPSILON < a.reflection.get() {
+        let d = a.reflection.get() * lost;
         lose(
             src,
             if HitPoints::new(1.0) <= d {

@@ -5,10 +5,12 @@ use crate::combat::Charge;
 use crate::combat::ChargeRate;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
+use crate::objects::Regeneration;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::FormationClass;
+use crate::objects::masters::InvulnerabilityLevel;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::SpecialAttack;
@@ -76,7 +78,7 @@ impl Master {
             }
             a::TOTAL_MISSILES => self.volley_fire = v,
             a::MAXIMUM_TOTAL_MISSILES => self.max_volley = low8(v),
-            a::REGENERATION_RATE => self.regeneration = v,
+            a::REGENERATION_RATE => self.regeneration = Regeneration::new(v),
             a::POPULATION => {
                 // the unpaid entries take the negated amount; the storage of population (4) the
                 // amount, of resources 11 and 19 its negation
@@ -105,10 +107,11 @@ impl Master {
             }
             a::FORMATION_CATEGORY => self.formation_category = FormationClass::of_data(low8(v)),
             a::REGENERATION_HP_PERCENT => {
-                self.regeneration = HitPoints::of_master(self.hit_points).get() * v;
+                self.regeneration =
+                    Regeneration::new(HitPoints::of_master(self.hit_points).get() * v);
             }
             a::ATTACK_PRIORITY => self.attack_priority = AttackPriority::of_byte(low8(v)),
-            a::INVULNERABILITY_LEVEL => self.invulnerability = v,
+            a::INVULNERABILITY_LEVEL => self.invulnerability = InvulnerabilityLevel::new(v),
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
                 *self.volley_spread.lane_mut(attribute) = v;
             }
@@ -242,16 +245,17 @@ impl Master {
             }
             a::TOTAL_MISSILES => self.volley_fire += v,
             a::MAXIMUM_TOTAL_MISSILES => self.max_volley = self.max_volley.wrapping_add(low8(v)),
-            a::REGENERATION_RATE => self.regeneration += v,
+            a::REGENERATION_RATE => self.regeneration += Regeneration::new(v),
             a::MIN_CONVERSION_TIME_MODIFIER
             | a::MAX_CONVERSION_TIME_MODIFIER
             | a::CONVERSION_CHANCE_MODIFIER => {
                 *self.conversion.lane_mut(attribute) += v;
             }
             a::REGENERATION_HP_PERCENT => {
-                self.regeneration += HitPoints::of_master(self.hit_points).get() * v;
+                self.regeneration +=
+                    Regeneration::new(HitPoints::of_master(self.hit_points).get() * v);
             }
-            a::INVULNERABILITY_LEVEL => self.invulnerability += v,
+            a::INVULNERABILITY_LEVEL => self.invulnerability += InvulnerabilityLevel::new(v),
             // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             a::ATTACK_GRAPHIC_2 => add_sprite(&mut self.attack_sprite2, v, world),
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {

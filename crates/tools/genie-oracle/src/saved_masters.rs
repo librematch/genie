@@ -23,12 +23,14 @@ use genie_core::objects::masters::ChargeTarget;
 use genie_core::objects::masters::ChargeType;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
+use genie_core::objects::masters::DamageShare;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::FormationClass;
 use genie_core::objects::masters::GarrisonCapacity;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::HeroFlags;
 use genie_core::objects::masters::HitChance;
+use genie_core::objects::masters::InvulnerabilityLevel;
 use genie_core::objects::masters::MasterField;
 use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::SoundEvents;
@@ -255,7 +257,7 @@ pub(super) fn work_masters(
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);
             work.volley_missile = id(c.volley_missile_id);
             work.charge_projectile = id(c.charge_projectile_unit);
-            work.invulnerability = c.invulnerability_level;
+            work.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
             work.attack_priority =
                 genie_core::objects::masters::AttackPriority::of_byte(c.attack_priority);
             work.special_attack = SpecialAttack::of_data(c.special_attack_flag);
@@ -292,13 +294,13 @@ pub(super) fn work_masters(
                 .iter()
                 .map(|&a| ClassAmount::new((a & 0xffff) as i16, (a >> 16) as i16))
                 .collect();
-            work.resistance = rc.bonus_damage_resistance;
+            work.resistance = DamageShare::new(rc.bonus_damage_resistance);
             work.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
-            work.reflection = rc.damage_reflection;
-            work.friendly_fire = rc.friendly_fire_damage;
+            work.reflection = DamageShare::new(rc.damage_reflection);
+            work.friendly_fire = DamageShare::new(rc.friendly_fire_damage);
             work.area_effect = Distance::new(rc.area_effect_range);
             work.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
-            work.area_damage = rc.area_damage;
+            work.area_damage = DamageShare::new(rc.area_damage);
             work.garrison_firepower = rc.garrison_firepower;
         }
         work.storage = s

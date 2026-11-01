@@ -16,6 +16,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::HpPowerup;
 use genie_core::objects::MasterHitPoints;
 use genie_core::objects::ObjectId;
+use genie_core::objects::Regeneration;
 use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
 use genie_core::objects::lifecycle::Lifecycle;
@@ -115,8 +116,10 @@ pub(super) fn unit(
             .combat()
             .filter(|_| object.tribe_building_object.is_none())
             .map_or(0, |c| c.num_builders),
-        regen_powerup: object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
-        regen_stinger: object.combat().map_or(0.0, |c| c.regeneration_stinger),
+        regen_powerup: Regeneration::new(
+            object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
+        ),
+        regen_stinger: Regeneration::new(object.combat().map_or(0.0, |c| c.regeneration_stinger)),
         workers: s.worker_num,
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
         town_bell,

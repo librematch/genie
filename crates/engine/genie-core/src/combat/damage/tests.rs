@@ -81,7 +81,7 @@ fn sheep() -> Victim {
                 ClassAmount::new(31, 0),
             ],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: 1.0,
+            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
             ..Armored::default()
         }),
         ..Victim::default()
@@ -116,7 +116,7 @@ fn hunter() -> Victim {
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: 1.0,
+            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
             ..Armored::default()
         }),
         ..Victim::default()
@@ -799,7 +799,7 @@ fn a_retaliation_strikes_the_melee_attacker_first() {
 #[test]
 fn reflected_damage_comes_back_at_least_one() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
-    sheep.armored.as_mut().unwrap().reflection = 0.5;
+    sheep.armored.as_mut().unwrap().reflection = crate::objects::masters::DamageShare::new(0.5);
     take(
         &mut sheep,
         &mut hunter,
@@ -838,7 +838,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(0x42);
-    elephant.source.area_damage = 0.5;
+    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let center = elephant.position;
     let enemy = |x: f32, y: f32| Victim {
@@ -884,7 +884,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
     assert_eq!(t.hp, HitPoints::new(9.0));
     // a NaN area damage share leaves the factor at 1
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = f32::NAN;
+    elephant.source.area_damage = crate::objects::masters::DamageShare::new(f32::NAN);
     let mut t = enemy(10.8, 11.0);
     assert_eq!(
         blast(&mut elephant, center, None, None, &mut [&mut t], 1.0),
@@ -920,7 +920,7 @@ fn a_blast_reaches_the_objects_about_its_attacker() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = 0.5;
+    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
     elephant.source.player = PlayerId::new(1);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let enemy = |id: i32, x: f32| Victim {
@@ -987,7 +987,7 @@ fn house() -> Victim {
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 7)],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: 1.0,
+            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
             ..Armored::default()
         }),
         building: Some(Building {
@@ -1427,7 +1427,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
     let mut mangonel = hunter();
     mangonel.source.area_effect = Distance::new(2.0);
     mangonel.source.blast_level = BlastLevel::from_bits_retain(2);
-    mangonel.source.area_damage = 0.5;
+    mangonel.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
     mangonel.weapons = vec![ClassAmount::new(4, 10)];
     mangonel.position = Position::new(10.5, 10.5, 0.0);
     let center = mangonel.position;
@@ -1444,7 +1444,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
         }),
         ..house()
     };
-    main.source.area_damage = 0.0;
+    main.source.area_damage = crate::objects::masters::DamageShare::new(0.0);
     let mut annex = Victim {
         id: object_id(21),
         hp: HitPoints::new(100.0),
@@ -1485,7 +1485,7 @@ fn a_blast_walks_a_tile_s_objects_in_its_list_order() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = 0.5;
+    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
     elephant.source.player = PlayerId::new(1);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let enemy = |id: i32, x: f32, y: f32, tile_place| Victim {
@@ -1623,7 +1623,7 @@ fn a_heal_to_full_holds_the_master_s_hit_points() {
 fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
     use crate::combat::damage::blasts::{blast_ledger, ledger_values};
     let mut main = house();
-    main.source.area_damage = 0.25;
+    main.source.area_damage = crate::objects::masters::DamageShare::new(0.25);
     main.blast_defense = BlastDefense::new(3);
     main.building.as_mut().unwrap().blast_taken = HitPoints::new(7.0);
     let mut annex = Victim {
@@ -1641,7 +1641,7 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
     assert_eq!(blast_ledger(&all, 1), Ok(Some(0)));
     assert_eq!(blast_ledger(&all, 2), Ok(None));
     let a = Attacker {
-        area_damage: 0.5,
+        area_damage: crate::objects::masters::DamageShare::new(0.5),
         ..Attacker::default()
     };
     assert_eq!(
@@ -1749,7 +1749,7 @@ fn a_blast_s_factor_takes_the_friendly_fire_and_the_falloff() {
         0.5
     );
     enemy.player = PlayerId::new(1);
-    enemy.armored.as_mut().unwrap().friendly_fire = 0.25;
+    enemy.armored.as_mut().unwrap().friendly_fire = crate::objects::masters::DamageShare::new(0.25);
     assert_eq!(
         blast_falloff(&attacker, &melee, &enemy, (1.0, d2), false),
         0.25
@@ -1925,7 +1925,7 @@ fn a_blast_passes_over_what_it_spares_and_hits_the_rest() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = 0.5;
+    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
     let center = elephant.position;
     let blast = |a: Attacker| Blast {
         a,

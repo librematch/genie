@@ -8,6 +8,7 @@ use crate::combat::damage::ArmorPair;
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
+use crate::objects::Regeneration;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
@@ -17,7 +18,8 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 /// A hero's regeneration (`DAT_142ed06a8`, a minute's hit points).
-pub(crate) const HERO_REGENERATION: f32 = crate::math::image::turn::HERO_REGENERATION;
+pub(crate) const HERO_REGENERATION: Regeneration =
+    Regeneration::new(crate::math::image::turn::HERO_REGENERATION);
 /// The regeneration's minute (`DAT_14330ebc8`).
 pub(crate) const REGENERATION_MINUTE: f32 = crate::math::image::turn::REGENERATION_MINUTE;
 /// The size below which a rate or a period is none (`DAT_142f49458`).
@@ -75,9 +77,13 @@ impl HpPowerup {
 /// assembly's order. A hero is a master whose `hero_flag` (`+0x8d9`) grants
 /// [`HeroFlags::REGENERATES`].
 #[must_use]
-pub(crate) fn regeneration_rate(master: &Master, unit: &Unit) -> f32 {
+pub(crate) fn regeneration_rate(master: &Master, unit: &Unit) -> Regeneration {
     let hero = master.hero_flag.grants(HeroFlags::REGENERATES);
-    let bonus = if hero { HERO_REGENERATION } else { 0.0 };
+    let bonus = if hero {
+        HERO_REGENERATION
+    } else {
+        Regeneration::ZERO
+    };
     unit.regen_stinger + (unit.regen_powerup + (bonus + master.regeneration))
 }
 
@@ -134,8 +140,7 @@ impl Unit {
         let Some(d) = self.hp_powerup.absorb(d) else {
             return;
         };
-        let floor =
-            crate::combat::damage::invulnerability_floor(master.invulnerability, master.hit_points);
+        let floor = master.invulnerability.floor(master.hit_points);
         let left = self.life.hp - d;
         self.life.hp = if floor == HitPoints::ZERO || floor <= left {
             left
@@ -158,7 +163,7 @@ impl Unit {
     /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed).
     pub(crate) fn regenerate(&mut self, master: &Master, dt_seconds: Seconds) {
         use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-        let rate = regeneration_rate(master, self);
+        let rate = regeneration_rate(master, self).get();
         if below_or_unordered(self.life.hp.get(), REGENERATION_LEAST_HP)
             || self.life.state != ObjectState::Alive
         {

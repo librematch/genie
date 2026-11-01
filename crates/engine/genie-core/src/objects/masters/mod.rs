@@ -352,20 +352,20 @@ pub struct Master {
     /// Its armor classes (class, amount; `+0x808`, count `+0x802`).
     pub armors: Vec<ClassAmount>,
     /// `bonus_damage_resistance` (`+0x824`).
-    pub resistance: f32,
+    pub resistance: DamageShare,
     /// `combat_ability` (`+0x840`).
     pub combat_ability: CombatAbility,
     /// `damage_reflection` (`+0x864`).
-    pub reflection: f32,
+    pub reflection: DamageShare,
     /// `invulnerability_level` (`+0x930`): a hit point floor.
-    pub invulnerability: f32,
+    pub invulnerability: InvulnerabilityLevel,
     /// `attack_priority` (`+0x92c`, `FUN_141202220`): 3 attacks only the classes of
     /// `FUN_140fddf10`.
     pub attack_priority: AttackPriority,
     /// `special_attack_flag` (`+0x8d8`).
     pub special_attack: SpecialAttack,
     /// `friendly_fire_damage` (`+0x868`).
-    pub friendly_fire: f32,
+    pub friendly_fire: DamageShare,
     /// It has a special graphic (`+0x8e8`).
     pub special_graphic: bool,
     /// The special graphic's sprite (the `.dat`'s `special_graphic`), −1 for none: a herder
@@ -378,7 +378,7 @@ pub struct Master {
     /// `area_effect_level` (`+0x830`).
     pub blast_level: BlastLevel,
     /// `area_damage` (`+0x834`).
-    pub area_damage: f32,
+    pub area_damage: DamageShare,
     /// `max_charge` (`+0x918`).
     pub max_charge: Charge,
     /// `charge_target` (`+0x924`).
@@ -517,7 +517,7 @@ pub struct Master {
     /// change.
     pub train_location_entry: i16,
     /// `+0x8b4`, `regeneration_rate`.
-    pub regeneration: f32,
+    pub regeneration: crate::objects::Regeneration,
     /// `+0x91c`, `mRechargeRate`.
     pub recharge_rate: ChargeRate,
     /// `+0x920`, `mChargeEvent`.
@@ -615,6 +615,7 @@ mod class_id;
 mod class_mask;
 mod combat_ability;
 mod damage_class;
+mod damage_share;
 mod fly_mode;
 mod fog_visibility;
 mod formation_class;
@@ -629,6 +630,7 @@ mod id_field;
 pub mod ids;
 mod interaction_mode;
 mod interface_kind;
+mod invulnerability;
 mod master_id;
 mod master_kind;
 pub mod master_type;
@@ -661,6 +663,7 @@ pub use self::class_mask::ClassMask;
 pub use self::combat_ability::CombatAbility;
 pub use self::conversion_adjust::ConversionAdjust;
 pub use self::damage_class::{ClassAmount, DamageClass};
+pub use self::damage_share::DamageShare;
 pub use self::fly_mode::FlyMode;
 pub use self::fog_visibility::FogVisibility;
 pub use self::formation_class::FormationClass;
@@ -674,6 +677,7 @@ pub use self::hit_chance::HitChance;
 pub use self::id_field::{MasterField, RestrictionField};
 pub use self::interaction_mode::InteractionMode;
 pub use self::interface_kind::InterfaceKind;
+pub use self::invulnerability::InvulnerabilityLevel;
 pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
 pub use self::minimap_mode::MinimapMode;

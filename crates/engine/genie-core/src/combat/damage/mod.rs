@@ -35,7 +35,6 @@ pub use self::hit_factors::{
     range_charge_hit,
 };
 use self::hit_factors::{charge_damage, special_charge_ready};
-pub(crate) use self::hit_points::invulnerability_floor;
 use self::hit_points::{effective, hp_floor};
 pub use self::hit_points::{gain_hp, heal_hp, lose, shield};
 pub use self::shown_values::{
@@ -309,17 +308,17 @@ pub struct Armored {
     /// Its master's `defense_terrain_bonus`.
     pub terrain_bonus: crate::objects::masters::RestrictionField,
     /// Its master's `bonus_damage_resistance`.
-    pub resistance: f32,
+    pub resistance: crate::objects::masters::DamageShare,
     /// Its master's `combat_ability`.
     pub ability: CombatAbility,
     /// Its master's `damage_reflection`.
-    pub reflection: f32,
+    pub reflection: crate::objects::masters::DamageShare,
     /// Its master's `invulnerability_level`.
-    pub invulnerability: f32,
+    pub invulnerability: crate::objects::masters::InvulnerabilityLevel,
     /// Its master's `special_attack_flag`.
     pub special_attack: SpecialAttack,
     /// Its master's `friendly_fire_damage`.
-    pub friendly_fire: f32,
+    pub friendly_fire: crate::objects::masters::DamageShare,
     /// Its master has a special graphic (`+0x8e8`), which its special attack shows.
     pub special_graphic: bool,
     /// Its terrain defense: `defense_terrain_bonus`'s restriction's value for its tile's terrain
@@ -372,7 +371,7 @@ pub struct Attacker {
     /// Its master's `area_effect_level` (`+0x830`).
     pub blast_level: BlastLevel,
     /// Its master's `area_damage` (`+0x834`).
-    pub area_damage: f32,
+    pub area_damage: crate::objects::masters::DamageShare,
     /// Its master's `charge_type`, `max_charge`, `charge_target` and `special_attack_flag`; its
     /// charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
     pub charge_type: ChargeType,
