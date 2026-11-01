@@ -285,9 +285,9 @@ impl World {
             return Ok(());
         };
         let view = GroupView {
-            computer: self
-                .players
-                .get(g.owner as usize)
+            computer: g
+                .owner
+                .and_then(|o| self.players.get(o.index()))
                 .is_some_and(|p| p.computer),
             members: g
                 .members

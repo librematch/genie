@@ -736,7 +736,7 @@ mod tests {
         s.sight = Some(v);
         t.spatial = s;
         let mut g = UnitGroup::new(group_id(1));
-        g.owner = 1;
+        g.owner = Some(PlayerId::new(1));
         g.members = vec![Member {
             id: object_id(10),
             ..Member::default()

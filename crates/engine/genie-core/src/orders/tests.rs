@@ -4132,7 +4132,7 @@ fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
     let g = &t.groups.groups[0];
     assert_eq!(
         (g.owner, g.has(object_id(11)), g.has(object_id(12))),
-        (1, true, true)
+        (Some(PlayerId::new(1)), true, true)
     );
     assert_eq!(
         (g.differentiator_id, g.current_command),

@@ -33,7 +33,7 @@ impl World {
             .groups
             .groups
             .iter()
-            .filter(|g| g.owner as usize == p.index())
+            .filter(|g| g.owner == Some(p))
             .map(|g| g.id)
             .collect();
         for id in ids {
@@ -161,7 +161,7 @@ impl World {
             let leaves = match self.world_object(id) {
                 None | Some(WorldObject::Ghost(..)) => true,
                 Some(WorldObject::Unit(p, u)) => {
-                    u.ai.is_none() || u.life.hp < HitPoints::new(1.0) || p.index() as u32 != owner
+                    u.ai.is_none() || u.life.hp < HitPoints::new(1.0) || Some(p) != owner
                 }
             };
             if leaves && self.remove_unit(group, id, None, false)? {

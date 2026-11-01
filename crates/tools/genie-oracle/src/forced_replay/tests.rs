@@ -78,7 +78,7 @@ fn groups(ids: &[i32]) -> UnitGroups {
             .iter()
             .map(|&id| UnitGroup {
                 id: crate::test_ids::group_id(id),
-                owner: 1,
+                owner: Some(PlayerId::new(1)),
                 ..UnitGroup::default()
             })
             .collect(),
@@ -112,7 +112,7 @@ fn a_group_difference_goes_with_its_owner() {
         group_owner(&turns, &game, "unit group counter slice 7 game 8"),
         0
     );
-    turns.groups.groups[0].owner = 9;
+    turns.groups.groups[0].owner = Some(PlayerId::new(9));
     assert_eq!(group_owner(&turns, &game, "group 4: x"), 0);
 }
 

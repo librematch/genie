@@ -699,7 +699,7 @@ mod tests {
         };
         t.masters = vec![Masters::new([master]); 2];
         let mut g = UnitGroup::new(group_id(1));
-        g.owner = 1;
+        g.owner = Some(PlayerId::new(1));
         g.members = vec![Member {
             id: object_id(7),
             ..Member::default()

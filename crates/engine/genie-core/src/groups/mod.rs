@@ -360,8 +360,9 @@ pub struct UnitGroup {
     pub motion: Motion,
     /// `mID` (`+0xd8`).
     pub id: GroupId,
-    /// `mOwner` (its 32 bits).
-    pub owner: u32,
+    /// `mOwner` (`+0xdc`): the player the order's handler gave the group; none for the
+    /// constructor's −1 (all 32 bits set).
+    pub owner: Option<PlayerId>,
     /// `mState`: the members' most common stance
     /// ([`crate::world::World::stances_state`]), none (−1) until
     /// a formation first locks it.
@@ -478,12 +479,12 @@ impl UnitGroup {
     ///
     /// # Errors
     ///
-    /// A group no player owns yet (the constructor's `u32::MAX`).
+    /// A group no player owns yet (the constructor's −1).
     pub(crate) fn owner_player(&self) -> Result<PlayerId, GenieError> {
-        usize::try_from(self.owner)
-            .map_err(|_| GenieError::unreachable("a group's owner past the players"))
-            .and_then(PlayerId::try_from)
-            .map_err(|e| e.with("owner", self.owner))
+        self.owner.ok_or_else(|| {
+            GenieError::unreachable("a group no player owns (the constructor's -1)")
+                .with("group", self.id)
+        })
     }
 
     /// `BUnitGroup`'s constructor (`FUN_140fe1550` after [`Motion::new`]) with id `id`
@@ -504,7 +505,7 @@ impl UnitGroup {
         Self {
             motion: Motion::new(),
             id,
-            owner: u32::MAX,
+            owner: None,
             stance: None,
             flags: GroupFlags::TURN,
             current_command: GroupCommandKind::NONE,

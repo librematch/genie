@@ -146,7 +146,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
         );
     }
     let mut g = UnitGroup::new(group_id(1));
-    g.owner = 1;
+    g.owner = Some(PlayerId::new(1));
     g.members = units
         .iter()
         .map(|&(id, ..)| crate::groups::Member {
@@ -926,7 +926,7 @@ fn type_world(paths: Vec<PathData>) -> World {
     }]);
     t.masters = vec![masters.clone(), masters];
     let mut g = UnitGroup::new(group_id(1));
-    g.owner = 1;
+    g.owner = Some(PlayerId::new(1));
     g.members = vec![crate::groups::Member {
         id: object_id(7),
         ..crate::groups::Member::default()

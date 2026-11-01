@@ -82,9 +82,9 @@ impl World {
             };
             let mut d = sub(end, g.motion.position[0]);
             d = d.with_height(0.0);
-            let formations = usize::try_from(g.owner)
-                .ok()
-                .and_then(|p| self.players.get(p))
+            let formations = g
+                .owner
+                .and_then(|o| self.players.get(o.index()))
                 .map(|p| p.formations)
                 .unwrap_or_default();
             let mut column_to_line = formations.column_to_line_distance as f32;

@@ -18,6 +18,7 @@ use genie_core::math::fmath::BVector;
 use genie_core::movement::Speed;
 use genie_core::movement::TurnRate;
 use genie_core::objects::ObjectId;
+use genie_core::players::PlayerId;
 use genie_core::unit_ai::UnitStance;
 use genie_core::world::Millis;
 use genie_core::world::Seconds;
@@ -125,7 +126,13 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
     Ok(UnitGroup {
         motion: motion(&g.motion, paths)?,
         id: GroupId::try_from(g.id)?,
-        owner: g.owner.to_bits(),
+        // the 32 bits of −1 (the constructor's) are none
+        owner: match g.owner.to_bits() {
+            u32::MAX => None,
+            bits => Some(u8::try_from(bits).map(PlayerId::from).map_err(|_| {
+                GenieError::invalid_input("a group's owner past a byte").with("owner", bits)
+            })?),
+        },
         // −1 (the constructor's) is none
         stance: match g.state {
             -1 => None,
@@ -416,6 +423,7 @@ flat_value!(
     GroupId,
     GroupTarget,
     ActionType,
+    PlayerId,
     FormationKind,
     SlotState,
     UnitStance
@@ -589,7 +597,7 @@ mod tests {
     fn group(id: i32) -> UnitGroup {
         UnitGroup {
             id: group_id(id),
-            owner: 1,
+            owner: Some(PlayerId::new(1)),
             members: vec![Member {
                 id: object_id(31000),
                 ..Member::default()

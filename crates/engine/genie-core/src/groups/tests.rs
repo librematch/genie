@@ -255,7 +255,7 @@ fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
 #[test]
 fn a_new_group_holds_the_constructor_s_values() {
     let g = UnitGroup::new(group_id(7));
-    assert_eq!((g.id, g.owner, g.stance), (group_id(7), u32::MAX, None));
+    assert_eq!((g.id, g.owner, g.stance), (group_id(7), None, None));
     assert_eq!(
         (g.flags, g.current_command, g.differentiator_id),
         (GroupFlags::TURN, GroupCommandKind::NONE, -1)
@@ -285,8 +285,8 @@ fn a_new_group_takes_the_next_id_at_the_list_s_end() {
         counter: group_id(4),
         ..UnitGroups::default()
     };
-    assert_eq!(groups.create(2).id, group_id(4));
-    assert_eq!(groups.create(1).id, group_id(5));
+    assert_eq!(groups.create(Some(PlayerId::new(2))).id, group_id(4));
+    assert_eq!(groups.create(Some(PlayerId::new(1))).id, group_id(5));
     assert_eq!(groups.counter, group_id(6));
     assert_eq!(
         groups
@@ -294,7 +294,10 @@ fn a_new_group_takes_the_next_id_at_the_list_s_end() {
             .iter()
             .map(|g| (g.id, g.owner))
             .collect::<Vec<_>>(),
-        [(group_id(4), 2), (group_id(5), 1)]
+        [
+            (group_id(4), Some(PlayerId::new(2))),
+            (group_id(5), Some(PlayerId::new(1)))
+        ]
     );
 }
 
@@ -627,7 +630,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
     ]);
     t.masters = vec![Masters::new([]), masters.clone(), masters];
     let mut g = UnitGroup::new(group_id(1));
-    g.owner = 1;
+    g.owner = Some(PlayerId::new(1));
     g.members = members
         .iter()
         .map(|&(id, ..)| Member {

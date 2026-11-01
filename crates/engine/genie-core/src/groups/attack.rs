@@ -227,7 +227,11 @@ impl World {
         range: &mut f32,
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
-        let Some(computer) = self.players.get(g.owner as usize).map(|p| p.computer) else {
+        let Some(computer) = g
+            .owner
+            .and_then(|o| self.players.get(o.index()))
+            .map(|p| p.computer)
+        else {
             return Ok(());
         };
         let ids: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();

@@ -445,11 +445,11 @@ pub(super) fn group_owner(
             .as_ref()
             .and_then(|g| g.get(id))
             .or_else(|| turns.groups.get(id))
-            .map(|g| g.owner)
+            .and_then(|g| g.owner)
     });
     owner
-        .filter(|&o| (o as usize) < turns.players.len())
-        .unwrap_or(0)
+        .filter(|o| o.index() < turns.players.len())
+        .map_or(0, |o| u32::from(o.get()))
 }
 
 /// The game's saves parsed ahead of a forced run ([`forced_run`]): the pool's tasks put them by

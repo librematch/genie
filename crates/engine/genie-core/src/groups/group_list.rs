@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::{GroupId, UnitGroup};
 use crate::objects::{ObjectId, ObjectKey};
+use crate::players::PlayerId;
 use genie_diff::Diff;
 
 /// An object's link to its group: `mGroupID` (`+0x6d0`) and `mGroupFlag` (`+0x6d4`), -1 and -2
@@ -119,7 +120,7 @@ impl UnitGroups {
     /// constructor, `FUN_141039640`'s id, then the count and the counter up by one); its state
     /// is the constructor's ([`UnitGroup::new`]) and `owner`'s, which the order's handler sets
     /// (`+0xdc`).
-    pub fn create(&mut self, owner: u32) -> &mut UnitGroup {
+    pub fn create(&mut self, owner: Option<PlayerId>) -> &mut UnitGroup {
         let id = self.counter;
         self.counter = id.successor();
         let at = self.groups.len();

@@ -136,7 +136,7 @@ fn world() -> World {
         Tiles::new(GridSize::new(32, 32), vec![2; 32 * 32]),
     );
     let mut g = UnitGroup::new(group_id(1));
-    g.owner = 1;
+    g.owner = Some(PlayerId::new(1));
     g.flags = GroupFlags::NONE;
     g.motion.maximum_velocity_forward = Speed::new(0.9);
     g.members = [10, 11]

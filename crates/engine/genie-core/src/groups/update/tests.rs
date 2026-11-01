@@ -141,7 +141,7 @@ fn world() -> World {
         ..Member::default()
     };
     let mut g = UnitGroup::new(group_id(1));
-    g.owner = 1;
+    g.owner = Some(PlayerId::new(1));
     g.members = vec![
         member(object_id(10)),
         member(object_id(11)),
@@ -1390,7 +1390,7 @@ fn a_group_steers_its_free_members_speeds_in_their_own_update() {
         ..crate::movement::PathData::without_path()
     }];
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.owner = 9;
+    g.owner = Some(PlayerId::new(9));
     g.motion.maximum_velocity_forward = Speed::new(0.9);
     g.members[0].specific_move.reason = 1;
     g.members[1].specific_move.reason = -1;

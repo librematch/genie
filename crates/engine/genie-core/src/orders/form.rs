@@ -102,7 +102,7 @@ impl World {
         units: &[ObjectId],
         number: usize,
     ) -> Result<GroupId, GenieError> {
-        let owner = split.owner.map_or(u32::MAX, |p| p.index() as u32);
+        let owner = split.owner;
         let id = self.groups.create(owner).id;
         for &unit in units {
             let _ = self.add_to_group(id, unit)?;

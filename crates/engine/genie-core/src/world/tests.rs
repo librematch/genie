@@ -6404,7 +6404,7 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
     };
     t.groups.groups.push(crate::groups::UnitGroup {
         id: group_id(7),
-        owner: 1,
+        owner: Some(PlayerId::new(1)),
         members: vec![member(object_id(9175)), member(object_id(401))],
         ..crate::groups::UnitGroup::default()
     });
