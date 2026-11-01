@@ -213,10 +213,13 @@ impl World {
         if u.own_master.is_none() {
             u.own_master = Some(Box::new(old.clone()));
         }
-        if u.dead_master.is_none() && old.death_spawns[0].is_some() {
-            u.dead_master = dead
-                .filter(|d| crate::ownership::change::DEAD_COPY_TYPES.contains(&d.kind))
-                .map(Box::new);
+        let id = u.id;
+        if !self.parts.dead_master.contains(id)
+            && old.death_spawns[0].is_some()
+            && let Some(d) =
+                dead.filter(|d| crate::ownership::change::DEAD_COPY_TYPES.contains(&d.kind))
+        {
+            self.set_part(id, crate::world::parts::Part::DeadMaster(d))?;
         }
         Ok(())
     }

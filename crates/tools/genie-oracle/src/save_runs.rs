@@ -5,7 +5,7 @@ use crate::command_args::Frame;
 use crate::masters::{MasterTable, TerrainTable};
 use crate::{
     Decoder, Dumps, Error, SavedStep, TickReport, frames, ghost_pool_from_dump, groups,
-    inside_lists_from_dump, listed, mesh_from_dump, mesh_owners_from_dump, object_differences,
+    inside_lists_from_dump, mesh_from_dump, mesh_owners_from_dump, object_differences,
     recycle_pools_from_dump, registry_from_dump, run, slice, spatial, tile_differences,
     tile_lists_from_dump, visibility_differences, watch_at_load,
 };
@@ -80,7 +80,7 @@ fn player_differences(
         for d in tech_differences(player, &after.game, p) {
             report.differences.push((id, d));
         }
-        for d in object_differences(player.objects.iter().filter(|u| listed(u)), game) {
+        for d in object_differences(crate::object_rows(turns, p), game) {
             let object = d
                 .split(':')
                 .next()

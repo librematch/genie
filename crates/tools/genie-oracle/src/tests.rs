@@ -9,6 +9,7 @@ use genie_core::production::QueueButton;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_core::world::checkpoint::ActionTerm;
+use genie_core::world::parts::Object;
 
 /// Word 9 reads a building's production action's state over its top action's (records
 /// MarvinBlue/426048706's town centre 7150 after update 7499: its Attack in state 7 and its
@@ -120,6 +121,7 @@ fn differences_name_the_object_its_master_and_the_field() {
             HitPoints::new(1.0),
         ),
     ];
+    let (slice, game) = (slice.map(Object::from), game.map(Object::from));
     let d = object_field_differences(&slice, &game);
     let fields: Vec<(i32, i16, &str)> = d
         .iter()

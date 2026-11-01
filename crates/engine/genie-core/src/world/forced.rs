@@ -231,7 +231,7 @@ impl World {
                     continue;
                 }
                 let gone = self.swap_remove_live(p, i)?;
-                if let Err(e) = self.leave_world(p, &gone) {
+                if let Err(e) = self.leave_world(p, &gone.unit) {
                     notes.push((p, Some(id), e));
                 }
                 continue;

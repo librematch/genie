@@ -846,9 +846,9 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
             .unwrap()
     };
     let u = walked(true);
-    assert_eq!(u.body.mover().unwrap().waiting, 1);
-    assert!(!u.combat.town_bell.flag);
-    let ai = u.combat.ai.as_ref().unwrap();
+    assert_eq!(u.unit.body.mover().unwrap().waiting, 1);
+    assert!(!u.unit.combat.town_bell.flag);
+    let ai = u.unit.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (Some(OrderKind::Move), Some(ActionKind::Move), None)
@@ -856,7 +856,7 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
     assert_eq!(ai.target_point, Position::new(40.0, 80.0, 0.0));
     assert_eq!(ai.orders, []);
     assert_eq!(
-        u.actions.list.move_to().copied(),
+        u.unit.actions.list.move_to().copied(),
         Some(MoveToAction {
             sprite: None,
             state: MoveTo::Start,
@@ -869,10 +869,13 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
         })
     );
     let unloaded = walked(false);
-    assert_eq!(unloaded.combat.ai.as_ref().unwrap().orders, [queued_move()]);
     assert_eq!(
-        unloaded.actions.list.move_to().copied(),
-        u.actions.list.move_to().copied()
+        unloaded.unit.combat.ai.as_ref().unwrap().orders,
+        [queued_move()]
+    );
+    assert_eq!(
+        unloaded.unit.actions.list.move_to().copied(),
+        u.unit.actions.list.move_to().copied()
     );
 }
 

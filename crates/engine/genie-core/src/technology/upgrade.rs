@@ -1054,7 +1054,7 @@ mod tests {
             Some(MasterHitPoints::of_data(550))
         );
         assert_eq!(
-            dead.dead_master.as_deref().map(|m| m.id),
+            t.parts.dead_master.get(dead.id).map(|m| m.id),
             Some(master_id(1403))
         );
         assert_eq!(

@@ -891,9 +891,9 @@ mod tests {
                 Unit {
                     combat: crate::objects::layers::Combat {
                         ai: Some(crate::unit_ai::UnitAi::default()),
-                        ..asleep.combat
+                        ..asleep.unit.combat
                     },
-                    ..asleep
+                    ..asleep.unit
                 },
             )
             .unwrap();

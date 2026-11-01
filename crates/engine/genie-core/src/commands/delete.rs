@@ -573,8 +573,8 @@ impl World {
             }
             Place::Sleeping(p, i) => {
                 let mut woken = self.swap_remove_asleep(p, i)?;
-                woken.life.goto_sleep = false;
-                let (id, master) = (woken.id, woken.life.master_id);
+                woken.unit.life.goto_sleep = false;
+                let (id, master) = (woken.unit.id, woken.unit.life.master_id);
                 let i = self.push_live(p, woken)?;
                 // the remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
                 self.track_relist(p, id, master)?;

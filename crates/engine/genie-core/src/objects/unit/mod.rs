@@ -121,13 +121,6 @@ pub struct Unit {
         gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
     )]
     pub own_master: Option<Box<Master>>,
-    /// `+0x6b8`: the copy of its old owner's death-spawn master (`+0x5e4`) an ownership change
-    /// took ([`change_hands`]), which its death spawn makes its dead object of
-    /// (`FUN_1411a5090`); None for none.
-    ///
-    /// [`change_hands`]: crate::ownership::change::change_hands
-    #[diff(gap = "the import does not read a saved dead master")]
-    pub dead_master: Option<Box<Master>>,
 }
 
 impl Unit {

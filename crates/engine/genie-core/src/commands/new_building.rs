@@ -365,7 +365,6 @@ impl World {
             idle_variant: 0,
             roo_called: false,
             own_master: None,
-            dead_master: None,
         };
         let _ = self.push_live(player, unit)?;
         self.settle_building(player, id, &made, (position, desolid), foundation)?;

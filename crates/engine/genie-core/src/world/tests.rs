@@ -6837,7 +6837,7 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
                 attributes: vec![Amount::ZERO; 250],
                 ..Player::default()
             };
-            ally.objects.push(house);
+            ally.objects.push(house.unit);
             t.players.push(ally);
             t.reindex();
             t.masters.push(t.masters[1].clone());
@@ -9816,7 +9816,7 @@ fn a_research_s_unmodelled_parts_fail() {
         fails(&|t| {
             let tc = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
             t.players.push(Player {
-                objects: vec![tc].into(),
+                objects: vec![tc.unit].into(),
                 ..Player::default()
             });
             t.reindex();
@@ -10207,6 +10207,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
         Distance::new(6.0),
     );
     let mut u = hands_unit(21712, master_id(4));
+    let dead = crate::ownership::change::dead_master_of(&u, 0, &masters, false);
     assert_eq!(
         change_hands(
             &mut u,
@@ -10227,7 +10228,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
         )
     );
     assert_eq!(
-        u.dead_master.as_deref().map(|d| d.hit_points),
+        dead.as_ref().map(|d| d.hit_points),
         Some(MasterHitPoints::of_data(9))
     );
     assert_eq!(
@@ -10273,6 +10274,10 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     );
     let mut u = hands_unit(9520, master_id(705));
     assert_eq!(
+        crate::ownership::change::dead_master_of(&u, 1, &masters, false),
+        None
+    );
+    assert_eq!(
         change_hands(
             &mut u,
             (1, PlayerId::new(2)),
@@ -10287,7 +10292,6 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
         (own.line_of_sight, own.fog_visibility),
         (Distance::new(4.0), FogVisibility::VISIBLE_IF_ALIVE)
     );
-    assert_eq!(u.dead_master, None);
     let v = s.sight.as_ref().unwrap();
     assert_eq!(
         v.seer(object_id(9520)).map(|s| s.los),
@@ -10320,6 +10324,10 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     );
     let mut a = hands_unit(7, master_id(4));
     assert_eq!(
+        crate::ownership::change::dead_master_of(&a, 1, &masters, false),
+        None
+    );
+    assert_eq!(
         change_hands(
             &mut a,
             (1, PlayerId::new(0)),
@@ -10329,14 +10337,11 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
         ),
         Ok(true)
     );
-    assert_eq!(a.dead_master, None);
-    // a dead master it holds stays
-    let held = Box::new(Master {
-        id: master_id(3),
-        hit_points: MasterHitPoints::of_data(99),
-        ..Master::default()
-    });
-    a.dead_master = Some(held.clone());
+    // a dead master it holds stays: none is made
+    assert_eq!(
+        crate::ownership::change::dead_master_of(&a, 0, &masters, true),
+        None
+    );
     assert_eq!(
         change_hands(
             &mut a,
@@ -10347,7 +10352,6 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
         ),
         Ok(true)
     );
-    assert_eq!(a.dead_master, Some(held));
     assert_eq!(
         a.own_master.as_deref().map(|m| m.hit_points),
         Some(MasterHitPoints::of_data(35))
@@ -10776,10 +10780,7 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
         s.get(object_id(21712)).map(|p| p.player),
         Some(PlayerId::new(0))
     );
-    assert_eq!(
-        (u.own_master.is_none(), u.dead_master.is_none()),
-        (true, true)
-    );
+    assert!(u.own_master.is_none());
     assert_eq!(u.combat.ai.as_ref().unwrap().notifies.len(), 1);
     u.life.inside = Some(ContainerId::new(object_id(100)));
     assert_eq!(
@@ -12185,7 +12186,7 @@ fn only_a_static_object_let_go_by_its_last_worker_goes_to_sleep() {
     );
     let mut t = deaths_world();
     let mut tree = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
-    tree.workers = crate::objects::WorkerCount::of_data(2);
+    tree.unit.workers = crate::objects::WorkerCount::of_data(2);
     let _ = t.push_asleep(PlayerId::new(0), tree).unwrap();
     t.release(object_id(50), by).unwrap();
     let tree = &t.players[0].sleeping[ListIndex::new(0)];
@@ -19762,8 +19763,11 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     let allied = |hp: HitPoints| {
         let mut t = repairing(near);
         let mut house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
-        (house.life.hp, house.combat.armor_removed, house.workers) =
-            (hp, ArmorPair::new(3, 4), crate::objects::WorkerCount::ZERO);
+        (
+            house.unit.life.hp,
+            house.unit.combat.armor_removed,
+            house.unit.workers,
+        ) = (hp, ArmorPair::new(3, 4), crate::objects::WorkerCount::ZERO);
         let _ = t.push_live(PlayerId::new(0), house).unwrap();
         t.players[0].attributes = vec![Amount::ZERO; 300];
         t.spatial.relations = ByPlayer::new(vec![relation_row([0, 0]), relation_row([0, 0])]);

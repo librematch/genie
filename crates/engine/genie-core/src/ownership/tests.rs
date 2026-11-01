@@ -57,7 +57,8 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError>
     })?;
     Ok((
         t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
-            .unwrap(),
+            .unwrap()
+            .unit,
         released,
     ))
 }

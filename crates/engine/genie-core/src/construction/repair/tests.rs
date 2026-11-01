@@ -554,7 +554,7 @@ fn a_repair_ends_with_its_target_gone_foreign_or_dead() {
             |t| {
                 let house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
                 t.players.push(crate::world::Player {
-                    objects: vec![house].into(),
+                    objects: vec![house.unit].into(),
                     attributes: vec![Amount::ZERO; 300],
                     relations: relation_row([1, 0, 0]),
                     ..crate::world::Player::default()

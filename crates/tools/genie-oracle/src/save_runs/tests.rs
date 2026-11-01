@@ -30,7 +30,13 @@ fn same(save: &Header, turns: &World) -> SavedStep {
         objects: turns
             .players
             .iter()
-            .map(|p| p.objects.iter().filter(|u| listed(u)).cloned().collect())
+            .map(|p| {
+                p.objects
+                    .iter()
+                    .filter(|u| listed(u))
+                    .map(|u| turns.object_of(u))
+                    .collect()
+            })
             .collect(),
         ghosts: Vec::new(),
         seen: saved_sight(save).unwrap(),
@@ -78,8 +84,8 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
         object_id(7),
         GenieError::unsupported("a test's freeze"),
     ));
-    for unit in &mut after.objects[1] {
-        unit.life.hp += HitPoints::new(1.0);
+    for object in &mut after.objects[1] {
+        object.unit.life.hp += HitPoints::new(1.0);
     }
     let mut report = TickReport::default();
     compare_players(&turns, &after, Some(6), &mut report).unwrap();

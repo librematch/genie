@@ -2,6 +2,7 @@ use crate::test_ids::object_id;
 use std::num::NonZeroUsize;
 
 use genie_core::objects::unit::Unit;
+use genie_core::world::parts::Object;
 use genie_diff::Scope;
 use genie_rec::de::Op;
 
@@ -85,7 +86,10 @@ fn the_scope_widens_the_compared_fields() {
         idle_variant,
         ..Unit::default()
     };
-    let (slice, game) = ([unit(1, 1)], [unit(0, 0)]);
+    let (slice, game) = (
+        [unit(1, 1)].map(Object::from),
+        [unit(0, 0)].map(Object::from),
+    );
     let fields = |scope| -> Vec<String> {
         object_field_differences_in(&slice, &game, scope)
             .into_iter()

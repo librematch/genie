@@ -187,13 +187,20 @@ impl Unit {
                 .get(new.index())
                 .is_some_and(|m| m.get(self.life.master_id).is_some()));
         }
-        change_hands(
+        let had = c.w.parts.dead_master.contains(self.id);
+        let dead =
+            crate::ownership::change::dead_master_of(self, c.player.index(), &c.w.masters, had);
+        let changed = change_hands(
             self,
             (c.player.index(), new),
             &c.w.masters,
             &mut c.w.spatial,
             c.w.world_time,
-        )
+        )?;
+        if changed && let Some(d) = dead {
+            c.w.set_part(self.id, crate::world::parts::Part::DeadMaster(d))?;
+        }
+        Ok(changed)
     }
 }
 

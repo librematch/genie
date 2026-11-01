@@ -273,7 +273,7 @@ impl World {
             Place::Live(p, i) => self.players.live_mut(p, i)?,
             Place::Sleeping(p, i) => {
                 let woken = self.swap_remove_asleep(p, i)?;
-                let (id, master) = (woken.id, woken.life.master_id);
+                let (id, master) = (woken.unit.id, woken.unit.life.master_id);
                 let i = self.push_live(p, woken)?;
                 // the wake's remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
                 self.track_relist(p, id, master)?;

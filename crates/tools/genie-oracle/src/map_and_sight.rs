@@ -119,7 +119,7 @@ pub(super) fn tile_differences(
 ///
 /// [`forced_run`]: crate::forced_replay::forced_run
 pub(super) struct SavedStep {
-    pub(super) objects: Vec<Vec<genie_core::objects::unit::Unit>>,
+    pub(super) objects: Vec<Vec<genie_core::world::parts::Object>>,
     /// Each player's ghosts (type 25) in its list's order.
     pub(super) ghosts: Vec<Vec<genie_core::vision::ghost::Ghost>>,
     pub(super) seen: Visibility,

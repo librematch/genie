@@ -27,6 +27,7 @@ pub mod checkpoint;
 pub mod index;
 pub(crate) mod lets;
 pub(crate) mod others;
+pub mod parts;
 pub(crate) mod player;
 pub(crate) mod slots;
 pub(crate) mod step;
@@ -255,6 +256,9 @@ pub struct World {
     /// The table by id (`FUN_1415417a0`): each object's place, written by the world's list
     /// operations ([`index`]); a list changed in place indexes again ([`World::reindex`]).
     pub index: index::ObjectIndex,
+    /// The parts only some objects hold, each in a table by id ([`parts`], FD-045-D51): their
+    /// one writer the world's list operations and [`World::set_part`].
+    pub parts: parts::Parts,
     /// The updates run so far.
     pub ticks: Tick,
     /// `mNextObjectId`, the id the next new object gets.

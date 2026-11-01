@@ -19,6 +19,7 @@ use crate::objects::object_list::ObjectList;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::parts::Object;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
 
@@ -504,42 +505,56 @@ impl World {
         self.players.live_mut(p, i).ok()
     }
 
-    /// `unit` goes to the end of player `p`'s live list; returns its slot.
+    /// `object` goes to the end of player `p`'s live list, its parts into the world's tables;
+    /// returns its slot.
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn push_live(&mut self, p: PlayerId, unit: Unit) -> Result<ListIndex, GenieError> {
+    pub fn push_live(
+        &mut self,
+        p: PlayerId,
+        object: impl Into<Object>,
+    ) -> Result<ListIndex, GenieError> {
+        let Object { unit, parts } = object.into();
         let list = &mut self.players.player_mut(p)?.objects;
+        self.parts.file(unit.id, parts);
         Ok(self
             .index
             .push(list, Place::Live(p, ListIndex::new(0)), unit))
     }
 
-    /// `unit` goes to the end of player `p`'s sleeping list; returns its slot.
+    /// `object` goes to the end of player `p`'s sleeping list, its parts into the world's
+    /// tables; returns its slot.
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn push_asleep(&mut self, p: PlayerId, unit: Unit) -> Result<ListIndex, GenieError> {
+    pub fn push_asleep(
+        &mut self,
+        p: PlayerId,
+        object: impl Into<Object>,
+    ) -> Result<ListIndex, GenieError> {
+        let Object { unit, parts } = object.into();
         let list = &mut self.players.player_mut(p)?.sleeping;
+        self.parts.file(unit.id, parts);
         Ok(self
             .index
             .push(list, Place::Sleeping(p, ListIndex::new(0)), unit))
     }
 
-    /// The objects of `units` go to the end of player `p`'s live list, in their order.
+    /// The objects of `objects` go to the end of player `p`'s live list, in their order.
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn extend_live(
+    pub fn extend_live<O: Into<Object>>(
         &mut self,
         p: PlayerId,
-        units: impl IntoIterator<Item = Unit>,
+        objects: impl IntoIterator<Item = O>,
     ) -> Result<(), GenieError> {
-        for unit in units {
-            let _ = self.push_live(p, unit)?;
+        for object in objects {
+            let _ = self.push_live(p, object)?;
         }
         Ok(())
     }
@@ -549,9 +564,10 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn swap_remove_live(&mut self, p: PlayerId, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn swap_remove_live(&mut self, p: PlayerId, i: ListIndex) -> Result<Object, GenieError> {
         let list = &mut self.players.player_mut(p)?.objects;
-        self.index.swap_remove(list, Place::Live(p, i))
+        let unit = self.index.swap_remove(list, Place::Live(p, i))?;
+        Ok(self.whole_from(unit))
     }
 
     /// The object in slot `i` of player `p`'s sleeping list leaves it; the last one takes its
@@ -560,9 +576,10 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn swap_remove_asleep(&mut self, p: PlayerId, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn swap_remove_asleep(&mut self, p: PlayerId, i: ListIndex) -> Result<Object, GenieError> {
         let list = &mut self.players.player_mut(p)?.sleeping;
-        self.index.swap_remove(list, Place::Sleeping(p, i))
+        let unit = self.index.swap_remove(list, Place::Sleeping(p, i))?;
+        Ok(self.whole_from(unit))
     }
 
     /// The object in slot `i` of player `p`'s live list leaves it; the ones after it move up.
@@ -570,9 +587,16 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn remove_live(&mut self, p: PlayerId, i: ListIndex) -> Result<Unit, GenieError> {
+    pub fn remove_live(&mut self, p: PlayerId, i: ListIndex) -> Result<Object, GenieError> {
         let list = &mut self.players.player_mut(p)?.objects;
-        self.index.remove(list, Place::Live(p, i))
+        let unit = self.index.remove(list, Place::Live(p, i))?;
+        Ok(self.whole_from(unit))
+    }
+
+    /// `unit`, which left its list, with its parts taken out of the world's tables.
+    fn whole_from(&mut self, unit: Unit) -> Object {
+        let parts = self.parts.take(unit.id);
+        Object { unit, parts }
     }
 
     /// The object in slot `i` of player `p`'s live list leaves its slot for a while (its update,
@@ -709,7 +733,7 @@ mod tests {
         let gone = t
             .swap_remove_live(PlayerId::new(0), ListIndex::new(0))
             .unwrap();
-        assert_eq!(gone.id, object_id(1));
+        assert_eq!(gone.unit.id, object_id(1));
         assert_eq!(t.place(object_id(1)), None);
         assert_eq!(t.place(object_id(3)), Some(live(0, 0)));
         assert_eq!(t.place(object_id(2)), Some(live(0, 1)));
@@ -717,7 +741,7 @@ mod tests {
             .swap_remove_live(PlayerId::new(0), ListIndex::new(1))
             .unwrap();
         assert_eq!(
-            (gone.id, t.place(object_id(3))),
+            (gone.unit.id, t.place(object_id(3))),
             (object_id(2), Some(live(0, 0)))
         );
         assert!(
@@ -734,7 +758,7 @@ mod tests {
     fn a_remove_moves_the_later_objects_up_in_the_table() {
         let mut t = world(&[&[1, 2, 3]]);
         let gone = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
-        assert_eq!(gone.id, object_id(1));
+        assert_eq!(gone.unit.id, object_id(1));
         assert_eq!(
             (t.place(object_id(2)), t.place(object_id(3))),
             (Some(live(0, 0)), Some(live(0, 1)))
@@ -765,7 +789,7 @@ mod tests {
         let p = PlayerId::new(0);
         let out = t.take_out(p, ListIndex::new(0)).unwrap();
         assert_eq!(
-            t.swap_remove_live(p, ListIndex::new(0)).unwrap().id,
+            t.swap_remove_live(p, ListIndex::new(0)).unwrap().unit.id,
             TAKEN_OUT
         );
         assert!(t.put_back(p, out).is_err());

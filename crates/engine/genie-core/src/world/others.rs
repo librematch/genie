@@ -456,8 +456,8 @@ impl World {
             return Ok(false);
         };
         let mut woken = self.swap_remove_asleep(p, i)?;
-        woken.life.goto_sleep = false;
-        let master = woken.life.master_id;
+        woken.unit.life.goto_sleep = false;
+        let master = woken.unit.life.master_id;
         let _ = self.push_live(p, woken)?;
         self.track_relist(p, id, master)?;
         Ok(true)

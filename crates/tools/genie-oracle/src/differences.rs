@@ -1,10 +1,13 @@
 //! Where two object lists differ, object by object and field by field ([`Difference`]): every
 //! field the game's save holds, each named by its path in genie's object (`life.hp`,
-//! `body.mover.paths[0].points[2]`), compared by genie-diff (FD-045-D14).
+//! `body.mover.paths[0].points[2]`), compared by genie-diff (FD-045-D14). Each object compares
+//! whole, its row and its parts ([`ObjectView`]): the world's tables lend the slice's parts, the
+//! import's objects their own (FD-045-D51).
 
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::unit::Unit;
+use genie_core::world::parts::ObjectView;
 use genie_diff::Scope;
 
 /// One field of one object where the slice and the game's save differ
@@ -45,8 +48,8 @@ impl std::fmt::Display for Difference {
 /// Where two object lists differ, one line per object and field ([`object_field_differences`]).
 #[must_use]
 pub fn object_differences<'a>(
-    slice: impl IntoIterator<Item = &'a Unit>,
-    game: impl IntoIterator<Item = &'a Unit>,
+    slice: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
+    game: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
 ) -> Vec<String> {
     object_field_differences(slice, game)
         .iter()
@@ -55,12 +58,13 @@ pub fn object_differences<'a>(
 }
 
 /// Where two object lists differ, one [`Difference`] per object and field the game's save holds:
-/// `slice` from the slice, `game` from the game's save imported as genie's objects, matched by
-/// id, in the game's order, then the objects only the slice holds. Equal lists give none.
+/// `slice` from the slice ([`crate::object_rows`]), `game` from the game's save imported as
+/// genie's objects ([`crate::saved_objects`]), each whole, matched by id, in the game's order,
+/// then the objects only the slice holds. Equal lists give none.
 #[must_use]
 pub fn object_field_differences<'a>(
-    slice: impl IntoIterator<Item = &'a Unit>,
-    game: impl IntoIterator<Item = &'a Unit>,
+    slice: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
+    game: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
 ) -> Vec<Difference> {
     object_field_differences_in(slice, game, Scope::Saved)
 }
@@ -70,27 +74,27 @@ pub fn object_field_differences<'a>(
 /// [`Scope::All`] adds the unsaved ones too.
 #[must_use]
 pub fn object_field_differences_in<'a>(
-    slice: impl IntoIterator<Item = &'a Unit>,
-    game: impl IntoIterator<Item = &'a Unit>,
+    slice: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
+    game: impl IntoIterator<Item = impl Into<ObjectView<'a>>>,
     scope: Scope,
 ) -> Vec<Difference> {
-    let slice: Vec<&Unit> = slice.into_iter().collect();
-    let game: Vec<&Unit> = game.into_iter().collect();
+    let slice: Vec<ObjectView<'a>> = slice.into_iter().map(Into::into).collect();
+    let game: Vec<ObjectView<'a>> = game.into_iter().map(Into::into).collect();
     let mut out = Vec::new();
     // the first slice object of each id, as a search from the front finds it
     let mut by_id = std::collections::HashMap::with_capacity(slice.len());
-    for &s in &slice {
-        let _ = by_id.entry(s.id).or_insert(s);
+    for s in &slice {
+        let _ = by_id.entry(s.unit.id).or_insert(s);
     }
-    for &g in &game {
-        let master = g.life.master_id;
-        let Some(&s) = by_id.get(&g.id) else {
+    for g in &game {
+        let (id, master) = (g.unit.id, g.unit.life.master_id);
+        let Some(&s) = by_id.get(&id) else {
             out.push(Difference {
-                id: g.id,
+                id,
                 master,
                 field: ONLY_IN_THE_GAME.to_owned(),
                 slice: String::new(),
-                game: summary(g),
+                game: summary(g.unit),
             });
             continue;
         };
@@ -98,7 +102,7 @@ pub fn object_field_differences_in<'a>(
             genie_diff::differences(s, g, scope)
                 .into_iter()
                 .map(|d| Difference {
-                    id: g.id,
+                    id,
                     master,
                     field: d.path,
                     slice: d.left,
@@ -106,12 +110,15 @@ pub fn object_field_differences_in<'a>(
                 }),
         );
     }
-    for s in slice.iter().filter(|s| !game.iter().any(|g| g.id == s.id)) {
+    for s in slice
+        .iter()
+        .filter(|s| !game.iter().any(|g| g.unit.id == s.unit.id))
+    {
         out.push(Difference {
-            id: s.id,
-            master: s.life.master_id,
+            id: s.unit.id,
+            master: s.unit.life.master_id,
             field: ONLY_IN_THE_SLICE.to_owned(),
-            slice: summary(s),
+            slice: summary(s.unit),
             game: String::new(),
         });
     }

@@ -38,6 +38,8 @@ impl World {
     /// on the Player stream).
     pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> Result<(), GenieError> {
         let mut unit = self.take_out(q, j)?;
+        let had = self.parts.dead_master.contains(unit.id);
+        let dead = dead_master_of(&unit, q.index(), &self.masters, had);
         let changed = change_hands(
             &mut unit,
             (q.index(), PlayerId::GAIA),
@@ -45,22 +47,27 @@ impl World {
             &mut self.spatial,
             self.world_time,
         );
+        let id = unit.id;
         let j = self.put_back_own(q, unit)?;
         if !changed? {
             return Ok(());
         }
+        if let Some(d) = dead {
+            self.set_part(id, crate::world::parts::Part::DeadMaster(d))?;
+        }
         let unit = self.swap_remove_live(q, j)?;
-        let handed = self.hand_over_attributes(q, PlayerId::GAIA, &unit);
+        let handed = self.hand_over_attributes(q, PlayerId::GAIA, &unit.unit);
         // the old owner's remove and Gaia's add (slots 0x2d8, 0x2d0) move it between the
         // trackers; a building whose build points reach its build time completes in Gaia's
         // (`FUN_1411cd860`, `COMISS`/`JC`: a NaN does not)
-        let (id, master_id) = (unit.id, unit.life.master_id);
+        let (id, master_id) = (unit.unit.id, unit.unit.life.master_id);
         let built = self
             .masters
             .first()
             .and_then(|m| m.get(master_id))
             .is_some_and(|m| m.kind == BUILDING)
             && unit
+                .unit
                 .building
                 .construction
                 .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
@@ -290,6 +297,8 @@ impl World {
         id: ObjectId,
     ) -> Result<PlayerId, GenieError> {
         let mut unit = self.take_out(old, idx)?;
+        let had = self.parts.dead_master.contains(unit.id);
+        let dead = dead_master_of(&unit, old.index(), &self.masters, had);
         let changed = change_hands(
             &mut unit,
             (old.index(), new),
@@ -298,10 +307,14 @@ impl World {
             self.world_time,
         );
         let idx = self.put_back_own(old, unit)?;
-        Ok(if changed? {
+        let changed = changed?;
+        if changed && let Some(d) = dead {
+            self.set_part(id, crate::world::parts::Part::DeadMaster(d))?;
+        }
+        Ok(if changed {
             let unit = self.swap_remove_live(old, idx)?;
-            let handed = self.hand_over_attributes(old, new, &unit);
-            let master_id = unit.life.master_id;
+            let handed = self.hand_over_attributes(old, new, &unit.unit);
+            let master_id = unit.unit.life.master_id;
             let _ = self.push_live(new, unit)?;
             self.track_remove(old, id, master_id)?;
             self.track_add(new, id, master_id)?;
@@ -433,9 +446,8 @@ pub(crate) const DEAD_COPY_TYPES: [MasterKind; 6] = [
 /// `old` goes to player `new` (`masters`, every player's). First its records take the new owner
 /// ([`Spatial::records_owner`]); without its master in the new owner's table (`player+0x28`)
 /// nothing else changes and the answer is false. Then, in order: its sight goes from the old
-/// owner's map (slot 0x1d8) when it sees (state 2, not inside another); its master's death
-/// spawn (`+0x5e4`) in the old owner's table becomes its dead master ([`Unit::dead_master`], a
-/// copy of type 10 to 40, 70 or 80) unless it has one; its owner
+/// owner's map (slot 0x1d8) when it sees (state 2, not inside another); its dead master is the
+/// caller's ([`dead_master_of`], filed once it changed hands); its owner
 /// changes; it takes a master of its own (`FUN_141186d10`: a copy of the master it reads unless
 /// it has one, [`Unit::own_master`]) with the new owner's master's `fog_visibility` (`+0x605`)
 /// and, for livestock (class 58), line of sight (`+0x5d0`); its sight comes to the new owner's
@@ -448,6 +460,31 @@ pub(crate) const DEAD_COPY_TYPES: [MasterKind; 6] = [
 /// `+0x770`), the old owner's selection (`FUN_141677380` for `+0x30c` bit 0), the log line and
 /// the message of game mode 12 for master 1377; nor are the slot 0xa8 calls on the copies (the
 /// masters' graphics).
+/// The dead master an ownership change of `u` from player `old` makes, unless it holds one
+/// (`had`): its master's death spawn (`+0x5e4`, the master it reads: its own, else its old
+/// owner's) in the old owner's table, a copy of type 10 to 40, 70 or 80 (`FUN_14120f800`, before
+/// the copy `FUN_141186d10`); none without a death spawn ([`crate::world::parts::Parts::dead_master`]).
+pub(crate) fn dead_master_of(
+    u: &Unit,
+    old: usize,
+    masters: &[Masters],
+    had: bool,
+) -> Option<Master> {
+    if had {
+        return None;
+    }
+    let old_table = masters.get(old)?;
+    let reads = u
+        .own_master
+        .as_deref()
+        .or_else(|| old_table.get(u.life.master_id))?;
+    let spawn = reads.death_spawns.first().copied().flatten()?;
+    old_table
+        .get(spawn)
+        .filter(|d| DEAD_COPY_TYPES.contains(&d.kind))
+        .cloned()
+}
+
 pub(crate) fn change_hands(
     u: &mut Unit,
     (old, new): (usize, PlayerId),
@@ -471,13 +508,6 @@ pub(crate) fn change_hands(
                 .clone(),
         ),
     };
-    // the dead master comes before the copy (FUN_141186d10), from the master it reads
-    if u.dead_master.is_none() && own.death_spawns[0].is_some() {
-        u.dead_master = old_table
-            .and_then(|m| own.death_spawns[0].and_then(|id| m.get(id)))
-            .filter(|d| DEAD_COPY_TYPES.contains(&d.kind))
-            .map(|d| Box::new(d.clone()));
-    }
     own.fog_visibility = to.fog_visibility;
     if own.class == class::LIVESTOCK {
         own.line_of_sight = to.line_of_sight;

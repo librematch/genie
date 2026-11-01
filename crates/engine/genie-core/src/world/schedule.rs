@@ -243,6 +243,13 @@ impl World {
             self.world_step(step, &mut run);
             observe(self, UpdateStep::World(step));
         }
+        // the parts' bookkeeping (FD-045-D51): a part whose object the world no longer holds
+        // stops every player
+        if let Err(e) = self.check_parts() {
+            for p in PlayerId::each(self.players.len()) {
+                self.stop_player(p, e.clone());
+            }
+        }
     }
 
     /// Player `p`'s time slot (`world+0x18c[p]`).

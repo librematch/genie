@@ -45,6 +45,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`object_step.rs`](object_step.rs) | One object's step with its `Step` (`World::run_object`) and a unit AI run outside its update. |
 | [`options.rs`](options.rs) | The game options' values: the game mode, the ages, the visibility, the resource level, the sub-mode's rules, the content mode and the treaty. |
 | [`others.rs`](others.rs) | The world's objects by id as an update reaches them (FD-045-D19, D28): `OthersRef` to read them (the owner's live list and the other players' lists), `Others` to change them while the unit AI runs, and the world's own lookups for the update itself, which holds the world (`World::locate`, `World::wake_sleeper`, `World::take_out_own`). |
+| [`parts.rs`](parts.rs) | The parts only some objects hold, each in a table by id on the world (FD-045-D51), so that an object's row holds only what every object has. |
 | [`play_state.rs`](play_state.rs) | The world's game state. |
 | [`player.rs`](player.rs) | A player (`Player`): its objects, attributes and formations, and the stop of its update. |
 | [`schedule.rs`](schedule.rs) | The world update as a declared schedule (FD-045-D13): its steps in the game's order, each with the game routine it ports, and the update that runs them with an observer. |

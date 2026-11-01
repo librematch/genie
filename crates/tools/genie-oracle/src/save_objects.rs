@@ -8,7 +8,6 @@ use genie_core::map::Distance;
 use genie_core::map::Tile;
 use genie_core::objects::ListIndex;
 use genie_core::objects::ObjectId;
-use genie_core::objects::unit::Unit;
 use genie_core::vision::VisionBits;
 use genie_core::vision::visibility::Visibility;
 use genie_core::world::World;
@@ -18,8 +17,10 @@ use genie_save::generated::world::RgeStaticObject;
 /// update the slice could not model, if any.
 #[derive(Clone, Debug)]
 pub struct SliceRun {
-    /// Every listed object the player holds after the run.
-    pub objects: Vec<Unit>,
+    /// Every listed object the player holds after the run, whole ([`World::object_of`]).
+    ///
+    /// [`World::object_of`]: genie_core::world::World::object_of
+    pub objects: Vec<genie_core::world::parts::Object>,
     /// The first update the slice could not model: the tick, the object's index and why.
     pub unsupported: Option<(u32, ListIndex, GenieError)>,
     /// The id of the object whose update was not modelled.
@@ -292,7 +293,7 @@ pub fn objects_from_save(
             .objects
             .iter()
             .filter(|u| listed(u))
-            .cloned()
+            .map(|u| turns.object_of(u))
             .collect(),
         unsupported: player.unsupported.clone().map(|(t, i, e)| (t.get(), i, e)),
         unsupported_id: player
