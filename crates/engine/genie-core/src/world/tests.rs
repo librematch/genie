@@ -22,6 +22,8 @@ use crate::construction::build::{BuildAction, BuildTask, Construction};
 use crate::construction::gates::gate_units;
 use crate::construction::repair::RepairState;
 use crate::garrison::ContainerId;
+use crate::gathering::DropSiteId;
+use crate::gathering::PastureId;
 use crate::gathering::QueueCount;
 use crate::gathering::closest_resource::search_origin;
 use crate::gathering::gather::GatherState;
@@ -916,7 +918,8 @@ fn a_completed_pasture_puts_its_livestock_on_its_edges() {
             let _ = e.rand15();
         }
     }
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     let made: Vec<(MasterId, Point)> = t.players[1].objects.as_slice()[1..]
         .iter()
         .map(|u| (u.life.master_id, u.position().ground()))
@@ -935,7 +938,7 @@ fn a_completed_pasture_puts_its_livestock_on_its_edges() {
                 u.untargetable
             ),
             (
-                Some(object_id(50)),
+                Some(PastureId::new(object_id(50))),
                 Amount::new(100.0),
                 Some(attribute::FOOD),
                 true
@@ -957,7 +960,8 @@ fn a_pasture_puts_one_animal_a_tile_on_the_map() {
         16.0,
         &[master_id(1899), master_id(1900)],
     );
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     let tiles = |t: &World| {
         let mut v: Vec<(i32, i32)> = t.players[1].objects.as_slice()[1..]
             .iter()
@@ -975,7 +979,8 @@ fn a_pasture_puts_one_animal_a_tile_on_the_map() {
         16.0,
         &[master_id(1899), master_id(1900)],
     );
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     assert_eq!(
         tiles(&t),
         [(0, 8), (0, 11), (1, 8), (1, 9), (1, 10), (1, 11)]
@@ -1008,7 +1013,8 @@ fn a_pasture_counts_each_attempt_and_shares_its_food() {
         }
     }
     assert!(expected.len() < 3, "the seed draws an Ibex");
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     let made: Vec<Point> = t.players[1].objects.as_slice()[1..]
         .iter()
         .map(|u| u.position().ground())
@@ -1020,7 +1026,8 @@ fn a_pasture_counts_each_attempt_and_shares_its_food() {
         0.0,
         &[master_id(1899), master_id(1900)],
     );
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     assert_eq!(
         (
             t.players[1].objects.len(),
@@ -1033,7 +1040,8 @@ fn a_pasture_counts_each_attempt_and_shares_its_food() {
         7.0,
         &[master_id(1899), master_id(1900)],
     );
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     let food = 300.0f32 / 7.0;
     assert!(
         t.players[1].objects.as_slice()[1..]
@@ -1088,7 +1096,8 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Unit {
         }
         *m = Masters::new(all);
     }
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     let animal = t.players[1].objects[ListIndex::new(1)].id;
     t.players[1].objects[ListIndex::new(1)].life.hp = HitPoints::ZERO;
     if let Some(m) = t.players[1].objects[ListIndex::new(1)].body.mover_mut() {
@@ -1109,7 +1118,8 @@ fn tended_pasture(at: Position, room: f32) -> World {
         3.0,
         &[master_id(1899), master_id(1900)],
     );
-    t.setup_pasture(PlayerId::new(1), object_id(50)).unwrap();
+    t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
+        .unwrap();
     t.players[1].attributes[290] = Amount::new(room);
     let villager = Master {
         id: VILLAGER_MALE,
@@ -1151,7 +1161,7 @@ fn a_villager_tends_the_nearest_livestock_with_room() {
     let mut t = tended_pasture(near.with_z(0.0), 2.0);
     let villager = t.players[1].objects.last_place().unwrap();
     assert_eq!(
-        t.pasture_pick(object_id(50), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
         Ok(Some(ids[0]))
     );
     let mut gaps: Vec<(f32, ObjectId)> = ids
@@ -1174,30 +1184,30 @@ fn a_villager_tends_the_nearest_livestock_with_room() {
     };
     worked(&mut t, by_gap[0], 1);
     assert_eq!(
-        t.pasture_pick(object_id(50), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
         Ok(Some(by_gap[1]))
     );
     worked(&mut t, by_gap[1], 1);
     worked(&mut t, by_gap[2], 1);
     assert_eq!(
-        t.livestock_workers(object_id(50)),
+        t.livestock_workers(PastureId::new(object_id(50))),
         crate::objects::WorkerCount::of_data(3)
     );
     // all worked: the nearest below the room
     assert_eq!(
-        t.pasture_pick(object_id(50), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
         Ok(Some(by_gap[0]))
     );
     worked(&mut t, by_gap[0], 2);
     assert_eq!(
-        t.pasture_pick(object_id(50), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
         Ok(Some(by_gap[1]))
     );
     for &id in &by_gap {
         worked(&mut t, id, 2);
     }
     assert_eq!(
-        t.pasture_pick(object_id(50), PlayerId::new(1), villager),
+        t.pasture_pick(PastureId::new(object_id(50)), PlayerId::new(1), villager),
         Ok(None)
     );
     let mut other = tended_pasture(near, 2.0);
@@ -1209,7 +1219,11 @@ fn a_villager_tends_the_nearest_livestock_with_room() {
     });
     other.masters.push(other.masters[1].clone());
     assert_eq!(
-        other.pasture_pick(object_id(50), PlayerId::new(2), ListIndex::new(0)),
+        other.pasture_pick(
+            PastureId::new(object_id(50)),
+            PlayerId::new(2),
+            ListIndex::new(0)
+        ),
         Ok(None)
     );
 }
@@ -1231,14 +1245,17 @@ fn a_villager_ordered_on_a_pasture_works_its_livestock() {
     let v = t.players[1].objects.last_place().unwrap();
     t.order_work(PlayerId::new(1), v, &order(Some(object_id(50))))
         .unwrap();
-    assert_eq!(t.players[1].objects[v].my_pasture, Some(object_id(50)));
+    assert_eq!(
+        t.players[1].objects[v].my_pasture,
+        Some(PastureId::new(object_id(50)))
+    );
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].pasture_workers,
         [object_id(60)]
     );
     let mut full = tended_pasture(Position::new(18.0, 18.0, 0.0), 0.0);
     let v = full.players[1].objects.last_place().unwrap();
-    full.players[1].objects[v].my_pasture = Some(object_id(50));
+    full.players[1].objects[v].my_pasture = Some(PastureId::new(object_id(50)));
     full.players[1].objects[ListIndex::new(0)].pasture_workers = vec![object_id(60)];
     full.order_work(PlayerId::new(1), v, &order(Some(object_id(50))))
         .unwrap();
@@ -1292,10 +1309,13 @@ fn a_villager_ordered_on_a_pasture_without_livestock_tends_on() {
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
     t.players[1].objects[ListIndex::new(0)].livestock.clear();
-    t.players[1].objects[v].my_pasture = Some(object_id(50));
+    t.players[1].objects[v].my_pasture = Some(PastureId::new(object_id(50)));
     t.players[1].objects[ListIndex::new(0)].pasture_workers = vec![object_id(60)];
     t.order_work(PlayerId::new(1), v, &order).unwrap();
-    assert_eq!(t.players[1].objects[v].my_pasture, Some(object_id(50)));
+    assert_eq!(
+        t.players[1].objects[v].my_pasture,
+        Some(PastureId::new(object_id(50)))
+    );
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].pasture_workers,
         [object_id(60)]
@@ -1308,15 +1328,18 @@ fn a_villager_ordered_on_a_pasture_without_livestock_tends_on() {
 fn a_unit_joins_and_leaves_a_pasture_s_workers() {
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
-    t.tend_pasture(PlayerId::new(1), v, Some(object_id(50)))
+    t.tend_pasture(PlayerId::new(1), v, Some(PastureId::new(object_id(50))))
         .unwrap();
-    t.tend_pasture(PlayerId::new(1), v, Some(object_id(50)))
+    t.tend_pasture(PlayerId::new(1), v, Some(PastureId::new(object_id(50))))
         .unwrap();
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].pasture_workers,
         [object_id(60)]
     );
-    assert_eq!(t.players[1].objects[v].my_pasture, Some(object_id(50)));
+    assert_eq!(
+        t.players[1].objects[v].my_pasture,
+        Some(PastureId::new(object_id(50)))
+    );
     t.tend_pasture(PlayerId::new(1), v, None).unwrap();
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].pasture_workers,
@@ -1324,15 +1347,19 @@ fn a_unit_joins_and_leaves_a_pasture_s_workers() {
     );
     assert_eq!(t.players[1].objects[v].my_pasture, None);
     let animal = t.players[1].objects[ListIndex::new(1)].id;
-    t.tend_pasture(PlayerId::new(1), v, ObjectId::of_field(animal.get()))
-        .unwrap();
+    t.tend_pasture(
+        PlayerId::new(1),
+        v,
+        ObjectId::of_field(animal.get()).map(PastureId::new),
+    )
+    .unwrap();
     assert_eq!(
         t.players[1].objects[ListIndex::new(1)].pasture_workers,
         Vec::new()
     );
     assert_eq!(
         t.players[1].objects[v].my_pasture,
-        ObjectId::of_field(animal.get())
+        ObjectId::of_field(animal.get()).map(PastureId::new)
     );
 }
 
@@ -3291,7 +3318,7 @@ fn a_loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
     let loaded_to_700 = (
         (
             None,
-            Some(object_id(700)),
+            Some(DropSiteId::new(object_id(700))),
             GatherState::Drop,
             Position::from([-1.0; 3]),
         ),
@@ -3459,7 +3486,7 @@ fn a_gather_takes_a_move_toward_an_object_as_its_point_or_drop_site() {
         (g.target, g.carry_to, g.state, g.point),
         (
             None,
-            Some(object_id(700)),
+            Some(DropSiteId::new(object_id(700))),
             GatherState::Drop,
             Position::from([-1.0; 3])
         )
@@ -3519,7 +3546,7 @@ fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
         .expect("a Gather to the drop site");
     assert_eq!(
         (g.carry_to, g.state),
-        (Some(object_id(700)), GatherState::Drop)
+        (Some(DropSiteId::new(object_id(700))), GatherState::Drop)
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,
@@ -3541,7 +3568,7 @@ fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
             .actions
             .gather()
             .map(|g| (g.carry_to, g.state)),
-        Some((Some(object_id(700)), GatherState::Drop))
+        Some((Some(DropSiteId::new(object_id(700))), GatherState::Drop))
     );
     // no centre standing (state 2): no drop site, no table entry for berries by class
     let mut t = world;
@@ -4099,7 +4126,7 @@ fn the_unit_ai_s_resource_search_finds_the_nearest_bush_it_reaches() {
         search(
             &mut t,
             ResourceSearch {
-                site: Some(object_id(700)),
+                site: Some(DropSiteId::new(object_id(700))),
                 ..any
             }
         ),
@@ -4109,7 +4136,7 @@ fn the_unit_ai_s_resource_search_finds_the_nearest_bush_it_reaches() {
         search(
             &mut t,
             ResourceSearch {
-                site: Some(object_id(4444)),
+                site: Some(DropSiteId::new(object_id(4444))),
                 ..any
             }
         ),
@@ -4741,7 +4768,7 @@ fn a_hunt_takes_a_move_toward_an_object_as_its_point_or_drop_site() {
         (h.target, h.carry_to, h.state, h.point, h.target_class),
         (
             None,
-            Some(object_id(700)),
+            Some(DropSiteId::new(object_id(700))),
             HuntState::Drop,
             Position::from([-1.0; 3]),
             Some(class::BUILDING)
@@ -4820,8 +4847,12 @@ fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
 fn a_hunter_s_drop_off_waits_then_searches_its_drop_site_again() {
     let wait = |timer| {
         hunter_in(|h| {
-            (h.state, h.timer, h.target, h.carry_to) =
-                (HuntState::Drop, timer, None, Some(object_id(700)));
+            (h.state, h.timer, h.target, h.carry_to) = (
+                HuntState::Drop,
+                timer,
+                None,
+                Some(DropSiteId::new(object_id(700))),
+            );
             h.attack = None;
         })
     };
@@ -4835,7 +4866,7 @@ fn a_hunter_s_drop_off_waits_then_searches_its_drop_site_again() {
         .unwrap();
     assert_eq!(
         (h.state, h.carry_to),
-        (HuntState::Drop, Some(object_id(700)))
+        (HuntState::Drop, Some(DropSiteId::new(object_id(700))))
     );
     assert!((h.timer + Seconds::new(0.45)).get().abs() < 1e-6);
     let mut t = wait(Seconds::new(-0.01));
@@ -4850,7 +4881,11 @@ fn a_hunter_s_drop_off_waits_then_searches_its_drop_site_again() {
         .unwrap();
     assert_eq!(
         (h.state, h.carry_to, h.timer),
-        (HuntState::Drop, Some(object_id(700)), Seconds::ZERO)
+        (
+            HuntState::Drop,
+            Some(DropSiteId::new(object_id(700))),
+            Seconds::ZERO
+        )
     );
     // the centre let go, then taken again as the new drop site
     assert_eq!(
@@ -4873,7 +4908,7 @@ fn a_hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
             (h.state, h.timer, h.carry_to, h.move_to) = (
                 HuntState::Drop,
                 Seconds::ZERO,
-                Some(object_id(700)),
+                Some(DropSiteId::new(object_id(700))),
                 Some(MoveToAction::sub_in(move_to)),
             );
             h.attack = None;
@@ -5167,7 +5202,7 @@ fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         .unwrap();
     assert_eq!(
         (h.state, h.carry_to),
-        (HuntState::Drop, Some(object_id(700)))
+        (HuntState::Drop, Some(DropSiteId::new(object_id(700))))
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].life.amount,
@@ -5363,7 +5398,11 @@ fn a_hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_a_near_one() {
         .unwrap();
     assert_eq!(
         (h.state, h.target, h.drop_site),
-        (HuntState::Lead, Some(object_id(510)), Some(object_id(700)))
+        (
+            HuntState::Lead,
+            Some(object_id(510)),
+            Some(DropSiteId::new(object_id(700)))
+        )
     );
     assert!(
         t.players[1].objects[ListIndex::new(3)]
@@ -11290,7 +11329,7 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
     let hunt = hunter.actions.hunt().copied().unwrap();
     assert_eq!(
         (hunt.state, hunt.carry_to),
-        (HuntState::Drop, Some(object_id(9149)))
+        (HuntState::Drop, Some(DropSiteId::new(object_id(9149))))
     );
     assert_eq!(drop_off(&mut hunter, &mut t), Ok(None));
 }
@@ -11319,7 +11358,7 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
         .actions
         .hunt_mut()
         .unwrap()
-        .carry_to = Some(object_id(9149));
+        .carry_to = Some(DropSiteId::new(object_id(9149)));
     t.tick(Millis::new(100));
     assert_eq!(
         (
@@ -11364,7 +11403,7 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
         .set_hunt(Some(crate::gathering::hunt::HuntAction {
             state: HuntState::Search,
             target: None,
-            carry_to: Some(object_id(9149)),
+            carry_to: Some(DropSiteId::new(object_id(9149))),
             ..crate::gathering::hunt::tests::hunting(-1)
         }));
     let mut gone = t.clone();
@@ -11405,7 +11444,7 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
         .set_hunt(Some(crate::gathering::hunt::HuntAction {
             state: HuntState::Failed,
             target: None,
-            carry_to: Some(object_id(9149)),
+            carry_to: Some(DropSiteId::new(object_id(9149))),
             ..crate::gathering::hunt::tests::hunting(-1)
         }));
     failed.tick(Millis::new(100));
@@ -11427,19 +11466,31 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
 fn a_second_target_past_state_6_is_let_go_and_one_gone_dropped() {
     use crate::objects::unit::second_target_checked;
     assert_eq!(
-        second_target_checked(Some(object_id(9149)), true, Some(ObjectState::Removed)),
-        (None, Some(object_id(9149)))
+        second_target_checked(
+            Some(DropSiteId::new(object_id(9149))),
+            true,
+            Some(ObjectState::Removed)
+        ),
+        (None, Some(DropSiteId::new(object_id(9149))))
     );
     assert_eq!(
-        second_target_checked(Some(object_id(9149)), true, Some(ObjectState::Undead)),
-        (Some(object_id(9149)), None)
+        second_target_checked(
+            Some(DropSiteId::new(object_id(9149))),
+            true,
+            Some(ObjectState::Undead)
+        ),
+        (Some(DropSiteId::new(object_id(9149))), None)
     );
     assert_eq!(
-        second_target_checked(Some(object_id(9149)), true, Some(ObjectState::Alive)),
-        (Some(object_id(9149)), None)
+        second_target_checked(
+            Some(DropSiteId::new(object_id(9149))),
+            true,
+            Some(ObjectState::Alive)
+        ),
+        (Some(DropSiteId::new(object_id(9149))), None)
     );
     assert_eq!(
-        second_target_checked(Some(object_id(9149)), false, None),
+        second_target_checked(Some(DropSiteId::new(object_id(9149))), false, None),
         (None, None)
     );
     assert_eq!(second_target_checked(None, false, None), (None, None));
@@ -14305,7 +14356,7 @@ fn an_ai_move_hands_the_point_to_a_hunt_without_a_work_range() {
     let mut u = mover_unit(47);
     let mut hunt = crate::gathering::hunt::tests::hunting(9149);
     hunt.state = HuntState::Idle;
-    hunt.carry_to = Some(object_id(9150));
+    hunt.carry_to = Some(DropSiteId::new(object_id(9150)));
     u.actions.set_hunt(Some(hunt));
     assert_eq!(
         ai_move_of(&mut u, forced(false), class::VILLAGER),
@@ -14317,7 +14368,7 @@ fn an_ai_move_hands_the_point_to_a_hunt_without_a_work_range() {
         (
             HuntState::WalkPoint,
             None,
-            Some(object_id(9150)),
+            Some(DropSiteId::new(object_id(9150))),
             AI_POINT,
             None
         )
@@ -16841,7 +16892,7 @@ fn a_forager_fills_up_carries_its_berries_home_and_comes_back() {
                 );
                 assert_eq!(
                     (g.target, g.carry_to),
-                    (Some(object_id(600)), Some(object_id(700)))
+                    (Some(object_id(600)), Some(DropSiteId::new(object_id(700))))
                 );
             }
         }
@@ -17101,13 +17152,13 @@ fn what_follows_the_gather_s_update_lets_go_builds_or_reseeds() {
         Vec<i32>,
         Option<(Option<ObjectId>, GatherState)>,
     );
-    let follow = |next: Next, old: (Option<ObjectId>, Option<ObjectId>)| -> (World, Followed) {
+    let follow = |next: Next, old: (Option<ObjectId>, Option<DropSiteId>)| -> (World, Followed) {
         let mut t = foraging();
         t.players[1].objects[ListIndex::new(0)]
             .actions
             .gather_mut()
             .unwrap()
-            .carry_to = Some(object_id(700));
+            .carry_to = Some(DropSiteId::new(object_id(700)));
         for id in [600, 700] {
             t.object_mut(object_id(id)).unwrap().1.workers =
                 crate::objects::WorkerCount::of_data(1);
@@ -17140,7 +17191,10 @@ fn what_follows_the_gather_s_update_lets_go_builds_or_reseeds() {
         .unwrap();
         (t, seen)
     };
-    let (t, seen) = follow(Next::Done, (Some(object_id(600)), Some(object_id(700))));
+    let (t, seen) = follow(
+        Next::Done,
+        (Some(object_id(600)), Some(DropSiteId::new(object_id(700)))),
+    );
     assert_eq!(seen, (Ok(()), vec![600, 700], None));
     assert!(
         t.players[1].objects[ListIndex::new(0)]
@@ -17157,11 +17211,14 @@ fn what_follows_the_gather_s_update_lets_go_builds_or_reseeds() {
             .gather()
             .is_some()
     );
-    let (_, seen) = follow(Next::Stay, (Some(object_id(600)), Some(object_id(600))));
+    let (_, seen) = follow(
+        Next::Stay,
+        (Some(object_id(600)), Some(DropSiteId::new(object_id(600)))),
+    );
     assert_eq!((seen.0, seen.1), (Ok(()), vec![600]));
     let (_, seen) = follow(
         Next::Reseed { arrived: true },
-        (Some(object_id(600)), Some(object_id(700))),
+        (Some(object_id(600)), Some(DropSiteId::new(object_id(700)))),
     );
     assert_eq!(
         seen,
@@ -17300,7 +17357,7 @@ fn drop_again_with(held: Held) -> (BuildState, Option<ObjectId>, f32, i32, Vec<N
             .collect();
     (
         b.state,
-        b.site,
+        b.site.map(DropSiteId::id),
         b.move_to.map_or(0.0, |m| m.range.get()),
         t.players[1].objects[ListIndex::new(2)].workers.get(),
         heard,
@@ -17344,7 +17401,7 @@ fn a_loaded_builder_s_drop_off_finds_its_town_centre() {
 fn drop_site_sought(
     setup: impl FnOnce(&mut World),
     args: (bool, bool, Option<ActionType>),
-) -> Result<Option<ObjectId>, GenieError> {
+) -> Result<Option<DropSiteId>, GenieError> {
     let mut t = forage_world();
     let mut far = t.players[1].objects[ListIndex::new(2)].clone();
     far.id = object_id(701);
@@ -17396,11 +17453,11 @@ fn a_drop_site_search_from_a_unit_takes_the_nearest_it_reaches() {
     let keep = |_: &mut World| ();
     assert_eq!(
         drop_site_sought(keep, (false, true, None)),
-        Ok(Some(object_id(700)))
+        Ok(Some(DropSiteId::new(object_id(700))))
     );
     assert_eq!(
         drop_site_sought(keep, (false, false, None)),
-        Ok(Some(object_id(700)))
+        Ok(Some(DropSiteId::new(object_id(700))))
     );
     let inside = |t: &mut World| {
         t.players[1].objects[ListIndex::new(2)].life.inside =
@@ -17408,11 +17465,11 @@ fn a_drop_site_search_from_a_unit_takes_the_nearest_it_reaches() {
     };
     assert_eq!(
         drop_site_sought(inside, (true, true, None)),
-        Ok(Some(object_id(701)))
+        Ok(Some(DropSiteId::new(object_id(701))))
     );
     assert_eq!(
         drop_site_sought(inside, (false, true, None)),
-        Ok(Some(object_id(700)))
+        Ok(Some(DropSiteId::new(object_id(700))))
     );
     let making = |t: &mut World| {
         t.players[1].objects[ListIndex::new(2)]
@@ -17426,11 +17483,11 @@ fn a_drop_site_search_from_a_unit_takes_the_nearest_it_reaches() {
     };
     assert_eq!(
         drop_site_sought(making, (false, true, Some(MAKE))),
-        Ok(Some(object_id(701)))
+        Ok(Some(DropSiteId::new(object_id(701))))
     );
     assert_eq!(
         drop_site_sought(making, (false, true, None)),
-        Ok(Some(object_id(700)))
+        Ok(Some(DropSiteId::new(object_id(700))))
     );
     let unknown = |t: &mut World| {
         for masters in &mut t.masters {
@@ -17859,7 +17916,7 @@ fn hunt_after(t: &World) -> (Option<(HuntState, i32, i32)>, [i32; 2]) {
             (
                 h.state,
                 ObjectId::field(h.target),
-                ObjectId::field(h.carry_to),
+                ObjectId::field(h.carry_to.map(DropSiteId::id)),
             )
         }),
         [
@@ -19185,10 +19242,23 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
     assert_eq!(
         seen,
         [
-            (0, (drop, Some(MoveTo::Moving), Some(object_id(700)), 6.0)),
+            (
+                0,
+                (
+                    drop,
+                    Some(MoveTo::Moving),
+                    Some(DropSiteId::new(object_id(700))),
+                    6.0
+                )
+            ),
             (
                 177,
-                (drop, Some(MoveTo::Arrived), Some(object_id(700)), 6.0)
+                (
+                    drop,
+                    Some(MoveTo::Arrived),
+                    Some(DropSiteId::new(object_id(700))),
+                    6.0
+                )
             ),
             (178, (BuildState::Move, Some(MoveTo::Start), None, 0.0)),
             (179, (BuildState::Move, Some(MoveTo::Moving), None, 0.0)),
@@ -19351,7 +19421,7 @@ fn the_unit_ai_s_orders_reach_the_unit_and_the_units_they_name() {
 
     let mut t = house_builder();
     let drop = Effect::Command(AiCommand::DropElsewhere {
-        site: object_id(700),
+        site: DropSiteId::new(object_id(700)),
         back: Some(object_id(600)),
     });
     assert!(applied(&mut t, vec![drop]).is_ok());
@@ -19509,7 +19579,10 @@ fn a_completion_s_parts_reach_their_owner() {
             .collect()
     };
     let mut t = pasture_game(Position::new(60.0, 60.0, 0.0), 2.0, &LIVESTOCK);
-    assert_eq!(t.setup_pasture(PlayerId::new(1), object_id(50)), Ok(()));
+    assert_eq!(
+        t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50))),
+        Ok(())
+    );
     assert_eq!(
         made(&t),
         [

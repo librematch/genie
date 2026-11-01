@@ -198,9 +198,18 @@ impl Action {
     #[must_use]
     pub const fn second_target(&self) -> Option<ObjectId> {
         match self {
-            Self::Hunt(h) => h.carry_to,
-            Self::Gather(g) => g.carry_to,
-            Self::Build(b) => b.site,
+            Self::Hunt(h) => match h.carry_to {
+                Some(s) => Some(s.id()),
+                None => None,
+            },
+            Self::Gather(g) => match g.carry_to {
+                Some(s) => Some(s.id()),
+                None => None,
+            },
+            Self::Build(b) => match b.site {
+                Some(s) => Some(s.id()),
+                None => None,
+            },
             Self::Missile(m) => m.fired_from,
             Self::Attack(a) => a.target2,
             _ => None,

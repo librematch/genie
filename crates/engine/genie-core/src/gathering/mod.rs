@@ -6,6 +6,7 @@ use crate::players::attribute::AttributeId;
 
 pub(crate) mod closest_resource;
 pub(crate) mod drop_off;
+pub mod drop_site_id;
 pub(crate) mod drop_sites;
 pub mod farm_queue;
 mod farm_stops;
@@ -16,9 +17,12 @@ pub mod make;
 mod make_state;
 pub(crate) mod mule_cart;
 pub mod pasture;
+mod pasture_id;
 mod queue_count;
 
+pub use self::drop_site_id::DropSiteId;
 pub use self::farm_stops::{FarmStops, StopIndex};
+pub use self::pasture_id::{Pasture, PastureId};
 pub use self::queue_count::QueueCount;
 
 /// Both loads are food (0, or the foods a unit carries, 15 to 17; [`AttributeId::is_food_load`]):

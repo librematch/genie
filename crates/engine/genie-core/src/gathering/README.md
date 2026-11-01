@@ -33,6 +33,7 @@ part of the update, which binds the action to the world.
 | --- | --- |
 | [`closest_resource.rs`](closest_resource.rs) | `ClosestResourceObject` (`FUN_140c49760`): where it searches from and what it finds; a herded sheep. |
 | [`drop_off.rs`](drop_off.rs) | A gatherer's walk after a drop and the drop sites it walks to. |
+| [`drop_site_id.rs`](drop_site_id.rs) | A drop site's id as its own type: the object a worker carries its load to. |
 | [`drop_sites.rs`](drop_sites.rs) | The drop-site searches (`FUN_1411671e0`): from a unit, or from a point without one. |
 | [`farm_queue.rs`](farm_queue.rs) | The mill's and the dock's queues: the farms and pastures (`farm_queue_count`, `+0x141c`) and the fish traps (`fishTrapQueueCount`, `+0x1420`) a player paid for ahead, which GAME's sub-commands 0xd, 0x15 and 0x11 buy and 0xe, 0x16 and 0x12 give back. |
 | [`farm_stops.rs`](farm_stops.rs) | A gatherer's stops on a farm. |
@@ -42,6 +43,7 @@ part of the update, which binds the action to the world.
 | [`mod.rs`](mod.rs) | Gathering resources: the Gather and Hunt actions with each gatherer's part of its update, a farm's food, the searches for a resource, the drop sites and drop-offs, the mill's and the dock's queues and the pastures. |
 | [`mule_cart.rs`](mule_cart.rs) | The mule cart: the resources a finished cart searches (its completion, `FUN_1411c6bd0`'s tail) and its unit AI's own search (slot 0x1e8), then the work command toward the one it found. |
 | [`pasture.rs`](pasture.rs) | A pasture's livestock (`FUN_1411c8410`, `SetupPasture`): the completion's first part (`FUN_1411c6bd0`) of a pasture (masters 1893 and 1897, class 49) whose build points reached its build time puts its owner's livestock on points along its edges, each holding its share of the pasture's food. |
+| [`pasture_id.rs`](pasture_id.rs) | A pasture's id as its own type: the building whose livestock a unit is in or tends. |
 | [`queue_count.rs`](queue_count.rs) | The count of farms or fish traps a queue paid for. |
 | [`gather/`](gather/) | The Gather action (`RGE_Action_Gather`, type 5, vtable `0x142ed4f28`): a forager sent to a resource walks to it (state 4, a quiet `MoveTo`), faces it (6), gathers (7), takes the load to a drop site (8) and walks back to the resource (4). |
 | [`hunt/`](hunt/) | The Hunt action (`TRIBE_Action_Hunt`, type 110, vtable `0x142ed70f8`): a villager sent to a tree (or an animal) with a gather task attacks it first (state 12, an `Attack` sub-action); once it is dead the villager walks to it (state 4, a `MoveTo` sub-action), faces it (6) and gathers (7), then carries the load to a drop site (8). |
@@ -51,5 +53,5 @@ part of the update, which binds the action to the world.
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`construction`](../construction/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
-- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`groups`](../groups/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
+- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

@@ -46,10 +46,10 @@ fn top_after(fx: &[Effect]) -> TopLeft {
             | Effect::Command(
                 AiCommand::HuntObject(target)
                 | AiCommand::GatherObject(target)
-                | AiCommand::DropElsewhere { site: target, .. }
                 | AiCommand::WorkOn { target, .. },
             ) => Some(TopLeft::On(target)),
             Effect::Command(AiCommand::BuildObject(target)) => Some(TopLeft::On(target.id())),
+            Effect::Command(AiCommand::DropElsewhere { site, .. }) => Some(TopLeft::On(site.id())),
             Effect::CapHumanOrder(_) | Effect::OrderOnTarget(_) | Effect::ChangeOwner(_) => None,
         })
         .unwrap_or(TopLeft::Untouched)
@@ -199,7 +199,7 @@ impl UnitSide for With<'_> {
         Ok(self.interruptible || self.fx.contains(&Effect::Stop))
     }
 
-    fn table_drop_site(&mut self) -> Result<Option<ObjectId>, GenieError> {
+    fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
         self.side.table_drop_site()
     }
 

@@ -3,7 +3,6 @@
 
 use crate::GenieError;
 use crate::math::rng::Well512;
-use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
@@ -442,7 +441,7 @@ impl UnitAi {
                     } else {
                         crate::objects::WorkerCount::NO_CAP
                     },
-                    site: ObjectId::of_field(n.p[2]),
+                    site: crate::gathering::DropSiteId::of_field(n.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,
@@ -533,7 +532,7 @@ impl UnitAi {
                 side.closest_resource(ResourceSearch {
                     kind,
                     cap,
-                    site: ObjectId::of_field(n.p[2]),
+                    site: crate::gathering::DropSiteId::of_field(n.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,

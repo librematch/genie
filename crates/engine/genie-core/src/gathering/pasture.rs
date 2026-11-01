@@ -90,7 +90,11 @@ impl World {
     ///
     /// Its master or attributes the player has not got, a facet draw on a sprite of one facet
     /// (the game divides by zero), and what the object's making does not model.
-    pub(crate) fn setup_pasture(&mut self, p: PlayerId, id: ObjectId) -> Result<(), GenieError> {
+    pub(crate) fn setup_pasture(
+        &mut self,
+        p: PlayerId,
+        id: crate::gathering::PastureId,
+    ) -> Result<(), GenieError> {
         let (at, master) = self
             .object(id)
             .map(|(_, u)| (u.position(), u.life.master_id))
@@ -157,7 +161,10 @@ impl World {
     /// A pasture's slot 0x780 (`FUN_1411c5dd0`): the workers (`+0x644`) of its livestock
     /// ([`crate::objects::unit::Unit::livestock`]) the world holds, summed; 0 for an object the world does
     /// not hold.
-    pub(crate) fn livestock_workers(&self, pasture: ObjectId) -> crate::objects::WorkerCount {
+    pub(crate) fn livestock_workers(
+        &self,
+        pasture: crate::gathering::PastureId,
+    ) -> crate::objects::WorkerCount {
         crate::objects::WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
             b.livestock
                 .iter()
@@ -178,7 +185,7 @@ impl World {
     /// A master the players have not got, or an attribute the owner has not got.
     pub(crate) fn pasture_pick(
         &self,
-        pasture: ObjectId,
+        pasture: crate::gathering::PastureId,
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<ObjectId>, GenieError> {
@@ -235,7 +242,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        pasture: Option<ObjectId>,
+        pasture: Option<crate::gathering::PastureId>,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(p, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
@@ -256,7 +263,7 @@ impl World {
 
     /// Whether the objects on `tile` (its list, `+0x28`) hold a livestock master ([`LIVESTOCK`])
     /// of the pasture `pasture` (`+0x790`). A ghost on it is not of a pasture.
-    fn holds_livestock_of(&self, pasture: ObjectId, tile: Tile) -> bool {
+    fn holds_livestock_of(&self, pasture: crate::gathering::PastureId, tile: Tile) -> bool {
         self.spatial.tile_list(tile).iter().any(|&o| {
             self.object(o).is_some_and(|(_, u)| {
                 u.pasture == Some(pasture) && LIVESTOCK.contains(&u.life.master_id)

@@ -36,7 +36,7 @@ pub(super) enum PastureAfter {
     Ends,
     /// The unit tends this pasture, or none (`FUN_141189ca0` with −1: it leaves the one it
     /// tends).
-    Tends(Option<ObjectId>),
+    Tends(Option<crate::gathering::PastureId>),
 }
 
 impl World {
@@ -425,6 +425,7 @@ impl World {
         if !pasture {
             return Ok(PastureAfter::Tends(None));
         }
+        let on = crate::gathering::PastureId::new(on);
         let room = Attributes::get(self.players.player(player)?, PASTURE_WORKERS)?;
         let workers = self.livestock_workers(on).as_f32();
         // COMISS room with the workers, JBE: a NaN is full

@@ -93,9 +93,9 @@ pub struct Unit {
     /// `+0x685`, `underAttackValue`: its unit AI keeps attackers (`FUN_14119d2d0`).
     pub under_attack: bool,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
-    pub pasture: Option<ObjectId>,
+    pub pasture: Option<crate::gathering::PastureId>,
     /// `+0x794`, `my_pasture_id`: the pasture it tends.
-    pub my_pasture: Option<ObjectId>,
+    pub my_pasture: Option<crate::gathering::PastureId>,
     /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
     pub undeletable: bool,
     /// `capture_flag` (`+0x924`).
@@ -363,10 +363,13 @@ pub(crate) fn annexes_of<'a>(
 /// target's absence before the first target's state; the two touch different objects. Returns
 /// the second target after them and the object let go.
 pub(crate) fn second_target_checked(
-    site: Option<ObjectId>,
+    site: Option<crate::gathering::DropSiteId>,
     held: bool,
     state: Option<ObjectState>,
-) -> (Option<ObjectId>, Option<ObjectId>) {
+) -> (
+    Option<crate::gathering::DropSiteId>,
+    Option<crate::gathering::DropSiteId>,
+) {
     let Some(site) = site else {
         return (None, None);
     };

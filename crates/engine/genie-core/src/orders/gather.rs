@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::{Arms, Engagement};
+use crate::gathering::DropSiteId;
 use crate::gathering::gather::{GatherRetarget, GatherStart};
 use crate::gathering::hunt::{HuntAction, HuntMove, HuntStart, HuntTask, Quarry};
 use crate::map::Position;
@@ -9,6 +10,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ObjectFlags;
@@ -104,7 +106,7 @@ impl World {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = [gather.target, gather.carry_to];
+        let old = [gather.target, gather.carry_to.map(DropSiteId::id)];
         let rng = self.streams.get(Stream::Action);
         let took = gather.retarget(
             GatherRetarget {
@@ -118,7 +120,7 @@ impl World {
             mover,
             rng,
         )?;
-        let new = [gather.target, gather.carry_to];
+        let new = [gather.target, gather.carry_to.map(DropSiteId::id)];
         // a farm another farmer works: taken (slot 0x68) and let go again (set_state 11)
         let waits =
             gather.state == crate::gathering::gather::GatherState::WalkBack && new[0].is_none();
@@ -183,9 +185,9 @@ impl World {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = [gather.target, gather.carry_to];
+        let old = [gather.target, gather.carry_to.map(DropSiteId::id)];
         gather.take_move(moved_to, point, player, mover, &walks)?;
-        let new = [gather.target, gather.carry_to];
+        let new = [gather.target, gather.carry_to.map(DropSiteId::id)];
         self.exchange_gather_targets(old, new, by)?;
         Ok(true)
     }
@@ -269,9 +271,9 @@ impl World {
             && let Some(new) = new_second
         {
             if let Some(old) = old_second {
-                self.release(old, by)?;
+                self.release(old.id(), by)?;
             }
-            self.take(new, by)?;
+            self.take(new.id(), by)?;
         }
         Ok(true)
     }
@@ -403,9 +405,9 @@ impl World {
             kind: unit.life.attribute_type,
             amount: unit.life.amount,
         } = held;
-        let drops = gather.target.is_none() && gather.carry_to == Some(target);
+        let drops = gather.target.is_none() && gather.carry_to.key() == Some(target);
         // a farm another farmer works: the start let it go (set_state 11, then slot 0x68)
-        let waits = gather.target.is_none() && gather.carry_to != Some(target);
+        let waits = gather.target.is_none() && gather.carry_to.key() != Some(target);
         unit.actions.set_gather(Some(gather));
         if drops {
             self.take(target, self.releaser(player, idx)?)?;
@@ -593,7 +595,7 @@ impl World {
             );
             unit.body.set_anim_speed(Speed::ZERO);
         }
-        let drops = hunt.target.is_none() && hunt.carry_to == Some(target);
+        let drops = hunt.target.is_none() && hunt.carry_to.key() == Some(target);
         unit.actions.set_hunt(Some(hunt));
         // a load to its own drop site: the target taken as the second (FUN_140a7a190), then let
         // go as the first (slot 0x68 with none)

@@ -123,7 +123,7 @@ impl Unit {
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
         let master = self.master(&c.w.masters, c.player)?;
         let site = if let Some(carry) = carry_to {
-            carry.get()
+            carry.id().get()
         } else if master.drop_sites.is_empty() {
             -1
         } else {
@@ -152,7 +152,7 @@ impl Unit {
                     0
                 }
                 // the notify's record holds the drop site's id
-                Some(site) => site.get(),
+                Some(site) => site.id().get(),
             }
         };
         self.post_own(

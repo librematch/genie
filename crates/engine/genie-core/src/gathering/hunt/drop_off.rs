@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::set_walker_anim;
+use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
@@ -64,7 +65,7 @@ impl HuntAction {
         }
         let range = self.task.range;
         let to = WalkTo {
-            id: self.carry_to,
+            id: self.carry_to.map(DropSiteId::id),
             at: site,
             gap,
             state: None,

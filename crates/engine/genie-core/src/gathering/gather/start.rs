@@ -2,6 +2,7 @@
 //! the idle and the halt; a farm's stops and their productivity.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
 use crate::gathering::StopIndex;
 use crate::gathering::gather::GatherState;
@@ -260,7 +261,7 @@ impl GatherAction {
         if target.player == player && target.drop_site && Amount::ZERO < held.amount {
             self.target = None;
             self.point = Position::from([-1.0; 3]);
-            self.carry_to = Some(target.id);
+            self.carry_to = Some(DropSiteId::new(target.id));
             return self.set_drop(target.position, target.gap, mover, &walks);
         }
         self.set_walk(target.walk_to(), target.radius, mover, rng, &walks)
@@ -312,7 +313,7 @@ impl GatherAction {
             self.timer = Seconds::ZERO;
             self.target = None;
             self.point = Position::from([-1.0; 3]);
-            self.carry_to = Some(target.id);
+            self.carry_to = Some(DropSiteId::new(target.id));
             self.set_drop(target.position, target.gap, mover, &walks)?;
             return Ok(true);
         }
@@ -419,7 +420,7 @@ impl GatherAction {
             ));
         }
         let to = WalkTo {
-            id: self.carry_to,
+            id: self.carry_to.map(DropSiteId::id),
             at: site,
             gap,
             state: None,
@@ -449,11 +450,16 @@ impl GatherAction {
     ) -> Result<(), GenieError> {
         let held = walks.held.amount;
         match target.filter(|t| t.player == player && t.drop_site && Amount::ZERO < held) {
-            Some(t) if Some(t.id) == self.carry_to && self.state == GatherState::Drop => Ok(()),
+            Some(t)
+                if Some(t.id) == self.carry_to.map(DropSiteId::id)
+                    && self.state == GatherState::Drop =>
+            {
+                Ok(())
+            }
             Some(t) => {
                 self.target = None;
                 self.point = Position::from([-1.0; 3]);
-                self.carry_to = Some(t.id);
+                self.carry_to = Some(DropSiteId::new(t.id));
                 self.set_drop(t.position, t.gap, mover, walks)
             }
             None => {
@@ -520,7 +526,7 @@ impl GatherAction {
         if let Some(s) = stand {
             new_sprite(sprite, mover.map(|m| &mut m.stats), s, rng);
         }
-        let released = [self.target, self.carry_to];
+        let released = [self.target, self.carry_to.map(DropSiteId::id)];
         self.target = None;
         self.carry_to = None;
         self.point = Position::from([-1.0; 3]);

@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::garrison::ContainerId;
+use crate::gathering::DropSiteId;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -98,7 +99,7 @@ impl Action {
                     torn.builder_leaves.push(target);
                 }
                 torn.release(b.target);
-                torn.release(b.site);
+                torn.release(b.site.map(DropSiteId::id));
                 stop_if_moving(body, b.move_to.is_some())?;
             }
             Self::Repair(r) => {
@@ -114,12 +115,12 @@ impl Action {
             Self::Hunt(mut h) => {
                 h.tear_down(body.mover_mut())?;
                 torn.release(h.target);
-                torn.release(h.carry_to);
+                torn.release(h.carry_to.map(DropSiteId::id));
             }
             Self::Gather(mut g) => {
                 g.tear_down(body.mover_mut())?;
                 torn.release(g.target);
-                torn.release(g.carry_to);
+                torn.release(g.carry_to.map(DropSiteId::id));
             }
             Self::Attack(mut a) => {
                 a.tear_down(body.mover_mut())?;
@@ -299,7 +300,7 @@ mod tests {
             }
         );
         assert!(!moves(&body));
-        (b.added, b.move_to, b.site) = (false, None, Some(object_id(10050)));
+        (b.added, b.move_to, b.site) = (false, None, Some(DropSiteId::new(object_id(10050))));
         let torn = Action::Build(b).tear_down(&mut moving()).unwrap();
         assert_eq!(
             (torn.releases, torn.builder_leaves),
@@ -312,7 +313,7 @@ mod tests {
     fn a_build_s_second_target_is_its_drop_site() {
         let mut b = build();
         assert_eq!(Action::Build(b).second_target(), None);
-        b.site = Some(object_id(10050));
+        b.site = Some(DropSiteId::new(object_id(10050)));
         assert_eq!(Action::Build(b).second_target(), Some(object_id(10050)));
     }
 

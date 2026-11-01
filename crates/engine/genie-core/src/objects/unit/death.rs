@@ -183,7 +183,7 @@ impl Unit {
             let (p, id) = (c.player, self.id);
             c.lend(self, |w| {
                 if part.pasture {
-                    w.setup_pasture(p, id)?;
+                    w.setup_pasture(p, crate::gathering::PastureId::new(id))?;
                 }
                 if part.cart {
                     w.cart_search(p, id, ObjectState::Foundation)?;

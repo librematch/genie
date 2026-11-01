@@ -4,6 +4,7 @@ use crate::{OTHER_SUB_ACTION, combat_master, saved_attack, saved_move_wait, save
 use genie_core::GenieError;
 use genie_core::construction::build::{BuildAction, BuildTask};
 use genie_core::garrison::ContainerId;
+use genie_core::gathering::DropSiteId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
@@ -387,7 +388,7 @@ fn import_build(
             .as_deref()
             .is_some_and(|b| b.added_to_num_builders != 0),
         timer: Seconds::new(base.timer),
-        site: ObjectId::of_field(base.target2_id),
+        site: DropSiteId::of_field(base.target2_id),
     }));
     Ok(())
 }

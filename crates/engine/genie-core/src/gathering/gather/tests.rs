@@ -1,4 +1,5 @@
 use super::*;
+use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
 use crate::map::DistanceSquared;
 use crate::math::Angle;
@@ -321,7 +322,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
     let mut g = GatherAction {
         state: GatherState::Walk,
         target: Some(object_id(31)),
-        carry_to: Some(object_id(9)),
+        carry_to: Some(DropSiteId::new(object_id(9))),
         point: Position::new(5.0, 6.0, 0.0),
         timer: Seconds::new(2.0),
         move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
@@ -511,7 +512,7 @@ fn a_gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         (
             GatherState::Drop,
             None,
-            Some(object_id(500)),
+            Some(DropSiteId::new(object_id(500))),
             Position::from([-1.0; 3])
         )
     );
@@ -682,7 +683,7 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
 fn a_gatherer_s_drop_off_waits_walks_and_drops_its_load_at_the_site() {
     let dropping = |move_to: Option<MoveTo>, timer| GatherAction {
         state: GatherState::Drop,
-        carry_to: Some(object_id(10028)),
+        carry_to: Some(DropSiteId::new(object_id(10028))),
         move_to: move_to.map(MoveToAction::sub_in),
         timer,
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
@@ -754,7 +755,7 @@ fn a_drop_off_whose_site_was_let_go_waits_a_random_while() {
     let mut rig = Rig::on_the_path().with_house(ObjectState::Removed);
     let mut g = GatherAction {
         state: GatherState::Drop,
-        carry_to: Some(object_id(10028)),
+        carry_to: Some(DropSiteId::new(object_id(10028))),
         move_to: Some(to_house(MoveTo::Moving)),
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
@@ -775,7 +776,7 @@ fn a_drop_off_whose_site_was_let_go_waits_a_random_while() {
 fn a_gatherer_walks_to_its_drop_site_and_starts_again_when_it_moved() {
     let dropping = |move_to| GatherAction {
         state: GatherState::Drop,
-        carry_to: Some(object_id(10028)),
+        carry_to: Some(DropSiteId::new(object_id(10028))),
         move_to: Some(to_house(move_to)),
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
@@ -1161,7 +1162,7 @@ fn without_a_reseed_the_farmer_idles_or_a_computer_s_is_done() {
         let mut g = GatherAction {
             state: GatherState::ReseedWalk,
             target: Some(object_id(5)),
-            carry_to: Some(object_id(6)),
+            carry_to: Some(DropSiteId::new(object_id(6))),
             move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
             ..GatherAction::new(task(), &farm(), false, rate()).unwrap()
         };
@@ -1371,7 +1372,7 @@ fn a_gatherer_sent_again_to_its_bush_walks_to_it_anew() {
         (
             GatherState::Drop,
             None,
-            Some(object_id(500)),
+            Some(DropSiteId::new(object_id(500))),
             Position::from([-1.0; 3])
         )
     );

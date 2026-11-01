@@ -2,6 +2,7 @@
 //! halt by kind.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
@@ -168,7 +169,7 @@ impl World {
             &self.graphics,
         );
         // the target, then the second target
-        let released = [hunt.target, hunt.carry_to];
+        let released = [hunt.target, hunt.carry_to.map(DropSiteId::id)];
         hunt.set_target(None);
         hunt.carry_to = None;
         hunt.point = Position::from([-1.0; 3]);

@@ -5,6 +5,7 @@
 use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::combat::victims::readable;
+use crate::gathering::DropSiteId;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
 use crate::movement::move_to::MoveTo;
@@ -63,13 +64,16 @@ impl Unit {
             let (kept, let_go) = second_target_checked(
                 site,
                 held,
-                state_of(site, OthersRef::of(&c.w.players, c.player)?),
+                state_of(
+                    site.map(DropSiteId::id),
+                    OthersRef::of(&c.w.players, c.player)?,
+                ),
             );
             if let Some(h) = self.actions.hunt_mut() {
                 h.carry_to = kept;
             }
             if let Some(t) = let_go {
-                self.hunt_release(c, [Some(t)])?;
+                self.hunt_release(c, [Some(t.id())])?;
             }
         }
         Ok(())
@@ -150,7 +154,7 @@ impl Unit {
         if Seconds::ZERO <= hunt.timer {
             hunt.timer = Seconds::ZERO;
             let site = hunt.carry_to.take();
-            self.hunt_release(c, [site])?;
+            self.hunt_release(c, [site.map(DropSiteId::id)])?;
             self.hunt_drop_off(c)?;
         }
         Ok(())
@@ -233,7 +237,7 @@ impl Unit {
                 // the drop site goes (FUN_140a7a190 with none), then set_state(8)
                 let hunt = self.actions.hunt_mut().ok_or(NO_HUNT)?;
                 let site = hunt.carry_to.take();
-                self.hunt_release(c, [site])?;
+                self.hunt_release(c, [site.map(DropSiteId::id)])?;
                 self.hunt_drop_off(c)?;
             }
             crate::gathering::hunt::Dropped::Idle => {

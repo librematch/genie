@@ -8,6 +8,7 @@ use crate::test_ids::object_id;
 use crate::top_actions::saved_actions;
 use genie_core::GenieError;
 use genie_core::construction::build::BuildTask;
+use genie_core::gathering::DropSiteId;
 use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::MoveWaitState;
@@ -671,7 +672,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         (a.target, a.site, walk.target, walk.state, walk.quiet),
         (
             Some(object_id(30)),
-            Some(object_id(31)),
+            Some(DropSiteId::new(object_id(31))),
             None,
             MoveTo::Moving,
             true
@@ -835,7 +836,7 @@ fn a_hunt_takes_its_task_lead_and_move_to() {
         (h.target_class, h.drop_site, h.task.id),
         (
             Some(class::VILLAGER),
-            Some(object_id(40)),
+            Some(DropSiteId::new(object_id(40))),
             TaskId::of_task(0)
         )
     );

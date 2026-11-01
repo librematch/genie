@@ -123,7 +123,7 @@ pub struct GatherAction {
     pub target: Option<ObjectId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
-    pub carry_to: Option<ObjectId>,
+    pub carry_to: Option<crate::gathering::DropSiteId>,
     /// The action state (`+0x18`), which word 9 adds.
     pub state: GatherState,
     /// `+0x38`..`+0x40`: where the target stood.

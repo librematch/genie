@@ -67,7 +67,7 @@ impl World {
             crate::gathering::gather::GATHER
         };
         let work = Work {
-            target: Some(site),
+            target: Some(site.id()),
             point: Position::from([NO_POINT; 3]),
             carry_test: false,
             filter: Some(filter),
@@ -89,7 +89,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(&self.masters, p)?;
         let seeks = master.kind < COMBAT
@@ -145,7 +145,7 @@ impl World {
         at: Point,
         held: Option<AttributeId>,
         class: ClassId,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
         let player = self.players.player(p)?;
         let look = |id: ObjectId| self.object(id).map(|(_, o)| (o.life.state, o.position()));
         Ok(nearest_table_site(
@@ -189,7 +189,7 @@ impl World {
             match self.table_drop_site(p, at, held, class)? {
                 None => DropSearch::Nothing,
                 Some(id) => {
-                    let found = self.find_work_task(p, idx, id, None, false)?;
+                    let found = self.find_work_task(p, idx, id.id(), None, false)?;
                     let range = found.map_or(task_range, |t| t.work_range);
                     let sprite = found.and_then(|t| t.sprites.carrying);
                     DropSearch::Site { id, range, sprite }
@@ -245,7 +245,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        site: ObjectId,
+        site: crate::gathering::DropSiteId,
         back: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let back = back.filter(|t| !t.is_recyclable()).and_then(|t| {
@@ -257,7 +257,7 @@ impl World {
             .map(|(_, o)| o.position())
             .ok_or(GenieError::unreachable("the drop site found"))?;
         let work = Work {
-            target: Some(site),
+            target: Some(site.id()),
             point,
             carry_test: true,
             filter: None,

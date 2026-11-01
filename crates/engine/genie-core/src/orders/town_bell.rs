@@ -551,7 +551,7 @@ impl World {
         if let Some(t) = found
             && let Some(pasture) = t.pasture
         {
-            found = held(pasture).map(|(_, p)| p);
+            found = held(pasture.id()).map(|(_, p)| p);
         }
         if found.is_none() {
             let own = unit

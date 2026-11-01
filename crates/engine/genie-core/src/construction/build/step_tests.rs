@@ -1,6 +1,7 @@
 //! The Build's update on the step ([`BuildAction::update`] through [`Unit::build_part`]), on
 //! World fixtures: the state of the builder, its foundation and the world after each update.
 
+use crate::gathering::DropSiteId;
 use crate::map::GridSize;
 use crate::map::Restriction;
 use crate::map::TerrainId;
@@ -1319,7 +1320,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
         .unwrap()
     };
     let site = |sprite| DropSearch::Site {
-        id: object_id(300),
+        id: DropSiteId::new(object_id(300)),
         range: Distance::new(0.5),
         sprite,
     };
@@ -1335,7 +1336,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
         ),
         (
             BuildState::Drop,
-            Some(object_id(300)),
+            Some(DropSiteId::new(object_id(300))),
             300,
             Distance::new(0.5),
             MoveTo::Start
@@ -1387,7 +1388,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
             -1,
             Position::ORIGIN,
             MoveTo::Start,
-            Some(object_id(300))
+            Some(DropSiteId::new(object_id(300)))
         )
     );
 }
@@ -1404,7 +1405,7 @@ fn at_the_mill(state: MoveTo) -> BuildAction {
             on_target_moved: TargetMoved::AsksAgain,
             ..walk_in(state)
         }),
-        site: Some(object_id(300)),
+        site: Some(DropSiteId::new(object_id(300))),
         ..started(HOUSE, AT_HOUSE, Distance::new(5.0), TASK)
     }
 }
@@ -1469,7 +1470,7 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
         (
             BuildState::Drop,
             Seconds::ZERO,
-            Some(object_id(300)),
+            Some(DropSiteId::new(object_id(300))),
             Some(MoveTo::Start)
         )
     );
@@ -1552,7 +1553,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
     assert_eq!(heard(&t), [SEARCH]);
     assert_eq!(
         (build(&t).state, build(&t).site),
-        (BuildState::Idle, Some(object_id(300)))
+        (BuildState::Idle, Some(DropSiteId::new(object_id(300))))
     );
     assert!(stands(&t));
     let mut t = drop_world(

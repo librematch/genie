@@ -1,6 +1,7 @@
 //! A gatherer's walk after a drop and the drop sites it walks to.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::{Seeker, drop_site_search};
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{GatherRetarget, Walks};
@@ -218,7 +219,7 @@ impl Unit {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = [gather.target, gather.carry_to];
+        let old = [gather.target, gather.carry_to.map(DropSiteId::id)];
         let rng = c.w.streams.get(Stream::Action);
         let _ = gather.retarget(
             GatherRetarget {
@@ -232,7 +233,7 @@ impl Unit {
             mover,
             rng,
         )?;
-        let new = [gather.target, gather.carry_to];
+        let new = [gather.target, gather.carry_to.map(DropSiteId::id)];
         for (old, new) in old.into_iter().zip(new) {
             if old == new {
                 continue;
@@ -355,7 +356,7 @@ impl Unit {
         };
         gather.carry_to = site;
         gather.set_drop(at, gap, mover, &walks)?;
-        Ok(site.filter(|_| site != carry_to))
+        Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 
     /// [`Unit::hunt_drop_off`] in `w`, from the update or a command, with the sprites' table
@@ -397,7 +398,7 @@ impl Unit {
         };
         hunt.carry_to = site;
         hunt.set_drop(at, gap, mover, &walks)?;
-        Ok(site.filter(|_| site != carry_to))
+        Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 
     /// The drop site a gatherer's `set_state(8)` walks to, its second target `carry_to` or, with
@@ -408,9 +409,9 @@ impl Unit {
         &self,
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
-        carry_to: Option<ObjectId>,
+        carry_to: Option<DropSiteId>,
         state: ActionState,
-    ) -> Result<(Option<ObjectId>, Distance), GenieError> {
+    ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
         let master = self.master_in(c.masters)?;
         let mover = self
             .body
@@ -458,7 +459,7 @@ impl Unit {
         others: OthersRef<'_>,
         state: ActionState,
         outside: bool,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> Result<Option<DropSiteId>, GenieError> {
         let by_path = !c.computer;
         self.drop_site_with(
             c,
@@ -476,7 +477,7 @@ impl Unit {
         others: OthersRef<'_>,
         state: ActionState,
         (outside, by_path, at_work): (bool, bool, Option<ActionType>),
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> Result<Option<DropSiteId>, GenieError> {
         let masters = c.masters.ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;

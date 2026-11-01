@@ -401,7 +401,7 @@ pub enum AiCommand {
     /// ([`crate::world::World::drop_elsewhere`]).
     DropElsewhere {
         /// The drop site.
-        site: ObjectId,
+        site: crate::gathering::DropSiteId,
         /// The top action's target before the work.
         back: Option<ObjectId>,
     },

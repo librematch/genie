@@ -32,7 +32,7 @@ pub enum DropSearch {
     /// and its carrying sprite `+0x58`), else the Build task's.
     Site {
         /// The drop site.
-        id: ObjectId,
+        id: crate::gathering::DropSiteId,
         /// The `MoveTo`'s range.
         range: Distance,
         /// The found task's carrying sprite, None without the task or the sprite.
@@ -103,8 +103,8 @@ impl BuildAction {
         };
         let every = &c.w.masters;
         let task = match (
-            crate::unit_ai::task_finder::world::task_target_with(id, 1, &find, every)?,
-            crate::unit_ai::task_finder::world::task_target_with(id, 2, &find, every)?,
+            crate::unit_ai::task_finder::world::task_target_with(id.id(), 1, &find, every)?,
+            crate::unit_ai::task_finder::world::task_target_with(id.id(), 2, &find, every)?,
         ) {
             (Some(t), Some(general)) => {
                 use crate::unit_ai::task_finder::world::SideWorld;
@@ -187,7 +187,7 @@ impl BuildAction {
         };
         let move_reads = builder.move_to_reads(&c.w.masters, c.player, &c.w.graphics)?;
         let to = move_reads
-            .walk_to(c.w, Some(id))?
+            .walk_to(c.w, Some(id.id()))?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         let given = sprite.or(self.task.moving);
         self.move_to = move_reads.to_object(to, range, given, TargetMoved::AsksAgain)?;

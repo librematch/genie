@@ -36,7 +36,7 @@ use crate::world::PETARD;
 use crate::world::slots::PlayerSlots;
 
 impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
-    fn table_drop_site(&mut self) -> Result<Option<ObjectId>, GenieError> {
+    fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
         let class = self.unit.master(&self.c.w.masters, self.player)?.class;
         let at = self.unit.position().ground();
         let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;

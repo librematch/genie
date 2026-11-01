@@ -1,12 +1,12 @@
 //! The drop-site searches (`FUN_1411671e0`): from a unit, or from a point without one.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
-use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
@@ -164,7 +164,7 @@ pub(crate) fn drop_site_search<'u>(
     at: Position,
     mut seeker: Option<Seeker<'_, '_>>,
     (outside, at_work): (bool, Option<ActionType>),
-) -> Result<Option<ObjectId>, GenieError> {
+) -> Result<Option<DropSiteId>, GenieError> {
     let (mut x, mut y) = (at.x(), at.y());
     let pointless = x <= NO_POINT || y <= NO_POINT;
     let fishing = seeker.as_ref().is_some_and(Seeker::fishing);
@@ -173,7 +173,7 @@ pub(crate) fn drop_site_search<'u>(
         .filter(|_| !fishing && !pointless)
         .map(|s| s.zones.zone(Tile::new(x as i32, y as i32)));
     let mut by_path = seeker.as_ref().is_some_and(|s| s.by_path) && !pointless;
-    let mut best: Option<ObjectId> = None;
+    let mut best: Option<DropSiteId> = None;
     let mut best_d = NO_DROP_DISTANCE;
     let mut last = NO_DROP_DISTANCE;
     for o in units {
@@ -181,7 +181,7 @@ pub(crate) fn drop_site_search<'u>(
             continue;
         }
         if x == NO_POINT && y == NO_POINT {
-            return Ok(Some(o.id));
+            return Ok(Some(DropSiteId::new(o.id)));
         }
         let master = o.master_in(Some(masters))?;
         if let (Some(s), Some(zone)) = (seeker.as_ref(), own_zone)
@@ -221,7 +221,7 @@ pub(crate) fn drop_site_search<'u>(
             None => squared,
         };
         if d < best_d {
-            best = Some(o.id);
+            best = Some(DropSiteId::new(o.id));
             best_d = d;
         }
     }
@@ -243,8 +243,8 @@ pub(crate) fn nearest_drop_site(
     others: OthersRef<'_>,
     sites: &[MasterId],
     at: Position,
-) -> Option<(ObjectId, DistanceSquared)> {
-    let mut best: Option<(ObjectId, DistanceSquared)> = None;
+) -> Option<(DropSiteId, DistanceSquared)> {
+    let mut best: Option<(DropSiteId, DistanceSquared)> = None;
     for o in others.own_iter() {
         if !sites.contains(&o.life.master_id) || o.life.state != ObjectState::Alive {
             continue;
@@ -253,7 +253,7 @@ pub(crate) fn nearest_drop_site(
         let (dx, dy) = (x - o.position().x(), y - o.position().y());
         let d = DistanceSquared::new(dy * dy + dx * dx);
         if best.is_none_or(|(_, b)| d < b) {
-            best = Some((o.id, d));
+            best = Some((DropSiteId::new(o.id), d));
         }
     }
     best
@@ -379,7 +379,7 @@ mod tests {
         class: ClassId,
         at: Position,
         spatial: &Spatial,
-    ) -> Result<Option<ObjectId>, GenieError> {
+    ) -> Result<Option<DropSiteId>, GenieError> {
         let mover = crate::gathering::hunt::tests::walker();
         // the search writes the obstruction manager's scratch: it runs on the fixture's copy
         let mut spatial = spatial.clone();
@@ -436,17 +436,17 @@ mod tests {
                 at,
                 &near_tc
             ),
-            Ok(Some(object_id(700)))
+            Ok(Some(DropSiteId::new(object_id(700))))
         );
         let tie = spatial(Point::new(20.0, 19.5));
         assert_eq!(
             search(&sites(), &villager(Some(800)), class::VILLAGER, at, &tie),
-            Ok(Some(object_id(700)))
+            Ok(Some(DropSiteId::new(object_id(700))))
         );
         let reversed: Vec<Unit> = sites().into_iter().rev().collect();
         assert_eq!(
             search(&reversed, &villager(Some(800)), class::VILLAGER, at, &tie),
-            Ok(Some(object_id(701)))
+            Ok(Some(DropSiteId::new(object_id(701))))
         );
         // another class, or a target of another class: by path as before
         assert_eq!(
@@ -488,24 +488,24 @@ mod tests {
         let none = Position::new(NO_POINT, NO_POINT, 0.0);
         assert_eq!(
             search(&sites(), &villager(None), class::VILLAGER, none, &map),
-            Ok(Some(object_id(700)))
+            Ok(Some(DropSiteId::new(object_id(700))))
         );
         let mut units = sites();
         units[0].life.state = ObjectState::Foundation;
         assert_eq!(
             search(&units, &villager(None), class::VILLAGER, none, &map),
-            Ok(Some(object_id(701)))
+            Ok(Some(DropSiteId::new(object_id(701))))
         );
         // (−2, 30): by distance, the mill (22² + 5²) before the town centre (22² + 16²)
         let below = Position::new(-2.0, 30.0, 0.0);
         assert_eq!(
             search(&sites(), &villager(None), class::VILLAGER, below, &map),
-            Ok(Some(object_id(701)))
+            Ok(Some(DropSiteId::new(object_id(701))))
         );
         let left = Position::new(5.0, NO_POINT, 0.0);
         assert_eq!(
             search(&sites(), &villager(None), class::VILLAGER, left, &map),
-            Ok(Some(object_id(700)))
+            Ok(Some(DropSiteId::new(object_id(700))))
         );
     }
 }

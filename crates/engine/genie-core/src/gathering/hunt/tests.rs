@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::attack::AttackState;
+use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
 use crate::map::Footprint;
 use crate::map::Radii;
@@ -888,7 +889,7 @@ fn a_walk_to_the_point_ends_in_a_search_or_done() {
     let mut h = hunt(HuntState::Search, MoveTo::Arrived);
     (h.target, h.carry_to, h.timer) = (
         Some(object_id(28813)),
-        Some(object_id(9156)),
+        Some(DropSiteId::new(object_id(9156))),
         Seconds::new(-10.0),
     );
     assert_eq!(
@@ -951,7 +952,7 @@ fn a_hunter_walks_to_its_drop_site_and_to_its_point() {
     };
     let dropping = |move_to: Option<MoveToAction>| HuntAction {
         state: HuntState::Drop,
-        carry_to: Some(object_id(10028)),
+        carry_to: Some(DropSiteId::new(object_id(10028))),
         move_to,
         ..hunting(-1)
     };
@@ -1057,7 +1058,7 @@ fn a_hunter_s_walks_pass_on_the_units_in_their_way() {
             rig.mover_mut().in_the_way = vec![object_id(77), object_id(78)];
             let mut h = HuntAction {
                 state,
-                carry_to: Some(object_id(10028)),
+                carry_to: Some(DropSiteId::new(object_id(10028))),
                 point: Position::new(35.5, 88.5, 0.0),
                 move_to: Some(MoveToAction {
                     target: (state == HuntState::Drop).then(|| object_id(10028)),
@@ -1471,7 +1472,7 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
 /// one unprepared is not modelled.
 #[test]
 fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
-    let herd = |site: Option<(ObjectId, DistanceSquared)>, idle| Herd {
+    let herd = |site: Option<(DropSiteId, DistanceSquared)>, idle| Herd {
         own: true,
         drop_site: site,
         engagement: engagement(),
@@ -1509,7 +1510,7 @@ fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
         &mut h,
         sheep(ObjectState::Alive),
         Some(herd(
-            Some((object_id(500), DistanceSquared::new(16.0))),
+            Some((DropSiteId::new(object_id(500)), DistanceSquared::new(16.0))),
             false,
         )),
     );
@@ -1518,7 +1519,7 @@ fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
         (h.state, h.drop_site, h.lead.moved, h.lead.start, h.timer),
         (
             HuntState::Lead,
-            Some(object_id(500)),
+            Some(DropSiteId::new(object_id(500))),
             true,
             Point::new(29.5, 89.0),
             LEAD_WAIT
@@ -1530,7 +1531,7 @@ fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
         (HERD_FAR, true, HuntState::Lead),
     ] {
         let mut h = walking(10028, moved);
-        let herd = herd(Some((object_id(500), gap_squared)), false);
+        let herd = herd(Some((DropSiteId::new(object_id(500)), gap_squared)), false);
         assert_eq!(
             face(&mut h, sheep(ObjectState::Alive), Some(herd)),
             Ok(HuntNext::Stay)
@@ -1577,7 +1578,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
         attack: None,
         move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
         drop_site: None,
-        carry_to: Some(object_id(9156)),
+        carry_to: Some(DropSiteId::new(object_id(9156))),
         timer: Seconds::ZERO,
         lead: Lead::default(),
     };
@@ -1778,7 +1779,7 @@ fn a_move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
     let mut rig = lost();
     let mut h = HuntAction {
         state: HuntState::Drop,
-        carry_to: Some(object_id(10028)),
+        carry_to: Some(DropSiteId::new(object_id(10028))),
         move_to: Some(to_house(MoveTo::Moving, CHOP.range)),
         ..hunting(-1)
     };

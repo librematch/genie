@@ -648,7 +648,7 @@ pub(crate) fn nearest_table_site(
     ),
     (at, held, class): (Point, Option<AttributeId>, ClassId),
     look: impl Fn(ObjectId) -> Option<(ObjectState, Position)>,
-) -> Option<ObjectId> {
+) -> Option<crate::gathering::DropSiteId> {
     let buildings =
         crate::unit_ai::task_finder::table_drop_buildings(table, held, Some(class), civ);
     let mut best = (None, TABLE_DROP_FAR);
@@ -664,7 +664,7 @@ pub(crate) fn nearest_table_site(
             let (dx, dy) = (at.x() - position.x(), at.y() - position.y());
             let d = dy * dy + dx * dx;
             if d < best.1 {
-                best = (Some(id), d);
+                best = (Some(crate::gathering::DropSiteId::new(id)), d);
             }
         }
     }

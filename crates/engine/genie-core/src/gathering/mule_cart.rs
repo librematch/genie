@@ -158,7 +158,11 @@ impl World {
                     &cart,
                     &mut w,
                     others,
-                    (kind, crate::objects::WorkerCount::NO_CAP, Some(id)),
+                    (
+                        kind,
+                        crate::objects::WorkerCount::NO_CAP,
+                        Some(crate::gathering::DropSiteId::new(id)),
+                    ),
                     (current, ObjectState::Foundation, crate::unit_ai::NO_POINT),
                 )?;
                 if let Some(f) = f {

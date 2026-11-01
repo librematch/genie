@@ -4,6 +4,7 @@
 use crate::top_actions::{Saved, TaskAt, first_action, saved_move_to};
 use crate::{saved_attack, saved_reload, saved_sprite};
 use genie_core::GenieError;
+use genie_core::gathering::DropSiteId;
 use genie_core::map::Point;
 use genie_core::movement::move_to::MOVE_TO;
 use genie_core::objects::ObjectId;
@@ -95,8 +96,8 @@ pub(super) fn import_hunt(
         task,
         attack: None,
         move_to: None,
-        drop_site: ObjectId::of_field(part.sheep_drop_site_id as i32),
-        carry_to: ObjectId::of_field(base.target2_id),
+        drop_site: DropSiteId::of_field(part.sheep_drop_site_id as i32),
+        carry_to: DropSiteId::of_field(base.target2_id),
         timer: Seconds::new(base.timer),
         lead: genie_core::gathering::hunt::Lead {
             moved: part.moved_sheep != 0,
@@ -186,7 +187,7 @@ pub(super) fn import_gather(
     let task = hunt_task(&saved.task(task_at)?);
     let mut gather = GatherAction {
         target: ObjectId::of_field(base.target_id),
-        carry_to: ObjectId::of_field(base.target2_id),
+        carry_to: DropSiteId::of_field(base.target2_id),
         state,
         point: saved.point(),
         timer: Seconds::new(base.timer),

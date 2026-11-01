@@ -5,6 +5,7 @@
 use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildReads, FISHING_SHIPS, drop_done_orders};
+use crate::gathering::DropSiteId;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
@@ -443,7 +444,7 @@ impl BuildAction {
         self.state = BuildState::Halted;
         let target = self.target.take();
         let site = self.site.take();
-        Ok((counted, [target, site]))
+        Ok((counted, [target, site.map(DropSiteId::id)]))
     }
 
     /// `set_state(2)` from the update ([`BuildAction::halt`]): a counted builder leaves its

@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::victims::{readable, victim, write_back};
+use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntSprites;
 use crate::map::Footprint;
@@ -98,7 +99,10 @@ impl Unit {
         let (kept, let_go) = second_target_checked(
             site,
             held,
-            state_of(site, OthersRef::of(&c.w.players, c.player)?),
+            state_of(
+                site.map(DropSiteId::id),
+                OthersRef::of(&c.w.players, c.player)?,
+            ),
         );
         self.actions.gather_mut().ok_or(NO_GATHER)?.carry_to = kept;
         if let Some(t) = let_go {
@@ -199,7 +203,7 @@ impl Unit {
                 .map(|p| (p.position, p.radius))
                 .ok_or(GenieError::unsupported("a gatherer without a place"))?;
         let site = self.gather_site(c, gather.carry_to, (position, radius))?;
-        let before = [gather.target, gather.carry_to];
+        let before = [gather.target, gather.carry_to.map(DropSiteId::id)];
         let dropped = gather.update_drop(c, self, me, reads, site);
         self.put_gather(gather);
         match dropped? {
@@ -223,7 +227,7 @@ impl Unit {
     fn gather_site(
         &self,
         c: &Step<'_>,
-        site: Option<ObjectId>,
+        site: Option<DropSiteId>,
         (position, radius): (Position, Footprint),
     ) -> Result<Option<crate::gathering::hunt::DropOff>, GenieError> {
         let Some(s) = c.w.spatial.get_known(site)? else {
@@ -333,7 +337,7 @@ impl Unit {
         &mut self,
         c: &mut Step<'_>,
         next: crate::gathering::gather::Next,
-        (old_target, old_second): (Option<ObjectId>, Option<ObjectId>),
+        (old_target, old_second): (Option<ObjectId>, Option<DropSiteId>),
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
         use crate::gathering::gather::Next;
@@ -341,7 +345,13 @@ impl Unit {
             return Ok(HeadCode::Deletes);
         }
         if let Some(g) = self.actions.gather() {
-            for (old, new) in [(old_target, g.target), (old_second, g.carry_to)] {
+            for (old, new) in [
+                (old_target, g.target),
+                (
+                    old_second.map(DropSiteId::id),
+                    g.carry_to.map(DropSiteId::id),
+                ),
+            ] {
                 if let Some(old) = old.filter(|_| old != new) {
                     crate::world::lets::release(c, self, old, by)?;
                 }
@@ -378,7 +388,7 @@ impl Unit {
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
         let master = self.master(&c.w.masters, c.player)?;
         let site = if let Some(carry) = carry_to {
-            carry.get()
+            carry.id().get()
         } else if !master.drop_sites.is_empty() {
             let mut w = DropWorld {
                 masters: c.w.masters.of(c.player),
@@ -392,7 +402,7 @@ impl Unit {
             };
             // the notify's record holds the drop site's id, 0 for none
             self.drop_site_from(&mut w, others, ActionState::new(state.get()), false)?
-                .map_or(0, ObjectId::get)
+                .map_or(0, |s| s.id().get())
         } else {
             -1
         };

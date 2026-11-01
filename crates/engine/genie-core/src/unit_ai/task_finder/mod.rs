@@ -81,7 +81,7 @@ pub struct TaskTarget<'a> {
     /// `+0x68a`, `unit_attackable_flag` (`FUN_141188b10`).
     pub attackable: bool,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in, if any.
-    pub pasture: Option<ObjectId>,
+    pub pasture: Option<crate::gathering::PastureId>,
     /// The type of the first action in its action list (`+0x880`), if any.
     pub top_action: Option<ActionType>,
 }

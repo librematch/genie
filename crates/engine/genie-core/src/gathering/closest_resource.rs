@@ -58,7 +58,11 @@ pub(crate) fn closest_resource_of(
     unit: &Unit,
     c: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
-    (kind, cap, site): (GatherGroup, crate::objects::WorkerCount, Option<ObjectId>),
+    (kind, cap, site): (
+        GatherGroup,
+        crate::objects::WorkerCount,
+        Option<crate::gathering::DropSiteId>,
+    ),
     (current, min_state, point): (Option<ObjectId>, crate::objects::ObjectState, Point),
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
@@ -68,7 +72,7 @@ pub(crate) fn closest_resource_of(
         None => None,
         Some(site) => {
             // the unit itself (a mule cart searches from its own place) or another object
-            let (sp, s) = if site == unit.id {
+            let (sp, s) = if site.id() == unit.id {
                 Some((c.player, unit))
             } else {
                 others.find(site)
@@ -265,7 +269,7 @@ impl Unit {
         c: &mut Step<'_>,
         kind: GatherGroup,
         cap: crate::objects::WorkerCount,
-        site: Option<ObjectId>,
+        site: Option<crate::gathering::DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
         let others = OthersRef::of(&c.w.players, c.player)?;
         let current = self

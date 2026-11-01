@@ -105,10 +105,10 @@ pub struct HuntAction {
     /// player's livestock), to the drop site, or to the point, which `set_state` makes.
     pub move_to: Option<MoveToAction>,
     /// `+0x70`: the drop site its own livestock is led to, none yet.
-    pub drop_site: Option<ObjectId>,
+    pub drop_site: Option<crate::gathering::DropSiteId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
-    pub carry_to: Option<ObjectId>,
+    pub carry_to: Option<crate::gathering::DropSiteId>,
     /// `+0x44`: the state's timer (state 8 waits with it below 0 before it tries again).
     pub timer: Seconds,
     /// What it keeps of the livestock it leads to its drop site.
@@ -154,7 +154,7 @@ pub struct Herd {
     pub own: bool,
     /// For its own livestock, the drop site (the hunt's, else the nearest that takes livestock,
     /// `FUN_1411671e0`) and the gap between it and the target squared (`FUN_14118f8c0`).
-    pub drop_site: Option<(ObjectId, DistanceSquared)>,
+    pub drop_site: Option<(crate::gathering::DropSiteId, DistanceSquared)>,
     /// The Attack `set_state(12)` starts.
     pub engagement: Engagement,
     /// The Attack's sprites and frames.

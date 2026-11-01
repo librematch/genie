@@ -2334,7 +2334,10 @@ fn closest_object_takes_a_free_farm_its_searcher_gathers_from() {
     let look = |id: ObjectId| match id.get() {
         1 => Some((crate::objects::WorkerCount::ZERO, None)),
         2 => Some((crate::objects::WorkerCount::ONE, None)),
-        3 => Some((crate::objects::WorkerCount::ZERO, Some(object_id(9)))),
+        3 => Some((
+            crate::objects::WorkerCount::ZERO,
+            Some(crate::gathering::PastureId::new(object_id(9))),
+        )),
         _ => None,
     };
     let farmer = Searcher {

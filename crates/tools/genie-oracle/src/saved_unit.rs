@@ -15,6 +15,7 @@ use genie_core::combat::MissileCount;
 use genie_core::combat::damage::ArmorPair;
 use genie_core::construction::BuilderCount;
 use genie_core::garrison::RaiderCountdown;
+use genie_core::gathering::PastureId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
@@ -103,8 +104,8 @@ pub(super) fn unit(
         attackable: s.unit_attackable_flag != 0,
         untargetable: s.unit_targeting_flag == 0,
         under_attack: s.under_attack_value != 0,
-        pasture: ObjectId::of_field(s.parent_pasture_id),
-        my_pasture: ObjectId::of_field(s.my_pasture_id),
+        pasture: PastureId::of_field(s.parent_pasture_id),
+        my_pasture: PastureId::of_field(s.my_pasture_id),
         undeletable: s.deletion_enabled == 0,
         capture_flag: object
             .combat()

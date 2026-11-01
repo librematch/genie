@@ -105,7 +105,7 @@ pub struct BuildAction {
     pub timer: Seconds,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site of its drop-off (state 8,
     /// `set_state(8)`'s search).
-    pub site: Option<ObjectId>,
+    pub site: Option<crate::gathering::DropSiteId>,
 }
 
 /// What a builder's Build task gives its work: the task's work range (`+0x30`; its `MoveTo` to the

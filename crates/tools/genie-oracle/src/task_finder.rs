@@ -2,6 +2,7 @@
 
 use crate::masters::MasterTable;
 use crate::{Error, work_masters};
+use genie_core::gathering::PastureId;
 use genie_core::map::Position;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
@@ -52,7 +53,7 @@ pub struct FinderObject {
     /// It may be attacked.
     pub attackable: bool,
     /// The pasture it is in.
-    pub pasture: Option<ObjectId>,
+    pub pasture: Option<PastureId>,
     /// The main building of an annex (`+0xbb8`), if it is one.
     pub annex_of: Option<ObjectId>,
     /// Its top action's type, if it has one.
@@ -224,7 +225,7 @@ fn finder_object(
         ),
         max_hp: HitPoints::new(master_hp + powerup(|c| c.hitpoints_max_powerup)),
         attackable: s.unit_attackable_flag != 0,
-        pasture: ObjectId::of_field(s.parent_pasture_id),
+        pasture: PastureId::of_field(s.parent_pasture_id),
         annex_of: o
             .tribe_building_object
             .as_deref()

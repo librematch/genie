@@ -3,6 +3,8 @@
 
 use crate::GenieError;
 use crate::combat::attack::{Arms, Attack, Engagement};
+use crate::gathering::DropSiteId;
+use crate::gathering::PastureId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
@@ -100,7 +102,7 @@ pub struct HuntMove<'a> {
     /// The target is a drop site of the hunter's master.
     pub drops_here: bool,
     /// The pasture the unit is on (`mMyPastureId`).
-    pub my_pasture: Option<ObjectId>,
+    pub my_pasture: Option<PastureId>,
     /// The gap to a drop site target.
     pub gap: Distance,
 }
@@ -170,7 +172,7 @@ impl HuntAction {
             hunt.set_target(None);
             hunt.point = Position::from([-1.0; 3]);
             hunt.target_class = None;
-            hunt.carry_to = Some(target.id);
+            hunt.carry_to = Some(DropSiteId::new(target.id));
             hunt.set_drop(target.position, attack.gap, mover, &walks)?;
             return Ok((hunt, false));
         }
@@ -263,7 +265,7 @@ impl HuntAction {
             self.set_target(None);
             self.timer = Seconds::ZERO;
             self.point = Position::from([-1.0; 3]);
-            self.carry_to = Some(target.id);
+            self.carry_to = Some(DropSiteId::new(target.id));
             self.target_class = Some(target.class);
             self.set_drop(target.position, attack.gap, mover, &walks)?;
             return Ok(Some(false));
@@ -302,20 +304,22 @@ impl HuntAction {
         if target.is_none() && self.task.range != Distance::ZERO {
             return Ok(false);
         }
-        if my_pasture.is_some() && target.is_none_or(|t| Some(t.id) != my_pasture) {
+        if my_pasture.is_some()
+            && target.is_none_or(|t| Some(t.id) != my_pasture.map(PastureId::id))
+        {
             return Err(GenieError::unsupported(
                 "a hunter leaving its pasture (FUN_141189ca0)",
             ));
         }
         if let Some(t) = target.filter(|t| t.player == player && drops_here && Amount::ZERO < held)
         {
-            if Some(t.id) == self.carry_to && self.state == HuntState::Drop {
+            if Some(t.id) == self.carry_to.map(DropSiteId::id) && self.state == HuntState::Drop {
                 return Ok(true);
             }
             self.set_target(None);
             self.point = Position::from([-1.0; 3]);
             self.target_class = Some(t.class);
-            self.carry_to = Some(t.id);
+            self.carry_to = Some(DropSiteId::new(t.id));
             self.set_drop(t.position, gap, mover, &walks)?;
             return Ok(true);
         }
@@ -431,6 +435,6 @@ impl HuntAction {
         let second = self.carry_to.take();
         self.point = Position::from([-1.0; 3]);
         self.timer = Seconds::ZERO;
-        [target, second]
+        [target, second.map(DropSiteId::id)]
     }
 }

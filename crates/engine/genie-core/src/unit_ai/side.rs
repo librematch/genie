@@ -95,7 +95,7 @@ pub trait UnitSide {
     /// # Errors
     ///
     /// A side without its unit.
-    fn table_drop_site(&mut self) -> Result<Option<ObjectId>, GenieError> {
+    fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
         Err(WITHOUT_UNIT)
     }
 
@@ -432,7 +432,7 @@ pub struct TargetFlags {
     /// `capture_flag` (`+0x924`, `FUN_14107cc90`).
     pub capture: CaptureKind,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
-    pub pasture: Option<ObjectId>,
+    pub pasture: Option<crate::gathering::PastureId>,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (`FUN_141188bb0`).
     pub untargetable: bool,
     /// `+0x68a`, `unit_attackable_flag` (`FUN_141188b10`).
@@ -448,7 +448,7 @@ pub struct ResourceSearch {
     /// Fewer workers than this (`param_4`; −1 any).
     pub cap: crate::objects::WorkerCount,
     /// The drop site the search starts from (`param_3`).
-    pub site: Option<ObjectId>,
+    pub site: Option<crate::gathering::DropSiteId>,
     /// The unit AI's current target (`+0x48`), which the search passes over.
     pub current: Option<ObjectId>,
     /// The point the search starts from without a site (`param_7`, `param_8`; (−1, −1) for the

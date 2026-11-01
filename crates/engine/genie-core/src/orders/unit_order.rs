@@ -95,7 +95,7 @@ impl World {
         &mut self,
         p: PlayerId,
         sheep: ObjectId,
-        site: ObjectId,
+        site: crate::gathering::DropSiteId,
     ) -> Result<(), GenieError> {
         self.send_to_site(p, sheep, site)?;
         let mut listed = Vec::new();
@@ -112,7 +112,7 @@ impl World {
         &mut self,
         p: PlayerId,
         sheep: ObjectId,
-        site: ObjectId,
+        site: crate::gathering::DropSiteId,
         listed: &mut Vec<ObjectId>,
     ) -> Result<(), GenieError> {
         listed.push(sheep);
@@ -167,7 +167,7 @@ impl World {
         &mut self,
         p: PlayerId,
         sheep: ObjectId,
-        site: ObjectId,
+        site: crate::gathering::DropSiteId,
     ) -> Result<(), GenieError> {
         let Some(Place::Live(q, idx)) = self.place(sheep) else {
             return Err(GenieError::unsupported(
@@ -181,7 +181,7 @@ impl World {
         let (site, point) = Some(site)
             .and_then(|id| self.spatial.get(id).map(|s| (id, s.position)))
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
-        self.move_to_object(p, idx, site, point)
+        self.move_to_object(p, idx, site.id(), point)
     }
 
     /// `UNIT_ORDER`'s action 4 (`FUN_14161e370` case 4) to the objects `ids`: each the world

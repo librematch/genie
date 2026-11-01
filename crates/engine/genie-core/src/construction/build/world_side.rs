@@ -75,7 +75,7 @@ impl crate::world::World {
                 .add_attribute(kind, amount)?;
         }
         if part.pasture {
-            self.setup_pasture(owner, id)?;
+            self.setup_pasture(owner, crate::gathering::PastureId::new(id))?;
         }
         if part.cart {
             self.cart_search(owner, id, ObjectState::Foundation)?;

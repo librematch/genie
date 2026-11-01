@@ -43,7 +43,7 @@ pub struct Candidate {
     /// x, y, z.
     pub position: Position,
     /// `+0x790`, `parent_pasture_id`.
-    pub pasture: Option<ObjectId>,
+    pub pasture: Option<crate::gathering::PastureId>,
     /// `+0x689` is 0 ([`crate::objects::unit::Unit::untargetable`]).
     pub untargetable: bool,
     /// `+0x308`, `attribute_type_held`, none for −1.
@@ -234,7 +234,7 @@ pub struct Seeker {
     /// Its unit AI's current target (`+0x48`), which the search passes over.
     pub current_target: Option<ObjectId>,
     /// `+0x794`, `my_pasture_id`.
-    pub my_pasture: Option<ObjectId>,
+    pub my_pasture: Option<crate::gathering::PastureId>,
     /// `param_6`: below this state the unit finds nothing (2 for the unit AIs' searches, 0 for
     /// a mule cart's).
     pub min_state: ObjectState,
@@ -636,6 +636,7 @@ pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, crate::obje
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gathering::PastureId;
     use crate::players::attribute;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
@@ -978,7 +979,7 @@ mod tests {
             Ok((None, None))
         );
         let tending = Seeker {
-            my_pasture: Some(object_id(50)),
+            my_pasture: Some(PastureId::new(object_id(50))),
             ..SEEKER
         };
         assert_eq!(

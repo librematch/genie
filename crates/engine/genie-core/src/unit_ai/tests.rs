@@ -1,5 +1,7 @@
 use super::*;
 use crate::construction::FoundationId;
+use crate::gathering::DropSiteId;
+use crate::gathering::PastureId;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -226,8 +228,8 @@ impl UnitSide for Recorder {
     fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
-    fn table_drop_site(&mut self) -> Result<Option<ObjectId>, GenieError> {
-        Ok(self.drop_site)
+    fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
+        Ok(self.drop_site.map(DropSiteId::new))
     }
     fn top_target_now(&mut self) -> Result<Option<ObjectId>, GenieError> {
         Ok(self.top)
@@ -1098,8 +1100,12 @@ impl UnitSide for ResourceSide {
             (search.point, search.min_state),
             (NO_POINT, ObjectState::Alive)
         );
-        self.searches
-            .push((search.kind, search.cap.get(), search.site, search.current));
+        self.searches.push((
+            search.kind,
+            search.cap.get(),
+            search.site.map(DropSiteId::id),
+            search.current,
+        ));
         Ok(self.resource)
     }
 }
@@ -11139,7 +11145,7 @@ fn the_tail_stops_work_on_a_target_without_its_targeting_flag() {
         &mut u,
         PlayerId::new(1),
         TargetFlags {
-            pasture: Some(object_id(77)),
+            pasture: Some(PastureId::new(object_id(77))),
             ..untargetable
         },
         &mut fx,
@@ -12931,7 +12937,7 @@ fn a_villager_drops_another_resource_at_the_table_s_building() {
     assert_eq!(
         fx,
         [Effect::Command(AiCommand::DropElsewhere {
-            site: object_id(45),
+            site: DropSiteId::new(object_id(45)),
             back: Some(object_id(77))
         })]
     );

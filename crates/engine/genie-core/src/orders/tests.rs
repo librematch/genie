@@ -3,6 +3,7 @@ use crate::commands::UnitOrderAction;
 use crate::commands::UnloadPick;
 use crate::construction::build::BuildState;
 use crate::garrison::ContainerId;
+use crate::gathering::DropSiteId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::hunt::HuntState;
 use crate::groups::Differentiator;
@@ -253,7 +254,7 @@ fn a_drop_off_order_leaves_a_livestock_without_a_drop_site_alone() {
             class::LIVESTOCK
         )
         .unwrap(),
-        Some(object_id(503))
+        Some(DropSiteId::new(object_id(503)))
     );
     assert_eq!(
         t.table_drop_site(
@@ -455,7 +456,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         ),
         (
             BuildState::Drop,
-            Some(object_id(503)),
+            Some(DropSiteId::new(object_id(503))),
             503,
             Distance::new(0.1)
         )
@@ -531,7 +532,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             .actions
             .build()
             .map(|b| (b.state, b.site)),
-        Some((BuildState::Drop, Some(object_id(503))))
+        Some((BuildState::Drop, Some(DropSiteId::new(object_id(503)))))
     );
     let mut t = world();
     t.unit_order(
@@ -3236,8 +3237,12 @@ fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
             placed(PlayerId::from(p), master_id(594), at, 0.2),
         );
     }
-    t.lead_herd(PlayerId::new(1), object_id(20), object_id(11))
-        .unwrap();
+    t.lead_herd(
+        PlayerId::new(1),
+        object_id(20),
+        DropSiteId::new(object_id(11)),
+    )
+    .unwrap();
     let goes = |p: usize, id: i32| {
         t.players[p]
             .objects
@@ -4582,7 +4587,7 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
         .expect("the Gather");
     assert_eq!(
         (g.carry_to, g.state),
-        (Some(object_id(700)), GatherState::Drop)
+        (Some(DropSiteId::new(object_id(700))), GatherState::Drop)
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,
@@ -4619,7 +4624,7 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
         v.actions.gather().map(|g| (g.carry_to, g.state)),
-        Some((Some(object_id(700)), GatherState::Drop))
+        Some((Some(DropSiteId::new(object_id(700))), GatherState::Drop))
     );
     assert_eq!(v.ai.as_ref().map(|ai| ai.orders.len()), Some(1));
 }
@@ -4645,7 +4650,7 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
         .expect("the Hunt");
     assert_eq!(
         (h.carry_to, h.state),
-        (Some(object_id(700)), HuntState::Drop)
+        (Some(DropSiteId::new(object_id(700))), HuntState::Drop)
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,

@@ -660,8 +660,12 @@ type ClosestChecks<'a> = (
 
 /// What `ClosestObject` reads of a farm it found: its workers (`+0x644`) and the pasture it is in
 /// (`+0x790`, `parent_pasture_id`); None for an object the caller does not hold.
-pub type FarmLook<'a> =
-    dyn Fn(ObjectId) -> Option<(crate::objects::WorkerCount, Option<ObjectId>)> + 'a;
+pub type FarmLook<'a> = dyn Fn(
+        ObjectId,
+    ) -> Option<(
+        crate::objects::WorkerCount,
+        Option<crate::gathering::PastureId>,
+    )> + 'a;
 
 #[cfg(test)]
 mod tests;

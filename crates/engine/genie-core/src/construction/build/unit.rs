@@ -4,6 +4,7 @@
 //! foundation's work, its starts and its completion.
 
 use crate::construction::build::BuildState;
+use crate::gathering::DropSiteId;
 use crate::map::Rect;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -143,7 +144,7 @@ impl Unit {
         &self,
         c: &Step<'_>,
         others: OthersRef<'_>,
-        site: Option<ObjectId>,
+        site: Option<DropSiteId>,
     ) -> Result<Option<(ObjectState, DropOff)>, GenieError> {
         let Some(s) = c.w.spatial.get(site).filter(|_| site.is_some()) else {
             return Ok(None);
@@ -168,7 +169,7 @@ impl Unit {
                 .unwrap_or(Amount::ZERO),
             civ: c.w.players.player(c.player)?.civ,
         };
-        Ok(state_of(site, others).map(|state| {
+        Ok(state_of(site.map(DropSiteId::id), others).map(|state| {
             let drop = DropOff {
                 takes: crate::unit_ai::task_finder::drops_at(&c.w.drop_sites, s.master, &actor),
                 gap_squared: footprint_gap_squared(

@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
 use crate::combat::victims::{KillLeft, file_kill, victim};
+use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
@@ -206,8 +207,8 @@ impl Unit {
                     .collect();
             nearest_drop_site(others, &sites, them.position)
                 .map(
-                    |(id, _)| -> Result<(ObjectId, DistanceSquared), GenieError> {
-                        let s = at(Some(id))?;
+                    |(id, _)| -> Result<(DropSiteId, DistanceSquared), GenieError> {
+                        let s = at(Some(id.id()))?;
                         Ok((
                             id,
                             footprint_gap_squared(them.position, them.radius, s.position, s.radius),
