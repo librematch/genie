@@ -8,15 +8,15 @@ use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::walk_in::WalkIn;
 use crate::pathing::hull_path::walks::WalkOut;
 use crate::pathing::hull_path::{
-    GROWTHS, HullIndex, HullPather, HullQuery, ITERATION_CAP, MOST, NUDGE, PATHS, Point, Waypoints,
+    GROWTHS, HullIndex, HullPather, HullQuery, ITERATION_CAP, MOST, NUDGE, NodeIndex, NodeList,
+    PATHS, Point, Waypoints,
 };
-use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 /// What `FindShortPath`'s rounds carry from one to the next and to the end.
 pub(super) struct Rounds {
     /// The nearest a node came to the goal (at first the straight walk).
-    nearest_d: f32,
+    nearest_d: Distance,
     /// Whether the search reached the goal or the target.
     pub(super) found: bool,
     /// The goal hull's entrance the found node takes, or -1.
@@ -40,7 +40,7 @@ pub(super) struct Rounds {
 
 impl Rounds {
     /// The rounds before the first: the straight walk as the nearest.
-    pub(super) const fn new(straight: f32) -> Self {
+    pub(super) const fn new(straight: Distance) -> Self {
         Self {
             nearest_d: straight,
             found: false,
@@ -56,7 +56,7 @@ impl Rounds {
     }
 
     /// A node `d` from the goal: nearer than the nearest so far, it is the best node.
-    fn nearer(&mut self, node: NodeIndex, d: f32) {
+    fn nearer(&mut self, node: NodeIndex, d: Distance) {
         if d < self.nearest_d {
             self.nearest_d = d;
             self.best_node = Some(node);

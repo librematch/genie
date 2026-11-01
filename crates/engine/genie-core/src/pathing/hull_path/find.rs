@@ -13,9 +13,9 @@ use crate::pathing::ShortFound;
 use crate::pathing::hull_path::NO_AREA;
 use crate::pathing::hull_path::rounds::Rounds;
 use crate::pathing::hull_path::{
-    HALF, HullPather, HullQuery, NEAR_TARGET, Point, Target, Waypoints,
+    HALF, HullPather, HullQuery, NEAR_TARGET, NodeIndex, NodeList, Point, Target, Waypoints,
+    walk_length,
 };
-use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 impl HullPather<'_> {
@@ -149,9 +149,7 @@ impl HullPather<'_> {
             (ay1 + 6) as f32,
         ))?;
         self.empty(NodeList::SEARCH)?;
-        let mut rounds = Rounds::new(sqrt(
-            (from.y() - to.y()) * (from.y() - to.y()) + (from.x() - to.x()) * (from.x() - to.x()),
-        ));
+        let mut rounds = Rounds::new(walk_length(from, to));
         if let Some(result) = self.search(&q, keep, &mut rounds, &mut path)? {
             return Ok((result, path, true));
         }
@@ -219,15 +217,11 @@ impl HullPather<'_> {
     /// box or of the goal (the straight walk less the radius).
     fn already_there(&self, q: &HullQuery) -> bool {
         let (from, to) = (q.from, q.to);
-        let straight = sqrt(
-            (from.y() - to.y()) * (from.y() - to.y()) + (from.x() - to.x()) * (from.x() - to.x()),
+        let gap = q.target.as_ref().map_or_else(
+            || walk_length(from, to) - self.radius,
+            |t| self.target_gap(t, from),
         );
-        let radius = self.radius.get();
-        let gap = q
-            .target
-            .as_ref()
-            .map_or(straight - radius, |t| self.target_gap(t, from).get());
-        (from.x() == to.x() && from.y() == to.y()) || gap <= q.range.get()
+        (from.x() == to.x() && from.y() == to.y()) || gap <= q.range
     }
 
     /// The quick path's goal: without a range (or with a target off the goal) the goal, short of

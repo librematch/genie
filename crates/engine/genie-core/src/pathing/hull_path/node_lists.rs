@@ -4,10 +4,9 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::spatial::{Hit, RecordId};
-use crate::math::fmath::sqrt;
 use crate::objects::ObjectId;
 use crate::pathing::hull_path::{
-    EPSILON, HullPather, LINE_HITS, Node, NodeIndex, NodeList, Point, Waypoints,
+    EPSILON, HullPather, LINE_HITS, Node, NodeIndex, NodeList, Point, Waypoints, walk_length,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -214,20 +213,15 @@ impl HullPather<'_> {
         parent: Option<NodeIndex>,
         at: Point,
         goal: Option<Point>,
-    ) -> Result<(f32, f32), GenieError> {
+    ) -> Result<(Distance, Distance), GenieError> {
         let cost = match parent {
             Some(p) => {
                 let q = *self.nodes.checked(p)?;
-                sqrt(
-                    (q.at.y() - at.y()) * (q.at.y() - at.y())
-                        + (q.at.x() - at.x()) * (q.at.x() - at.x()),
-                ) + q.cost
+                walk_length(q.at, at) + q.cost
             }
-            None => 0.0,
+            None => Distance::ZERO,
         };
-        let to_goal = goal.map_or(0.0, |g| {
-            sqrt((at.y() - g.y()) * (at.y() - g.y()) + (at.x() - g.x()) * (at.x() - g.x()))
-        });
+        let to_goal = goal.map_or(Distance::ZERO, |g| walk_length(at, g));
         Ok((cost, to_goal))
     }
 

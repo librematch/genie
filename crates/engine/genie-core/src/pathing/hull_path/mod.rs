@@ -253,9 +253,9 @@ struct Node {
     next: Option<NodeIndex>,
     prev: Option<NodeIndex>,
     /// The straight distance to the goal (`+0x20`).
-    to_goal: f32,
+    to_goal: Distance,
     /// The walk from the start (`+0x24`).
-    cost: f32,
+    cost: Distance,
     /// The hull of a hull point ([`HullIndex::slot`]); in a walk out of a hull, the box the node
     /// lies on (`+0x28`, −1 none). The game's one field for both, which no reader tells apart.
     hull: i32,
@@ -273,13 +273,21 @@ impl Node {
             parent: None,
             next: None,
             prev: None,
-            to_goal: 0.0,
-            cost: 0.0,
+            to_goal: Distance::ZERO,
+            cost: Distance::ZERO,
             hull: -1,
             vertex: -1,
             direction: -1,
         }
     }
+}
+
+/// The straight walk from `a` to `b`: the root of the squares' sum, y's first, as the pather
+/// reckons every node's step, distance to the goal and straight walk.
+fn walk_length(a: Point, b: Point) -> Distance {
+    Distance::new(sqrt(
+        (a.y() - b.y()) * (a.y() - b.y()) + (a.x() - b.x()) * (a.x() - b.x()),
+    ))
 }
 
 /// A path (`BPath`): its waypoints (x, y; the game keeps a height of 0 between) and the cost the
@@ -289,7 +297,7 @@ pub struct Waypoints {
     /// The waypoints.
     pub points: Vec<Point>,
     /// The cost.
-    pub cost: f32,
+    pub cost: Distance,
 }
 
 impl Waypoints {

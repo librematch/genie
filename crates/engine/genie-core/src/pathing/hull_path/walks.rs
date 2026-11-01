@@ -9,10 +9,9 @@ use crate::math::fmath::{at_most_or_unordered, maxss, sqrt};
 use crate::objects::ObjectId;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
-    DIRECTIONS, EXIT_STEP, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, ONE, Point,
-    SAME_END, SIDES, SQRT_2, Target, Waypoints, Within,
+    DIRECTIONS, EXIT_STEP, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, NodeIndex,
+    NodeList, ONE, Point, SAME_END, SIDES, SQRT_2, Target, Waypoints, Within, walk_length,
 };
-use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 /// A walk out of a hull ([`HullPather::walk_out`]'s arguments, `FUN_140f8cf00`'s order).
@@ -374,9 +373,7 @@ impl HullPather<'_> {
         let mut left_boxes = false;
         self.empty(NodeList::WALKS)?;
         let mut nearest: Option<NodeIndex> = None;
-        let mut best = goal.map_or(0.0, |g| {
-            sqrt((from.y() - g.y()) * (from.y() - g.y()) + (from.x() - g.x()) * (from.x() - g.x()))
-        });
+        let mut best = goal.map_or(Distance::ZERO, |g| walk_length(from, g));
         let (inside, stuck) = self.begin_walk_out(hull, from, goal)?;
         if stuck {
             return Ok(Within {

@@ -4,10 +4,9 @@ use crate::GenieError;
 use crate::map::Rect;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
-    ENTRANCE_STEP, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, PATHS, Point, SIDES, Target,
-    Waypoints, Within,
+    ENTRANCE_STEP, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, NodeIndex, NodeList, PATHS,
+    Point, SIDES, Target, Waypoints, Within,
 };
-use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 /// The ways in a walk into a hull keeps: its paths, the hull side each leaves by, how many it

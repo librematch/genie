@@ -457,18 +457,39 @@ fn the_node_pool_holds_the_heads_first_and_numbers_nodes_in_order() {
         (NodeIndex(0), NodeIndex(1))
     );
     let mut node = Node::head();
-    node.cost = 3.0;
+    node.cost = Distance::new(3.0);
     assert_eq!(nodes.push(node), NodeIndex(2));
-    assert_eq!(nodes.checked(NodeIndex(2)).unwrap().cost, 3.0);
-    assert_eq!(nodes[NodeIndex(2)].cost, 3.0);
-    nodes.checked_mut(NodeIndex(2)).unwrap().cost = 4.0;
-    assert_eq!(nodes.get(NodeIndex(2)).map(|n| n.cost), Some(4.0));
+    assert_eq!(
+        nodes.checked(NodeIndex(2)).unwrap().cost,
+        Distance::new(3.0)
+    );
+    assert_eq!(nodes[NodeIndex(2)].cost, Distance::new(3.0));
+    nodes.checked_mut(NodeIndex(2)).unwrap().cost = Distance::new(4.0);
+    assert_eq!(
+        nodes.get(NodeIndex(2)).map(|n| n.cost),
+        Some(Distance::new(4.0))
+    );
     assert!(nodes.checked(NodeIndex(3)).is_err());
     assert!(nodes.get(NodeIndex(3)).is_none());
     let mut closed = ClosedLists::default();
     closed.of_mut(NodeList::WALKS).push(NodeIndex(2));
     assert_eq!(*closed.of(NodeList::WALKS), [NodeIndex(2)]);
     assert_eq!(*closed.of(NodeList::SEARCH), []);
+}
+
+/// A straight walk is the root of the squares' sum, y's first: the same either way, and
+/// exact for a 3-4-5 triangle.
+#[test]
+fn a_walk_s_length_is_the_root_of_the_squares_sum() {
+    let (a, b) = (Point::new(1.0, 2.0), Point::new(4.0, 6.0));
+    assert_eq!(walk_length(a, b), Distance::new(5.0));
+    assert_eq!(walk_length(b, a), Distance::new(5.0));
+    assert_eq!(walk_length(a, a), Distance::ZERO);
+    let (c, d) = (Point::new(0.1, 0.7), Point::new(2.3, -1.9));
+    assert_eq!(
+        walk_length(c, d).get().to_bits(),
+        sqrt((0.7f32 - -1.9) * (0.7 - -1.9) + (0.1f32 - 2.3) * (0.1 - 2.3)).to_bits()
+    );
 }
 
 fn open_world() -> Spatial {
@@ -524,7 +545,10 @@ fn a_node_joins_the_open_list_by_cost_and_distance_and_replaces_a_dearer_one() {
         })
         .unwrap()
         .unwrap();
-    assert_eq!((p.nodes[root].cost, p.nodes[root].to_goal), (0.0, 10.0));
+    assert_eq!(
+        (p.nodes[root].cost, p.nodes[root].to_goal),
+        (Distance::ZERO, Distance::new(10.0))
+    );
     // cost 5, distance √65: 13.06
     let a = p
         .add_node(NewNode {
@@ -540,7 +564,10 @@ fn a_node_joins_the_open_list_by_cost_and_distance_and_replaces_a_dearer_one() {
         })
         .unwrap()
         .unwrap();
-    assert_eq!((p.nodes[a].cost, p.nodes[a].parent), (5.0, Some(root)));
+    assert_eq!(
+        (p.nodes[a].cost, p.nodes[a].parent),
+        (Distance::new(5.0), Some(root))
+    );
     assert_eq!(
         (p.nodes[a].hull, p.nodes[a].vertex, p.nodes[a].direction),
         (0, 1, 7)
@@ -642,7 +669,7 @@ fn a_node_joins_the_open_list_by_cost_and_distance_and_replaces_a_dearer_one() {
         })
         .unwrap()
         .unwrap();
-    assert_eq!(p.nodes[e].cost, 5.0);
+    assert_eq!(p.nodes[e].cost, Distance::new(5.0));
     // a node not open goes to the closed list without a test
     let f = p
         .add_node(NewNode {
@@ -658,7 +685,10 @@ fn a_node_joins_the_open_list_by_cost_and_distance_and_replaces_a_dearer_one() {
         })
         .unwrap()
         .unwrap();
-    assert_eq!((p.nodes[f].cost, p.nodes[f].to_goal), (5.0, 0.0));
+    assert_eq!(
+        (p.nodes[f].cost, p.nodes[f].to_goal),
+        (Distance::new(5.0), Distance::ZERO)
+    );
     assert_eq!(*p.closed.of(NodeList::SEARCH), [a, b, f]);
     assert!(!open_nodes(&p, NodeList::SEARCH).contains(&f));
 }
@@ -1690,7 +1720,7 @@ fn the_pather_s_float_tests_take_the_game_s_nan_paths() {
     // partway: an unordered end is nearer the goal than the start, and not within range
     let mut path = Waypoints {
         points: vec![Point::new(1.0, 1.0), Point::new(f32::NAN, 2.0)],
-        cost: 0.0,
+        cost: Distance::ZERO,
     };
     p.start = Point::new(1.0, 1.0);
     assert_eq!(
@@ -2868,9 +2898,9 @@ fn a_found_path_follows_its_entrance_and_keeps_a_last_leg_on_the_target() {
     };
     let walk = || Waypoints {
         points: vec![Point::new(2.0, 5.5), Point::new(11.7, 5.5)],
-        cost: 0.0,
+        cost: Distance::ZERO,
     };
-    let mut rounds = Rounds::new(0.0);
+    let mut rounds = Rounds::new(Distance::ZERO);
     let mut path = walk();
     assert_eq!(p.found_end(&q, &rounds, &mut path), Ok(true));
     assert_eq!(path, walk());
@@ -2942,12 +2972,12 @@ fn an_unfound_search_ends_at_the_node_or_the_walk_nearer_the_goal() {
             direction: -1,
         })
         .unwrap();
-    let mut rounds = Rounds::new(7.0);
+    let mut rounds = Rounds::new(Distance::new(7.0));
     rounds.within = true;
     rounds.best_node = Some(node);
     let walked = |x: &[Point]| Waypoints {
         points: x.to_vec(),
-        cost: 0.0,
+        cost: Distance::ZERO,
     };
     let to_node = [Point::new(2.0, 5.0), Point::new(6.0, 5.0)];
     for walk in [&[Point::new(2.0, 5.0), Point::new(4.0, 5.0)][..], &[]] {
@@ -3015,7 +3045,7 @@ fn a_goal_in_the_start_s_hull_is_walked_to_within_it() {
         target_id: None,
         range: Distance::ZERO,
     };
-    let mut rounds = Rounds::new(0.0);
+    let mut rounds = Rounds::new(Distance::ZERO);
     let mut path = Waypoints::default();
     assert_eq!(p.round_start(&q, true, &mut rounds, &mut path), Ok(None));
     assert!(rounds.within);
