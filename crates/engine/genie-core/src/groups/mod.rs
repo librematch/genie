@@ -291,7 +291,7 @@ pub struct UnitTypeStatistic {
     /// `mAttackRange`.
     pub attack_range: Distance,
     /// `mDesiredSpacing`.
-    pub desired_spacing: f32,
+    pub desired_spacing: Distance,
     /// `mNumberUnitTypes`.
     pub number_unit_types: i32,
     /// `mUnitTypes`: the 200 bytes the save writes (`+0x38`), as 50 words.
@@ -310,7 +310,7 @@ pub struct TargetData {
     /// `mRange`.
     pub range: Distance,
     /// `mTargetRadius`.
-    pub target_radius: f32,
+    pub target_radius: Distance,
     /// `mDisableRetargeting`.
     pub disable_retargeting: u8,
     /// `mCertainAction`: the action type the attack asks of its units, none for −1 (any).
@@ -381,11 +381,11 @@ pub struct UnitGroup {
     /// `mDesiredHeight`.
     pub desired_height: f32,
     /// `mLargestUnitRadius`.
-    pub largest_unit_radius: f32,
+    pub largest_unit_radius: Distance,
     /// `mSmallestUnitRadius`.
-    pub smallest_unit_radius: f32,
+    pub smallest_unit_radius: Distance,
     /// `mDesiredSpacing`.
-    pub desired_spacing: f32,
+    pub desired_spacing: Distance,
     /// `mSmallestUnitRange`.
     pub smallest_unit_range: Distance,
     /// `mSmallestRangedUnitRange`.
@@ -428,7 +428,7 @@ pub struct UnitGroup {
     /// `mDifferentiatorGroups`.
     pub differentiator_groups: Vec<GroupId>,
     /// `mTotalSpacing`.
-    pub total_spacing: f32,
+    pub total_spacing: Distance,
     /// `mNonRetargetUnits`.
     pub non_retarget_units: Vec<u32>,
     /// The members' `mSecondsSinceAttacking` slots past the members (not saved): the array's

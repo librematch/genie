@@ -130,8 +130,8 @@ impl UnitGroup {
             });
         let stat = self.unit_types.checked_mut(at)?;
         let spacing = unit.radius * SPACING_FACTOR;
-        if stat.desired_spacing < spacing.get() {
-            stat.desired_spacing = spacing.get();
+        if stat.desired_spacing < spacing {
+            stat.desired_spacing = spacing;
         }
         stat.units.push(id);
         count_unit_types(stat, masters_of, scratch);
@@ -415,8 +415,8 @@ impl World {
         });
         g.join_statistic(sub, id, unit, &masters_of, &mut scratch)?;
         let spacing = unit.radius * SPACING_FACTOR;
-        if g.desired_spacing < spacing.get() {
-            g.desired_spacing = spacing.get();
+        if g.desired_spacing < spacing {
+            g.desired_spacing = spacing;
         }
         g.flags |= GroupFlags::RELAYOUT;
         if !g.motion.flags.contains(MotionFlags::NEW) {
@@ -433,6 +433,7 @@ mod tests {
     use crate::groups::GroupFlags;
     use crate::groups::MotionFlags;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
+    use crate::map::Distance;
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
@@ -805,10 +806,13 @@ mod tests {
                 m.spacing_modifier = 1.0;
             }
         }
-        t.groups.get_mut(group_id(1)).unwrap().desired_spacing = 0.0;
+        t.groups.get_mut(group_id(1)).unwrap().desired_spacing = Distance::ZERO;
         let _ = t.lock_formation(group_id(1), FormationKind::LINE);
         let spacing = t.groups.get(group_id(1)).unwrap().desired_spacing;
-        assert_eq!(spacing, 0.2 * crate::math::image::group::SPACING_FACTOR);
+        assert_eq!(
+            spacing,
+            Distance::new(0.2 * crate::math::image::group::SPACING_FACTOR)
+        );
     }
 
     /// Kept moving, the unit's walk stays; a unit the world does not hold leaves the first

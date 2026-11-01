@@ -818,7 +818,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
     let set = |t: &mut World, flags: u32, spacing: f32| {
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags = GroupFlags::from_bits_retain(flags);
-        g.total_spacing = spacing;
+        g.total_spacing = Distance::new(spacing);
     };
     set(&mut t, 0, 6.0);
     assert_eq!(t.relayout_choice(group_id(1), 3).unwrap(), (false, false));

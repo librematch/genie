@@ -156,7 +156,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
         .collect();
     g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
     g.motion.position[2] = BVector::new(0.0, 1.0, 0.0);
-    g.desired_spacing = 2.0;
+    g.desired_spacing = Distance::new(2.0);
     t.groups = crate::groups::UnitGroups {
         groups: vec![g],
         ..crate::groups::UnitGroups::default()
@@ -553,7 +553,7 @@ fn an_unreachable_slot_moves_to_the_reachable_cell_its_unit_finds() {
         let mut t = slot_world(&[(10, 4, 5.5, 5.5), (11, 4, 7.5, 5.5)], &[(8, 5)]);
         t.groups.groups[0].motion.position[0] = BVector::new(5.5, 0.0, 5.5);
         t.groups.groups[0].motion.lead = Some(object_id(10));
-        t.groups.groups[0].desired_spacing = spacing;
+        t.groups.groups[0].desired_spacing = Distance::new(spacing);
         let mut f = Formation::new();
         f.slots = vec![
             Slot {
@@ -757,7 +757,7 @@ fn a_cell_mark_points_toward_the_nearest_slot_and_a_nan_along_y() {
 fn a_nan_distance_back_takes_the_index_times_the_spacing() {
     let mut t = slot_world(&[(10, 4, 5.0, 5.0)], &[]);
     t.groups.groups[0].motion.position[0] = BVector::new(9.0, 0.0, 5.0);
-    t.groups.groups[0].desired_spacing = 2.0;
+    t.groups.groups[0].desired_spacing = Distance::new(2.0);
     let mut f = Formation::new();
     f.transform_type = 0;
     f.number_lines = 2;
@@ -812,11 +812,11 @@ fn one_statistic(t: &mut World, units: &[ObjectId]) {
     let mut counts = vec![0u32; 50];
     counts[0] = units.len() as u32;
     let g = &mut t.groups.groups[0];
-    g.desired_spacing = 1.0;
+    g.desired_spacing = Distance::new(1.0);
     g.unit_types = vec![crate::groups::UnitTypeStatistic {
         formation_category: 1,
         units: units.to_vec(),
-        desired_spacing: 1.0,
+        desired_spacing: Distance::new(1.0),
         number_unit_types: 1,
         unit_types,
         unit_type_counts: counts,
@@ -996,7 +996,7 @@ fn a_group_chooses_a_column_far_along_its_path_and_a_line_near_its_end() {
     assert_eq!(own(&t), FormationKind::COLUMN);
     let g = &mut t.groups.groups[0];
     g.current_target.target = GroupTarget::of_saved(3, -1);
-    g.current_target.target_radius = 5.0;
+    g.current_target.target_radius = Distance::new(5.0);
     g.current_target.range = Distance::new(2.5);
     assert_eq!(own(&t), FormationKind::LINE);
     // a lone level measures its own path; one point measures to the origin
@@ -1076,7 +1076,7 @@ fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> 
         unit_types: vec![crate::groups::UnitTypeStatistic {
             formation_category: category,
             units: object_id_list(0..count as i32),
-            desired_spacing: spacing,
+            desired_spacing: Distance::new(spacing),
             number_unit_types: types.len() as i32,
             unit_types,
             unit_type_counts: counts,
@@ -1197,8 +1197,8 @@ fn a_sub_formation_fits_the_widest_line() {
         unit_types: Vec::new(),
         unit_type_counts: Vec::new(),
     };
-    assert_eq!(fit_to_widest(&cat(4, 1.0), 4.0), (1, 4));
-    assert_eq!(fit_to_widest(&cat(9, 1.0), 8.0), (2, 5));
-    assert_eq!(fit_to_widest(&cat(7, 1.0), 1.3), (4, 2));
-    assert_eq!(fit_to_widest(&cat(7, 1.0), f32::NAN), (1, 7));
+    assert_eq!(fit_to_widest(&cat(4, Distance::new(1.0)), 4.0), (1, 4));
+    assert_eq!(fit_to_widest(&cat(9, Distance::new(1.0)), 8.0), (2, 5));
+    assert_eq!(fit_to_widest(&cat(7, Distance::new(1.0)), 1.3), (4, 2));
+    assert_eq!(fit_to_widest(&cat(7, Distance::new(1.0)), f32::NAN), (1, 7));
 }

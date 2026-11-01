@@ -426,17 +426,24 @@ impl World {
                     .is_some_and(|f| f.kind == FormationKind::TYPE_6)
             {
                 refill = true;
-            } else if crate::math::fmath::at_most_or_unordered(g.total_spacing, RELAYOUT_SPACING) {
+            } else if crate::math::fmath::at_most_or_unordered(
+                g.total_spacing.get(),
+                RELAYOUT_SPACING,
+            ) {
                 g.flags |= GroupFlags::RELAYOUT_SPREAD;
             } else {
                 relayout = true;
             }
         }
-        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD) && RELAYOUT_SPACING < g.total_spacing {
+        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD) && RELAYOUT_SPACING < g.total_spacing.get()
+        {
             relayout = true;
             g.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
         }
-        if g.flags.contains(GroupFlags::RELAYOUT) && RELAYOUT_SPACING < g.total_spacing && idle {
+        if g.flags.contains(GroupFlags::RELAYOUT)
+            && RELAYOUT_SPACING < g.total_spacing.get()
+            && idle
+        {
             g.flags &= !GroupFlags::RELAYOUT;
             relayout = true;
         }

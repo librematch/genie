@@ -120,7 +120,7 @@ impl World {
                         back = line.distance_back.get();
                         // COMISS/JA at 0x14103a850: a NaN distance back takes the spacing too
                         if crate::math::fmath::at_most_or_unordered(back, 0.0) {
-                            back = i as f32 * g.desired_spacing;
+                            back = i as f32 * g.desired_spacing.get();
                         }
                     }
                     let point = find_point_from_front(&g.stored_positions, Distance::new(back))
@@ -205,7 +205,7 @@ impl World {
             let (x, y) = (tile.x(), tile.y());
             let s = formation.slots.checked_mut(u)?;
             // COMISS/JC at 0x14103cde3: a NaN spacing nudges too
-            if crate::math::fmath::below_or_unordered(un.spacing, PASS_ONE) {
+            if crate::math::fmath::below_or_unordered(un.spacing.get(), PASS_ONE) {
                 s.transform_position = s
                     .transform_position
                     .with_x(x as f32 + PASS_HALF + SLOT_NUDGE.checked(nudge)?.x())
@@ -577,7 +577,7 @@ pub(super) fn cell_mark(b: u8, dx: f32, dz: f32) -> u8 {
 struct Unreachable<'a> {
     slots: &'a [usize],
     nearest: usize,
-    spacing: f32,
+    spacing: Distance,
     grow: Distance,
 }
 

@@ -104,8 +104,8 @@ impl World {
         let g = self.groups.held_mut(group)?;
         let (held, mut slowest, under_attack) = member_totals(g, &views, objects, dt)?;
         if held == 0 {
-            g.smallest_unit_radius = 0.0;
-            g.desired_spacing = 0.0;
+            g.smallest_unit_radius = Distance::ZERO;
+            g.desired_spacing = Distance::ZERO;
             g.smallest_unit_range = Distance::ZERO;
             g.smallest_ranged_unit_range = Distance::ZERO;
             return Ok(false);
@@ -125,8 +125,7 @@ impl World {
         let largest = g.largest_unit_radius;
         g.desired_spacing = largest + largest;
         g.total_spacing = largest + g.total_spacing + largest + g.total_spacing;
-        g.stored_positions.desired_length =
-            Distance::new(g.members.len() as f32 * (largest + largest));
+        g.stored_positions.desired_length = (largest + largest) * g.members.len() as f32;
         if g.flags.contains(GroupFlags::CATCHING_UP) {
             slowest /= SLOW_GROUP_FACTOR;
         }
@@ -231,15 +230,15 @@ impl World {
             if units.is_empty() {
                 continue;
             }
-            let (mut range, mut widest) = (0.0f32, 0.0f32);
+            let (mut range, mut widest) = (Distance::ZERO, Distance::ZERO);
             for (k, &id) in units.iter().enumerate() {
                 let Some(object) = self.world_object(id) else {
                     continue;
                 };
                 let r = self.range_against(object, self.world_object(target))?;
                 // COMISS/JBE at 0x14100c506 and 0x14100c51e
-                if range < r.get() {
-                    range = r.get();
+                if range < r {
+                    range = r;
                 }
                 let radius = match object {
                     crate::groups::WorldObject::Unit(p, u) => {
@@ -249,12 +248,12 @@ impl World {
                         FormationUnit::of(self.master(p, object.master_id())?).radius
                     }
                 };
-                if k == 0 || widest < radius.get() {
-                    widest = radius.get();
+                if k == 0 || widest < radius {
+                    widest = radius;
                 }
             }
             let g = self.groups.held_mut(group)?;
-            g.unit_types.checked_mut(n)?.attack_range = Distance::new(range);
+            g.unit_types.checked_mut(n)?.attack_range = range;
             g.unit_types.checked_mut(n)?.desired_spacing = widest + widest;
         }
         Ok(())
@@ -500,14 +499,14 @@ fn member_totals(
 ) -> Result<(i32, f32, bool), GenieError> {
     g.centroid = BVector::ZERO;
     g.desired_height = 0.0;
-    g.largest_unit_radius = 0.0;
-    g.smallest_unit_radius = f32::MAX;
-    g.desired_spacing = 0.0;
+    g.largest_unit_radius = Distance::ZERO;
+    g.smallest_unit_radius = Distance::MAX;
+    g.desired_spacing = Distance::ZERO;
     g.smallest_unit_range = Distance::new(f32::MAX);
     g.smallest_ranged_unit_range = Distance::new(f32::MAX);
     g.largest_unit_range = Distance::ZERO;
     g.largest_ranged_unit_range = Distance::ZERO;
-    g.total_spacing = 0.0;
+    g.total_spacing = Distance::ZERO;
     g.sighted = objects;
     let mut slowest = f32::MAX;
     let mut held = 0;
@@ -520,12 +519,12 @@ fn member_totals(
             g.centroid.y() + v.at.y(),
         );
         let r = v.unit.radius;
-        g.total_spacing += r.get();
-        if g.largest_unit_radius < r.get() {
-            g.largest_unit_radius = r.get();
+        g.total_spacing += r;
+        if g.largest_unit_radius < r {
+            g.largest_unit_radius = r;
         }
-        if r < Distance::new(g.smallest_unit_radius) {
-            g.smallest_unit_radius = r.get();
+        if r < g.smallest_unit_radius {
+            g.smallest_unit_radius = r;
         }
         if v.speed < Speed::new(slowest) {
             slowest = v.speed.get();
@@ -950,7 +949,7 @@ mod tests {
         assert_eq!(u.body.mover().unwrap().animated.speed, 0.0);
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(g.centroid, BVector::new(5.0, 0.0, 5.0));
-        assert_eq!(g.largest_unit_radius, 0.2);
+        assert_eq!(g.largest_unit_radius, Distance::new(0.2));
         // a formation of type 7, a wide member before it: 40
         let mut t = world(1.0, [11, 10]);
         t.groups

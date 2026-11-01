@@ -94,7 +94,7 @@ impl UnitGroup {
             t.target = GroupTarget::None;
             t.original_position = BVector::ZERO;
             t.range = Distance::ZERO;
-            t.target_radius = 0.0;
+            t.target_radius = Distance::ZERO;
             t.disable_retargeting = 0;
         }
         for m in &mut self.members {
@@ -252,7 +252,7 @@ impl World {
             t.target = GroupTarget::None;
             t.original_position = BVector::ZERO;
             t.range = Distance::ZERO;
-            t.target_radius = 0.0;
+            t.target_radius = Distance::ZERO;
             t.disable_retargeting = 0;
         }
         for m in &mut g.members {

@@ -90,8 +90,9 @@ impl World {
             let mut column_to_line = formations.column_to_line_distance as f32;
             let min_column = formations.min_column_distance as f32;
             if g.current_target.target.key().is_some() {
-                column_to_line =
-                    column_to_line + g.current_target.target_radius + g.current_target.range.get();
+                column_to_line = column_to_line
+                    + g.current_target.target_radius.get()
+                    + g.current_target.range.get();
             }
             let remaining =
                 crate::math::fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());

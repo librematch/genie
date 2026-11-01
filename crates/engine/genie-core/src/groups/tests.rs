@@ -272,7 +272,10 @@ fn a_new_group_holds_the_constructor_s_values() {
     );
     assert_eq!((g.previous_formation, g.current_formation), (None, None));
     assert!(g.members.is_empty() && g.unit_types.is_empty() && g.command_queue.is_empty());
-    assert_eq!((g.formation_locked_type, g.desired_spacing), (None, 0.0));
+    assert_eq!(
+        (g.formation_locked_type, g.desired_spacing),
+        (None, Distance::ZERO)
+    );
     assert_eq!(g.motion, Motion::new());
 }
 
@@ -708,7 +711,7 @@ fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
             target: GroupTarget::Object(object_id(60)),
             original_position: BVector::new(40.0, 0.0, 45.0),
             range: Distance::new(4.0),
-            target_radius: radius,
+            target_radius: Distance::new(radius),
             disable_retargeting: 0,
             certain_action: Some(crate::objects::masters::ActionType::named(0x1234)),
         }
@@ -913,7 +916,7 @@ fn a_general_command_moves_the_group_to_the_target_and_takes_the_command() {
             target: GroupTarget::Object(object_id(60)),
             original_position: BVector::new(40.0, 0.0, 45.0),
             range: Distance::new(3.0),
-            target_radius: crate::math::fmath::sqrt(8.0),
+            target_radius: Distance::new(crate::math::fmath::sqrt(8.0)),
             disable_retargeting: 0,
             certain_action: None,
         }

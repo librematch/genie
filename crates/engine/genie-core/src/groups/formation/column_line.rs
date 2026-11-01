@@ -21,7 +21,7 @@ const CATEGORY_COUNT: usize = CATEGORIES as usize;
 #[derive(Clone, Debug)]
 pub(super) struct Category {
     pub(super) count: i32,
-    pub(super) spacing: f32,
+    pub(super) spacing: Distance,
     pub(super) types: i32,
     pub(super) unit_types: Vec<u32>,
     pub(super) unit_type_counts: Vec<u32>,
@@ -184,7 +184,7 @@ fn category_sizes(
         let (lines, columns) = sizes(cat.count, !column);
         *lines_of.checked_mut(c as usize)? = lines;
         *columns_of.checked_mut(c as usize)? = columns;
-        let width = columns as f32 * cat.spacing;
+        let width = columns as f32 * cat.spacing.get();
         if widest_index == -1 || widest < width {
             widest = width;
             widest_index = c;
@@ -210,10 +210,10 @@ fn category_sizes(
 /// needs (the ratio rounded up, `CVTTSS2SI`, at least 1) and the columns its count needs over
 /// them, then a line less while its columns are fewer than its empty places.
 pub(super) fn fit_to_widest(cat: &Category, widest: f32) -> (i32, i32) {
-    if cat.count as f32 * cat.spacing <= widest {
+    if cat.count as f32 * cat.spacing.get() <= widest {
         return (1, cat.count);
     }
-    let mut lines = cvttss2si(((cat.count as f32 * cat.spacing) / widest).ceil());
+    let mut lines = cvttss2si(((cat.count as f32 * cat.spacing.get()) / widest).ceil());
     if lines < 1 {
         lines = 1;
     }
@@ -245,7 +245,7 @@ struct Cursor {
     line_index: i32,
     slot_index: i32,
     distance_back: Distance,
-    last_spacing: f32,
+    last_spacing: Distance,
     used_slots: usize,
 }
 
@@ -299,15 +299,15 @@ fn lay_category(
         next: if cat.types == 1 { -1 } else { 0 },
         used: [0u32; 50],
     };
-    let mut single: BVector = scale(cat.spacing, BVector::new(0.0, 0.0, -1.0));
+    let mut single: BVector = scale(cat.spacing.get(), BVector::new(0.0, 0.0, -1.0));
     if style.staggered {
         single = BVector::new(single.x() * TWO, single.height() * TWO, single.y() * TWO);
     }
     if EPSILON < at.distance_back.get()
-        && EPSILON < at.last_spacing
+        && EPSILON < at.last_spacing.get()
         && at.last_spacing < cat.spacing
     {
-        at.distance_back += Distance::new(cat.spacing - at.last_spacing);
+        at.distance_back += cat.spacing - at.last_spacing;
     }
     for in_category in 0..lines {
         let mut actual = columns;
@@ -335,7 +335,7 @@ fn lay_category(
         } else {
             cat.spacing
         };
-        at.distance_back += Distance::new(at.last_spacing);
+        at.distance_back += at.last_spacing;
     }
     Ok(())
 }

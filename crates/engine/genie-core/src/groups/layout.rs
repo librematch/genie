@@ -220,7 +220,7 @@ pub(crate) fn phalanx_slots(
     formation.maximum_width = lines;
     formation.maximum_depth = lines;
     formation.number_lines = lines;
-    let single = fmath::scale(group.desired_spacing, BVector::new(0.0, 0.0, -1.0));
+    let single = fmath::scale(group.desired_spacing.get(), BVector::new(0.0, 0.0, -1.0));
     let mut slot = 0usize;
     let mut statistic = None;
     let mut placed = 0usize;
@@ -462,7 +462,7 @@ pub(crate) fn box_slots(
     if group.members.is_empty() {
         return Ok(false);
     }
-    let s = group.desired_spacing;
+    let s = group.desired_spacing.get();
     let mut max_x = s * BOX_HALF;
     let mut min_x = (-s) * BOX_HALF;
     let mut min_z = min_x;
@@ -648,7 +648,7 @@ mod tests {
                 ..Member::default()
             })
             .collect();
-        g.desired_spacing = spacing;
+        g.desired_spacing = Distance::new(spacing);
         g.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
         g.unit_types = stats
             .iter()
@@ -820,19 +820,19 @@ mod tests {
             &[],
         );
         let g = &mut t.groups.groups[0];
-        g.desired_spacing = 1.0;
+        g.desired_spacing = Distance::new(1.0);
         g.motion.position[0] = BVector::new(6.0, 0.0, 6.0);
         g.unit_types = vec![
             UnitTypeStatistic {
                 formation_category: 1,
                 units: vec![object_id(10), object_id(11)],
-                desired_spacing: 1.0,
+                desired_spacing: Distance::new(1.0),
                 ..UnitTypeStatistic::default()
             },
             UnitTypeStatistic {
                 formation_category: 3,
                 units: vec![object_id(12)],
-                desired_spacing: 1.0,
+                desired_spacing: Distance::new(1.0),
                 ..UnitTypeStatistic::default()
             },
         ];

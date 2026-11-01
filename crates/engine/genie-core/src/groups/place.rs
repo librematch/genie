@@ -301,7 +301,7 @@ impl World {
         let mut nearest_d = DistanceSquared::new(FARTHEST);
         for &(id, p) in &held {
             let q = p.with_height(0.0);
-            if fmath::line_distance(q, through, forward) < limit {
+            if fmath::line_distance(q, through, forward) < limit.get() {
                 in_front.push((id, p));
             }
             let d = ground_squared(q, front);
@@ -516,7 +516,7 @@ mod tests {
         g.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
         g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
         g.motion.flags = MotionFlags::NONE;
-        g.desired_spacing = 2.0;
+        g.desired_spacing = Distance::new(2.0);
         g.stored_positions.points = vec![crate::groups::LinePoint::default(); 2];
         g.stored_positions.length = Distance::new(3.0);
         t.groups = crate::groups::UnitGroups {

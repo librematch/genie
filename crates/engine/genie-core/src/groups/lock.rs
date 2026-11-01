@@ -90,14 +90,14 @@ impl World {
         // radius gives one above it sets it, and every later member finds it set
         let mut spacing = g.desired_spacing;
         for m in &g.members {
-            if spacing != 0.0 {
+            if spacing != Distance::ZERO {
                 break;
             }
             if let Some((p, u)) = self.object(m.id) {
                 let unit = FormationUnit::of(u.master(&self.masters, p)?);
                 let s = unit.radius * crate::math::image::group::SPACING_FACTOR;
-                if spacing <= s.get() && s != Distance::new(spacing) {
-                    spacing = s.get();
+                if spacing <= s && s != spacing {
+                    spacing = s;
                 }
             }
         }

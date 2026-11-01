@@ -92,7 +92,7 @@ impl UnitGroup {
         let t = &mut self.current_target;
         t.target = GroupTarget::None;
         t.original_position = BVector::ZERO;
-        t.target_radius = 0.0;
+        t.target_radius = Distance::ZERO;
         t.disable_retargeting = 0;
     }
 }
@@ -193,10 +193,10 @@ impl World {
     }
 
     /// The target master's two radii as one length (`+0xb57`, `+0xb5b`: `sqrt(x² + y²)`).
-    pub(super) fn target_radius(&self, id: ObjectId) -> Result<f32, GenieError> {
+    pub(super) fn target_radius(&self, id: ObjectId) -> Result<Distance, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let r = u.master(&self.masters, p)?.radius;
-        Ok(fmath::sqrt(r.x() * r.x() + r.y() * r.y()))
+        Ok(Distance::new(fmath::sqrt(r.x() * r.x() + r.y() * r.y())))
     }
 
     /// Whether every member of `g` the world holds that has a top action's target (slot 0x190,
