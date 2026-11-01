@@ -15,6 +15,7 @@
 
 use crate::GenieError;
 use crate::commands::UnitList;
+use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -284,9 +285,9 @@ impl World {
         &mut self,
         w: &BuildWallCommand,
         radius: Footprint,
-    ) -> Result<Vec<(ObjectId, Position)>, GenieError> {
+    ) -> Result<Vec<(FoundationId, Position)>, GenieError> {
         let (player, master) = (w.player, w.master);
-        let mut placed: Vec<(ObjectId, Position)> = Vec::new();
+        let mut placed: Vec<(FoundationId, Position)> = Vec::new();
         for (a, b) in segments(w.from, w.to) {
             for t in tiles(a, b)? {
                 let at = snap(
@@ -355,8 +356,8 @@ impl World {
         &mut self,
         w: &BuildWallCommand,
         id: ObjectId,
-        placed: &[(ObjectId, Position)],
-        (foundation, at): (ObjectId, Position),
+        placed: &[(FoundationId, Position)],
+        (foundation, at): (FoundationId, Position),
     ) -> Result<(), GenieError> {
         let (player, master) = (w.player, w.master);
         let Some(Place::Live(q, idx)) = self.place(id) else {

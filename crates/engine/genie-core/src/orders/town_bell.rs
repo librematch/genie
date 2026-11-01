@@ -4,6 +4,7 @@
 //! `mBackToWork1` and `mBackToWork2`.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
@@ -276,7 +277,7 @@ impl World {
             {
                 units.push(id);
             } else if kind == BUILDING && takes_villagers && near(self)? {
-                shelters.buildings.push(id);
+                shelters.buildings.push(ContainerId::new(id));
                 shelters.counts.push(self.garrisoned(id)?);
                 self.players.live_mut(owner, here)?.town_bell.flag = true;
             }
@@ -790,6 +791,7 @@ mod tests {
                 .actions
                 .enter()
                 .and_then(|e| e.target)
+                .map(crate::garrison::ContainerId::id)
         }
 
         #[test]
@@ -974,7 +976,7 @@ mod tests {
             t.all_back_to_work(player_id(2), object_id(100)).unwrap();
             assert_eq!(
                 t.object(object_id(1000)).unwrap().1.life.inside,
-                Some(object_id(100))
+                Some(crate::garrison::ContainerId::new(object_id(100)))
             );
         }
     }

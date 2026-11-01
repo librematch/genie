@@ -2,6 +2,7 @@
 //! (its slot 0): what they leave the unit's world to apply.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -87,7 +88,7 @@ impl Action {
             }
             Self::Enter(e) => {
                 stop_if_moving(body, e.move_to.is_some())?;
-                torn.release(e.target);
+                torn.release(e.target.map(ContainerId::id));
             }
             Self::Transport(t) => stop_if_moving(body, t.move_to.is_some())?,
             Self::Build(b) => {

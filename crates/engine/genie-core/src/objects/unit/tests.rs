@@ -1,6 +1,7 @@
 use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::construction::wait_solidify::WaitSolidifyState;
+use crate::garrison::ContainerId;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Speed;
@@ -343,7 +344,7 @@ fn an_object_inside_another_runs_its_inside_update() {
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
     let at = t.players[1].objects[ListIndex::new(0)].position();
-    t.players[1].objects[ListIndex::new(0)].life.inside = Some(object_id(700));
+    t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(700)));
     assert_eq!(
         in_update(
             &mut t,
@@ -486,7 +487,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
     artifact.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
     assert_eq!(of(Action::Artifact(artifact)), walking);
     let mut enter = crate::garrison::EnterAction::new(
-        object_id(7),
+        ContainerId::new(object_id(7)),
         Position::new(1.0, 2.0, 0.0),
         &crate::garrison::tests::enter_task(
             Distance::new(0.5),

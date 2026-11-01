@@ -25,6 +25,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | File | What it holds |
 | --- | --- |
 | [`class_flags.rs`](class_flags.rs) | A class's garrison flags (`ClassFlags`, the class-flags table's word). |
+| [`container_id.rs`](container_id.rs) | A container's id as its own type: the object a unit is inside, enters or leaves. |
 | [`damage_rate.rs`](damage_rate.rs) | The damage an object deals per second (`DamageRate`). |
 | [`enter.rs`](enter.rs) | The enter command and the Enter's construction, install and start, at once or with the transport's move. |
 | [`enter_state.rs`](enter_state.rs) | An Enter's state: walking to a building or transport, waiting, inside. |

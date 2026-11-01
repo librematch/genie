@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::commands::FOUNDATION_GONE;
+use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildTask};
 use crate::map::Distance;
 use crate::map::Position;
@@ -53,7 +54,7 @@ impl World {
     pub(crate) fn task_builders(
         &mut self,
         player: PlayerId,
-        foundation: ObjectId,
+        foundation: FoundationId,
         master: MasterId,
         position: Position,
         builders: &[Option<ObjectId>],
@@ -94,7 +95,7 @@ impl World {
         &mut self,
         (q, idx): (PlayerId, ListIndex),
         (id, kind): (ObjectId, MasterKind),
-        (site, position): ((PlayerId, ObjectId, MasterId), Position),
+        (site, position): ((PlayerId, FoundationId, MasterId), Position),
         (to_queue, commits): (bool, bool),
     ) -> Result<(), GenieError> {
         let (player, foundation, _) = site;
@@ -109,7 +110,7 @@ impl World {
             // another player's unit: slot 0x128's slot 0x7e8 finds whatever task it has on
             // the foundation (a Build on an ally's), the work command's general path
             let work = crate::orders::Work {
-                target: Some(foundation),
+                target: Some(foundation.id()),
                 point: Position::new(position.x(), position.y(), 0.0),
                 carry_test: false,
                 filter: None,
@@ -127,7 +128,7 @@ impl World {
     fn queue_builder(
         &mut self,
         (q, idx): (PlayerId, ListIndex),
-        site: (PlayerId, ObjectId, MasterId),
+        site: (PlayerId, FoundationId, MasterId),
         position: Position,
         commits: bool,
     ) -> Result<(), GenieError> {
@@ -167,7 +168,7 @@ impl World {
         &self,
         q: PlayerId,
         id: ObjectId,
-        (fp, foundation, master): (PlayerId, ObjectId, MasterId),
+        (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
     ) -> Result<(MasterId, BuildAction), GenieError> {
         let masters = self.masters.of(q).ok_or(GenieError::unsupported(
@@ -177,7 +178,7 @@ impl World {
             "BUILD of a master the player does not have",
         ))?;
         let target = TaskTarget {
-            id: foundation,
+            id: foundation.id(),
             master: site,
             player: fp,
             state: ObjectState::Foundation,
@@ -237,7 +238,7 @@ impl World {
         }
         let builder = masters.get(with).ok_or(NO_WORK_MASTER)?;
         let to = WalkTo {
-            id: Some(foundation),
+            id: Some(foundation.id()),
             at: position,
             gap: footprint_gap(unit.position(), builder.radius, position, site.radius),
             state: self.object_state(foundation),
@@ -258,7 +259,7 @@ impl World {
         &mut self,
         q: PlayerId,
         idx: ListIndex,
-        (fp, foundation, master): (PlayerId, ObjectId, MasterId),
+        (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(q, idx)?;
@@ -270,7 +271,7 @@ impl World {
             issuer: Some(crate::unit_ai::Issuer::Player(q)),
             order: OrderKind::Build,
             priority: crate::unit_ai::OrderPriority::COMMAND,
-            target: Some(foundation),
+            target: Some(foundation.id()),
             target_owner: Some(fp),
             point: Position::new(position.x(), position.y(), 0.0),
             range: Distance::ZERO,
@@ -295,7 +296,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (with, build): (MasterId, BuildAction),
-        (fp, foundation, master): (PlayerId, ObjectId, MasterId),
+        (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
     ) -> Result<(), GenieError> {
         let site_class = self.master(fp, master)?.class;
@@ -304,13 +305,13 @@ impl World {
         }
         // slot 0x128 -> slot 0x7e8 (task filter -1): the villager's town-bell record, its
         // flag cleared (FUN_1412067f0)
-        self.town_bell_order(player, idx, foundation, None)?;
+        self.town_bell_order(player, idx, foundation.id(), None)?;
         // the work command (FUN_14106ff70): the master changes (slot 0x90, its action list
         // cleared); the Build action takes its foundation (FUN_140a7a230, slot 0x178)
         if self.players.live(player, idx)?.life.master_id != with {
             self.change_master(player, idx, with)?;
         }
-        self.take(foundation, self.releaser(player, idx)?)?;
+        self.take(foundation.id(), self.releaser(player, idx)?)?;
         // the work command's notify (slot 0x828): the build order and the foundation, with
         // the point slot 0x128 passes (BUILD's x and y, on the ground)
         let unit = self.players.live_mut(player, idx)?;
@@ -318,7 +319,7 @@ impl World {
             ai.notify_work(
                 Some(OrderKind::Build),
                 Some(ActionKind::Build),
-                Some((foundation, site_class)),
+                Some((foundation.id(), site_class)),
                 Position::new(position.x(), position.y(), 0.0),
                 true,
                 self.streams.get(Stream::Ai),
@@ -378,23 +379,23 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        foundation: ObjectId,
+        foundation: FoundationId,
     ) -> Result<bool, GenieError> {
         if self.object(foundation).is_none() {
             return Ok(false);
         }
         if self.players.live(player, idx)?.top_action_kind() == Some(action_type::BUILD) {
-            let _ = self.build_take(player, idx, foundation)?;
+            let _ = self.build_take(player, idx, foundation.id())?;
             return Ok(true);
         }
         let gone = FOUNDATION_GONE;
         let (fp, f) = self.object(foundation).ok_or_else(|| gone.clone())?;
         let (site, f_at) = (f.master(&self.masters, fp)?, f.position());
         let find = |id: ObjectId| self.object(id);
-        let t =
-            task_target_with(foundation, 1, &find, &self.masters)?.ok_or_else(|| gone.clone())?;
-        let general =
-            task_target_with(foundation, 2, &find, &self.masters)?.ok_or_else(|| gone.clone())?;
+        let t = task_target_with(foundation.id(), 1, &find, &self.masters)?
+            .ok_or_else(|| gone.clone())?;
+        let general = task_target_with(foundation.id(), 2, &find, &self.masters)?
+            .ok_or_else(|| gone.clone())?;
         let masters = self
             .masters
             .get(player.index())
@@ -424,7 +425,7 @@ impl World {
         };
         let builder = switch.unwrap_or(actor.master);
         let to = WalkTo {
-            id: Some(foundation),
+            id: Some(foundation.id()),
             at: f_at,
             gap: footprint_gap(unit.position(), builder.radius, f_at, site.radius),
             state: Some(f.life.state),
@@ -438,7 +439,7 @@ impl World {
         if let Some(m) = switch.map(|m| m.id) {
             self.change_master(player, idx, m)?;
         }
-        self.take(foundation, self.releaser(player, idx)?)?;
+        self.take(foundation.id(), self.releaser(player, idx)?)?;
         self.clear_actions(player, idx)?;
         self.players
             .live_mut(player, idx)?

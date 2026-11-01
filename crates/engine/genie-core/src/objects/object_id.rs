@@ -110,9 +110,9 @@ impl ObjectKey for ObjectId {
     }
 }
 
-impl ObjectKey for Option<ObjectId> {
+impl<K: ObjectKey> ObjectKey for Option<K> {
     fn key(self) -> Option<ObjectId> {
-        self
+        self.and_then(ObjectKey::key)
     }
 }
 

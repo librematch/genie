@@ -4,6 +4,7 @@ use crate::masters::MasterTable;
 use crate::masters::dat_id;
 use crate::vec3;
 use genie_core::GenieError;
+use genie_core::garrison::ContainerId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::Position;
@@ -100,7 +101,7 @@ pub(super) fn lifecycle(
         death_spawn: death_spawn >= 0,
         remains: MasterId::of_data(remains),
         death_facets,
-        inside: ObjectId::of_field(s.inside_obj),
+        inside: ContainerId::of_field(s.inside_obj),
         goto_sleep: s.goto_sleep_flag != 0,
         master_id,
         master,

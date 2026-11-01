@@ -1,6 +1,7 @@
 //! A unit entering a building or a transport, and the transport's sail.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
 use crate::gathering::gather::unit::give_load;
 use crate::map::Distance;
@@ -12,6 +13,7 @@ use crate::movement::Me;
 use crate::movement::move_to::MoveDefaults;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::GarrisonKinds;
@@ -41,7 +43,10 @@ use crate::world::step::Step;
 
 /// The units inside object `id`, any player's (its slot 0x498).
 fn units_inside(others: OthersRef<'_>, id: ObjectId) -> usize {
-    others.every().filter(|u| u.life.inside == Some(id)).count()
+    others
+        .every()
+        .filter(|u| u.life.inside.key() == Some(id))
+        .count()
 }
 
 impl Unit {
@@ -129,12 +134,12 @@ impl Unit {
     pub(crate) fn enter_in_update(
         &mut self,
         c: &mut Step<'_>,
-        target: Option<ObjectId>,
+        target: Option<ContainerId>,
     ) -> Result<(), GenieError> {
         let target = target.ok_or(GenieError::unreachable(
             "an Enter's enter without its target",
         ))?;
-        let inside = units_inside(OthersRef::of(&c.w.players, c.player)?, target);
+        let inside = units_inside(OthersRef::of(&c.w.players, c.player)?, target.id());
         if !self.enter_building(c, target, inside)? {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",
@@ -318,7 +323,7 @@ impl Unit {
     pub(crate) fn enter_building(
         &mut self,
         c: &mut Step<'_>,
-        target: ObjectId,
+        target: ContainerId,
         inside: usize,
     ) -> Result<bool, GenieError> {
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
@@ -420,7 +425,7 @@ impl Unit {
     pub(crate) fn go_inside(
         &mut self,
         c: &mut Step<'_>,
-        target: ObjectId,
+        target: ContainerId,
         me: &Master,
         bm: &Master,
     ) -> Result<(), GenieError> {
@@ -457,7 +462,7 @@ impl Unit {
         if let Some(group) = self.group.id {
             if c.w.groups.get(group).is_some() {
                 c.lend(self, |w| {
-                    w.remove_unit(group, id, Some(target), false).map(drop)
+                    w.remove_unit(group, id, Some(target.id()), false).map(drop)
                 })?;
             }
             if let Some(m) = self.body.mover_mut() {
@@ -478,7 +483,7 @@ impl Unit {
     fn join_building(
         &self,
         c: &mut Step<'_>,
-        target: Option<ObjectId>,
+        target: Option<ContainerId>,
         bp: PlayerId,
         reload: Seconds,
         me: &Master,
@@ -508,7 +513,7 @@ impl Unit {
     fn enter_sight(
         &self,
         c: &mut Step<'_>,
-        target: ObjectId,
+        target: ContainerId,
         at: Position,
         radius: Footprint,
         placed: crate::map::spatial::Placed,
@@ -535,7 +540,7 @@ impl Unit {
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
         if bm.kind == BUILDING {
             let _ = v.sight_on_los(
-                target,
+                target.id(),
                 at,
                 radius,
                 false,
@@ -553,7 +558,7 @@ impl Unit {
     /// villagers; with 3 it is never cleared.
     fn enter_town_bell(
         &mut self,
-        target: Option<ObjectId>,
+        target: Option<ContainerId>,
         at: Position,
         state: ObjectState,
         me: &Master,
@@ -571,7 +576,7 @@ impl Unit {
                         "a town-bell record of a unit without a unit AI",
                     ))?;
             self.town_bell.record(crate::orders::town_bell::BackToWork {
-                target,
+                target: target.map(ContainerId::id),
                 target_class: None,
                 action,
                 target2: None,

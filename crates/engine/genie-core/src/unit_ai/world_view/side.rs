@@ -77,7 +77,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
 
     fn off_footprint(
         &mut self,
-        site: ObjectId,
+        site: crate::construction::FoundationId,
         radius: Footprint,
     ) -> Result<crate::unit_ai::OffFootprint, GenieError> {
         self.spot_off_footprint(site, radius)
@@ -475,7 +475,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         }
     }
 
-    fn builds(&self, foundation: ObjectId) -> Result<bool, GenieError> {
+    fn builds(&self, foundation: crate::construction::FoundationId) -> Result<bool, GenieError> {
         self.builds_on(foundation)
     }
 

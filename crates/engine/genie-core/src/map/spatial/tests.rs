@@ -1,4 +1,5 @@
 use super::*;
+use crate::construction::FoundationId;
 use crate::map::GridSize;
 use crate::map::TerrainMask;
 use crate::map::Tile;
@@ -1513,21 +1514,23 @@ fn the_free_spot_beside_a_footprint_is_the_closest_empty_tile_around_it() {
 fn the_footprint_s_occupants_are_the_objects_whose_centre_is_on_it() {
     let (mut s, house) = site();
     assert_eq!(
-        s.footprint_occupants(object_id(10028), &house, true, &BTreeMap::new()),
+        s.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &BTreeMap::new()
+        ),
         Ok(vec![object_id(9175)])
     );
     s.insert(object_id(9177), villager(28.0, 89.0));
     assert_eq!(
-        s.footprint_occupants(object_id(10028), &house, true, &BTreeMap::new()),
+        s.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &BTreeMap::new()
+        ),
         Ok(vec![object_id(9175)])
-    );
-    assert_eq!(s.footprint_clearing(object_id(10028), &house), Ok(vec![]));
-    let mut flower = villager(30.5, 87.5);
-    flower.buildable_on = BuildableOn::YES;
-    s.insert(object_id(77), flower);
-    assert_eq!(
-        s.footprint_clearing(object_id(10028), &house),
-        Ok(vec![object_id(77)])
     );
     assert!(!s.foreign_marks(&house));
 }
@@ -1570,8 +1573,14 @@ fn a_foundation_not_allied_both_ways_or_a_dead_object_occupies_no_footprint() {
             (object_id(33990), wall),
         ])
     };
-    let occupants =
-        |s: &Spatial, wall| s.footprint_occupants(object_id(10028), &house, true, &looks(wall));
+    let occupants = |s: &Spatial, wall| {
+        s.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &looks(wall),
+        )
+    };
     assert_eq!(
         occupants(
             &s,
@@ -1608,7 +1617,12 @@ fn a_foundation_not_allied_both_ways_or_a_dead_object_occupies_no_footprint() {
     );
     // the view does not look at it: it counts
     assert_eq!(
-        s.footprint_occupants(object_id(10028), &house, true, &BTreeMap::new()),
+        s.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &BTreeMap::new()
+        ),
         Ok(vec![object_id(9175), object_id(33990)])
     );
 }
@@ -1943,19 +1957,34 @@ fn a_frozen_object_may_be_anywhere_its_speed_could_take_it() {
     s.freeze(object_id(9656));
     // frozen at once, the deer is where the save has it
     assert!(
-        s.footprint_occupants(object_id(10028), &house, true, &BTreeMap::new())
-            .is_ok()
+        s.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &BTreeMap::new()
+        )
+        .is_ok()
     );
     assert!(s.get_known(object_id(9656)).is_ok());
     // its box reaches x 33.8; 3 s later it may stand on the footprint, which ends at 31
     s.grow_unknown(Seconds::new(2.5));
     assert!(
-        s.footprint_occupants(object_id(10028), &house, true, &BTreeMap::new())
-            .is_ok()
+        s.footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &BTreeMap::new()
+        )
+        .is_ok()
     );
     s.grow_unknown(Seconds::new(0.5));
     let e = s
-        .footprint_occupants(object_id(10028), &house, true, &BTreeMap::new())
+        .footprint_occupants(
+            FoundationId::new(object_id(10028)),
+            &house,
+            true,
+            &BTreeMap::new(),
+        )
         .unwrap_err();
     assert_eq!(e.context().next(), Some(("object", "9656")));
     let e = s.get_known(object_id(9656)).unwrap_err();

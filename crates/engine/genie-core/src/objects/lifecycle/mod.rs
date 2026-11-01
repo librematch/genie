@@ -10,7 +10,6 @@
 use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
-use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
@@ -113,7 +112,7 @@ pub struct Lifecycle {
     /// draws the facet from the Object stream.
     pub death_facets: Option<crate::objects::FacetCount>,
     /// `+0x2f0`: the object it is inside (its `inside_obj`), whose update decides for it.
-    pub inside: Option<ObjectId>,
+    pub inside: Option<crate::garrison::ContainerId>,
     /// `+0x643`: the next update moves the object to the sleeping list.
     pub goto_sleep: bool,
     /// The master's id.
@@ -271,6 +270,7 @@ impl Lifecycle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::garrison::ContainerId;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::test_ids::master_id;
@@ -422,7 +422,7 @@ mod tests {
     fn the_paths_not_modelled_are_unsupported() {
         let cases = [
             Lifecycle {
-                inside: Some(object_id(1)),
+                inside: Some(ContainerId::new(object_id(1))),
                 ..dead(Class::Static)
             },
             Lifecycle {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::construction::FoundationId;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -605,10 +606,10 @@ impl UnitSide for OffSide {
     }
     fn off_footprint(
         &mut self,
-        site: ObjectId,
+        site: FoundationId,
         radius: Footprint,
     ) -> Result<OffFootprint, GenieError> {
-        self.1.push((site, radius));
+        self.1.push((site.id(), radius));
         Ok(self.0)
     }
 }
@@ -781,7 +782,7 @@ impl UnitSide for WaitSide {
     fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
-    fn builds(&self, _: ObjectId) -> Result<bool, GenieError> {
+    fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
         Ok(true)
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -893,7 +894,9 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
         (r, fx),
         (
             OrderOutcome::Taken,
-            vec![Effect::Command(AiCommand::BuildObject(object_id(10028)))]
+            vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
+                object_id(10028)
+            )))]
         )
     );
     assert_eq!(
@@ -1052,7 +1055,7 @@ impl UnitSide for ResourceSide {
     fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
-    fn builds(&self, _: ObjectId) -> Result<bool, GenieError> {
+    fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
         Ok(!self.no_build_task)
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -1347,7 +1350,9 @@ fn a_villager_searches_by_its_action() {
         (r, fx),
         (
             Ok(BREAK),
-            vec![Effect::Command(AiCommand::BuildObject(object_id(10028)))]
+            vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
+                object_id(10028)
+            )))]
         )
     );
     assert_eq!(
@@ -1395,7 +1400,7 @@ fn a_build_object_whose_build_command_answers_0_changes_nothing() {
     let mut fx = Vec::new();
     assert_eq!(
         u.build_object(
-            object_id(10028),
+            FoundationId::new(object_id(10028)),
             true,
             &at,
             &mut With::new(&mut side, &mut fx),
@@ -1409,7 +1414,7 @@ fn a_build_object_whose_build_command_answers_0_changes_nothing() {
     side.no_build_task = false;
     assert_eq!(
         u.build_object(
-            object_id(10028),
+            FoundationId::new(object_id(10028)),
             true,
             &at,
             &mut With::new(&mut side, &mut fx),
@@ -1419,7 +1424,9 @@ fn a_build_object_whose_build_command_answers_0_changes_nothing() {
     );
     assert_eq!(
         fx,
-        vec![Effect::Command(AiCommand::BuildObject(object_id(10028)))]
+        vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
+            object_id(10028)
+        )))]
     );
     assert_eq!(
         (u.current_action, u.current_target),
@@ -9992,7 +9999,7 @@ impl UnitSide for ShipSide {
     fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
-    fn builds(&self, _: ObjectId) -> Result<bool, GenieError> {
+    fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
         Ok(true)
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
@@ -10306,7 +10313,9 @@ fn a_fishing_ship_builds_the_nearest_foundation_it_reaches() {
     );
     assert_eq!(
         fx,
-        vec![Effect::Command(AiCommand::BuildObject(object_id(42)))]
+        vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
+            object_id(42)
+        )))]
     );
     let groups: Vec<Option<ClassId>> = side
         .searched

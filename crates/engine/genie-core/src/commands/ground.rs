@@ -1,6 +1,7 @@
 //! A new building's ground: the units on its foundation sent off, its terrain, the footprint
 //! clearing and its place.
 
+use crate::construction::FoundationId;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
@@ -44,7 +45,7 @@ impl World {
     /// modelled.
     pub(crate) fn evacuate(
         &mut self,
-        foundation: ObjectId,
+        foundation: FoundationId,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
         /// The notify's radii are hundredths (`DAT_14330ebcc`).
@@ -56,7 +57,7 @@ impl World {
         let p = [
             (radius.x() * RADIUS_SCALE) as i32,
             (radius.y() * RADIUS_SCALE) as i32,
-            foundation.get(),
+            foundation.id().get(),
         ];
         let mut together = Vec::new();
         for &id in units {
@@ -66,7 +67,7 @@ impl World {
             let master = u.master(&self.masters, owner)?;
             if master.kind < MOVING
                 || u.life.state != ObjectState::Alive
-                || u.top_target() == Some(foundation)
+                || u.top_target() == Some(foundation.id())
             {
                 continue;
             }
@@ -122,7 +123,7 @@ impl World {
     /// notify `0x21b` ([`crate::unit_ai::NotifyKind::SENT_OFF_GROUP`]).
     pub(crate) fn evacuate_together(
         &mut self,
-        foundation: ObjectId,
+        foundation: FoundationId,
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {

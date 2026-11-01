@@ -179,7 +179,10 @@ impl Action {
             Self::Hunt(a) => a.target,
             Self::Gather(a) => a.target,
             Self::Attack(a) => a.target,
-            Self::Enter(a) => a.target,
+            Self::Enter(a) => match a.target {
+                Some(t) => Some(t.id()),
+                None => None,
+            },
             Self::Missile(a) => a.target,
             Self::Fly(_)
             | Self::Explore(_)

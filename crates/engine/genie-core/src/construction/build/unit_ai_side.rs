@@ -3,6 +3,7 @@
 //! spot off a foundation's footprint.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Tile;
@@ -25,9 +26,9 @@ impl UnitView<'_, '_> {
     /// reads before it takes the build ([`crate::unit_ai::UnitSide::builds`]): 0 for a
     /// foundation the world does not hold (`FUN_1415417a0`), 1 with a Build on top (its slot
     /// 0x48), else whether slot 0x820 finds a task ([`UnitView::build_found`]).
-    pub(crate) fn builds_on(&self, foundation: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn builds_on(&self, foundation: FoundationId) -> Result<bool, GenieError> {
         let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
-        if self.find_in(view, foundation).is_none() {
+        if self.find_in(view, foundation.id()).is_none() {
             return Ok(false);
         }
         // The Build action's type, which word 9 adds.
@@ -50,15 +51,15 @@ impl UnitView<'_, '_> {
     /// Slot 0x380's search without a Build on top: the foundation (false when the world does not
     /// hold it), then slot 0x820 with any action type and the switch ([`task_search`] on the
     /// foundation and its main building); false without a task.
-    fn build_found(&self, foundation: ObjectId) -> Result<bool, GenieError> {
+    fn build_found(&self, foundation: FoundationId) -> Result<bool, GenieError> {
         let view = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
         let find = |id: ObjectId| self.find_in(view, id);
-        let Some((_, f)) = find(foundation) else {
+        let Some((_, f)) = find(foundation.id()) else {
             return Ok(false);
         };
         let (Some(t), Some(general)) = (
-            task_target_with(foundation, 1, &find, &self.c.w.masters)?,
-            task_target_with(foundation, 2, &find, &self.c.w.masters)?,
+            task_target_with(foundation.id(), 1, &find, &self.c.w.masters)?,
+            task_target_with(foundation.id(), 2, &find, &self.c.w.masters)?,
         ) else {
             return Err(crate::commands::FOUNDATION_GONE);
         };
@@ -142,7 +143,7 @@ impl UnitView<'_, '_> {
     /// [`Spatial::spot_off`]: crate::map::spatial::Spatial::spot_off
     pub(crate) fn spot_off_footprint(
         &mut self,
-        site: ObjectId,
+        site: FoundationId,
         radius: Footprint,
     ) -> Result<crate::unit_ai::OffFootprint, GenieError> {
         let unit = &*self.unit;
@@ -186,7 +187,7 @@ impl UnitView<'_, '_> {
             class: master.class,
             computer: self.computer,
             player,
-            site: named(site),
+            site: named(site.id()),
             action_target: target.and_then(named),
         })
     }

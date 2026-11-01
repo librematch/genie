@@ -97,7 +97,7 @@ impl Unit {
         let foundation = others.own(target);
         let site = foundation
             .filter(|u| u.construction.is_some())
-            .map(|u| u.id);
+            .map(|u| crate::construction::FoundationId::new(u.id));
         let built = foundation.map(|u| u.life.master_id);
         let stack_made = foundation.and_then(|u| u.stack_made);
         let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> =

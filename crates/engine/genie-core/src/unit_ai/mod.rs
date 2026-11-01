@@ -386,7 +386,7 @@ pub enum AiCommand {
     /// `BuildObject`'s unit part (the AI's slot 0xf0, `FUN_140c47d80`): the unit's build command
     /// (slot 0x380) on the foundation ([`crate::world::World::build_command`]); the AI's part,
     /// the build action and the foundation as its target, is its own ([`UnitAi::build_object`]).
-    BuildObject(ObjectId),
+    BuildObject(crate::construction::FoundationId),
     /// The unit's slot 0x7e8 (`FUN_141227190`) on object `target` at `point`, with the
     /// carried-resource test, any task and `+0xa14` 0 ([`crate::world::World::order_work`]).
     WorkOn {

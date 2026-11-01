@@ -46,10 +46,10 @@ fn top_after(fx: &[Effect]) -> TopLeft {
             | Effect::Command(
                 AiCommand::HuntObject(target)
                 | AiCommand::GatherObject(target)
-                | AiCommand::BuildObject(target)
                 | AiCommand::DropElsewhere { site: target, .. }
                 | AiCommand::WorkOn { target, .. },
             ) => Some(TopLeft::On(target)),
+            Effect::Command(AiCommand::BuildObject(target)) => Some(TopLeft::On(target.id())),
             Effect::CapHumanOrder(_) | Effect::OrderOnTarget(_) | Effect::ChangeOwner(_) => None,
         })
         .unwrap_or(TopLeft::Untouched)
@@ -203,7 +203,7 @@ impl UnitSide for With<'_> {
         self.side.table_drop_site()
     }
 
-    fn builds(&self, foundation: ObjectId) -> Result<bool, GenieError> {
+    fn builds(&self, foundation: crate::construction::FoundationId) -> Result<bool, GenieError> {
         self.side.builds(foundation)
     }
 
@@ -245,7 +245,7 @@ impl UnitSide for With<'_> {
 
     fn off_footprint(
         &mut self,
-        site: ObjectId,
+        site: crate::construction::FoundationId,
         radius: Footprint,
     ) -> Result<OffFootprint, GenieError> {
         self.side.off_footprint(site, radius)

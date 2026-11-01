@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::Charge;
+use crate::garrison::ContainerId;
 use crate::gathering::make::MakeState;
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -238,7 +239,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
         };
         u.life.master_id = ids::HOUSE;
         u.life.state = state;
-        u.life.inside = inside;
+        u.life.inside = inside.map(ContainerId::new);
         u
     };
     let mut t = World::new(
@@ -343,7 +344,7 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
     let mut stream = t.streams.get(Stream::Player).clone();
     t.spawn_at(PlayerId::new(1), (Some(VILLAGER), Some(TC)), 2)
         .unwrap();
-    let made: Vec<(MasterId, Option<ObjectId>)> = t.players[1].objects.as_slice()[before..]
+    let made: Vec<(MasterId, Option<ContainerId>)> = t.players[1].objects.as_slice()[before..]
         .iter()
         .map(|u| (u.life.master_id, u.life.inside))
         .collect();
@@ -533,7 +534,7 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     tower.garrison = vec![object_id(11)];
     tower.firepower = crate::combat::Firepower::new(2.0);
     let mut archer = unit_of(11, master_id(4), HitPoints::new(30.0));
-    archer.life.inside = Some(object_id(10));
+    archer.life.inside = Some(ContainerId::new(object_id(10)));
     let player = Player {
         objects: vec![tower, archer].into(),
         ..Player::default()

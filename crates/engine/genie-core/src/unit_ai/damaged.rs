@@ -1,6 +1,7 @@
 //! What the villagers, transports, traders, fishing ships and buildings do when damaged.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::math::image::unit_ai::{ATTACKER_FAR, ATTACKER_TIE};
 use crate::math::rng::Well512;
@@ -375,7 +376,7 @@ impl UnitAi {
         if let Some(site) = best.0
             && side.reaches(site, FOUNDATION_REACH)?
         {
-            let _ = self.build_object(site, true, at, side, rng)?;
+            let _ = self.build_object(FoundationId::new(site), true, at, side, rng)?;
             return Ok(BREAK);
         }
         if computer {

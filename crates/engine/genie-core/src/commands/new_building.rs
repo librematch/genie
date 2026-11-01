@@ -46,13 +46,13 @@ impl World {
     /// The new foundation of BUILD and of `BUILD_WALL`'s tiles (the master's slot 0x108,
     /// [`World::make_building`], with the unit AI type the factory gives its master,
     /// [`Master::unit_ai_type`]), then the player pays the master's cost (each entry flagged
-    /// paid). Its id and position.
+    /// paid). Its id, which takes the foundation's role here, and position.
     pub(crate) fn found(
         &mut self,
         player: PlayerId,
         master: MasterId,
         position: Position,
-    ) -> Result<(ObjectId, Position), GenieError> {
+    ) -> Result<(crate::construction::FoundationId, Position), GenieError> {
         let unit_ai = self.master(player, master)?.unit_ai_type(master);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
         let cost = self.master(player, master)?.cost;
@@ -66,7 +66,7 @@ impl World {
                 *slot -= Amount::new(amount.as_f32());
             }
         }
-        Ok(made)
+        Ok((crate::construction::FoundationId::new(made.0), made.1))
     }
 
     /// [`World::make_building`]'s combat setup (`FUN_14121df60`): its class counters

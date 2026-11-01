@@ -8,6 +8,7 @@
 //! `107 + state` for it.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Me;
@@ -142,7 +143,7 @@ impl Artifact {
         let enter = self.enter.take();
         SubActionsGone {
             stops: walked || enter.is_some_and(|e| e.move_to.is_some()),
-            released: enter.and_then(|e| e.target),
+            released: enter.and_then(|e| e.target).map(ContainerId::id),
         }
     }
 
@@ -655,7 +656,7 @@ mod tests {
     fn a_move_deletes_the_held_enter_letting_its_transport_go() {
         let walking_enter = || {
             crate::garrison::EnterAction::new(
-                object_id(11970),
+                ContainerId::new(object_id(11970)),
                 Position::new(34.125, 123.333, 0.0),
                 &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
             )
@@ -703,7 +704,7 @@ mod tests {
         // an Enter that does not walk stops nothing
         let mut c = Artifact::new(false, None);
         c.enter = Some(crate::garrison::EnterAction::new(
-            object_id(11970),
+            ContainerId::new(object_id(11970)),
             Position::new(1.0, 2.0, 0.0),
             &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
         ));
@@ -722,7 +723,7 @@ mod tests {
     #[test]
     fn the_stop_and_the_teardown_delete_the_held_enter() {
         let mut e = crate::garrison::EnterAction::new(
-            object_id(11970),
+            ContainerId::new(object_id(11970)),
             Position::new(1.0, 2.0, 0.0),
             &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
         );
@@ -778,27 +779,33 @@ mod tests {
         let gone = |stops, released| SubActionsGone { stops, released };
         let mut a = Artifact::new(false, None);
         // nothing held: nothing to let go, nothing walking
-        assert_eq!(a.hold_enter(enter(object_id(7934))), gone(false, None));
+        assert_eq!(
+            a.hold_enter(enter(ContainerId::new(object_id(7934)))),
+            gone(false, None)
+        );
         // the held Enter walks: its MoveTo's teardown stops the unit
         let held = a.enter.take().unwrap();
         a.enter = Some(held.walking(MoveTo::Moving));
         assert_eq!(
-            a.hold_enter(enter(object_id(7934))),
+            a.hold_enter(enter(ContainerId::new(object_id(7934)))),
             gone(true, Some(object_id(7934)))
         );
         assert_eq!(
             a.enter.map(|e| (e.target, e.move_to)),
-            Some((Some(object_id(7934)), None))
+            Some((Some(ContainerId::new(object_id(7934))), None))
         );
         // an Enter not walking only lets its target go
         assert_eq!(
-            a.hold_enter(enter(object_id(7935))),
+            a.hold_enter(enter(ContainerId::new(object_id(7935)))),
             gone(false, Some(object_id(7934)))
         );
         // the Artifact's own MoveTo goes with its goal and stops the unit
         a.enter = None;
         a.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
-        assert_eq!(a.hold_enter(enter(object_id(7934))), gone(true, None));
+        assert_eq!(
+            a.hold_enter(enter(ContainerId::new(object_id(7934)))),
+            gone(true, None)
+        );
         assert_eq!(a.move_to, None);
     }
 
@@ -1361,7 +1368,7 @@ mod tests {
         assert_eq!((found, a.state), (Ok(None), ArtifactState::Wait));
         // the step's effects on a handover: the Enter's transport let go, the unit stopped
         let mut e = crate::garrison::EnterAction::new(
-            object_id(11970),
+            ContainerId::new(object_id(11970)),
             Position::new(1.0, 2.0, 0.0),
             &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
         );

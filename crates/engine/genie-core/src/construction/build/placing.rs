@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::construction::FootprintWaits;
+use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
     BUILDER_UNMOVING, BuildAction, BuildReads, ClearingSite, EXTRA_BUILDER, FOREIGN_SITE,
@@ -63,7 +64,7 @@ impl BuildAction {
         if !desolid {
             return self.join(c, builder);
         }
-        let site = self.target.ok_or(SITE_GONE)?;
+        let site = FoundationId::new(self.target.ok_or(SITE_GONE)?);
         let placed = *c.w.spatial.get_known(site)?.ok_or(SITE_GONE)?;
         let clearing = ClearingSite {
             player: placed.player,
@@ -84,10 +85,10 @@ impl BuildAction {
         for cl in cleared {
             c.w.clear_object(cl, true)?;
         }
-        let parts = self.part_tests(c, builder, (site, &cleared_ids), reads)?;
+        let parts = self.part_tests(c, builder, (site.id(), &cleared_ids), reads)?;
         // the foundation's placement test (its master's slot 0x50, FUN_14123aee0): one that may
         // not stay, or follows a part that may not, sends no unit off
-        let own = with_annexes(c, site);
+        let own = with_annexes(c, site.id());
         // the builder lent to its slot, where the tests' scans meet it (FD-045-D32)
         let code = self.lend(c, builder, |w, _, _| w.foundation_code(&placed, true, &own))?;
         let stays = parts.stay && code.is_allowed();
@@ -175,12 +176,13 @@ impl BuildAction {
             if !code.is_allowed() {
                 tests.stay = false;
             } else if tests.stay {
-                let others: Vec<ObjectId> = site_occupants(c, part, &placed, cleared, reads)?
-                    .into_iter()
-                    .filter(|&id| id != builder.id)
-                    .collect();
+                let others: Vec<ObjectId> =
+                    site_occupants(c, FoundationId::new(part), &placed, cleared, reads)?
+                        .into_iter()
+                        .filter(|&id| id != builder.id)
+                        .collect();
                 if !others.is_empty() {
-                    c.w.evacuate(part, &others)?;
+                    c.w.evacuate(FoundationId::new(part), &others)?;
                     tests.occupied = true;
                 }
             }
@@ -409,7 +411,7 @@ fn with_annexes(c: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
 /// [`Spatial::footprint_occupants`]: crate::map::spatial::Spatial::footprint_occupants
 fn site_occupants(
     c: &Step<'_>,
-    site: ObjectId,
+    site: FoundationId,
     placed: &Placed,
     cleared: &[ObjectId],
     reads: &BuildReads,

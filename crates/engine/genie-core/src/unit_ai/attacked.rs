@@ -358,7 +358,7 @@ impl UnitAi {
     ) -> Result<u32, GenieError> {
         let radius = Footprint::new(n.p[0] as f32 / RADIUS_SCALE, n.p[1] as f32 / RADIUS_SCALE);
         // p3 the foundation: none (−1) has no footprint, so the unit has nowhere to go
-        let Some(site) = ObjectId::of_field(n.p[2]) else {
+        let Some(site) = crate::construction::FoundationId::of_field(n.p[2]) else {
             return Ok(GO_ON);
         };
         let off = side.off_footprint(site, radius)?;

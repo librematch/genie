@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::garrison::ClassFlags;
+use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
 use crate::garrison::{
     COMPUTER_IDS, FAR, HUMAN_IDS, NEARBY, TOWN_BELL_REACH, class_has_flags, has_garrison_task,
@@ -47,9 +48,9 @@ const NO_UNIT_AI: GenieError = GenieError::unreachable("a sheltered unit without
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Shelters {
     /// The buildings.
-    pub buildings: Vec<ObjectId>,
+    pub buildings: Vec<ContainerId>,
     /// The transports.
-    pub transports: Vec<ObjectId>,
+    pub transports: Vec<ContainerId>,
     /// The counts ([`World::garrisoned`], slot 0x498).
     pub counts: Vec<InsideCount>,
 }
@@ -102,7 +103,7 @@ impl World {
             if tm.kind < BUILDING {
                 Shelters {
                     buildings: Vec::new(),
-                    transports: vec![target],
+                    transports: vec![ContainerId::new(target)],
                     counts: vec![self.garrisoned(target)?],
                 }
             } else {
@@ -113,7 +114,7 @@ impl World {
                     _ => target,
                 };
                 Shelters {
-                    buildings: vec![building],
+                    buildings: vec![ContainerId::new(building)],
                     transports: Vec::new(),
                     counts: vec![self.garrisoned(building)?],
                 }
@@ -173,12 +174,12 @@ impl World {
                 && m.kind == BUILDING
                 && takes_villagers
             {
-                buildings.push(b.id);
+                buildings.push(ContainerId::new(b.id));
             }
         }
         let counts = buildings
             .iter()
-            .map(|&b| self.garrisoned(b))
+            .map(|&b| self.garrisoned(b.id()))
             .collect::<Result<Vec<_>, GenieError>>()?;
         let shelters = Shelters {
             buildings,
@@ -216,9 +217,9 @@ impl World {
             }
             let om = o.master(&self.masters, op)?;
             if om.kind < BUILDING {
-                shelters.transports.push(id);
+                shelters.transports.push(ContainerId::new(id));
             } else if om.class != class::GATE && o.annex_of.is_none() {
-                shelters.buildings.push(id);
+                shelters.buildings.push(ContainerId::new(id));
             }
             shelters.counts.push(self.garrisoned(id)?);
         }
@@ -258,7 +259,7 @@ impl World {
         through_ai: bool,
     ) -> Result<(), GenieError> {
         let reach = if near { TOWN_BELL_REACH } else { FAR };
-        let all: Vec<ObjectId> = shelters
+        let all: Vec<ContainerId> = shelters
             .buildings
             .iter()
             .chain(&shelters.transports)
@@ -290,7 +291,7 @@ impl World {
             for (j, &building) in shelters.buildings.iter().enumerate() {
                 let (is_building, capacity, _) = capacities[j];
                 if is_building && capacity.holds() && self.takes_in(building, player, copy)? {
-                    let gap = gap_to(building)?;
+                    let gap = gap_to(building.id())?;
                     if gap < reach {
                         pairs.push((i, j, gap));
                     }
@@ -305,7 +306,7 @@ impl World {
                 let (_, _, transport_class) = capacities[first_transport + k];
                 let list = self.master(player, master)?;
                 if has_garrison_task(&list.tasks, GARRISON, transport_class) {
-                    let gap = gap_to(transport)?;
+                    let gap = gap_to(transport.id())?;
                     if gap < reach {
                         pairs.push((i, first_transport + k, gap));
                     }
@@ -341,7 +342,7 @@ impl World {
         if b.master(&self.masters, bp)?.kind < COMBAT {
             return Ok(false);
         }
-        self.takes_in(b.id, player, Some(master))
+        self.takes_in(ContainerId::new(b.id), player, Some(master))
     }
 
     /// One shelter's part of [`World::shelter`]: the order splitter (`FUN_140fd9dc0` with
@@ -354,7 +355,7 @@ impl World {
     /// range 0, priority 100, the point shown, ready.
     pub(super) fn shelter_in(
         &mut self,
-        building: ObjectId,
+        building: ContainerId,
         going: &[ObjectId],
         through_ai: bool,
     ) -> Result<(), GenieError> {
@@ -397,7 +398,7 @@ impl World {
                     issuer: Some(crate::unit_ai::Issuer::Object(id)),
                     order: OrderKind::Enter,
                     priority: crate::unit_ai::OrderPriority::COMMAND,
-                    target: Some(building),
+                    target: Some(building.id()),
                     target_owner: Some(owner),
                     point,
                     range: Distance::ZERO,
@@ -413,7 +414,7 @@ impl World {
                 continue;
             }
             let work = Work {
-                target: Some(building),
+                target: Some(building.id()),
                 point,
                 carry_test: false,
                 filter: Some(GARRISON),
@@ -431,9 +432,9 @@ impl World {
 fn assign_shelters(
     pairs: &[(usize, usize, f32)],
     units: &[ObjectId],
-    (all, capacities): (&[ObjectId], &[(bool, GarrisonCapacity, ClassId)]),
+    (all, capacities): (&[ContainerId], &[(bool, GarrisonCapacity, ClassId)]),
     mut counts: Vec<InsideCount>,
-) -> Result<(Vec<Vec<ObjectId>>, Vec<ObjectId>), GenieError> {
+) -> Result<(Vec<Vec<ObjectId>>, Vec<ContainerId>), GenieError> {
     let mut taken = vec![false; units.len()];
     // each shelter's units, by shelter index, and the order of the shelters' first take
     let mut going: Vec<Vec<ObjectId>> = vec![Vec::new(); all.len()];

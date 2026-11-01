@@ -119,6 +119,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::garrison::ContainerId;
     use crate::map::Position;
     use crate::objects::ObjectId;
     use crate::objects::lifecycle::Lifecycle;
@@ -205,7 +206,7 @@ mod tests {
             body: crate::objects::layers::Body::at(position),
             life: Lifecycle {
                 master_id: KING,
-                inside,
+                inside: inside.map(ContainerId::new),
                 ..Lifecycle::default()
             },
             ..Unit::default()

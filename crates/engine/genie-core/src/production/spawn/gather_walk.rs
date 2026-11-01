@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::GatherPoint;
+use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
 use crate::map::Distance;
 use crate::map::Position;
@@ -215,7 +216,7 @@ impl World {
             let room = b.master(&self.masters, bp)?.garrison;
             let held = self.garrisoned(b.id)?;
             if held < FORCED_ENTRY_BELOW || held.below(room) {
-                return self.enter_forced(p, new, building);
+                return self.enter_forced(p, new, ContainerId::new(building));
             }
         }
         let target = match g.target.filter(|&t| self.object(t).is_some()) {

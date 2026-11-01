@@ -296,7 +296,7 @@ fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
     );
     // the world's table holds ghosts only in its negative half, none for −1 (no object takes
     // it) and none for i32::MIN
-    assert!(t.world_object(None).is_none());
+    assert!(t.world_object(None::<ObjectId>).is_none());
     assert!(t.world_object(crate::objects::unit::TAKEN_OUT).is_none());
 }
 

@@ -353,7 +353,10 @@ impl Unit {
             Next::Build => {
                 // a build command on no foundation does nothing
                 if let Some(target) = self.actions.gather().and_then(|g| g.target) {
-                    c.lend_at(self, |w, p, i| w.build_command(p, i, target).map(drop))?;
+                    c.lend_at(self, |w, p, i| {
+                        w.build_command(p, i, crate::construction::FoundationId::new(target))
+                            .map(drop)
+                    })?;
                 }
             }
             Next::Reseed { arrived } => {

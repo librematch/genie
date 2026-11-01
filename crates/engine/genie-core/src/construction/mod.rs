@@ -5,6 +5,7 @@ pub mod build;
 mod builder_count;
 pub(crate) mod building_update;
 mod footprint_waits;
+mod foundation_id;
 pub(crate) mod gates;
 pub mod repair;
 pub mod wait_solidify;
@@ -12,3 +13,4 @@ mod wait_solidify_state;
 
 pub use self::builder_count::BuilderCount;
 pub use self::footprint_waits::FootprintWaits;
+pub use self::foundation_id::{Foundation, FoundationId};

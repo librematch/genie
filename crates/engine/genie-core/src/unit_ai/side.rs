@@ -105,7 +105,7 @@ pub trait UnitSide {
     /// # Errors
     ///
     /// A side without its unit, and what the task search does not model.
-    fn builds(&self, _foundation: ObjectId) -> Result<bool, GenieError> {
+    fn builds(&self, _foundation: crate::construction::FoundationId) -> Result<bool, GenieError> {
         Err(WITHOUT_UNIT)
     }
 
@@ -197,7 +197,7 @@ pub trait UnitSide {
     /// What the spot's search does not model.
     fn off_footprint(
         &mut self,
-        _site: ObjectId,
+        _site: crate::construction::FoundationId,
         _radius: Footprint,
     ) -> Result<OffFootprint, GenieError> {
         Err(GenieError::unsupported(

@@ -1,10 +1,12 @@
 //! A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
 use crate::garrison::{CLASS_FLAGS, ClassFlags, LEAST_HP_SHARE};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
@@ -129,7 +131,7 @@ impl World {
     /// `FUN_14120eb10(building, player, master, 1, 1)` ([`World::takes_in_as`]).
     pub(crate) fn takes_in(
         &self,
-        building: ObjectId,
+        building: ContainerId,
         player: PlayerId,
         master: Option<MasterId>,
     ) -> Result<bool, GenieError> {
@@ -150,7 +152,7 @@ impl World {
     /// (`param_5` not 0).
     pub(crate) fn takes_in_as(
         &self,
-        building: ObjectId,
+        building: ContainerId,
         player: PlayerId,
         master: Option<MasterId>,
         others: bool,
@@ -223,7 +225,7 @@ impl World {
                 q.objects
                     .iter()
                     .chain(&q.sleeping)
-                    .any(|v| v.life.inside == Some(id))
+                    .any(|v| v.life.inside.key() == Some(id))
             })
         };
         let is_building = self
@@ -234,7 +236,7 @@ impl World {
         let mut count = 0;
         for (p, player) in PlayerId::each(self.players.len()).zip(&self.players) {
             for u in player.objects.iter().chain(&player.sleeping) {
-                if u.life.inside != Some(building) {
+                if u.life.inside.key() != Some(building) {
                     continue;
                 }
                 let kind = u.master(&self.masters, p)?.kind;

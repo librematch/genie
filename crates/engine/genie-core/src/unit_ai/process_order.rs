@@ -1,6 +1,7 @@
 //! An order's processing: the combat and work orders, the top target and the attack slots.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Point;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
@@ -220,7 +221,9 @@ impl UnitAi {
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order;
         // the hunt's stops the unit (`hunt_order`)
         Ok(match (o.order, o.target) {
-            (OrderKind::Build, Some(t)) => self.build_object(t, true, at, side, rng)?,
+            (OrderKind::Build, Some(t)) => {
+                self.build_object(FoundationId::new(t), true, at, side, rng)?
+            }
             (OrderKind::Heal | OrderKind::Convert | OrderKind::Repair, Some(t)) => {
                 let (action, command) = match o.order {
                     OrderKind::Heal => (ActionKind::Heal, UnitCommand::Heal(t)),

@@ -2,6 +2,7 @@
 //! transport's move.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
 use crate::garrison::meeting::Meeting;
 use crate::garrison::{
@@ -44,7 +45,7 @@ impl World {
             ai.notify_work(
                 Some(OrderKind::Enter),
                 Some(ActionKind::Enter),
-                Some((target, class)),
+                Some((target.id(), class)),
                 point,
                 clears,
                 self.streams.get(crate::math::rng::Stream::Ai),
@@ -162,21 +163,21 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         task: &Task,
-    ) -> Result<(EnterAction, ObjectId, ClassId), GenieError> {
+    ) -> Result<(EnterAction, ContainerId, ClassId), GenieError> {
         let (tp, t) = self
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
-        let target = if t.master(&self.masters, tp)?.kind == BUILDING {
+        let target = ContainerId::new(if t.master(&self.masters, tp)?.kind == BUILDING {
             t.annex_of.unwrap_or(target)
         } else {
             target
-        };
+        });
         let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
         let tm = t.master(&self.masters, tp)?;
         let (class, height) = (tm.class, t.position().z());
         let (at, _) = self.enter_meeting(player, idx, target)?;
         let action = EnterAction::new(target, at.with_height(height), task);
-        self.take(target, self.releaser(player, idx)?)?;
+        self.take(target.id(), self.releaser(player, idx)?)?;
         Ok((action, target, class))
     }
 
@@ -190,7 +191,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
+        target: ContainerId,
         action: EnterAction,
         task: &Task,
     ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
@@ -209,7 +210,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
+        target: ContainerId,
         mut action: EnterAction,
         task: &Task,
         sub: bool,
@@ -297,7 +298,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
+        target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
         let id = self.players.player(player)?.objects[idx].id;
@@ -358,7 +359,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
+        target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
         let id = self.players.player(player)?.objects[idx].id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
@@ -383,7 +384,7 @@ impl World {
     /// that cannot reach it is [`UNREACHED`].
     pub(crate) fn move_transport(
         &mut self,
-        transport: Option<ObjectId>,
+        transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
         let Some(crate::orders::Place::Live(tp, ti)) = self.place(transport) else {
@@ -407,7 +408,7 @@ impl World {
     /// running) to `to`, where it meets an entering unit.
     pub(crate) fn ship_move(
         &mut self,
-        ship: Option<ObjectId>,
+        ship: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
         let Some(crate::orders::Place::Live(p, i)) = self.place(ship) else {
@@ -429,7 +430,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
+        target: ContainerId,
     ) -> Result<(), GenieError> {
         let inside = self
             .players
@@ -458,7 +459,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: ObjectId,
+        target: ContainerId,
     ) -> Result<(), GenieError> {
         let Some(crate::orders::Place::Live(tp, ti)) = self.place(target) else {
             return Err(ENTER_SLEEPING);

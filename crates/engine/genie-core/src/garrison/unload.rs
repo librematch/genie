@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::unload::{UnloadCommand, UnloadPick};
+use crate::garrison::ContainerId;
 use crate::garrison::{SIEGE_UNLOAD, WHOLE_SHARE_CLASS};
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -9,6 +10,7 @@ use crate::map::Point;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
@@ -91,7 +93,7 @@ impl World {
             if let Some((c, kind)) = container
                 && BUILDING <= kind
             {
-                self.leave_building(c, id, point)?;
+                self.leave_building(c.id(), id, point)?;
                 continue;
             }
             let unit = &self.players.player(player)?.objects[idx];
@@ -218,7 +220,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        transport: Option<ObjectId>,
+        transport: Option<ContainerId>,
         named: Option<ObjectId>,
         last: &mut Option<Point>,
     ) -> Result<(), GenieError> {
@@ -226,7 +228,7 @@ impl World {
         let (inner, holder) = match (transport, named) {
             (Some(t), _) => (own, t),
             (None, Some(named)) => match self.object(named) {
-                Some((_, o)) if o.life.inside == Some(own) => (named, own),
+                Some((_, o)) if o.life.inside.key() == Some(own) => (named, ContainerId::new(own)),
                 _ => return Ok(()),
             },
             (None, None) => return Ok(()),

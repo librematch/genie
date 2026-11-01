@@ -389,7 +389,7 @@ mod built_sprite_tests {
 pub(crate) struct BuildReads {
     /// The foundation (the action's target) when the builder's player holds it with its
     /// construction: the update reads and works it through the world.
-    pub(crate) site: Option<ObjectId>,
+    pub(crate) site: Option<crate::construction::FoundationId>,
     /// The foundation's master, when the builder's player holds the foundation.
     pub(crate) built: Option<MasterId>,
     /// The foundation's `+0xcb0`: the object its completion's stack unit made

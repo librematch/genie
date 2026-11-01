@@ -1,5 +1,6 @@
 use crate::combat::Charge;
 use crate::combat::attack::AttackState;
+use crate::garrison::ContainerId;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
@@ -314,7 +315,7 @@ fn a_target_is_pending_while_seen_and_no_ally_s() {
     t.players[2].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
     assert!(!t.target_pending(group_id(1)).unwrap());
     t.players[2].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
-    t.players[2].objects[ListIndex::new(0)].life.inside = Some(object_id(5));
+    t.players[2].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(5)));
     assert!(!t.target_pending(group_id(1)).unwrap());
     t.players[2].objects[ListIndex::new(0)].life.inside = None;
     assert!(t.target_pending(group_id(1)).unwrap());

@@ -1,6 +1,7 @@
 //! The slice set up from the header save ([`slice`]): the players' technologies, wonder
 //! times, ghosts, AI settings and history, and the garrisons' firepower.
 
+use genie_core::garrison::ContainerId;
 use genie_core::gathering::QueueCount;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
@@ -564,7 +565,7 @@ pub(super) fn garrison_firepower(turns: &mut World) {
         let Some(masters) = turns.masters.get(p) else {
             continue;
         };
-        let units: Vec<(ObjectId, ObjectId, MasterId, Seconds)> = player
+        let units: Vec<(ObjectId, ContainerId, MasterId, Seconds)> = player
             .objects
             .iter()
             .chain(&player.sleeping)
@@ -575,7 +576,7 @@ pub(super) fn garrison_firepower(turns: &mut World) {
                 .objects
                 .iter_mut()
                 .chain(&mut player.sleeping)
-                .find(|u| u.id == building)
+                .find(|u| u.id == building.id())
             else {
                 continue;
             };

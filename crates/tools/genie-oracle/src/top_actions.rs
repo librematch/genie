@@ -3,6 +3,7 @@
 use crate::{OTHER_SUB_ACTION, combat_master, saved_attack, saved_move_wait, saved_sprite};
 use genie_core::GenieError;
 use genie_core::construction::build::{BuildAction, BuildTask};
+use genie_core::garrison::ContainerId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::{Offset, Position};
@@ -461,7 +462,7 @@ fn import_enter(saved: &Saved<'_>, task_at: TaskAt<'_>, unit: &mut Unit) -> Resu
         ))?;
     let task = saved.task(task_at)?;
     unit.actions.set_enter(Some(EnterAction {
-        target: ObjectId::of_field(base.target_id),
+        target: ContainerId::of_field(base.target_id),
         state,
         move_to,
         point: saved.point(),

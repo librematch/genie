@@ -1,6 +1,7 @@
 //! The flight of the hunted animals, the boar and the villagers, and their calls for help.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -341,7 +342,7 @@ impl UnitAi {
                 if let Some(found) = side.foundation_search()?
                     && side.reaches(found, FOUNDATION_REACH)?
                 {
-                    let _ = self.build_object(found, true, at, side, rng)?;
+                    let _ = self.build_object(FoundationId::new(found), true, at, side, rng)?;
                     return Ok(BREAK);
                 }
                 if computer {

@@ -16,10 +16,12 @@ use crate::commands::{
     TownBellCommand, TradeCommand, TransformObjectCommand, TributeCommand, UnitAiStateCommand,
     UnitList, UnitOrderAction, UnitOrderCommand, UnloadCommand, UnmodelledCommand, Waypoints,
 };
+use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildTask, Construction};
 use crate::construction::gates::gate_units;
 use crate::construction::repair::RepairState;
+use crate::garrison::ContainerId;
 use crate::gathering::QueueCount;
 use crate::gathering::closest_resource::search_origin;
 use crate::gathering::gather::GatherState;
@@ -3834,7 +3836,9 @@ fn the_unit_ai_s_hunt_build_and_target_orders_apply_after_its_run() {
     let mut t = sent_off_world(vec![]);
     with_effects(
         &mut t,
-        vec![Effect::Command(AiCommand::BuildObject(object_id(10028)))],
+        vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
+            object_id(10028),
+        )))],
     )
     .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -3979,7 +3983,10 @@ fn a_unit_sent_off_a_foundation_finds_the_spot_beside_it() {
         .unwrap();
     let mut found = None;
     t.run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
-        found = Some(side.off_footprint(object_id(10028), Footprint::new(1.0, 1.0))?);
+        found = Some(side.off_footprint(
+            FoundationId::new(object_id(10028)),
+            Footprint::new(1.0, 1.0),
+        )?);
         Ok(())
     })
     .unwrap();
@@ -4014,7 +4021,10 @@ fn a_unit_sent_off_a_foundation_finds_the_spot_beside_it() {
     );
     let mut found = None;
     t.run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
-        found = Some(side.off_footprint(object_id(10028), Footprint::new(1.0, 1.0))?);
+        found = Some(side.off_footprint(
+            FoundationId::new(object_id(10028)),
+            Footprint::new(1.0, 1.0),
+        )?);
         Ok(())
     })
     .unwrap();
@@ -4251,7 +4261,7 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
     };
     let mut t = footprint_world();
     t.evacuate(
-        object_id(10028),
+        FoundationId::new(object_id(10028)),
         &[object_id(9175), object_id(600), object_id(4444)],
     )
     .unwrap();
@@ -4260,7 +4270,8 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
     t.players[1].objects[ListIndex::new(0)]
         .body
         .set_anim_speed(Speed::new(1.0));
-    t.evacuate(object_id(10028), &[object_id(9175)]).unwrap();
+    t.evacuate(FoundationId::new(object_id(10028)), &[object_id(9175)])
+        .unwrap();
     assert_eq!(sent(&t), Vec::<[i32; 3]>::new());
     let mut t = footprint_world();
     t.players[1].objects[ListIndex::new(0)]
@@ -4268,7 +4279,8 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
         .as_mut()
         .unwrap()
         .current_action = Some(ActionKind::MoveAside);
-    t.evacuate(object_id(10028), &[object_id(9175)]).unwrap();
+    t.evacuate(FoundationId::new(object_id(10028)), &[object_id(9175)])
+        .unwrap();
     assert_eq!(sent(&t), Vec::<[i32; 3]>::new());
     let mut t = footprint_world();
     t.order_work(
@@ -4283,9 +4295,13 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
         },
     )
     .unwrap();
-    t.evacuate(object_id(10028), &[object_id(9175)]).unwrap();
+    t.evacuate(FoundationId::new(object_id(10028)), &[object_id(9175)])
+        .unwrap();
     assert_eq!(sent(&t), Vec::<[i32; 3]>::new());
-    assert!(t.evacuate(object_id(4444), &[object_id(9175)]).is_err());
+    assert!(
+        t.evacuate(FoundationId::new(object_id(4444)), &[object_id(9175)])
+            .is_err()
+    );
 }
 
 /// `FUN_14123bb20`'s owner's units of a formation category on the footprint go together
@@ -4298,7 +4314,8 @@ fn a_formation_s_units_on_a_new_foundation_move_off_together() {
     for masters in &mut t.masters {
         masters.get_mut(master_id(120)).unwrap().formation_category = FormationClass::of_data(1);
     }
-    t.evacuate(object_id(10028), &[object_id(9175)]).unwrap();
+    t.evacuate(FoundationId::new(object_id(10028)), &[object_id(9175)])
+        .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     let ai = v.ai.as_ref().unwrap();
     assert_eq!(ai.current_action, Some(ActionKind::MoveAside));
@@ -4437,7 +4454,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
                 house(
                     object_id(3),
                     ObjectState::Alive,
-                    Some(object_id(1)),
+                    Some(ContainerId::new(object_id(1))),
                     false,
                     ids::HOUSE,
                 ),
@@ -6228,7 +6245,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
         .expect("the Enter");
     assert_eq!(
         (first.target, first.state),
-        (Some(object_id(10028)), crate::garrison::EnterState::Walk)
+        (Some(container_id(10028)), crate::garrison::EnterState::Walk)
     );
     t.players[1].objects[ListIndex::new(0)]
         .actions
@@ -6269,7 +6286,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
 #[test]
 fn an_enter_of_a_unit_inside_an_object_fails_at_its_start() {
     let mut t = enter_world(vec![], 5);
-    t.players[1].objects[ListIndex::new(0)].life.inside = Some(object_id(4242));
+    t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(4242)));
     assert_eq!(
         t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), true),
         Ok(true)
@@ -6296,7 +6313,7 @@ fn an_enter_of_a_unit_inside_an_object_fails_at_its_start() {
 fn the_unit_ai_s_enter_from_inside_tells_its_ai_as_the_side_returns() {
     use crate::unit_ai::{UnitCommand, UnitSide};
     let mut t = enter_world(vec![], 5);
-    t.players[1].objects[ListIndex::new(0)].life.inside = Some(object_id(4242));
+    t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(4242)));
     let seen = villager_side(&mut t, |side| {
         let enters = side.command(UnitCommand::Enter(object_id(10028)))?;
         Ok((enters, side.unit.actions.enter().map(|e| e.state)))
@@ -6371,8 +6388,8 @@ fn livestock_s_enter_command_becomes_its_artifact_s_sub_action() {
     );
     let sub = v.actions.artifact().copied().unwrap().enter;
     assert!(
-        sub.is_some_and(|e| e.target == Some(object_id(10028)))
-            || v.life.inside == Some(object_id(10028)),
+        sub.is_some_and(|e| e.target == Some(ContainerId::new(object_id(10028))))
+            || v.life.inside == Some(ContainerId::new(object_id(10028))),
         "{v:?}"
     );
 }
@@ -6418,7 +6435,7 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
             timer: Seconds::ZERO,
             moving,
             ..crate::garrison::EnterAction::new(
-                object_id(10028),
+                ContainerId::new(object_id(10028)),
                 Position::new(30.0, 88.0, 0.0),
                 &task,
             )
@@ -6463,7 +6480,7 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
 fn livestock_s_second_enter_command_stops_the_walk_and_lets_the_old_enter_s_target_go() {
     let mut t = livestock_enter_world();
     let mut walking = crate::garrison::EnterAction::new(
-        object_id(10028),
+        ContainerId::new(object_id(10028)),
         Position::new(30.0, 88.0, 0.0),
         &crate::garrison::tests::enter_task(Distance::ZERO, class::BUILDING),
     );
@@ -6499,7 +6516,7 @@ fn livestock_s_second_enter_command_stops_the_walk_and_lets_the_old_enter_s_targ
 #[test]
 fn an_inside_unit_s_update_deletes_its_top_action() {
     let mut t = enter_world(vec![], 5);
-    t.players[1].objects[ListIndex::new(0)].life.inside = Some(object_id(10028));
+    t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(10028)));
     t.spatial
         .go_inside(object_id(9175), Position::new(30.0, 88.0, 0.0));
     t.players[1].objects[ListIndex::new(0)]
@@ -6545,7 +6562,7 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
             ]);
         }
         let mut e = crate::garrison::EnterAction::new(
-            object_id(10028),
+            ContainerId::new(object_id(10028)),
             Position::new(30.0, 88.0, 0.0),
             &crate::garrison::tests::enter_task(Distance::new(2.0), class::BUILDING),
         );
@@ -6577,11 +6594,11 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
     };
     assert_eq!(
         entered(false),
-        Ok((Some(object_id(10028)), vec![object_id(9175)]))
+        Ok((Some(container_id(10028)), vec![object_id(9175)]))
     );
     assert_eq!(
         entered(true),
-        Ok((Some(object_id(10028)), vec![object_id(9175)]))
+        Ok((Some(container_id(10028)), vec![object_id(9175)]))
     );
 }
 
@@ -6602,7 +6619,7 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
         ..crate::groups::UnitGroup::default()
     });
     let mut e = crate::garrison::EnterAction::new(
-        object_id(10028),
+        ContainerId::new(object_id(10028)),
         Position::new(30.0, 88.0, 0.0),
         &crate::garrison::tests::enter_task(Distance::new(2.0), class::BUILDING),
     );
@@ -6634,7 +6651,7 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
     );
     assert_eq!(
         left,
-        Ok((Some(object_id(10028)), None, vec![object_id(401)]))
+        Ok((Some(container_id(10028)), None, vec![object_id(401)]))
     );
 }
 
@@ -6644,7 +6661,7 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
 fn an_entered_enter_of_a_unit_let_out_goes_at_its_update() {
     let mut t = enter_world(vec![], 5);
     let mut e = crate::garrison::EnterAction::new(
-        object_id(10028),
+        ContainerId::new(object_id(10028)),
         Position::new(30.0, 88.0, 0.0),
         &crate::garrison::tests::enter_task(Distance::new(0.5), class::BUILDING),
     );
@@ -6690,8 +6707,8 @@ fn the_unit_ai_s_enter_order_gives_the_unit_an_enter() {
     assert!(
         v.actions
             .enter()
-            .is_some_and(|e| e.target == Some(object_id(10028)))
-            || v.life.inside == Some(object_id(10028)),
+            .is_some_and(|e| e.target == Some(ContainerId::new(object_id(10028))))
+            || v.life.inside == Some(ContainerId::new(object_id(10028))),
         "{:?}",
         t.players[1].freezes
     );
@@ -6849,19 +6866,31 @@ fn a_build_command_without_its_foundation_or_a_task_does_nothing() {
     let mut t = sent_off_world(vec![]);
     let before = t.players[1].objects[ListIndex::new(0)].clone();
     assert_eq!(
-        t.build_command(PlayerId::new(1), ListIndex::new(0), object_id(99_999)),
+        t.build_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            FoundationId::new(object_id(99_999))
+        ),
         Ok(false)
     );
     without_build_tasks(&mut t);
     assert_eq!(
-        t.build_command(PlayerId::new(1), ListIndex::new(0), object_id(10028)),
+        t.build_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            FoundationId::new(object_id(10028))
+        ),
         Ok(false)
     );
     assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
     // with a task it builds as the builder 118
     let mut t = sent_off_world(vec![]);
     assert_eq!(
-        t.build_command(PlayerId::new(1), ListIndex::new(0), object_id(10028)),
+        t.build_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            FoundationId::new(object_id(10028))
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -6952,24 +6981,28 @@ fn the_unit_ai_s_view_answers_the_build_command_before_it_runs() {
         answer.unwrap()
     };
     let mut t = sent_off_world(vec![]);
-    assert!(answers(&mut t, object_id(10028)));
-    assert!(!answers(&mut t, object_id(99_999)));
+    assert!(answers(&mut t, FoundationId::new(object_id(10028))));
+    assert!(!answers(&mut t, FoundationId::new(object_id(99_999))));
     // the build command on top: a Build answers 1 without a task in the lists
     assert_eq!(
-        t.build_command(PlayerId::new(1), ListIndex::new(0), object_id(10028)),
+        t.build_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            FoundationId::new(object_id(10028))
+        ),
         Ok(true)
     );
     for id in [83, 118, 212] {
         let m = t.masters[1].get_mut(master_id(id)).unwrap();
         m.tasks.retain(|k| k.action_type != action_type::BUILD);
     }
-    assert!(answers(&mut t, object_id(10028)));
+    assert!(answers(&mut t, FoundationId::new(object_id(10028))));
     let mut t = sent_off_world(vec![]);
     for id in [118, 212] {
         let m = t.masters[1].get_mut(master_id(id)).unwrap();
         m.tasks.retain(|k| k.action_type != action_type::BUILD);
     }
-    assert!(!answers(&mut t, object_id(10028)));
+    assert!(!answers(&mut t, FoundationId::new(object_id(10028))));
 }
 
 /// The build command at once from the unit AI's run (`UnitSide::build_now`: a requeued build
@@ -6980,13 +7013,17 @@ fn the_build_command_at_once_matches_the_one_after_the_update() {
     let mut later = sent_off_world(vec![]);
     let mut now = later.clone();
     let _ = later
-        .build_command(PlayerId::new(1), ListIndex::new(0), object_id(10028))
+        .build_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            FoundationId::new(object_id(10028)),
+        )
         .unwrap();
     now.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
         |ai, _, side, _, rng| {
             side.effect_now(
-                Effect::Command(AiCommand::BuildObject(object_id(10028))),
+                Effect::Command(AiCommand::BuildObject(FoundationId::new(object_id(10028)))),
                 ai,
                 rng,
             )
@@ -10250,7 +10287,7 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
         (true, true)
     );
     assert_eq!(u.ai.as_ref().unwrap().notifies.len(), 1);
-    u.life.inside = Some(object_id(100));
+    u.life.inside = Some(ContainerId::new(object_id(100)));
     assert_eq!(
         change_hands(
             &mut u,
@@ -10552,7 +10589,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
     villager
         .actions
         .set_enter(Some(crate::garrison::EnterAction {
-            target: Some(object_id(9150)),
+            target: Some(ContainerId::new(object_id(9150))),
             state: crate::garrison::EnterState::Wait,
             move_to: None,
             point: Position::new(20.0, 20.0, 0.0),
@@ -14646,7 +14683,7 @@ fn scout_attack_on(
         actions: ActionList::default().with_attack(own.copied()),
         life: Lifecycle {
             master_id: ids::ID_448,
-            inside,
+            inside: inside.map(ContainerId::new),
             ..Lifecycle::default()
         },
         ..Unit::default()
@@ -16013,7 +16050,7 @@ fn livestock_got_in_by_its_artifact_s_enter_keeps_the_artifact_to_its_next_updat
     }
     t.tick(Millis::new(50));
     let v = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(v.life.inside, Some(object_id(10028)));
+    assert_eq!(v.life.inside, Some(ContainerId::new(object_id(10028))));
     assert_eq!(
         v.top_action_kind(),
         Some(crate::ownership::artifact::ARTIFACT_TYPE)
@@ -16040,7 +16077,7 @@ fn livestock_inside_gets_its_default_artifact_and_loses_it_by_turns() {
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     v.default_artifact = true;
     v.actions.set_artifact(None);
-    v.life.inside = Some(object_id(10028));
+    v.life.inside = Some(ContainerId::new(object_id(10028)));
     t.spatial
         .go_inside(object_id(9175), Position::new(30.0, 88.0, 0.0));
     let mut kinds = Vec::new();
@@ -17218,7 +17255,11 @@ fn house_builder() -> World {
     };
     t.spatial.insert(object_id(10028), site);
     let _ = t
-        .build_command(PlayerId::new(1), ListIndex::new(0), object_id(10028))
+        .build_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            FoundationId::new(object_id(10028)),
+        )
         .unwrap();
     let k = crate::players::tracker::key(t.masters.get(1), &t.lines, ids::TOWN_CENTRE);
     t.players[1].tracker.add(object_id(700), k);
@@ -17361,8 +17402,10 @@ fn a_drop_site_search_from_a_unit_takes_the_nearest_it_reaches() {
         drop_site_sought(keep, (false, false, None)),
         Ok(Some(object_id(700)))
     );
-    let inside =
-        |t: &mut World| t.players[1].objects[ListIndex::new(2)].life.inside = Some(object_id(9175));
+    let inside = |t: &mut World| {
+        t.players[1].objects[ListIndex::new(2)].life.inside =
+            Some(ContainerId::new(object_id(9175)));
+    };
     assert_eq!(
         drop_site_sought(inside, (true, true, None)),
         Ok(Some(object_id(701)))
@@ -19351,7 +19394,9 @@ fn an_enter_s_transport_moves_to_the_meeting_point_where_the_unit_runs() {
     let meet = Position::new(25.0, 89.5, 0.0);
     let moved = |t: &mut World, ship: i32| {
         in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
-            c.lend(unit, |w| w.ship_move(ObjectId::of_field(ship), meet))?;
+            c.lend(unit, |w| {
+                w.ship_move(ObjectId::of_field(ship).map(ContainerId::new), meet)
+            })?;
             let (_, s) = c.w.object(object_id(9176)).expect("held");
             Ok(s.actions.move_to().map(|m| (m.goal(), m.range)))
         })
@@ -20418,4 +20463,9 @@ fn only_a_computer_players_explorer_notify_reaches_the_ai() {
         ))
     })
     .unwrap();
+}
+
+/// Object `value` as a container.
+fn container_id(value: i32) -> ContainerId {
+    ContainerId::new(object_id(value))
 }

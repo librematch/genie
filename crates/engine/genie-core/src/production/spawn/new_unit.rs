@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::commands::GatherPointState;
+use crate::garrison::ContainerId;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::{Obstruction, Placed};
@@ -177,7 +178,7 @@ impl World {
                     && t_master.garrison.holds()
                     // a queued order's target −1 is a point: it takes nothing in
                     && o.target
-                        .map_or(Ok(false), |t| self.takes_in(t, p, Some(master)))?
+                        .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?
                 {
                     return Err(GenieError::unsupported(
                         "a command queue's order on a building the unit may enter (its room, slot 0x198)",

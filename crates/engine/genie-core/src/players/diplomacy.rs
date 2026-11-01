@@ -11,6 +11,7 @@
 //! `FUN_1415e23f0`; the revealed units `FUN_14152bcb0`; the tile list's refill `FUN_141285cb0`.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
@@ -199,7 +200,7 @@ impl World {
         p: PlayerId,
         id: ObjectId,
         q: PlayerId,
-        inside: Option<ObjectId>,
+        inside: Option<ContainerId>,
     ) -> Result<(), GenieError> {
         let Some(holder) = inside else {
             return Ok(());
@@ -212,7 +213,7 @@ impl World {
         }
         let holder_master = h.master(&self.masters, hp)?;
         if holder_master.kind == master_type::BUILDING {
-            let hi = self.live_index(hp, holder)?;
+            let hi = self.live_index(hp, holder.id())?;
             if !self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? {
                 self.destroy(p, id)?;
             }

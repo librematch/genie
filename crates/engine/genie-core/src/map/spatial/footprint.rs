@@ -11,7 +11,6 @@ use crate::math::fmath::BVector;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::class;
 use crate::world::slots::CheckedIndex;
 use std::collections::BTreeMap;
 
@@ -125,7 +124,7 @@ impl Spatial {
     /// state 2 or 6) passes the state and foundation tests.
     pub fn footprint_occupants(
         &self,
-        site_id: ObjectId,
+        site_id: crate::construction::FoundationId,
         site: &Placed,
         obstructs: bool,
         looks: &BTreeMap<ObjectId, crate::construction::build::ClearLook>,
@@ -149,7 +148,7 @@ impl Spatial {
             .objects
             .iter()
             .filter(|&(&id, o)| {
-                id != site_id
+                id != site_id.id()
                     && (obstructs || o.speed <= Speed::ZERO)
                     && !o.buildable_on.passed()
                     && o.tall
@@ -157,32 +156,6 @@ impl Spatial {
                     && (o.position.x() - sx).abs() <= rx
                     && (o.position.y() - sy).abs() <= ry
                     && counts(id, o)
-            })
-            .map(|(&id, _)| id)
-            .collect())
-    }
-
-    /// The objects a foundation clears off its footprint when its first builder arrives
-    /// (`FUN_1415c3620`): those whose footprint overlaps the site's, of another master, that may
-    /// be built over (`can_be_built_on`) or are trees (class 15, which it clears when their hit
-    /// points are at most 1).
-    pub fn footprint_clearing(
-        &self,
-        site_id: ObjectId,
-        site: &Placed,
-    ) -> Result<Vec<ObjectId>, GenieError> {
-        let (sx, sy) = (site.position.x(), site.position.y());
-        let (rx, ry) = (site.radius.x(), site.radius.y());
-        self.check_known(Rect::new(sx - rx, sy - ry, sx + rx, sy + ry))?;
-        Ok(self
-            .objects
-            .iter()
-            .filter(|&(&id, o)| {
-                id != site_id
-                    && o.master != site.master
-                    && (o.buildable_on.cleared() || o.class == class::TREE)
-                    && (o.position.x() - sx).abs() < o.radius.x() + rx
-                    && (o.position.y() - sy).abs() < o.radius.y() + ry
             })
             .map(|(&id, _)| id)
             .collect())

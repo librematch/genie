@@ -2,6 +2,7 @@
 //! and its update.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
 use crate::garrison::meeting::Meeting;
 use crate::garrison::{ENTER_NEAR, HALF_TILE};
@@ -16,7 +17,6 @@ use crate::movement::move_to::{
     GiveUp, MoveDefaults, MoveToAction, MoveToReads, SpriteReads, WalkTo,
 };
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
-use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
@@ -56,7 +56,7 @@ pub(crate) const SIEGE_UNLOAD: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct EnterAction {
     /// The building or transport (`+0x20`, its id `+0x30`).
-    pub target: Option<ObjectId>,
+    pub target: Option<ContainerId>,
     /// The action state (`+0x18`).
     pub state: EnterState,
     /// Its `MoveTo` sub-action to the target: quiet, within [`EnterAction::walk_range`], with
@@ -141,7 +141,7 @@ impl EnterAction {
     ///
     /// [`meeting`]: crate::garrison::meeting::meeting_point
     #[must_use]
-    pub const fn new(target: ObjectId, point: Position, task: &Task) -> Self {
+    pub const fn new(target: ContainerId, point: Position, task: &Task) -> Self {
         Self {
             target: Some(target),
             state: EnterState::Walk,
@@ -196,7 +196,7 @@ impl EnterAction {
         // `FUN_140aa0df0`'s: the target's place; `FUN_140aa0d30`'s: the meeting point toward a
         // transport (a point below 0 would make the first)
         let to = WalkTo {
-            id: self.target,
+            id: self.target.map(ContainerId::id),
             at: t.position,
             gap: start.gap,
             state: Some(t.state),
@@ -230,7 +230,10 @@ impl EnterAction {
         self.move_to = Some(MoveToAction {
             state,
             point: Position::ORIGIN,
-            target: self.target,
+            target: match self.target {
+                Some(t) => Some(t.id()),
+                None => None,
+            },
             range: self.range,
             sprite: None,
             quiet: true,

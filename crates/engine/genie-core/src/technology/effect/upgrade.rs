@@ -2,6 +2,7 @@
 //! kinds and a negative cost's entries.
 
 use crate::GenieError;
+use crate::garrison::ContainerId;
 use crate::map::Point;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
@@ -295,7 +296,7 @@ impl World {
                     let Some(crate::orders::Place::Live(np, ni)) = self.place(new) else {
                         continue;
                     };
-                    self.enter_forced(np, ni, b)?;
+                    self.enter_forced(np, ni, ContainerId::new(b))?;
                 }
                 if attribute(self.players.player(p)?, 283) <= Amount::ZERO {
                     let Some(crate::orders::Place::Live(bp, bi)) = self.place(b) else {

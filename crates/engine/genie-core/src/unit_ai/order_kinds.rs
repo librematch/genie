@@ -82,7 +82,7 @@ impl UnitAi {
     /// model.
     pub(crate) fn build_object(
         &mut self,
-        target: ObjectId,
+        target: crate::construction::FoundationId,
         force: bool,
         at: &Surroundings,
         side: &mut dyn UnitSide,
@@ -94,8 +94,8 @@ impl UnitAi {
         side.effect_now(Effect::Command(AiCommand::BuildObject(target)), self, rng)?;
         self.set_action(Some(ActionKind::Build));
         match Self::world_object(target, at, side)? {
-            Some(t) => self.set_target(Some(target), t.class.or_none(), t.position),
-            None => self.set_target(Some(target), None, Position::ORIGIN),
+            Some(t) => self.set_target(Some(target.id()), t.class.or_none(), t.position),
+            None => self.set_target(Some(target.id()), None, Position::ORIGIN),
         }
         Ok(true)
     }

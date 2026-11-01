@@ -696,6 +696,7 @@ impl World {
 mod tests {
     use super::*;
     use crate::construction::wait_solidify::WaitSolidifyState;
+    use crate::garrison::ContainerId;
     use crate::gathering::make::MakeState;
     use crate::map::Distance;
     use crate::map::Footprint;
@@ -1639,7 +1640,7 @@ mod tests {
         let sighted = |state: ObjectState, inside: Option<ObjectId>, keep: bool| {
             let mut u = object(10, master_id(4), state, HitPoints::new(10.0));
             u.place_for_test(Position::new(5.5, 5.5, 0.0));
-            u.life.inside = inside;
+            u.life.inside = inside.map(ContainerId::new);
             let mut t = one_player(vec![u], vec![old.clone()], &[]);
             t.spatial = crate::map::spatial::Spatial::new(GridSize::new(20, 20));
             t.spatial.insert(

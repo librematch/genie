@@ -2,6 +2,7 @@ use super::*;
 use crate::commands::UnitOrderAction;
 use crate::commands::UnloadPick;
 use crate::construction::build::BuildState;
+use crate::garrison::ContainerId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::hunt::HuntState;
 use crate::groups::Differentiator;
@@ -2126,7 +2127,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         life: crate::objects::lifecycle::Lifecycle {
             hp: HitPoints::new(20.0),
             master_id: master_id(4),
-            inside: Some(object_id(100)),
+            inside: Some(ContainerId::new(object_id(100))),
             ..crate::objects::lifecycle::Lifecycle::default()
         },
         ..Unit::default()
