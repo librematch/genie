@@ -9,6 +9,7 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
+use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
@@ -1634,7 +1635,7 @@ fn grounded() -> World {
         GridSize::new(8, 8),
         vec![TileTerrain::of_save(0, 255, -1); 64],
         kinds,
-        vec![vec![1.0]],
+        vec![Restriction::new(vec![1.0])],
     ));
     t.spatial.sight.as_mut().unwrap().registry =
         Some(crate::vision::registry::Registry::new(4, 65));

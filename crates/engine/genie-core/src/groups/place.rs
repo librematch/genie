@@ -399,6 +399,7 @@ mod tests {
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
+    use crate::map::Restriction;
     use crate::map::RestrictionId;
     use crate::map::TerrainFlags;
     use crate::map::terrain::TileTerrain;
@@ -481,7 +482,7 @@ mod tests {
             GridSize::new(20, 20),
             vec![TileTerrain::of_save(0, 255, -1); 400],
             vec![kind],
-            vec![vec![1.0]],
+            vec![Restriction::new(vec![1.0])],
         ));
         for u in &units {
             t.spatial.insert(

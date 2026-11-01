@@ -3,6 +3,8 @@
 
 use crate::map::Distance;
 use crate::map::GridSize;
+use crate::map::Restriction;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::{
@@ -20,9 +22,9 @@ pub struct Planner {
     pub(super) offsets: [i32; 4],
     pub(super) cells: Cells,
     /// `+0x3c0`: the restriction's passability per terrain.
-    pub(super) passable: Vec<f32>,
+    pub(super) passable: Restriction,
     /// Each tile's terrain (the map's tile `+9`), row by row.
-    pub(super) terrain: Vec<u8>,
+    pub(super) terrain: Vec<TerrainId>,
     /// `+0x408`..`+0x40e`: the tiles an update or the goal's marks cover.
     pub(super) region: PlanRect,
     /// `+0x410`, `+0x412`: the goal's tile.
@@ -72,7 +74,12 @@ impl Planner {
     /// every tile's edges and the levels above them (`FUN_140f7e4b0` over the whole map).
     /// `terrain` holds each tile's terrain row by row, `passable` the restriction's value per
     /// terrain (above 0 passes).
-    pub fn new(size: GridSize, terrain: Vec<u8>, passable: Vec<f32>, map: &impl Blocked) -> Self {
+    pub fn new(
+        size: GridSize,
+        terrain: Vec<TerrainId>,
+        passable: Restriction,
+        map: &impl Blocked,
+    ) -> Self {
         let (w, h) = (size.width() as i16, size.height() as i16);
         let w0 = (w.wrapping_add(7)) & !7;
         let h0 = (h.wrapping_add(7)) & !7;
@@ -113,7 +120,7 @@ impl Planner {
 
     /// The restriction's passability per terrain the planner was made for.
     #[must_use]
-    pub fn passable(&self) -> &[f32] {
+    pub const fn passable(&self) -> &Restriction {
         &self.passable
     }
 
@@ -170,7 +177,7 @@ impl Planner {
         let (w, h) = (self.size.width(), self.size.height());
         let passes = |t: Tile| {
             let kind = self.terrain[(t.y() * w + t.x()) as usize];
-            0.0 < self.passable[usize::from(kind)] && !map.blocked(t)
+            self.passable.passes(kind) && !map.blocked(t)
         };
         if !passes(tile) {
             return 1;

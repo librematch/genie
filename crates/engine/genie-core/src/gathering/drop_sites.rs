@@ -264,6 +264,7 @@ mod tests {
     use super::*;
     use crate::construction::build::BuildTask;
     use crate::map::Footprint;
+    use crate::map::Restriction;
     use crate::map::spatial::Placed;
     use crate::math::rng::Well512;
     use crate::movement::Speed;
@@ -384,7 +385,7 @@ mod tests {
         let zones = ZoneMap::new(
             crate::map::GridSize::new(40, 40),
             &[crate::map::TerrainId::named(0); 1600],
-            &[1.0],
+            &Restriction::new(vec![1.0]),
         );
         let mut pathing = Pathing::default();
         let mut object = Well512::default();

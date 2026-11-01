@@ -15,6 +15,8 @@
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
+use crate::map::Restriction;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::spatial::{BLOCKED, Obstruction, Placed, Tiles};
 use crate::objects::ObjectId;
@@ -52,9 +54,9 @@ pub struct Pathing {
     /// The map's size in tiles.
     pub size: GridSize,
     /// Each tile's terrain, row by row.
-    pub terrain: Vec<u8>,
+    pub terrain: Vec<TerrainId>,
     /// Each terrain restriction's value per terrain (above 0 passes), by restriction id.
-    pub restrictions: Vec<Vec<f32>>,
+    pub restrictions: Vec<Restriction>,
     /// The game type (the world's `game_type`): type 12 has the escape the motion step runs for
     /// a unit on an `E` tile (`FUN_141158210` result 1), which the slice does not model.
     pub game_type: u8,
@@ -169,8 +171,8 @@ impl Pathing {
     #[must_use]
     pub fn new(
         size: GridSize,
-        terrain: Vec<u8>,
-        restrictions: Vec<Vec<f32>>,
+        terrain: Vec<TerrainId>,
+        restrictions: Vec<Restriction>,
         game_type: u8,
     ) -> Self {
         Self {
@@ -274,7 +276,8 @@ impl Pathing {
             let own = self
                 .restrictions
                 .get(r.index())
-                .map_or(&[][..], Vec::as_slice);
+                .map_or(&[][..], Restriction::values);
+            let values = values.values();
             own.len() != values.len()
                 || own.is_empty()
                 || own.iter().zip(values).all(|(a, b)| a == b)
@@ -523,14 +526,16 @@ mod tests {
     #[test]
     fn the_planner_lookup_takes_the_first_of_another_length_or_of_equal_values() {
         let mut p = Pathing {
-            restrictions: vec![
+            restrictions: [
                 vec![1.0, 0.0],
                 vec![1.0, 0.0],
                 vec![0.0, 1.0],
                 vec![1.0, 0.0, 1.0],
                 vec![],
                 vec![f32::NAN, 0.0],
-            ],
+            ]
+            .map(Restriction::new)
+            .into(),
             ..Pathing::default()
         };
         p.register(RestrictionId::named(2));

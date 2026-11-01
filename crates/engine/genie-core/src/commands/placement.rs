@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::Restriction;
 use crate::map::Tile;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
@@ -185,7 +186,7 @@ impl World {
     /// # Errors
     ///
     /// A world without the players' sight, and a restriction the data file does not have.
-    fn site_restriction(&self, site: &Master) -> Result<&[f32], GenieError> {
+    fn site_restriction(&self, site: &Master) -> Result<&Restriction, GenieError> {
         if self.spatial.sight.is_none() {
             return Err(GenieError::unsupported(
                 "BUILD's placement test without the players' sight",

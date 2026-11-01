@@ -8,6 +8,7 @@ use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::Restriction;
 use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
@@ -4048,7 +4049,7 @@ fn searchable(mut t: World) -> World {
         GridSize::new(60, 60),
         vec![TileTerrain::of_save(0, 255, -1); 3600],
         vec![kind],
-        vec![vec![1.0]],
+        vec![Restriction::new(vec![1.0])],
     ));
     s.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([0, 0])]);
     s.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([0, 1])]);

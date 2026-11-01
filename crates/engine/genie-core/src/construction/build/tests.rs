@@ -3,6 +3,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
 use crate::map::Point;
+use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
@@ -740,7 +741,7 @@ fn small_map() -> Spatial {
         GridSize::new(4, 4),
         vec![TileTerrain::of_save(0, 255, -1); 16],
         vec![kind; 40],
-        vec![vec![0.0; 40]; 5],
+        vec![Restriction::new(vec![0.0; 40]); 5],
     ));
     world
 }
@@ -778,7 +779,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         GridSize::new(4, 4),
         vec![TileTerrain::of_save(32, 255, -1); 16],
         kinds,
-        vec![vec![0.0; 40]; 5],
+        vec![Restriction::new(vec![0.0; 40]); 5],
     ));
     let mut master = built_master(
         ids::HOUSE,

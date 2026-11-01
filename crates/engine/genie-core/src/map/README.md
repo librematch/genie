@@ -27,6 +27,7 @@ vision and the unit AI's searches read it.
 | [`position.rs`](position.rs) | A place on the map as one type (`Position`): x, y and z, apart from the game's vectors (x, height, y, `crate::math::fmath::BVector`). |
 | [`radii.rs`](radii.rs) | An object's size as two types: its three radii (`Radii`, x, y and z, as its master holds them) and their part on the ground (`Footprint`, x and y), apart from a place (`crate::map::Position`) and a displacement (`crate::map::Offset`). |
 | [`rect.rs`](rect.rs) | A box on the map's ground as one type (`Rect`): two corners, x0 and y0 then x1 and y1, apart from a point (`crate::map::Point`) and a walk between two points (`Segment`). |
+| [`restriction.rs`](restriction.rs) | A terrain restriction's values (`Restriction`): one a terrain, which terrains an object of the restriction may stand on and the terrain bonus's damage multipliers. |
 | [`restriction_id.rs`](restriction_id.rs) | A terrain restriction's id: which terrains an object may stand on. |
 | [`terrain.rs`](terrain.rs) | The map's terrain per tile (`RGE_Map`'s tiles, 0x40 bytes each: `+0x9` the terrain, `+0xa` the terrain to restore, `+0xc` the layer) and what the `.dat` says of each terrain, as far as the slice reads them: a completed building's snow check and its foundation terrain (`FUN_1411dbb70`, `FUN_1411ddd90`). |
 | [`terrain_flags.rs`](terrain_flags.rs) | A terrain's flags (`TerrainFlags`, the `.dat`'s `is_water` byte). |

@@ -7,6 +7,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Rect;
+use crate::map::Restriction;
 use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
@@ -121,7 +122,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
         GridSize::new(20, 20),
         vec![TileTerrain::of_save(0, 255, -1); 400],
         kinds,
-        vec![vec![1.0, 0.0]],
+        vec![Restriction::new(vec![1.0, 0.0])],
     ));
     for u in &objects {
         t.spatial.insert(
@@ -628,7 +629,10 @@ fn the_passability_tests_with_the_world_s_object_of_the_lead_id() {
             GridSize::new(20, 20),
             vec![TileTerrain::of_save(0, 255, -1); 400],
             vec![kind(TerrainFlags::WATER), kind(TerrainFlags::SHALLOWS)],
-            vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            vec![
+                Restriction::new(vec![1.0, 0.0]),
+                Restriction::new(vec![0.0, 1.0]),
+            ],
         ));
         for masters in &mut t.masters {
             let ghost = crate::objects::masters::Master {

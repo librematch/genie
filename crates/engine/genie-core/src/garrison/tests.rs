@@ -10,8 +10,10 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Radii;
+use crate::map::Restriction;
 use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
+use crate::map::TerrainId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
@@ -1649,7 +1651,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
             };
             1
         ],
-        vec![vec![1.0]],
+        vec![Restriction::new(vec![1.0])],
     );
     terrain.set_elevations(vec![0; n]);
     t.spatial.terrain = Some(terrain);
@@ -2457,7 +2459,7 @@ fn shore_world(at: Point, ship: Point) -> World {
             kind(TerrainFlags::BEACH),
             kind(TerrainFlags::WATER),
         ],
-        vec![vec![1.0, 1.0, 1.0]],
+        vec![Restriction::new(vec![1.0, 1.0, 1.0])],
     );
     terrain.set_elevations(vec![0; 40 * 40]);
     t.spatial.terrain = Some(terrain);
@@ -2714,13 +2716,16 @@ fn coast_world(ship: Point) -> World {
             }
         })
         .collect();
-    let kinds: Vec<u8> = tiles.iter().map(|t| t.0).collect();
+    let kinds: Vec<TerrainId> = tiles.iter().map(|t| TerrainId::named(t.0)).collect();
     let kind = |flags| crate::map::terrain::TerrainKind {
         shown: true,
         flags,
         forest: false,
     };
-    let restrictions = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+    let restrictions = vec![
+        Restriction::new(vec![1.0, 0.0]),
+        Restriction::new(vec![0.0, 1.0]),
+    ];
     let mut terrain = crate::map::terrain::Terrain::new(
         GridSize::new(30, 20),
         tiles
@@ -3122,7 +3127,7 @@ fn a_transport_without_a_drop_location_sails_on_to_a_new_point() {
     let mut t = coast_world(Point::new(14.5, 10.5));
     // the villager's master stands nowhere (restriction 0 refuses both terrains)
     if let Some(terrain) = t.spatial.terrain.as_mut() {
-        terrain.restrictions[0] = vec![0.0, 0.0];
+        terrain.restrictions[0] = Restriction::new(vec![0.0, 0.0]);
     }
     UnloadCommand {
         player: player_id(1),

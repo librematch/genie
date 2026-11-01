@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
+use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
@@ -35,7 +36,7 @@ pub struct BuildSite<'a> {
     /// The master's `obstruction_type` is neither 0 nor 12 (`FUN_1411205c0`).
     pub obstructs: bool,
     /// The master's terrain restriction's value per terrain.
-    pub restriction: &'a [f32],
+    pub restriction: &'a Restriction,
     /// `hill_mode` (`+0x604`, `p7`).
     pub hill_mode: u8,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).

@@ -428,6 +428,7 @@ mod stack_tests {
     use crate::map::GridSize;
     use crate::map::GroundOffset;
     use crate::map::Radii;
+    use crate::map::Restriction;
     use crate::map::TerrainFlags;
     use crate::map::spatial::{Placed, Tiles};
     use crate::map::terrain::TileTerrain;
@@ -627,7 +628,7 @@ mod stack_tests {
                 };
                 40
             ],
-            vec![vec![0.0; 40]; 5],
+            vec![Restriction::new(vec![0.0; 40]); 5],
         ));
         t.spatial.insert(
             object_id(8759),

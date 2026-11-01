@@ -31,6 +31,7 @@ use crate::map::Offset;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Radii;
+use crate::map::Restriction;
 use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
 use crate::map::TerrainMask;
@@ -572,7 +573,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
             };
             1
         ],
-        vec![vec![1.0]],
+        vec![Restriction::new(vec![1.0])],
     );
     terrain.set_elevations(vec![0; n]);
     t.spatial.terrain = Some(terrain);
@@ -2860,7 +2861,7 @@ pub(crate) fn open_map(t: &mut World) {
     );
     placeable(t);
     if let Some(terrain) = t.spatial.terrain.as_mut() {
-        terrain.restrictions = vec![vec![1.0]; 8];
+        terrain.restrictions = vec![Restriction::new(vec![1.0]); 8];
     }
 }
 
@@ -6198,8 +6199,8 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
         let mut t = enter_world(vec![], 5);
         t.pathing = Pathing::new(
             GridSize::new(120, 120),
-            vec![0; 120 * 120],
-            vec![vec![1.0]; 8],
+            vec![TerrainId::named(0); 120 * 120],
+            vec![Restriction::new(vec![1.0]); 8],
             0,
         );
         t.build_mesh().unwrap();
@@ -16811,8 +16812,8 @@ fn drop_site_sought(
     );
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -16902,8 +16903,8 @@ fn own_move_world(m: MoveToAction) -> World {
     let mut t = forage_world();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -17089,8 +17090,8 @@ fn explored(set: impl FnOnce(&mut crate::movement::explore::ExploreAction)) -> E
     let mut t = forage_world();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -17131,8 +17132,8 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
     let mut t = forage_world();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -17460,8 +17461,8 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -18480,8 +18481,8 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -18562,8 +18563,8 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();
@@ -19070,8 +19071,8 @@ fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
-        vec![0; 120 * 120],
-        vec![vec![1.0]; 8],
+        vec![TerrainId::named(0); 120 * 120],
+        vec![Restriction::new(vec![1.0]); 8],
         0,
     );
     t.build_mesh().unwrap();

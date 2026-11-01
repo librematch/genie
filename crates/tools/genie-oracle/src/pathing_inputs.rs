@@ -139,16 +139,20 @@ pub fn unit_terrain(
 pub fn planner_from_save(
     save: &[u8],
     terrain: &TerrainTable,
-    passable: Vec<f32>,
+    passable: genie_core::map::Restriction,
 ) -> Result<genie_core::pathing::tile_path::Planner, Error> {
     use genie_core::map::spatial::BLOCKED;
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
-    let terrain_ids: Vec<u8> = map
+    let terrain_ids: Vec<genie_core::map::TerrainId> = map
         .rows
         .iter()
-        .flat_map(|r| r.tiles.iter().map(|t| t.terrain_type))
+        .flat_map(|r| {
+            r.tiles
+                .iter()
+                .map(|t| genie_core::map::TerrainId::named(t.terrain_type))
+        })
         .collect();
     let spatial = spatial(&header, terrain).map_err(Error::Unmodelled)?;
     let tiles = spatial.tiles();

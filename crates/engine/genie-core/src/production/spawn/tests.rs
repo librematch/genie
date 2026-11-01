@@ -5,6 +5,7 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
 use crate::map::Radii;
+use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
@@ -332,7 +333,7 @@ fn a_fogged_building_blocks_a_build_by_its_visibility_mask() {
         scans: false,
         class: class::BUILDING,
         obstructs: true,
-        restriction: &[1.0],
+        restriction: &Restriction::new(vec![1.0]),
         hill_mode: 0,
         placement: PlacementTerrains::NONE,
         zones: false,
@@ -407,7 +408,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
-        restriction: &[1.0],
+        restriction: &Restriction::new(vec![1.0]),
         hill_mode: 0,
         placement: PlacementTerrains::NONE,
     };
@@ -427,7 +428,7 @@ fn the_first_object_of_a_tile_s_list_reports_the_block() {
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
-        restriction: &[1.0],
+        restriction: &Restriction::new(vec![1.0]),
         hill_mode: 0,
         placement: PlacementTerrains::NONE,
     };
@@ -1053,7 +1054,7 @@ impl PlaceMap for Dark {
 
 /// Player 1's house site (class 3, radii 1, obstructing, no height) on terrain 0, which `restriction`
 /// rates; `human` or not.
-const fn house_site(restriction: &[f32], human: bool) -> BuildSite<'_> {
+const fn house_site(restriction: &Restriction, human: bool) -> BuildSite<'_> {
     BuildSite {
         player: PlayerId::new(1),
         human,
@@ -1076,7 +1077,8 @@ const fn house_site(restriction: &[f32], human: bool) -> BuildSite<'_> {
 #[test]
 fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
     use crate::production::spawn::placement_test::build_static_test;
-    let open = house_site(&[1.0], true);
+    let open_values = Restriction::new(vec![1.0]);
+    let open = house_site(&open_values, true);
     let flat = Flat(Vec::new());
     assert_eq!(
         build_static_test(&open, &flat, Point::new(50.0, 50.0)),
@@ -1090,7 +1092,8 @@ fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
         build_static_test(&open, &flat, Point::new(119.5, 50.0)),
         Ok(Some(7))
     );
-    let forbidden = house_site(&[0.0], true);
+    let forbidden_values = Restriction::new(vec![0.0]);
+    let forbidden = house_site(&forbidden_values, true);
     assert_eq!(
         build_static_test(&forbidden, &flat, Point::new(50.0, 50.0)),
         Ok(Some(2))
@@ -1099,7 +1102,8 @@ fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
         build_static_test(&open, &Dark, Point::new(50.0, 50.0)),
         Ok(Some(5))
     );
-    let computer = house_site(&[1.0], false);
+    let computer_values = Restriction::new(vec![1.0]);
+    let computer = house_site(&computer_values, false);
     assert_eq!(
         build_static_test(&computer, &Dark, Point::new(50.0, 50.0)),
         Ok(None)
@@ -1131,7 +1135,8 @@ fn build_s_scan_reads_eight_tiles_either_way_within_the_map() {
 #[test]
 fn build_s_scan_counts_what_the_player_sees_of_a_tile() {
     use crate::production::spawn::placement_test::build_sees;
-    let site = house_site(&[1.0], true);
+    let site_values = Restriction::new(vec![1.0]);
+    let site = house_site(&site_values, true);
     let flat = Flat(Vec::new());
     let fogged = Fogged(Vec::new(), [0; 2]);
     let o = |player, fog_visibility| Near {
@@ -1172,7 +1177,8 @@ fn build_s_scan_counts_what_the_player_sees_of_a_tile() {
 #[test]
 fn build_s_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
     use crate::production::spawn::placement_test::build_ignores;
-    let site = house_site(&[1.0], true);
+    let site_values = Restriction::new(vec![1.0]);
+    let site = house_site(&site_values, true);
     let flat = Flat(Vec::new());
     let house = Near {
         kind: master_type::BUILDING,
@@ -1250,7 +1256,8 @@ fn build_s_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() 
 #[test]
 fn build_s_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     use crate::production::spawn::placement_test::build_passes;
-    let site = house_site(&[1.0], true);
+    let site_values = Restriction::new(vec![1.0]);
+    let site = house_site(&site_values, true);
     let flat = Flat(Vec::new());
     let walker = Near {
         kind: master_type::COMBAT,
@@ -1310,7 +1317,8 @@ fn build_s_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
 #[test]
 fn build_s_blockers_are_the_standing_objects_whose_box_overlaps() {
     use crate::production::spawn::placement_test::blocks_build;
-    let site = house_site(&[1.0], true);
+    let site_values = Restriction::new(vec![1.0]);
+    let site = house_site(&site_values, true);
     let flat = Flat(Vec::new());
     let house = Near {
         id: object_id(500),
@@ -1402,7 +1410,8 @@ fn the_build_s_static_scans_find_a_dying_house_build_passes_over() {
         obstruction_type: ObstructionType::TYPE_2,
         ..sheep(ObjectState::Alive)
     };
-    let build = house_site(&[1.0], false);
+    let build_values = Restriction::new(vec![1.0]);
+    let build = house_site(&build_values, false);
     let test = |site: &BuildSite<'_>, o: Near| {
         build_placement(site, &Flat(vec![o]), Point::new(21.0, 21.0)).unwrap()
     };

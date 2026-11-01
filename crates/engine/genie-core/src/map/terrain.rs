@@ -11,6 +11,7 @@ use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
+use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::TerrainMask;
@@ -119,7 +120,7 @@ pub struct Terrain {
     pub terrains: Vec<TerrainKind>,
     /// Each terrain restriction's value per terrain (`world+0x788`, the `.dat`'s
     /// `passable_buildable_dmg_multiplier`).
-    pub restrictions: Vec<Vec<f32>>,
+    pub restrictions: Vec<Restriction>,
     /// Per tile, its elevation (`+0x14`, the save's `t->m_elevation`); empty when not known.
     pub elevations: Vec<u8>,
     /// Per tile, its shape (`+0x8`, not saved): what the map's load (`FUN_140f733f0` over the
@@ -241,10 +242,8 @@ pub const fn terrain_class(flags: TerrainFlags) -> u8 {
 impl Terrain {
     /// Restriction `restriction`'s values, one a terrain; none for a restriction the table lacks.
     #[must_use]
-    pub fn restriction(&self, restriction: crate::map::RestrictionId) -> Option<&[f32]> {
-        self.restrictions
-            .get(restriction.index())
-            .map(Vec::as_slice)
+    pub fn restriction(&self, restriction: crate::map::RestrictionId) -> Option<&Restriction> {
+        self.restrictions.get(restriction.index())
     }
 
     /// The terrain classes restriction `restriction` lets an object stand on
@@ -257,6 +256,7 @@ impl Terrain {
             .map_or(TerrainMask::NONE, |values| {
                 TerrainMask::of_bits(
                     values
+                        .values()
                         .iter()
                         .enumerate()
                         .filter(|&(_, &v)| 0.0 < v)
@@ -273,7 +273,7 @@ impl Terrain {
         size: GridSize,
         tiles: Vec<TileTerrain>,
         terrains: Vec<TerrainKind>,
-        restrictions: Vec<Vec<f32>>,
+        restrictions: Vec<Restriction>,
     ) -> Self {
         Self {
             size,
@@ -383,10 +383,10 @@ impl Terrain {
             None => *self.kinds.get(i)?,
             Some(t) => t,
         };
-        let v = *self
+        let v = self
             .restrictions
             .get(usize::try_from(bonus).ok()?)?
-            .get(t.index())?;
+            .value(t)?;
         Some(if v == 0.0 { 1.0 } else { v })
     }
 
@@ -549,7 +549,7 @@ impl Terrain {
                 let i = self.size.index(Tile::new(tx, ty)).ok_or(TILE_OFF_MAP)?;
                 let t = *self.kinds.checked(i)?;
                 if let Some(values) = bonus.as_ref() {
-                    let v = values.get(t.index()).copied().unwrap_or(0.0);
+                    let v = values.value(t).unwrap_or(0.0);
                     if v != 0.0 && v != 1.0 {
                         *self.restore.checked_mut(i)? = Some(t);
                     }
@@ -610,7 +610,7 @@ mod tests {
             restore: vec![None; n],
             layers: layers_of(&layers),
             terrains,
-            restrictions: vec![vec![0.0; 40]; 5],
+            restrictions: vec![Restriction::new(vec![0.0; 40]); 5],
             elevations: vec![0; n],
             shapes: vec![0; n],
         }
@@ -622,8 +622,10 @@ mod tests {
     #[test]
     fn a_tile_s_defense_is_its_restriction_s_value_for_its_terrain() {
         let mut t = map(vec![0, 1, 2, 3], vec![0; 4]);
-        t.restrictions[2][1] = 1.25;
-        t.restrictions[2][3] = 0.75;
+        let mut values = vec![0.0; 40];
+        values[1] = 1.25;
+        values[3] = 0.75;
+        t.restrictions[2] = Restriction::new(values);
         t.restore[3] = Some(TerrainId::named(1));
         assert_eq!(t.defense(2, Tile::new(1, 0)), Some(1.25));
         assert_eq!(t.defense(2, Tile::new(0, 0)), Some(1.0));
@@ -793,7 +795,9 @@ mod tests {
         t.kinds = ids(&[0; 16]);
         t.layers = vec![None; 16];
         t.restore = vec![None; 16];
-        t.restrictions[4][0] = 0.5;
+        let mut values = vec![0.0; 40];
+        values[0] = 0.5;
+        t.restrictions[4] = Restriction::new(values);
         t.cover(&Foundation {
             position: Position::new(2.0, 2.0, 0.0),
             clearance: Footprint::new(2.0, 2.0),

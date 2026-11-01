@@ -151,7 +151,7 @@ pub struct TerrainTable {
     kinds: Vec<genie_core::map::terrain::TerrainKind>,
     masks: Vec<genie_core::map::TerrainMask>,
     /// Each terrain restriction's value per terrain (`passable_buildable_dmg_multiplier`).
-    passable: Vec<Vec<f32>>,
+    passable: Vec<genie_core::map::Restriction>,
 }
 
 impl TerrainTable {
@@ -181,7 +181,7 @@ impl TerrainTable {
         let passable = dat
             .terrain_restrictions
             .iter()
-            .map(|r| r.passable_buildable_dmg_multiplier.clone())
+            .map(|r| genie_core::map::Restriction::new(r.passable_buildable_dmg_multiplier.clone()))
             .collect();
         let kinds = dat
             .terrain_block
@@ -234,7 +234,7 @@ impl TerrainTable {
 
     /// Each terrain restriction's value per terrain, by restriction id.
     #[must_use]
-    pub fn passable(&self) -> &[Vec<f32>] {
+    pub fn passable(&self) -> &[genie_core::map::Restriction] {
         &self.passable
     }
 

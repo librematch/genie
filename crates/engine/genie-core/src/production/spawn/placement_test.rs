@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Radii;
+use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
@@ -135,7 +136,7 @@ pub struct Placing<'a> {
     /// Its master's class.
     pub class: ClassId,
     /// Its terrain restriction's value per terrain.
-    pub restriction: &'a [f32],
+    pub restriction: &'a Restriction,
     /// `hill_mode` (`+0x604`).
     pub hill_mode: u8,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
@@ -347,13 +348,10 @@ pub(super) fn build_static_test(
         for ty in y0..=y1 {
             let tile = Tile::new(tx, ty);
             let t = map.terrain(tile)?;
-            let value = site
-                .restriction
-                .get(t.index())
-                .ok_or(GenieError::unsupported(
-                    "a terrain its restriction does not list",
-                ))?;
-            if *value <= PASSABLE {
+            let value = site.restriction.value(t).ok_or(GenieError::unsupported(
+                "a terrain its restriction does not list",
+            ))?;
+            if value <= PASSABLE {
                 return Ok(Some(2));
             }
             explored = explored || (site.human && map.explored(site.player, tile));
@@ -534,13 +532,10 @@ pub fn placement(
             for ty in y0..=y1 {
                 let tile = Tile::new(tx, ty);
                 let t = map.terrain(tile)?;
-                let value = me
-                    .restriction
-                    .get(t.index())
-                    .ok_or(GenieError::unsupported(
-                        "a terrain its restriction does not list",
-                    ))?;
-                if *value <= PASSABLE {
+                let value = me.restriction.value(t).ok_or(GenieError::unsupported(
+                    "a terrain its restriction does not list",
+                ))?;
+                if value <= PASSABLE {
                     passable = false;
                     break 'tiles;
                 }

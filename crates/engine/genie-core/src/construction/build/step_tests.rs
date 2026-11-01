@@ -2,6 +2,8 @@
 //! World fixtures: the state of the builder, its foundation and the world after each update.
 
 use crate::map::GridSize;
+use crate::map::Restriction;
+use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveWaitState;
@@ -220,7 +222,12 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
 
 /// The world's planners for its 20 × 20 tiles and their shape mesh.
 fn plan(t: &mut World) {
-    t.pathing = Pathing::new(GridSize::new(20, 20), vec![0; 400], vec![vec![1.0]; 8], 0);
+    t.pathing = Pathing::new(
+        GridSize::new(20, 20),
+        vec![TerrainId::named(0); 400],
+        vec![Restriction::new(vec![1.0]); 8],
+        0,
+    );
     t.pathing.start_mesh(20);
 }
 

@@ -305,7 +305,11 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         GridSize::new(map.map_width, map.map_height),
         map.rows
             .iter()
-            .flat_map(|r| r.tiles.iter().map(|t| t.terrain_type))
+            .flat_map(|r| {
+                r.tiles
+                    .iter()
+                    .map(|t| genie_core::map::TerrainId::named(t.terrain_type))
+            })
             .collect(),
         terrain.passable().to_vec(),
         header.world.game_type,
@@ -320,7 +324,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     GridSize::new(map.map_width, map.map_height),
                     &z.number_tiles_in_zone_value,
                     &z.zone_map,
-                    &z.float_value,
+                    &genie_core::map::Restriction::new(z.float_value.clone()),
                     z.number_zones,
                 )
             })
