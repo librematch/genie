@@ -9,12 +9,14 @@ use crate::groups::GroupTarget;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::RestrictionId;
+use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::PathFlags;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
@@ -803,7 +805,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let mut t = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
     t.graphics = std::collections::BTreeMap::from([
@@ -2117,7 +2119,7 @@ fn switched_in_the_open(
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
-                flags: 1,
+                flags: SpriteFlags::ANIMATED,
             };
             (g.id, g)
         })
@@ -2201,7 +2203,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
-                flags: 1,
+                flags: SpriteFlags::ANIMATED,
             },
             &mut sprites,
         )),
@@ -3412,7 +3414,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         group: None,
         kind: master_type::COMBAT,
         grouped,
-        flag_1: false,
+        turns: false,
         speed: Speed::new(1.2),
         position,
         moved_at: position.ground(),
@@ -4037,7 +4039,7 @@ fn searchable(mut t: World) -> World {
     );
     let kind = crate::map::terrain::TerrainKind {
         shown: true,
-        flags: 1,
+        flags: TerrainFlags::WATER,
         forest: false,
     };
     s.terrain = Some(crate::map::terrain::Terrain::new(

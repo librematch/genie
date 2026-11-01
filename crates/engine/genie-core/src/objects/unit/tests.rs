@@ -7,6 +7,7 @@ use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
@@ -22,7 +23,7 @@ use crate::world::Seconds;
 use crate::world::others::OthersRef;
 use crate::world::tests::{forage_world, in_update};
 
-/// A graphic of sixteen facets, its sequence flag bit 1 set (`flag_1`).
+/// A graphic of sixteen facets, its sequence flag bit 1 set (`turns`).
 const WALKING: Graphic = Graphic {
     id: SpriteId::named(300),
     frames: 10,
@@ -30,7 +31,7 @@ const WALKING: Graphic = Graphic {
     speed_multiplier: 1.0,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
-    flags: 3,
+    flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),
 };
 
 /// `RGE_Static_Object::update`'s sleep: a static object flagged to sleep drops the flag and its
@@ -75,7 +76,7 @@ fn the_movement_state_takes_the_sprite_s_facets() {
         u.body.mover().unwrap().sprite_facets,
         Some(crate::objects::facing::SpriteFacets {
             count: 16,
-            flag_1: true,
+            turns: true,
         })
     );
 }

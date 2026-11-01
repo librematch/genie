@@ -11,6 +11,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Radii;
 use crate::map::RestrictionId;
+use crate::map::TerrainFlags;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
@@ -25,6 +26,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildingMaster;
@@ -486,7 +488,7 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
     if let Some(m) = v.body.mover_mut() {
         m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
             count: 16,
-            flag_1: false,
+            turns: false,
         });
     }
     t.object_mut(object_id(1000))
@@ -1603,7 +1605,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
         vec![
             crate::map::terrain::TerrainKind {
                 shown: true,
-                flags: 0,
+                flags: TerrainFlags::NONE,
                 forest: false,
             };
             1
@@ -2411,7 +2413,11 @@ fn shore_world(at: Point, ship: Point) -> World {
     let mut terrain = crate::map::terrain::Terrain::new(
         GridSize::new(40, 40),
         tiles,
-        vec![kind(0x20), kind(0x10), kind(1)],
+        vec![
+            kind(TerrainFlags::LAND),
+            kind(TerrainFlags::BEACH),
+            kind(TerrainFlags::WATER),
+        ],
         vec![vec![1.0, 1.0, 1.0]],
     );
     terrain.set_elevations(vec![0; 40 * 40]);
@@ -2455,7 +2461,7 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let _ = t.graphics.insert(SpriteId::named(2001), running);
     for m in &mut t.masters {
@@ -2682,7 +2688,7 @@ fn coast_world(ship: Point) -> World {
             .into_iter()
             .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
             .collect(),
-        vec![kind(8), kind(1)],
+        vec![kind(TerrainFlags::SHALLOWS), kind(TerrainFlags::WATER)],
         restrictions.clone(),
     );
     terrain.set_elevations(vec![0; 30 * 20]);

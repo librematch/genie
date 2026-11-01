@@ -16,6 +16,7 @@ use crate::movement::move_to::{
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::class;
@@ -253,7 +254,7 @@ pub(crate) fn walker() -> Mover {
             fast_turn: false,
             facets: Some(crate::objects::facing::SpriteFacets {
                 count: 16,
-                flag_1: true,
+                turns: true,
             }),
             weapon_range: Distance::ZERO,
         },
@@ -770,7 +771,7 @@ fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 3,
+        flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),
     };
     let ibex = Victim {
         id: object_id(15371),
@@ -1378,7 +1379,7 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
-            flags: 0,
+            flags: SpriteFlags::from_bits_retain(0x0),
         });
         h.attack = Some(a);
         let mut rig = Rig::on_the_path(victim).holding(10028, PlayerId::new(1));
@@ -1686,7 +1687,7 @@ fn a_hunt_s_walk_starts_toward_its_target() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 3,
+        flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),
     };
     let start = |range: Distance| {
         let house = Victim {

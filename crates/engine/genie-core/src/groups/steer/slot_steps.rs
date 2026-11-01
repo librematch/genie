@@ -14,6 +14,7 @@ use crate::math::fmath::{BVector, at_most_or_unordered, below_or_unordered};
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::master_type::BUILDING;
 use crate::world::Seconds;
 use crate::world::World;
@@ -162,7 +163,7 @@ impl World {
         let (_, u) = self.object_mut(id).ok_or_else(|| member_gone(id))?;
         let facets = u.sprite.map(|s| crate::objects::facing::SpriteFacets {
             count: s.graphic.facets,
-            flag_1: s.graphic.flags & 2 != 0,
+            turns: s.graphic.flags.contains(SpriteFlags::TURNS),
         });
         let at = u.moved_vector();
         let mover = u.body.mover_mut().ok_or(NO_MOVER)?;

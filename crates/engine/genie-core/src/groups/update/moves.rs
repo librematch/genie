@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MotionFlags;
 use crate::groups::SlotState;
 use crate::groups::command::MOVE_COMMAND;
 use crate::groups::group_list::member_gone;
@@ -25,12 +26,12 @@ impl World {
     /// command does nothing; a move ([`World::move_update`], `FUN_141041420`) that finished
     /// hibernates the group (`+0x13c` 1) while commands are queued, else deletes it. A follow (2)
     /// with its target held and a lead (the member nearest the target's place, [`World::
-    /// nearest_to_target`]) moves the group to the target (`commandMoveTo` with the target's x
-    /// and y, the range half the lead's master's line of sight, at once) when the target is
-    /// that range or more (`COMISS` then `JC`: a NaN is not) from where the group's target was
-    /// (`+0x3c8`, the height left out), and sets flags bit 12; without the target or a lead it
-    /// ends as a finished move. An attack ([`World::attack_update`], `FUN_14103f4e0`) that
-    /// finished deletes the group when no command is queued and its target is no longer pending
+    /// nearest_to_target`]) moves the group to the target (`commandMoveTo` with the target's x and
+    /// y, the range half the lead's master's line of sight, at once) when the target is that range
+    /// or more (`COMISS` then `JC`: a NaN is not) from where the group's target was (`+0x3c8`, the
+    /// height left out), and sets [`GroupFlags::FOLLOWED`]; without the target or a lead it ends as
+    /// a finished move. An attack ([`World::attack_update`], `FUN_14103f4e0`) that finished deletes
+    /// the group when no command is queued and its target is no longer pending
     /// ([`World::target_pending`]), else hibernates it. The other commands (`FUN_141040bd0`) are
     /// not modelled.
     pub(super) fn command_update(
@@ -110,23 +111,23 @@ impl World {
         Ok(true)
     }
 
-    /// `FUN_141041420`, a move's update: true when the move finished. Motion flags bit 1 asks
-    /// for a relayout. A moving group (`FUN_141046600`) asks for one too, unless with flags bit
-    /// 12 (a follow's) its target the world holds stands a squared 1 or more (`COMISS` then
-    /// `JNC`: not a NaN) from the top path's end (`FUN_140f95fb0`: its last point, the static
-    /// zero point `DAT_143f0dc78` for fewer than two), when the command becomes a follow (2);
-    /// such a group without its target does nothing. A standing group with flags bit 12 follows
-    /// too. A group with wait delays (`+0xc0`) or waiting for a path (`FUN_141046640`) does
-    /// nothing. Then, off a patrol (the top path's flags bit 0) and with flags bit 11 clear,
-    /// without queued commands but with a formation whose slots' array exists: the units of the
-    /// slots in state 3 leave the group (`removeUnit` with the group's target); some left and
-    /// some not: the rest move to their places ([`World::move_to_desired_positions`]) and the
-    /// update ends. With a path walked (the walked level's path, `+0x18`, holding points) it
-    /// goes on; without, a formation none of whose slots was in state 3 locks to its kind
-    /// ([`World::lock_formation`], `FUN_141024e70`) and the command ends (-1); else the command
-    /// ends. Any other group without a path walked ends its command. Then flags bit 2 clears, bit
-    /// 5 sets and the members move to their places; finished: no path walked and not the
-    /// patrol's case.
+    /// `FUN_141041420`, a move's update: true when the move finished. [`MotionFlags::NEW`] asks for
+    /// a relayout. A moving group (`FUN_141046600`) asks for one too, unless with
+    /// [`GroupFlags::FOLLOWED`] (a follow's) its target the world holds stands a squared 1 or more
+    /// (`COMISS` then `JNC`: not a NaN) from the top path's end (`FUN_140f95fb0`: its last point,
+    /// the static zero point `DAT_143f0dc78` for fewer than two), when the command becomes a follow
+    /// (2); such a group without its target does nothing. A standing group with
+    /// [`GroupFlags::FOLLOWED`] follows too. A group with wait delays (`+0xc0`) or waiting for a
+    /// path (`FUN_141046640`) does nothing. Then, off a patrol (the top path's
+    /// [`PathFlags::LOOPS`]) and with [`GroupFlags::PATROL`] clear, without queued commands but
+    /// with a formation whose slots' array exists: the units of the slots in state 3 leave the
+    /// group (`removeUnit` with the group's target); some left and some not: the rest move to their
+    /// places ([`World::move_to_desired_positions`]) and the update ends. With a path walked (the
+    /// walked level's path, `+0x18`, holding points) it goes on; without, a formation none of whose
+    /// slots was in state 3 locks to its kind ([`World::lock_formation`], `FUN_141024e70`) and the
+    /// command ends (-1); else the command ends. Any other group without a path walked ends its
+    /// command. Then [`GroupFlags::LINE`] clears, [`GroupFlags::MEMBERS_SENT`] sets and the members
+    /// move to their places; finished: no path walked and not the patrol's case.
     ///
     /// # Errors
     ///
@@ -135,7 +136,7 @@ impl World {
     /// When the world does not hold `group`: the group update passes its own.
     pub fn move_update(&mut self, group: GroupId, relayout: &mut bool) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
-        if g.motion.flags & 2 != 0 {
+        if g.motion.flags.contains(MotionFlags::NEW) {
             *relayout = true;
             return Ok(false);
         }
@@ -209,9 +210,9 @@ impl World {
         self.move_members_on(group, walks, patrolling)
     }
 
-    /// [`World::move_update`] of a group whose motion moves: a following group (flags bit 12)
-    /// whose top path ends at least [`CLOSE`] from its target goes on following; any other
-    /// asks for a layout anew. The update does not end.
+    /// [`World::move_update`] of a group whose motion moves: a following group
+    /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least [`CLOSE`] from its target goes on
+    /// following; any other asks for a layout anew. The update does not end.
     fn moving_step(
         &mut self,
         group: GroupId,
@@ -241,9 +242,10 @@ impl World {
         Ok(false)
     }
 
-    /// `FUN_141041420`'s end (`0x1410416dc`): flags bit 2 clears, bit 5 sets, the members move
-    /// to their places ([`World::move_to_desired_positions`] with a move and no target); the
-    /// move finished when no path is walked and it was no patrol.
+    /// `FUN_141041420`'s end (`0x1410416dc`): [`GroupFlags::LINE`] clears,
+    /// [`GroupFlags::MEMBERS_SENT`] sets, the members move to their places
+    /// ([`World::move_to_desired_positions`] with a move and no target); the move finished when no
+    /// path is walked and it was no patrol.
     pub(super) fn move_members_on(
         &mut self,
         group: GroupId,
@@ -508,10 +510,10 @@ impl World {
         }
     }
 
-    /// `IsIdle` (`FUN_141017ad0`) of group `group`: idle with flags bit 5 (`cConsiderIdle`), or on a
-    /// move (command 1) along a patrol (the top path's flags bit 0, `FUN_141046500`) or with
-    /// flags bit 11; else not while its motion moves or waits to move; else idle. False for a
-    /// group the world does not hold.
+    /// `IsIdle` (`FUN_141017ad0`) of group `group`: idle with [`GroupFlags::MEMBERS_SENT`]
+    /// (`cConsiderIdle`), or on a move (command 1) along a patrol (the top path's
+    /// [`PathFlags::LOOPS`], `FUN_141046500`) or with [`GroupFlags::PATROL`]; else not while its
+    /// motion moves or waits to move; else idle. False for a group the world does not hold.
     #[must_use]
     pub fn is_idle(&self, group: GroupId) -> bool {
         self.groups.get(group).is_some_and(UnitGroup::is_idle)

@@ -6,6 +6,7 @@ use crate::groups::CommandArgs;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MotionFlags;
 use crate::groups::attack::AttackOrder;
 use crate::groups::group_list::member_gone;
 use crate::groups::{GroupCommand, GroupTarget, SpecificMove, UnitGroup};
@@ -81,11 +82,11 @@ impl UnitGroup {
         }
     }
 
-    /// `FUN_14100f6b0`: flags bit 5 clears; with `forget_target` the target goes (-1, type -1,
-    /// its place, range and radius 0, its retargeting byte 0); the rams are not re-added
-    /// (`FUN_14102b730`, gated by `DAT_143f01837`, which nothing writes); every member's seconds
-    /// since attacking are `f32::MAX`; the waypoints (`+0x398`, count `+0x3a0`) take (`x`, the
-    /// desired height, `z`). The array's growth (5, then twice) fails only without memory.
+    /// `FUN_14100f6b0`: [`GroupFlags::MEMBERS_SENT`] clears; with `forget_target` the target goes
+    /// (-1, type -1, its place, range and radius 0, its retargeting byte 0); the rams are not
+    /// re-added (`FUN_14102b730`, gated by `DAT_143f01837`, which nothing writes); every member's
+    /// seconds since attacking are `f32::MAX`; the waypoints (`+0x398`, count `+0x3a0`) take (`x`,
+    /// the desired height, `z`). The array's growth (5, then twice) fails only without memory.
     pub fn add_waypoint(&mut self, x: f32, z: f32, forget_target: bool) {
         self.flags &= !GroupFlags::MEMBERS_SENT;
         if forget_target {
@@ -198,25 +199,27 @@ impl World {
     /// -1 and type -1, its place, range, radius and retargeting byte 0); its rams are not
     /// re-added (`readdRams`, `FUN_14102b730`, gated by `DAT_143f01837`, which nothing writes).
     /// Each member's seconds since attacking are `f32::MAX`. A horde moves as one
-    /// (`commandHorde`, not modelled). A changed target, or a patrol's path (the top path's flags
-    /// bit 0, [`crate::groups::formation::top_path`], or flags bit 11) when neither `leg` nor
-    /// `hold`, sets flags `0xc000`. Below [`EPSILON`] of top speed nothing moves (false). The
+    /// (`commandHorde`, not modelled). A changed target, or a patrol's path (the top path's
+    /// [`PathFlags::LOOPS`], [`crate::groups::formation::top_path`], or [`GroupFlags::PATROL`])
+    /// when neither `leg` nor `hold`, sets [`GroupFlags::RELAYOUT_AT_TURN`] and
+    /// [`GroupFlags::PLACE_AGAIN`]. Below [`EPSILON`] of top speed nothing moves (false). The
     /// path (a new one, flags [`PathFlags::NEW`], made now) runs from the group's place through
-    /// its waypoints (which it empties) to the point at the group's desired height, its flags
-    /// bit 0 off and bit 1 on; a patrol's leg (`leg`) loops instead (bit 0 on) and goes back and
-    /// forth (bit 1) when the point is at least [`PATROL_LEG_REACH`] from the group on the ground
-    /// (`COMISS`/`JBE` at 0x141010de3: a NaN distance too). Flags bit 11 ends set only with
-    /// `hold`, which also clears the path's bit 0 (`keep_flag`'s bit 11 is cleared again after
-    /// it, and a leg leaves it to `hold` alone). Measured, under two points
+    /// its waypoints (which it empties) to the point at the group's desired height, without
+    /// [`PathFlags::LOOPS`] and with [`PathFlags::BACK_AND_FORTH`]; a patrol's leg (`leg`) loops
+    /// instead and goes back and forth when the point is at least [`PATROL_LEG_REACH`] from the
+    /// group on the ground (`COMISS`/`JBE` at 0x141010de3: a NaN distance too).
+    /// [`GroupFlags::PATROL`] ends set only with `hold`, which also clears the path's
+    /// [`PathFlags::LOOPS`] (`keep_flag`'s [`GroupFlags::PATROL`] is cleared again after it, and a
+    /// leg leaves it to `hold` alone). Measured, under two points
     /// or at most [`EPSILON`] of length (`COMISS`/`JC` at 0x141010e2a: a NaN length keeps it) it
     /// is none. The group's path data resets ([`PathData`]'s `FUN_140f98e80`) and takes it
     /// (`FUN_140f9b800`: range, target, waypoint 1, state 2) as waypoint level 2 (that level even
     /// without a path); the members stop ([`World::stop_all_units`]) and the unit AIs of those
     /// the world's table holds, sleeping ones too, drop their notifies at the world's time
     /// (`FUN_140c5dc10`); the target's place is the point, the command [`MOVE_COMMAND`]. With
-    /// motion flags bit 1 clear and no patrol the formation follows (`UpdateDesiredPositions`: a
+    /// [`MotionFlags::NEW`] clear and no patrol the formation follows (`UpdateDesiredPositions`: a
     /// column without a path or when the player's `mMinColumnDistance` is below its length,
-    /// `COMISS`/`JNC` at 0x141010fc8, a NaN too; else a line). Flags bit 8 is set. True.
+    /// `COMISS`/`JNC` at 0x141010fc8, a NaN too; else a line). [`GroupFlags::TURN`] is set. True.
     ///
     /// # Errors
     ///
@@ -290,7 +293,7 @@ impl World {
             .with_x(point.x())
             .with_y(point.y());
         g.current_command = MOVE_COMMAND;
-        if g.motion.flags & 2 == 0 && !patrol {
+        if !g.motion.flags.contains(MotionFlags::NEW) && !patrol {
             let column = length
                 .is_none_or(|l| crate::math::fmath::below_or_unordered(min_column as f32, l.get()));
             self.update_desired_positions(
@@ -339,7 +342,7 @@ impl World {
         let at = BVector::new(point.x(), g.desired_height, point.y());
         let _ = path.push(at);
         let mut path_flags = move_path_flags(g.motion.position[0], at, how.leg);
-        // `keep_flag` sets bit 11 (0x141010dc1) off a leg, which the hold's test then decides
+        // `keep_flag` sets PATROL (0x141010dc1) off a leg, which the hold's test then decides
         // again
         if how.hold {
             path_flags &= !PathFlags::LOOPS;
@@ -584,9 +587,10 @@ impl World {
     }
 }
 
-/// [`World::command_move_to`]'s path flags: a patrol leg sets bit 0 and, when the group's place
-/// `from` lies at least [`PATROL_LEG_REACH`] from `to` on the ground (`COMISS`/`JBE`: a NaN
-/// too), bit 1; any other move clears bit 0 and sets bit 1.
+/// [`World::command_move_to`]'s path flags: a patrol leg sets [`PathFlags::LOOPS`] and, when the
+/// group's place `from` lies at least [`PATROL_LEG_REACH`] from `to` on the ground (`COMISS`/`JBE`:
+/// a NaN too), [`PathFlags::BACK_AND_FORTH`]; any other move clears [`PathFlags::LOOPS`] and sets
+/// [`PathFlags::BACK_AND_FORTH`].
 fn move_path_flags(from: BVector, to: BVector, leg: bool) -> PathFlags {
     if leg {
         let mut d = crate::math::fmath::sub(from, to);
@@ -645,6 +649,7 @@ fn held_id(id: Option<ObjectId>) -> Result<ObjectId, GenieError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::groups::MotionFlags;
     use crate::groups::{GroupCommand, Member, UnitGroups};
     use crate::objects::ListIndex;
     use crate::objects::masters::{Master, Masters};
@@ -657,7 +662,7 @@ mod tests {
     use crate::world::Player;
 
     /// Player 1's unit 7 (master 4: type 70, category 1, no action, no unit AI) in group 1 at
-    /// the origin, its top speed 1, its motion flags bit 1 set (no formation follows), at world
+    /// the origin, its top speed 1, its [`MotionFlags::NEW`] set (no formation follows), at world
     /// time 50.
     fn moving_world() -> World {
         let mut u = Unit {
@@ -692,7 +697,7 @@ mod tests {
             id: object_id(7),
             ..Member::default()
         }];
-        g.motion.flags = 2;
+        g.motion.flags = MotionFlags::NEW;
         g.motion.maximum_velocity_forward = Speed::new(1.0);
         t.groups = UnitGroups {
             groups: vec![g],
@@ -824,8 +829,9 @@ mod tests {
         );
     }
 
-    /// `param_8` (hold) clears the path's bit 0 and leaves flags bit 11 set; a patrol is read
-    /// on the top ancestor's path (`FUN_141046500`), which sets flags `0xc000`; a sleeping
+    /// `param_8` (hold) clears the path's [`PathFlags::LOOPS`] and leaves [`GroupFlags::PATROL`]
+    /// set; a patrol is read on the top ancestor's path (`FUN_141046500`), which sets
+    /// [`GroupFlags::RELAYOUT_AT_TURN`] and [`GroupFlags::PLACE_AGAIN`]; a sleeping
     /// member's unit AI drops its notifies (`FUN_140c5dc10` at the world's time); a NaN length
     /// keeps the path (`COMISS`/`JC`).
     #[test]
@@ -886,9 +892,10 @@ mod tests {
         assert!(t.groups.get(group_id(1)).unwrap().motion.paths[0].has_path);
     }
 
-    /// `param_6` (a patrol's leg): the path loops (bit 0) and goes back and forth (bit 1) from 5
-    /// tiles on the ground (`COMISS`/`JBE`: a NaN distance too); flags bit 11 clears, `0xc000`
-    /// stays off for a leg on a patrol.
+    /// `param_6` (a patrol's leg): the path loops ([`PathFlags::LOOPS`]) and goes back and forth
+    /// ([`PathFlags::BACK_AND_FORTH`]) from 5 tiles on the ground (`COMISS`/`JBE`: a NaN distance
+    /// too); [`GroupFlags::PATROL`] clears, [`GroupFlags::RELAYOUT_AT_TURN`] and
+    /// [`GroupFlags::PLACE_AGAIN`] stay off for a leg on a patrol.
     #[test]
     fn a_patrol_s_leg_loops_and_turns_back_from_five_tiles() {
         let leg = MoveTo {
@@ -912,7 +919,7 @@ mod tests {
                 "{point:?}"
             );
         }
-        // the group patrols already: a leg leaves flags 0xc000 off
+        // the group patrols already: a leg leaves RELAYOUT_AT_TURN and PLACE_AGAIN off
         let mut t = moving_world();
         let mut top = PathData::without_path();
         top.has_path = true;

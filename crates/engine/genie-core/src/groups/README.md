@@ -41,6 +41,7 @@ The world runs the update of each group that a player owns, before the player's 
 | [`layout.rs`](layout.rs) | The formations' layouts besides createColumnLine (FD-036): a horde (`FUN_141013eb0`), a user defined formation (`FUN_141014f60`), a phalanx (`FUN_1410147b0`) and a box (`FUN_141011a00` with `FUN_14102ab30` and `CreateLines` `FUN_1410143a0`), as `UpdateDesiredPositions` (`FUN_14103fd00`) makes them. |
 | [`lock.rs`](lock.rs) | A group's formation type (FD-036): `CalcFormationType` (`FUN_14100b940`), the members' vote after a change of members; `LockFormation` (`FUN_141024e70`), the lock to a type; and the members' stances as the group's state (`FUN_14100d140`). |
 | [`mod.rs`](mod.rs) | Unit groups and formations (FD-036): the game's `BUnitGroup` (`group.cpp`) with its motion (`BMotion`) and formations (`BFormation`). |
+| [`motion_flags.rs`](motion_flags.rs) | A group motion's flags (`MotionFlags`, `mMotionFlags`). |
 | [`objects.rs`](objects.rs) | An object of the world's id table (`WorldObject`) as the groups read it, and a unit's sub-formation. |
 | [`order.rs`](order.rs) | A group's command (FD-036): `BUnitGroup::command` (`FUN_14100efd0`), which chooses by the task a member has on the target how the group's order runs. |
 | [`place.rs`](place.rs) | A new group's place and facing (FD-036): `SetInitialPosition` (`FUN_141039990`) on the first clear point of a spiral round the centroid (`FUN_141007630`), `SetInitialOrientation` (`FUN_141039680`) and the motion's orientation (`FUN_141049e10`). |

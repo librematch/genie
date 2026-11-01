@@ -510,6 +510,7 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::movement::move_to::MoveWaitState;
     use crate::movement::move_to::tests::sheep;
+    use crate::objects::SpriteFlags;
     use crate::test_ids::object_id;
 
     /// A sprite `id` whose speed factor is `factor`, looped.
@@ -521,7 +522,7 @@ mod tests {
             speed_multiplier: factor,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
-            flags: 1,
+            flags: SpriteFlags::ANIMATED,
         }
     }
 

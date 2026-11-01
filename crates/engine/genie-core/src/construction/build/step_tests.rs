@@ -8,6 +8,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ObstructionClass;
@@ -71,7 +72,7 @@ const fn graphic(id: SpriteId) -> Graphic {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     }
 }
 

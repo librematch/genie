@@ -11,6 +11,7 @@ use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
@@ -32,8 +33,8 @@ pub struct TerrainKind {
     /// map's terrain reads (`FUN_140f690e0`, `FUN_140f69000`) see the terrain, else terrain 0.
     pub shown: bool,
     /// The `.dat`'s `is_water` byte, which the map's load copies to the terrain table
-    /// (`FUN_1413fc340`, `DAT_143cc7b40 + 0x2c`): bit 7 marks snow (`FUN_1413fc280`).
-    pub flags: u8,
+    /// (`FUN_1413fc340`, `DAT_143cc7b40 + 0x2c`).
+    pub flags: TerrainFlags,
     /// A forest (`FUN_140f5efb0`): the densities of its terrain units of class 15 (Gaia's
     /// masters) sum to more than 249.
     pub forest: bool,
@@ -221,18 +222,19 @@ pub struct Foundation {
 }
 
 /// The class bit of a terrain's flags (the `.dat`'s `is_water` byte) in the terrain
-/// restrictions' masks (the load's table `FUN_141054630` reads): none for 0, 1 for bits 0 to 2,
-/// 2 for bits 3 and 4, else bit 5 as 4.
+/// restrictions' masks (the load's table `FUN_141054630` reads): none for no flag, 1 for water
+/// ([`TerrainFlags::ANY_WATER`]), 2 for the shore ([`TerrainFlags::SHORE`]), else land
+/// ([`TerrainFlags::LAND`]) as 4.
 #[must_use]
-pub const fn terrain_class(flags: u8) -> u8 {
-    if flags == 0 {
+pub const fn terrain_class(flags: TerrainFlags) -> u8 {
+    if flags.is_empty() {
         0
-    } else if flags & 7 != 0 {
+    } else if flags.intersects(TerrainFlags::ANY_WATER) {
         1
-    } else if flags & 0x18 != 0 {
+    } else if flags.intersects(TerrainFlags::SHORE) {
         2
     } else {
-        (flags >> 3) & 4
+        (flags.bits() >> 3) & 4
     }
 }
 
@@ -401,12 +403,12 @@ impl Terrain {
     fn snowy(&self, t: TerrainId) -> bool {
         self.terrains
             .get(t.index())
-            .is_some_and(|k| k.flags & 0x80 != 0)
+            .is_some_and(|k| k.flags.contains(TerrainFlags::SNOW))
     }
 
     /// `FUN_1413fbee0` (`FUN_1413fbf30` on a place's tile) with `FUN_1413fc0f0`: the terrain a map
-    /// read sees on `tile` (terrain 0 off the map) has the terrain table's bit 4 (the `.dat`'s
-    /// `is_water` 16: a wet beach, where land units and ships meet).
+    /// read sees on `tile` (terrain 0 off the map) is a beach ([`TerrainFlags::BEACH`]), where
+    /// land units and ships meet.
     #[must_use]
     pub fn beach(&self, tile: Tile) -> bool {
         let t = self
@@ -416,17 +418,20 @@ impl Terrain {
             .map_or(TerrainId::named(0), |&k| self.seen(k));
         self.terrains
             .get(t.index())
-            .is_some_and(|k| k.flags & 0x10 != 0)
+            .is_some_and(|k| k.flags.contains(TerrainFlags::BEACH))
     }
 
     /// `FUN_1413fbee0`: the terrain table's flags (the `.dat`'s `is_water` byte) of the terrain a
     /// map read sees on `tile` (`FUN_140f690e0` on shorts, [`Tile::short`]: terrain 0 off the
     /// map, or for a terrain beyond the records or hidden); none for a terrain the records lack.
-    /// Bits 0 to 2 are water (`FUN_1413fc2b0`), bits 3 and 4 land (`FUN_1413fc270`).
+    /// [`TerrainFlags::ANY_WATER`] is water (`FUN_1413fc2b0`), [`TerrainFlags::SHORE`] the
+    /// shore (`FUN_1413fc270`).
     #[must_use]
-    pub fn flags_at(&self, tile: Tile) -> u8 {
+    pub fn flags_at(&self, tile: Tile) -> TerrainFlags {
         let t = self.read(tile);
-        self.terrains.get(t.index()).map_or(0, |k| k.flags)
+        self.terrains
+            .get(t.index())
+            .map_or(TerrainFlags::NONE, |k| k.flags)
     }
 
     /// The terrain the general task search reads at a point (`FUN_1411a8ba0`): none for x or y
@@ -593,12 +598,12 @@ mod tests {
         let mut terrains = vec![
             TerrainKind {
                 shown: true,
-                flags: 0x20,
+                flags: TerrainFlags::LAND,
                 forest: false,
             };
             40
         ];
-        terrains[32].flags = 0xa0;
+        terrains[32].flags = TerrainFlags::LAND | TerrainFlags::SNOW;
         Terrain {
             size: GridSize::new(2, n as i32 / 2),
             kinds: ids(&kinds),
@@ -664,20 +669,20 @@ mod tests {
 
     #[test]
     fn a_tile_s_flags_are_its_seen_terrain_s() {
-        // water 1 (flags 1) at (0, 0), a beach 2 (0x10) at (1, 0), a hidden 3 and 45, beyond the
-        // records, at (0, 1) and (1, 1): both read as terrain 0
+        // water 1 at (0, 0), a beach 2 at (1, 0), a hidden 3 and 45, beyond the records, at
+        // (0, 1) and (1, 1): both read as terrain 0, shallows
         let mut t = map(vec![1, 2, 3, 45], vec![-1; 4]);
-        t.terrains[0].flags = 8;
-        t.terrains[1].flags = 1;
-        t.terrains[2].flags = 0x10;
+        t.terrains[0].flags = TerrainFlags::SHALLOWS;
+        t.terrains[1].flags = TerrainFlags::WATER;
+        t.terrains[2].flags = TerrainFlags::BEACH;
         t.terrains[3].shown = false;
         assert_eq!(
             [t.flags_at(Tile::new(0, 0)), t.flags_at(Tile::new(1, 0))],
-            [1, 0x10]
+            [TerrainFlags::WATER, TerrainFlags::BEACH]
         );
         assert_eq!(
             [t.flags_at(Tile::new(0, 1)), t.flags_at(Tile::new(1, 1))],
-            [8, 8]
+            [TerrainFlags::SHALLOWS; 2]
         );
         assert_eq!(
             [
@@ -691,11 +696,11 @@ mod tests {
         // off the map: terrain 0
         assert_eq!(
             [t.flags_at(Tile::new(-1, 0)), t.flags_at(Tile::new(2, 0))],
-            [8, 8]
+            [TerrainFlags::SHALLOWS; 2]
         );
         // without terrain 0's record, none
         t.terrains.clear();
-        assert_eq!(t.flags_at(Tile::new(0, 1)), 0);
+        assert_eq!(t.flags_at(Tile::new(0, 1)), TerrainFlags::NONE);
     }
 
     #[test]

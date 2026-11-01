@@ -1,6 +1,7 @@
 use crate::fixtures::{combat_master, master_moving_mut, master_static_mut};
 use crate::masters::{MasterTable, Turning};
 use crate::saved_masters::{master_facets, moving_stats};
+use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::facing::SpriteFacets;
 use genie_save::generated::world::Master;
@@ -27,9 +28,9 @@ fn table(facets: [i16; 3]) -> MasterTable {
         min_collision_size_multiplier: 0.75,
     };
     MasterTable::of_master(1, 83, Some(turning), 2)
-        .with_sprite(SpriteId::named(10), 0.0, facets[0], 2)
-        .with_sprite(SpriteId::named(11), 2.0, facets[1], 2)
-        .with_sprite(SpriteId::named(12), 3.0, facets[2], 2)
+        .with_sprite(SpriteId::named(10), 0.0, facets[0], SpriteFlags::TURNS)
+        .with_sprite(SpriteId::named(11), 2.0, facets[1], SpriteFlags::TURNS)
+        .with_sprite(SpriteId::named(12), 3.0, facets[2], SpriteFlags::TURNS)
         .with_masks(vec![0, 0b101])
 }
 
@@ -47,7 +48,7 @@ fn a_master_s_facets_are_its_sprites_when_they_agree() {
         .rge_master_static_object;
     let facets = SpriteFacets {
         count: 8,
-        flag_1: true,
+        turns: true,
     };
     // the fight sprite (0) is not in the data file
     assert_eq!(master_facets(&master, s, &table([8; 3])), Some(facets));

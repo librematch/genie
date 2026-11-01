@@ -18,6 +18,7 @@ use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
@@ -278,7 +279,7 @@ impl Attack {
         // the loop test reads the unit's sprite as it is now (`+0x140`): readyToAttack may have
         // shown the standing one
         let sprite = unit.sprite.unwrap_or(sprite);
-        if !sprite.looped && sprite.graphic.flags & 1 != 0 {
+        if !sprite.looped && sprite.graphic.flags.contains(SpriteFlags::ANIMATED) {
             return Ok(());
         }
         // a reload longer than the sprite: at its last frame the unit waits with its idle attack

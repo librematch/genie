@@ -219,7 +219,7 @@ impl World {
     ///   the member's failures (`+0x1c` of its own move) clear, and the end.
     /// - More than 10 failures: the member's own move becomes a move aside
     ///   ([`World::set_specific_move`], reason 2, its place, [`ASIDE_TIMER`]), it stops (slot
-    ///   0x5d0) and the group's flags take bit 9; the end without the goal.
+    ///   0x5d0) and the group takes [`GroupFlags::CATCHING_UP`]; the end without the goal.
     /// - A member that is not free ([`World::member_idle`]) stops as one in no slot does, its
     ///   failures clear and a slot in state 1 or 2 takes state 3; the end without the goal. A
     ///   free one in a slot of state 3 whose group moves or waits for a path (`FUN_141046600`,
@@ -235,22 +235,22 @@ impl World {
     ///   group's forward again when it was put, its failures clear, and the end without the
     ///   goal.
     /// - Then the line to the slot ([`World::line_clear`] with [`CLEARANCE`], the update's list
-    ///   ignored): one that meets a record is the way round ([`World::way_round`]). A clear line steers
-    ///   the unit: the direction to the slot (slot 0x610), the turn from its forward (slot 0x618
-    ///   with dt, [`crate::movement::Mover::turn_dt`]) and the yaw (slot 0x5c0), where its speed
-    ///   takes it this update (slot 0x638) and the slot's state from that
+    ///   ignored): one that meets a record is the way round ([`World::way_round`]). A clear line
+    ///   steers the unit: the direction to the slot (slot 0x610), the turn from its forward (slot
+    ///   0x618 with dt, [`crate::movement::Mover::turn_dt`]) and the yaw (slot 0x5c0), where its
+    ///   speed takes it this update (slot 0x638) and the slot's state from that
     ///   ([`passes_waypoint`], `FUN_141046130`). A slot in state 2 stops the unit (slot 0x5d0),
-    ///   which shows its standing sprite when paused (slot 0x600) or when neither the group's
-    ///   top path (`FUN_141046500`) is a patrol (flags bit 0) nor its walked level holds points.
-    ///   Else by the gap and the radius (master `+0x5d8`; `COMISS` with `SETNC`, then `JC`: a NaN
-    ///   is neither): between the radius and five radii, the unit's top speed (slot 0x208) and
-    ///   its walking sprite (slot 0x658, [`World::show_walking`]); within the radius, the group's
-    ///   top speed (`+0xbc`) and the walking sprite; farther, the group's flags take bit 9, and
-    ///   from five tiles on (or a NaN) the top speed and the walking sprite (bit 9 again), nearer
-    ///   the top speed times 1.2 from three tiles on (or a NaN), below three
-    ///   `speed + ((speed × 1.2 − speed) × gap) / 3`, with its running sprite (slot 0x650,
-    ///   [`World::show_running`]) or else its walking one. The speed is slot 0x598's
-    ///   ([`crate::movement::Mover::set_speed`]).
+    ///   which shows its standing sprite when paused (slot 0x600) or when neither the group's top
+    ///   path (`FUN_141046500`) is a patrol ([`crate::movement::PathFlags::LOOPS`]) nor its walked
+    ///   level holds points. Else by the gap and the radius (master `+0x5d8`; `COMISS` with
+    ///   `SETNC`, then `JC`: a NaN is neither): between the radius and five radii, the unit's top
+    ///   speed (slot 0x208) and its walking sprite (slot 0x658, [`World::show_walking`]); within
+    ///   the radius, the group's top speed (`+0xbc`) and the walking sprite; farther, the group
+    ///   takes [`GroupFlags::CATCHING_UP`], and from five tiles on (or a NaN) the top speed and the
+    ///   walking sprite (`CATCHING_UP` again), nearer the top speed times 1.2 from three tiles on
+    ///   (or a NaN), below three `speed + ((speed × 1.2 − speed) × gap) / 3`, with its running
+    ///   sprite (slot 0x650, [`World::show_running`]) or else its walking one. The speed is slot
+    ///   0x598's ([`crate::movement::Mover::set_speed`]).
     /// - The goal: the unit AI's `state_position` (`+0x1ac`, `+0x1b0`) takes the slot's x and y.
     ///
     /// The logs (`FUN_140a7f7e0`, `FUN_140f3ee00`) and the slots whose answers only they read

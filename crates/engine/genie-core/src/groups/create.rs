@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MotionFlags;
 use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
 use crate::map::Distance;
@@ -328,12 +329,12 @@ impl World {
     /// [`MAX_MEMBERS`] already; true when it is a member already. Else the members' arrays make
     /// room ([`UnitGroup::resize_members`]); a unit in another group the world holds leaves it
     /// ([`World::remove_unit`]); the unit's group link names the group (`+0x6d0`), its unit AI
-    /// drops the actions and orders of [`CLEARED_ACTIONS`] and [`CLEARED_ORDERS`]
-    /// (`FUN_140c64b50` and `FUN_140c64b60` with -1) and empties its order queue
-    /// (`FUN_140c5e010`); it joins the members with no move of its own (active 0, path and
-    /// reason -1), its sub-formation's statistic and the group's spacing (its two radii, the
-    /// widest: `COMISS`/`JBE` at 0x141008ced); the group's flags take bit 1, and bit 16 too
-    /// when its motion's bit 1 is clear. A sleeping unit joins as a live one.
+    /// drops the actions and orders of [`CLEARED_ACTIONS`] and [`CLEARED_ORDERS`] (`FUN_140c64b50`
+    /// and `FUN_140c64b60` with -1) and empties its order queue (`FUN_140c5e010`); it joins the
+    /// members with no move of its own (active 0, path and reason -1), its sub-formation's
+    /// statistic and the group's spacing (its two radii, the widest: `COMISS`/`JBE` at
+    /// 0x141008ced); the group takes [`GroupFlags::RELAYOUT`], and [`GroupFlags::STATISTICS`] too
+    /// when its motion lacks [`MotionFlags::NEW`]. A sleeping unit joins as a live one.
     ///
     /// The routine's target (`param_3`), which it hands to `removeUnit` and to its second
     /// `FUN_141011300`, enters only the rams' rule, which never holds
@@ -417,7 +418,7 @@ impl World {
             g.desired_spacing = spacing.get();
         }
         g.flags |= GroupFlags::RELAYOUT;
-        if g.motion.flags & 2 == 0 {
+        if !g.motion.flags.contains(MotionFlags::NEW) {
             g.flags |= GroupFlags::STATISTICS | GroupFlags::RELAYOUT;
         }
         self.groups.unit_types_scratch = scratch;
@@ -429,6 +430,7 @@ impl World {
 mod tests {
     use crate::groups::FormationKind;
     use crate::groups::GroupFlags;
+    use crate::groups::MotionFlags;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
     use crate::map::Footprint;
     use crate::map::GridSize;
@@ -687,7 +689,7 @@ mod tests {
         );
     }
 
-    /// `FUN_14100bcb0`'s closing `CalcFormationType` is gated on the motion flags' bit 1
+    /// `FUN_14100bcb0`'s closing `CalcFormationType` is gated on [`MotionFlags::NEW`]
     /// (`+0xb8`, `SHR EAX, 1; TEST AL, 1` at 0x14100c657), not the group flags'.
     #[test]
     fn the_statistics_call_for_the_formation_type_by_the_motion_flags() {
@@ -715,11 +717,11 @@ mod tests {
             crate::players::ByPlayer::new(vec![relations([1, 2]), relations([0, 1])]);
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags |= GroupFlags::RELAYOUT;
-        g.motion.flags &= !2;
+        g.motion.flags &= !MotionFlags::NEW;
         assert!(!t.statistics_only(group_id(1), false).unwrap());
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags &= !GroupFlags::RELAYOUT;
-        g.motion.flags |= 2;
+        g.motion.flags |= MotionFlags::NEW;
         assert!(t.statistics_only(group_id(1), false).unwrap());
     }
 

@@ -700,6 +700,7 @@ mod tests {
     use crate::movement::Speed;
     use crate::objects::ListIndex;
     use crate::objects::ObjectId;
+    use crate::objects::SpriteFlags;
     use crate::objects::WorkRate;
     use crate::objects::lifecycle::Held;
     use crate::objects::masters::ObstructionType;
@@ -729,7 +730,7 @@ mod tests {
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
-            flags: 5,
+            flags: SpriteFlags::ANIMATED.union(SpriteFlags::RANDOM_FIRST_FRAME),
         }
     }
 

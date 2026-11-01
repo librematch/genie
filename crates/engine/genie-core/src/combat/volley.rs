@@ -14,6 +14,7 @@ use crate::movement::Mover;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
@@ -379,13 +380,13 @@ impl Unit {
             .and_then(|s| c.w.graphics.get(&s).copied());
         if let Some(g) = standing {
             let _ = ActiveSprite::start(g, c.w.streams.get(Stream::Sprite));
-            if g.flags & 4 != 0 && 1 < g.facets {
+            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets {
                 let _ = c.w.streams.get(Stream::Object).rand15();
             }
         }
         let facets = standing.map(|g| crate::objects::facing::SpriteFacets {
             count: g.facets,
-            flag_1: g.flags & 2 != 0,
+            turns: g.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
         if let Some(f) = facets.filter(|_| crate::objects::facing::draws_angle(facets)) {

@@ -3,6 +3,7 @@
 
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::ObjectFlags;
@@ -45,7 +46,7 @@ impl Master {
             .filter_map(|id| graphics.get(&id))
             .map(|g| crate::objects::facing::SpriteFacets {
                 count: g.facets,
-                flag_1: g.flags & 2 != 0,
+                turns: g.flags.contains(SpriteFlags::TURNS),
             });
         let first = seen.next()?;
         seen.all(|f| f == first).then_some(first)

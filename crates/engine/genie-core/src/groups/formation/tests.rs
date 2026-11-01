@@ -8,6 +8,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Rect;
 use crate::map::RestrictionId;
+use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::movement::LevelFlags;
@@ -106,12 +107,12 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     let kinds = vec![
         TerrainKind {
             shown: true,
-            flags: 1,
+            flags: TerrainFlags::WATER,
             forest: false,
         },
         TerrainKind {
             shown: true,
-            flags: 8,
+            flags: TerrainFlags::SHALLOWS,
             forest: false,
         },
     ];
@@ -616,7 +617,7 @@ fn the_passability_tests_with_the_world_s_object_of_the_lead_id() {
     use crate::map::terrain::{Terrain, TerrainKind};
     let run = |ghost: bool| {
         let mut t = slot_world(&[(10, 4, 5.5, 5.5), (11, 4, 7.5, 5.5)], &[(8, 5)]);
-        let kind = |flags: u8| TerrainKind {
+        let kind = |flags| TerrainKind {
             shown: true,
             flags,
             forest: false,
@@ -624,7 +625,7 @@ fn the_passability_tests_with_the_world_s_object_of_the_lead_id() {
         t.spatial.terrain = Some(Terrain::new(
             GridSize::new(20, 20),
             vec![TileTerrain::of_save(0, 255, -1); 400],
-            vec![kind(1), kind(8)],
+            vec![kind(TerrainFlags::WATER), kind(TerrainFlags::SHALLOWS)],
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         ));
         for masters in &mut t.masters {
@@ -998,8 +999,8 @@ fn a_group_chooses_a_column_far_along_its_path_and_a_line_near_its_end() {
     assert_eq!(own(&t), FormationKind::COLUMN);
 }
 
-/// Flags bit 2 (`MinAutoDistanceLock`) choose a line, horde units only a horde; given a
-/// type, or locked to one (not -1 or 0), the group takes it.
+/// [`crate::groups::GroupFlags::LINE`] (`MinAutoDistanceLock`) chooses a line, horde units only a
+/// horde; given a type, or locked to one (not -1 or 0), the group takes it.
 #[test]
 fn a_lock_or_a_given_type_overrides_the_groups_own_choice() {
     let walked = level(&[BVector::ZERO, BVector::new(1.0, 0.0, 0.0)], 0, 0);

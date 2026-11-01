@@ -12,6 +12,7 @@ use crate::movement::Mover;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
@@ -248,13 +249,13 @@ impl World {
         &mut self,
         standing: Graphic,
     ) -> (ActiveSprite, crate::objects::facing::SpriteFacets, Angle) {
-        if standing.flags & 4 != 0 && 1 < standing.facets {
+        if standing.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < standing.facets {
             let _ = self.streams.get(Stream::Object).rand15();
         }
         let sprite = ActiveSprite::start(standing, self.streams.get(Stream::Sprite));
         let facets = crate::objects::facing::SpriteFacets {
             count: standing.facets,
-            flag_1: standing.flags & 2 != 0,
+            turns: standing.flags.contains(SpriteFlags::TURNS),
         };
         let angle = if crate::objects::facing::draws_angle(Some(facets)) {
             let r = self.streams.get(Stream::Object).rand15();

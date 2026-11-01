@@ -18,6 +18,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
@@ -52,7 +53,7 @@ const fn graphic(id: i16, factor: f32) -> Graphic {
         speed_multiplier: factor,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     }
 }
 
@@ -286,7 +287,7 @@ fn a_member_s_own_move_is_set_or_ended() {
 
 /// A member on its slot (1e-7 or nearer, not a NaN) in state 3 clears its failures and
 /// takes the slot as its unit AI's goal; one more than 10 failures in is moved aside: its
-/// own move (reason 2, its place, 0.1 s), a stop and the group's flags bit 9.
+/// own move (reason 2, its place, 0.1 s), a stop and [`GroupFlags::CATCHING_UP`].
 #[test]
 fn a_member_in_place_or_failing_too_often() {
     let mut t = world();

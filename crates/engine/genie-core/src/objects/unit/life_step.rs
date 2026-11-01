@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::death_parts::forget_resource;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::{Outcome, Unit};
@@ -28,7 +29,7 @@ impl Unit {
         // the sprite list's slot 0x20 on the current sprite (FUN_1413b38a0)
         let animating = self
             .sprite
-            .is_some_and(|s| s.animate != 0 && s.graphic.flags & 1 != 0);
+            .is_some_and(|s| s.animate != 0 && s.graphic.flags.contains(SpriteFlags::ANIMATED));
         let leaves =
             if self
                 .life

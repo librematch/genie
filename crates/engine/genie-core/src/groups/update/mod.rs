@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupFlags;
+use crate::groups::MotionFlags;
 use crate::groups::UnitGroup;
 use crate::movement::PathFlags;
 use crate::objects::masters::ActionType;
@@ -75,9 +76,9 @@ const OTHER_COMMANDS: GenieError = GenieError::unsupported(
 );
 
 impl UnitGroup {
-    /// `IsIdle` (`FUN_141017ad0`): idle with flags bit 5 (`cConsiderIdle`), or on a move
-    /// (command 1) while it patrols ([`UnitGroup::patrols`]); else not while its motion moves or
-    /// waits to move; else idle.
+    /// `IsIdle` (`FUN_141017ad0`): idle with [`GroupFlags::MEMBERS_SENT`] (`cConsiderIdle`), or on
+    /// a move (command 1) while it patrols ([`UnitGroup::patrols`]); else not while its motion
+    /// moves or waits to move; else idle.
     #[must_use]
     pub fn is_idle(&self) -> bool {
         if self.flags.contains(GroupFlags::MEMBERS_SENT) {
@@ -90,7 +91,7 @@ impl UnitGroup {
     }
 
     /// The group patrols: its top path's flags have bit 0 (`FUN_141017c40`, the path of
-    /// `FUN_141046500`) or its flags bit 11 (`FUN_141017c30`).
+    /// `FUN_141046500`) or its [`GroupFlags::PATROL`] (`FUN_141017c30`).
     #[must_use]
     pub fn patrols(&self) -> bool {
         crate::groups::formation::top_path(&self.motion.paths)
@@ -99,12 +100,13 @@ impl UnitGroup {
     }
 
     /// The group's vtable slot 8 after its update (`BUnitGroup::updateEnd`, `FUN_141040b50`): a
-    /// group whose motion moved (motion flags bit 0) adds its new position to the front of its
-    /// stored positions ([`crate::groups::PointLine::add_at_front`]); the motion's flags lose bit
-    /// 0, and bit 1 with it when set, which sets the group's flags bit 1 (`FUN_14104a240`).
+    /// group whose motion moved ([`MotionFlags::MOVED`]) adds its new position to the front of its
+    /// stored positions ([`crate::groups::PointLine::add_at_front`]); the motion's flags lose
+    /// [`MotionFlags::MOVED`], and [`MotionFlags::NEW`] with it when set, which sets the group's
+    /// [`GroupFlags::RELAYOUT`] (`FUN_14104a240`).
     pub fn update_end(&mut self) -> Result<(), GenieError> {
         let g = self;
-        if g.motion.flags & 1 != 0 {
+        if g.motion.flags.contains(MotionFlags::MOVED) {
             let [point, forward, up, right] = g.motion.new_position;
             g.stored_positions.add_at_front(crate::groups::LinePoint {
                 point,
@@ -114,9 +116,9 @@ impl UnitGroup {
             })?;
         }
         let flags = g.motion.flags;
-        g.motion.flags &= !1;
-        if flags & 2 != 0 {
-            g.motion.flags &= !3;
+        g.motion.flags.remove(MotionFlags::MOVED);
+        if flags.contains(MotionFlags::NEW) {
+            g.motion.flags.remove(MotionFlags::MOVED | MotionFlags::NEW);
             g.flags |= GroupFlags::RELAYOUT;
         }
         Ok(())

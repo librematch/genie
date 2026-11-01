@@ -56,7 +56,7 @@ pub(super) fn master_facets(
         .filter_map(|id| table.graphics.get(&id))
         .map(|g| genie_core::objects::facing::SpriteFacets {
             count: g.facets,
-            flag_1: g.flags & 2 != 0,
+            turns: g.flags.contains(genie_core::objects::SpriteFlags::TURNS),
         });
     let first = seen.next()?;
     seen.all(|f| f == first).then_some(first)

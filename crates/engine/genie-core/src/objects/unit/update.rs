@@ -5,6 +5,7 @@ use crate::math::rng::Stream;
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::actions::Action;
 use crate::objects::lifecycle::Class;
 use crate::objects::masters::PlayersMasters;
@@ -194,7 +195,7 @@ impl Unit {
         if let (Some(m), Some(s)) = (self.body.mover_mut(), self.sprite) {
             m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
                 count: s.graphic.facets,
-                flag_1: s.graphic.flags & 2 != 0,
+                turns: s.graphic.flags.contains(SpriteFlags::TURNS),
             });
         }
     }

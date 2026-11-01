@@ -1,6 +1,7 @@
 //! The terrain look tasks (action type 159) and the removal reward tasks (161).
 
 use crate::combat::abilities::{Look, ONE, Reward};
+use crate::map::TerrainFlags;
 use crate::objects::ListIndex;
 use crate::objects::SpriteId;
 use crate::objects::masters::CostSlot;
@@ -13,12 +14,14 @@ use crate::world::World;
 /// None for 0: the bit's `set` throws (`out_of_range`, `FUN_14120b5d0`), which the game does not
 /// catch; no task of the `.dat` has terrain 0.
 #[must_use]
-pub const fn terrain_mask(terrain: i16) -> Option<u8> {
+pub const fn terrain_mask(terrain: i16) -> Option<TerrainFlags> {
     match terrain {
-        t if t < 0 => Some(t.wrapping_neg().to_le_bytes()[0]),
-        1..=8 => Some(1 << (terrain - 1)),
+        t if t < 0 => Some(TerrainFlags::from_bits_retain(
+            t.wrapping_neg().to_le_bytes()[0],
+        )),
+        1..=8 => Some(TerrainFlags::from_bits_retain(1 << (terrain - 1))),
         0 => None,
-        _ => Some(0),
+        _ => Some(TerrainFlags::NONE),
     }
 }
 
@@ -29,8 +32,13 @@ pub const fn terrain_mask(terrain: i16) -> Option<u8> {
 /// (`FUN_141533c70`: from 0 to the table's count, and not null). A task's id below −1 would
 /// read before the table at its load; no `.dat` task has one. None off its terrains.
 #[must_use]
-pub fn look(task: &Task, mask: u8, flags: u8, exists: impl Fn(i32) -> bool) -> Option<Look> {
-    if flags & mask == 0 {
+pub fn look(
+    task: &Task,
+    mask: TerrainFlags,
+    flags: TerrainFlags,
+    exists: impl Fn(i32) -> bool,
+) -> Option<Look> {
+    if !flags.intersects(mask) {
         return None;
     }
     let sprite = |id: i32| {
@@ -101,11 +109,15 @@ impl World {
             .body
             .mover()
             .map_or_else(|| unit.position(), |m| m.moved_at);
-        let flags = self.spatial.terrain.as_ref().map_or(0, |t| {
-            t.kind(at.ground().tile())
-                .and_then(|k| t.terrains.get(k.index()))
-                .map_or(0, |k| k.flags)
-        });
+        let flags = self
+            .spatial
+            .terrain
+            .as_ref()
+            .map_or(TerrainFlags::NONE, |t| {
+                t.kind(at.ground().tile())
+                    .and_then(|k| t.terrains.get(k.index()))
+                    .map_or(TerrainFlags::NONE, |k| k.flags)
+            });
         let graphics = &self.graphics;
         let exists = |id: i32| {
             i16::try_from(id)

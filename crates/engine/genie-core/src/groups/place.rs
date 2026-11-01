@@ -7,6 +7,7 @@ use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::Motion;
+use crate::groups::MotionFlags;
 use crate::groups::formation::on_map;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -76,8 +77,8 @@ impl Spiral {
 
 impl Motion {
     /// `FUN_141049e10`: the motion faces `forward` with `up`, both normalized, and their cross
-    /// product `up × forward` (normalized) as its right; the new position takes all three, and
-    /// with `both` (`param_4` 1) the position too. Motion flags bit 0 is set. False, with nothing
+    /// product `up × forward` (normalized) as its right; the new position takes all three, and with
+    /// `both` (`param_4` 1) the position too. [`MotionFlags::MOVED`] is set. False, with nothing
     /// changed, when the dot product of the two lies outside [`SQUARE_MIN`] to [`SQUARE_MAX`].
     pub fn set_orientation(&mut self, forward: BVector, up: BVector, both: bool) -> bool {
         let d = up.height() * forward.height() + up.x() * forward.x() + up.y() * forward.y();
@@ -94,7 +95,7 @@ impl Motion {
             self.position[2] = up;
             self.position[3] = right;
         }
-        self.flags |= 1;
+        self.flags |= MotionFlags::MOVED;
         true
     }
 }
@@ -104,7 +105,7 @@ impl World {
     /// nothing writes) has it: the stored positions lose their points, the group stands, at once
     /// and as its new position, on the first clear point round its centroid
     /// ([`World::clear_spot`]), faces as its members do ([`World::set_initial_orientation`]), and
-    /// its flags take bit 10.
+    /// it takes [`GroupFlags::PLACED`].
     ///
     /// # Errors
     ///
@@ -225,7 +226,7 @@ impl World {
 impl World {
     /// `movePositionToFront` (`FUN_141025a20`) of group `group`, `ahead` (`param_2`, 100 in the
     /// update) the distance of the point ahead along the group's forward. The group's place is
-    /// its own, or with motion flags bit 1 the members' centre (slot 0x520, summed over the
+    /// its own, or with [`MotionFlags::NEW`] the members' centre (slot 0x520, summed over the
     /// members the world holds, over the members' count). A flanked group (locked type 8) whose
     /// lead's object ([`World::lead_object`]) moves and could stand there among the members (slot
     /// 0x270, [`crate::map::spatial::Spatial::point_clear_among`], with [`FRONT_SHARE`] of its radius;
@@ -256,15 +257,15 @@ impl World {
             .iter()
             .filter_map(|mb| self.object(mb.id).map(|(_, u)| (mb.id, u.moved_vector())))
             .collect();
-        let centre = if m.flags & 2 == 0 {
-            m.position[0]
-        } else {
+        let centre = if m.flags.contains(MotionFlags::NEW) {
             let mut c = [0.0f32; 3];
             for &(_, p) in &held {
                 c = [c[0] + p.x(), c[1] + p.height(), c[2] + p.y()];
             }
             let n = g.members.len() as f32;
             BVector::new(c[0] / n, c[1] / n, c[2] / n)
+        } else {
+            m.position[0]
         };
         // the lead's slot 0x270: an object that does not move (a ghost found by the lead -1)
         // stands nowhere (`FUN_141071e30`)
@@ -394,10 +395,12 @@ fn ground_squared(p: BVector, q: BVector) -> DistanceSquared {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::groups::MotionFlags;
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
     use crate::map::RestrictionId;
+    use crate::map::TerrainFlags;
     use crate::map::terrain::TileTerrain;
     use crate::movement::Speed;
     use crate::objects::masters::ObstructionClass;
@@ -413,7 +416,7 @@ mod tests {
     #[test]
     fn an_orientation_takes_the_cross_product_of_up_and_forward_as_its_right() {
         let mut m = Motion::new();
-        m.flags = 0;
+        m.flags = MotionFlags::NONE;
         assert!(m.set_orientation(
             BVector::new(2.0, 0.0, 0.0),
             BVector::new(0.0, 1.0, 0.0),
@@ -422,7 +425,7 @@ mod tests {
         assert_eq!(m.position[1], BVector::new(1.0, 0.0, 0.0));
         assert_eq!(m.position[3], BVector::new(0.0, 0.0, -1.0));
         assert_eq!(m.new_position[3], BVector::new(0.0, 0.0, -1.0));
-        assert_eq!(m.flags, 1);
+        assert_eq!(m.flags, MotionFlags::MOVED);
         // a forward too far from square to the up is refused
         assert!(!m.set_orientation(
             BVector::new(1.0, 0.1, 0.0),
@@ -471,7 +474,7 @@ mod tests {
         );
         let kind = TerrainKind {
             shown: true,
-            flags: 1,
+            flags: TerrainFlags::WATER,
             forest: false,
         };
         t.spatial.terrain = Some(Terrain::new(
@@ -511,7 +514,7 @@ mod tests {
             .collect();
         g.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
         g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
-        g.motion.flags = 0;
+        g.motion.flags = MotionFlags::NONE;
         g.desired_spacing = 2.0;
         g.stored_positions.points = vec![crate::groups::LinePoint::default(); 2];
         g.stored_positions.length = Distance::new(3.0);
@@ -599,7 +602,7 @@ mod tests {
         assert_eq!(placed(&t).0, BVector::new(19.0, 0.0, 13.0));
     }
 
-    /// Motion flags bit 1 take the line through the members' centre, (13, 0, 12): 11 at
+    /// [`MotionFlags::NEW`] take the line through the members' centre, (13, 0, 12): 11 at
     /// (13, 12.2) lies on it, 10 at (6, 10.1) on the group's own line.
     #[test]
     fn with_flags_bit_1_the_line_runs_through_the_members_centre() {
@@ -609,7 +612,7 @@ mod tests {
             unit(12, 20.0, 13.7),
         ];
         let mut t = front_world(units.clone());
-        t.groups.groups[0].motion.flags = 2;
+        t.groups.groups[0].motion.flags = MotionFlags::NEW;
         t.move_position_to_front(group_id(1), 100.0).unwrap();
         assert_eq!(placed(&t).0, BVector::new(13.0, 0.0, 12.2));
         let mut t = front_world(units);

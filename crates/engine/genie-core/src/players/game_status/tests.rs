@@ -12,6 +12,7 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
@@ -289,7 +290,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     });
     let attack = add(Unit {
         id: object_id(33),

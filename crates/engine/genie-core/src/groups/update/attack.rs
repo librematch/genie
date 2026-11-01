@@ -176,14 +176,14 @@ impl World {
 
     /// The target is pending, and not the first member's player's: each formation category
     /// (0 to 5) with units, the first of its number, either is released ([`World::release_units`])
-    /// or keeps `finished`. With the group's flags bit 3 (arrived) the category is released at
+    /// or keeps `finished`. With [`GroupFlags::ARRIVED`] the category is released at
     /// once; else it is when one of its units is within its attack range of the target: the
     /// footprint gap less a slack, at most the category's range (negative or unordered: 0). The
     /// slack is [`CONTACT_SLACK`] for a category without a range, [`RANGED_SLACK`] for one
     /// with, and [`CHASING_SLACK`] when the target moves (slot 0x5c8) and the category's range
     /// is above the target's own weapon range (slot 0x230) plus [`RANGED_SLACK`]. A category
     /// without one in range ends `finished` (the returned flag, false). A released category
-    /// stops the group's walk, clears flags bit 4 and sends its units at the target.
+    /// stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its units at the target.
     ///
     /// # Errors
     ///
@@ -265,15 +265,15 @@ impl World {
         Ok(false)
     }
 
-    /// The group follows a target that moved (`FUN_14103f4e0`'s object-target tail): a target
-    /// more than [`CLOSE`] from where it stood (`+0x3c8`, the ground length of the difference
-    /// of the places slot 0x520 gives). One the first member's player cannot see
-    /// ([`World::sees_object`], `FUN_141188ea0`) sends the group back to that place, forgetting
-    /// the target, and the update ends (`Some(false)`). One it sees is attacked anew
-    /// ([`World::command_attack`]): a move begun ends the update (`Some(false)`); else the group
-    /// moves to the target's place within its range, is in command 9 with flags bit 3 off and
-    /// bit 4 on, and the update ends (`Some(false)`). None for a group whose target is no
-    /// object or has not moved.
+    /// The group follows a target that moved (`FUN_14103f4e0`'s object-target tail): a target more
+    /// than [`CLOSE`] from where it stood (`+0x3c8`, the ground length of the difference of the
+    /// places slot 0x520 gives). One the first member's player cannot see ([`World::sees_object`],
+    /// `FUN_141188ea0`) sends the group back to that place, forgetting the target, and the update
+    /// ends (`Some(false)`). One it sees is attacked anew ([`World::command_attack`]): a move begun
+    /// ends the update (`Some(false)`); else the group moves to the target's place within its
+    /// range, is in command 9 with [`GroupFlags::ARRIVED`] off and [`GroupFlags::ATTACKING`] on,
+    /// and the update ends (`Some(false)`). None for a group whose target is no object or has not
+    /// moved.
     ///
     /// # Errors
     ///
@@ -344,13 +344,13 @@ impl World {
         Ok(Some(false))
     }
 
-    /// The end of the update (`FUN_14103f4e0` after the chase): a moving group asks for a
-    /// relayout, a standing one that does not wait for a path has arrived (flags bit 3); a
-    /// group whose footprint-gap to the target, from the motion's place, is within its range
-    /// stops its walk and has arrived. A group arrived and on its way to attack (bit 4) clears
-    /// the bit and sends all its members at the target ([`World::release_units`]) and is
-    /// not finished. Any other is finished as the categories left `finished` while a member is
-    /// held, and not finished without one.
+    /// The end of the update (`FUN_14103f4e0` after the chase): a moving group asks for a relayout,
+    /// a standing one that does not wait for a path has arrived ([`GroupFlags::ARRIVED`]); a group
+    /// whose footprint-gap to the target, from the motion's place, is within its range stops its
+    /// walk and has arrived. A group arrived and on its way to attack ([`GroupFlags::ATTACKING`])
+    /// clears it and sends all its members at the target ([`World::release_units`]) and is not
+    /// finished. Any other is finished as the categories left `finished` while a member is held,
+    /// and not finished without one.
     ///
     /// # Errors
     ///

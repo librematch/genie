@@ -4,6 +4,7 @@
 //! from the `.dat` of the recording's game, never from constants.
 
 use genie_core::GenieError;
+use genie_core::map::TerrainFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::MasterData;
 use genie_core::objects::masters as work;
@@ -161,7 +162,9 @@ impl TerrainTable {
             .terrain_block
             .terrains
             .iter()
-            .map(|t| genie_core::map::terrain::terrain_class(t.is_water))
+            .map(|t| {
+                genie_core::map::terrain::terrain_class(TerrainFlags::from_bits_retain(t.is_water))
+            })
             .collect();
         let masks = dat
             .terrain_restrictions
@@ -204,7 +207,7 @@ impl TerrainTable {
                     .sum();
                 genie_core::map::terrain::TerrainKind {
                     shown: t.enabled != 0 || 0 <= t.terrain_to_draw,
-                    flags: t.is_water,
+                    flags: TerrainFlags::from_bits_retain(t.is_water),
                     forest: 249 < trees,
                 }
             })
@@ -447,7 +450,7 @@ impl MasterTable {
                         speed_multiplier: g.speed_multiplier,
                         frame_duration: Seconds::new(g.frame_duration),
                         replay_delay: Seconds::new(g.replay_delay),
-                        flags: g.sequence_type,
+                        flags: genie_core::objects::SpriteFlags::from_bits_retain(g.sequence_type),
                     },
                 ))
             })
@@ -562,7 +565,7 @@ impl MasterTable {
         sprite: SpriteId,
         speed: f32,
         facets: i16,
-        flags: u8,
+        flags: genie_core::objects::SpriteFlags,
     ) -> Self {
         let _ = self.sprite_speed.insert(sprite, speed);
         let graphic = genie_core::objects::sprite::Graphic {

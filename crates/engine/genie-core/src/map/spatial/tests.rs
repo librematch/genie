@@ -1351,7 +1351,7 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
             .all(|&w| w == VisionBits::ENDED | VisionBits::ENDED_EXPLORED)
     );
     // player 1 lost: its masks take the ended bits; the tile tests mask them out
-    // (registry::MASK holds neither bit 30 nor 62)
+    // (OBJECT_MASK holds neither ENDED nor ENDED_EXPLORED)
     assert_eq!(
         s.vision.get(PlayerId::new(1)),
         Some(&crate::vision::own_masks(PlayerId::new(1), true))

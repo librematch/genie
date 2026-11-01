@@ -18,6 +18,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
+use crate::objects::SpriteFlags;
 use crate::objects::layers::Animated;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
@@ -148,7 +149,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
     a.move_to = Some(walking(MoveTo::Moving));
@@ -439,7 +440,7 @@ fn a_sprite_resets_only_for_its_own_graphic() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let other = Graphic {
         id: SpriteId::named(225),
@@ -488,7 +489,7 @@ fn soldier_mover(speed: f32) -> Mover {
             fast_turn: false,
             facets: Some(crate::objects::facing::SpriteFacets {
                 count: 8,
-                flag_1: true,
+                turns: true,
             }),
             weapon_range: Distance::ZERO,
         },
@@ -516,7 +517,7 @@ const STANDING: Graphic = Graphic {
     speed_multiplier: 1.0,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
-    flags: 1,
+    flags: SpriteFlags::ANIMATED,
 };
 
 /// The reads of a soldier's Attack ([`AttackReads`]): the standing sprite [`STANDING`], a
@@ -1644,7 +1645,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let mut a = Attack {
         target: None,
@@ -1710,7 +1711,7 @@ fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let graphics: BTreeMap<SpriteId, Graphic> = [10, 11, 12, 20, 21]
         .into_iter()
@@ -2249,7 +2250,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let me = |id| Me {
         id,

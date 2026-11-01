@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::TileRect;
@@ -77,14 +78,15 @@ pub(super) fn hill_fails(
 }
 
 /// `FUN_141123f80`'s placement terrains (`placement`: the master's side terrains `+0x5f2`,
-/// `+0x5f4`, then its terrains `+0x5f6`, `+0x5f8`; −1 for none) for a box of tiles `b` (x0, y0,
-/// x1, y1) around point `p`: false where they refuse it (the test's code 1). With a terrain,
-/// the point's tile must be of one of the two, or share the flag 4 or 8 (the terrains' `.dat`
-/// flags, [`PlaceMap::terrain_flags`]) with them, and the box shrinks to that tile. With a side
-/// terrain, one of the tiles beside the box (the row below, the column right, the row above and
-/// the column left) must be of a side terrain, or of a terrain with the flag 0x40 or 0x10 when a
-/// side terrain has it. A terrain of −1 beside one of 0 or more (its flags read past the table)
-/// is not modelled.
+/// `+0x5f4`, then its terrains `+0x5f6`, `+0x5f8`; −1 for none) for a box of tiles `b` (x0, y0, x1,
+/// y1) around point `p`: false where they refuse it (the test's code 1). With a terrain, the
+/// point's tile must be of one of the two, or share shallow water or shallows
+/// ([`TerrainFlags::SHALLOW_WATER`], [`TerrainFlags::SHALLOWS`]: the terrains' `.dat` flags,
+/// [`PlaceMap::terrain_flags`]) with them, and the box shrinks to that tile. With a side terrain,
+/// one of the tiles beside the box (the row below, the column right, the row above and the column
+/// left) must be of a side terrain, or of a terrain with ice or beach ([`TerrainFlags::ICE`],
+/// [`TerrainFlags::BEACH`]) when a side terrain has it. A terrain of −1 beside one of 0 or more
+/// (its flags read past the table) is not modelled.
 ///
 /// # Errors
 ///
@@ -124,7 +126,10 @@ pub fn placement_terrains(
 /// # Errors
 ///
 /// A terrain of −1 or beyond the terrains (its flags read past the table), not modelled.
-pub(super) fn placement_flags(map: &dyn PlaceMap, t: Option<TerrainId>) -> Result<u8, GenieError> {
+pub(super) fn placement_flags(
+    map: &dyn PlaceMap,
+    t: Option<TerrainId>,
+) -> Result<TerrainFlags, GenieError> {
     t.and_then(|t| map.terrain_flags(t.index()))
         .ok_or(GenieError::unsupported(
             "placement terrains with one of -1 or beyond the terrains",
@@ -132,7 +137,7 @@ pub(super) fn placement_flags(map: &dyn PlaceMap, t: Option<TerrainId>) -> Resul
 }
 
 /// [`placement_terrains`]'s test of the point's tile `at` against the master's terrains
-/// `terrains`: of one of the two, or sharing the flag 4 or 8 with them.
+/// `terrains`: of one of the two, or sharing shallow water or shallows with them.
 ///
 /// # Errors
 ///
@@ -151,14 +156,13 @@ pub(super) fn point_terrain_allows(
         placement_flags(map, t2)?,
         placement_flags(map, Some(tile))?,
     );
-    let water = (f1 & 4 != 0 || f2 & 4 != 0) && ft & 4 != 0;
-    let shallow = (f1 & 8 != 0 || f2 & 8 != 0) && ft & 8 != 0;
-    Ok(water || shallow)
+    let shares = |flag| (f1.contains(flag) || f2.contains(flag)) && ft.contains(flag);
+    Ok(shares(TerrainFlags::SHALLOW_WATER) || shares(TerrainFlags::SHALLOWS))
 }
 
-/// [`placement_terrains`]'s side terrains: the master's own (those of 0 or more), then for the
-/// flag 0x40 and then 0x10, when a side terrain has it, every other terrain with it in the
-/// terrains' order.
+/// [`placement_terrains`]'s side terrains: the master's own (those of 0 or more), then for ice
+/// and then beach, when a side terrain has it, every other terrain with it in the terrains'
+/// order.
 ///
 /// # Errors
 ///
@@ -169,12 +173,12 @@ pub(super) fn side_terrains(
 ) -> Result<Vec<TerrainId>, GenieError> {
     let (f1, f2) = (placement_flags(map, side1)?, placement_flags(map, side2)?);
     let mut sides: Vec<TerrainId> = [side1, side2].into_iter().flatten().collect();
-    for bit in [0x40, 0x10] {
-        if f1 & bit != 0 || f2 & bit != 0 {
+    for flag in [TerrainFlags::ICE, TerrainFlags::BEACH] {
+        if f1.contains(flag) || f2.contains(flag) {
             for t in 0..map.terrain_count() {
                 let t = TerrainId::named(u8::try_from(t).unwrap_or(u8::MAX));
                 let other = Some(t) != side1 && Some(t) != side2;
-                if placement_flags(map, Some(t))? & bit != 0 && other {
+                if placement_flags(map, Some(t))?.contains(flag) && other {
                     sides.push(t);
                 }
             }

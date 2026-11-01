@@ -4,14 +4,15 @@
 use crate::GenieError;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::{
-    Changed, LAND_FLAGS, MOVE_RANGE, MapShore, NEAR, NO_TRANSPORT, NONE, SHORE_MARGIN, Ship, Shore,
-    TransportAction, TransportReads, UNLOAD_REACH_SQUARED, Updated, WATER_FLAGS,
+    Changed, MOVE_RANGE, MapShore, NEAR, NO_TRANSPORT, NONE, SHORE_MARGIN, Ship, Shore,
+    TransportAction, TransportReads, UNLOAD_REACH_SQUARED, Updated,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
 use crate::math::rng::{Stream, Well512};
@@ -317,7 +318,9 @@ impl TransportAction {
                         return Ok(Updated::Unload);
                     }
                     let over_water = x != NONE
-                        && shore.flags(Point::new(x, y).tile().short()) & WATER_FLAGS != 0;
+                        && shore
+                            .flags(Point::new(x, y).tile().short())
+                            .intersects(TerrainFlags::ANY_WATER);
                     cannot_unload = !over_water;
                 }
                 let changed = self.unloaded(ship, shore)?;
@@ -445,7 +448,9 @@ impl TransportAction {
         for ty in y0..=y1 {
             for tx in x0..=x1 {
                 let found = match zone {
-                    None => shore.flags(Tile::new(tx, ty).short()) & LAND_FLAGS != 0,
+                    None => shore
+                        .flags(Tile::new(tx, ty).short())
+                        .intersects(TerrainFlags::SHORE),
                     Some(z) => shore.zone(Tile::new(tx, ty))? == z,
                 };
                 if found {

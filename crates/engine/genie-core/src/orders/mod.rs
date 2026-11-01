@@ -168,7 +168,7 @@ struct Splittable {
     group: Option<GroupId>,
     kind: MasterKind,
     grouped: bool,
-    flag_1: bool,
+    turns: bool,
     speed: Speed,
     position: Position,
     moved_at: Point,
@@ -266,7 +266,7 @@ fn splits_together(
     if a.kind <= MAX_UNGROUPED || b.kind <= MAX_UNGROUPED {
         return Ok(false);
     }
-    if a.grouped != b.grouped || a.flag_1 != b.flag_1 {
+    if a.grouped != b.grouped || a.turns != b.turns {
         return Ok(false);
     }
     if f.by_speed && SPLIT_SPEED_GAP < (a.speed - b.speed).get().abs() {

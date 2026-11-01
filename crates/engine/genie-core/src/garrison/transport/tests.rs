@@ -1,11 +1,13 @@
 use super::*;
 use crate::map::GridSize;
+use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ActionState;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::TaskSprites;
 use crate::test_ids::object_id;
 use crate::unit_ai::NotifyKind;
@@ -14,7 +16,7 @@ use crate::world::Seconds;
 /// A map of zones by column (the tile's x over 10) and terrain flags by a closure; the shore
 /// point the planner gives, recorded.
 struct Coast {
-    flags: fn(Tile) -> u8,
+    flags: fn(Tile) -> TerrainFlags,
     near: bool,
     shore: Option<Point>,
     asked: Vec<(Point, Point)>,
@@ -33,7 +35,7 @@ impl Shore for Coast {
         Ok(self.near)
     }
 
-    fn flags(&self, tile: Tile) -> u8 {
+    fn flags(&self, tile: Tile) -> TerrainFlags {
         (self.flags)(tile)
     }
 
@@ -45,7 +47,13 @@ impl Shore for Coast {
 
 fn coast(near: bool) -> Coast {
     Coast {
-        flags: |t| if 20 <= t.x() { LAND_FLAGS } else { 1 },
+        flags: |t| {
+            if 20 <= t.x() {
+                TerrainFlags::SHORE
+            } else {
+                TerrainFlags::WATER
+            }
+        },
         near,
         shore: None,
         asked: Vec::new(),
@@ -60,7 +68,7 @@ const SHOWN: Graphic = Graphic {
     speed_multiplier: 1.0,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
-    flags: 1,
+    flags: SpriteFlags::ANIMATED,
 };
 const STANDING: Graphic = Graphic {
     id: SpriteId::named(300),
@@ -349,7 +357,7 @@ fn the_shore_search_looks_about_the_footprint_for_the_point_s_zone_or_land() {
     let mut c = Coast {
         flags: |t| {
             assert!(0 <= t.x() && 0 <= t.y(), "{t:?}");
-            0
+            TerrainFlags::NONE
         },
         ..coast(true)
     };
@@ -381,7 +389,7 @@ fn an_unload_out_of_reach_or_beside_no_shore_tells_the_owner_unless_over_water()
     // owner, over water it waits silently
     assert!(alerts(&unloading(), &s, &mut coast(true)));
     let mut wet = coast(true);
-    wet.flags = |_| 1;
+    wet.flags = |_| TerrainFlags::WATER;
     assert!(!alerts(&unloading(), &s, &mut wet));
     let (r, Left { stands, .. }) = run(&mut unloading(), &s, &mut wet);
     assert_eq!((r, stands), (Ok(Updated::Code(0)), true));

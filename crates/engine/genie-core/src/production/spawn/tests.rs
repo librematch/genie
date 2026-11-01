@@ -5,6 +5,7 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
 use crate::map::Radii;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::TileOffset;
@@ -13,6 +14,7 @@ use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlacementTerrains;
@@ -473,7 +475,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
-                flags: 1,
+                flags: SpriteFlags::ANIMATED,
             },
         );
         let p = &mut t.players[1];
@@ -612,7 +614,7 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
-                flags: 1,
+                flags: SpriteFlags::ANIMATED,
             },
         );
         let p = &mut t.players[1];
@@ -892,7 +894,10 @@ fn remains_world() -> World {
         replay_delay: Seconds::ZERO,
         flags,
     };
-    for (id, flags) in [(20, 4), (21, 1)] {
+    for (id, flags) in [
+        (20, SpriteFlags::RANDOM_FIRST_FRAME),
+        (21, SpriteFlags::ANIMATED),
+    ] {
         let id = SpriteId::named(id);
         let _ = t.graphics.insert(id, graphic(id, flags));
     }
@@ -964,7 +969,7 @@ fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
     let u = &t.players[1].objects[i];
     let facets = crate::objects::facing::SpriteFacets {
         count: 8,
-        flag_1: false,
+        turns: false,
     };
     assert_eq!(
         u.body.mover().map(|m| m.angle),
@@ -1444,7 +1449,7 @@ fn the_build_s_static_scans_find_a_dying_house_build_passes_over() {
 /// the placement terrains' test ([`placement_terrains`]).
 struct Terrains {
     kinds: [u8; 9],
-    flags: Vec<u8>,
+    flags: Vec<TerrainFlags>,
 }
 
 impl PlaceMap for Terrains {
@@ -1458,7 +1463,7 @@ impl PlaceMap for Terrains {
             .ok_or(GenieError::unsupported("off the map"))?;
         Ok(TerrainId::named(self.kinds[i]))
     }
-    fn terrain_flags(&self, t: usize) -> Option<u8> {
+    fn terrain_flags(&self, t: usize) -> Option<TerrainFlags> {
         self.flags.get(t).copied()
     }
     fn terrain_count(&self) -> usize {
@@ -1487,16 +1492,21 @@ impl PlaceMap for Terrains {
     }
 }
 
-/// The point's tile must be of one of the master's terrains or share the water flag 4 or the
-/// shallows flag 8 with them; a terrain of none beside a set one reads flags the map has not
+/// The point's tile must be of one of the master's terrains or share shallow water or shallows
+/// with them; a terrain of none beside a set one reads flags the map has not
 /// got, which is not modelled.
 #[test]
 fn a_placement_terrain_takes_its_own_tile_or_one_of_a_shared_flag() {
     use crate::production::spawn::terrains::point_terrain_allows;
-    // terrains 0 (land), 1 (water, 4), 2 (water, 4), 3 (shallows, 8)
+    // terrains 0 (land), 1 and 2 (shallow water), 3 (shallows)
     let map = Terrains {
         kinds: [0, 1, 2, 3, 0, 0, 0, 0, 0],
-        flags: vec![0, 4, 4, 8],
+        flags: vec![
+            TerrainFlags::NONE,
+            TerrainFlags::SHALLOW_WATER,
+            TerrainFlags::SHALLOW_WATER,
+            TerrainFlags::SHALLOWS,
+        ],
     };
     let t = |id: u8| Some(TerrainId::named(id));
     let at = |i: i32| Tile::new(i % 3, i / 3);
@@ -1508,14 +1518,20 @@ fn a_placement_terrain_takes_its_own_tile_or_one_of_a_shared_flag() {
     assert!(point_terrain_allows(&map, [t(1), None], at(0)).is_err());
 }
 
-/// The side terrains: the master's own, then every other terrain with the flag 0x40 (then 0x10)
-/// that one of its own has, in the terrains' order.
+/// The side terrains: the master's own, then every other terrain with ice (then beach) that one
+/// of its own has, in the terrains' order.
 #[test]
 fn side_terrains_take_the_others_of_a_shared_flag() {
     use crate::production::spawn::terrains::side_terrains;
     let map = Terrains {
         kinds: [0; 9],
-        flags: vec![0, 0x40, 0x40, 0x10, 0x50],
+        flags: vec![
+            TerrainFlags::NONE,
+            TerrainFlags::ICE,
+            TerrainFlags::ICE,
+            TerrainFlags::BEACH,
+            TerrainFlags::ICE | TerrainFlags::BEACH,
+        ],
     };
     let t = |id: u8| Some(TerrainId::named(id));
     let ids = |v: &[u8]| v.iter().copied().map(TerrainId::named).collect::<Vec<_>>();
@@ -1532,7 +1548,7 @@ fn a_master_s_placement_terrains_test_the_point_and_the_tiles_beside() {
     // the centre (1, 1) of terrain 5, the tile right of it (2, 1) of terrain 6
     let map = Terrains {
         kinds: [0, 0, 0, 0, 5, 6, 0, 0, 0],
-        flags: vec![0; 8],
+        flags: vec![TerrainFlags::NONE; 8],
     };
     let t = |id: u8| Some(TerrainId::named(id));
     let centre = Point::new(1.5, 1.5);

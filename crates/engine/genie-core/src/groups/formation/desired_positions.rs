@@ -56,7 +56,7 @@ impl World {
     /// The type `UpdateDesiredPositions` (`FUN_14103fd00`) chooses itself for group
     /// `g` (given none and its lock -1 or 0): a line (2), unless its path (the top level's, else the
     /// walked level's, [`measured_path`]) makes it a column (1): off the last high waypoint
-    /// ([`on_last_high_level_waypoint`]) or on a patrol (the top path's flags bit 0,
+    /// ([`on_last_high_level_waypoint`]) or on a patrol (the top path's [`PathFlags::LOOPS`],
     /// `FUN_141046500`) always; on the last waypoint, beyond both the owner's minimum column
     /// distance (`+0x6b8`) and its column-to-line distance (`+0x6bc`, plus the target's radius
     /// and range when the group has a target), measured on the ground from the group's place to

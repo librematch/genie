@@ -5,6 +5,7 @@
 
 use crate::GenieError;
 use crate::groups::Motion;
+use crate::groups::MotionFlags;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -203,7 +204,7 @@ impl Motion {
 
     /// `FUN_14104c150`: a turn of `yaw` (above 1e-7 in size) about the new position's up: its
     /// forward and right turn (`FUN_14087e350`, `FUN_14087e2c0`) and are normalized
-    /// (`FUN_141027d00`); motion flags bit 0.
+    /// (`FUN_141027d00`); [`MotionFlags::MOVED`].
     pub fn turn(&mut self, yaw: f32) {
         // only an ordered 1e-7 below the yaw's size turns: a NaN yaw does not
         if fmath::at_most_or_unordered(yaw.abs(), EPSILON) {
@@ -212,7 +213,7 @@ impl Motion {
         let r = fmath::rotation(yaw, self.new_position[2]);
         self.new_position[1] = fmath::normalize(fmath::rotate(&r, self.new_position[1]));
         self.new_position[3] = fmath::normalize(fmath::rotate(&r, self.new_position[3]));
-        self.flags |= 1;
+        self.flags |= MotionFlags::MOVED;
     }
 
     /// `BMotion`'s update (`FUN_14104a090`) after its path step ([`path_step`]): the forward
@@ -233,7 +234,7 @@ impl Motion {
                 let v = fmath::scale(d, *self.new_position.checked(along)?);
                 let p = &mut self.new_position[0];
                 *p = BVector::new(p.x() + v.x(), v.height() + p.height(), v.y() + p.y());
-                self.flags |= 1;
+                self.flags |= MotionFlags::MOVED;
             }
         }
         self.position = self.new_position;

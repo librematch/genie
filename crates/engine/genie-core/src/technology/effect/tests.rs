@@ -10,6 +10,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
@@ -99,7 +100,7 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let arms = crate::combat::attack::Arms {
         move_sprite: Some(g(SpriteId::named(1))),
@@ -312,7 +313,7 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let _ = t.graphics.insert(SpriteId::named(300), standing);
     for ms in &mut t.masters {
@@ -851,7 +852,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         speed_multiplier: 2.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let moving = |id| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));
@@ -1935,7 +1936,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let mut rng = crate::math::rng::Well512::default();
     let mut shown = |id, variant| {

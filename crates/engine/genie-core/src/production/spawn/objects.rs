@@ -14,6 +14,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
@@ -130,11 +131,11 @@ impl World {
                 let own = standing.map_or(
                     crate::objects::facing::SpriteFacets {
                         count: 0,
-                        flag_1: false,
+                        turns: false,
                     },
                     |g| crate::objects::facing::SpriteFacets {
                         count: g.facets,
-                        flag_1: g.flags & 2 != 0,
+                        turns: g.flags.contains(SpriteFlags::TURNS),
                     },
                 );
                 if let Some(m) = self.players.live_mut(p, new)?.body.mover_mut() {
@@ -214,13 +215,13 @@ impl World {
         let mut sprite = None;
         if let Some(g) = standing {
             sprite = Some(ActiveSprite::start(g, self.streams.get(Stream::Sprite)));
-            if g.flags & 4 != 0 && 1 < g.facets {
+            if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets {
                 let _ = self.streams.get(Stream::Object).rand15();
             }
         }
         let facets = standing.map(|g| crate::objects::facing::SpriteFacets {
             count: g.facets,
-            flag_1: g.flags & 2 != 0,
+            turns: g.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
         let moving = if MOVING <= made.kind {
@@ -242,7 +243,7 @@ impl World {
                     ))?;
                     let own = facets.unwrap_or(crate::objects::facing::SpriteFacets {
                         count: 0,
-                        flag_1: false,
+                        turns: false,
                     });
                     crate::objects::facing::angle_of_facet(facet, own)
                 }
@@ -287,7 +288,7 @@ impl World {
             let after = made.death_sprite.or(made.standing_sprite);
             after
                 .and_then(|after| self.graphics.get(&after))
-                .filter(|g| g.flags & 4 != 0 && 1 < g.facets)
+                .filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets)
                 .map(|g| g.facets)
         } else {
             None

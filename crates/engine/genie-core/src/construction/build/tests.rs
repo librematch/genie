@@ -3,6 +3,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
 use crate::map::Point;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
@@ -10,6 +11,7 @@ use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToReads, SpriteReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
@@ -450,7 +452,7 @@ pub(crate) fn graphics() -> BTreeMap<SpriteId, crate::objects::sprite::Graphic> 
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
-                flags: 1,
+                flags: SpriteFlags::ANIMATED,
             };
             (g.id, g)
         })
@@ -730,7 +732,7 @@ fn small_map() -> Spatial {
     );
     let kind = TerrainKind {
         shown: true,
-        flags: 0x20,
+        flags: TerrainFlags::LAND,
         forest: false,
     };
     world.terrain = Some(Terrain::new(
@@ -765,12 +767,12 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let mut kinds = vec![
         TerrainKind {
             shown: true,
-            flags: 0x20,
+            flags: TerrainFlags::LAND,
             forest: false,
         };
         40
     ];
-    kinds[32].flags = 0xa0;
+    kinds[32].flags = TerrainFlags::LAND | TerrainFlags::SNOW;
     world.terrain = Some(Terrain::new(
         GridSize::new(4, 4),
         vec![TileTerrain::of_save(32, 255, -1); 16],

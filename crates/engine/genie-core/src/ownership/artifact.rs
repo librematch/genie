@@ -578,6 +578,7 @@ mod tests {
     use crate::movement::move_to::{MoveDefaults, MoveToReads, MoveWait, SpriteReads, WalkTo};
     use crate::objects::ActionState;
     use crate::objects::ObjectId;
+    use crate::objects::SpriteFlags;
     use crate::objects::masters::class;
     use crate::objects::sprite::Graphic;
     use crate::test_ids::object_id;
@@ -1117,7 +1118,7 @@ mod tests {
             speed_multiplier: 1.0,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
-            flags: 1,
+            flags: SpriteFlags::ANIMATED,
         }
     }
 

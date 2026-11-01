@@ -17,6 +17,7 @@ use crate::combat::abilities::Look;
 use crate::math::fmath;
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -40,17 +41,17 @@ pub struct Graphic {
     pub frame_duration: Seconds,
     /// `+0x14`, `replay_delay`.
     pub replay_delay: Seconds,
-    /// `+0x1a`, `sequence_type`: bit 0 animated, 2 a random first frame, 3 played once, 4 backwards.
-    pub flags: u8,
+    /// `+0x1a`, `sequence_type`.
+    pub flags: SpriteFlags,
 }
 
 impl Graphic {
     const fn animated(&self) -> bool {
-        self.flags & 1 != 0
+        self.flags.contains(SpriteFlags::ANIMATED)
     }
 
     const fn backwards(&self) -> bool {
-        self.flags & 0x10 != 0
+        self.flags.contains(SpriteFlags::BACKWARDS)
     }
 
     /// The first frame: the last one for a sprite played backwards.
@@ -134,7 +135,7 @@ impl ActiveSprite {
             return Self::start_static(graphic, sprite_rng);
         }
         let last = graphic.frames - 1;
-        if graphic.flags & 4 != 0 {
+        if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             // FUN_1413b3490's draw, which the second one overrides
             let _ = sprite_rng.rand15();
         }
@@ -152,7 +153,7 @@ impl ActiveSprite {
         if f64::from(s.interval.get()) < 0.001 {
             s.interval = Seconds::new(SHORTEST);
         }
-        if graphic.flags & 4 != 0 {
+        if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             let d = graphic.frame_duration.get();
             if 0.0 < d {
                 let draw = sprite_rng.rand15();
@@ -180,7 +181,7 @@ impl ActiveSprite {
     fn start_static(graphic: Graphic, sprite_rng: &mut Well512) -> Self {
         let last = graphic.frames - 1;
         let mut frame = graphic.first_frame();
-        if graphic.flags & 4 != 0 {
+        if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             let draw = sprite_rng.rand15() as i32;
             frame = ((draw * i32::from(graphic.frames)) / 0x7fff) as i16;
             frame = frame.min(last);
@@ -334,7 +335,7 @@ impl ActiveSprite {
                 }
             }
         }
-        if stop && g.flags & 8 != 0 {
+        if stop && g.flags.contains(SpriteFlags::ONCE) {
             self.animate = 0;
             self.frame = if forward { last.max(0) } else { 0 };
         }
@@ -448,7 +449,7 @@ mod tests {
         speed_multiplier: 0.0,
         frame_duration: Seconds::new(0.044_444_446),
         replay_delay: Seconds::ZERO,
-        flags: 3,
+        flags: SpriteFlags::ANIMATED.union(SpriteFlags::TURNS),
     };
 
     #[test]
@@ -479,7 +480,7 @@ mod tests {
         let walking = Graphic {
             id: SpriteId::named(1),
             speed_multiplier: 1.25,
-            flags: 5,
+            flags: SpriteFlags::ANIMATED | SpriteFlags::RANDOM_FIRST_FRAME,
             ..CHOP
         };
         let mut stats = crate::gathering::hunt::tests::walker().stats;
@@ -567,24 +568,55 @@ mod tests {
             s.update(Seconds::new(dt), 1.0);
             s
         };
-        assert_eq!(after(four(1, Seconds::ZERO), Some(9), 0.1).frame, 3);
-        assert_eq!(after(four(1, Seconds::ZERO), Some(-2), 0.1).frame, 0);
-        let s = after(four(1, Seconds::new(0.5)), None, 1.0);
+        assert_eq!(
+            after(four(SpriteFlags::ANIMATED, Seconds::ZERO), Some(9), 0.1).frame,
+            3
+        );
+        assert_eq!(
+            after(four(SpriteFlags::ANIMATED, Seconds::ZERO), Some(-2), 0.1).frame,
+            0
+        );
+        let s = after(four(SpriteFlags::ANIMATED, Seconds::new(0.5)), None, 1.0);
         assert_eq!(
             (s.frame, s.animate, s.interval, s.looped),
             (1, 2, Seconds::new(0.5), false)
         );
-        let s = after(four(0x11, Seconds::new(0.5)), None, 1.0);
+        let s = after(
+            four(
+                SpriteFlags::ANIMATED | SpriteFlags::BACKWARDS,
+                Seconds::new(0.5),
+            ),
+            None,
+            1.0,
+        );
         assert_eq!((s.frame, s.animate, s.interval), (2, 2, Seconds::new(0.5)));
-        let s = after(four(0x11, Seconds::ZERO), None, 1.25);
+        let s = after(
+            four(
+                SpriteFlags::ANIMATED | SpriteFlags::BACKWARDS,
+                Seconds::ZERO,
+            ),
+            None,
+            1.25,
+        );
         assert_eq!((s.frame, s.animate, s.looped), (2, 1, true));
-        let s = after(four(9, Seconds::ZERO), None, 1.0);
+        let s = after(
+            four(SpriteFlags::ANIMATED | SpriteFlags::ONCE, Seconds::ZERO),
+            None,
+            1.0,
+        );
         assert_eq!((s.frame, s.animate), (3, 0));
-        let s = after(four(0x19, Seconds::ZERO), None, 1.0);
+        let s = after(
+            four(
+                SpriteFlags::ANIMATED | SpriteFlags::ONCE | SpriteFlags::BACKWARDS,
+                Seconds::ZERO,
+            ),
+            None,
+            1.0,
+        );
         assert_eq!((s.frame, s.animate), (0, 0));
         let one = Graphic {
             frames: 1,
-            ..four(1, Seconds::ZERO)
+            ..four(SpriteFlags::ANIMATED, Seconds::ZERO)
         };
         let s = after(one, None, 0.25);
         assert_eq!((s.frame, s.looped, s.animate), (0, true, 1));
@@ -613,7 +645,7 @@ mod tests {
             speed_multiplier: 0.0,
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
-            flags: 0,
+            flags: SpriteFlags::from_bits_retain(0x0),
         };
         let mut rng = Well512::default();
         let mut s = ActiveSprite::start(still, &mut rng);
@@ -625,7 +657,13 @@ mod tests {
         let mut once = Well512::default();
         let _ = once.rand15();
         let mut rng = Well512::default();
-        let _ = ActiveSprite::start(Graphic { flags: 4, ..still }, &mut rng);
+        let _ = ActiveSprite::start(
+            Graphic {
+                flags: SpriteFlags::RANDOM_FIRST_FRAME,
+                ..still
+            },
+            &mut rng,
+        );
         assert_eq!(rng, once);
     }
 

@@ -12,6 +12,7 @@ use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Walk;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
@@ -93,7 +94,7 @@ fn stats() -> MoveStats {
         fast_turn: false,
         facets: Some(crate::objects::facing::SpriteFacets {
             count: 16,
-            flag_1: true,
+            turns: true,
         }),
         weapon_range: Distance::ZERO,
     }
@@ -1028,7 +1029,7 @@ fn a_yaw_turns_forward_and_right_and_takes_the_facet_s_angle() {
     m.right = BVector::new(0.0, 0.0, -1.0);
     let facets = crate::objects::facing::SpriteFacets {
         count: 16,
-        flag_1: true,
+        turns: true,
     };
     m.yaw(Angle::new(-std::f32::consts::FRAC_PI_2), Some(facets))
         .unwrap();
@@ -3175,7 +3176,7 @@ fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
         speed_multiplier: factor,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let mut m = crate::gathering::hunt::tests::walker();
     m.stats.base = Speed::new(0.8);

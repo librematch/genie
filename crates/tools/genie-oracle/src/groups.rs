@@ -7,6 +7,7 @@
 
 use genie_core::GenieError;
 use genie_core::groups::GroupFlags;
+use genie_core::groups::MotionFlags;
 use genie_core::groups::{
     Formation, FormationKind, FormationLine, GroupCommand, GroupId, GroupOrder, GroupTarget,
     LinePoint, Member, Motion, PointLine, Slot, SlotState, SpecificMove, TargetData, UnitGroup,
@@ -66,7 +67,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
             .rev()
             .map(|d| path_level(d, paths))
             .collect::<Result<_, _>>()?,
-        flags: m.motion_flags_m_bits,
+        flags: MotionFlags::from_bits_retain(m.motion_flags_m_bits),
         maximum_velocity_forward: Speed::new(m.maximum_velocity_forward),
         number_wait_delays: m.number_wait_delays,
         // not saved: the constructor's
@@ -479,6 +480,13 @@ impl Flat for BVector {
 
 /// A group's flags flatten as their bits, as the save holds them.
 impl Flat for GroupFlags {
+    fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
+        self.bits().flat(path, out);
+    }
+}
+
+/// A motion's flags flatten as their bits, as the save holds them.
+impl Flat for MotionFlags {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.bits().flat(path, out);
     }

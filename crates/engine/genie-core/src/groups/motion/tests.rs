@@ -1,5 +1,6 @@
 use super::*;
 use crate::groups::GroupFlags;
+use crate::groups::MotionFlags;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::GridSize;
@@ -343,14 +344,14 @@ fn the_yaw_clamp_keeps_the_angle_for_a_nan_operand() {
 #[test]
 fn the_motion_turns_then_moves_along_its_forward() {
     let mut m = Motion::new();
-    m.flags = 0;
+    m.flags = MotionFlags::NONE;
     m.turn(1e-8);
-    assert_eq!((m.new_position, m.flags), (m.position, 0));
+    assert_eq!((m.new_position, m.flags), (m.position, MotionFlags::NONE));
     m.turn(-std::f32::consts::FRAC_PI_2);
-    assert_eq!(m.flags, 1);
+    assert_eq!(m.flags, MotionFlags::MOVED);
     let f = m.new_position[1];
     assert!((f.y() - 1.0).abs() < 1e-6 && f.x().abs() < 1e-6, "{f:?}");
-    m.flags = 0;
+    m.flags = MotionFlags::NONE;
     m.velocity = BVector::new(0.0, 0.0, 2.0);
     m.acceleration = BVector::new(0.0, 0.0, 1.0);
     m.integrate(Seconds::new(0.5)).unwrap();
@@ -358,7 +359,7 @@ fn the_motion_turns_then_moves_along_its_forward() {
     let p = m.position[0];
     assert!((p.y() - 1.25).abs() < 1e-6 && p.x().abs() < 1e-6, "{p:?}");
     assert_eq!(m.position, m.new_position);
-    assert_eq!(m.flags, 1);
+    assert_eq!(m.flags, MotionFlags::MOVED);
 }
 
 struct Fixture {

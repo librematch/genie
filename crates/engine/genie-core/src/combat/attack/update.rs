@@ -17,6 +17,7 @@ use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::masters::ClassId;
@@ -354,7 +355,7 @@ impl Attack {
         // animate) the attack lets its target go and ends; the hunt reads code 5
         let done = unit
             .sprite
-            .is_none_or(|sp| sp.looped || sp.graphic.flags & 1 == 0);
+            .is_none_or(|sp| sp.looped || !sp.graphic.flags.contains(SpriteFlags::ANIMATED));
         if !done {
             return Ok(0);
         }

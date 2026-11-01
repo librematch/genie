@@ -653,6 +653,7 @@ mod tests {
     use crate::map::Footprint;
     use crate::movement::Speed;
     use crate::objects::ObjectState;
+    use crate::objects::SpriteFlags;
     use crate::world::Seconds;
 
     const WALKING: Graphic = Graphic {
@@ -662,7 +663,7 @@ mod tests {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
 
     /// What an Explore's `MoveTo` reads of a unit in state 2 with speed 1: the sprites in

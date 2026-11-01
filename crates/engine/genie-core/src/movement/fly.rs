@@ -377,6 +377,7 @@ mod tests {
     use crate::objects::ActionState;
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
+    use crate::objects::SpriteFlags;
     use crate::objects::layers::Body;
     use crate::objects::lifecycle::Lifecycle;
     use crate::test_ids::master_id;
@@ -476,7 +477,7 @@ mod tests {
                     speed_multiplier: 1.0,
                     frame_duration: Seconds::new(frame_duration),
                     replay_delay: Seconds::ZERO,
-                    flags: 3,
+                    flags: SpriteFlags::ANIMATED | SpriteFlags::TURNS,
                 };
                 (g.id, g)
             })

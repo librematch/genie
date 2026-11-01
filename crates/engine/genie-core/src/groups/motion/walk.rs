@@ -24,11 +24,11 @@ use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
 /// The walk of the walked level (`LAB_14104b6b4`): see [`path_step`]. A group on its waypoint
-/// counts it reached (bit 1); else the step along the ground toward it (this tick's speed
-/// times dt) passes it (reached, bit 1) or ends on it (bits 1 and 0, the walk goes on). Then
-/// what stands in the way ([`way_blocked`]), the walk's end in range ([`walk_ends`]), the turn
-/// toward the waypoint ([`turn_toward`]) and the members' pull ([`pull_to_members`]); the forward
-/// speed takes the top speed.
+/// counts it reached ([`crate::movement::LevelFlags::AT_WAYPOINT`]); else the step along the ground
+/// toward it (this tick's speed times dt) passes it (reached, `AT_WAYPOINT`) or ends on it
+/// (`AT_WAYPOINT` and `REACHED`, the walk goes on). Then what stands in the way ([`way_blocked`]),
+/// the walk's end in range ([`walk_ends`]), the turn toward the waypoint ([`turn_toward`]) and the
+/// members' pull ([`pull_to_members`]); the forward speed takes the top speed.
 pub(super) fn steer(
     motion: &mut Motion,
     group: &GroupView,

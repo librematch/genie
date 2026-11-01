@@ -6,6 +6,7 @@ use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MotionFlags;
 use crate::groups::attack::moved_place;
 use crate::groups::create::FormationUnit;
 use crate::groups::group_list::member_gone;
@@ -24,7 +25,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
-/// A group whose `mGroupFlags` bit 9 is set moves at its slowest member's speed divided by this
+/// A group with [`GroupFlags::CATCHING_UP`] moves at its slowest member's speed divided by this
 /// (`FUN_14100bcb0`, `DAT_142ed66b4`).
 const SLOW_GROUP_FACTOR: f32 = crate::math::image::group::SLOW_GROUP_FACTOR;
 /// A member farther than this from its slot leaves the group (`FUN_14100bcb0`'s far test,
@@ -58,28 +59,27 @@ struct MemberView {
 }
 
 impl World {
-    /// `FUN_14100bcb0` with `far` (`param_2`): the statistics start over (the centroid, the
-    /// largest radius and range, the spacing sums and the searches' objects at 0, the smallest
-    /// radius, range and ranged range at `f32::MAX`); each member the world holds then, in the
-    /// members' order, lists the objects its unit AI's search finds ([`World::member_objects`]);
-    /// with `far`, one far from its slot ([`World::far_from_slot`]) leaves the group (`removeUnit`
-    /// with target -1, [`World::remove_unit`]) and, when it left, stops (slot 0x5d0) and the next
-    /// member takes its index; either way it counts in no statistic. Any other
-    /// adds its place (slot 0x520) to the centroid and its radius ([`FormationUnit`]) to the
-    /// spacing, and takes part in the largest and smallest radius, the slowest speed (slot
-    /// 0x208) and the ranges (slot 0x230; the ranged ones only above 0); its seconds since
-    /// attacking are 0 in the attack action (600), else they grow by the update's time. With
-    /// members, the centroid and the desired height are their means, the spacing twice the largest
-    /// radius, the total spacing `(largest + sum) + (largest + sum)` in that order, the stored
-    /// positions' desired length the members' count times the spacing; the motion's top speed is
-    /// the slowest member's (divided by [`SLOW_GROUP_FACTOR`] with flags bit 9), the seconds not
-    /// under attack 0 when a member is under attack, else they grow by the update's time; a
-    /// member inside another object stops ([`World::stop_if_inside`]); each sub-formation's
-    /// spacing is twice its widest unit's radius and its attack range its units' largest against
-    /// the group's target ([`World::range_against`]), its units looked up in the world's table;
-    /// with the motion flags' bit 1 the formation type follows
-    /// ([`World::calc_formation_type`]). Without one the smallest radius, the spacing and the
-    /// smallest ranges are 0.
+    /// `FUN_14100bcb0` with `far` (`param_2`): the statistics start over (the centroid, the largest
+    /// radius and range, the spacing sums and the searches' objects at 0, the smallest radius,
+    /// range and ranged range at `f32::MAX`); each member the world holds then, in the members'
+    /// order, lists the objects its unit AI's search finds ([`World::member_objects`]); with `far`,
+    /// one far from its slot ([`World::far_from_slot`]) leaves the group (`removeUnit` with target
+    /// -1, [`World::remove_unit`]) and, when it left, stops (slot 0x5d0) and the next member takes
+    /// its index; either way it counts in no statistic. Any other adds its place (slot 0x520) to
+    /// the centroid and its radius ([`FormationUnit`]) to the spacing, and takes part in the
+    /// largest and smallest radius, the slowest speed (slot 0x208) and the ranges (slot 0x230; the
+    /// ranged ones only above 0); its seconds since attacking are 0 in the attack action (600),
+    /// else they grow by the update's time. With members, the centroid and the desired height are
+    /// their means, the spacing twice the largest radius, the total spacing `(largest + sum) +
+    /// (largest + sum)` in that order, the stored positions' desired length the members' count
+    /// times the spacing; the motion's top speed is the slowest member's (divided by
+    /// [`SLOW_GROUP_FACTOR`] with [`GroupFlags::CATCHING_UP`]), the seconds not under attack 0 when
+    /// a member is under attack, else they grow by the update's time; a member inside another
+    /// object stops ([`World::stop_if_inside`]); each sub-formation's spacing is twice its widest
+    /// unit's radius and its attack range its units' largest against the group's target
+    /// ([`World::range_against`]), its units looked up in the world's table; with
+    /// [`MotionFlags::NEW`] the formation type follows ([`World::calc_formation_type`]). Without
+    /// one the smallest radius, the spacing and the smallest ranges are 0.
     ///
     /// Not modelled: `+0x478` (a member's `+0x30c`; the group holds no such field), a charge's
     /// range against a target, and the attack plan's re-attack (`FUN_14100f7f0`) against a
@@ -91,8 +91,8 @@ impl World {
         Ok(())
     }
 
-    /// [`World::group_statistics`] up to the formation type: true when that follows (motion
-    /// flags bit 1).
+    /// [`World::group_statistics`] up to the formation type: true when that follows
+    /// ([`MotionFlags::NEW`]).
     ///
     /// # Errors
     ///
@@ -153,8 +153,8 @@ impl World {
                 "a group's attack plan that attacks again (FUN_14100f7f0)",
             ));
         }
-        // the motion flags' bit 1 (`+0xb8`, 0x14100c657), not the group flags'
-        Ok(g.motion.flags >> 1 & 1 != 0)
+        // the motion flags' (`+0xb8`, 0x14100c657), not the group flags'
+        Ok(g.motion.flags.contains(MotionFlags::NEW))
     }
 
     /// [`World::statistics_only`]'s member loop: each member's view in the members' order with the
@@ -404,14 +404,14 @@ impl World {
         })
     }
 
-    /// `FUN_14100bcb0`'s far test (`0x14100be04`..`0x14100c1c9`, `param_2` 1) of member
-    /// `view` of group `group`, `largest` the largest radius of the members before it: the
-    /// group walks no patrol (the top path's flags bit 0, `FUN_141046500`), its flags lack bit 11,
-    /// the member's action list holds no Attack (slot 0x538 with 9) and it has a slot in the
-    /// formation (the first by its id) farther on the ground from where it last moved to (slot
-    /// 0x520) than [`FAR`], or [`FAR_WIDE`] in a formation of type 7 or once a member of radius
-    /// [`WIDE_RADIUS`] or more came before (`COMISS` with `JC`: a NaN radius is not wide;
-    /// `COMISS` with `JBE`: a NaN distance is not far).
+    /// `FUN_14100bcb0`'s far test (`0x14100be04`..`0x14100c1c9`, `param_2` 1) of member `view` of
+    /// group `group`, `largest` the largest radius of the members before it: the group walks no
+    /// patrol (the top path's [`PathFlags::LOOPS`], `FUN_141046500`), its flags lack
+    /// [`GroupFlags::PATROL`], the member's action list holds no Attack (slot 0x538 with 9) and it
+    /// has a slot in the formation (the first by its id) farther on the ground from where it last
+    /// moved to (slot 0x520) than [`FAR`], or [`FAR_WIDE`] in a formation of type 7 or once a
+    /// member of radius [`WIDE_RADIUS`] or more came before (`COMISS` with `JC`: a NaN radius is
+    /// not wide; `COMISS` with `JBE`: a NaN distance is not far).
     ///
     /// # Errors
     ///
@@ -885,7 +885,7 @@ mod tests {
     /// the group (its link cleared) and stops, the next member taking its index, and counts in
     /// no statistic; in a formation of type 7, or after a member of radius 0.5 or more (10's,
     /// before it), the distance is 40 and it stays; none leaves without `far`, on a patrol or
-    /// with flags bit 11.
+    /// with [`GroupFlags::PATROL`].
     #[test]
     fn a_member_far_from_its_slot_leaves_the_group() {
         let world = |spacing: f32, order: [i32; 2]| {
@@ -968,7 +968,7 @@ mod tests {
         let mut t = world(2.5, [11, 10]);
         let _ = t.statistics_only(group_id(1), true).unwrap();
         assert_eq!(ids(&t), [object_id(10)]);
-        // no far test without far, on a patrol, with flags bit 11
+        // no far test without far, on a patrol, with [`GroupFlags::PATROL`]
         let mut t = world(1.0, [11, 10]);
         let _ = t.statistics_only(group_id(1), false).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);

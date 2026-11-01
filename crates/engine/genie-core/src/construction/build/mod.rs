@@ -308,6 +308,7 @@ pub(crate) fn show_built(
 #[cfg(test)]
 mod built_sprite_tests {
     use super::*;
+    use crate::objects::SpriteFlags;
 
     use crate::objects::sprite::{ActiveSprite, Graphic};
 
@@ -326,22 +327,34 @@ mod built_sprite_tests {
             flags,
         };
         let graphics = BTreeMap::from([
-            (SpriteId::named(10), g(SpriteId::named(10), 1)),
-            (SpriteId::named(11), g(SpriteId::named(11), 1)),
+            (
+                SpriteId::named(10),
+                g(SpriteId::named(10), SpriteFlags::ANIMATED),
+            ),
+            (
+                SpriteId::named(11),
+                g(SpriteId::named(11), SpriteFlags::ANIMATED),
+            ),
         ]);
         let master = Master {
             standing_sprite: Some(SpriteId::named(11)),
             ..Master::default()
         };
         let mut rng = crate::math::rng::Well512::default();
-        let mut sprite = Some(ActiveSprite::start(g(SpriteId::named(10), 1), &mut rng));
+        let mut sprite = Some(ActiveSprite::start(
+            g(SpriteId::named(10), SpriteFlags::ANIMATED),
+            &mut rng,
+        ));
         show_built(&mut sprite, None, &master, 2, &graphics, &mut rng);
         let s = sprite.unwrap();
         assert_eq!(
             (s.graphic.id, s.frame, s.last_frame),
             (SpriteId::named(11), 2, 2)
         );
-        let statics = BTreeMap::from([(SpriteId::named(11), g(SpriteId::named(11), 0))]);
+        let statics = BTreeMap::from([(
+            SpriteId::named(11),
+            g(SpriteId::named(11), SpriteFlags::NONE),
+        )]);
         let mut none = None;
         show_built(&mut none, None, &master, 3, &statics, &mut rng);
         assert_eq!(
@@ -415,6 +428,7 @@ mod stack_tests {
     use crate::map::GridSize;
     use crate::map::GroundOffset;
     use crate::map::Radii;
+    use crate::map::TerrainFlags;
     use crate::map::spatial::{Placed, Tiles};
     use crate::map::terrain::TileTerrain;
     use crate::movement::Speed;
@@ -607,7 +621,7 @@ mod stack_tests {
             vec![
                 crate::map::terrain::TerrainKind {
                     shown: true,
-                    flags: 0,
+                    flags: TerrainFlags::NONE,
                     forest: false,
                 };
                 40

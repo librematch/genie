@@ -12,6 +12,7 @@ use genie_core::map::Distance;
 use genie_core::map::Position;
 use genie_core::movement::move_to::MoveWaitState;
 use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
+use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ActionType;
@@ -303,7 +304,7 @@ fn a_move_to_takes_its_sprite_from_the_sprites_table() {
         speed_multiplier: 1.5,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let graphics = std::collections::BTreeMap::from([(walking.id, walking)]);
     let mut action = move_to(4, 0.5);
@@ -696,7 +697,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let graphics = std::collections::BTreeMap::from([(carried.id, carried)]);
     let a = import_drawn(
@@ -1183,7 +1184,7 @@ fn swing_sprites() -> std::collections::BTreeMap<SpriteId, Graphic> {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     std::collections::BTreeMap::from([(swing.id, swing)])
 }

@@ -19,6 +19,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, MoveToReads};
@@ -73,10 +74,6 @@ const DRAW_SCALE: f32 = crate::math::image::transport::DRAW_SCALE;
 const DROP_GAP: f32 = crate::math::image::transport::DROP_GAP;
 /// The draws `find_drop_location` makes (`FUN_141192d10`: 50).
 const DROP_TRIES: u16 = 50;
-
-/// The terrain table's water bits (`FUN_1413fc2b0`) and land bits (`FUN_1413fc270`).
-const WATER_FLAGS: u8 = 7;
-const LAND_FLAGS: u8 = 0x18;
 
 /// A drop location's first draw of side 4 (a draw of `0x7fff`), which keeps the place the
 /// stack holds: not modelled.
@@ -140,7 +137,7 @@ pub trait Shore {
     fn near(&mut self, zone: u8, reach: Distance) -> Result<bool, GenieError>;
     /// The terrain table's flags of `tile`, its x and y shorts
     /// ([`crate::map::terrain::Terrain::flags_at`]).
-    fn flags(&self, tile: Tile) -> u8;
+    fn flags(&self, tile: Tile) -> TerrainFlags;
     /// `FUN_140f7c390` with the planner of the unit's restriction (`FUN_140f7cb30`, none without
     /// a master): the last point of the planner's path from `from` to `to` whose tile has an edge
     /// ([`crate::pathing::tile_path::Planner::last_open_point`]); None without a planner or such a point.

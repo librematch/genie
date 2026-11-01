@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::map::GridSize;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::Speed;
@@ -19,7 +20,7 @@ pub(crate) struct WorldMap<'a> {
 }
 
 impl PlaceMap for WorldMap<'_> {
-    fn terrain_flags(&self, t: usize) -> Option<u8> {
+    fn terrain_flags(&self, t: usize) -> Option<TerrainFlags> {
         self.turns
             .spatial
             .terrain

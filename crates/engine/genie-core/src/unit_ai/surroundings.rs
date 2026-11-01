@@ -280,8 +280,8 @@ pub struct GroupState {
     pub commanded: bool,
     /// `IsIdle` (`FUN_141017ad0`, [`crate::groups::UnitGroup::is_idle`]).
     pub idle: bool,
-    /// It patrols: its top path's flags bit 0 (`FUN_141017c40`) or its flags bit 11
-    /// (`FUN_141017c30`).
+    /// It patrols: its top path's [`crate::movement::PathFlags::LOOPS`] (`FUN_141017c40`) or its
+    /// [`crate::groups::GroupFlags::PATROL`] (`FUN_141017c30`).
     pub patrol: bool,
     /// Its motion moves (`FUN_141046600`).
     pub moving: bool,

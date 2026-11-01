@@ -9,6 +9,7 @@ use genie_core::map::Position;
 use genie_core::movement::PathFlags;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
+use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::{Class, Lifecycle, MasterData};
 use genie_core::objects::masters::ClassId;
@@ -57,7 +58,9 @@ pub(super) fn lifecycle(
     let death_facets = masters
         .zip(after)
         .and_then(|(t, after)| t.graphics.get(&after))
-        .filter(|g| pure_static && g.flags & 4 != 0 && 1 < g.facets)
+        .filter(|g| {
+            pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && 1 < g.facets
+        })
         .map(|g| g.facets);
     let (dying_sprite, [death_spawn, remains], master) = s.own_master().map_or_else(
         || {

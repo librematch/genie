@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::damage::ArmorPair;
+use crate::map::TerrainFlags;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::{
@@ -8,6 +9,7 @@ use crate::movement::move_to::{
 use crate::objects::ActionState;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -45,7 +47,7 @@ fn graphics() -> std::collections::BTreeMap<SpriteId, crate::objects::sprite::Gr
                 speed_multiplier: 1.0,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
-                flags: 1,
+                flags: SpriteFlags::ANIMATED,
             };
             (g.id, g)
         })
@@ -322,7 +324,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
 /// The map's terrain of class 4 (`terrain_class` of flags 0x20), the tiles' class: the
 /// repairer's master's restriction then passes them, so its quick path reaches the house.
 fn passable(t: &mut crate::world::World) {
-    t.spatial.terrain.as_mut().unwrap().terrains[0].flags = 0x20;
+    t.spatial.terrain.as_mut().unwrap().terrains[0].flags = TerrainFlags::LAND;
 }
 
 /// The repairer's Repair part of 50 ms through its step (`Unit::repair_part`): its code.

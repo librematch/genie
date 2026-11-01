@@ -4,12 +4,14 @@ use crate::combat::damage::Victim;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::SoundEvents;
@@ -460,14 +462,15 @@ fn a_hit_below_1_hit_point_leaves_0_and_holds_nothing() {
 #[test]
 fn the_terrain_mask_is_a_bitset_of_8() {
     // the longboats' -32: the mask 32
-    assert_eq!(terrain_mask(-32), Some(32));
-    assert_eq!(terrain_mask(-3), Some(3));
+    assert_eq!(terrain_mask(-32), Some(TerrainFlags::LAND));
+    let water = TerrainFlags::WATER | TerrainFlags::DEEP_WATER;
+    assert_eq!(terrain_mask(-3), Some(water));
     // the negation's low byte
-    assert_eq!(terrain_mask(-0x103), Some(3));
-    assert_eq!(terrain_mask(i16::MIN), Some(0));
-    assert_eq!(terrain_mask(1), Some(1));
-    assert_eq!(terrain_mask(8), Some(0x80));
-    assert_eq!(terrain_mask(9), Some(0));
+    assert_eq!(terrain_mask(-0x103), Some(water));
+    assert_eq!(terrain_mask(i16::MIN), Some(TerrainFlags::NONE));
+    assert_eq!(terrain_mask(1), Some(TerrainFlags::WATER));
+    assert_eq!(terrain_mask(8), Some(TerrainFlags::SNOW));
+    assert_eq!(terrain_mask(9), Some(TerrainFlags::NONE));
     assert_eq!(terrain_mask(0), None);
 }
 
@@ -489,7 +492,12 @@ fn a_terrain_look_gives_the_task_s_sprites_on_its_terrains() {
     let t = longboat_look();
     let all = |_| true;
     assert_eq!(
-        look(&t, 32, 0x21, all),
+        look(
+            &t,
+            TerrainFlags::LAND,
+            TerrainFlags::WATER | TerrainFlags::LAND,
+            all
+        ),
         Some(Look {
             standing: Some(SpriteId::named(19599)),
             walking: Some(SpriteId::named(19601)),
@@ -499,10 +507,10 @@ fn a_terrain_look_gives_the_task_s_sprites_on_its_terrains() {
             undead: Some(SpriteId::named(19600)),
         })
     );
-    assert_eq!(look(&t, 32, 1, all), None);
+    assert_eq!(look(&t, TerrainFlags::LAND, TerrainFlags::WATER, all), None);
     // a sprite the table lacks is a null one
     let some = |id: i32| id != 19600 && id != 19599;
-    let l = look(&t, 32, 32, some).unwrap();
+    let l = look(&t, TerrainFlags::LAND, TerrainFlags::LAND, some).unwrap();
     assert_eq!(
         (l.standing, l.undead, l.walking),
         (None, None, Some(SpriteId::named(19601)))
@@ -512,7 +520,7 @@ fn a_terrain_look_gives_the_task_s_sprites_on_its_terrains() {
         sound_events: SoundEvents::new(0x62d4_b3ec, -5),
         ..longboat_look()
     };
-    let l = look(&t, 32, 32, all).unwrap();
+    let l = look(&t, TerrainFlags::LAND, TerrainFlags::LAND, all).unwrap();
     assert_eq!((l.dying, l.undead), (None, None));
 }
 
@@ -971,7 +979,11 @@ fn waters(t: &mut World) {
             .into_iter()
             .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
             .collect(),
-        vec![kind(0), kind(1), kind(0x21)],
+        vec![
+            kind(TerrainFlags::NONE),
+            kind(TerrainFlags::WATER),
+            kind(TerrainFlags::WATER | TerrainFlags::LAND),
+        ],
         Vec::new(),
     ));
     let g = |id| crate::objects::sprite::Graphic {
@@ -981,7 +993,7 @@ fn waters(t: &mut World) {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     for id in [19598, 19599, 19600, 19601] {
         let id = SpriteId::named(id);

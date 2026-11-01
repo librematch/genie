@@ -32,6 +32,7 @@ mod formation_kind;
 mod group_flags;
 mod group_id;
 mod group_list;
+mod motion_flags;
 mod objects;
 mod slot_state;
 
@@ -39,6 +40,7 @@ pub use self::formation_kind::FormationKind;
 pub use self::group_flags::GroupFlags;
 pub use self::group_id::GroupId;
 pub use self::group_list::{GroupLink, UnitGroups, common_group};
+pub use self::motion_flags::MotionFlags;
 pub(crate) use self::objects::WorldObject;
 pub use self::objects::sub_formation;
 pub use self::slot_state::SlotState;
@@ -94,7 +96,7 @@ pub struct Motion {
     /// first).
     pub paths: Vec<PathData>,
     /// `mMotionFlags`.
-    pub flags: u32,
+    pub flags: MotionFlags,
     /// `mMaximumVelocityForward`.
     pub maximum_velocity_forward: Speed,
     /// `mNumberWaitDelays`.
@@ -446,7 +448,7 @@ impl Motion {
     /// `BMotion`'s constructor (`FUN_141041850`): at the origin facing x (forward (1, 0, 0), up
     /// (0, 1, 0), right their cross product (0, 0, -1)), no speed, the turn limits at `f32::MAX`
     /// (the constructor's `0x7f7fffff`), one level of path data without a path (`FUN_140f8f670`),
-    /// flags 3.
+    /// flags [`MotionFlags::MOVED`] and [`MotionFlags::NEW`].
     #[must_use]
     pub fn new() -> Self {
         let frame = [
@@ -462,7 +464,7 @@ impl Motion {
             maximum_yaw_per_second_moving: TurnRate::MAX,
             maximum_yaw_per_second_stationary: TurnRate::MAX,
             paths: vec![PathData::without_path()],
-            flags: 3,
+            flags: MotionFlags::MOVED.union(MotionFlags::NEW),
             lead: None,
             ..Self::default()
         }
@@ -483,11 +485,11 @@ impl UnitGroup {
     }
 
     /// `BUnitGroup`'s constructor (`FUN_140fe1550` after [`Motion::new`]) with id `id`
-    /// (`FUN_141039640`): the owner -1 (the 64-bit -1 over `+0xd8` and `+0xdc`, whose id the
-    /// id's setter then writes; [`UnitGroups::create`] sets the owner after), no stance (−1), no
-    /// formation, flags `0x100`, no command (-1), no target (-1, type -1), differentiator -1,
-    /// `+0x13d` 1 (the 16-bit `0x100` at `+0x13c`, `mHibernating` 0); every other field 0 or
-    /// empty, the attack plan (`+0x3b0`, `FUN_140fd75c0`) too.
+    /// (`FUN_141039640`): the owner -1 (the 64-bit -1 over `+0xd8` and `+0xdc`, whose id the id's
+    /// setter then writes; [`UnitGroups::create`] sets the owner after), no stance (−1), no
+    /// formation, flags [`GroupFlags::TURN`], no command (-1), no target (-1, type -1),
+    /// differentiator -1, `+0x13d` 1 (the 16-bit `0x100` at `+0x13c`, `mHibernating` 0); every
+    /// other field 0 or empty, the attack plan (`+0x3b0`, `FUN_140fd75c0`) too.
     ///
     /// The constructor's other values are no group state: `+0xc8` and `+0xd0` point at the
     /// group itself; `+0x1e0` (-1) is the category of the unit types list's sentinel node
@@ -513,7 +515,8 @@ impl UnitGroup {
 
     /// `FUN_14102bb40`: the command queue empties (`+0x420`, its size `+0x450`); a hibernating
     /// group (`mHibernating`, `+0x13c`, which `commandMoveTo`'s queue path sets for a group
-    /// without a command) wakes, with flags `0x4c000` when it was 1.
+    /// without a command) wakes, with flags [`GroupFlags::RELAYOUT_AT_TURN`],
+    /// [`GroupFlags::PLACE_AGAIN`] and [`GroupFlags::LEAD_TO_TARGET`] when it was 1.
     pub fn clear_command_queue(&mut self) {
         self.command_queue.clear();
         if self.hibernating != 0 {

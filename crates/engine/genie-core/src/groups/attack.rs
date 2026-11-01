@@ -99,14 +99,15 @@ impl UnitGroup {
 
 impl World {
     /// `FUN_14100f7f0` of group `group` on `target`: the object the command is on stands for its
-    /// main building (`FUN_141189b20`). A group already on it, whose members with a target are
-    /// all on it, and without flags bit 17 only notes the target's place (false). Else the
+    /// main building (`FUN_141189b20`). A group already on it, whose members with a target are all
+    /// on it, and without [`GroupFlags::JOINED`] only notes the target's place (false). Else the
     /// target's data resets, the range comes from the members' pass ([`World::reach_pass`], with
-    /// fewer than two queued commands) or is the group's smallest unit range, the special units
-    /// and the categories' attack ranges take the target ([`World::refill_special_units`],
-    /// [`World::raise_attack_ranges`]), the target's data is set, and the group moves to the
-    /// target ([`World::command_move_to`]: its range, the move not queued, direct, flag 1). True
-    /// when the move began: the group is then in command 9, flags bit 3 off and bit 4 on.
+    /// fewer than two queued commands) or is the group's smallest unit range, the special units and
+    /// the categories' attack ranges take the target ([`World::refill_special_units`],
+    /// [`World::raise_attack_ranges`]), the target's data is set, and the group moves to the target
+    /// ([`World::command_move_to`]: its range, the move not queued, direct, flag 1). True when the
+    /// move began: the group is then in command 9, [`GroupFlags::ARRIVED`] off and
+    /// [`GroupFlags::ATTACKING`] on.
     ///
     /// # Errors
     ///

@@ -36,7 +36,10 @@ fn a_new_motion_holds_the_constructor_s_values() {
         ),
         (Speed::new(f32::MAX), TurnRate::MAX, TurnRate::MAX)
     );
-    assert_eq!((m.flags, m.lead, m.number_wait_delays), (3, None, 0));
+    assert_eq!(
+        (m.flags, m.lead, m.number_wait_delays),
+        ((MotionFlags::MOVED | MotionFlags::NEW), None, 0)
+    );
     assert_eq!((m.velocity, m.acceleration), (BVector::ZERO, BVector::ZERO));
     let frame = [
         BVector::ZERO,
@@ -600,7 +603,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
             ..Member::default()
         })
         .collect();
-    g.motion.flags = 2;
+    g.motion.flags = MotionFlags::NEW;
     g.motion.maximum_velocity_forward = Speed::new(1.0);
     g.smallest_unit_range = Distance::new(2.5);
     t.groups = UnitGroups {
@@ -655,7 +658,8 @@ fn building_60() -> ObjectId {
 /// `FUN_14100f7f0`: a group commanded on a target out of its members' reach resets the target's
 /// data, takes the largest weapon range as its range, then sets the target (kind 1, the place the
 /// target last moved to as x, height, y, the range, the radii's length, the order's bytes) and
-/// moves to it: command 9, flags bit 3 off and bit 4 on.
+/// moves to it: command 9, [`crate::groups::GroupFlags::ARRIVED`] off and [`GroupFlags::ATTACKING`]
+/// on.
 #[test]
 fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
@@ -695,8 +699,9 @@ fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
     );
 }
 
-/// A group already on the target whose members all work on it, without flags bit 17, only notes
-/// where the target is (false); with bit 17, or a member on another target, it commands again.
+/// A group already on the target whose members all work on it, without
+/// [`crate::groups::GroupFlags::JOINED`], only notes where the target is (false); with it, or a
+/// member on another target, it commands again.
 #[test]
 fn a_group_already_on_its_target_only_notes_the_place() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);

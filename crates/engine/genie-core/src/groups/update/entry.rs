@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MotionFlags;
 use crate::groups::WorldObject;
 use crate::groups::command::MOVE_COMMAND;
 use crate::groups::update::{ATTACK, BUILD, DELIVER_RELIC, NO_COMMAND, PICK_UP_RELIC, REPAIR};
@@ -111,12 +112,12 @@ impl World {
     /// routine's 0) has the world delete it. Flags bit 13 clears; the units the group keeps apart
     /// are checked ([`World::keep_apart`], `FUN_141007ca0`); a member the world does not hold,
     /// without a unit AI (a ghost has none), below 1 hit point (`COMISS` then `JA`: not a NaN) or
-    /// of another player leaves the group (`removeUnit` with target -1, [`World::remove_unit`])
-    /// and then stops (slot 0x5d0 on the object the world holds, [`crate::movement::Mover::
-    /// stop`]); any such leave sets flags bit 16. A hibernating group (`mHibernating`, `+0x13c`)
-    /// runs its own check ([`World::hibernating_update`]) and, unless that deletes it, stays
-    /// asleep (true) without motion flags bit 1; with it, and for an awake group, the update
-    /// goes on ([`World::awake_update`]).
+    /// of another player leaves the group (`removeUnit` with target -1, [`World::remove_unit`]) and
+    /// then stops (slot 0x5d0 on the object the world holds, [`crate::movement::Mover:: stop`]);
+    /// any such leave sets [`GroupFlags::STATISTICS`]. A hibernating group (`mHibernating`,
+    /// `+0x13c`) runs its own check ([`World::hibernating_update`]) and, unless that deletes it,
+    /// stays asleep (true) without [`MotionFlags::NEW`]; with it, and for an awake group, the
+    /// update goes on ([`World::awake_update`]).
     ///
     /// # Errors
     ///
@@ -132,7 +133,13 @@ impl World {
             if !self.hibernating_update(group)? {
                 return Ok(false);
             }
-            if self.groups.held(group)?.motion.flags & 2 == 0 {
+            if !self
+                .groups
+                .held(group)?
+                .motion
+                .flags
+                .contains(MotionFlags::NEW)
+            {
                 return Ok(true);
             }
         }

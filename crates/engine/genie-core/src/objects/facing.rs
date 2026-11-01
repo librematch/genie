@@ -37,8 +37,9 @@ const TWO: f32 = crate::math::image::facing::TWO;
 pub struct SpriteFacets {
     /// How many facets.
     pub count: i16,
-    /// Its sequence flags have bit 1 (`+0x1a`): the sprite turns.
-    pub flag_1: bool,
+    /// Its sequence flags hold [`crate::objects::SpriteFlags::TURNS`] (`+0x1a`): the sprite
+    /// turns.
+    pub turns: bool,
 }
 
 /// The facets most routines count: the sprite's, at least 8 (`FUN_14114d780`, `FUN_14119d0c0`).
@@ -225,7 +226,7 @@ pub fn drawn_angle(r: u32, s: SpriteFacets) -> Angle {
 /// A new object's sprite turns and has more than one facet: [`drawn_angle`] draws.
 #[must_use]
 pub fn draws_angle(s: Option<SpriteFacets>) -> bool {
-    s.is_some_and(|s| s.flag_1 && 1 < s.count)
+    s.is_some_and(|s| s.turns && 1 < s.count)
 }
 
 #[cfg(test)]
@@ -234,7 +235,7 @@ mod tests {
 
     const VILLAGER: SpriteFacets = SpriteFacets {
         count: 16,
-        flag_1: true,
+        turns: true,
     };
 
     #[test]

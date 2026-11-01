@@ -11,6 +11,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::Terrain;
 use crate::math::conversions::cvttss2si;
@@ -273,7 +274,7 @@ impl Shore for MapShore<'_> {
         }))
     }
 
-    fn flags(&self, tile: Tile) -> u8 {
+    fn flags(&self, tile: Tile) -> TerrainFlags {
         self.terrain.flags_at(tile)
     }
 

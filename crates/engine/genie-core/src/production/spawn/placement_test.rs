@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Radii;
+use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
@@ -149,7 +150,7 @@ pub trait PlaceMap {
     fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError>;
     /// Terrain `t`'s flags (the `.dat`'s `is_water` byte, the map's terrain record `+2`), None
     /// beyond the terrains.
-    fn terrain_flags(&self, _t: usize) -> Option<u8> {
+    fn terrain_flags(&self, _t: usize) -> Option<TerrainFlags> {
         None
     }
     /// How many terrains the map's table holds.

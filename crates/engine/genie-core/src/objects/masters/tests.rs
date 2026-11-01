@@ -5,6 +5,7 @@ use crate::map::TerrainMask;
 use crate::movement::TurnRate;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::class;
 use crate::players::CivId;
 use crate::players::PlayerId;
@@ -1017,7 +1018,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         speed_multiplier,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 1,
+        flags: SpriteFlags::ANIMATED,
     };
     let graphics = [
         (SpriteId::named(1), graphic(SpriteId::named(1), 0.0, 8)),
@@ -1069,7 +1070,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
         m.moving.unwrap().facets,
         Some(crate::objects::facing::SpriteFacets {
             count: 8,
-            flag_1: false
+            turns: false
         })
     );
 }

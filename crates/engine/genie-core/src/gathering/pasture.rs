@@ -12,6 +12,7 @@ use crate::math::conversions::cvttss2si;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpriteFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
@@ -137,7 +138,9 @@ impl World {
                 u.pasture = Some(id);
                 u.life.amount = food;
                 let graphic = u.sprite.map(|s| s.graphic);
-                if let Some(g) = graphic.filter(|g| g.flags & 4 != 0) {
+                if let Some(g) =
+                    graphic.filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME))
+                {
                     let d = self.streams.get(Stream::Object).rand15() as i32;
                     let _ =
                         d.checked_rem(i32::from(g.facets) - 1)

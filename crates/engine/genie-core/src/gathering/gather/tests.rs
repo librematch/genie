@@ -10,6 +10,7 @@ use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::TaskId;
@@ -331,7 +332,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let (mut sprite, mut rng) = (None, Well512::default());
     let released = g
@@ -644,7 +645,7 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
     mover.stats.turn_time = Seconds::new(1.0);
     mover.stats.facets = Some(crate::objects::facing::SpriteFacets {
         count: 16,
-        flag_1: true,
+        turns: true,
     });
     mover.angle = Angle::ZERO;
     let before = mover.angle;
@@ -970,7 +971,7 @@ fn a_gatherer_facing_its_target_works_it() {
         speed_multiplier: 1.0,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
-        flags: 0,
+        flags: SpriteFlags::from_bits_retain(0x0),
     };
     let mut rig = Rig::on_the_path();
     rig.mover_mut().stats.turn_time = Seconds::ZERO;

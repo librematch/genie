@@ -37,18 +37,18 @@ pub struct CommandArgs {
 
 impl World {
     /// `BUnitGroup::command` (`FUN_14100efd0`) of group `group` on `target` (-1 for none, or an
-    /// object the world does not hold: the game passes a null object) at `point`, with the
-    /// order's bytes ([`CommandArgs`]). Its rams are not re-added (`readdRams`, `FUN_14102b730`:
-    /// `DAT_143f01837`, which nothing writes, is 0), flags bit 5 clears, and the first member the
-    /// world holds with at least a hit point names the task on the target (slot 0x130,
-    /// [`World::member_task`]: none without a target). A group of horde units moves as a horde
-    /// (`commandHorde`, `FUN_141010180`, not modelled); any other notes whether the command was
-    /// queued (`+0x13d`, [`crate::groups::UnitGroup::replaces_queue`]) and runs the command by the
-    /// task's action type: without a task, or for 1, a move ([`World::command_move_to`] with its
-    /// target forgotten); for 1, 7, 9, `0x68` and `0x7d` the attack path
+    /// object the world does not hold: the game passes a null object) at `point`, with the order's
+    /// bytes ([`CommandArgs`]). Its rams are not re-added (`readdRams`, `FUN_14102b730`:
+    /// `DAT_143f01837`, which nothing writes, is 0), [`GroupFlags::MEMBERS_SENT`] clears, and the
+    /// first member the world holds with at least a hit point names the task on the target (slot
+    /// 0x130, [`World::member_task`]: none without a target). A group of horde units moves as a
+    /// horde (`commandHorde`, `FUN_141010180`, not modelled); any other notes whether the command
+    /// was queued (`+0x13d`, [`crate::groups::UnitGroup::replaces_queue`]) and runs the command by
+    /// the task's action type: without a task, or for 1, a move ([`World::command_move_to`] with
+    /// its target forgotten); for 1, 7, 9, `0x68` and `0x7d` the attack path
     /// ([`World::command_attack`], or a queue entry); the other tasks' general command
-    /// ([`World::general_command`]) runs. A move begun stops the members (`stopAllUnits` with 0, [`World::stop_all_units`]),
-    /// and flags bit 17 clears. True when the move began.
+    /// ([`World::general_command`]) runs. A move begun stops the members (`stopAllUnits` with 0,
+    /// [`World::stop_all_units`]), and [`GroupFlags::JOINED`] clears. True when the move began.
     ///
     /// # Errors
     ///
