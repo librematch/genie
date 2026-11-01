@@ -311,7 +311,6 @@ impl World {
             },
             building: crate::objects::layers::Building {
                 production: None,
-                gather_point: None,
                 construction: Some(Construction {
                     progress,
                     desolid,

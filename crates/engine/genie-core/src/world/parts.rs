@@ -11,6 +11,7 @@
 //! part escapes the comparison with the game's save.
 
 use crate::GenieError;
+use crate::commands::GatherPoint;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
@@ -116,6 +117,9 @@ pub struct Parts {
     /// ([`crate::ownership::change::change_hands`]), which the object's death spawn makes its
     /// dead object of (`FUN_1411a5090`).
     pub dead_master: PartTable<Master>,
+    /// A building's gather point (`+0xc30`..`+0xc44`, the save's `gather_point_*`), which its
+    /// trained units go to: SET GATHER POINT's and SET GATHER STATE's.
+    pub gather_point: PartTable<GatherPoint>,
 }
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
@@ -125,6 +129,9 @@ pub struct ObjectParts {
     /// Its dead master ([`Parts::dead_master`]).
     #[diff(gap = "the import does not read a saved dead master")]
     pub dead_master: Option<Master>,
+    /// Its gather point ([`Parts::gather_point`]).
+    #[diff(path = "building.gather_point")]
+    pub gather_point: Option<GatherPoint>,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -191,9 +198,15 @@ impl From<Unit> for Object {
 impl Parts {
     /// Object `id`'s parts filed in the tables (it enters the world).
     pub(in crate::world) fn file(&mut self, id: ObjectId, parts: ObjectParts) {
-        let ObjectParts { dead_master } = parts;
+        let ObjectParts {
+            dead_master,
+            gather_point,
+        } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
+        }
+        if let Some(g) = gather_point {
+            let _ = self.gather_point.insert(id, g);
         }
     }
 
@@ -201,6 +214,7 @@ impl Parts {
     pub(in crate::world) fn take(&mut self, id: ObjectId) -> ObjectParts {
         ObjectParts {
             dead_master: self.dead_master.remove(id),
+            gather_point: self.gather_point.remove(id),
         }
     }
 
@@ -209,20 +223,26 @@ impl Parts {
     pub fn of(&self, id: ObjectId) -> ObjectParts {
         ObjectParts {
             dead_master: self.dead_master.get(id).cloned(),
+            gather_point: self.gather_point.get(id).copied(),
         }
     }
 
     /// Every object id a table holds, each once per table that holds it.
     fn ids(&self) -> impl Iterator<Item = ObjectId> + '_ {
-        self.dead_master.iter().map(|(id, _)| id)
+        self.dead_master
+            .iter()
+            .map(|(id, _)| id)
+            .chain(self.gather_point.iter().map(|(id, _)| id))
     }
 }
 
 /// A part of an object: which table [`World::set_part`] writes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Part {
-    /// The dead master ([`Parts::dead_master`]).
-    DeadMaster(Master),
+    /// The dead master ([`Parts::dead_master`]), boxed: a master is about 700 bytes.
+    DeadMaster(Box<Master>),
+    /// The gather point ([`Parts::gather_point`]), none clearing it.
+    GatherPoint(Option<GatherPoint>),
 }
 
 impl World {
@@ -241,9 +261,32 @@ impl World {
         }
         match part {
             Part::DeadMaster(m) => {
-                let _ = self.parts.dead_master.insert(id, m);
+                let _ = self.parts.dead_master.insert(id, *m);
+            }
+            Part::GatherPoint(Some(g)) => {
+                let _ = self.parts.gather_point.insert(id, g);
+            }
+            Part::GatherPoint(None) => {
+                let _ = self.parts.gather_point.remove(id);
             }
         }
+        Ok(())
+    }
+
+    /// A loaded object's saved parts go into the tables (the import, after the world's lists
+    /// stand). The world must hold the object.
+    ///
+    /// # Errors
+    ///
+    /// An object the world does not hold.
+    pub fn load_parts(&mut self, id: ObjectId, parts: ObjectParts) -> Result<(), GenieError> {
+        if self.index.filed(id).is_none() && !self.index.scans() {
+            return Err(GenieError::unreachable(
+                "a loaded part of an object the world does not hold",
+            )
+            .with("object", id));
+        }
+        self.parts.file(id, parts);
         Ok(())
     }
 
@@ -347,10 +390,11 @@ mod tests {
         );
         let dead = Master::default();
         assert!(
-            t.set_part(object_id(6), Part::DeadMaster(dead.clone()))
+            t.set_part(object_id(6), Part::DeadMaster(Box::new(dead.clone())))
                 .is_err()
         );
-        t.set_part(id, Part::DeadMaster(dead.clone())).unwrap();
+        t.set_part(id, Part::DeadMaster(Box::new(dead.clone())))
+            .unwrap();
         t.check_parts().unwrap();
         let unit = t.players[0].objects.by_id(id).unwrap();
         let view = t.object_view(unit);
@@ -375,9 +419,61 @@ mod tests {
         assert!(t.check_parts().is_err());
     }
 
+    /// A loaded object's parts go into the tables only for an object the world holds; the
+    /// gather point's part is set and cleared in the object's life, and its removal from the
+    /// lists carries it.
+    #[test]
+    fn a_loaded_object_s_parts_go_into_the_tables() {
+        use crate::objects::ListIndex;
+        use crate::players::PlayerId;
+        let id = object_id(5);
+        let mut t = World::new(
+            crate::world::WorldTime::ZERO,
+            crate::world::FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![crate::world::Millis::ZERO],
+            vec![crate::world::player::Player {
+                objects: vec![Unit {
+                    id,
+                    ..Unit::default()
+                }]
+                .into(),
+                ..Default::default()
+            }],
+        );
+        let gather = gather_point(3.5);
+        let parts = ObjectParts {
+            gather_point: Some(gather),
+            ..ObjectParts::default()
+        };
+        assert!(t.load_parts(object_id(6), parts.clone()).is_err());
+        assert!(t.parts.gather_point.is_empty());
+        t.load_parts(id, parts).unwrap();
+        assert_eq!(t.parts.gather_point.get(id), Some(&gather));
+        t.check_parts().unwrap();
+        t.set_part(id, Part::GatherPoint(None)).unwrap();
+        assert!(t.parts.gather_point.is_empty());
+        t.set_part(id, Part::GatherPoint(Some(gather))).unwrap();
+        let gone = t
+            .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
+            .unwrap();
+        assert_eq!(gone.parts.gather_point, Some(gather));
+        assert!(t.parts.gather_point.is_empty());
+    }
+
+    /// A gather point at `x` on no target.
+    fn gather_point(x: f32) -> GatherPoint {
+        GatherPoint {
+            state: crate::commands::GatherPointState::POINT,
+            point: crate::map::Position::new(x, 1.0, 0.0),
+            target: None,
+            target_master: None,
+        }
+    }
+
     /// A whole object compares its row's fields and its parts' at the paths they had on the
-    /// object: the dead master is a known gap (left out of the saved scope), a row's field
-    /// keeps its own path.
+    /// object: the dead master is a known gap (left out of the saved scope), the gather point
+    /// compares at the building layer's path, a row's field keeps its own path.
     #[test]
     fn a_whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
@@ -388,13 +484,17 @@ mod tests {
         let mut b = a.clone();
         b.parts.dead_master = Some(Master::default());
         b.unit.life.hp = crate::objects::HitPoints::new(7.0);
+        b.parts.gather_point = Some(gather_point(2.0));
         let paths = |scope| {
             differences(&a, &b, scope)
                 .into_iter()
                 .map(|d| d.path)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(paths(Scope::Saved), ["life.hp"]);
-        assert_eq!(paths(Scope::SavedWithGaps), ["life.hp", "dead_master"]);
+        assert_eq!(paths(Scope::Saved), ["life.hp", "building.gather_point"]);
+        assert_eq!(
+            paths(Scope::SavedWithGaps),
+            ["life.hp", "dead_master", "building.gather_point"]
+        );
     }
 }

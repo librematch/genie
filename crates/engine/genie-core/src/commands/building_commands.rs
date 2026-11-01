@@ -21,6 +21,7 @@ use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::world::parts::Part;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{BLOCKS_RESEARCH, World};
@@ -78,7 +79,7 @@ impl World {
                 continue;
             }
             let unit = &self.players.live(player, i)?;
-            let old = unit.building.gather_point;
+            let old = self.parts.gather_point.get(unit.id).copied();
             let kept = old.is_some_and(|g| g.state == GatherPointState::KEPT);
             let z = old.map_or(0.0, |g| g.point.z());
             let gather = if own {
@@ -110,8 +111,9 @@ impl World {
                     target_master,
                 })
             };
+            let id = self.players.live(player, i)?.id;
+            self.set_part(id, Part::GatherPoint(gather))?;
             let unit = self.players.live_mut(player, i)?;
-            unit.building.gather_point = gather;
             // the unit AI's slot 0x210 (FUN_140c16790): its command queue empties
             if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.building_orders.clear();
@@ -150,7 +152,8 @@ impl World {
             } else {
                 None
             };
-            self.players.live_mut(player, i)?.building.gather_point = gather;
+            let id = self.players.live(player, i)?.id;
+            self.set_part(id, Part::GatherPoint(gather))?;
         }
         Ok(())
     }
@@ -219,7 +222,7 @@ impl World {
             let building = unit.master(&self.masters, p)?.kind == BUILDING;
             let mut queued = Vec::new();
             if building
-                && let Some(g) = unit.building.gather_point
+                && let Some(g) = self.parts.gather_point.get(unit.id).copied()
                 && ai.building_orders.is_empty()
                 && g.target != Some(unit.id)
             {
@@ -232,10 +235,11 @@ impl World {
                 queued.push(first);
             }
             queued.push(step(self, target, Point::new(x, y))?);
-            let unit = self.players.live_mut(p, i)?;
             if building {
-                unit.building.gather_point = None;
+                let id = self.players.live(p, i)?.id;
+                self.set_part(id, Part::GatherPoint(None))?;
             }
+            let unit = self.players.live_mut(p, i)?;
             if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.building_orders.extend(queued);
             }

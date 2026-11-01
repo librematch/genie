@@ -38,13 +38,15 @@ use self::player_parts::ai_settings;
 pub use self::player_parts::{ai_module, history};
 
 use crate::masters::{MasterTable, TerrainTable};
-use crate::{groups, market, spatial, unit, work_masters};
+use crate::{groups, market, object, spatial, work_masters};
 use genie_core::map::Position;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
+use genie_core::objects::unit::Unit;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::vision::VisionBits;
+use genie_core::world::parts::ObjectParts;
 use genie_core::world::{Player, World};
 use genie_save::{Header, PlayerSection};
 
@@ -126,6 +128,8 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         Ok(techs) => (techs, None),
         Err(e) => (Vec::new(), Some(e)),
     };
+    // each object's parts, for the world's tables once its lists stand
+    let mut parts: Vec<(ObjectId, ObjectParts)> = Vec::new();
     let players = header
         .players()
         .iter()
@@ -133,33 +137,29 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         .map(|(i, p)| {
             let civ = CivId::new(p.world_player().base.civ_id);
             let attributes = &p.world_player().base.attributes;
+            let mut rows = |saved: &mut dyn Iterator<Item = &genie_save::Object>| -> Vec<Unit> {
+                saved
+                    .map(|o| {
+                        let whole = object(
+                            o,
+                            p.objects(),
+                            &header.world.base_world.path,
+                            civ,
+                            masters,
+                            header.players().len(),
+                        );
+                        if whole.parts != ObjectParts::default() {
+                            parts.push((whole.unit.id, whole.parts));
+                        }
+                        whole.unit
+                    })
+                    .collect()
+            };
+            let live = rows(&mut p.live_objects());
+            let sleeping = rows(&mut p.sleeping_objects());
             Player {
-                objects: p
-                    .live_objects()
-                    .map(|o| {
-                        unit(
-                            o,
-                            p.objects(),
-                            &header.world.base_world.path,
-                            civ,
-                            masters,
-                            header.players().len(),
-                        )
-                    })
-                    .collect(),
-                sleeping: p
-                    .sleeping_objects()
-                    .map(|o| {
-                        unit(
-                            o,
-                            p.objects(),
-                            &header.world.base_world.path,
-                            civ,
-                            masters,
-                            header.players().len(),
-                        )
-                    })
-                    .collect(),
+                objects: live.into(),
+                sleeping: sleeping.into(),
                 computer: false,
                 kind: genie_core::players::PlayerType::from(p.player.type_),
                 attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
@@ -279,6 +279,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     if let Some(e) = tech_error {
         stop_all(&mut turns, &e);
     }
+    file_parts(&mut turns, parts);
     match header
         .players()
         .iter()
@@ -452,6 +453,17 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     // the spatial index's views of the loaded annexes, relations and task 0x99 masters
     turns.sync_world();
     turns
+}
+
+/// The saved objects' parts into the world's tables ([`World::load_parts`]); a part of an object
+/// the world does not hold stops every player.
+fn file_parts(turns: &mut World, parts: Vec<(ObjectId, ObjectParts)>) {
+    if let Err(e) = parts
+        .into_iter()
+        .try_for_each(|(id, part)| turns.load_parts(id, part))
+    {
+        stop_all(turns, &e);
+    }
 }
 
 /// Every player stops on `e`, which the slice does not model of the save.

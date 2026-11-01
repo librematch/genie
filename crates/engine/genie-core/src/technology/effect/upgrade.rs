@@ -219,7 +219,7 @@ impl World {
             && let Some(d) =
                 dead.filter(|d| crate::ownership::change::DEAD_COPY_TYPES.contains(&d.kind))
         {
-            self.set_part(id, crate::world::parts::Part::DeadMaster(d))?;
+            self.set_part(id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
         }
         Ok(())
     }

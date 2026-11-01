@@ -10,7 +10,7 @@ use genie_rec::de;
 use genie_save::Header;
 
 use crate::masters::MasterTable;
-use crate::saved_unit::unit;
+use crate::saved_unit::object;
 use crate::{Error, listed};
 
 /// A player's listed objects in genie's world, in its list's order, each with its parts from the
@@ -38,8 +38,8 @@ pub fn saved_objects(
     header_objects(&header, id, masters)
 }
 
-/// [`saved_objects`] of a read header. The import reads no part yet: the dead master, the only
-/// part moved, is its gap (MISSING.md).
+/// [`saved_objects`] of a read header, each object with the parts the import reads (the dead
+/// master is its gap, MISSING.md).
 pub(crate) fn header_objects(
     header: &Header,
     id: u32,
@@ -51,8 +51,7 @@ pub(crate) fn header_objects(
     let paths = &header.world.base_world.path;
     Ok(section
         .live_objects()
-        .map(|o| unit(o, section.objects(), paths, civ, masters, sections.len()))
-        .filter(listed)
-        .map(Object::from)
+        .map(|o| object(o, section.objects(), paths, civ, masters, sections.len()))
+        .filter(|o| listed(&o.unit))
         .collect())
 }

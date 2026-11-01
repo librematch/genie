@@ -4055,14 +4055,17 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
     );
     assert_eq!(v.top_action(), None);
     let gather = |t: &mut World| {
-        t.players[1].objects[ListIndex::new(0)]
-            .building
-            .gather_point = Some(GatherPoint {
-            state: GatherPointState::POINT,
-            target: Some(object_id(101)),
-            point: Position::new(16.0, 4.0, 0.0),
-            target_master: Some(TC),
-        });
+        let id = t.players[1].objects[ListIndex::new(0)].id;
+        t.set_part(
+            id,
+            crate::world::parts::Part::GatherPoint(Some(GatherPoint {
+                state: GatherPointState::POINT,
+                target: Some(object_id(101)),
+                point: Position::new(16.0, 4.0, 0.0),
+                target_master: Some(TC),
+            })),
+        )
+        .unwrap();
     };
     let (r, t) = let_out_beside_a_second_centre(gather, Point::new(NO_POINT, NO_POINT), None);
     assert_eq!(r, Ok(true));

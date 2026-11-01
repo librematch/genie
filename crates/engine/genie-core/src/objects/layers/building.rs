@@ -2,7 +2,6 @@
 //! order (`TribeBuildingObject`), then the two the save does not hold. Every object holds it for
 //! now, with the game's defaults below type 80 (T4 step 2).
 
-use crate::commands::GatherPoint;
 use crate::construction::build::Construction;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
@@ -13,7 +12,7 @@ use crate::world::WorldTime;
 use genie_diff::Diff;
 
 /// The building layer of an object: its construction, its garrison's clock, its relics, its
-/// gather point, its main building, its production queue, its gate, its livestock and pasture
+/// main building, its production queue, its gate, its livestock and pasture
 /// workers, the units that took it as their target, its rice flag, its stack unit and its frame.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Building {
@@ -24,8 +23,6 @@ pub struct Building {
     pub garrison_time: WorldTime,
     /// A building's `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`).
     pub relics: Relics,
-    /// A building's gather point, which its new units go to.
-    pub gather_point: Option<GatherPoint>,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
     pub annex_of: Option<crate::construction::MainBuildingId>,
     /// A main building's annexes (`+0xbc0`..`+0xbd8`, the save's linked objects).

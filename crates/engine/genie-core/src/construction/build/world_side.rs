@@ -245,7 +245,7 @@ impl crate::world::World {
                 .as_ref()
                 .map(|ai| ai.building_orders.clone())
                 .unwrap_or_default(),
-            old.building.gather_point,
+            self.parts.gather_point.get(building).copied(),
         );
         let old_class = old.master(&self.masters, p)?.class;
         let old_lock = old.building.gate.map(|g| g.locked);
@@ -303,14 +303,12 @@ impl crate::world::World {
             });
         }
         let now = self.world_time;
+        if let Some(g) = point.filter(|_| building_made) {
+            self.set_part(new, crate::world::parts::Part::GatherPoint(g))?;
+        }
         let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
-        if building_made {
-            if let Some(ai) = nu.combat.ai.as_mut().filter(|_| !orders.is_empty()) {
-                ai.building_orders.extend(orders);
-            }
-            if let Some(g) = point {
-                nu.building.gather_point = g;
-            }
+        if building_made && let Some(ai) = nu.combat.ai.as_mut().filter(|_| !orders.is_empty()) {
+            ai.building_orders.extend(orders);
         }
         // a gate's stack gate takes the old one's lock (its slot 0x670 with `+0xc7c`)
         if let Some(lock) = gate_lock {

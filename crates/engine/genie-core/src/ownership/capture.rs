@@ -198,7 +198,7 @@ impl Unit {
             c.w.world_time,
         )?;
         if changed && let Some(d) = dead {
-            c.w.set_part(self.id, crate::world::parts::Part::DeadMaster(d))?;
+            c.w.set_part(self.id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
         }
         Ok(changed)
     }

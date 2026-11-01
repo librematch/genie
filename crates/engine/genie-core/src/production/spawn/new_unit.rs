@@ -86,7 +86,7 @@ impl World {
             .as_ref()
             .map(|a| a.building_orders.clone())
             .unwrap_or_default();
-        let gather = building.building.gather_point;
+        let gather = self.parts.gather_point.get(building.id).copied();
         let position = building.position();
         let toward = match (gather, queue.first()) {
             (None, Some(first)) => Some(first.point.ground()),

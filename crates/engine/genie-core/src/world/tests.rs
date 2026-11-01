@@ -171,6 +171,7 @@ use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::checkpoint::TopAction;
 use crate::world::others::OthersRef;
+use crate::world::parts::Part;
 use crate::world::player::Player;
 use ids::FISH_TRAP;
 
@@ -9037,8 +9038,8 @@ fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
     let game = GameState {
         frame_seed: FrameSeed::of_data(77),
         players: vec![vec![
-            game_unit(object_id(7), Millis::new(900)),
-            game_unit(object_id(8), Millis::new(901)),
+            game_unit(object_id(7), Millis::new(900)).into(),
+            game_unit(object_id(8), Millis::new(901)).into(),
         ]],
         resources: vec![[1.0, 2.0, 3.0, 4.0]],
         ..GameState::default()
@@ -9066,9 +9067,9 @@ fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
     // a game object the slice never made is named, not added
     let made = GameState {
         players: vec![vec![
-            game_unit(object_id(7), Millis::new(900)),
-            game_unit(object_id(8), Millis::new(901)),
-            game_unit(object_id(10), Millis::new(5)),
+            game_unit(object_id(7), Millis::new(900)).into(),
+            game_unit(object_id(8), Millis::new(901)).into(),
+            game_unit(object_id(10), Millis::new(5)).into(),
         ]],
         ..GameState::default()
     };
@@ -9116,7 +9117,7 @@ fn the_forced_replay_s_removal_leaves_as_an_update_s_leave_does() {
         bits: VisionBits::NONE,
     });
     let game = GameState {
-        players: vec![vec![live(7)]],
+        players: vec![vec![live(7).into()]],
         ..GameState::default()
     };
     assert_eq!(t.force(&game), vec![]);
@@ -12343,12 +12344,6 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
                 snow: false,
                 sprite_override: false,
             }),
-            gather_point: Some(GatherPoint {
-                state: GatherPointState::POINT,
-                point: Position::new(12.0, 12.0, 0.0),
-                target: None,
-                target_master: None,
-            }),
             ..hands_unit(7, master_id(1378)).building
         },
         ..hands_unit(7, master_id(1378))
@@ -12384,6 +12379,16 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         ],
     );
     t.masters = vec![table.clone(), table.clone(), table];
+    t.set_part(
+        object_id(7),
+        Part::GatherPoint(Some(GatherPoint {
+            state: GatherPointState::POINT,
+            point: Position::new(12.0, 12.0, 0.0),
+            target: None,
+            target_master: None,
+        })),
+    )
+    .unwrap();
     t.spatial = hands_world(
         7,
         PlayerId::new(0),
@@ -12472,7 +12477,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         [false, true]
     );
     let shop = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!(shop.building.gather_point, None);
+    assert_eq!(t.parts.gather_point.get(shop.id), None);
     assert_eq!(
         shop.own_master.as_deref().map(|m| m.id),
         Some(master_id(1378))
@@ -13520,9 +13525,7 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
     );
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
+        gather_of(&t, 0, 0),
         Some(GatherPoint {
             state: GatherPointState::POINT,
             point: Position::new(107.2451, 46.075_863, 0.0),
@@ -13531,20 +13534,18 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
         })
     );
     t.tick_with(Millis::new(25), &[set(None, Point::new(-1.0, -1.0), false)]);
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
-        None
-    );
+    assert_eq!(gather_of(&t, 0, 0), None);
     t.tick_with(Millis::new(25), &[set(None, Point::new(-1.0, -1.0), true)]);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point
-            .map(|g| g.target),
+        gather_of(&t, 0, 0).map(|g| g.target),
         Some(Some(object_id(9149)))
     );
+}
+
+/// The gather point of player `p`'s live object `i` ([`crate::world::parts::Parts::gather_point`]).
+fn gather_of(t: &World, p: usize, i: usize) -> Option<GatherPoint> {
+    let id = t.players[p].objects[ListIndex::new(i)].id;
+    t.parts.gather_point.get(id).copied()
 }
 
 /// A town centre of master 109 with the given position and a gather state, for SET GATHER STATE.
@@ -13584,27 +13585,12 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
     };
     t.tick_with(Millis::new(25), &[set(Some(GatherPointState::POINT))]);
     assert_eq!(t.players[0].unsupported, None);
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
-        own(GatherPointState::POINT)
-    );
+    assert_eq!(gather_of(&t, 0, 0), own(GatherPointState::POINT));
     // the state byte is the state, 0xff included
     t.tick_with(Millis::new(25), &[set(Some(GatherPointState::KEPT))]);
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
-        own(GatherPointState::KEPT)
-    );
+    assert_eq!(gather_of(&t, 0, 0), own(GatherPointState::KEPT));
     t.tick_with(Millis::new(25), &[set(None)]);
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
-        None
-    );
+    assert_eq!(gather_of(&t, 0, 0), None);
 }
 
 /// SET GATHER STATE's test is SET GATHER POINT's: a building that neither garrisons nor trains
@@ -13614,13 +13600,15 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
 fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_object() {
     let mut house = gathering_centre(10909, Position::new(20.0, 30.0, 0.0));
     house.life.master_id = ids::HOUSE;
-    house.building.gather_point = Some(GatherPoint {
+    let gather = Some(GatherPoint {
         state: GatherPointState::POINT,
         point: Position::new(5.0, 6.0, 0.0),
         target: None,
         target_master: None,
     });
+    let at = house.id;
     let mut t = one_player(vec![house], [200.0; 4]);
+    t.set_part(at, Part::GatherPoint(gather)).unwrap();
     t.masters = vec![Masters::new([Master {
         id: ids::HOUSE,
         kind: BUILDING,
@@ -13633,24 +13621,12 @@ fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_obje
             state,
         })
     };
-    let held = t.players[0].objects[ListIndex::new(0)]
-        .building
-        .gather_point;
+    let held = gather_of(&t, 0, 0);
     t.tick_with(Millis::new(25), &[set(Some(GatherPointState::KEPT))]);
     assert_eq!(t.players[0].unsupported, None);
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
-        held
-    );
+    assert_eq!(gather_of(&t, 0, 0), held);
     t.tick_with(Millis::new(25), &[set(None)]);
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
-        None
-    );
+    assert_eq!(gather_of(&t, 0, 0), None);
 }
 
 /// SET GATHER POINT on a gather point of state 0xff (`FUN_140e7e9a0`, `FUN_1411c7ff0`): its x
@@ -13658,14 +13634,16 @@ fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_obje
 /// with the target kept.
 #[test]
 fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
-    let mut tc = gathering_centre(9149, Position::new(104.0, 47.0, 0.5));
-    tc.building.gather_point = Some(GatherPoint {
+    let tc = gathering_centre(9149, Position::new(104.0, 47.0, 0.5));
+    let gather = Some(GatherPoint {
         state: GatherPointState::KEPT,
         point: Position::new(104.0, 47.0, 0.5),
         target: Some(object_id(9149)),
         target_master: Some(ids::TOWN_CENTRE),
     });
+    let at = tc.id;
     let mut t = one_player(vec![tc], [200.0; 4]);
+    t.set_part(at, Part::GatherPoint(gather)).unwrap();
     t.masters = vec![Masters::new([Master {
         id: ids::TOWN_CENTRE,
         garrison: GarrisonCapacity::of_data(15),
@@ -13684,9 +13662,7 @@ fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
     t.tick_with(Millis::new(25), &[set(Some(9520), false)]);
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
+        gather_of(&t, 0, 0),
         Some(GatherPoint {
             state: GatherPointState::KEPT,
             point: Position::new(107.25, 46.5, 0.5),
@@ -13694,17 +13670,10 @@ fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
             target_master: Some(ids::TOWN_CENTRE),
         })
     );
-    t.players[0].objects[ListIndex::new(0)]
-        .building
-        .gather_point
-        .as_mut()
-        .unwrap()
-        .target = Some(object_id(9520));
+    t.parts.gather_point.get_mut(at).unwrap().target = Some(object_id(9520));
     t.tick_with(Millis::new(25), &[set(None, true)]);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
+        gather_of(&t, 0, 0),
         Some(GatherPoint {
             state: GatherPointState::POINT,
             point: Position::new(104.0, 47.0, 0.5),
@@ -13754,9 +13723,7 @@ fn set_gather_point_takes_a_building_that_trains_without_garrisoning() {
     t.tick_with(Millis::new(25), &[set]);
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
-            .gather_point,
+        gather_of(&t, 0, 0),
         Some(GatherPoint {
             state: GatherPointState::POINT,
             point: Position::new(20.5, 30.5, 0.0),
@@ -13764,12 +13731,7 @@ fn set_gather_point_takes_a_building_that_trains_without_garrisoning() {
             target_master: None,
         })
     );
-    assert_eq!(
-        t.players[0].objects[ListIndex::new(1)]
-            .building
-            .gather_point,
-        None
-    );
+    assert_eq!(gather_of(&t, 0, 1), None);
 }
 
 /// `BUILDING_COMMAND_QUEUE` on a town centre with a gather point: the gather point goes
@@ -13787,13 +13749,15 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
         last_target: None,
         ..UnitAi::default()
     });
-    tc.building.gather_point = Some(GatherPoint {
+    let gather = Some(GatherPoint {
         state: GatherPointState::POINT,
         point: Position::new(30.5, 40.5, 0.0),
         target: None,
         target_master: None,
     });
+    let at = tc.id;
     let mut t = one_player(vec![tc], [200.0; 4]);
+    t.set_part(at, Part::GatherPoint(gather)).unwrap();
     t.masters = vec![Masters::new([Master {
         id: ids::TOWN_CENTRE,
         kind: BUILDING,
@@ -13812,7 +13776,7 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
     t.tick_with(Millis::new(25), &[step(Point::new(70.0, 80.0))]);
     assert_eq!(t.players[0].unsupported, None);
     let tc = &t.players[0].objects[ListIndex::new(0)];
-    assert_eq!(tc.building.gather_point, None);
+    assert_eq!(t.parts.gather_point.get(tc.id), None);
     let steps: Vec<_> = tc
         .combat
         .ai

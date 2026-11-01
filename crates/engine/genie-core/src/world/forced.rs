@@ -22,7 +22,7 @@ pub struct GameState {
     /// `world+0x7d0`, the frame seed.
     pub frame_seed: crate::world::FrameSeed,
     /// Every player's live objects.
-    pub players: Vec<Vec<Unit>>,
+    pub players: Vec<Vec<crate::world::parts::Object>>,
     /// Every player's food, wood, stone and gold.
     pub resources: Vec<[f32; 4]>,
     /// Every player's attributes as saved (the first four are the resources), which the oracle
@@ -120,7 +120,7 @@ impl World {
             if let Err(e) = self.force_objects(p, theirs, (game, stopped), &mut notes) {
                 notes.push((p, None, e));
             }
-            for g in theirs {
+            for g in theirs.iter().map(|g| &g.unit) {
                 if known.binary_search(&g.id).is_err() {
                     notes.push((
                         p,
@@ -204,7 +204,7 @@ impl World {
     fn force_objects(
         &mut self,
         p: PlayerId,
-        theirs: &[Unit],
+        theirs: &[crate::world::parts::Object],
         (game, stopped): (&GameState, bool),
         notes: &mut Vec<(PlayerId, Option<ObjectId>, GenieError)>,
     ) -> Result<(), GenieError> {
@@ -219,8 +219,11 @@ impl World {
                 i = i.next();
                 continue;
             }
-            let Some(g) = theirs.iter().find(|g| g.id == id) else {
-                let elsewhere = game.players.iter().any(|q| q.iter().any(|g| g.id == id));
+            let Some(g) = theirs.iter().find(|g| g.unit.id == id) else {
+                let elsewhere = game
+                    .players
+                    .iter()
+                    .any(|q| q.iter().any(|g| g.unit.id == id));
                 if elsewhere {
                     notes.push((
                         p,
@@ -236,7 +239,7 @@ impl World {
                 }
                 continue;
             };
-            if g.life.master_id != unit.life.master_id {
+            if g.unit.life.master_id != unit.life.master_id {
                 notes.push((
                     p,
                     Some(id),
@@ -259,10 +262,20 @@ impl World {
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    fn take_game_object(&mut self, p: PlayerId, i: ListIndex, g: &Unit) -> Result<(), GenieError> {
+    fn take_game_object(
+        &mut self,
+        p: PlayerId,
+        i: ListIndex,
+        g: &crate::world::parts::Object,
+    ) -> Result<(), GenieError> {
+        // the parts the import reads are the game's (the dead master, its gap, stays genie's)
+        let id = self.players.live(p, i)?.id;
+        self.set_part(
+            id,
+            crate::world::parts::Part::GatherPoint(g.parts.gather_point),
+        )?;
         let unit = &self.players.live(p, i)?;
-        let id = unit.id;
-        let mut forced = g.clone();
+        let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
         let before = unit.life.state;
         if forced.position() != unit.position() {
@@ -452,7 +465,8 @@ mod tests {
     }
 
     /// The forced objects: a frozen forager takes the game's (placed where the game has it,
-    /// running again) but keeps its hunted record, which no save holds; a frozen object the game
+    /// running again, its gather point the game's) but keeps its hunted record, which no save
+    /// holds; a frozen object the game
     /// no longer holds leaves; one that changed hands or masters stays, noted; an object that
     /// runs, and a dead one the game does not resync, are the slice's; an object the game made
     /// and the slice did not is noted.
@@ -468,11 +482,19 @@ mod tests {
         theirs[ListIndex::new(0)].stopped = false;
         theirs[ListIndex::new(0)].combat.ai.as_mut().unwrap().hunted = None;
         let mut game = GameState {
-            players: vec![vec![], theirs.as_slice().to_vec()],
+            players: vec![vec![], theirs.iter().cloned().map(Into::into).collect()],
             ..GameState::default()
         };
+        let gather = crate::commands::GatherPoint {
+            state: crate::commands::GatherPointState::POINT,
+            point: Position::new(30.0, 80.0, 0.0),
+            target: None,
+            target_master: None,
+        };
+        game.players[1][0].parts.gather_point = Some(gather);
         let notes = t.force(&game);
         assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(t.parts.gather_point.get(object_id(9175)), Some(&gather));
         let forager = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
             (forager.position(), forager.stopped),
@@ -484,10 +506,13 @@ mod tests {
             Some(Position::new(29.5, 88.5, 0.0))
         );
         // the game made 800, then the forager changed hands, then masters, then left
-        game.players[1].push(Unit {
-            id: object_id(800),
-            ..Unit::default()
-        });
+        game.players[1].push(
+            Unit {
+                id: object_id(800),
+                ..Unit::default()
+            }
+            .into(),
+        );
         let reasons = |t: &mut World, game: &GameState| -> Vec<(Option<ObjectId>, &'static str)> {
             t.players[1].objects[ListIndex::new(0)].stopped = true;
             t.force(game)
@@ -511,7 +536,7 @@ mod tests {
             [(Some(object_id(9175)), "a forced object changed hands")]
         );
         let mut changed = moved.clone();
-        let forager = changed.players[0].pop().unwrap();
+        let forager = changed.players[0].pop().unwrap().unit;
         changed.players[1].insert(
             0,
             Unit {
@@ -520,7 +545,8 @@ mod tests {
                     ..forager.life
                 },
                 ..forager
-            },
+            }
+            .into(),
         );
         assert_eq!(
             reasons(&mut t, &changed),

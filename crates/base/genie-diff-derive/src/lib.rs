@@ -2,7 +2,9 @@
 //! field is that field, a tuple struct of more numbers them, an enum differs by its variant and
 //! then compares the same variant's fields the same way. A field takes `#[diff(unsaved)]` (only
 //! a comparison of every field reads it), `#[diff(gap = "why")]` (a known difference, which the
-//! save's comparison leaves out) and `#[diff(eq)]` (compared by its equality, as one value).
+//! save's comparison leaves out), `#[diff(eq)]` (compared by its equality, as one value) and
+//! `#[diff(path = "a.b")]` (its step in the path, for a field that moved but keeps the path it
+//! had).
 
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as Tokens};
@@ -47,11 +49,13 @@ fn expand(input: &DeriveInput) -> syn::Result<Tokens> {
 }
 
 /// How a field is compared: its attributes.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct How {
     unsaved: bool,
     gap: bool,
     eq: bool,
+    /// Its step in the path instead of its name.
+    path: Option<String>,
 }
 
 fn how(field: &syn::Field) -> syn::Result<How> {
@@ -72,8 +76,24 @@ fn how(field: &syn::Field) -> syn::Result<How> {
                 }
                 how.gap = true;
                 Ok(())
+            } else if meta.path.is_ident("path") {
+                let path: syn::LitStr = meta.value()?.parse()?;
+                let steps = path.value();
+                let named = |step: &str| {
+                    step.chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphabetic() || c == '_')
+                        && step.chars().all(|c| c.is_alphanumeric() || c == '_')
+                };
+                if !steps.split('.').all(named) {
+                    return Err(
+                        meta.error("a path is field names joined by dots: `path = \"a.b\"`")
+                    );
+                }
+                how.path = Some(steps);
+                Ok(())
             } else {
-                Err(meta.error("expected `unsaved`, `gap = \"why\"` or `eq`"))
+                Err(meta.error("expected `unsaved`, `gap = \"why\"`, `eq` or `path = \"a.b\"`"))
             }
         })?;
     }
@@ -82,7 +102,8 @@ fn how(field: &syn::Field) -> syn::Result<How> {
 
 /// One field's comparison: `left` and `right` are references to its two values, `name` its step
 /// in the path (None: the field is its value's, as a newtype's).
-fn compare(how: How, name: Option<&str>, left: &Tokens, right: &Tokens) -> Tokens {
+fn compare(how: &How, name: Option<&str>, left: &Tokens, right: &Tokens) -> Tokens {
+    let name = how.path.as_deref().or(name);
     let call = match (name, how.eq) {
         (Some(n), false) => quote! { d.field(#n, #left, #right); },
         (Some(n), true) => quote! { d.equal_field(#n, #left, #right); },
@@ -121,7 +142,7 @@ fn struct_body(fields: &Fields) -> syn::Result<Tokens> {
             |ident| quote!(#ident),
         );
         let (left, right) = (quote!(&self.#member), quote!(&other.#member));
-        out.push(compare(how(field)?, name.as_deref(), &left, &right));
+        out.push(compare(&how(field)?, name.as_deref(), &left, &right));
     }
     if out.is_empty() {
         out.push(quote! { let _ = (other, d); });
@@ -180,7 +201,7 @@ fn enum_body(variants: &[&syn::Variant]) -> syn::Result<Tokens> {
             .zip(left.iter().zip(&right))
         {
             body.push(compare(
-                how(field)?,
+                &how(field)?,
                 name.as_deref(),
                 &quote!(#l),
                 &quote!(#r),

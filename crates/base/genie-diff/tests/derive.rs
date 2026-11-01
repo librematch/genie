@@ -192,3 +192,37 @@ fn a_generic_type_compares_its_parameter() {
     let b = Held { value: Id(2) };
     assert_eq!(found(&a, &b, Scope::Saved), [row("value", "1", "2")]);
 }
+
+/// An object's parts that moved off its row, each at the place it had.
+#[derive(Clone, Debug, Default, PartialEq, Diff)]
+struct Parts {
+    #[diff(path = "building.gather_point")]
+    gather_point: Option<u8>,
+    #[diff(path = "combat.ai", gap = "a test's gap")]
+    ai: u8,
+    #[diff(path = "building.queue", eq)]
+    queue: Vec<u8>,
+}
+
+/// A field with a path takes that place in the path, whatever else it is marked.
+#[test]
+fn a_field_with_a_path_takes_that_place() {
+    let other = Parts {
+        gather_point: Some(2),
+        ai: 1,
+        queue: vec![3],
+    };
+    let saved = [
+        row("building.gather_point", "None", "Some(2)"),
+        row("building.queue", "[]", "[3]"),
+    ];
+    assert_eq!(found(&Parts::default(), &other, Scope::Saved), saved);
+    assert_eq!(
+        found(&Parts::default(), &other, Scope::SavedWithGaps),
+        [
+            saved[0].clone(),
+            row("combat.ai", "0", "1"),
+            saved[1].clone()
+        ]
+    );
+}

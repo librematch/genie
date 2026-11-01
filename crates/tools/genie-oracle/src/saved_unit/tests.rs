@@ -1,6 +1,6 @@
-use crate::fixtures::{action_list, combat_mut, combat_object};
+use crate::fixtures::{action_list, building_mut, building_object, combat_mut, combat_object};
 use crate::masters::{DefaultAction, MasterTable};
-use crate::saved_unit::{annexes, unit};
+use crate::saved_unit::{annexes, object, unit};
 use crate::test_ids::object_id;
 use genie_core::combat::missile::ShooterId;
 use genie_core::objects::ObjectId;
@@ -27,6 +27,39 @@ fn an_object_without_its_static_part_is_unmodelled() {
     );
     assert_eq!(u.id, ObjectId::UNSAVED);
     assert!(u.actions.unmodelled_action.is_some());
+}
+
+/// A saved building's gather point is its object's part, not its row's; a state the import
+/// cannot read leaves the part out and is the row's unmodelled part. The dead master is the
+/// import's gap.
+#[test]
+fn a_saved_gather_point_is_its_object_s_part() {
+    use genie_core::commands::GatherPointState;
+    let whole = |state: i32| {
+        let mut barracks = building_object(11, 12);
+        let b = building_mut(&mut barracks);
+        b.gather_point_exists = state;
+        b.gather_point_x = 3.5;
+        b.gather_point_target = -1;
+        object(
+            &barracks,
+            &PlayerObjects::default(),
+            &[],
+            CivId::GAIA,
+            None,
+            PLAYERS,
+        )
+    };
+    let o = whole(1);
+    let g = o.parts.gather_point.unwrap();
+    assert_eq!(
+        (g.state, g.point.x(), g.target),
+        (GatherPointState::POINT, 3.5, None)
+    );
+    assert!(o.parts.dead_master.is_none());
+    let o = whole(0x100);
+    assert!(o.parts.gather_point.is_none());
+    assert!(o.unit.actions.unmodelled_action.is_some());
 }
 
 /// A save from the start: livestock's default task is the Artifact, which exists from the

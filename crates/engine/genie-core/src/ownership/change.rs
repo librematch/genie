@@ -53,7 +53,7 @@ impl World {
             return Ok(());
         }
         if let Some(d) = dead {
-            self.set_part(id, crate::world::parts::Part::DeadMaster(d))?;
+            self.set_part(id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
         }
         let unit = self.swap_remove_live(q, j)?;
         let handed = self.hand_over_attributes(q, PlayerId::GAIA, &unit.unit);
@@ -163,8 +163,8 @@ impl World {
         if state < ObjectState::Dying {
             self.record_again(id, &master);
         }
-        if let Some((_, u)) = self.object_mut(id) {
-            u.building.gather_point = None;
+        if self.object(id).is_some() {
+            self.set_part(id, crate::world::parts::Part::GatherPoint(None))?;
         }
         Ok(())
     }
@@ -309,7 +309,7 @@ impl World {
         let idx = self.put_back_own(old, unit)?;
         let changed = changed?;
         if changed && let Some(d) = dead {
-            self.set_part(id, crate::world::parts::Part::DeadMaster(d))?;
+            self.set_part(id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
         }
         Ok(if changed {
             let unit = self.swap_remove_live(old, idx)?;

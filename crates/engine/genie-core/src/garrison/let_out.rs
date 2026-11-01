@@ -69,7 +69,7 @@ impl World {
         let b = self.players.live(player, building)?;
         let bid = b.id;
         let bm = b.master(&self.masters, player)?.clone();
-        let gather = b.building.gather_point;
+        let gather = self.parts.gather_point.get(bid).copied();
         // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
         // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
         // point that is not on the building, else none

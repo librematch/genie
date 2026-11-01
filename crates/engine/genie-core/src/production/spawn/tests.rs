@@ -675,12 +675,15 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
             current_target: None,
             ..UnitAi::default()
         });
-        p.objects[ListIndex::new(2)].building.gather_point = Some(GatherPoint {
+        let at = p.objects[ListIndex::new(2)].id;
+        let gather = Some(GatherPoint {
             state,
             point: Position::new(40.0, 80.0, 0.0),
             target: None,
             target_master: None,
         });
+        t.set_part(at, crate::world::parts::Part::GatherPoint(gather))
+            .unwrap();
         t.spawn(
             PlayerId::new(1),
             ListIndex::new(2),

@@ -4,8 +4,9 @@
 use crate::masters::MasterTable;
 use crate::{
     Dumps, Error, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump,
-    groups, loaded_slice, played_frames, primed, recycle_pools_from_dump, run, run_from_save,
-    save_header, tech_state, tile_lists_from_dump, tile_order_differences, turns_from_save, unit,
+    groups, loaded_slice, object, played_frames, primed, recycle_pools_from_dump, run,
+    run_from_save, save_header, tech_state, tile_lists_from_dump, tile_order_differences,
+    turns_from_save,
 };
 use genie_core::GenieError;
 use genie_core::map::Distance;
@@ -542,7 +543,7 @@ pub(super) fn game_state(
         game.players.push(
             p.live_objects()
                 .map(|o| {
-                    unit(
+                    object(
                         o,
                         p.objects(),
                         &world.path,
