@@ -22,6 +22,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MISSILE;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
 /// `FUN_141082e80`: the damage ([`armor_damage`]) beyond what a blast has done: an attacker of
@@ -218,7 +219,7 @@ pub(super) fn blast_one(
     (b, weapons): (&Blast, &[crate::objects::masters::ClassAmount]),
 ) -> Result<(), GenieError> {
     let a = &b.a;
-    let t = &*targets[i];
+    let t = &**targets.checked(i)?;
     if !b.on_tiles(t) {
         return Ok(());
     }
@@ -237,11 +238,11 @@ pub(super) fn blast_one(
     }
     let is_main = Some(t.id) == b.main;
     let ledger = blast_ledger(targets, i)?;
-    let (share, defense, blast_taken) = ledger_values(targets, i, ledger, a);
+    let (share, defense, blast_taken) = ledger_values(targets, i, ledger, a)?;
     if !(BlastDefense::ALWAYS_REACHED <= defense || a.blast_level.reaches(defense)) {
         return Ok(());
     }
-    let t = &mut *targets[i];
+    let t = &mut **targets.checked_mut(i)?;
     if RAMS.contains(&a.master_id) && t.kind != BUILDING && !is_main {
         return Ok(());
     }
@@ -278,7 +279,7 @@ pub(super) fn blast_one(
 /// place among `targets` for an annex, its own for another building; None for an object that
 /// is not a building.
 pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> Result<Option<usize>, GenieError> {
-    let t = &*targets[i];
+    let t = &**targets.checked(i)?;
     if t.kind != BUILDING {
         return Ok(None);
     }
@@ -301,28 +302,21 @@ pub(super) fn ledger_values(
     i: usize,
     ledger: Option<usize>,
     a: &Attacker,
-) -> (f32, BlastDefense, HitPoints) {
+) -> Result<(f32, BlastDefense, HitPoints), GenieError> {
     let taken = |v: &Victim| {
         v.building
             .as_ref()
             .map_or(HitPoints::ZERO, |b| b.blast_taken)
     };
-    match ledger {
+    let t = &**targets.checked(i)?;
+    Ok(match ledger {
         Some(k) if k != i => {
-            let m = &*targets[k];
+            let m = &**targets.checked(k)?;
             (m.source.area_damage.get(), m.blast_defense, taken(m))
         }
-        Some(_) => (
-            a.area_damage.get(),
-            targets[i].blast_defense,
-            taken(&*targets[i]),
-        ),
-        None => (
-            a.area_damage.get(),
-            targets[i].blast_defense,
-            HitPoints::ZERO,
-        ),
-    }
+        Some(_) => (a.area_damage.get(), t.blast_defense, taken(t)),
+        None => (a.area_damage.get(), t.blast_defense, HitPoints::ZERO),
+    })
 }
 
 /// The square distance from the blast's `center` to the object's box (the gap past each
@@ -455,8 +449,8 @@ pub(super) fn blast_hit(
     (weapons, factor): (&[crate::objects::masters::ClassAmount], f32),
     (ledger, blast_taken): (Option<usize>, HitPoints),
 ) -> Result<(), GenieError> {
-    let before = targets[i].hp;
-    let mut t = std::mem::replace(&mut *targets[i], Victim::placeholder());
+    let before = targets.checked(i)?.hp;
+    let mut t = std::mem::replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
     let hit = take(&mut t, attacker, targets, weapons, factor, blast_taken);
     if hit.is_ok() {
         if !attacker.source.charge_hit {
@@ -465,13 +459,13 @@ pub(super) fn blast_hit(
         let lost = before - t.hp;
         let ledger = match ledger {
             Some(k) if k == i => t.building.as_mut(),
-            Some(k) => targets[k].building.as_mut(),
+            Some(k) => targets.checked_mut(k)?.building.as_mut(),
             None => None,
         };
         if let Some(b) = ledger {
             b.blast_taken += lost;
         }
     }
-    *targets[i] = t;
+    **targets.checked_mut(i)? = t;
     hit
 }

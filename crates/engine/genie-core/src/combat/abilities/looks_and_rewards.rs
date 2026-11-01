@@ -1,5 +1,6 @@
 //! The terrain look tasks (action type 159) and the removal reward tasks (161).
 
+use crate::GenieError;
 use crate::combat::abilities::{Look, ONE, Reward};
 use crate::map::TerrainFlags;
 use crate::objects::ListIndex;
@@ -9,6 +10,7 @@ use crate::objects::masters::Task;
 use crate::objects::masters::TaskTerrain;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::slots::PlayerSlots;
 
 /// A terrain look task's terrain mask (`0x141207501`, a `std::bitset<8>`): a terrain below 0
 /// is the mask of its negation's low byte, 1 to 8 sets the bit of that less 1, above 8 none.
@@ -107,11 +109,19 @@ impl World {
     /// is the one under where the object last moved to (slot 0x520: `+0x824`, `+0x82c`,
     /// truncated; a building's place); without the map's terrain no tile matches. False when
     /// the task's terrain mask throws ([`terrain_mask`]): the routine ends.
-    pub(super) fn terrain_look(&mut self, (p, i): (usize, ListIndex), task: &Task) -> bool {
+    ///
+    /// # Errors
+    ///
+    /// An object `(p, i)` the player's list has not got.
+    pub(super) fn terrain_look(
+        &mut self,
+        (p, i): (PlayerId, ListIndex),
+        task: &Task,
+    ) -> Result<bool, GenieError> {
         let Some(mask) = terrain_mask(task.terrain) else {
-            return false;
+            return Ok(false);
         };
-        let unit = &self.players[p].objects[i];
+        let unit = self.players.live(p, i)?;
         let at = unit
             .body
             .mover()
@@ -133,7 +143,7 @@ impl World {
                 .is_some_and(|id| graphics.contains_key(id))
         };
         let look = look(task, mask, flags, exists);
-        let unit = &mut self.players[p].objects[i];
+        let unit = self.players.live_mut(p, i)?;
         let (factor, rate) = if look.is_some() {
             (task.work_val1.get(), task.work_val2.get())
         } else {
@@ -144,6 +154,6 @@ impl World {
         }
         unit.abilities.attack_rate = rate;
         unit.abilities.look = look;
-        true
+        Ok(true)
     }
 }

@@ -127,16 +127,19 @@ impl Origin {
     /// The save's 28 bytes: seven 32-bit words.
     #[must_use]
     pub fn from_bytes(b: &[u8; 28]) -> Self {
-        let w = |i: usize| u32::from_le_bytes([b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]]);
-        let f = |i: usize| f32::from_bits(w(i));
+        let mut words = [0u32; 7];
+        for (w, bytes) in words.iter_mut().zip(b.as_chunks::<4>().0) {
+            *w = u32::from_le_bytes(*bytes);
+        }
+        let [x, y, z, rx, ry, master, owner] = words;
         Self {
-            position: Position::new(f(0), f(1), f(2)),
-            radius: Footprint::new(f(3), f(4)),
+            position: Position::new(f32::from_bits(x), f32::from_bits(y), f32::from_bits(z)),
+            radius: Footprint::new(f32::from_bits(rx), f32::from_bits(ry)),
             // −1 (all 32 bits) for none; a master's id is a short, a player's a byte
-            master: i16::try_from(w(5).cast_signed())
+            master: i16::try_from(master.cast_signed())
                 .ok()
                 .and_then(MasterId::of_data),
-            owner: u8::try_from(w(6)).ok().map(PlayerId::from),
+            owner: u8::try_from(owner).ok().map(PlayerId::from),
         }
     }
 }

@@ -1736,15 +1736,15 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
         ..Attacker::default()
     };
     assert_eq!(
-        ledger_values(&all, 1, Some(0), &a),
+        ledger_values(&all, 1, Some(0), &a).unwrap(),
         (0.25, BlastDefense::new(3), HitPoints::new(7.0))
     );
     assert_eq!(
-        ledger_values(&all, 0, Some(0), &a),
+        ledger_values(&all, 0, Some(0), &a).unwrap(),
         (0.5, BlastDefense::new(3), HitPoints::new(7.0))
     );
     assert_eq!(
-        ledger_values(&all, 2, None, &a),
+        ledger_values(&all, 2, None, &a).unwrap(),
         (0.5, BlastDefense::new(0), HitPoints::ZERO)
     );
     let mut orphan = Victim {

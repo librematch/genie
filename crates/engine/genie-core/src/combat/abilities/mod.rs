@@ -249,10 +249,10 @@ impl World {
         }
         for task in &tasks {
             match task.action_type {
-                GENERATE => self.generate((p.index(), i), owner, own, task)?,
-                MOVEMENT_DAMAGE => self.movement_damage((p.index(), i), owner, own, task)?,
+                GENERATE => self.generate((p, i), owner, own, task)?,
+                MOVEMENT_DAMAGE => self.movement_damage((p, i), owner, own, task)?,
                 // the terrain mask's throw ends the game
-                TERRAIN_LOOK if !self.terrain_look((p.index(), i), task) => return Ok(rewards),
+                TERRAIN_LOOK if !self.terrain_look((p, i), task)? => return Ok(rewards),
                 _ => {}
             }
         }

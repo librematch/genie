@@ -7,6 +7,7 @@ use crate::combat::damage::{
     ONE, RETALIATION_RANGE, RETALIATION_SCALE, Razed, SPECIAL, Victim, charge_hit, damage,
     effective, elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
+use crate::world::slots::CheckedIndex;
 
 /// One kill or razing, as the counts add it to an attribute.
 const ONE_COUNT: Amount = Amount::new(ONE);
@@ -139,21 +140,7 @@ pub(super) fn take_building(
     let before = t.hp;
     let main = t.building.as_ref().and_then(|b| b.main);
     if forward && let Some(main) = main {
-        let k = others
-            .iter()
-            .position(|v| v.id == main.id())
-            .ok_or(crate::construction::build::NOT_HELD)?;
-        let mut m = std::mem::replace(&mut *others[k], Victim::placeholder());
-        let struck = take_building(&mut m, src, others, weapons, factor, false, blast_taken);
-        let annexed = m
-            .building
-            .as_ref()
-            .is_some_and(|b| b.annexes.contains(&t.id));
-        if matches!(struck, Ok(true)) && annexed {
-            t.hp = m.hp;
-        }
-        *others[k] = m;
-        return struck.map(|_| false);
+        return forward_to_main(t, src, others, (weapons, factor), blast_taken, main);
     }
     if HitPoints::ZERO >= t.hp {
         return Ok(false);
@@ -211,6 +198,35 @@ pub(super) fn take_building(
         attack_effects(&src.source, t)?;
     }
     Ok(true)
+}
+
+/// [`take_building`]'s forward of an annex `t`'s hit to its main building `main` among
+/// `others` (out of the slice while it takes the hit, not forwarded again): the annex takes the
+/// main building's hit points when the hit got past its test and the main building lists it.
+/// Answers false.
+fn forward_to_main(
+    t: &mut Victim,
+    src: &mut Victim,
+    others: &mut [&mut Victim],
+    (weapons, factor): (&[crate::objects::masters::ClassAmount], f32),
+    blast_taken: HitPoints,
+    main: crate::construction::MainBuildingId,
+) -> Result<bool, GenieError> {
+    let k = others
+        .iter()
+        .position(|v| v.id == main.id())
+        .ok_or(crate::construction::build::NOT_HELD)?;
+    let mut m = std::mem::replace(&mut **others.checked_mut(k)?, Victim::placeholder());
+    let struck = take_building(&mut m, src, others, weapons, factor, false, blast_taken);
+    let annexed = m
+        .building
+        .as_ref()
+        .is_some_and(|b| b.annexes.contains(&t.id));
+    if matches!(struck, Ok(true)) && annexed {
+        t.hp = m.hp;
+    }
+    **others.checked_mut(k)? = m;
+    struck.map(|_| false)
 }
 
 /// `FUN_1415c6510`, the kill bonus of the attacker `src` (type 40 and up) for an object it

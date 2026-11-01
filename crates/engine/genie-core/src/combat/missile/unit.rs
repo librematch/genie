@@ -353,7 +353,7 @@ impl Unit {
             objects,
             attributes,
             ..
-        } = &mut players[p.index()];
+        } = players.player_mut(p)?;
         let shooter = objects
             .by_id_mut(action.fired_from)
             .ok_or(GenieError::unsupported(

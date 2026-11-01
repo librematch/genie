@@ -119,12 +119,12 @@ impl World {
     /// who shares with allies ([`crate::gathering::gather::unit::give_load`]).
     pub(super) fn generate(
         &mut self,
-        (p, i): (usize, ListIndex),
+        (p, i): (PlayerId, ListIndex),
         owner: PlayerId,
         master: Own,
         task: &Task,
     ) -> Result<(), GenieError> {
-        let unit = &self.players[p].objects[i];
+        let unit = self.players.live(p, i)?;
         let flags = task.combat_level_flag;
         let short_cut = match master.kind {
             COMBAT => flags.contains(TaskFlags::UNITS_ALWAYS),

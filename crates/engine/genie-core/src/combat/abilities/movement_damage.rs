@@ -169,13 +169,13 @@ impl World {
     /// model.
     pub(super) fn movement_damage(
         &mut self,
-        (p, i): (usize, ListIndex),
+        (p, i): (PlayerId, ListIndex),
         owner: PlayerId,
         master: Own,
         task: &Task,
     ) -> Result<(), GenieError> {
         let dt = self.dt_seconds;
-        let unit = &mut self.players[p].objects[i];
+        let unit = self.players.live_mut(p, i)?;
         if !movement_damage_due(&mut unit.abilities.movement_damage_timer, dt) {
             return Ok(());
         }
@@ -208,7 +208,7 @@ impl World {
                     if !struck(&hitter, range, &b) {
                         continue;
                     }
-                    self.players[p].objects[i].abilities.movement_damage_timer =
+                    self.players.live_mut(p, i)?.abilities.movement_damage_timer =
                         Seconds::new(task.work_val2.get());
                     self.movement_hit(b, owner, HitPoints::new(task.work_val1.get()))?;
                 }
