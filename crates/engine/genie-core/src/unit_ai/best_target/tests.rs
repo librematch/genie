@@ -57,19 +57,29 @@ fn the_statistics_count_bound_and_time_each_object() {
         armed: false,
         ..candidate(3, Distance::new(7.0), 2.0)
     });
-    let bounds = |least, most| Bounds { least, most };
-    assert_eq!(st.distance, bounds(0.5, 7.0));
-    assert_eq!(st.kill_time, bounds(5.0, f32::MAX));
-    assert_eq!(st.moving_distance, bounds(3.0, 7.0));
-    assert_eq!(st.moving_kill_time, bounds(5.0, f32::MAX));
-    assert_eq!((st.others, st.moving, st.armed, st.in_reach), (2, 2, 2, 1));
-    assert_eq!(st.by_category[category_of(1)], 2);
-    assert_eq!(st.closest_moving, (3.0, Some(object_id(1))));
-    let kill: Vec<f32> = st.entries.iter().map(|e| e.kill_time).collect();
+    let gaps = |least, most| Bounds {
+        least: Distance::new(least),
+        most: Distance::new(most),
+    };
+    let times = |least, most| Bounds {
+        least: KillTime::new(least),
+        most: KillTime::new(most),
+    };
+    assert_eq!(st.distance, gaps(0.5, 7.0));
+    assert_eq!(st.kill_time, times(5.0, f32::MAX));
+    assert_eq!(st.moving_distance, gaps(3.0, 7.0));
+    assert_eq!(st.moving_kill_time, times(5.0, f32::MAX));
+    assert_eq!(
+        [st.others, st.moving, st.armed, st.in_reach].map(EntryCount::get),
+        [2, 2, 2, 1]
+    );
+    assert_eq!(st.by_category[category_of(1)], EntryCount::new(2));
+    assert_eq!(st.closest_moving, (Distance::new(3.0), Some(object_id(1))));
+    let kill: Vec<f32> = st.entries.iter().map(|e| e.kill_time.get()).collect();
     assert_eq!(kill, [5.0, 5.0, f32::MAX]);
     let fixed: Vec<bool> = st.entries.iter().map(|e| e.fixed).collect();
     assert_eq!(fixed, [false, true, false]);
-    assert_eq!(st.entries[1].bonus, 5.0);
+    assert_eq!(st.entries[1].bonus, TargetScore::new(5.0));
 }
 
 /// `FUN_140c48150`, then the rank and the sort: a still entry alone in its kind takes the
@@ -86,12 +96,19 @@ fn the_scores_rank_and_sort_the_entries() {
     });
     st.add(&candidate(9, Distance::new(4.0), 0.0));
     let mut weights = ByCategory::default();
-    weights[category_of(1)] = 0.5;
+    weights[category_of(1)] = OrderWeight::new(0.5);
     st.score(&weights, (0, 0), &mut |_| Ok(false)).unwrap();
     let scores: Vec<(f32, f32, f32, f32)> = st
         .entries
         .iter()
-        .map(|e| (e.kill_score, e.distance_score, e.weight, e.total))
+        .map(|e| {
+            (
+                e.kill_score.get(),
+                e.distance_score.get(),
+                e.weight.get(),
+                e.total.get(),
+            )
+        })
         .collect();
     // moving kill times 5 and 10: 10 - (0/5)·10 = 10 and 10 - (5/5)·10 = 0; moving
     // distances 2 and 6: 75 and 0; the still entry: kill span 10 - 5 over all, distance
@@ -110,7 +127,7 @@ fn the_scores_rank_and_sort_the_entries() {
     assert_eq!(ids, [object_id(9), object_id(5), object_id(4)]);
     // equal ranks go to the lower id
     for e in &mut st.entries {
-        e.rank = 1.0;
+        e.rank = TargetScore::new(1.0);
     }
     st.order = vec![0, 1, 2];
     st.sort().unwrap();
@@ -136,9 +153,9 @@ fn the_order_history_weighs_the_last_minute_s_categories() {
         ],
         WorldTime::from_millis(100_000),
     );
-    assert_eq!(w[category_of(1)], 1.0 + 30_000.0 / 60_000.0);
-    assert_eq!(w[category_of(3)], 0.0);
-    assert_eq!(w[category_of(2)], 0.0);
+    assert_eq!(w[category_of(1)].get(), 1.0 + 30_000.0 / 60_000.0);
+    assert_eq!(w[category_of(3)], OrderWeight::ZERO);
+    assert_eq!(w[category_of(2)], OrderWeight::ZERO);
 }
 
 /// A world of objects by id: each a [`Thing`] and its candidate's values; the paths that

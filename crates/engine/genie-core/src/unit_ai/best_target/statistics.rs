@@ -9,6 +9,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::unit_ai::best_target::ORDER_WINDOW;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
+use crate::unit_ai::best_target::{EntryCount, KillTime, OrderWeight, TargetScore};
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -46,7 +47,7 @@ pub struct Entry {
     pub fixed: bool,
     /// `+8`: the time the unit takes to kill it (its hit points over the unit's damage to it,
     /// over the unit's reload time).
-    pub kill_time: f32,
+    pub kill_time: KillTime,
     /// `+0xc`: the footprints' gap.
     pub distance: Distance,
     /// `+0x10`: its attack category ([`category`]).
@@ -54,17 +55,17 @@ pub struct Entry {
     /// [`category`]: crate::unit_ai::best_target::category
     pub category: Option<AttackCategory>,
     /// `+0x14`: the kill-time score.
-    pub kill_score: f32,
+    pub kill_score: TargetScore,
     /// `+0x18`: the distance score.
-    pub distance_score: f32,
+    pub distance_score: TargetScore,
     /// `+0x1c`: the order history's weight of its category.
-    pub weight: f32,
+    pub weight: TargetScore,
     /// `+0x20`: the current target's bonus (5, else 0).
-    pub bonus: f32,
+    pub bonus: TargetScore,
     /// `+0x24`: the sum of the four.
-    pub total: f32,
+    pub total: TargetScore,
     /// `+0x28`: the rank the sort orders by ([`Statistics::rank`]).
-    pub rank: f32,
+    pub rank: TargetScore,
 }
 
 /// What `FUN_140c66590` reads of the unit and of an object it adds.
@@ -103,25 +104,25 @@ pub struct Candidate {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Statistics {
     /// `+0`, `+4`: the least and the most distance.
-    pub distance: Bounds,
+    pub distance: Bounds<Distance>,
     /// `+8`, `+0xc`: the least and the most kill time.
-    pub kill_time: Bounds,
+    pub kill_time: Bounds<KillTime>,
     /// `+0x10`, `+0x14`: the moving objects' least and most distance.
-    pub moving_distance: Bounds,
+    pub moving_distance: Bounds<Distance>,
     /// `+0x18`, `+0x1c`: the moving objects' least and most kill time.
-    pub moving_kill_time: Bounds,
+    pub moving_kill_time: Bounds<KillTime>,
     /// `+0x20`: the objects other than the current target.
-    pub others: i32,
+    pub others: EntryCount,
     /// `+0x24`: the moving objects.
-    pub moving: i32,
+    pub moving: EntryCount,
     /// `+0x28`: the armed objects.
-    pub armed: i32,
+    pub armed: EntryCount,
     /// `+0x2c`: the objects within the unit's range against them.
-    pub in_reach: i32,
+    pub in_reach: EntryCount,
     /// `+0x30`..: the objects per attack category.
-    pub by_category: ByCategory<i32>,
+    pub by_category: ByCategory<EntryCount>,
     /// `+0x60`, `+0x64`: the closest moving object's distance and id.
-    pub closest_moving: (f32, Option<ObjectId>),
+    pub closest_moving: (Distance, Option<ObjectId>),
     /// `+0x68`.., count `+0x1668`.
     pub entries: Vec<Entry>,
     /// `+0x166c`..: the entries' order, by rank after the sort.
@@ -133,53 +134,84 @@ impl Default for Statistics {
     /// −1, the counts 0, no closest moving object (none at the largest float).
     fn default() -> Self {
         Self {
-            distance: Bounds::RESET,
-            kill_time: Bounds::RESET,
-            moving_distance: Bounds::RESET,
-            moving_kill_time: Bounds::RESET,
-            others: 0,
-            moving: 0,
-            armed: 0,
-            in_reach: 0,
+            distance: Bounds::reset(),
+            kill_time: Bounds::reset(),
+            moving_distance: Bounds::reset(),
+            moving_kill_time: Bounds::reset(),
+            others: EntryCount::ZERO,
+            moving: EntryCount::ZERO,
+            armed: EntryCount::ZERO,
+            in_reach: EntryCount::ZERO,
             by_category: ByCategory::default(),
-            closest_moving: (f32::MAX, None),
+            closest_moving: (Distance::new(f32::MAX), None),
             entries: Vec::new(),
             order: Vec::new(),
         }
     }
 }
 
-/// The least and the most of a value over the table's entries.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Bounds {
-    /// The least.
-    pub least: f32,
-    /// The most.
-    pub most: f32,
+/// A value [`Bounds`] holds: a float, which the table's reset sets to the largest float and −1.
+pub trait Bounded: Copy + PartialOrd {
+    /// The value of the float `v`.
+    fn of_float(v: f32) -> Self;
+    /// The float.
+    fn float(self) -> f32;
 }
 
-impl Bounds {
+impl Bounded for Distance {
+    fn of_float(v: f32) -> Self {
+        Self::new(v)
+    }
+
+    fn float(self) -> f32 {
+        self.get()
+    }
+}
+
+impl Bounded for KillTime {
+    fn of_float(v: f32) -> Self {
+        Self::new(v)
+    }
+
+    fn float(self) -> f32 {
+        self.get()
+    }
+}
+
+/// The least and the most of a value over the table's entries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Bounds<T> {
+    /// The least.
+    pub least: T,
+    /// The most.
+    pub most: T,
+}
+
+impl<T: Bounded> Bounds<T> {
     /// `bestUnitToAttack`'s reset: the least the largest float, the most −1.
-    pub const RESET: Self = Self {
-        least: f32::MAX,
-        most: -1.0,
-    };
+    #[must_use]
+    pub fn reset() -> Self {
+        Self {
+            least: T::of_float(f32::MAX),
+            most: T::of_float(-1.0),
+        }
+    }
 
     /// `v` joins the bounds: the least takes it when above it (`COMISS least, v`, `JBE`: a NaN
     /// changes nothing), then the most when below it (`COMISS v, most`, `JBE`).
-    pub fn take(&mut self, v: Distance) {
-        if self.least > v.get() {
-            self.least = v.get();
+    pub fn take(&mut self, v: T) {
+        if self.least > v {
+            self.least = v;
         }
-        if v > Distance::new(self.most) {
-            self.most = v.get();
+        if v > self.most {
+            self.most = v;
         }
     }
 
     /// The most less the least.
     #[must_use]
     pub fn span(self) -> f32 {
-        self.most - self.least
+        self.most.float() - self.least.float()
     }
 }
 
@@ -205,38 +237,44 @@ impl Statistics {
             ..Entry::default()
         };
         if let Some(k) = c.category {
-            self.by_category[k] += 1;
+            self.by_category[k].count_one();
         }
         if !c.current {
-            self.others += 1;
+            self.others.count_one();
         }
         if Speed::ZERO < c.speed {
             e.moving = true;
-            if self.closest_moving.0 > c.distance.get() {
-                self.closest_moving = (c.distance.get(), Some(c.id));
+            if self.closest_moving.0 > c.distance {
+                self.closest_moving = (c.distance, Some(c.id));
             }
-            self.moving += 1;
+            self.moving.count_one();
         }
         e.fixed = FIXED_CLASSES.contains(c.class);
         if c.armed {
-            self.armed += 1;
+            self.armed.count_one();
         }
         if !(c.reach < c.distance || c.reach.get().is_nan() || c.distance.get().is_nan()) {
-            self.in_reach += 1;
+            self.in_reach.count_one();
         }
         self.distance.take(c.distance);
-        e.kill_time = if crate::math::fmath::below_or_unordered(EPSILON, c.damage.get()) {
-            (c.hp / c.damage) / c.reload.get()
-        } else if c.workable {
-            NO_DAMAGE_KILL
+        e.kill_time = KillTime::new(
+            if crate::math::fmath::below_or_unordered(EPSILON, c.damage.get()) {
+                (c.hp / c.damage) / c.reload.get()
+            } else if c.workable {
+                NO_DAMAGE_KILL
+            } else {
+                NEVER
+            },
+        );
+        self.kill_time.take(e.kill_time);
+        e.bonus = if c.current {
+            TargetScore::new(NO_DAMAGE_KILL)
         } else {
-            NEVER
+            TargetScore::ZERO
         };
-        self.kill_time.take(Distance::new(e.kill_time));
-        e.bonus = if c.current { NO_DAMAGE_KILL } else { 0.0 };
         if Speed::ZERO < c.speed {
             self.moving_distance.take(c.distance);
-            self.moving_kill_time.take(Distance::new(e.kill_time));
+            self.moving_kill_time.take(e.kill_time);
         }
         self.entries.push(e);
     }
@@ -256,7 +294,7 @@ impl Statistics {
     /// What `armored` does not model.
     pub fn score(
         &mut self,
-        weights: &ByCategory<f32>,
+        weights: &ByCategory<OrderWeight>,
         (mode, factor): (i32, i32),
         armored: &mut dyn FnMut(ObjectId) -> Result<bool, crate::GenieError>,
     ) -> Result<(), crate::GenieError> {
@@ -264,9 +302,11 @@ impl Statistics {
         let distance_span = self.distance.span();
         let moving_kill_span = self.moving_kill_time.span();
         let moving_distance_span = self.moving_distance.span();
-        let (kill_low, distance_low) = (self.kill_time.least, self.distance.least);
-        let (moving_kill_low, moving_distance_low) =
-            (self.moving_kill_time.least, self.moving_distance.least);
+        let (kill_low, distance_low) = (self.kill_time.least.get(), self.distance.least.get());
+        let (moving_kill_low, moving_distance_low) = (
+            self.moving_kill_time.least.get(),
+            self.moving_distance.least.get(),
+        );
         for e in &mut self.entries {
             let top = if mode == 1 {
                 factor as f32 * PER_CENT
@@ -276,28 +316,30 @@ impl Statistics {
             let mut kill = top * SCORE;
             if e.moving {
                 if crate::math::fmath::at_most_or_unordered(EPSILON, moving_kill_span) {
-                    kill -= ((e.kill_time - moving_kill_low) / moving_kill_span) * kill;
+                    kill -= ((e.kill_time.get() - moving_kill_low) / moving_kill_span) * kill;
                 }
-                e.kill_score = kill;
+                e.kill_score = TargetScore::new(kill);
                 let mut d = DISTANCE_SCORE;
                 if crate::math::fmath::at_most_or_unordered(EPSILON, moving_distance_span) {
                     d -= ((e.distance.get() - moving_distance_low) / moving_distance_span)
                         * DISTANCE_SCORE;
                 }
-                e.distance_score = d;
+                e.distance_score = TargetScore::new(d);
             } else {
                 if crate::math::fmath::at_most_or_unordered(EPSILON, kill_span) {
-                    kill -= ((e.kill_time - kill_low) / kill_span) * kill;
+                    kill -= ((e.kill_time.get() - kill_low) / kill_span) * kill;
                 }
-                e.kill_score = kill;
-                e.distance_score = if EPSILON > distance_span {
+                e.kill_score = TargetScore::new(kill);
+                e.distance_score = TargetScore::new(if EPSILON > distance_span {
                     DISTANCE_SCORE
                 } else {
                     DISTANCE_SCORE
                         - ((e.distance.get() - distance_low) / distance_span) * DISTANCE_SCORE
-                };
+                });
             }
-            e.weight = e.category.map_or(0.0, |k| weights[k] * SCORE);
+            e.weight = e.category.map_or(TargetScore::ZERO, |k| {
+                TargetScore::new(weights[k].get() * SCORE)
+            });
             e.total = ((e.kill_score + e.distance_score) + e.weight) + e.bonus;
             if mode == 2 && armored(e.id)? {
                 e.total *= factor as f32 * PER_CENT;
@@ -318,7 +360,7 @@ impl Statistics {
     ) -> Result<(), crate::GenieError> {
         self.order = (0..self.entries.len()).collect();
         for e in &mut self.entries {
-            e.rank = tier(e)? as f32 * TIER + e.total;
+            e.rank = TargetScore::new(tier(e)? as f32 * TIER + e.total.get());
         }
         Ok(())
     }
@@ -385,7 +427,10 @@ impl Statistics {
 /// adds the rest of the minute over 60000 (`DAT_142efe420`) to its target's category; the first
 /// older one ends the walk.
 #[must_use]
-pub fn order_weights(history: &[crate::unit_ai::OrderRecord], now: WorldTime) -> ByCategory<f32> {
+pub fn order_weights(
+    history: &[crate::unit_ai::OrderRecord],
+    now: WorldTime,
+) -> ByCategory<OrderWeight> {
     let mut w = ByCategory::default();
     for r in history {
         let age = now.since(r.time);
@@ -393,7 +438,7 @@ pub fn order_weights(history: &[crate::unit_ai::OrderRecord], now: WorldTime) ->
             break;
         }
         if let Some(k) = r.category {
-            w[k] += (60000 - age.get()) as f32 / ORDER_WINDOW;
+            w[k] += OrderWeight::new((60000 - age.get()) as f32 / ORDER_WINDOW);
         }
     }
     w
@@ -408,13 +453,13 @@ mod tests {
     /// them, pass over a NaN, and span the most less the least.
     #[test]
     fn bounds_widen_by_each_value_beyond_them_and_pass_over_a_nan() {
-        let mut b = Bounds::RESET;
-        assert_eq!((b.least, b.most), (f32::MAX, -1.0));
+        let mut b = Bounds::<Distance>::reset();
+        assert_eq!((b.least.get(), b.most.get()), (f32::MAX, -1.0));
         b.take(Distance::new(3.0));
-        assert_eq!((b.least, b.most), (3.0, 3.0));
+        assert_eq!((b.least.get(), b.most.get()), (3.0, 3.0));
         b.take(Distance::new(1.0));
         b.take(Distance::new(7.0));
         b.take(Distance::new(f32::NAN));
-        assert_eq!((b.least, b.most, b.span()), (1.0, 7.0, 6.0));
+        assert_eq!((b.least.get(), b.most.get(), b.span()), (1.0, 7.0, 6.0));
     }
 }

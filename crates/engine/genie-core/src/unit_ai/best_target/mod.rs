@@ -4,12 +4,16 @@
 mod attack_category;
 mod choice;
 mod statistics;
+mod values;
 mod world_view;
 
 pub use self::attack_category::{AttackCategory, ByCategory};
 pub use self::choice::{Choice, best_unit_to_attack};
 use self::statistics::EPSILON;
-pub use self::statistics::{Bounds, Candidate, Entry, STATISTICS, Statistics, order_weights};
+pub use self::statistics::{
+    Bounded, Bounds, Candidate, Entry, STATISTICS, Statistics, order_weights,
+};
+pub use self::values::{EntryCount, KillTime, OrderWeight, TargetScore};
 use self::world_view::ORDER_WINDOW;
 pub use self::world_view::{Ask, Battlefield, Searcher, Thing};
 use crate::objects::masters::ClassId;

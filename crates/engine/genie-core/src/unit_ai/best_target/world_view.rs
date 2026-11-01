@@ -61,7 +61,7 @@ pub struct Searcher {
     /// The order history's weights ([`order_weights`]).
     ///
     /// [`order_weights`]: crate::unit_ai::best_target::statistics::order_weights
-    pub weights: ByCategory<f32>,
+    pub weights: ByCategory<crate::unit_ai::best_target::OrderWeight>,
     /// The AI's retarget entries' targets (`+0x1e0`).
     pub retries: Vec<ObjectId>,
     /// The world's time (`FUN_1415300d0`).

@@ -13,7 +13,8 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, UnitRelation};
 use crate::unit_ai::best_target::{
-    Ask, AttackCategory, Battlefield, EPSILON, STATISTICS, Searcher, Statistics, Thing, category,
+    Ask, AttackCategory, Battlefield, EPSILON, EntryCount, STATISTICS, Searcher, Statistics, Thing,
+    category,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -55,8 +56,10 @@ pub(super) const BOAT_HUNTERS: [MasterId; 3] = [
     MasterId::named(45),
     MasterId::named(109),
 ];
+/// The gap of a closest gate or wall not found yet.
+const NO_GAP: Distance = Distance::new(-1.0);
 /// The moving targets past which the current target and the closest moving one answer.
-pub(super) const FEW_MOVING: i32 = 5;
+pub(super) const FEW_MOVING: EntryCount = EntryCount::new(5);
 /// The retarget entries' times: a moving object's 1 s, another's 2 s.
 pub(super) const RETRY_MOVING: Millis = Millis::new(1000);
 pub(super) const RETRY_OTHER: Millis = Millis::new(2000);
@@ -153,10 +156,10 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing) -> bo
 /// within the weapon range unless the unit moves, within `near` (the main walk's sight, the
 /// retry walk's range) unless it may move, within the reference distance when there is one, and
 /// within the sight.
-pub(super) fn within(me: &Searcher, ask: &Ask, gap: Distance, near: f32) -> bool {
+pub(super) fn within(me: &Searcher, ask: &Ask, gap: Distance, near: Distance) -> bool {
     me.min_range <= gap
         && (gap <= me.weapon_range || me.speed != Speed::ZERO)
-        && (me.can_move || gap <= Distance::new(near))
+        && (me.can_move || gap <= near)
         && (ask.distance <= Distance::ZERO || gap <= ask.distance)
         && gap <= me.sight
 }
@@ -316,8 +319,8 @@ struct Walked {
     narrowed: Option<AttackCategory>,
     walls: bool,
     later: Vec<(ObjectId, UnitRelation)>,
-    gate: (Option<ObjectId>, f32),
-    wall: (Option<ObjectId>, f32),
+    gate: (Option<ObjectId>, Distance),
+    wall: (Option<ObjectId>, Distance),
     beyond_walls: bool,
 }
 
@@ -328,8 +331,8 @@ impl Walked {
             narrowed,
             walls,
             later: Vec::new(),
-            gate: (None, -1.0),
-            wall: (None, -1.0),
+            gate: (None, NO_GAP),
+            wall: (None, NO_GAP),
             beyond_walls: false,
         }
     }
@@ -373,7 +376,7 @@ impl Walked {
                 match t.class {
                     // The wall's and the gate's classes.
                     class::GATE => {
-                        if self.gate.1 < 0.0 || gap < self.gate.1 {
+                        if self.gate.1 < Distance::ZERO || gap < self.gate.1 {
                             self.gate = (Some(id), gap);
                         }
                         if !self.walls {
@@ -381,13 +384,13 @@ impl Walked {
                         }
                     }
                     class::WALL => {
-                        if !self.note_wall(id, Distance::new(gap)) {
+                        if !self.note_wall(id, gap) {
                             continue;
                         }
                     }
                     _ => self.beyond_walls = true,
                 }
-                st.add(&world.candidate(id, Distance::new(gap), k)?);
+                st.add(&world.candidate(id, gap, k)?);
             }
         }
         Ok(())
@@ -409,11 +412,11 @@ impl Walked {
             };
             let counts = match t.class {
                 class::GATE => self.walls,
-                class::WALL => self.note_wall(id, Distance::new(gap)),
+                class::WALL => self.note_wall(id, gap),
                 _ => true,
             };
             if counts {
-                st.add(&world.candidate(id, Distance::new(gap), k)?);
+                st.add(&world.candidate(id, gap, k)?);
             }
         }
         Ok(())
@@ -429,26 +432,26 @@ impl Walked {
         relation: UnitRelation,
         near: Distance,
         world: &mut dyn Battlefield,
-    ) -> Result<Option<(Thing, f32, Option<AttackCategory>)>, crate::GenieError> {
+    ) -> Result<Option<(Thing, Distance, Option<AttackCategory>)>, crate::GenieError> {
         let Some(t) = tested(me, ask, id, relation, world)? else {
             return Ok(None);
         };
         let gap = t.distance;
-        if !within(me, ask, gap, near.get()) {
+        if !within(me, ask, gap, near) {
             return Ok(None);
         }
         let k = category(t.master, t.class);
         if self.narrowed.is_some_and(|n| k != Some(n)) {
             return Ok(None);
         }
-        Ok(Some((t, gap.get(), k)))
+        Ok(Some((t, gap, k)))
     }
 
     /// A wall `id` at `gap`: the closest wall when it is the first or nearer; whether it counts
     /// (only for a unit that attacks walls).
     fn note_wall(&mut self, id: ObjectId, gap: Distance) -> bool {
-        if self.wall.1 < 0.0 || gap < Distance::new(self.wall.1) {
-            self.wall = (Some(id), gap.get());
+        if self.wall.1 < Distance::ZERO || gap < self.wall.1 {
+            self.wall = (Some(id), gap);
         }
         self.walls
     }
@@ -543,9 +546,10 @@ fn current_holds(
         return Ok(None);
     };
     let holds = st.moving < FEW_MOVING
-        && ((t.speed < Speed::new(EPSILON) && st.moving == 0) || Speed::ZERO < t.speed)
+        && ((t.speed < Speed::new(EPSILON) && st.moving == EntryCount::ZERO)
+            || Speed::ZERO < t.speed)
         && !ask.idle
-        && (world.engages(target)? || st.armed < 1)
+        && (world.engages(target)? || st.armed < EntryCount::new(1))
         && (ask.paths == 0 || world.path(target, me.range)?);
     Ok(holds.then_some(target))
 }
@@ -560,7 +564,9 @@ fn quick_pick(
 ) -> Result<Option<ObjectId>, crate::GenieError> {
     for &i in st.order.iter().take(3) {
         let e = *st.entries.checked(i)?;
-        if (e.moving || st.moving < 1 || !ranked) && world.quick_path(e.id, range)? {
+        if (e.moving || st.moving < EntryCount::new(1) || !ranked)
+            && world.quick_path(e.id, range)?
+        {
             return Ok(Some(e.id));
         }
     }
