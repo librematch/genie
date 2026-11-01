@@ -7,8 +7,8 @@ use crate::pathing::FixedRect;
 use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Corner, Emit, FixedPoint, Foot, Kind, NodeIndex, Poly, Search, TRACE_STEPS, UNSET, WalkDir,
-    cheb, clamp_to_box, contact_point, corner_emits, in_box, inside, shrunk_corner,
+    Corner, Emit, FixedPoint, Foot, Kind, NodeIndex, Poly, PolyIndex, Run, Search, TRACE_STEPS,
+    UNSET, WalkDir, cheb, clamp_to_box, contact_point, corner_emits, in_box, inside, shrunk_corner,
 };
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -35,7 +35,7 @@ pub(super) struct Traced {
 
 /// A new polygon's walk: the polygon and the node it comes from.
 struct NewWalk {
-    poly: u32,
+    poly: PolyIndex,
     parent: NodeIndex,
 }
 
@@ -465,12 +465,12 @@ impl Search<'_> {
     /// becomes a corner node toward the goal when it emits; each edge gets its foot test.
     pub(super) fn walk_new(
         &mut self,
-        pi: u32,
+        pi: PolyIndex,
         p: FixedPoint,
         g0: FixedDistance,
         parent: NodeIndex,
     ) -> Result<(), GenieError> {
-        let poly = self.polys.checked(pi as usize)?.clone();
+        let poly = self.poly(pi)?.clone();
         let v = &poly.vertices;
         let n = v.len() as u32;
         let last = n - 1;
@@ -488,13 +488,15 @@ impl Search<'_> {
                 let w = *v.checked((bi - 1) as usize)?;
                 let dx = vv.x() - w.x();
                 self.foot_test(Foot {
-                    poly: pi,
                     start: vv,
                     end: w,
                     x_extent: dx,
-                    low: bi - 1,
-                    high: 0,
-                    dir: WalkDir::Backward,
+                    run: Run {
+                        poly: pi,
+                        dir: WalkDir::Backward,
+                        lo: bi - 1,
+                        hi: 0,
+                    },
                     start_cost: cb,
                     parent,
                 })?;
@@ -513,13 +515,15 @@ impl Search<'_> {
                 let w = *v.checked(fi as usize)?;
                 let dx = vv.x() - w.x();
                 self.foot_test(Foot {
-                    poly: pi,
                     start: vv,
                     end: w,
                     x_extent: dx,
-                    low: 0,
-                    high: fi,
-                    dir: WalkDir::Forward,
+                    run: Run {
+                        poly: pi,
+                        dir: WalkDir::Forward,
+                        lo: 0,
+                        hi: fi,
+                    },
                     start_cost: cf,
                     parent,
                 })?;
@@ -547,24 +551,28 @@ impl Search<'_> {
         let (dxb, dyb) = (vb.x() - p.x(), vb.y() - p.y());
         let (dxf, dyf) = (vf.x() - p.x(), vf.y() - p.y());
         self.foot_test(Foot {
-            poly: walk.poly,
             start: p,
             end: vb,
             x_extent: dxb,
-            low: last as u32,
-            high: 0,
-            dir: WalkDir::Backward,
+            run: Run {
+                poly: walk.poly,
+                dir: WalkDir::Backward,
+                lo: last as u32,
+                hi: 0,
+            },
             start_cost: g0,
             parent: walk.parent,
         })?;
         self.foot_test(Foot {
-            poly: walk.poly,
             start: p,
             end: vf,
             x_extent: dxf,
-            low: 0,
-            high: 0,
-            dir: WalkDir::Forward,
+            run: Run {
+                poly: walk.poly,
+                dir: WalkDir::Forward,
+                lo: 0,
+                hi: 0,
+            },
             start_cost: g0,
             parent: walk.parent,
         })?;
@@ -595,23 +603,23 @@ impl Search<'_> {
         let sp = *poly.sides.checked(before as usize)?;
         let sn = *poly.sides.checked(at as usize)?;
         let sh = *poly.shapes.checked(at as usize)?;
+        let run = Run {
+            poly: walk.poly,
+            dir,
+            lo,
+            hi,
+        };
         if !self.goal_test(Corner {
             cost: g,
             parent: walk.parent,
-            dir,
-            low: lo,
-            high: hi,
-            poly: walk.poly,
+            run,
             point: vv,
         })? && sp != sn
             && sh.is_some()
             && let Some(token) = corner_emits(sp, sn, vv, self.goal.at)
         {
             let kind = Kind::Corner {
-                dir,
-                lo,
-                hi,
-                poly: walk.poly,
+                run: Some(run),
                 emit: Some(Emit {
                     token,
                     prev: sp,
@@ -620,7 +628,7 @@ impl Search<'_> {
             };
             let node = self.add(g, walk.parent, vv, kind);
             self.push(node);
-            let pm = self.polys.checked_mut(walk.poly as usize)?;
+            let pm = self.poly_mut(walk.poly)?;
             pm.flag = true;
             *pm.costs.checked_mut(at as usize)? = g;
         }

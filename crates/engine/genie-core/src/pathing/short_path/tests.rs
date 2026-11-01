@@ -45,6 +45,14 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
     s
 }
 
+/// A forward run of polygon 0 over its vertex 0, for the goal and foot tests.
+const RUN_0: Run = Run {
+    poly: PolyIndex::of(0),
+    dir: WalkDir::Forward,
+    lo: 0,
+    hi: 0,
+};
+
 /// A node's index is its place in the arena, the start's 0; a goal node beats only a cheaper
 /// one, and anything beats none.
 #[test]
@@ -74,6 +82,20 @@ fn a_node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
     assert!(s.beats_goal(FixedDistance::ZERO).is_err());
 }
 
+/// A polygon's index is its place in the search's list.
+#[test]
+fn a_polygon_index_reads_the_search_s_list() {
+    let mesh = Mesh::new(64);
+    let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
+    assert!(s.poly(PolyIndex::of(0)).is_err());
+    s.polys.push(Poly::default());
+    s.polys.push(Poly::default());
+    assert_eq!(PolyIndex::of(1).get(), 1);
+    s.poly_mut(PolyIndex::of(1)).unwrap().flag = true;
+    assert!(s.poly(PolyIndex::of(1)).unwrap().flag);
+    assert!(!s.poly(PolyIndex::of(0)).unwrap().flag);
+}
+
 /// `FUN_140fa3860`: a node within range becomes the goal while it is cheaper than the goal so
 /// far; any other node becomes the best when it lies nearer than the best's estimate, and a
 /// node no nearer adds nothing.
@@ -85,10 +107,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
         s.goal_test(Corner {
             cost: FixedDistance::new(5 * ONE),
             parent: NodeIndex::START,
-            dir: WalkDir::Forward,
-            low: 0,
-            high: 0,
-            poly: 0,
+            run: RUN_0,
             point: FixedPoint::new(11 * ONE, 10 * ONE)
         })
         .unwrap()
@@ -99,10 +118,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
         !s.goal_test(Corner {
             cost: FixedDistance::new(6 * ONE),
             parent: NodeIndex::START,
-            dir: WalkDir::Forward,
-            low: 0,
-            high: 0,
-            poly: 0,
+            run: RUN_0,
             point: FixedPoint::new(11 * ONE, 10 * ONE)
         })
         .unwrap()
@@ -116,10 +132,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
         !s.goal_test(Corner {
             cost: FixedDistance::TILE,
             parent: NodeIndex::START,
-            dir: WalkDir::Forward,
-            low: 0,
-            high: 0,
-            poly: 0,
+            run: RUN_0,
             point: FixedPoint::new(30 * ONE, 30 * ONE)
         })
         .unwrap()
@@ -135,26 +148,20 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
     let mesh = Mesh::new(64);
     let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     s.foot_test(Foot {
-        poly: 0,
         start: FixedPoint::new(9 * ONE, 12 * ONE),
         end: FixedPoint::new(9 * ONE, 20 * ONE),
         x_extent: 0,
-        low: 0,
-        high: 0,
-        dir: WalkDir::Forward,
+        run: RUN_0,
         start_cost: FixedDistance::TILE,
         parent: NodeIndex::START,
     })
     .unwrap();
     assert_eq!(s.arena.len(), 1);
     s.foot_test(Foot {
-        poly: 0,
         start: FixedPoint::new(15 * ONE, 9 * ONE),
         end: FixedPoint::new(5 * ONE, 9 * ONE),
         x_extent: 1,
-        low: 0,
-        high: 0,
-        dir: WalkDir::Forward,
+        run: RUN_0,
         start_cost: FixedDistance::TILE,
         parent: NodeIndex::START,
     })

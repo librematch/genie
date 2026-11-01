@@ -3,7 +3,7 @@
 
 use crate::GenieError;
 use crate::pathing::short_path::{
-    FixedPoint, Kind, Node, NodeIndex, RECT_HEURISTIC, Search, Token, WalkDir,
+    FixedPoint, Kind, Node, NodeIndex, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, Token,
 };
 use crate::pathing::{FixedDistance, FixedRect, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -15,14 +15,8 @@ pub(super) struct Corner {
     pub(super) cost: FixedDistance,
     /// The node it was reached from.
     pub(super) parent: NodeIndex,
-    /// The walk's direction round the polygon.
-    pub(super) dir: WalkDir,
-    /// The first vertex of the walked run.
-    pub(super) low: u32,
-    /// The last vertex of the walked run.
-    pub(super) high: u32,
-    /// The polygon.
-    pub(super) poly: u32,
+    /// The run of the polygon walked to it.
+    pub(super) run: Run,
     /// The corner's point.
     pub(super) point: FixedPoint,
 }
@@ -31,20 +25,14 @@ pub(super) struct Corner {
 /// [`Search::foot_test`]).
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Foot {
-    /// The polygon.
-    pub(super) poly: u32,
     /// The edge's start.
     pub(super) start: FixedPoint,
     /// The edge's end.
     pub(super) end: FixedPoint,
     /// The edge's x extent: horizontal when not 0.
     pub(super) x_extent: i32,
-    /// The first vertex of the walked run.
-    pub(super) low: u32,
-    /// The last vertex of the walked run.
-    pub(super) high: u32,
-    /// The walk's direction round the polygon.
-    pub(super) dir: WalkDir,
+    /// The run of the polygon walked to the edge's start, the edge included.
+    pub(super) run: Run,
     /// The cost at the edge's start.
     pub(super) start_cost: FixedDistance,
     /// The node it was reached from.
@@ -193,6 +181,16 @@ impl Search<'_> {
         self.arena.checked_mut(i.get())
     }
 
+    /// The polygon at `i`.
+    pub(super) fn poly(&self, i: PolyIndex) -> Result<&Poly, GenieError> {
+        self.polys.checked(i.get())
+    }
+
+    /// The polygon at `i`, to change.
+    pub(super) fn poly_mut(&mut self, i: PolyIndex) -> Result<&mut Poly, GenieError> {
+        self.polys.checked_mut(i.get())
+    }
+
     /// No goal node yet, or `g` cheaper than the goal node's cost: the game's
     /// `goal == -1 || g < arena[goal].g`.
     pub(super) fn beats_goal(&self, g: FixedDistance) -> Result<bool, GenieError> {
@@ -252,10 +250,7 @@ impl Search<'_> {
         let Corner {
             cost: g,
             parent,
-            dir,
-            low: lo,
-            high: hi,
-            poly,
+            run,
             point: pt,
         } = corner;
         let d2: i64 = if RECT_HEURISTIC {
@@ -266,10 +261,7 @@ impl Search<'_> {
             i64::from((((dy * dy) >> 22) as i32).wrapping_add(((dx * dx) >> 22) as i32))
         };
         let kind = Kind::Corner {
-            dir,
-            lo,
-            hi,
-            poly,
+            run: Some(run),
             emit: None,
         };
         let better = self.beats_goal(g)?;
@@ -291,13 +283,10 @@ impl Search<'_> {
     /// goal candidate.
     pub(super) fn foot_test(&mut self, edge: Foot) -> Result<(), GenieError> {
         let Foot {
-            poly,
             start: a,
             end: b,
             x_extent: dx,
-            low: lo,
-            high: hi,
-            dir,
+            run,
             start_cost: g0,
             parent,
         } = edge;
@@ -318,10 +307,7 @@ impl Search<'_> {
             let _ = self.goal_test(Corner {
                 cost: g,
                 parent,
-                dir,
-                low: lo,
-                high: hi,
-                poly,
+                run,
                 point: foot,
             })?;
         }

@@ -2,9 +2,10 @@
 
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, NONE, NUDGES, Node, NodeIndex,
-    OPEN_CORNER_WITHOUT_EMIT, Poly, RECT_HEURISTIC, Search, ShortPath, T_START, TO_FIXED, TO_FLOAT,
-    UNSET, WalkDir, cheb, corner_emits, float_distance, in_box, isqrt, through_float,
+    Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, NUDGES, Node, NodeIndex,
+    OPEN_CORNER_WITHOUT_EMIT, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, ShortPath, T_START,
+    TO_FIXED, TO_FLOAT, UNSET, WalkDir, cheb, corner_emits, float_distance, in_box, isqrt,
+    through_float,
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -13,7 +14,7 @@ use crate::{GenieError, math::fmath};
 /// What a polygon's re-walk keeps fixed: the node it comes from, the polygon and its vertex count.
 struct Rewalk {
     parent: NodeIndex,
-    poly: u32,
+    poly: PolyIndex,
     count: u32,
 }
 
@@ -43,7 +44,7 @@ impl Search<'_> {
             if !RECT_HEURISTIC || !self.polys.checked(i)?.flag {
                 return Ok(None);
             }
-            self.rewalk(n, i as u32, e)?;
+            self.rewalk(n, PolyIndex::of(i), e)?;
             return Ok(None);
         }
         self.polys.push(Poly::default());
@@ -74,16 +75,16 @@ impl Search<'_> {
                 points: Vec::new(),
             }));
         }
-        self.walk_new(last as u32, p, n.g, n.idx)?;
+        self.walk_new(PolyIndex::of(last), p, n.g, n.idx)?;
         Ok(None)
     }
 
     /// The re-walk of a polygon from edge `e` (0x140fa63d4..0x140fa6639): backward from `v[e]`,
     /// forward from `v[e + 1]`, the forward side on equal costs, each while its cost stays below
     /// the vertex's; vertices no corner node reached are passed over.
-    pub(super) fn rewalk(&mut self, n: Node, pi: u32, e: u32) -> Result<(), GenieError> {
+    pub(super) fn rewalk(&mut self, n: Node, pi: PolyIndex, e: u32) -> Result<(), GenieError> {
         let p = n.at;
-        let poly = self.polys.checked(pi as usize)?;
+        let poly = self.poly(pi)?;
         let m = poly.vertices.len() as u32;
         let next0 = (e + 1) % m;
         let mut bv = e;
@@ -103,7 +104,7 @@ impl Search<'_> {
                 return Ok(());
             }
             let forward = (gf <= gb && alive_f) || !alive_b;
-            let poly = self.polys.checked(pi as usize)?.clone();
+            let poly = self.poly(pi)?.clone();
             if forward {
                 self.rewalk_corner(&walk, &poly, (fv, gf), (WalkDir::Forward, e, fv))?;
                 (fv, gf, alive_f) = self.rewalk_advance(&walk, &poly, (fv, gf), true)?;
@@ -129,14 +130,17 @@ impl Search<'_> {
         let sp = *poly.sides.checked(((at + m - 1) % m) as usize)?;
         let sn = *poly.sides.checked(at as usize)?;
         let sh = *poly.shapes.checked(at as usize)?;
+        let run = Run {
+            poly: walk.poly,
+            dir,
+            lo,
+            hi,
+        };
         if *poly.costs.checked(at as usize)? != UNSET
             && !self.goal_test(Corner {
                 cost: g,
                 parent: walk.parent,
-                dir,
-                low: lo,
-                high: hi,
-                poly: walk.poly,
+                run,
                 point: v,
             })?
             && sp != sn
@@ -144,10 +148,7 @@ impl Search<'_> {
             && let Some(token) = corner_emits(sp, sn, v, self.goal.at)
         {
             let kind = Kind::Corner {
-                dir,
-                lo,
-                hi,
-                poly: walk.poly,
+                run: Some(run),
                 emit: Some(Emit {
                     token,
                     prev: sp,
@@ -156,11 +157,7 @@ impl Search<'_> {
             };
             let node = self.add(g, walk.parent, v, kind);
             self.push(node);
-            *self
-                .polys
-                .checked_mut(walk.poly as usize)?
-                .costs
-                .checked_mut(at as usize)? = g;
+            *self.poly_mut(walk.poly)?.costs.checked_mut(at as usize)? = g;
         }
         Ok(())
     }
@@ -176,7 +173,7 @@ impl Search<'_> {
         forward: bool,
     ) -> Result<(u32, FixedDistance, bool), GenieError> {
         let m = walk.count;
-        let costs = &self.polys.checked(walk.poly as usize)?.costs;
+        let costs = &self.poly(walk.poly)?.costs;
         let (mut vi, mut g) = (from, g);
         let mut at = *poly.vertices.checked(from as usize)?;
         loop {
@@ -246,10 +243,7 @@ impl Search<'_> {
         }
         let g = n.g.wrapping_add(float_distance(p, t));
         let kind = Kind::Corner {
-            dir: WalkDir::Forward,
-            lo: NONE,
-            hi: NONE,
-            poly: NONE,
+            run: None,
             emit: None,
         };
         let node = self.add(g, n.idx, t, kind);
@@ -343,10 +337,11 @@ impl Search<'_> {
             let parent = *self.node(up)?;
             match node.kind {
                 Kind::Corner {
-                    poly, dir, lo, hi, ..
-                } if poly != NONE => {
+                    run: Some(Run { poly, dir, lo, hi }),
+                    ..
+                } => {
                     pts.push(node.at);
-                    let v = &self.polys.checked(poly as usize)?.vertices;
+                    let v = &self.poly(poly)?.vertices;
                     let n = v.len() as u32;
                     if dir == WalkDir::Backward {
                         let mut k = lo;

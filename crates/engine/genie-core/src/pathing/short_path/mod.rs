@@ -169,8 +169,6 @@ const NUDGES: [FixedPoint; 4] = [
     FixedPoint::new(0, -ONE),
     FixedPoint::new(-ONE, 0),
 ];
-/// No node or polygon.
-const NONE: u32 = u32::MAX;
 /// An open corner node without its emission: only the goal candidates, which never open, lack
 /// one.
 const OPEN_CORNER_WITHOUT_EMIT: GenieError =
@@ -226,16 +224,41 @@ enum Kind {
     Waypoint,
     /// 2: a point on a shape's side.
     Side { shape: ShapeId, side: ShapeSide },
-    /// 3: a polygon corner or a terminal node: the walk's direction (1 backward), the vertices
-    /// it covers, its polygon and what the corner emits its ray with (none for a goal
-    /// candidate, which never opens: the game's token 5 or −1 and sides 0 or 0xff).
+    /// 3: a polygon corner or a terminal node: the run of the polygon it was walked over (none
+    /// for the terminal goal candidate of a clear ray, the game's direction 0 with vertices and
+    /// polygon −1) and what the corner emits its ray with (none for a goal candidate, which
+    /// never opens: the game's token 5 or −1 and sides 0 or 0xff).
     Corner {
-        dir: WalkDir,
-        lo: u32,
-        hi: u32,
-        poly: u32,
+        run: Option<Run>,
         emit: Option<Emit>,
     },
+}
+
+/// A polygon's place in the search's list (a corner node's `+0x28`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PolyIndex(u32);
+
+impl PolyIndex {
+    /// The polygon at slice index `i`, as the game's 32 bits.
+    const fn of(i: usize) -> Self {
+        Self(i as u32)
+    }
+
+    /// The place as a slice index.
+    const fn get(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// The run of a polygon's vertices a corner node or a goal candidate was walked over: the
+/// polygon, the walk's direction round it and the run's first and last vertex, which the path
+/// back reads (a node's `+0x1c..+0x2c`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Run {
+    poly: PolyIndex,
+    dir: WalkDir,
+    lo: u32,
+    hi: u32,
 }
 
 /// The direction of a walk round a polygon's vertices (a corner node's, a goal candidate's):
