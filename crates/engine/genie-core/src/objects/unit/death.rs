@@ -73,7 +73,7 @@ impl Unit {
             for annex in c.w.spatial.annexes_of(self.id) {
                 c.w.spatial.set_annex(annex, None);
                 if let Some((_, a)) = c.w.object_mut(annex) {
-                    a.annex_of = None;
+                    a.building.annex_of = None;
                     a.life.hp = self.life.hp;
                 }
             }
@@ -100,7 +100,7 @@ impl Unit {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
             // 165), each at least 0 (slots 0xf8, then 0xf0 with 0)
             let owner = c.w.players.player_mut(c.player)?;
-            for (kind, cost) in refund_of(master, self.annex_of) {
+            for (kind, cost) in refund_of(master, self.building.annex_of) {
                 owner.take_at_least_zero(kind, cost)?;
             }
         }
@@ -115,6 +115,7 @@ impl Unit {
         let look = self.combat.abilities.look.as_ref();
         let shown = if master.kind == BUILDING {
             let built = self
+                .building
                 .construction
                 .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
             crate::objects::sprite::building_death(master, look, built.progress)
@@ -156,6 +157,7 @@ impl Unit {
         master: &Master,
     ) -> Result<(), GenieError> {
         let construction = self
+            .building
             .construction
             .as_mut()
             .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
@@ -192,6 +194,7 @@ impl Unit {
             })?;
         }
         let construction = self
+            .building
             .construction
             .as_mut()
             .ok_or(crate::construction::build::NO_CONSTRUCTION)?;

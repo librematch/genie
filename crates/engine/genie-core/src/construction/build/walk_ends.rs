@@ -83,7 +83,7 @@ impl BuildAction {
     ) -> Result<(), GenieError> {
         if let Some(target) = self.target {
             let s = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
-            let desolid = s.construction.is_some_and(|k| k.desolid);
+            let desolid = s.building.construction.is_some_and(|k| k.desolid);
             let placed = *c.w.spatial.get_known(target)?.ok_or(SITE_GONE)?;
             if desolid && c.w.spatial.foreign_marks(&placed) {
                 let seen =

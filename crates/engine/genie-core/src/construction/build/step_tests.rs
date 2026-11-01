@@ -186,7 +186,10 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             master_id: ids::HOUSE,
             ..Lifecycle::default()
         },
-        construction: Some(construction(0.0, 0, true)),
+        building: crate::objects::layers::Building {
+            construction: Some(construction(0.0, 0, true)),
+            ..Default::default()
+        },
         workers: crate::objects::WorkerCount::of_data(1),
         pasture: None,
         my_pasture: None,
@@ -346,13 +349,13 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     let mut t = site_world(class::VILLAGER, Position::new(12.0, 10.5, 0.0), b);
     // another builder works on the main building, below 1 hit point: the work stays the annex's
     let main = own(&mut t, HOUSE);
-    main.construction = Some(construction(1.0, 1, false));
+    main.building.construction = Some(construction(1.0, 1, false));
     main.life.hp = HitPoints::new(0.5);
     let mut annex = own(&mut t, HOUSE).clone();
     annex.id = ANNEX;
-    annex.annex_of = Some(MainBuildingId::new(HOUSE));
+    annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.life.hp = HitPoints::new(1.0);
-    annex.construction = Some(construction(1.0, 0, false));
+    annex.building.construction = Some(construction(1.0, 0, false));
     t.players[1].objects.push(annex);
     t.spatial.insert(
         ANNEX,
@@ -364,7 +367,14 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
         ),
     );
     let _ = code(&mut t, 30);
-    let annex_of = |t: &World| t.players[1].objects.by_id(ANNEX).unwrap().construction;
+    let annex_of = |t: &World| {
+        t.players[1]
+            .objects
+            .by_id(ANNEX)
+            .unwrap()
+            .building
+            .construction
+    };
     let b = build(&t);
     assert_eq!(
         (b.state, b.added, house(&t).0),
@@ -381,7 +391,7 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
         ))
     );
     let mut b = build(&t);
-    let main = own(&mut t, HOUSE).construction.as_mut().unwrap();
+    let main = own(&mut t, HOUSE).building.construction.as_mut().unwrap();
     b.retake(
         Position::ORIGIN,
         None,
@@ -462,7 +472,8 @@ fn a_builder_whose_foundation_dies_walks_to_its_point() {
     };
     let mut t = site_world(class::VILLAGER, Position::new(8.0, 9.0, 0.0), b);
     let h = own(&mut t, HOUSE);
-    (h.life.state, h.construction) = (ObjectState::Removed, Some(construction(3.0, 1, false)));
+    (h.life.state, h.building.construction) =
+        (ObjectState::Removed, Some(construction(3.0, 1, false)));
     assert_eq!(code(&mut t, 20), HeadCode::Keeps);
     let b = build(&t);
     assert_eq!(
@@ -549,7 +560,8 @@ fn a_waiting_builder_whose_foundation_dies_walks_to_its_place() {
     // within the task's range of the place, so the walk ends without a path
     let mut t = site_world(class::VILLAGER, Position::new(10.55, 10.5, 0.0), b);
     let h = own(&mut t, HOUSE);
-    (h.life.state, h.construction) = (ObjectState::Gone, Some(construction(0.0, 0, false)));
+    (h.life.state, h.building.construction) =
+        (ObjectState::Gone, Some(construction(0.0, 0, false)));
     let _ = code(&mut t, 20);
     let b = build(&t);
     let walk = b.move_to.unwrap();
@@ -1071,11 +1083,11 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
     let h = own(&mut t, HOUSE);
     h.life.master_id = PASTURE_1889;
     h.life.state = ObjectState::Alive;
-    h.construction = Some(Construction {
+    h.building.construction = Some(Construction {
         build_time: WholeSeconds::of_data(20),
         ..construction(20.0, 1, false)
     });
-    h.stack_made = Some(object_id(10031));
+    h.building.stack_made = Some(object_id(10031));
     let v = own(&mut t, BUILDER);
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(7.0));
     let ai = v.combat.ai.as_mut().unwrap();
@@ -1171,7 +1183,7 @@ fn a_builder_lets_a_dead_foundation_go() {
         let h = own(&mut t, HOUSE);
         h.life.master_id = master;
         h.life.state = state;
-        h.construction = Some(construction(progress, 2, false));
+        h.building.construction = Some(construction(progress, 2, false));
         let _ = code(&mut t, 20);
         let b = build(&t);
         (
@@ -1263,7 +1275,7 @@ fn with_mill(t: &mut World) {
     mill.life.master_id = master_id(68);
     mill.life.state = ObjectState::Alive;
     mill.workers = crate::objects::WorkerCount::of_data(0);
-    mill.construction = Some(construction(25.0, 0, false));
+    mill.building.construction = Some(construction(25.0, 0, false));
     mill.place_for_test(Position::new(15.5, 10.5, 0.0));
     t.players[1].objects.push(mill);
     t.spatial.insert(
@@ -1309,7 +1321,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
     };
     let mut t = site_world(class::VILLAGER, Position::new(2.5, 2.5, 0.0), b);
     with_mill(&mut t);
-    own(&mut t, HOUSE).construction = Some(construction(0.0, 3, true));
+    own(&mut t, HOUSE).building.construction = Some(construction(0.0, 3, true));
     let mill = |t: &World| {
         t.players[1]
             .objects
@@ -1612,7 +1624,7 @@ fn camp(t: &mut World, at: Position) {
     camp.id = object_id(30);
     camp.life.master_id = master_id(562);
     camp.life.state = ObjectState::Alive;
-    camp.construction = Some(construction(25.0, 0, false));
+    camp.building.construction = Some(construction(25.0, 0, false));
     camp.place_for_test(at);
     t.players[1].objects.push(camp);
     t.spatial.insert(
@@ -1644,7 +1656,7 @@ fn annex(t: &mut World, at: Position) -> i32 {
     const ANNEX: i32 = 10029;
     let mut annex = own(t, HOUSE).clone();
     annex.id = object_id(ANNEX);
-    annex.annex_of = Some(MainBuildingId::new(HOUSE));
+    annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.place_for_test(at);
     t.players[1].objects.push(annex);
     t.spatial.insert(

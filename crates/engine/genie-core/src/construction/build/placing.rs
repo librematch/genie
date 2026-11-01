@@ -55,6 +55,7 @@ impl BuildAction {
     ) -> Result<(), GenieError> {
         let desolid = Self::site_unit(c, reads)?
             .ok_or(FOREIGN_SITE)?
+            .building
             .construction
             .is_some_and(|k| k.desolid);
         // every set_state first takes the builder out of FUN_140aaddb0's building's builders
@@ -169,7 +170,7 @@ impl BuildAction {
             let placed = *c.w.spatial.get_known(part)?.ok_or(SITE_GONE)?;
             let own = with_annexes(c, part);
             let (_, unit) = c.w.object(part).ok_or(SITE_GONE)?;
-            let desolid = unit.construction.is_some_and(|k| k.desolid);
+            let desolid = unit.building.construction.is_some_and(|k| k.desolid);
             let code = self.lend(c, builder, |w, _, _| {
                 w.foundation_code(&placed, desolid, &own)
             })?;

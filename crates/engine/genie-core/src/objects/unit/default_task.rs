@@ -17,7 +17,7 @@ impl Unit {
     pub(crate) fn start_default_task(&mut self, c: &mut Step<'_>) -> Result<bool, GenieError> {
         if self.life.state != ObjectState::Alive
             || self.top_action_kind().is_some()
-            || self.production.is_some()
+            || self.building.production.is_some()
         {
             return Ok(false);
         }

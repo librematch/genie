@@ -83,7 +83,7 @@ impl World {
         dt_seconds: Seconds,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(p, i)?;
-        let Some(production) = unit.production.as_ref() else {
+        let Some(production) = unit.building.production.as_ref() else {
             return Ok(());
         };
         if !production.queue.enabled
@@ -102,7 +102,7 @@ impl World {
                         | action_type::UNPACK
                 )
             });
-        if let Some(production) = self.players.live_mut(p, i)?.production.as_mut() {
+        if let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut() {
             production.queue.waiting = busy;
         }
         if busy {
@@ -122,6 +122,7 @@ impl World {
         let Some(first) = self
             .players
             .live(p, i)?
+            .building
             .production
             .as_ref()
             .and_then(|q| q.queue.first().copied())
@@ -135,7 +136,7 @@ impl World {
                 .map_or(Amount::ZERO, |m| population(&m.storage));
             self.players.player_mut(p)?.add_attribute(QUEUED, -pop)?;
         }
-        if let Some(production) = self.players.live_mut(p, i)?.production.as_mut() {
+        if let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut() {
             production.queue.release_first()?;
         }
         Ok(())
@@ -148,6 +149,7 @@ impl World {
         let production = self
             .players
             .live(p, i)?
+            .building
             .production
             .as_ref()
             .ok_or(NO_QUEUE)?;
@@ -183,6 +185,7 @@ impl World {
         if let Some(tech) = self
             .players
             .live(p, i)?
+            .building
             .production
             .as_ref()
             .and_then(|q| q.queue.first())
@@ -192,7 +195,7 @@ impl World {
                 .get(tech.index())
                 .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
             && tech.index() < self.players.player(p)?.techs.len()
-            && let Some(production) = self.players.live_mut(p, i)?.production.as_mut()
+            && let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut()
         {
             production.note_shared_research(tech);
         }
@@ -231,7 +234,7 @@ impl World {
             }
             Making::Research(r) => self.start_research(p, i, r)?,
         }
-        if let Some(production) = self.players.live_mut(p, i)?.production.as_mut() {
+        if let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut() {
             production.action = Some(making);
         }
         Ok(())
@@ -252,6 +255,7 @@ impl World {
         let paid = owner
             .objects
             .checked(i)?
+            .building
             .production
             .as_ref()
             .and_then(|q| q.queue.first())
@@ -285,6 +289,7 @@ impl World {
         let action = self
             .players
             .live(p, i)?
+            .building
             .production
             .as_ref()
             .and_then(|q| q.action);
@@ -311,7 +316,9 @@ impl World {
         dt_seconds: Seconds,
     ) -> Result<UpdateCode, GenieError> {
         let building = &self.players.live(p, i)?;
-        let Some(Some(Making::Unit(make))) = building.production.as_ref().map(|q| q.action) else {
+        let Some(Some(Making::Unit(make))) =
+            building.building.production.as_ref().map(|q| q.action)
+        else {
             return Err(NO_MAKE_ACTION);
         };
         match make.state {
@@ -327,6 +334,7 @@ impl World {
         if let Some(Some(Making::Unit(m))) = self
             .players
             .live_mut(p, i)?
+            .building
             .production
             .as_mut()
             .map(|q| q.action.as_mut())
@@ -348,6 +356,7 @@ impl World {
         if let Some(Some(Making::Unit(m))) = self
             .players
             .live_mut(p, i)?
+            .building
             .production
             .as_mut()
             .map(|q| q.action.as_mut())
@@ -368,6 +377,7 @@ impl World {
         let Some(making) = self
             .players
             .live_mut(p, i)?
+            .building
             .production
             .as_mut()
             .and_then(|q| q.action.take())

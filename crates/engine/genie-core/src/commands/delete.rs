@@ -145,7 +145,7 @@ impl World {
                         continue;
                     };
                     let kind = u.master(&self.masters, owner)?.kind;
-                    let desolid = u.construction.is_some_and(|c| c.desolid);
+                    let desolid = u.building.construction.is_some_and(|c| c.desolid);
                     if kind != BUILDING
                         || !desolid
                         || !self.spatial.sees_and_explored(owner, Tile::new(tx, ty))
@@ -225,7 +225,7 @@ impl World {
         let master = unit.master(&self.masters, owner)?;
         let cost = master.cost;
         let (state, hp) = (unit.life.state, unit.life.hp);
-        let site = unit.construction;
+        let site = unit.building.construction;
         let desolid = site.is_some_and(|c| c.desolid);
         let share = if state < ObjectState::Alive && HitPoints::new(1.0) <= hp {
             let c = site.ok_or(crate::construction::build::NO_CONSTRUCTION)?;
@@ -433,7 +433,7 @@ impl World {
             return self.base_set_state(owner, id, new, master);
         };
         let u = held(&mut self.players, place)?;
-        let (state, main) = (u.life.state, u.annex_of);
+        let (state, main) = (u.life.state, u.building.annex_of);
         if ObjectState::Dying <= new && state < ObjectState::Dying {
             crate::objects::lifecycle::death_parts::combat_dies(
                 u,
@@ -615,19 +615,22 @@ mod tests {
     fn game(progress: f32, desolid: bool) -> World {
         let house = Unit {
             id: object_id(11),
-            construction: Some(Construction {
-                progress: Seconds::new(progress),
-                desolid,
-                builders: crate::construction::BuilderCount::of_data(0),
-                hit_points: MasterHitPoints::of_data(550),
-                build_time: WholeSeconds::of_data(25),
-                record: Obstruction {
-                    kind: ObstructionType::TYPE_2,
-                    class: ObstructionClass::NONE,
-                },
-                snow: false,
-                sprite_override: false,
-            }),
+            building: crate::objects::layers::Building {
+                construction: Some(Construction {
+                    progress: Seconds::new(progress),
+                    desolid,
+                    builders: crate::construction::BuilderCount::of_data(0),
+                    hit_points: MasterHitPoints::of_data(550),
+                    build_time: WholeSeconds::of_data(25),
+                    record: Obstruction {
+                        kind: ObstructionType::TYPE_2,
+                        class: ObstructionClass::NONE,
+                    },
+                    snow: false,
+                    sprite_override: false,
+                }),
+                ..Default::default()
+            },
             ..Unit::default()
         };
         let mut t = World::new(

@@ -102,15 +102,18 @@ fn game() -> World {
             }),
             ..Default::default()
         },
-        production: Some(Production {
-            queue: queue(&[villager(Some(ids::VILLAGER_MALE), 1, 46.0)]),
-            action: Some(Making::Unit(MakeObj {
-                state: MakeObjState::Making,
-                progress: Seconds::new(3.0),
-                ..MakeObj::for_entry(&villager(Some(ids::VILLAGER_MALE), 1, 46.0))
-            })),
-            ..Production::default()
-        }),
+        building: crate::objects::layers::Building {
+            production: Some(Production {
+                queue: queue(&[villager(Some(ids::VILLAGER_MALE), 1, 46.0)]),
+                action: Some(Making::Unit(MakeObj {
+                    state: MakeObjState::Making,
+                    progress: Seconds::new(3.0),
+                    ..MakeObj::for_entry(&villager(Some(ids::VILLAGER_MALE), 1, 46.0))
+                })),
+                ..Production::default()
+            }),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let player = |objects| Player {
@@ -445,6 +448,7 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
 fn a_cancel_gives_back_one_queued_unit() {
     let mut t = game();
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -460,7 +464,11 @@ fn a_cancel_gives_back_one_queued_unit() {
         (p.attributes[0], p.attributes[80]),
         (Amount::new(45.0), Amount::new(1.0))
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     let q = &production.queue;
     assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (1, 1, 1));
     assert!(production.action.is_some());
@@ -475,7 +483,11 @@ fn a_cancel_gives_back_one_queued_unit() {
         (p.attributes[0], p.attributes[80], p.attributes[81]),
         (Amount::new(91.0), Amount::ZERO, Amount::ZERO)
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     assert!(production.queue.entries().is_empty() && production.action.is_none());
     assert!(
         t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
@@ -492,6 +504,7 @@ fn a_cancel_gives_back_one_queued_unit() {
 fn a_dying_building_cancels_its_queue_in_its_update() {
     let mut t = game();
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -506,6 +519,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
         (Amount::new(200.0), Amount::ZERO)
     );
     let q = &p.objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap()
@@ -514,6 +528,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
     t.building_production(PlayerId::new(1), ListIndex::new(0), Seconds::new(0.05))
         .unwrap();
     let q = &t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap()
@@ -521,6 +536,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
     assert_eq!((q.count.get(), q.changes.get()), (0, 2));
     let mut t = game();
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -529,6 +545,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
     t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
     // a disabled queue (+0xbf6): the production step does nothing
     t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap()
@@ -539,6 +556,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
     let p = &t.players[1];
     assert_eq!(
         p.objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .unwrap()
@@ -555,6 +573,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
 fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
     let mut t = game();
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -568,7 +587,11 @@ fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
     )
     .unwrap();
     let p = &t.players[1];
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     assert_eq!(
         (
             production.queue.count.get(),
@@ -592,6 +615,7 @@ fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
 fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
     let mut t = game();
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -621,7 +645,11 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
         (p.attributes[0], p.attributes[80]),
         (Amount::new(5.0 * 46.0), Amount::new(2.0))
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     let q = &production.queue;
     assert_eq!(
         (
@@ -639,6 +667,7 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
     let mut t2 = game();
     t2.masters = t.masters.clone();
     let tc = t2.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -650,6 +679,7 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
     t2.cancel_order(&object_ids([9]), UnitIndex::of_data(1), true)
         .unwrap();
     let production = t2.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap();
@@ -691,6 +721,7 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
     }]));
     t.players[1].attributes[80] = Amount::new(4.0);
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -710,6 +741,7 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
     assert_eq!(p.attributes[80], Amount::ZERO);
     assert_eq!(
         p.objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .unwrap()
@@ -730,6 +762,7 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
         ..villager(None, 1, 0.0)
     };
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -743,6 +776,7 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
     )
     .unwrap();
     let q = &t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap()
@@ -770,6 +804,7 @@ fn researching(progress: f32) -> World {
         ..villager(None, 3, 0.0)
     };
     let tc = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .unwrap();
@@ -849,7 +884,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
         tc.combat.store,
         crate::test_ids::adds([(attribute::WOOD, 20.0)])
     );
-    let production = tc.production.as_ref().unwrap();
+    let production = tc.building.production.as_ref().unwrap();
     assert_eq!(production.disabled_techs, [tech_id(5)]);
     assert_eq!(
         (production.queue.count.get(), production.queue.total.get()),
@@ -871,7 +906,11 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
         ),
         (Amount::new(50.0), ResearchState::Available, 2)
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     assert_eq!(production.queue.slots[0].count, QueuedUnits::of_data(2));
     assert!(production.action.is_some());
 }
@@ -897,7 +936,11 @@ fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_o
         ),
         (ResearchState::Available, 1, -1, Seconds::new(30.0))
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     assert_eq!(
         (production.queue.count.get(), production.queue.changes.get()),
         (0, 1)
@@ -957,6 +1000,7 @@ fn a_cancel_in_game_mode_16_clears_the_military_flag() {
             ..Master::default()
         }]));
         let tc = t.players[1].objects[ListIndex::new(0)]
+            .building
             .production
             .as_mut()
             .unwrap();
@@ -993,7 +1037,7 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
         (Amount::ZERO, Amount::ZERO)
     );
     let tc = &p.objects[ListIndex::new(0)];
-    let production = tc.production.as_ref().unwrap();
+    let production = tc.building.production.as_ref().unwrap();
     assert!(production.queue.entries().is_empty() && production.action.is_none());
     assert_eq!(
         (production.queue.total.get(), production.queue.changes.get()),
@@ -1018,6 +1062,7 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
 fn a_make_action_the_queue_did_not_pay_for_refunds_its_master_s_costs() {
     let mut t = game();
     if let Some(Some(Making::Unit(make))) = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_mut()
         .map(|q| q.action.as_mut())

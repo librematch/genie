@@ -419,7 +419,7 @@ impl crate::world::World {
             for u in player.objects.iter().chain(&player.sleeping) {
                 let k = self.tracker_key(p, u.life.master_id);
                 tracker.add(u.id, k);
-                for e in u.production.iter().flat_map(|q| q.queue.entries()) {
+                for e in u.building.production.iter().flat_map(|q| q.queue.entries()) {
                     if let Some(master) = e.master.filter(|m| 0 < m.get())
                         && QueuedUnits::ZERO < e.count
                     {
@@ -432,7 +432,8 @@ impl crate::world::World {
                 }
                 let building = u.master(&self.masters, p)?.kind == BUILDING;
                 if building
-                    && u.construction
+                    && u.building
+                        .construction
                         .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress)
                 {
                     tracker.complete(u.id, k);
@@ -886,19 +887,24 @@ mod tests {
         let unit = |id: i32, master: MasterId, progress: Option<f32>| {
             let mut u = Unit {
                 id: object_id(id),
-                construction: progress.map(|progress| crate::construction::build::Construction {
-                    progress: Seconds::new(progress),
-                    desolid: false,
-                    builders: crate::construction::BuilderCount::of_data(0),
-                    hit_points: MasterHitPoints::of_data(2400),
-                    build_time: WholeSeconds::of_data(150),
-                    record: crate::map::spatial::Obstruction {
-                        kind: ObstructionType::NONE,
-                        class: ObstructionClass::NONE,
-                    },
-                    snow: false,
-                    sprite_override: false,
-                }),
+                building: crate::objects::layers::Building {
+                    construction: progress.map(|progress| {
+                        crate::construction::build::Construction {
+                            progress: Seconds::new(progress),
+                            desolid: false,
+                            builders: crate::construction::BuilderCount::of_data(0),
+                            hit_points: MasterHitPoints::of_data(2400),
+                            build_time: WholeSeconds::of_data(150),
+                            record: crate::map::spatial::Obstruction {
+                                kind: ObstructionType::NONE,
+                                class: ObstructionClass::NONE,
+                            },
+                            snow: false,
+                            sprite_override: false,
+                        }
+                    }),
+                    ..Default::default()
+                },
                 ..Unit::default()
             };
             u.life.master_id = master;

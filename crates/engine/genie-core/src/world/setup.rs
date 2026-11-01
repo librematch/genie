@@ -124,7 +124,7 @@ impl World {
                     continue;
                 };
                 let moving = u.body.mover().is_some_and(Mover::is_moving);
-                let desolid = u.construction.is_some_and(|c| c.desolid);
+                let desolid = u.building.construction.is_some_and(|c| c.desolid);
                 let kind = m.obstruction_type;
                 if placed.tall
                     && kind.recorded()

@@ -186,6 +186,7 @@ impl World {
         let (player, unit) = self.object(target).ok_or_else(|| member_gone(target))?;
         let building = unit.master(&self.masters, player)?.kind == BUILDING;
         Ok(unit
+            .building
             .annex_of
             .filter(|_| building)
             .map_or(target, crate::construction::MainBuildingId::id))

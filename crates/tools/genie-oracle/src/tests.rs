@@ -42,7 +42,10 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
     let kind = ARTIFACT_TYPE;
     let both = Unit {
         actions: ActionList::default().with_artifact(Some(artifact)),
-        production: Some(making.clone()),
+        building: genie_core::objects::layers::Building {
+            production: Some(making.clone()),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     assert_eq!(
@@ -64,7 +67,10 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         })
     );
     let training = Unit {
-        production: Some(making),
+        building: genie_core::objects::layers::Building {
+            production: Some(making),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     assert_eq!(

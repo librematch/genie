@@ -103,7 +103,7 @@ impl crate::world::World {
         master: &Master,
     ) -> Result<(), GenieError> {
         let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        let c = u.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        let c = u.building.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         c.progress = Seconds::of_master(c.build_time);
         let mut gains = Vec::new();
         hand_storage(master, &mut gains, Some(&mut u.combat.store));
@@ -141,7 +141,7 @@ impl crate::world::World {
             &mut u.sprite,
             u.body.move_stats_mut(),
             master,
-            u.build_frame,
+            u.building.build_frame,
             graphics,
             streams.get(crate::math::rng::Stream::Sprite),
         );
@@ -172,7 +172,7 @@ impl crate::world::World {
         self.spatial.drop_record(id);
         self.pathing.tiles_changed(self.spatial.take_changes());
         let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        let (main, rice, hp) = (u.annex_of.is_some(), u.rice, u.life.hp);
+        let (main, rice, hp) = (u.building.annex_of.is_some(), u.building.rice, u.life.hp);
         u.roo_called = true;
         if !main && let Some(v) = self.spatial.sight.as_mut() {
             v.unlink_building(placed.position, master.radius)?;
@@ -211,8 +211,8 @@ impl crate::world::World {
             players, spatial, ..
         } = self;
         let u = held(players, place)?;
-        let (main, rice) = (u.annex_of.is_some(), u.rice);
-        let c = u.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        let (main, rice) = (u.building.annex_of.is_some(), u.building.rice);
+        let c = u.building.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let laid = stack_master(master, building, rice);
         lay_foundation(c, spatial, placed, master, building, laid, mode_680)?;
         let mut counts = Vec::new();

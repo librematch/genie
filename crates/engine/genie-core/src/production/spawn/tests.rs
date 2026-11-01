@@ -675,7 +675,7 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
             current_target: None,
             ..UnitAi::default()
         });
-        p.objects[ListIndex::new(2)].gather_point = Some(GatherPoint {
+        p.objects[ListIndex::new(2)].building.gather_point = Some(GatherPoint {
             state,
             point: Position::new(40.0, 80.0, 0.0),
             target: None,

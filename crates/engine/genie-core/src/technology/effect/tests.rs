@@ -88,9 +88,9 @@ fn a_charge_keeps_its_share_of_a_changed_maximum() {
 fn an_object_has_actions_while_it_holds_one() {
     let mut u = Unit::default();
     assert!(!has_actions(&u));
-    u.production = Some(crate::production::Production::default());
+    u.building.production = Some(crate::production::Production::default());
     assert!(!has_actions(&u));
-    u.production.as_mut().unwrap().action = Some(crate::production::Making::Research(
+    u.building.production.as_mut().unwrap().action = Some(crate::production::Making::Research(
         crate::production::MakeTech {
             state: crate::production::MakeTechState::Researching,
             paid: false,
@@ -581,10 +581,10 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
 fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
     let mut main = unit_of(20, master_id(30), HitPoints::new(100.0));
     main.life.master_id = master_id(30);
-    main.construction = Some(built());
+    main.building.construction = Some(built());
     let mut annex = unit_of(21, master_id(31), HitPoints::new(50.0));
-    annex.annex_of = Some(MainBuildingId::new(object_id(20)));
-    annex.construction = Some(built());
+    annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
+    annex.building.construction = Some(built());
     let mut foundation = unit_of(22, master_id(30), HitPoints::new(10.0));
     foundation.life.state = ObjectState::Foundation;
     let player = Player {
@@ -927,7 +927,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
 fn an_object_s_copies_of_its_master_follow_its_change() {
     use crate::objects::masters::attribute as a;
     let mut site = unit_of(1, master_id(4), HitPoints::new(30.0));
-    site.construction = Some(built());
+    site.building.construction = Some(built());
     let player = Player {
         objects: vec![site, unit_of(3, master_id(5), HitPoints::new(30.0))].into(),
         sleeping: vec![unit_of(2, master_id(4), HitPoints::new(30.0))].into(),
@@ -1018,7 +1018,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         (Some(SpriteId::named(7)), true)
     );
     assert_eq!(follows(&p.objects[ListIndex::new(1)]), (None, false));
-    let c = p.objects[ListIndex::new(0)].construction.unwrap();
+    let c = p.objects[ListIndex::new(0)].building.construction.unwrap();
     assert_eq!(c.build_time, WholeSeconds::of_data(33));
     assert_eq!(
         c.record,
@@ -1131,7 +1131,7 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
 fn a_farm_food_change_grows_the_farms_food() {
     let mut farm = unit_of(5, ids::FARM, HitPoints::new(480.0));
     farm.life.amount = Amount::new(75.0);
-    farm.construction = Some(built());
+    farm.building.construction = Some(built());
     farm.actions
         .set_make(Some(crate::gathering::make::MakeAction {
             state: MakeState::Done,
@@ -2079,7 +2079,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
 fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     let mut house = unit_of(1, ids::HOUSE, HitPoints::new(550.0));
     house.place_for_test(Position::new(5.5, 5.5, 0.0));
-    house.construction = Some(built());
+    house.building.construction = Some(built());
     let mut soldier = unit_of(2, master_id(4), HitPoints::new(30.0));
     soldier.group.id = Some(group_id(7));
     let player = Player {

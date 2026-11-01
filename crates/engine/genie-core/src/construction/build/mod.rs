@@ -285,7 +285,7 @@ pub struct StackUnit {
 /// The completion's sprite (`FUN_1411dbb70` from state 0 to 2, after its storage): slot 0x68
 /// (`FUN_141217000`) with the master's standing sprite (`+0x470`), then its sprite list's slot
 /// 0x28 (`FUN_1413ba880`) sets that sprite's node to the frame its BUILD command chose
-/// (`+0xc54`, [`crate::objects::unit::Unit::build_frame`]; slot 9 with it, [`ActiveSprite::set_frame`]).
+/// (`+0xc54`, [`crate::objects::layers::Building::build_frame`]; slot 9 with it, [`ActiveSprite::set_frame`]).
 pub(crate) fn show_built(
     sprite: &mut Option<crate::objects::sprite::ActiveSprite>,
     stats: Option<&mut crate::movement::MoveStats>,
@@ -393,7 +393,7 @@ pub(crate) struct BuildReads {
     /// The foundation's master, when the builder's player holds the foundation.
     pub(crate) built: Option<MasterId>,
     /// The foundation's `+0xcb0`: the object its completion's stack unit made
-    /// ([`crate::objects::unit::Unit::stack_made`]).
+    /// ([`crate::objects::layers::Building::stack_made`]).
     pub(crate) stack_made: Option<ObjectId>,
     /// The state of each foundation its unit AI's queued build orders name (None for one that
     /// is gone).
@@ -601,19 +601,22 @@ mod stack_tests {
                 master_id: ids::TOWN_CENTRE_621,
                 ..Lifecycle::default()
             },
-            construction: Some(Construction {
-                progress: Seconds::new(149.99),
-                desolid: false,
-                builders: crate::construction::BuilderCount::of_data(1),
-                hit_points: MasterHitPoints::of_data(2400),
-                build_time: WholeSeconds::of_data(150),
-                record: Obstruction {
-                    kind: ObstructionType::TYPE_2,
-                    class: ObstructionClass::UNIT,
-                },
-                snow: false,
-                sprite_override: false,
-            }),
+            building: crate::objects::layers::Building {
+                construction: Some(Construction {
+                    progress: Seconds::new(149.99),
+                    desolid: false,
+                    builders: crate::construction::BuilderCount::of_data(1),
+                    hit_points: MasterHitPoints::of_data(2400),
+                    build_time: WholeSeconds::of_data(150),
+                    record: Obstruction {
+                        kind: ObstructionType::TYPE_2,
+                        class: ObstructionClass::UNIT,
+                    },
+                    snow: false,
+                    sprite_override: false,
+                }),
+                ..Default::default()
+            },
             pasture: None,
             my_pasture: None,
             ..Unit::default()
@@ -765,6 +768,7 @@ mod stack_tests {
         let unit = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
         assert_eq!(
             [8769, 8770, 8771, 8772, 8773].map(|a| unit(object_id(a))
+                .building
                 .annex_of
                 .map(crate::construction::MainBuildingId::id)),
             [
@@ -883,7 +887,7 @@ mod stack_tests {
                     }
                 }
             }
-            t.players[1].objects[ListIndex::new(0)].gate = Some(crate::world::Gate {
+            t.players[1].objects[ListIndex::new(0)].building.gate = Some(crate::world::Gate {
                 locked,
                 ..crate::world::Gate::default()
             });
@@ -898,7 +902,7 @@ mod stack_tests {
             )
             .unwrap();
             let gate = t.players[1].objects.by_id(object_id(8768)).unwrap();
-            assert_eq!(gate.gate.map(|g| g.locked), Some(locked));
+            assert_eq!(gate.building.gate.map(|g| g.locked), Some(locked));
             let last_move = gate.body.mover().map(|m| m.last_move);
             assert_eq!(
                 last_move,
@@ -914,14 +918,18 @@ mod stack_tests {
     #[test]
     fn a_stack_unit_s_completion_reads_the_foundation_s_attacking_units() {
         let mut gone = world();
-        gone.players[1].objects[ListIndex::new(0)].attacking_units = vec![object_id(99_999)];
+        gone.players[1].objects[ListIndex::new(0)]
+            .building
+            .attacking_units = vec![object_id(99_999)];
         assert_eq!(
             gone.work_building(object_id(8759), Seconds::new(1.0)),
             Ok(false)
         );
         let mut held = world();
         let first = held.players[1].objects[ListIndex::new(0)].id;
-        held.players[1].objects[ListIndex::new(0)].attacking_units = vec![first];
+        held.players[1].objects[ListIndex::new(0)]
+            .building
+            .attacking_units = vec![first];
         assert_eq!(
             held.work_building(object_id(8759), Seconds::new(1.0)),
             Err(GenieError::unsupported(

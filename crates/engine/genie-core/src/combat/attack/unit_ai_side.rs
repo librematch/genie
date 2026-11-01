@@ -231,7 +231,7 @@ impl UnitView<'_, '_> {
         let target_mark = mark(target, t)?;
         let main = match owner_view(&self.c.w.players, self.c.player, self.new_owner)?
             .get(target)
-            .and_then(|u| u.annex_of)
+            .and_then(|u| u.building.annex_of)
         {
             Some(m) => match self.c.w.spatial.get(m).copied() {
                 Some(p) => Some(mark(m.id(), &p)?),

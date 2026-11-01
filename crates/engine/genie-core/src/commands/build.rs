@@ -37,7 +37,7 @@ pub struct BuildCommand {
     /// too, and the queue's orders become ready after (`FUN_140c42b60`).
     pub commits: bool,
     /// `+0x1c`: the frame the foundation's standing sprite takes once built (its `+0xc54`,
-    /// [`crate::objects::unit::Unit::build_frame`]).
+    /// [`crate::objects::layers::Building::build_frame`]).
     pub frame: crate::objects::Frame,
 }
 
@@ -73,10 +73,10 @@ impl BuildCommand {
         let (id, position) = w.found(player, master, Position::new(x, y, 0.0))?;
         let sprite_override = self.sprite_override_of(w.players.player(player)?.civ);
         if let Some((_, u)) = w.object_mut(id) {
-            if let Some(c) = u.construction.as_mut() {
+            if let Some(c) = u.building.construction.as_mut() {
                 c.sprite_override = sprite_override != crate::commands::SpriteOverride::NONE;
             }
-            u.build_frame = self.frame;
+            u.building.build_frame = self.frame;
         }
         w.task_builders(
             player,

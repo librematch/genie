@@ -78,7 +78,7 @@ impl World {
                 continue;
             }
             let unit = &self.players.live(player, i)?;
-            let old = unit.gather_point;
+            let old = unit.building.gather_point;
             let kept = old.is_some_and(|g| g.state == GatherPointState::KEPT);
             let z = old.map_or(0.0, |g| g.point.z());
             let gather = if own {
@@ -111,7 +111,7 @@ impl World {
                 })
             };
             let unit = self.players.live_mut(player, i)?;
-            unit.gather_point = gather;
+            unit.building.gather_point = gather;
             // the unit AI's slot 0x210 (FUN_140c16790): its command queue empties
             if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.building_orders.clear();
@@ -150,7 +150,7 @@ impl World {
             } else {
                 None
             };
-            self.players.live_mut(player, i)?.gather_point = gather;
+            self.players.live_mut(player, i)?.building.gather_point = gather;
         }
         Ok(())
     }
@@ -219,7 +219,7 @@ impl World {
             let building = unit.master(&self.masters, p)?.kind == BUILDING;
             let mut queued = Vec::new();
             if building
-                && let Some(g) = unit.gather_point
+                && let Some(g) = unit.building.gather_point
                 && ai.building_orders.is_empty()
                 && g.target != Some(unit.id)
             {
@@ -234,7 +234,7 @@ impl World {
             queued.push(step(self, target, Point::new(x, y))?);
             let unit = self.players.live_mut(p, i)?;
             if building {
-                unit.gather_point = None;
+                unit.building.gather_point = None;
             }
             if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.building_orders.extend(queued);

@@ -119,7 +119,7 @@ impl World {
                 .is_some_and(|b| b.transform_unit.is_some());
         Ok(gate.life.state < ObjectState::Dying
             && transforming
-            && !gate.gate.is_some_and(|g| g.locked)
+            && !gate.building.gate.is_some_and(|g| g.locked)
             && self.spatial.allied_with(q, p)
             && self.spatial.allied_with(p, q))
     }

@@ -412,7 +412,7 @@ impl World {
     ) -> Result<TaskTarget<'_>, GenieError> {
         let mut id = id;
         for _ in 0..steps {
-            match self.object(id).and_then(|(_, u)| u.annex_of) {
+            match self.object(id).and_then(|(_, u)| u.building.annex_of) {
                 Some(main) => id = main.id(),
                 None => break,
             }
@@ -554,7 +554,7 @@ pub(crate) fn set_stance(
 /// callers set to 0 or 1) takes `locked`; a lock also sets its last move time (`+0x870`,
 /// [`crate::movement::Mover::last_move`]) to the world time (`FUN_1415300d0`) plus 1.
 pub(crate) fn lock_gate(unit: &mut Unit, locked: bool, now: WorldTime) -> Result<(), GenieError> {
-    let gate = unit.gate.as_mut().ok_or(GenieError::unsupported(
+    let gate = unit.building.gate.as_mut().ok_or(GenieError::unsupported(
         "a GATE of a building without its gate state",
     ))?;
     gate.locked = locked;

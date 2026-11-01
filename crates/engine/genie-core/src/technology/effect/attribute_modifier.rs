@@ -349,7 +349,7 @@ impl World {
                 a::SIZE_Z => {
                     let desolid = self
                         .object(id)
-                        .and_then(|(_, u)| u.construction.as_ref())
+                        .and_then(|(_, u)| u.building.construction.as_ref())
                         .is_some_and(|c| c.desolid);
                     if master.kind == master_type::BUILDING
                         && !desolid
@@ -484,7 +484,7 @@ impl World {
                 a::DEAD_UNIT_ID => u.life.death_spawn = master.death_spawns[0].is_some(),
                 _ => {}
             }
-            if let Some(c) = u.construction.as_mut() {
+            if let Some(c) = u.building.construction.as_mut() {
                 match attribute {
                     a::HIT_POINTS => c.hit_points = master.hit_points,
                     a::TRAIN_TIME

@@ -83,7 +83,7 @@ impl Diplomacy for SideWorld<'_> {
 pub(crate) fn wait_progress(id: ObjectId, others: OthersRef<'_>) -> Option<Seconds> {
     others
         .get(id)
-        .and_then(|u| u.construction.map(|k| k.progress))
+        .and_then(|u| u.building.construction.map(|k| k.progress))
 }
 
 /// The state (`+0x640`) of object `id` among its owner's other objects and the other players'
@@ -107,7 +107,7 @@ pub(crate) fn task_target_with<'a>(
 ) -> Result<Option<TaskTarget<'a>>, GenieError> {
     let mut id = id;
     for _ in 0..steps {
-        match find(id).and_then(|(_, u)| u.annex_of) {
+        match find(id).and_then(|(_, u)| u.building.annex_of) {
             Some(main) => id = main.id(),
             None => break,
         }

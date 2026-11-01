@@ -11,8 +11,8 @@ missile. This folder holds the object itself and the parts that every object has
 - `facing.rs` holds the object's angle and its facet in the sprite.
 - `layers/` holds the object's layers (FD-045): below its actions the static layer with its
   place, animated with its animation speed, or moving with its mover (every layer holds the
-  static one; the place has one setter, which moves the world's index with it, D15), and the
-  combat layer.
+  static one; the place has one setter, which moves the world's index with it, D15), the
+  combat layer and the building layer.
 - `actions.rs` holds the object's action list: one `Action` per kind it holds, the current one
   first.
 - `release.rs` handles an object that leaves the world, and the release of a target by the

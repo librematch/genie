@@ -241,9 +241,9 @@ impl World {
             return Ok(false);
         };
         let m = u.master(&self.masters, p)?;
-        let annex = linked && u.annex_of.is_some();
+        let annex = linked && u.building.annex_of.is_some();
         Ok(!UNWATCHED_CLASSES.contains(&m.class)
-            && !u.construction.is_some_and(|c| c.desolid)
+            && !u.building.construction.is_some_and(|c| c.desolid)
             // The master a building's watch leaves out (`FUN_1411cc980`).
             && (!annex || m.class == class::GATE)
             && m.id != MASTER_1808)
@@ -318,7 +318,7 @@ impl World {
                 let held = self.players.player(p)?;
                 let objects = if list { &held.sleeping } else { &held.objects };
                 let mut annexes: Vec<ObjectId> = Vec::new();
-                for u in objects.iter().filter(|u| u.annex_of.is_some()) {
+                for u in objects.iter().filter(|u| u.building.annex_of.is_some()) {
                     if u.master(&self.masters, p)?.class != class::GATE {
                         annexes.push(u.id);
                     }
@@ -1300,14 +1300,14 @@ mod tests {
             ObjectState::Alive,
             Position::new(2.5, 2.5, 0.0),
         );
-        g.annex_of = Some(MainBuildingId::new(object_id(9)));
+        g.building.annex_of = Some(MainBuildingId::new(object_id(9)));
         let mut a = object(
             11,
             master_id(89),
             ObjectState::Alive,
             Position::new(3.5, 2.5, 0.0),
         );
-        a.annex_of = Some(MainBuildingId::new(object_id(9)));
+        a.building.annex_of = Some(MainBuildingId::new(object_id(9)));
         t.players[1].objects.extend([
             g,
             a,
@@ -1325,7 +1325,7 @@ mod tests {
             ),
         ]);
         let mut foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
-        foundation.construction = Some(crate::construction::build::Construction {
+        foundation.building.construction = Some(crate::construction::build::Construction {
             progress: Seconds::ZERO,
             desolid: true,
             builders: crate::construction::BuilderCount::NONE,

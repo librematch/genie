@@ -67,6 +67,7 @@ impl Unit {
         }
         let height = master.height.get();
         let gate = self
+            .building
             .gate
             .as_mut()
             .ok_or(GenieError::unsupported("a gate without its gate state"))?;
@@ -77,7 +78,7 @@ impl Unit {
         }
         let locked = gate.locked;
         let (total, allied) = self.gate_count(&mut c.w.spatial, others)?;
-        let gate = self.gate.as_mut().ok_or(GenieError::unreachable(
+        let gate = self.building.gate.as_mut().ok_or(GenieError::unreachable(
             "a gate whose state went during its update",
         ))?;
         if shut && 0 < allied && !locked {
@@ -139,12 +140,12 @@ impl Unit {
     /// most 2), lays terrain under it each update (`FUN_1411ce250` -> `FUN_1411ddd90`,
     /// [`crate::map::terrain::Terrain::cover`]): 29 plus the stage under a farm (master 50); under a
     /// rice farm or a pasture (1187, 1889) 65 plus the stage on mangrove or rice terrain (`+0xcd0`,
-    /// [`Unit::rice`]), else its foundation terrain (`+0x988`) plus 2 plus the stage (bytes).
+    /// [`Building::rice`](crate::objects::layers::Building::rice)), else its foundation terrain (`+0x988`) plus 2 plus the stage (bytes).
     /// `FUN_1411ce250` maps the terrains 8, 27 and 64 by the local player's view and the tile's
     /// own (`+0x2e8`'s `+10`), which the slice does not hold; the masters' foundations (7, 63,
     /// 117) never give them.
     pub(crate) fn farm_stage(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let Some(cons) = self.construction.filter(|k| {
+        let Some(cons) = self.building.construction.filter(|k| {
             self.life.state == ObjectState::Foundation && WholeSeconds::ZERO < k.build_time
         }) else {
             return Ok(());
@@ -153,7 +154,7 @@ impl Unit {
         let foundation = m.building.as_ref().and_then(|b| b.foundation_terrain);
         let Some(terrain) = farm_stage_terrain(
             m.id,
-            (self.rice, foundation),
+            (self.building.rice, foundation),
             cons.progress,
             cons.build_time,
         ) else {
@@ -199,13 +200,14 @@ impl Unit {
         self.farm_stage(c)?;
         let due = self.life.state == ObjectState::Foundation
             && self
+                .building
                 .construction
                 .is_some_and(|cons| Seconds::of_master(cons.build_time) <= cons.progress);
         if !due {
             return Ok(());
         }
         let master = self.master(&c.w.masters, c.player)?;
-        if !walls_branch(master) && self.annex_of.is_some() {
+        if !walls_branch(master) && self.building.annex_of.is_some() {
             return Ok(());
         }
         let (p, id) = (c.player, self.id);
@@ -263,15 +265,18 @@ impl Unit {
                 "a building whose master attribute 255 names (FUN_1411c39b0)",
             ));
         }
-        let seconds = c.w.world_time.since(self.garrison_time).get() / 1000;
+        let seconds = c.w.world_time.since(self.building.garrison_time).get() / 1000;
         if seconds == 0 {
             return Ok(());
         }
-        self.garrison_time = self.garrison_time.after(Millis::new(seconds * 1000));
+        self.building.garrison_time = self
+            .building
+            .garrison_time
+            .after(Millis::new(seconds * 1000));
         if self.damaged_lately.running() {
             self.damaged_lately = self.damaged_lately.tick();
         }
-        if master.id == MONASTERY && self.relics != Relics::NONE {
+        if master.id == MONASTERY && self.building.relics != Relics::NONE {
             return Err(GenieError::unsupported(
                 "a monastery's relics' goods (its seconds)",
             ));

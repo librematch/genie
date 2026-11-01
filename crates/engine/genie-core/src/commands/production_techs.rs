@@ -63,6 +63,7 @@ impl World {
         let production = owner
             .objects
             .checked_mut(i)?
+            .building
             .production
             .get_or_insert_with(Production::default);
         if join_last(&mut production.queue, tech, &costs, n)? {

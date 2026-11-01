@@ -61,6 +61,7 @@ impl World {
             .and_then(|m| m.get(master_id))
             .is_some_and(|m| m.kind == BUILDING)
             && unit
+                .building
                 .construction
                 .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
         self.players.player_mut(PlayerId::GAIA)?.objects.push(unit);
@@ -122,9 +123,10 @@ impl World {
         let master = u.master(&self.masters, old)?.clone();
         let (state, held, amount) = (u.life.state, u.life.attribute_type, u.life.amount);
         let built = u
+            .building
             .construction
             .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
-        let rice = u.rice;
+        let rice = u.building.rice;
         let placed = self.spatial.get(id).copied();
         if state < ObjectState::Dying {
             self.unrecord(id);
@@ -155,7 +157,7 @@ impl World {
             self.record_again(id, &master);
         }
         if let Some((_, u)) = self.object_mut(id) {
-            u.gather_point = None;
+            u.building.gather_point = None;
         }
         Ok(())
     }

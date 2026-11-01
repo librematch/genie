@@ -946,7 +946,7 @@ fn a_completed_pasture_puts_its_livestock_on_its_edges() {
         .collect();
     assert_eq!(made, expected);
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].livestock,
+        t.players[1].objects[ListIndex::new(0)].building.livestock,
         [object_id(100), object_id(101), object_id(102)]
     );
     for u in &t.players[1].objects.as_slice()[1..] {
@@ -1176,7 +1176,12 @@ fn tended_pasture(at: Position, room: f32) -> World {
 /// 290, else none; a unit of another player gets none. Slot 0x780 sums the livestock's workers.
 #[test]
 fn a_villager_tends_the_nearest_livestock_with_room() {
-    let livestock = |t: &World| t.players[1].objects[ListIndex::new(0)].livestock.clone();
+    let livestock = |t: &World| {
+        t.players[1].objects[ListIndex::new(0)]
+            .building
+            .livestock
+            .clone()
+    };
     let place = |t: &World, id: ObjectId| t.object(id).unwrap().1.position();
     let t = tended_pasture(Position::new(20.0, 20.0, 0.0), 2.0);
     let ids = livestock(&t);
@@ -1273,13 +1278,17 @@ fn a_villager_ordered_on_a_pasture_works_its_livestock() {
         Some(PastureId::new(object_id(50)))
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].pasture_workers,
+        t.players[1].objects[ListIndex::new(0)]
+            .building
+            .pasture_workers,
         [object_id(60)]
     );
     let mut full = tended_pasture(Position::new(18.0, 18.0, 0.0), 0.0);
     let v = full.players[1].objects.last_place().unwrap();
     full.players[1].objects[v].my_pasture = Some(PastureId::new(object_id(50)));
-    full.players[1].objects[ListIndex::new(0)].pasture_workers = vec![object_id(60)];
+    full.players[1].objects[ListIndex::new(0)]
+        .building
+        .pasture_workers = vec![object_id(60)];
     full.order_work(PlayerId::new(1), v, &order(Some(object_id(50))))
         .unwrap();
     let u = &full.players[1].objects[v];
@@ -1293,7 +1302,9 @@ fn a_villager_ordered_on_a_pasture_works_its_livestock() {
     );
     assert_eq!(u.my_pasture, None);
     assert_eq!(
-        full.players[1].objects[ListIndex::new(0)].pasture_workers,
+        full.players[1].objects[ListIndex::new(0)]
+            .building
+            .pasture_workers,
         Vec::new()
     );
 }
@@ -1331,16 +1342,23 @@ fn a_villager_ordered_on_a_pasture_without_livestock_tends_on() {
     };
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
-    t.players[1].objects[ListIndex::new(0)].livestock.clear();
+    t.players[1].objects[ListIndex::new(0)]
+        .building
+        .livestock
+        .clear();
     t.players[1].objects[v].my_pasture = Some(PastureId::new(object_id(50)));
-    t.players[1].objects[ListIndex::new(0)].pasture_workers = vec![object_id(60)];
+    t.players[1].objects[ListIndex::new(0)]
+        .building
+        .pasture_workers = vec![object_id(60)];
     t.order_work(PlayerId::new(1), v, &order).unwrap();
     assert_eq!(
         t.players[1].objects[v].my_pasture,
         Some(PastureId::new(object_id(50)))
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].pasture_workers,
+        t.players[1].objects[ListIndex::new(0)]
+            .building
+            .pasture_workers,
         [object_id(60)]
     );
 }
@@ -1356,7 +1374,9 @@ fn a_unit_joins_and_leaves_a_pasture_s_workers() {
     t.tend_pasture(PlayerId::new(1), v, Some(PastureId::new(object_id(50))))
         .unwrap();
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].pasture_workers,
+        t.players[1].objects[ListIndex::new(0)]
+            .building
+            .pasture_workers,
         [object_id(60)]
     );
     assert_eq!(
@@ -1365,7 +1385,9 @@ fn a_unit_joins_and_leaves_a_pasture_s_workers() {
     );
     t.tend_pasture(PlayerId::new(1), v, None).unwrap();
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].pasture_workers,
+        t.players[1].objects[ListIndex::new(0)]
+            .building
+            .pasture_workers,
         Vec::new()
     );
     assert_eq!(t.players[1].objects[v].my_pasture, None);
@@ -1377,7 +1399,9 @@ fn a_unit_joins_and_leaves_a_pasture_s_workers() {
     )
     .unwrap();
     assert_eq!(
-        t.players[1].objects[ListIndex::new(1)].pasture_workers,
+        t.players[1].objects[ListIndex::new(1)]
+            .building
+            .pasture_workers,
         Vec::new()
     );
     assert_eq!(
@@ -1875,7 +1899,12 @@ fn a_human_build_with_a_target_places_nothing_and_a_house_keeps_its_sprite_overr
             sprite_override,
         ));
         let foundation = t.players[1].objects.last().unwrap();
-        foundation.construction.as_ref().unwrap().sprite_override
+        foundation
+            .building
+            .construction
+            .as_ref()
+            .unwrap()
+            .sprite_override
     };
     assert!(overridden(
         CivId::new(12),
@@ -2077,7 +2106,8 @@ fn a_queued_build_queues_its_order_for_another_player_s_villager() {
     }));
     // the foundation keeps the command's frame (+0xc54)
     assert_eq!(
-        t.object(object_id(10028)).map(|(_, u)| u.build_frame),
+        t.object(object_id(10028))
+            .map(|(_, u)| u.building.build_frame),
         Some(crate::objects::Frame::of_data(2))
     );
     let order = |p: PlayerId| {
@@ -2148,19 +2178,22 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
             master_id: ids::HOUSE,
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::ZERO,
-            desolid: true,
-            builders: crate::construction::BuilderCount::of_data(0),
-            hit_points: MasterHitPoints::of_data(550),
-            build_time: WholeSeconds::of_data(25),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
+        building: crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::ZERO,
+                desolid: true,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         pasture: None,
         my_pasture: None,
         ..Unit::default()
@@ -2247,7 +2280,8 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
 #[test]
 fn a_task_target_reads_an_annex_as_its_main_building() {
     let mut t = sent_off_world(vec![]);
-    t.players[1].objects[ListIndex::new(0)].annex_of = Some(MainBuildingId::new(object_id(10028)));
+    t.players[1].objects[ListIndex::new(0)].building.annex_of =
+        Some(MainBuildingId::new(object_id(10028)));
     let find = |id: ObjectId| t.object(id);
     let at = |steps| {
         task_target_with(object_id(9175), steps, &find, &t.masters)
@@ -2392,7 +2426,10 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
     let mut t = sent_off_world(vec![]);
     let annex = Unit {
         id: object_id(10031),
-        annex_of: Some(MainBuildingId::new(object_id(10028))),
+        building: crate::objects::layers::Building {
+            annex_of: Some(MainBuildingId::new(object_id(10028))),
+            ..t.players[1].objects[ListIndex::new(1)].clone().building
+        },
         ..t.players[1].objects[ListIndex::new(1)].clone()
     };
     t.players[1].objects.push(annex);
@@ -2426,7 +2463,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
         t.work_building(object_id(10031), Seconds::new(0.021)),
         Ok(true)
     );
-    let c = |id: ObjectId| t.object(id).unwrap().1.construction.unwrap();
+    let c = |id: ObjectId| t.object(id).unwrap().1.building.construction.unwrap();
     let started = f32::from_bits(0x2edb_e6ff);
     assert!(!c(object_id(10031)).desolid);
     assert_eq!(c(object_id(10031)).progress, Seconds::new(started));
@@ -2449,7 +2486,7 @@ fn repair_world() -> World {
     let house = &mut t.players[1].objects[ListIndex::new(1)];
     house.life.state = ObjectState::Alive;
     house.life.hp = HitPoints::new(300.0);
-    let c = house.construction.as_mut().unwrap();
+    let c = house.building.construction.as_mut().unwrap();
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
     for masters in &mut t.masters {
         let builder = masters.get_mut(ids::BUILDER).unwrap();
@@ -2556,6 +2593,7 @@ fn a_work_command_on_another_building_moves_the_repair_there() {
         (r.state, r.counted) = (RepairState::Work, true);
     }
     t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap()
@@ -2582,6 +2620,7 @@ fn a_work_command_on_another_building_moves_the_repair_there() {
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(1)]
+            .building
             .construction
             .unwrap()
             .builders,
@@ -2795,6 +2834,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
         (b.state, b.added, b.move_to) = (BuildState::Wait, true, None);
     }
     t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap()
@@ -2818,6 +2858,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(1)]
+            .building
             .construction
             .map(|k| k.builders.get()),
         Some(0)
@@ -2869,6 +2910,7 @@ fn a_work_command_on_another_foundation_moves_the_build_there() {
         (b.state, b.added) = (BuildState::Wait, true);
     }
     t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap()
@@ -2902,7 +2944,10 @@ fn a_work_command_on_another_foundation_moves_the_build_there() {
     );
     let site = |i: ListIndex| {
         let o = &t.players[1].objects[i];
-        (o.workers.get(), o.construction.map(|k| k.builders.get()))
+        (
+            o.workers.get(),
+            o.building.construction.map(|k| k.builders.get()),
+        )
     };
     assert_eq!(
         (site(ListIndex::new(1)), site(ListIndex::new(2))),
@@ -4504,19 +4549,22 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
             inside,
             ..Lifecycle::default()
         },
-        construction: desolid.then_some(Construction {
-            progress: Seconds::ZERO,
-            desolid: true,
-            builders: crate::construction::BuilderCount::of_data(0),
-            hit_points: MasterHitPoints::of_data(550),
-            build_time: WholeSeconds::of_data(25),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
+        building: crate::objects::layers::Building {
+            construction: desolid.then_some(Construction {
+                progress: Seconds::ZERO,
+                desolid: true,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let mut t = World::new(
@@ -5609,7 +5657,10 @@ fn lets_world() -> World {
     }
     t.players[0].objects.push(Unit {
         id: object_id(530),
-        annex_of: Some(MainBuildingId::new(object_id(520))),
+        building: crate::objects::layers::Building {
+            annex_of: Some(MainBuildingId::new(object_id(520))),
+            ..Default::default()
+        },
         life: Lifecycle {
             state: ObjectState::Foundation,
             master_id: master_id(99),
@@ -5672,7 +5723,7 @@ fn an_update_s_take_counts_its_worker_and_wakes_a_sleeping_object() {
     assert_eq!(workers(&t, villager), Some(1));
     let annex = t
         .object(object_id(530))
-        .map(|(_, u)| (u.workers.get(), u.attacking_units.clone()));
+        .map(|(_, u)| (u.workers.get(), u.building.attacking_units.clone()));
     assert_eq!(annex, Some((2, vec![villager])));
 }
 
@@ -6085,7 +6136,7 @@ fn repairer_world(orders: Vec<crate::unit_ai::QueuedOrder>, repairer: bool) -> W
     let house = &mut t.players[1].objects[ListIndex::new(1)];
     house.life.state = ObjectState::Alive;
     house.life.hp = HitPoints::new(300.0);
-    let c = house.construction.as_mut().unwrap();
+    let c = house.building.construction.as_mut().unwrap();
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
     if repairer {
         for masters in &mut t.masters {
@@ -6264,7 +6315,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
     let house = &mut t.players[1].objects[ListIndex::new(1)];
     house.life.state = ObjectState::Alive;
     house.life.hp = HitPoints::new(550.0);
-    let c = house.construction.as_mut().unwrap();
+    let c = house.building.construction.as_mut().unwrap();
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
     for masters in &mut t.masters {
         let house = masters.get_mut(ids::HOUSE).unwrap();
@@ -6879,6 +6930,7 @@ fn a_villager_sent_off_a_foundation_waits_for_it_as_a_builder() {
         Some(crate::construction::wait_solidify::WAIT_SOLIDIFY)
     );
     t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap()
@@ -8160,10 +8212,13 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
             state,
             ..Lifecycle::default()
         },
-        gate: Some(Gate {
-            locked,
-            ..Gate::default()
-        }),
+        building: crate::objects::layers::Building {
+            gate: Some(Gate {
+                locked,
+                ..Gate::default()
+            }),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let player = |objects: Vec<Unit>| Player {
@@ -8224,7 +8279,10 @@ fn a_gate_opens_for_its_allies_while_they_update() {
             state: ObjectState::Alive,
             ..Lifecycle::default()
         },
-        gate: Some(Gate::default()),
+        building: crate::objects::layers::Building {
+            gate: Some(Gate::default()),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let player = |objects: Vec<Unit>, relations: Vec<u8>| Player {
@@ -8318,7 +8376,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
     assert!(blocked(&t));
     // a locked gate stays closed for its allies
     t.close_gates(PlayerId::new(3), &mut open).unwrap();
-    t.players[2].objects[ListIndex::new(0)].gate = Some(Gate {
+    t.players[2].objects[ListIndex::new(0)].building.gate = Some(Gate {
         locked: true,
         ..Gate::default()
     });
@@ -8475,7 +8533,10 @@ fn gate_world() -> World {
     let unit = |id, master, x: f32, annex_of| Unit {
         id,
         body: crate::objects::layers::Body::at(Position::new(x, 20.0, 0.0)),
-        annex_of,
+        building: crate::objects::layers::Building {
+            annex_of,
+            ..Default::default()
+        },
         life: Lifecycle {
             master_id: master,
             state: ObjectState::Alive,
@@ -8487,7 +8548,7 @@ fn gate_world() -> World {
         ..Unit::default()
     };
     let mut gate = unit(object_id(27745), master_id(88), 20.0, None);
-    gate.gate = Some(Gate::default());
+    gate.building.gate = Some(Gate::default());
     gate.body
         .put_mover(Some(crate::gathering::hunt::tests::walker()));
     let mut t = World::new(
@@ -8608,7 +8669,7 @@ fn a_gate_toggle_shuts_on_the_units_between_its_posts_or_opens() {
         t.players[1].objects[ListIndex::new(0)].life.master_id,
         master_id(92)
     );
-    t.players[1].objects[ListIndex::new(0)].gate = Some(Gate {
+    t.players[1].objects[ListIndex::new(0)].building.gate = Some(Gate {
         other_masters: true,
         ..Gate::default()
     });
@@ -8625,7 +8686,7 @@ fn gate_update_of(
 ) -> Result<(MasterId, Option<Gate>), GenieError> {
     let mut t = gate_world();
     let g = &mut t.players[1].objects[ListIndex::new(0)];
-    (g.life.master_id, g.gate) = (master, gate);
+    (g.life.master_id, g.building.gate) = (master, gate);
     setup(&mut t);
     let master = in_update(
         &mut t,
@@ -8636,7 +8697,10 @@ fn gate_update_of(
             Ok(unit.life.master_id)
         },
     )?;
-    Ok((master, t.players[1].objects[ListIndex::new(0)].gate))
+    Ok((
+        master,
+        t.players[1].objects[ListIndex::new(0)].building.gate,
+    ))
 }
 
 /// The gate's update (`FUN_1411e7730`): a shut (height 2, master 91), unlocked gate with an ally
@@ -8889,7 +8953,11 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
         p.resources(),
         crate::test_ids::amounts([154.0, 200.0, 200.0, 200.0])
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     // the make action works in the tick it is created in
     let Some(crate::production::Making::Unit(make)) = production.action else {
         panic!("a make action");
@@ -8934,6 +9002,7 @@ fn a_queued_villager_is_male_or_female_by_an_action_stream_draw() {
     };
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .unwrap()
@@ -8954,7 +9023,8 @@ fn a_queue_the_player_cannot_pay_or_at_a_missing_building_queues_nothing() {
     assert_eq!(poor.players[0].attributes[0], Amount::new(40.0));
     let tc = &poor.players[0].objects[ListIndex::new(0)];
     assert!(
-        tc.production
+        tc.building
+            .production
             .as_ref()
             .is_none_or(|p| p.queue.entries().is_empty())
     );
@@ -8991,6 +9061,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
     };
     let total = |t: &World, k: ListIndex| {
         t.players[0].objects[k]
+            .building
             .production
             .as_ref()
             .map_or(0, |p| p.queue.total.get())
@@ -9005,6 +9076,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 99, 1)]);
     let Some(crate::production::Making::Unit(make)) = t.players[0].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .and_then(|p| p.action)
@@ -9053,6 +9125,7 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
     };
     let total = |t: &World, k: ListIndex| {
         t.players[0].objects[k]
+            .building
             .production
             .as_ref()
             .map_or(0, |p| p.queue.total.get())
@@ -9082,6 +9155,7 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
     );
     assert!(
         alone.players[0].objects[ListIndex::new(0)]
+            .building
             .production
             .is_none()
     );
@@ -9118,6 +9192,7 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
     );
     assert_eq!(t.players[1].attributes[0], Amount::new(54.0));
     let production = t.players[1].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap();
@@ -9125,7 +9200,12 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
     let mut t = two(false);
     t.tick_with(Millis::new(104), &[queue(10, 83, 1)]);
     assert_eq!(t.players[1].attributes[0], Amount::new(100.0));
-    assert!(t.players[1].objects[ListIndex::new(0)].production.is_none());
+    assert!(
+        t.players[1].objects[ListIndex::new(0)]
+            .building
+            .production
+            .is_none()
+    );
 }
 
 /// `FUN_141614450` reads a listed object live or sleeping (`FUN_140e6b750`): a sleeping one the
@@ -9147,12 +9227,14 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
     t.tick_with(Millis::new(104), &[both]);
     assert!(t.players[0].unsupported.is_none());
     let production = t.players[0].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap();
     assert_eq!(production.queue.total, QueuedUnits::of_data(2));
     assert!(
         t.players[0].sleeping[ListIndex::new(0)]
+            .building
             .production
             .is_none()
     );
@@ -9311,6 +9393,7 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
         };
         let r = research_listed(&mut t, &at);
         let queued = t.players[0].objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .map_or(0, |p| p.queue.total.get());
@@ -9380,6 +9463,7 @@ fn research_at(tech: i16, target: i32) -> ResearchCommand {
 fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
     let queued = |t: &World| {
         t.players[0].objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .map_or(0, |p| p.queue.total.get())
@@ -9437,6 +9521,7 @@ fn a_queued_research_starts_at_the_buildings_master() {
         .unwrap();
     let master = t.players[0].objects[ListIndex::new(0)].life.master_id;
     let action = t.players[0].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .and_then(|p| p.action);
@@ -9527,6 +9612,7 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
     one.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let queued = |t: &World| {
         t.players[0].objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .unwrap()
@@ -9578,6 +9664,7 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         ],
     );
     let q = &t.players[0].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap()
@@ -9610,6 +9697,7 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         .collect();
     t.tick_with(Millis::new(104), &alternating);
     let q = &t.players[0].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap()
@@ -9633,20 +9721,25 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
         (p.attributes[0], p.attributes[80], p.attributes[81]),
         (Amount::new(1000.0), Amount::ZERO, Amount::ZERO)
     );
-    let production = p.objects[ListIndex::new(0)].production.as_ref().unwrap();
+    let production = p.objects[ListIndex::new(0)]
+        .building
+        .production
+        .as_ref()
+        .unwrap();
     assert_eq!(
         (production.queue.count.get(), production.queue.total.get()),
         (0, 0)
     );
     assert!(production.action.is_none());
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.players[0].objects[ListIndex::new(0)].production = Some(crate::production::Production {
-        queue: crate::production::Queue {
-            enabled: false,
-            ..crate::production::Queue::default()
-        },
-        ..crate::production::Production::default()
-    });
+    t.players[0].objects[ListIndex::new(0)].building.production =
+        Some(crate::production::Production {
+            queue: crate::production::Queue {
+                enabled: false,
+                ..crate::production::Queue::default()
+            },
+            ..crate::production::Production::default()
+        });
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
     assert_eq!(
@@ -9655,6 +9748,7 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
     );
     assert!(
         p.objects[ListIndex::new(0)]
+            .building
             .production
             .as_ref()
             .unwrap()
@@ -9672,6 +9766,7 @@ fn game_mode_16_queues_one_military_unit_at_a_time() {
     t.tick_with(Millis::new(104), &[queue(9, 99, 3)]);
     t.tick_with(Millis::new(104), &[queue(9, 99, 2)]);
     let q = &t.players[0].objects[ListIndex::new(0)]
+        .building
         .production
         .as_ref()
         .unwrap()
@@ -10472,7 +10567,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
                         combat: crate::objects::layers::Combat {
                             ai: None,
                             capture_flag: CaptureKind::BY_SIGHT,
-                            ..Default::default()
+                            ..hands_unit(21712, master_id(4)).combat
                         },
                         ..hands_unit(21712, master_id(4))
                     }]
@@ -10599,19 +10694,22 @@ fn teardown_world() -> World {
             master_id: ids::HOUSE,
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::ZERO,
-            desolid: false,
-            builders: crate::construction::BuilderCount::of_data(1),
-            hit_points: MasterHitPoints::of_data(550),
-            build_time: WholeSeconds::of_data(25),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
+        building: crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::ZERO,
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(1),
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let mut t = World::new(
@@ -10788,7 +10886,10 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .unwrap();
     let foundation = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(foundation.workers, crate::objects::WorkerCount::of_data(0));
-    assert_eq!(foundation.construction.map(|k| k.builders.get()), Some(0));
+    assert_eq!(
+        foundation.building.construction.map(|k| k.builders.get()),
+        Some(0)
+    );
 }
 
 /// `FUN_1411e63f0` then `FUN_1411e6580` at a built building's death: each storage entry of mode
@@ -10956,19 +11057,22 @@ fn deaths_world() -> World {
             master_id: ids::HOUSE,
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::ZERO,
-            desolid: false,
-            builders: crate::construction::BuilderCount::of_data(1),
-            hit_points: MasterHitPoints::of_data(550),
-            build_time: WholeSeconds::of_data(25),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
+        building: crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::ZERO,
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(1),
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     // player 1's turn: the boar's unit AI keeps its attackers
@@ -11042,7 +11146,10 @@ fn a_dead_unit_s_actions_go_and_let_their_targets_go_in_the_update_of_its_death(
     );
     let foundation = &villagers[ListIndex::new(3)];
     assert_eq!(foundation.workers, crate::objects::WorkerCount::of_data(0));
-    assert_eq!(foundation.construction.map(|k| k.builders.get()), Some(0));
+    assert_eq!(
+        foundation.building.construction.map(|k| k.builders.get()),
+        Some(0)
+    );
 }
 
 /// `FUN_140aaddb0`: a Build counts its builder in a building annex's main building (`+0xbb8`),
@@ -11053,8 +11160,10 @@ fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
     let mut t = deaths_world();
     let mut main = t.players[1].objects[ListIndex::new(3)].clone();
     main.id = object_id(10030);
-    t.players[1].objects[ListIndex::new(3)].annex_of = Some(MainBuildingId::new(object_id(10030)));
+    t.players[1].objects[ListIndex::new(3)].building.annex_of =
+        Some(MainBuildingId::new(object_id(10030)));
     t.players[1].objects[ListIndex::new(3)]
+        .building
         .construction
         .as_mut()
         .unwrap()
@@ -11079,7 +11188,7 @@ fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
             .objects
             .iter()
             .find(|u| u.id == id)
-            .and_then(|u| u.construction)
+            .and_then(|u| u.building.construction)
             .map(|k| k.builders.get())
     };
     assert_eq!(
@@ -11709,28 +11818,36 @@ fn a_foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
     }
     let site = |t: &World| t.players[1].objects[ListIndex::new(0)].clone();
     assert_eq!(
-        site(&t).attacking_units,
+        site(&t).building.attacking_units,
         [object_id(40), object_id(41), object_id(40)]
     );
     assert_eq!(site(&t).workers, crate::objects::WorkerCount::of_data(4));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(1)].attacking_units,
+        t.players[1].objects[ListIndex::new(1)]
+            .building
+            .attacking_units,
         Vec::new()
     );
     t.release(object_id(10028), enemy).unwrap();
     assert_eq!(
-        (site(&t).attacking_units, site(&t).workers),
+        (site(&t).building.attacking_units, site(&t).workers),
         (
             vec![object_id(41), object_id(40)],
             crate::objects::WorkerCount::of_data(3)
         )
     );
     t.release(object_id(10028), ally).unwrap();
-    assert_eq!(site(&t).attacking_units, [object_id(41), object_id(40)]);
+    assert_eq!(
+        site(&t).building.attacking_units,
+        [object_id(41), object_id(40)]
+    );
     t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
     t.take(object_id(10028), other).unwrap();
     t.release(object_id(10028), enemy).unwrap();
-    assert_eq!(site(&t).attacking_units, [object_id(41), object_id(40)]);
+    assert_eq!(
+        site(&t).building.attacking_units,
+        [object_id(41), object_id(40)]
+    );
 }
 
 /// Slot 0x180 by class: the static object's (`FUN_141197d00`, types 10 and 15) flags an object
@@ -11911,7 +12028,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
                 retarget_timer: Millis::new(1000),
                 ..UnitAi::default()
             }),
-            ..Default::default()
+            ..hands_unit(7, master_id(1378)).combat
         },
         life: Lifecycle {
             master_id: master_id(1378),
@@ -11919,32 +12036,35 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             hp: HitPoints::new(20000.0),
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::new(10.0),
-            desolid: false,
-            builders: crate::construction::BuilderCount::of_data(0),
-            hit_points: MasterHitPoints::of_data(20000),
-            build_time: WholeSeconds::of_data(10),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
-        gather_point: Some(GatherPoint {
-            state: GatherPointState::POINT,
-            point: Position::new(12.0, 12.0, 0.0),
-            target: None,
-            target_master: None,
-        }),
+        building: crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::new(10.0),
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(20000),
+                build_time: WholeSeconds::of_data(10),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            gather_point: Some(GatherPoint {
+                state: GatherPointState::POINT,
+                point: Position::new(12.0, 12.0, 0.0),
+                target: None,
+                target_master: None,
+            }),
+            ..hands_unit(7, master_id(1378)).building
+        },
         ..hands_unit(7, master_id(1378))
     };
     let villager = Unit {
         body: crate::objects::layers::Body::at(Position::new(11.5, 10.5, 0.0)),
         combat: crate::objects::layers::Combat {
             ai: None,
-            ..Default::default()
+            ..hands_unit(500, VILLAGER_MALE).combat
         },
         ..hands_unit(500, VILLAGER_MALE)
     };
@@ -12059,7 +12179,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
         [false, true]
     );
     let shop = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!(shop.gather_point, None);
+    assert_eq!(shop.building.gather_point, None);
     assert_eq!(
         shop.own_master.as_deref().map(|m| m.id),
         Some(master_id(1378))
@@ -12101,7 +12221,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
                 retarget_timer: Millis::new(1000),
                 ..UnitAi::default()
             }),
-            ..Default::default()
+            ..hands_unit(7, ids::ID_854).combat
         },
         ..hands_unit(7, ids::ID_854)
     };
@@ -12109,7 +12229,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
         body: crate::objects::layers::Body::at(Position::new(11.5, 10.5, 0.0)),
         combat: crate::objects::layers::Combat {
             ai: None,
-            ..Default::default()
+            ..hands_unit(500, VILLAGER_MALE).combat
         },
         ..hands_unit(500, VILLAGER_MALE)
     };
@@ -12234,7 +12354,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
         body: crate::objects::layers::Body::Moving(walker),
         combat: crate::objects::layers::Combat {
             ai: None,
-            ..Default::default()
+            ..hands_unit(9520, master_id(705)).combat
         },
         ..hands_unit(9520, master_id(705))
     };
@@ -12242,7 +12362,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
         body: crate::objects::layers::Body::at(Position::new(11.5, 10.5, 0.0)),
         combat: crate::objects::layers::Combat {
             ai: None,
-            ..Default::default()
+            ..hands_unit(500, VILLAGER_MALE).combat
         },
         ..hands_unit(500, VILLAGER_MALE)
     };
@@ -12826,7 +12946,10 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
             state: ObjectState::Alive,
             ..Lifecycle::default()
         },
-        annex_of: annex_of.map(MainBuildingId::new),
+        building: crate::objects::layers::Building {
+            annex_of: annex_of.map(MainBuildingId::new),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let player = |objects| Player {
@@ -13101,7 +13224,9 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
     );
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].gather_point,
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
         Some(GatherPoint {
             state: GatherPointState::POINT,
             point: Position::new(107.2451, 46.075_863, 0.0),
@@ -13110,10 +13235,16 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
         })
     );
     t.tick_with(Millis::new(25), &[set(None, Point::new(-1.0, -1.0), false)]);
-    assert_eq!(t.players[0].objects[ListIndex::new(0)].gather_point, None);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
+        None
+    );
     t.tick_with(Millis::new(25), &[set(None, Point::new(-1.0, -1.0), true)]);
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
+            .building
             .gather_point
             .map(|g| g.target),
         Some(Some(object_id(9149)))
@@ -13158,17 +13289,26 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
     t.tick_with(Millis::new(25), &[set(Some(GatherPointState::POINT))]);
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].gather_point,
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
         own(GatherPointState::POINT)
     );
     // the state byte is the state, 0xff included
     t.tick_with(Millis::new(25), &[set(Some(GatherPointState::KEPT))]);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].gather_point,
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
         own(GatherPointState::KEPT)
     );
     t.tick_with(Millis::new(25), &[set(None)]);
-    assert_eq!(t.players[0].objects[ListIndex::new(0)].gather_point, None);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
+        None
+    );
 }
 
 /// SET GATHER STATE's test is SET GATHER POINT's: a building that neither garrisons nor trains
@@ -13178,7 +13318,7 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
 fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_object() {
     let mut house = gathering_centre(10909, Position::new(20.0, 30.0, 0.0));
     house.life.master_id = ids::HOUSE;
-    house.gather_point = Some(GatherPoint {
+    house.building.gather_point = Some(GatherPoint {
         state: GatherPointState::POINT,
         point: Position::new(5.0, 6.0, 0.0),
         target: None,
@@ -13197,12 +13337,24 @@ fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_obje
             state,
         })
     };
-    let held = t.players[0].objects[ListIndex::new(0)].gather_point;
+    let held = t.players[0].objects[ListIndex::new(0)]
+        .building
+        .gather_point;
     t.tick_with(Millis::new(25), &[set(Some(GatherPointState::KEPT))]);
     assert_eq!(t.players[0].unsupported, None);
-    assert_eq!(t.players[0].objects[ListIndex::new(0)].gather_point, held);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
+        held
+    );
     t.tick_with(Millis::new(25), &[set(None)]);
-    assert_eq!(t.players[0].objects[ListIndex::new(0)].gather_point, None);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
+        None
+    );
 }
 
 /// SET GATHER POINT on a gather point of state 0xff (`FUN_140e7e9a0`, `FUN_1411c7ff0`): its x
@@ -13211,7 +13363,7 @@ fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_obje
 #[test]
 fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
     let mut tc = gathering_centre(9149, Position::new(104.0, 47.0, 0.5));
-    tc.gather_point = Some(GatherPoint {
+    tc.building.gather_point = Some(GatherPoint {
         state: GatherPointState::KEPT,
         point: Position::new(104.0, 47.0, 0.5),
         target: Some(object_id(9149)),
@@ -13236,7 +13388,9 @@ fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
     t.tick_with(Millis::new(25), &[set(Some(9520), false)]);
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].gather_point,
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
         Some(GatherPoint {
             state: GatherPointState::KEPT,
             point: Position::new(107.25, 46.5, 0.5),
@@ -13245,13 +13399,16 @@ fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
         })
     );
     t.players[0].objects[ListIndex::new(0)]
+        .building
         .gather_point
         .as_mut()
         .unwrap()
         .target = Some(object_id(9520));
     t.tick_with(Millis::new(25), &[set(None, true)]);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].gather_point,
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
         Some(GatherPoint {
             state: GatherPointState::POINT,
             point: Position::new(104.0, 47.0, 0.5),
@@ -13301,7 +13458,9 @@ fn set_gather_point_takes_a_building_that_trains_without_garrisoning() {
     t.tick_with(Millis::new(25), &[set]);
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].gather_point,
+        t.players[0].objects[ListIndex::new(0)]
+            .building
+            .gather_point,
         Some(GatherPoint {
             state: GatherPointState::POINT,
             point: Position::new(20.5, 30.5, 0.0),
@@ -13309,7 +13468,12 @@ fn set_gather_point_takes_a_building_that_trains_without_garrisoning() {
             target_master: None,
         })
     );
-    assert_eq!(t.players[0].objects[ListIndex::new(1)].gather_point, None);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(1)]
+            .building
+            .gather_point,
+        None
+    );
 }
 
 /// `BUILDING_COMMAND_QUEUE` on a town centre with a gather point: the gather point goes
@@ -13327,7 +13491,7 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
         last_target: None,
         ..UnitAi::default()
     });
-    tc.gather_point = Some(GatherPoint {
+    tc.building.gather_point = Some(GatherPoint {
         state: GatherPointState::POINT,
         point: Position::new(30.5, 40.5, 0.0),
         target: None,
@@ -13352,7 +13516,7 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
     t.tick_with(Millis::new(25), &[step(Point::new(70.0, 80.0))]);
     assert_eq!(t.players[0].unsupported, None);
     let tc = &t.players[0].objects[ListIndex::new(0)];
-    assert_eq!(tc.gather_point, None);
+    assert_eq!(tc.building.gather_point, None);
     let steps: Vec<_> = tc
         .combat
         .ai
@@ -13731,19 +13895,22 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
             master: Some(MasterData::default()),
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::new(100.0),
-            desolid: false,
-            builders: crate::construction::BuilderCount::of_data(0),
-            hit_points: MasterHitPoints::of_data(1650),
-            build_time: WholeSeconds::of_data(100),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
+        building: crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::new(100.0),
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(1650),
+                build_time: WholeSeconds::of_data(100),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let mut t = World::new(
@@ -13760,7 +13927,11 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                 objects: vec![
                     building(object_id(7228), master_id(88), HitPoints::new(-58.0)),
                     Unit {
-                        annex_of: Some(MainBuildingId::new(object_id(7228))),
+                        building: crate::objects::layers::Building {
+                            annex_of: Some(MainBuildingId::new(object_id(7228))),
+                            ..building(object_id(7229), master_id(95), HitPoints::new(1650.0))
+                                .building
+                        },
                         ..building(object_id(7229), master_id(95), HitPoints::new(1650.0))
                     },
                 ]
@@ -13791,7 +13962,10 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
             (7229, ObjectState::DyingSprite)
         ]
     );
-    assert_eq!(t.players[1].objects[ListIndex::new(1)].annex_of, None);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(1)].building.annex_of,
+        None
+    );
     assert_eq!(t.spatial.annexes_of(object_id(7228)), []);
 }
 
@@ -13834,7 +14008,23 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         id,
         pasture: None,
         my_pasture: None,
-        annex_of,
+        building: crate::objects::layers::Building {
+            annex_of,
+            construction: Some(Construction {
+                progress: Seconds::new(10.0),
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(10),
+                build_time: WholeSeconds::of_data(70),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         sprite: Some(crate::objects::sprite::ActiveSprite::at_rest(
             g(SpriteId::named(1751), SpriteFlags::NONE),
             crate::objects::Frame::of_data(0),
@@ -13853,19 +14043,6 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             master: Some(MasterData::default()),
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::new(10.0),
-            desolid: false,
-            builders: crate::construction::BuilderCount::of_data(0),
-            hit_points: MasterHitPoints::of_data(10),
-            build_time: WholeSeconds::of_data(70),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
         ..Unit::default()
     };
     let mut t = World::new(
@@ -13950,7 +14127,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         t.players[1]
             .objects
             .iter()
-            .map(|u| (u.id, u.life.state, u.life.hp.get(), u.annex_of))
+            .map(|u| (u.id, u.life.state, u.life.hp.get(), u.building.annex_of))
             .collect()
     };
     t.tick(Millis::new(100));
@@ -14240,19 +14417,22 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             dying_sprite: Some(SpriteId::named(2573)),
             ..Lifecycle::default()
         },
-        construction: Some(Construction {
-            progress: Seconds::new(10.0),
-            desolid: false,
-            builders: crate::construction::BuilderCount::of_data(0),
-            hit_points: MasterHitPoints::of_data(1200),
-            build_time: WholeSeconds::of_data(50),
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::NONE,
-            },
-            snow: false,
-            sprite_override: false,
-        }),
+        building: crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::new(10.0),
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(1200),
+                build_time: WholeSeconds::of_data(50),
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::NONE,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
+        },
         sprite: Some(ActiveSprite::at_rest(
             g(SpriteId::named(207)),
             crate::objects::Frame::of_data(0),
@@ -18211,7 +18391,7 @@ fn site_of(u: &Unit) -> (ObjectState, f32, Option<f32>) {
     (
         u.life.state,
         u.life.hp.get(),
-        u.construction.map(|c| c.progress.get()),
+        u.building.construction.map(|c| c.progress.get()),
     )
 }
 
@@ -18226,7 +18406,7 @@ fn annexed_house() -> World {
         .unwrap()
         .clone();
     annex.id = object_id(10030);
-    annex.annex_of = Some(MainBuildingId::new(object_id(10028)));
+    annex.building.annex_of = Some(MainBuildingId::new(object_id(10028)));
     t.players[1].objects.push(annex);
     let placed = *t.spatial.get(object_id(10028)).unwrap();
     t.spatial.insert(object_id(10030), placed);
@@ -18254,7 +18434,7 @@ fn done_at(t: &World, a: i32, b: i32) -> (Option<usize>, Option<usize>) {
 fn a_building_s_own_completion_completes_its_annexes_first() {
     let mut t = annexed_house();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
-    let k = h.construction.as_mut().unwrap();
+    let k = h.building.construction.as_mut().unwrap();
     k.progress = Seconds::of_master(k.build_time);
     let i = t.players[1].objects.position_of(object_id(10028)).unwrap();
     let seen = in_update(&mut t, (PlayerId::new(1), i), 50, |unit, c| {
@@ -18296,7 +18476,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
     (b.target, b.move_to, b.state) = (Some(object_id(700)), None, BuildState::Finished);
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     centre.workers = crate::objects::WorkerCount::of_data(1);
-    centre.construction = Some(Construction {
+    centre.building.construction = Some(Construction {
         progress: Seconds::new(25.0),
         desolid: false,
         builders: crate::construction::BuilderCount::of_data(0),
@@ -18404,7 +18584,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
     t.players[1]
         .objects
         .by_id_mut(object_id(10028))
-        .and_then(|h| h.construction.as_mut())
+        .and_then(|h| h.building.construction.as_mut())
         .unwrap()
         .builders = crate::construction::BuilderCount::of_data(1);
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), dt, |unit, c| {
@@ -18432,6 +18612,7 @@ fn a_builder_s_first_work_starts_the_site_its_owner_watches() {
         .objects
         .by_id(object_id(10028))
         .unwrap()
+        .building
         .construction
         .unwrap();
     assert!(!k.desolid);
@@ -18446,7 +18627,7 @@ fn a_builder_s_work_on_an_annex_goes_to_its_main_building() {
     let mut t = annexed_house();
     // the annex started: it clears no foundation under it (FUN_1411cd0d0) on the house's start
     let annex = t.players[1].objects.by_id_mut(object_id(10030)).unwrap();
-    annex.construction.as_mut().unwrap().desolid = false;
+    annex.building.construction.as_mut().unwrap().desolid = false;
     assert_eq!(
         worked(&mut t, 10030, 2500).map_err(|e| e.reason().to_owned()),
         Ok(())
@@ -18466,7 +18647,7 @@ fn a_builder_s_completion_reaches_the_world_within_its_update() {
     let mut t = house_builder();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
     h.life.hp = HitPoints::new(549.0);
-    let k = h.construction.as_mut().unwrap();
+    let k = h.building.construction.as_mut().unwrap();
     (k.progress, k.desolid) = (Seconds::new(24.99), false);
     assert_eq!(
         worked(&mut t, 10028, 50).map_err(|e| e.reason().to_owned()),
@@ -18503,7 +18684,7 @@ fn a_builder_s_completion_reaches_the_world_within_its_update() {
 fn a_builder_s_completion_completes_the_foundation_s_annexes_where_it_runs() {
     let mut t = annexed_house();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
-    let k = h.construction.as_mut().unwrap();
+    let k = h.building.construction.as_mut().unwrap();
     (k.progress, k.desolid) = (Seconds::new(24.99), false);
     assert_eq!(
         worked(&mut t, 10028, 50).map_err(|e| e.reason().to_owned()),
@@ -18542,7 +18723,7 @@ type Completed = (Vec<(i16, f32)>, usize);
 fn completed_house(setup: fn(&mut Unit)) -> (World, Completed) {
     let mut t = house_builder();
     let h = &mut t.players[1].objects[ListIndex::new(1)];
-    let k = h.construction.as_mut().unwrap();
+    let k = h.building.construction.as_mut().unwrap();
     k.progress = Seconds::of_master(k.build_time);
     setup(h);
     let r = in_update(
@@ -18570,16 +18751,17 @@ fn a_foundation_whose_build_points_reached_its_build_time_completes() {
     let (t, r) = completed_house(|_| ());
     assert_eq!(r, (vec![(98, 25.0), (165, 25.0)], 1));
     let h = &t.players[1].objects[ListIndex::new(1)];
-    let k = h.construction.unwrap();
+    let k = h.building.construction.unwrap();
     assert_eq!((h.life.state, k.desolid), (ObjectState::Alive, false));
     let key = crate::players::tracker::key(t.masters.get(1), &t.lines, ids::HOUSE);
     assert_eq!(
         t.players[1].tracker.list(ListKey::of_master(key.master)),
         [Some(object_id(10028))]
     );
-    let short: fn(&mut Unit) = |h| h.construction.as_mut().unwrap().progress = Seconds::new(24.0);
+    let short: fn(&mut Unit) =
+        |h| h.building.construction.as_mut().unwrap().progress = Seconds::new(24.0);
     let annex: fn(&mut Unit) = |h| {
-        (h.life.master_id, h.annex_of) =
+        (h.life.master_id, h.building.annex_of) =
             (master_id(109), Some(MainBuildingId::new(object_id(700))));
     };
     for setup in [short, annex] {
@@ -18600,7 +18782,7 @@ fn a_foundation_whose_build_points_reached_its_build_time_completes() {
 fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_leaves() {
     let finish = |t: &mut World| {
         let h = &mut t.players[1].objects[ListIndex::new(1)];
-        let k = h.construction.as_mut().unwrap();
+        let k = h.building.construction.as_mut().unwrap();
         k.progress = Seconds::of_master(k.build_time);
         in_update(t, (PlayerId::new(1), ListIndex::new(1)), 50, |unit, c| {
             unit.complete_on_update(c)?;
@@ -18660,6 +18842,7 @@ fn a_dying_desolid_foundation_s_owner_watches_it_within_its_update() {
         }
     }
     let k = t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap();
@@ -18707,6 +18890,7 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieErr
     Ok((
         hp,
         t.players[1].objects[ListIndex::new(2)]
+            .building
             .garrison_time
             .millis(),
     ))
@@ -19183,7 +19367,8 @@ fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
     main.id = object_id(10029);
     main.place_for_test(Position::new(34.0, 88.0, 0.0));
     t.players[1].objects.push(main);
-    t.players[1].objects[ListIndex::new(1)].annex_of = Some(MainBuildingId::new(object_id(10029)));
+    t.players[1].objects[ListIndex::new(1)].building.annex_of =
+        Some(MainBuildingId::new(object_id(10029)));
     t.spatial.set_annex(
         object_id(10028),
         Some(MainBuildingId::new(object_id(10029))),
@@ -19386,7 +19571,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
     );
     let house = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
-        (house.construction.unwrap().progress, house.workers),
+        (house.building.construction.unwrap().progress, house.workers),
         (Seconds::new(25.0), crate::objects::WorkerCount::of_data(0))
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -19518,10 +19703,11 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
     let mut t = house_builder();
     t.spatial
         .set_annex(object_id(700), Some(MainBuildingId::new(object_id(10028))));
-    t.players[1].objects[ListIndex::new(2)].annex_of = Some(MainBuildingId::new(object_id(10028)));
+    t.players[1].objects[ListIndex::new(2)].building.annex_of =
+        Some(MainBuildingId::new(object_id(10028)));
     let house = &t.players[1].objects[ListIndex::new(1)];
     let master = t.masters[1].get(house.life.master_id).unwrap();
-    let progress = house.construction.unwrap().progress;
+    let progress = house.building.construction.unwrap().progress;
     let id = building_death(master, None, progress).unwrap();
     let shown = Graphic {
         id,
@@ -19545,7 +19731,7 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
                 .find(object_id(700))
                 .unwrap();
             Ok((
-                annex.annex_of,
+                annex.building.annex_of,
                 annex.life.hp.get(),
                 c.w.spatial.annexes_of(object_id(10028)),
             ))
@@ -20808,7 +20994,8 @@ fn a_frozen_unit_may_have_moved_its_master_s_speed() {
 fn a_world_s_sync_fills_the_annex_index_and_the_relations() {
     let mut t = forage_world();
     let id = t.players[1].objects[ListIndex::new(0)].id;
-    t.players[1].objects[ListIndex::new(0)].annex_of = Some(MainBuildingId::new(object_id(10028)));
+    t.players[1].objects[ListIndex::new(0)].building.annex_of =
+        Some(MainBuildingId::new(object_id(10028)));
     t.spatial.relations = ByPlayer::default();
     t.sync_world();
     assert_eq!(

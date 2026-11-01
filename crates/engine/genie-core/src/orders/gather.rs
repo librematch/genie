@@ -206,7 +206,7 @@ impl World {
         ))?;
         let tm = t.master(&self.masters, tp)?;
         let main = if tm.kind == BUILDING {
-            t.annex_of.map_or(target, MainBuildingId::id)
+            t.building.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         };
@@ -489,7 +489,7 @@ impl World {
                 ));
             }
             if !tm.object_flags.contains(ObjectFlags::GATHERED_BUILDING) {
-                let (mp, main) = match t.annex_of {
+                let (mp, main) = match t.building.annex_of {
                     Some(m) => self.object(m).ok_or(GenieError::unsupported(
                         "an annex whose main building is gone",
                     ))?,

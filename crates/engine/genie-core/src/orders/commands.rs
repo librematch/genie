@@ -95,7 +95,7 @@ impl World {
         let now = self.world_time;
         let (_, unit) = self.object_mut(id).ok_or_else(|| object_gone(id))?;
         // slot 0x668: the lock's value (a building without its gate state is lock_gate's)
-        let locked = unit.gate.is_some_and(|g| g.locked);
+        let locked = unit.building.gate.is_some_and(|g| g.locked);
         lock_gate(unit, !locked, now)?;
         // the walks of this update read the last move time the lock set
         if let Some(t) = unit.body.mover().map(|m| m.last_move) {

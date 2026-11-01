@@ -211,44 +211,56 @@ pub(super) fn unit(
                 })
                 .unwrap_or_default(),
         },
-        construction: construction(object, s, objects),
+        building: genie_core::objects::layers::Building {
+            construction: construction(object, s, objects),
+            annex_of: object
+                .tribe_building_object
+                .as_deref()
+                .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
+                .map(MainBuildingId::new),
+            garrison_time: object
+                .tribe_building_object
+                .as_deref()
+                .map_or(WorldTime::ZERO, |b| {
+                    WorldTime::from_millis(b.last_garrison_time)
+                }),
+            relics: object
+                .tribe_building_object
+                .as_deref()
+                .map_or(Relics::NONE, |b| {
+                    Relics::new(
+                        RelicCount::of_data(b.relic_count),
+                        RelicCount::of_data(b.specific_relic_count),
+                    )
+                }),
+            livestock_summation: object
+                .tribe_building_object
+                .as_deref()
+                .map_or(Amount::ZERO, |b| Amount::new(b.livestock_summation)),
+            livestock: lists.livestock,
+            pasture_workers: lists.pasture_workers,
+            attacking_units: lists.attacking_units,
+            gather_point: gather,
+            gate: saved_gate(object),
+            // mIsOnMangroveShallows (+0xcd0); build 158041's saves all hold it (its version gate
+            // 0x421999 lies before them)
+            rice: object
+                .tribe_building_object
+                .as_deref()
+                .and_then(|b| b.is_on_mangrove_shallows)
+                .is_some_and(|v| v != 0),
+            ..Default::default()
+        },
         attackable: s.unit_attackable_flag != 0,
         untargetable: s.unit_targeting_flag == 0,
         under_attack: s.under_attack_value != 0,
         pasture: PastureId::of_field(s.parent_pasture_id),
         my_pasture: PastureId::of_field(s.my_pasture_id),
         undeletable: s.deletion_enabled == 0,
-        annex_of: object
-            .tribe_building_object
-            .as_deref()
-            .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
-            .map(MainBuildingId::new),
         group: group_link(s),
         workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
-        garrison_time: object
-            .tribe_building_object
-            .as_deref()
-            .map_or(WorldTime::ZERO, |b| {
-                WorldTime::from_millis(b.last_garrison_time)
-            }),
-        relics: object
-            .tribe_building_object
-            .as_deref()
-            .map_or(Relics::NONE, |b| {
-                Relics::new(
-                    RelicCount::of_data(b.relic_count),
-                    RelicCount::of_data(b.specific_relic_count),
-                )
-            }),
         damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
-        livestock_summation: object
-            .tribe_building_object
-            .as_deref()
-            .map_or(Amount::ZERO, |b| Amount::new(b.livestock_summation)),
-        livestock: lists.livestock,
-        pasture_workers: lists.pasture_workers,
-        attacking_units: lists.attacking_units,
         // the animated layer (types 20 and up); a moving object's mover takes it below
         body: genie_core::objects::layers::Body::new(
             Position::new(s.t_x, s.t_y, s.t_z),
@@ -261,16 +273,7 @@ pub(super) fn unit(
         ),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
         sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
-        gather_point: gather,
-        gate: saved_gate(object),
         roo_called: s.rooalready_called != 0,
-        // mIsOnMangroveShallows (+0xcd0); build 158041's saves all hold it (its version gate
-        // 0x421999 lies before them)
-        rice: object
-            .tribe_building_object
-            .as_deref()
-            .and_then(|b| b.is_on_mangrove_shallows)
-            .is_some_and(|v| v != 0),
         ..Unit::default()
     };
     let imported = if saved {
@@ -327,7 +330,7 @@ pub(super) fn unit(
             step,
         });
     }
-    let production = production(object).map(|p| unit.production = p);
+    let production = production(object).map(|p| unit.building.production = p);
     let moving = mover(object, s, objects, paths, civ, masters).map(|m| unit.body.put_mover(m));
     unit.unmodelled_action = life_read
         .and(ai_read)

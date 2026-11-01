@@ -160,7 +160,7 @@ pub(crate) fn victim_of(
         killed: None,
         // a building's slot 0xe8 is FUN_1411cea90
         building: (kind == BUILDING).then(|| crate::combat::damage::Building {
-            main: u.annex_of,
+            main: u.building.annex_of,
             // the caller's, which holds the world's annex links
             annexes: Vec::new(),
             // +0xb90 is not saved and not held: a blast resets it on every building of its tiles
@@ -173,7 +173,7 @@ pub(crate) fn victim_of(
             cost: paid_cost(master),
             damaged_lately: u.damaged_lately,
             struck: false,
-            relics: u.relics,
+            relics: u.building.relics,
             razed: Vec::new(),
         }),
     }

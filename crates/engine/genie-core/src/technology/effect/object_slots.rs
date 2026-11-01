@@ -319,7 +319,7 @@ impl World {
             (a::BUILDING_ICON_OVERRIDE, Change::Set) => Ok(()),
             (a::TRAIN_TIME, _) => {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                if let Some(c) = u.construction.as_mut() {
+                if let Some(c) = u.building.construction.as_mut() {
                     c.progress = build_points_after(c.progress, master.build_time, change, v);
                 }
                 Ok(())
@@ -390,5 +390,8 @@ pub(super) fn has_actions(u: &Unit) -> bool {
         || u.actions.transport().is_some()
         || u.missile.is_some()
         || u.actions.make().is_some()
-        || u.production.as_ref().is_some_and(|q| q.action.is_some())
+        || u.building
+            .production
+            .as_ref()
+            .is_some_and(|q| q.action.is_some())
 }

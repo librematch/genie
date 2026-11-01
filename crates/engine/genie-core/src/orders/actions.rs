@@ -185,7 +185,7 @@ impl World {
         let build_time = self.master(player, new)?.build_time;
         let unit = self.players.live_mut(player, idx)?;
         if unit.life.state == ObjectState::Alive
-            && let Some(c) = unit.construction.as_mut()
+            && let Some(c) = unit.building.construction.as_mut()
         {
             c.progress = Seconds::of_master(build_time);
         }
@@ -204,7 +204,7 @@ impl World {
         idx: ListIndex,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
-        if unit.gate.is_some_and(|g| g.other_masters) {
+        if unit.building.gate.is_some_and(|g| g.other_masters) {
             return Err(GenieError::unsupported(
                 "a gate's toggle to a master of its own or its original owner's",
             ));

@@ -188,7 +188,7 @@ impl World {
         let tm = t.master(&self.masters, owner)?;
         // A building's master type (`'P'`); types below 30 do not move.
         let aimed = if tm.kind == BUILDING {
-            t.annex_of.map_or(target, MainBuildingId::id)
+            t.building.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         };

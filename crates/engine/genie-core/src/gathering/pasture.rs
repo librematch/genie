@@ -79,7 +79,7 @@ impl World {
     /// master of this pasture (`+0x790`) goes, and a draw picks another (0x1fb2); none left ends
     /// it. On the point the owner's slot 0x1c0 makes the master at the pasture's height
     /// ([`World::make_new_object`], no footprint): the point goes, the pasture lists it
-    /// ([`crate::objects::unit::Unit::livestock`]), its state is 2 (slot 0xa0 with 2: it is already), no
+    /// ([`crate::objects::layers::Building::livestock`]), its state is 2 (slot 0xa0 with 2: it is already), no
     /// unit targets it (`+0x689` 0, [`crate::objects::unit::Unit::untargetable`]), it is the pasture's
     /// (`+0x790`) and holds its food (`+0x310`); its current sprite with a random first facet
     /// draws a facet below its facets less one (0x1fd2, IDIV). Each attempt counts, a master
@@ -134,7 +134,7 @@ impl World {
             if let Some(new) = self.make_new_object(p, kind, Position::new(x, y, at.z()), false)? {
                 let _ = points.remove(i);
                 if let Some((_, u)) = self.object_mut(id) {
-                    u.livestock.push(new);
+                    u.building.livestock.push(new);
                 }
                 let (_, u) = self
                     .object_mut(new)
@@ -160,14 +160,15 @@ impl World {
     }
 
     /// A pasture's slot 0x780 (`FUN_1411c5dd0`): the workers (`+0x644`) of its livestock
-    /// ([`crate::objects::unit::Unit::livestock`]) the world holds, summed; 0 for an object the world does
+    /// ([`crate::objects::layers::Building::livestock`]) the world holds, summed; 0 for an object the world does
     /// not hold.
     pub(crate) fn livestock_workers(
         &self,
         pasture: crate::gathering::PastureId,
     ) -> crate::objects::WorkerCount {
         crate::objects::WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
-            b.livestock
+            b.building
+                .livestock
                 .iter()
                 .filter_map(|&id| self.object(id))
                 .map(|(_, l)| l.workers.get())
@@ -199,7 +200,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let reach = unit.master(&self.masters, p)?.radius;
         let mut tended = Vec::new();
-        for &id in &b.livestock {
+        for &id in &b.building.livestock {
             let Some((r, l)) = self.object(id) else {
                 continue;
             };
@@ -233,7 +234,7 @@ impl World {
     /// building it names (the one the unit tends, `+0x794`, for none; none for an object that is
     /// no building) takes the unit last among its workers unless it lists it already, or for none
     /// drops it
-    /// (`FUN_1411cafa0`, [`crate::objects::unit::Unit::pasture_workers`]); then the unit tends `pasture`
+    /// (`FUN_1411cafa0`, [`crate::objects::layers::Building::pasture_workers`]); then the unit tends `pasture`
     /// ([`crate::objects::unit::Unit::my_pasture`]).
     ///
     /// # Errors
@@ -253,9 +254,9 @@ impl World {
         };
         if building && let Some((_, b)) = self.object_mut(named) {
             if pasture.is_none() {
-                b.pasture_workers.retain(|&w| w != id);
-            } else if !b.pasture_workers.contains(&id) {
-                b.pasture_workers.push(id);
+                b.building.pasture_workers.retain(|&w| w != id);
+            } else if !b.building.pasture_workers.contains(&id) {
+                b.building.pasture_workers.push(id);
             }
         }
         self.players.live_mut(p, idx)?.my_pasture = pasture;

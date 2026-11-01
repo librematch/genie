@@ -164,6 +164,7 @@ pub(super) fn lane_block(section: &PlayerSection<'_>, id: u32, simulated: &Playe
 /// that attacks while it trains counts its Attack's type with its make action's state.
 pub(super) fn checkpoint_action(unit: &Unit) -> Option<ActionTerm> {
     let making = unit
+        .building
         .production
         .as_ref()
         .and_then(|p| p.action)

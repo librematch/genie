@@ -473,7 +473,7 @@ impl World {
             _ => Some(self.players.live_mut(fp, fi)?),
         };
         let builders = counted
-            .and_then(|b| b.construction.as_mut())
+            .and_then(|b| b.building.construction.as_mut())
             .map(|k| &mut k.builders);
         let r =
             build
@@ -523,7 +523,7 @@ impl World {
         };
         let kind = f.master(&self.masters, p)?.kind;
         Ok(Some(if kind == BUILDING {
-            f.annex_of.map_or(id, MainBuildingId::id)
+            f.building.annex_of.map_or(id, MainBuildingId::id)
         } else {
             id
         }))

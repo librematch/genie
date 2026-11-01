@@ -189,7 +189,7 @@ impl World {
         if unit.kind < COMBAT || own.kind != BUILDING {
             return Ok(false);
         }
-        let (bp, b) = match b.annex_of {
+        let (bp, b) = match b.building.annex_of {
             Some(main) => self.object(main).ok_or(GenieError::unsupported(
                 "an annex whose main building is gone",
             ))?,

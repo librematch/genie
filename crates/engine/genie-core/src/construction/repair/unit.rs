@@ -84,7 +84,7 @@ impl Unit {
 
     /// `+0x9e8` (`num_builders`): a building's in its construction, any other's its own.
     pub(crate) const fn repairers(&self) -> crate::construction::BuilderCount {
-        match &self.construction {
+        match &self.building.construction {
             Some(k) => k.builders,
             None => self.combat.builders,
         }
@@ -92,7 +92,7 @@ impl Unit {
 
     /// [`Unit::repairers`] to change.
     pub(crate) const fn repairers_mut(&mut self) -> &mut crate::construction::BuilderCount {
-        match &mut self.construction {
+        match &mut self.building.construction {
             Some(k) => &mut k.builders,
             None => &mut self.combat.builders,
         }
@@ -226,7 +226,7 @@ fn repairee_of(
         moves: MOVING <= tm.kind && tm.moving.as_ref().is_some_and(|m| Speed::ZERO < m.speed),
     };
     let counting = if tm.kind == BUILDING {
-        t.annex_of.map_or(target, MainBuildingId::id)
+        t.building.annex_of.map_or(target, MainBuildingId::id)
     } else {
         target
     };
@@ -307,7 +307,10 @@ fn reached_ids(spatial: &Spatial, t: &Unit, target: ObjectId, building: bool) ->
     let mut ids = vec![target];
     if building {
         // the annex's main building, else the target is its own
-        let head = t.annex_of.unwrap_or_else(|| MainBuildingId::new(target));
+        let head = t
+            .building
+            .annex_of
+            .unwrap_or_else(|| MainBuildingId::new(target));
         if head.id() != target {
             ids.push(head.id());
         }
@@ -337,7 +340,7 @@ fn repaired(
             .map_or(&[][..], |p| &p.attributes[..])
     };
     let rate = |k: usize| attributes.get(k).copied().unwrap_or(Amount::ZERO);
-    let annexes = if om.kind == BUILDING && o.annex_of.is_none() {
+    let annexes = if om.kind == BUILDING && o.building.annex_of.is_none() {
         let mut a = c.w.spatial.annexes_of(id);
         a.sort_unstable();
         a
@@ -353,7 +356,7 @@ fn repaired(
         hp: o.life.hp,
         hp_powerup: o.combat.hp_powerup,
         main: if om.kind == BUILDING {
-            o.annex_of
+            o.building.annex_of
         } else {
             None
         },

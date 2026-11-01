@@ -170,7 +170,10 @@ impl WorldPicker<'_> {
         );
         if fm.kind == BUILDING {
             factor = crate::combat::damage::building_elevation_factor(
-                factor, f.relics, tm.kind, t.relics,
+                factor,
+                f.building.relics,
+                tm.kind,
+                t.building.relics,
             );
         }
         let bonus = crate::combat::damage::bonus_damage(&unit, &target);
@@ -297,7 +300,7 @@ impl WorldPicker<'_> {
             inside: t.life.inside.is_some(),
             targeting: !t.untargetable,
             attackable: t.attackable,
-            desolid: t.construction.as_ref().is_some_and(|c| c.desolid),
+            desolid: t.building.construction.as_ref().is_some_and(|c| c.desolid),
             position: placed.position,
             radius: placed.radius,
         };

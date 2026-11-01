@@ -351,7 +351,7 @@ impl Lets<'_> {
     fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> Result<ObjectId, GenieError> {
         // The building master type RESEARCH asks for (`'P'`, 80).
         Ok(if f.master(self.masters, p)?.kind == BUILDING {
-            f.annex_of.map_or(id, MainBuildingId::id)
+            f.building.annex_of.map_or(id, MainBuildingId::id)
         } else {
             id
         })

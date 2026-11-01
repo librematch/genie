@@ -181,7 +181,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             hp: u.life.hp,
             master: u.life.master_id,
             kind: m.kind,
-            main: u.annex_of,
+            main: u.building.annex_of,
             allied: crate::unit_ai::task_finder::allied(
                 &self.c.w.players.player(self.player)?.relations,
                 self.player,

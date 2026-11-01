@@ -888,7 +888,7 @@ mod tests {
         t.players[1].sleeping.push(Unit {
             combat: crate::objects::layers::Combat {
                 ai: Some(crate::unit_ai::UnitAi::default()),
-                ..Default::default()
+                ..asleep.combat
             },
             ..asleep
         });

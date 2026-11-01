@@ -58,8 +58,8 @@ pub(crate) fn released_fields(
     listed: bool,
     by: Releaser,
 ) -> Option<Notify> {
-    if listed && let Some(i) = u.attacking_units.iter().position(|&t| t == by.id) {
-        let _ = u.attacking_units.remove(i);
+    if listed && let Some(i) = u.building.attacking_units.iter().position(|&t| t == by.id) {
+        let _ = u.building.attacking_units.remove(i);
     }
     if crate::objects::WorkerCount::ZERO < u.workers {
         u.workers = u.workers.plus(-1);

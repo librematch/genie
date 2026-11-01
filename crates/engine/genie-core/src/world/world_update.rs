@@ -89,7 +89,7 @@ impl World {
     pub fn sync_world(&mut self) {
         for p in &self.players {
             for u in p.objects.iter().chain(&p.sleeping) {
-                self.spatial.set_annex(u.id, u.annex_of);
+                self.spatial.set_annex(u.id, u.building.annex_of);
             }
         }
         self.spatial.relations = self.players.iter().map(|p| p.relations.clone()).collect();

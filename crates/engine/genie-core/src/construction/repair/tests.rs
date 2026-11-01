@@ -663,6 +663,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     let working = |r: &mut RepairAction| (r.state, r.move_to) = (RepairState::Work, None);
     let mut t = repair_at(NEAR, working);
     t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap()
@@ -716,6 +717,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     // the house moved out of reach: the repairer walks again, no longer counted
     let mut t = repair_at(NEAR, working);
     t.players[1].objects[ListIndex::new(1)]
+        .building
         .construction
         .as_mut()
         .unwrap()

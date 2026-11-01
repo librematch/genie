@@ -169,7 +169,7 @@ impl World {
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
         let target = ContainerId::new(if t.master(&self.masters, tp)?.kind == BUILDING {
-            t.annex_of.map_or(target, MainBuildingId::id)
+            t.building.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         });

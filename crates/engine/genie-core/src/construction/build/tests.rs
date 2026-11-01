@@ -694,7 +694,10 @@ fn foundation_at(id: i32, at: Position, life: Lifecycle, construction: Construct
         id: object_id(id),
         body: crate::objects::layers::Body::at(at),
         life,
-        construction: Some(construction),
+        building: crate::objects::layers::Building {
+            construction: Some(construction),
+            ..Default::default()
+        },
         pasture: None,
         my_pasture: None,
         ..Unit::default()
@@ -827,7 +830,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         Ok(false)
     );
     let h = t.players[1].objects.by_id(object_id(10026)).unwrap();
-    let c = h.construction.unwrap();
+    let c = h.building.construction.unwrap();
     assert_eq!(
         (h.life.state, c.progress, c.snow),
         (ObjectState::Alive, Seconds::new(25.0), true)
@@ -891,7 +894,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             sprite_override: false,
         };
         let mut h = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
-        h.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
+        h.building.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
         let mut t = site_world(world, vec![built_master(id, cost)], vec![h]);
         // a history records events from its first time slice on
         t.players[1].history.add_entry(
@@ -995,7 +998,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         Ok(true)
     );
     let h = t.players[1].objects.by_id(object_id(10028)).unwrap();
-    let c = h.construction.unwrap();
+    let c = h.building.construction.unwrap();
     assert_eq!(h.life.hp, HitPoints::new(1.462));
     assert!(!c.desolid);
     assert_eq!(c.progress, Seconds::new(f32::from_bits(STARTED) + rate));
@@ -1061,7 +1064,8 @@ fn the_work_starts_the_desolid_annexes_first() {
             life(master),
             foundation(desolid),
         );
-        u.annex_of = (master == master_id(1192)).then_some(MainBuildingId::new(object_id(10028)));
+        u.building.annex_of =
+            (master == master_id(1192)).then_some(MainBuildingId::new(object_id(10028)));
         u
     };
     let mut post = built_master(master_id(1192), &Vec::new());
@@ -1080,7 +1084,7 @@ fn the_work_starts_the_desolid_annexes_first() {
         Ok(true)
     );
     let u = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
-    let post = u(object_id(10029)).construction.unwrap();
+    let post = u(object_id(10029)).building.construction.unwrap();
     assert!(!post.desolid);
     assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
     assert_eq!(
@@ -1096,12 +1100,12 @@ fn the_work_starts_the_desolid_annexes_first() {
     );
     assert_eq!(
         (
-            u(object_id(10030)).construction.unwrap(),
+            u(object_id(10030)).building.construction.unwrap(),
             u(object_id(10030)).combat.firepower
         ),
         (foundation(false), crate::combat::Firepower::new(0.0))
     );
-    assert!(!u(object_id(10028)).construction.unwrap().desolid);
+    assert!(!u(object_id(10028)).building.construction.unwrap().desolid);
 }
 
 /// The construction's start (`FUN_1411e5670`) sets the foundation's last move time to the
@@ -1195,7 +1199,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
             ..Lifecycle::default()
         };
         let mut post = foundation_at(10029, Position::new(1.0, 2.0, 0.0), life, foundation);
-        post.annex_of = Some(MainBuildingId::new(object_id(10028)));
+        post.building.annex_of = Some(MainBuildingId::new(object_id(10028)));
         let gate = foundation_at(
             10028,
             Position::new(2.0, 2.0, 0.0),
@@ -1213,7 +1217,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
         let going = t.work_building(object_id(10029), Seconds::new(amount));
         let post = t.players[1].objects.by_id(object_id(10029)).unwrap();
         assert_eq!(
-            (post.construction, post.life.hp),
+            (post.building.construction, post.life.hp),
             (Some(foundation), HitPoints::new(1.0)),
             "the post itself is not worked"
         );

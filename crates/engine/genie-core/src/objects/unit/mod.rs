@@ -3,7 +3,6 @@
 use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::Relics;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::MasterId;
@@ -11,22 +10,17 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::MISSILE;
 use crate::objects::masters::master_type::TREE;
-use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::WorldTime;
 use genie_diff::Diff;
 
 use crate::GenieError;
-use crate::commands::GatherPoint;
-use crate::construction::build::Construction;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::Body;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::ActiveSprite;
 use crate::ownership::capture::Captured;
-use crate::production::Production;
-use crate::world::Gate;
 use crate::world::step::Step;
 
 mod death;
@@ -55,10 +49,6 @@ pub struct Unit {
     /// step; the slice does not model it, so that update stops the player.
     #[diff(unsaved, eq)]
     pub unmodelled_action: Option<GenieError>,
-    /// A building's production queue and make action.
-    pub production: Option<Production>,
-    /// A building's gather point, which its new units go to.
-    pub gather_point: Option<GatherPoint>,
     /// Its layers below the action layer ([`Body`]): the static layer with its place (every
     /// object), the animated layer (`+0x7b8`, types 20 and up) and the moving one with its
     /// movement state (types 30 and up).
@@ -71,8 +61,11 @@ pub struct Unit {
     ///
     /// [`Combat`]: crate::objects::layers::Combat
     pub combat: crate::objects::layers::Combat,
-    /// A building's construction.
-    pub construction: Option<Construction>,
+    /// Its building layer (`TRIBE_Building_Object`, [`Building`]): the game's defaults on an
+    /// object below type 80.
+    ///
+    /// [`Building`]: crate::objects::layers::Building
+    pub building: crate::objects::layers::Building,
     /// `+0x68a`, `unit_attackable_flag`.
     pub attackable: bool,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes the
@@ -86,8 +79,6 @@ pub struct Unit {
     pub my_pasture: Option<crate::gathering::PastureId>,
     /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
     pub undeletable: bool,
-    /// An annex's main building (`+0xbb8`, the save's linked owner).
-    pub annex_of: Option<crate::construction::MainBuildingId>,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).
     pub group: crate::groups::GroupLink,
     /// A missile's own part with its action ([`crate::combat::missile`]).
@@ -97,29 +88,9 @@ pub struct Unit {
     /// Not saved as a list: a load lists them by each one's `+0x2f0` in the objects' order.
     #[diff(unsaved)]
     pub garrison: Vec<ObjectId>,
-    /// A building's `last_garrison_time` (`+0xbe0`): the world time of its last whole second,
-    /// on which its garrison heals ([`Unit::building_seconds`]).
-    pub garrison_time: WorldTime,
-    /// A building's `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`).
-    pub relics: Relics,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after a hit on a building (`FUN_1411cea90`),
     /// one off in each of its updates that passes whole seconds; the computer AI reads it.
     pub damaged_lately: crate::objects::DamagedTimer,
-    /// A building's `mLivestockSummation` (`+0xc28`, saved): the livestock inside it (their
-    /// master's `+0x610`, `FUN_1411cb850`), whose food a mill makes ([`crate::players::world_player`]).
-    pub livestock_summation: Amount,
-    /// A pasture's livestock (`+0xb78`, saved as `livestockId`): the objects its completion put
-    /// on its edges ([`crate::world::World::setup_pasture`]), in the order it made them.
-    pub livestock: Vec<ObjectId>,
-    /// A pasture's workers (`+0xcb8`, saved as `pastureWorkerId`): the units that tend it
-    /// ([`crate::world::World::tend_pasture`]), in the order they came.
-    pub pasture_workers: Vec<ObjectId>,
-    /// A building's `+0xc54`: the frame its BUILD command chose (`FUN_140e7a400`, the packet's
-    /// `+0x1c`), which its standing sprite takes once built; 0 from its constructor and the load.
-    #[diff(unsaved)]
-    pub build_frame: crate::objects::Frame,
-    /// A building's gate lock ([`Gate`]).
-    pub gate: Option<Gate>,
     /// Its active sprite, held from an attack's swing on; None while the slice does not know it.
     /// Its clock runs at the animated layer's speed ([`Body::anim_speed`]).
     #[diff(
@@ -163,12 +134,6 @@ pub struct Unit {
     /// `FUN_14121cc40`, a footprint clearing's `FUN_141189670`, a construction start's clearing
     /// `FUN_1411cd0d0`, a stack unit's completion); later ones leave it alone.
     pub roo_called: bool,
-    /// A building's `+0xcd0`: its constructor found mangrove or rice terrain at its place
-    /// (`FUN_141188db0`), which master 1889's completion reads.
-    pub rice: bool,
-    /// A building's `+0xcb0` (`FUN_1411c5f70`): the id of the object its completion's stack unit
-    /// made ([`crate::world::World::stack_unit`]); None before (the save does not hold it).
-    pub stack_made: Option<ObjectId>,
     /// `+0x6c0` (`FUN_141185010`): the master of its own its master pointer (`+0xa0`) reads, a
     /// copy (`FUN_141186d10`, the master's slot 0x48) of the one it read when it took it; None
     /// while it reads its player's. An ownership change gives it one ([`change_hands`]).
@@ -185,11 +150,6 @@ pub struct Unit {
     /// [`change_hands`]: crate::ownership::change::change_hands
     #[diff(gap = "the import does not read a saved dead master")]
     pub dead_master: Option<Box<Master>>,
-    /// `+0xce0`, `attackingUnits` (saved): the units of players its owner is not allied with
-    /// that took this foundation (a building below state 2 whose master has a stack unit,
-    /// `+0x986`) as their target, once per take, in order ([`Unit::lists_taker`]); its stack
-    /// unit's completion tells each of the new object.
-    pub attacking_units: Vec<ObjectId>,
 }
 
 impl Unit {
@@ -265,7 +225,12 @@ pub(crate) fn annexes_of<'a>(
 ) -> Vec<ObjectId> {
     let mut annexes: Vec<ObjectId> = objects
         .into_iter()
-        .filter(|u| u.annex_of.map(crate::construction::MainBuildingId::id) == Some(id))
+        .filter(|u| {
+            u.building
+                .annex_of
+                .map(crate::construction::MainBuildingId::id)
+                == Some(id)
+        })
         .map(|u| u.id)
         .collect();
     annexes.sort_unstable();

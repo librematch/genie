@@ -86,7 +86,9 @@ impl World {
         }
         let owner = self.players.player(p)?;
         let building = owner.objects.checked(i)?;
-        let Some(Some(Making::Research(r))) = building.production.as_ref().map(|q| q.action) else {
+        let Some(Some(Making::Research(r))) =
+            building.building.production.as_ref().map(|q| q.action)
+        else {
             return Err(NO_RESEARCH_ACTION);
         };
         match r.state {
@@ -175,8 +177,11 @@ impl World {
         }
         let building = self.players.live_mut(p, i)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(Some(Making::Research(r))) =
-            building.production.as_mut().map(|q| q.action.as_mut())
+        if let Some(Some(Making::Research(r))) = building
+            .building
+            .production
+            .as_mut()
+            .map(|q| q.action.as_mut())
         {
             r.state = MakeTechState::Done;
         }
@@ -312,7 +317,11 @@ impl World {
 
 /// The research action of `building` takes the progress `progress`.
 fn set_progress(building: &mut crate::objects::unit::Unit, progress: Seconds) {
-    if let Some(Some(Making::Research(r))) = building.production.as_mut().map(|q| q.action.as_mut())
+    if let Some(Some(Making::Research(r))) = building
+        .building
+        .production
+        .as_mut()
+        .map(|q| q.action.as_mut())
     {
         r.progress = progress;
     }

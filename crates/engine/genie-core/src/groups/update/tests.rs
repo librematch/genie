@@ -2099,7 +2099,7 @@ fn gate_world() -> World {
     t.players[2].objects[ListIndex::new(0)].life.master_id = master_id(5);
     let mut annex = soldier(21, 2.5, 2.5);
     annex.life.master_id = master_id(5);
-    annex.annex_of = Some(MainBuildingId::new(object_id(20)));
+    annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
     t.players[2].objects.push(annex);
     t.spatial
         .set_annex(object_id(21), Some(MainBuildingId::new(object_id(20))));

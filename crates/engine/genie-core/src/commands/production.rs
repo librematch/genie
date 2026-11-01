@@ -141,6 +141,7 @@ impl World {
         for place in self.lookup(ids).into_iter().flatten() {
             let (_, building) = self.at(place)?;
             let listed = building
+                .building
                 .production
                 .as_ref()
                 .is_some_and(|p| p.available_units.contains(&unit_id));
@@ -210,6 +211,7 @@ impl World {
                 continue;
             }
             let total = building
+                .building
                 .production
                 .as_ref()
                 .map_or(0, |p| p.queue.total.get());
@@ -281,7 +283,7 @@ impl World {
         building: &crate::objects::unit::Unit,
     ) -> Result<Seconds, GenieError> {
         let owner = self.players.player(p)?;
-        let Some(production) = building.production.as_ref() else {
+        let Some(production) = building.building.production.as_ref() else {
             return Ok(Seconds::ZERO);
         };
         let queue = &production.queue;
@@ -348,6 +350,7 @@ impl World {
         let total = self
             .players
             .live(player, i)?
+            .building
             .production
             .as_ref()
             .map_or(0, |p| p.queue.total.get());
@@ -420,6 +423,7 @@ impl World {
         let production = owner
             .objects
             .checked_mut(i)?
+            .building
             .production
             .get_or_insert_with(Production::default);
         if let Some(last) = production.queue.last()
@@ -467,6 +471,7 @@ impl World {
         let queue = &self
             .players
             .live(player, i)?
+            .building
             .production
             .as_ref()
             .ok_or(NO_QUEUE)?
@@ -486,6 +491,7 @@ impl World {
         let queue = &mut self
             .players
             .live_mut(player, i)?
+            .building
             .production
             .as_mut()
             .ok_or(NO_QUEUE)?

@@ -63,7 +63,7 @@ impl Unit {
         if let Some(f) = Some(action)
             .filter(|b| matches!(b.state, BuildState::Work | BuildState::Wait))
             .and_then(|b| others.own(b.target))
-            .filter(|u| u.construction.is_some_and(|k| k.desolid))
+            .filter(|u| u.building.construction.is_some_and(|k| k.desolid))
         {
             let (fx, fy) = (f.position().x(), f.position().y());
             let reach = crate::construction::build::CLEARING_REACH + 1.0;
@@ -97,10 +97,10 @@ impl Unit {
         let target = action.target;
         let foundation = others.own(target);
         let site = foundation
-            .filter(|u| u.construction.is_some())
+            .filter(|u| u.building.construction.is_some())
             .map(|u| crate::construction::FoundationId::new(u.id));
         let built = foundation.map(|u| u.life.master_id);
-        let stack_made = foundation.and_then(|u| u.stack_made);
+        let stack_made = foundation.and_then(|u| u.building.stack_made);
         let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> =
             self.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
                 ai.orders

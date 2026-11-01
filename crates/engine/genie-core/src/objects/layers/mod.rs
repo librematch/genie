@@ -16,8 +16,10 @@ use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use genie_diff::Diff;
 
+mod building;
 mod combat;
 
+pub use self::building::Building;
 pub use self::combat::Combat;
 
 /// `RGE_Static_Object`'s place (FD-045-D15): x, y, z (`+0x3c8`, `+0x4c8`, `+0x5a8`, obfuscated in

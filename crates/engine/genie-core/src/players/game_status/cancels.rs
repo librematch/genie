@@ -37,7 +37,7 @@ impl World {
     /// 0x7d) is left; the entries go, the production list's action goes
     /// ([`World::end_production_action`]), the change counter grows and the total is 0.
     pub(crate) fn cancel_queue(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
-        let Some(production) = self.players.live(p, idx)?.production.as_ref() else {
+        let Some(production) = self.players.live(p, idx)?.building.production.as_ref() else {
             return Ok(());
         };
         let entries = production.queue.entries().to_vec();
@@ -52,11 +52,11 @@ impl World {
                 self.refund_researches(p, idx, e, e.count)?;
             }
         }
-        if let Some(production) = self.players.live_mut(p, idx)?.production.as_mut() {
+        if let Some(production) = self.players.live_mut(p, idx)?.building.production.as_mut() {
             production.queue.count = crate::production::QueueLength::ZERO;
         }
         self.end_production_action(p, idx)?;
-        if let Some(production) = self.players.live_mut(p, idx)?.production.as_mut() {
+        if let Some(production) = self.players.live_mut(p, idx)?.building.production.as_mut() {
             production.queue.changes = production.queue.changes.bumped();
             production.queue.total = QueuedUnits::ZERO;
         }
@@ -131,7 +131,7 @@ impl World {
                 }
             }
         }
-        if let (Some(production), Some(tech)) = (building.production.as_mut(), e.tech) {
+        if let (Some(production), Some(tech)) = (building.building.production.as_mut(), e.tech) {
             production.enable_tech(tech);
         }
         let pending = &mut owner.techs.checked_mut(t)?.pending;
@@ -159,7 +159,7 @@ impl World {
         index: UnitIndex,
         all: bool,
     ) -> Result<(), GenieError> {
-        let Some(production) = self.players.live(p, idx)?.production.as_ref() else {
+        let Some(production) = self.players.live(p, idx)?.building.production.as_ref() else {
             return Ok(());
         };
         let Some(e) = production.queue.entry_of_unit(index) else {
@@ -175,7 +175,9 @@ impl World {
             if index == UnitIndex::FIRST {
                 let owner = self.players.player_mut(p)?;
                 let unit = owner.objects.checked_mut(idx)?;
-                if let Some(Some(action)) = unit.production.as_mut().map(|q| q.action.as_mut()) {
+                if let Some(Some(action)) =
+                    unit.building.production.as_mut().map(|q| q.action.as_mut())
+                {
                     match action {
                         Making::Research(r) => r.progress = Seconds::ZERO,
                         // the game writes the make action's +0x70, its unique id
@@ -193,6 +195,7 @@ impl World {
         let queue = &mut owner
             .objects
             .checked_mut(idx)?
+            .building
             .production
             .as_mut()
             .ok_or(NO_PRODUCTION)?
@@ -262,6 +265,7 @@ impl World {
             Ok(&t
                 .players
                 .live(p, idx)?
+                .building
                 .production
                 .as_ref()
                 .ok_or(NO_PRODUCTION)?
@@ -339,7 +343,7 @@ impl World {
         from: i32,
         tech: Option<TechId>,
     ) -> Result<(), GenieError> {
-        let Some(production) = self.players.live(p, idx)?.production.as_ref() else {
+        let Some(production) = self.players.live(p, idx)?.building.production.as_ref() else {
             return Ok(());
         };
         let q = &production.queue;
@@ -375,6 +379,7 @@ impl World {
         let queue = &mut self
             .players
             .live_mut(p, idx)?
+            .building
             .production
             .as_mut()
             .ok_or(NO_PRODUCTION)?
@@ -427,6 +432,7 @@ impl World {
         let master = self
             .players
             .live(p, idx)?
+            .building
             .production
             .as_ref()
             .and_then(|q| q.queue.slots.get(index.signed() as usize))

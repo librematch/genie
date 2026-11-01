@@ -526,7 +526,7 @@ impl Unit {
                 hp: u.life.hp,
                 master: u.life.master_id,
                 kind: m.kind,
-                main: u.annex_of,
+                main: u.building.annex_of,
                 allied: crate::unit_ai::task_finder::allied(
                     view.relations(c.w)?,
                     view.player,

@@ -36,7 +36,7 @@ impl Unit {
     }
 
     /// Whether a building's slot 0x178 or 0x180 (`FUN_1411dba70`, `FUN_1411d6020`) lists its taker
-    /// among the attacking units (`+0xce0`, [`Unit::attacking_units`]): this object of `master` is a
+    /// among the attacking units (`+0xce0`, [`Building::attacking_units`](crate::objects::layers::Building::attacking_units)): this object of `master` is a
     /// building (type 80) below state 2 whose master has a stack unit (`+0x986`), and the taker's
     /// player is not allied with its owner (`FUN_141663d90` with 1: `allied` false).
     pub(crate) fn lists_taker(&self, master: &Master, allied: bool) -> bool {
@@ -48,7 +48,7 @@ impl Unit {
 
     /// Slot 0x178 on this object of its player's live list, taken by the object `by` (`listed`,
     /// [`Unit::lists_taker`]). A building's (`FUN_1411dba70`) first lists the taker among its attacking
-    /// units (`+0xce0`, [`Unit::attacking_units`]; once per take). Then the base take
+    /// units (`+0xce0`, [`Building::attacking_units`](crate::objects::layers::Building::attacking_units); once per take). Then the base take
     /// (`FUN_14119d3e0`): its worker count (`+0x644`) rises, to at most 550, and a live object flagged
     /// to sleep drops the flags (a sleeping one's wake is [`crate::world::World::take`]'s). The
     /// building's wake from semi-asleep (`+0xc98`) after it never runs here: only the building's
@@ -57,7 +57,7 @@ impl Unit {
     /// read); the slice does not hold it.
     pub(crate) fn taken(&mut self, listed: bool, by: ObjectId) {
         if listed {
-            self.attacking_units.push(by);
+            self.building.attacking_units.push(by);
         }
         if self.workers < crate::objects::WorkerCount::MOST {
             self.workers = self.workers.plus(1);
