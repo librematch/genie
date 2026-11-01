@@ -1,8 +1,6 @@
-//! The obstruction grid's cells and visits, the scout map, annexes, alliances and the line
-//! queries.
+//! The obstruction grid's cells and visits, the scout map, alliances and the line queries.
 
 use crate::GenieError;
-use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Tile;
@@ -10,8 +8,8 @@ use crate::map::spatial::{
     Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
+use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionType;
-use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::world::index::ObjectsRef;
 
@@ -202,46 +200,6 @@ impl Spatial {
         if let Some(m) = self.scout_maps.get_mut(&player) {
             m.set(tile, 1);
         }
-    }
-
-    /// An annex's main building, or none.
-    pub fn set_annex(&mut self, id: ObjectId, main: Option<MainBuildingId>) {
-        match main {
-            Some(m) => {
-                let _ = self.annexes.insert(id, m);
-            }
-            None => {
-                let _ = self.annexes.remove(id);
-            }
-        }
-    }
-
-    /// The obstruction query's ignore list for `ids` (−1 for none), as `FUN_14114e8a0` adds each
-    /// object: its id, then a building's annexes (`+0xbc0`..`+0xbd8`, in id order).
-    #[must_use]
-    pub fn query_ignore(&self, ids: &[Option<ObjectId>]) -> Vec<RecordId> {
-        let mut ignore = Vec::new();
-        for &id in ids.iter().flatten() {
-            ignore.push(RecordId::from(id));
-            ignore.extend(self.annexes_of(id).into_iter().map(RecordId::from));
-        }
-        ignore
-    }
-
-    /// The annexes of the building `main`, in id order.
-    #[must_use]
-    pub fn annexes_of(&self, main: ObjectId) -> Vec<ObjectId> {
-        self.annexes
-            .iter()
-            .filter(|&(_, &m)| m.id() == main)
-            .map(|(a, _)| a)
-            .collect()
-    }
-
-    /// The main building of the annex `id`, if it is one.
-    #[must_use]
-    pub fn annex_of(&self, id: impl ObjectKey) -> Option<MainBuildingId> {
-        self.annexes.get(id.key()?).copied()
     }
 
     /// `FUN_141663dc0` with the ally flag ([`Spatial::allied`]), for the walk's avoidance.

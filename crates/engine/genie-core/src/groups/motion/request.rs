@@ -86,7 +86,7 @@ pub(super) fn request(
     };
     let mut plan = PathSoFar::default();
     if leg.level == WaypointLevel::TOP {
-        tile_plan(lead, world, &leg, target, &mut plan)?;
+        tile_plan(lead, world, &leg, target, &mut plan, by_id)?;
     }
     let level = motion.paths.checked(0)?;
     let (short_range, beyond) = if leg.level == WaypointLevel::TOP
@@ -177,6 +177,7 @@ fn tile_plan(
     leg: &Leg,
     target: Option<&Placed>,
     plan: &mut PathSoFar,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(), GenieError> {
     let spatial = &mut *world.spatial;
     let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
@@ -186,7 +187,7 @@ fn tile_plan(
         lead.walker,
         leg.from,
         target.and(leg.target_id),
-        spatial,
+        (spatial, by_id),
         &mut planning,
         TileAsk {
             goal: leg.waypoint,

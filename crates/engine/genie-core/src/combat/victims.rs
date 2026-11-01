@@ -148,7 +148,7 @@ impl World {
             .into_iter()
             .chain(near.iter().map(|v| v.id))
             .filter_map(|id| {
-                self.spatial
+                self.objects()
                     .annex_of(id)
                     .map(crate::construction::MainBuildingId::id)
             })

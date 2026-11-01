@@ -143,7 +143,7 @@ impl BuildAction {
     /// `+0xbe0`, the foundation among them), then the foundation's own annexes', each by its
     /// master's slot 0x50 ([`crate::world::World::foundation_code`]) at its own place. While no
     /// part so far failed, the units on a part that may stay are sent off but this builder
-    /// (`FUN_14123bb20`, [`crate::world::World::evacuate`]). The annexes go in id order, the
+    /// (`FUN_14123bb20`, [`crate::world::World::evacuate`]). The annexes go in slot order, the
     /// order of their slots.
     ///
     /// # Errors
@@ -157,11 +157,12 @@ impl BuildAction {
         reads: &BuildReads,
     ) -> Result<PartTests, GenieError> {
         let mut parts = Vec::new();
-        if let Some(main) = c.w.spatial.annex_of(site) {
+        let by_id = c.w.objects();
+        if let Some(main) = by_id.annex_of(site) {
             parts.push(main.id());
-            parts.extend(c.w.spatial.annexes_of(main.id()));
+            parts.extend(by_id.annexes(main.id()).ids());
         }
-        parts.extend(c.w.spatial.annexes_of(site));
+        parts.extend(by_id.annexes(site).ids());
         let mut tests = PartTests {
             stay: true,
             occupied: false,
@@ -193,7 +194,7 @@ impl BuildAction {
 
     /// The first of the foundation's annexes whose radii are both above [`EPSILON`] and whose
     /// centre the builder stands nearer than the foundation's radii `radius` to, each way
-    /// (`0x140aae200` case 7, the annexes in id order).
+    /// (`0x140aae200` case 7, the annexes in slot order).
     ///
     /// # Errors
     ///
@@ -209,7 +210,8 @@ impl BuildAction {
         let Some(site) = self.target else {
             return Ok(None);
         };
-        for annex in c.w.spatial.annexes_of(site) {
+        let annexes = c.w.objects().annexes(site);
+        for annex in annexes.ids() {
             let placed = c.w.spatial.get_known(annex)?.ok_or(SITE_GONE)?;
             let (ax, ay) = (placed.position.x(), placed.position.y());
             let sized = EPSILON < placed.radius.x() && EPSILON < placed.radius.y();
@@ -398,7 +400,7 @@ fn with_annexes(c: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
     let mut own = vec![id];
     let mut next = 0;
     while let Some(&part) = own.get(next) {
-        own.extend(c.w.spatial.annexes_of(part));
+        own.extend(c.w.objects().annexes(part).ids());
         next += 1;
     }
     own

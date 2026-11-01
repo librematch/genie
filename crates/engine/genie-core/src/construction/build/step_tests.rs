@@ -1677,8 +1677,7 @@ fn annex(t: &mut World, at: Position) -> i32 {
         object_id(ANNEX),
         placed(at, 1.0, class::BUILDING, ids::HOUSE),
     );
-    t.spatial
-        .set_annex(object_id(ANNEX), Some(MainBuildingId::new(HOUSE)));
+    t.link_test_annex(object_id(ANNEX), HOUSE);
     ANNEX
 }
 

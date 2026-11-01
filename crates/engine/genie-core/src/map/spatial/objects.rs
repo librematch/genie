@@ -46,7 +46,6 @@ impl Spatial {
             fastest: 0.0,
             reach: Distance::ZERO,
             scout_maps: BTreeMap::new(),
-            annexes: crate::objects::IdTable::new(),
             relations: crate::players::ByPlayer::default(),
             unit_diplomacy: crate::players::ByPlayer::default(),
             task_0x99: Vec::new(),

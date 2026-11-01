@@ -128,7 +128,7 @@ impl HullPather<'_> {
                 [h] => target.is_some_and(|t| {
                     h.id == t
                         || self
-                            .world
+                            .by_id
                             .annex_of(h.id)
                             .map(crate::construction::MainBuildingId::id)
                             == Some(t)

@@ -32,7 +32,7 @@ pub(crate) fn victim_in(
     v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
     v.tile_place = spatial.tile_place(u.id);
     if let Some(b) = v.building.as_mut() {
-        b.annexes = spatial.annexes_of(u.id);
+        b.annexes = u.building.annexes.ids().collect();
     }
     v
 }

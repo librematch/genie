@@ -332,6 +332,7 @@ impl Mover {
         world: &Spatial,
         target_id: Option<ObjectId>,
         ground_radius: Footprint,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<LevelGaps, GenieError> {
         // FUN_1415417a0 on the level's target: none for -1 and for an object that is gone,
         // which then measures as a walk to a point (LAB_1411512df)
@@ -345,7 +346,7 @@ impl Mover {
         let gap = target.as_ref().map_or(Distance::new(FAR), |(id, t)| {
             let own = footprint_gap(self.position(), ground_radius, t.position, t.radius);
             let near = (self.position(), ground_radius);
-            gate_gap(world, near, (*id, t), own, |g| g - ANNEX_GAP)
+            gate_gap(world, near, (*id, t), own, |g| g - ANNEX_GAP, by_id)
         });
         let to_end = match (&target, self.paths.len()) {
             (Some(_), _) => gap,
@@ -438,7 +439,8 @@ impl Mover {
             let Some(level) = self.paths.first().filter(|l| l.has_path) else {
                 return Ok(Motion::Done);
             };
-            let (target, gap, to_end) = self.level_gaps(world, level.target, ground_radius)?;
+            let (target, gap, to_end) =
+                self.level_gaps(world, level.target, ground_radius, by_id)?;
             let goal = Goal {
                 target: target.as_ref().map(|(id, t)| (*id, t)),
                 gap,
@@ -597,7 +599,7 @@ impl Mover {
                 }
             }
         }
-        if let Some(next) = self.walk_ends(world, goal)? {
+        if let Some(next) = self.walk_ends(world, goal, by_id)? {
             return Ok(next);
         }
         let clipped = self.steer(direction, dt)?;
@@ -612,7 +614,12 @@ impl Mover {
     /// # Errors
     ///
     /// Path data without the walked level, and what the stop does not model.
-    fn walk_ends(&mut self, world: &Spatial, goal: Goal<'_>) -> Result<Option<Next>, GenieError> {
+    fn walk_ends(
+        &mut self,
+        world: &Spatial,
+        goal: Goal<'_>,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Result<Option<Next>, GenieError> {
         let ground_radius = self.stats.radius.ground();
         let level = self.paths.walked()?;
         match goal.target {
@@ -621,7 +628,7 @@ impl Mover {
                 let own =
                     footprint_gap(self.position(), ground_radius, t.position, t.radius) - range;
                 let near = (self.position(), ground_radius);
-                let gap = gate_gap(world, near, (id, t), own, |g| g - range);
+                let gap = gate_gap(world, near, (id, t), own, |g| g - range, by_id);
                 if gap.get() < EPSILON {
                     // in range of the target: the waypoint counts as reached
                     let level = self.paths.walked_mut()?;

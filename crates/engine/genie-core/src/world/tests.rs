@@ -2480,10 +2480,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
             },
         );
     }
-    t.spatial.set_annex(
-        object_id(10031),
-        Some(MainBuildingId::new(object_id(10028))),
-    );
+    t.link_test_annex(object_id(10031), object_id(10028));
     assert_eq!(
         t.work_building(object_id(10031), Seconds::new(0.021)),
         Ok(true)
@@ -8730,6 +8727,12 @@ fn gate_world() -> World {
     };
     let mut gate = unit(object_id(27745), master_id(88), 20.0, None);
     gate.building.gate = Some(Gate::default());
+    gate.building.annexes = crate::construction::Annexes::new([
+        Some(object_id(27746)),
+        Some(object_id(27747)),
+        None,
+        None,
+    ]);
     gate.body
         .put_mover(Some(crate::gathering::hunt::tests::walker()));
     let mut t = World::new(
@@ -10032,7 +10035,13 @@ fn hands_masters() -> Vec<Masters> {
 /// A 40 × 40 world of three players' sight with the registry, holding object `id` of
 /// player `p`, class `class` and master `master` at (10.5, 10.5) in player `p`'s registry
 /// list, its sight on.
-fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Distance) -> Spatial {
+pub(crate) fn hands_world(
+    id: i32,
+    p: PlayerId,
+    class: ClassId,
+    master: MasterId,
+    los: Distance,
+) -> Spatial {
     let n = 40 * 40;
     let mut s = Spatial::new(GridSize::new(40, 40));
     let mut v = crate::vision::visibility::Visibility::new(
@@ -13217,10 +13226,8 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     };
     let masters = Masters::new([castle, annex]);
     t.masters = vec![masters.clone(), masters.clone(), masters];
-    t.spatial
-        .set_annex(object_id(31), Some(MainBuildingId::new(object_id(30))));
-    t.spatial
-        .set_annex(object_id(32), Some(MainBuildingId::new(object_id(30))));
+    t.link_test_annex(object_id(31), object_id(30));
+    t.link_test_annex(object_id(32), object_id(30));
     // a history adds events once it has an entry
     t.players[1].history.entries = vec![crate::players::history::HistoryEntry::default()];
     let mut v = t.victim(object_id(30), PlayerId::new(1)).unwrap().unwrap();
@@ -14185,7 +14192,8 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         Masters::new([gate(master_id(88)), gate(master_id(95))]),
     ];
     t.graphics = Graphics::from([(SpriteId::named(1751), g)]);
-    // the spatial index's view of the annex, as a load fills it
+    // the main building's slot of the annex, as a load fills it
+    t.link_test_annex(object_id(7229), object_id(7228));
     t.sync_world();
     t.tick(Millis::new(100));
     assert_eq!(t.players[1].unsupported, None);
@@ -14205,7 +14213,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         t.players[1].objects[ListIndex::new(1)].building.annex_of,
         None
     );
-    assert_eq!(t.spatial.annexes_of(object_id(7228)), []);
+    assert_eq!(t.objects().annexes(object_id(7228)).ids().count(), 0);
 }
 
 /// 428799090's palisade gate foundation (34600, master 800) dies at no hit points in update 2674
@@ -14316,14 +14324,8 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             },
         ],
     );
-    t.spatial.set_annex(
-        object_id(34602),
-        Some(MainBuildingId::new(object_id(34600))),
-    );
-    t.spatial.set_annex(
-        object_id(34601),
-        Some(MainBuildingId::new(object_id(34600))),
-    );
+    t.link_test_annex(object_id(34602), object_id(34600));
+    t.link_test_annex(object_id(34601), object_id(34600));
     t.masters = vec![
         Masters::new([]),
         Masters::new([
@@ -18740,10 +18742,7 @@ fn annexed_house() -> World {
     let _ = t.push_live(PlayerId::new(1), annex).unwrap();
     let placed = *t.spatial.get(object_id(10028)).unwrap();
     t.spatial.insert(object_id(10030), placed);
-    t.spatial.set_annex(
-        object_id(10030),
-        Some(MainBuildingId::new(object_id(10028))),
-    );
+    t.link_test_annex(object_id(10030), object_id(10028));
     let k = crate::players::tracker::key(t.masters.get(1), &t.lines, ids::HOUSE);
     t.players[1].tracker.add(object_id(10030), k);
     t
@@ -19710,10 +19709,7 @@ fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
     let _ = t.push_live(PlayerId::new(1), main).unwrap();
     t.players[1].objects[ListIndex::new(1)].building.annex_of =
         Some(MainBuildingId::new(object_id(10029)));
-    t.spatial.set_annex(
-        object_id(10028),
-        Some(MainBuildingId::new(object_id(10029))),
-    );
+    t.link_test_annex(object_id(10028), object_id(10029));
     let p = *t.spatial.get(object_id(10028)).unwrap();
     t.spatial.insert(
         object_id(10029),
@@ -20045,8 +20041,7 @@ fn finished_with(
 fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
     use crate::objects::sprite::{Graphic, building_death};
     let mut t = house_builder();
-    t.spatial
-        .set_annex(object_id(700), Some(MainBuildingId::new(object_id(10028))));
+    t.link_test_annex(object_id(700), object_id(10028));
     t.players[1].objects[ListIndex::new(2)].building.annex_of =
         Some(MainBuildingId::new(object_id(10028)));
     let house = &t.players[1].objects[ListIndex::new(1)];
@@ -20077,7 +20072,7 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
             Ok((
                 annex.building.annex_of,
                 annex.life.hp.get(),
-                c.w.spatial.annexes_of(object_id(10028)),
+                unit.building.annexes.ids().collect::<Vec<_>>(),
             ))
         },
     );
@@ -21336,20 +21331,13 @@ fn a_frozen_unit_may_have_moved_its_master_s_speed() {
 }
 
 /// A world made from its parts (a load, a test's world) gets the spatial index's views once
-/// ([`World::sync_world`]): each annex's main building and how the players stand to each
-/// other; after it the routines that change them write them.
+/// ([`World::sync_world`]): how the players stand to each other; after it the routines that
+/// change them write them.
 #[test]
-fn a_world_s_sync_fills_the_annex_index_and_the_relations() {
+fn a_world_s_sync_fills_the_relations() {
     let mut t = forage_world();
-    let id = t.players[1].objects[ListIndex::new(0)].id;
-    t.players[1].objects[ListIndex::new(0)].building.annex_of =
-        Some(MainBuildingId::new(object_id(10028)));
     t.spatial.relations = ByPlayer::default();
     t.sync_world();
-    assert_eq!(
-        t.spatial.annex_of(id),
-        Some(MainBuildingId::new(object_id(10028)))
-    );
     assert_eq!(t.spatial.relations.len(), t.players.len());
     for (p, row) in t.spatial.relations.iter() {
         assert_eq!(row, &t.players[p.index()].relations);

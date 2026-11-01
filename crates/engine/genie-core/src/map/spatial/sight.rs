@@ -394,11 +394,15 @@ impl Spatial {
     /// `RGE_Combat_Object::update`'s sight ([`Visibility::combat_sight`]); an annex reads its
     /// main building's place and UMV entry. The changed mask of an object others take over by
     /// seeing it is the answer.
-    pub fn combat_sight(&mut self, id: ObjectId) -> Result<Option<VisionBits>, GenieError> {
+    pub fn combat_sight(
+        &mut self,
+        id: ObjectId,
+        annex_of: Option<crate::construction::MainBuildingId>,
+    ) -> Result<Option<VisionBits>, GenieError> {
         let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) else {
             return Ok(None);
         };
-        let main = self.annexes.get(id).and_then(|main| {
+        let main = annex_of.as_ref().and_then(|main| {
             let place = self.objects.get(main.id())?.position;
             Some((place, v.seer(*main).map_or(0, |s| s.umv)))
         });

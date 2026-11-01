@@ -195,26 +195,6 @@ impl Unit {
     }
 }
 
-/// A building's annexes among `objects` (`+0xbc0`.., the save's linked object ids), in id order,
-/// as the building made them.
-pub(crate) fn annexes_of<'a>(
-    id: ObjectId,
-    objects: impl IntoIterator<Item = &'a Unit>,
-) -> Vec<ObjectId> {
-    let mut annexes: Vec<ObjectId> = objects
-        .into_iter()
-        .filter(|u| {
-            u.building
-                .annex_of
-                .map(crate::construction::MainBuildingId::id)
-                == Some(id)
-        })
-        .map(|u| u.id)
-        .collect();
-    annexes.sort_unstable();
-    annexes
-}
-
 /// The second target's checks at the start of a Gather's or a Hunt's update (`0x140a8e1d0`,
 /// `0x140ac7a00`) on `site`, which the world's table holds (`held`,
 /// `FUN_1415417a0`) in `state`: one the table lacks goes (`FUN_140a7a190` with none, with nothing

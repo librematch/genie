@@ -172,7 +172,7 @@ impl crate::world::World {
     ) -> Result<bool, GenieError> {
         let mut at = id;
         loop {
-            for annex in self.spatial.annexes_of(at) {
+            for annex in self.objects().annexes(at).ids() {
                 let Some((q, a)) = self.object(annex) else {
                     continue;
                 };

@@ -286,6 +286,37 @@ impl<'a> ObjectsRef<'a> {
         self.get(id)?.gait()
     }
 
+    /// The main building of the annex `id` (its `+0xbb8`); none for an object that is no annex,
+    /// one the world does not hold or one out for its update.
+    #[must_use]
+    pub fn annex_of(&self, id: impl ObjectKey) -> Option<crate::construction::MainBuildingId> {
+        self.get(id)?.building.annex_of
+    }
+
+    /// The annexes of the building `main` ([`crate::construction::Annexes`]): none for an
+    /// object the world does not hold or one out for its update, which reads its own.
+    #[must_use]
+    pub fn annexes(&self, main: impl ObjectKey) -> crate::construction::Annexes {
+        self.get(main)
+            .map_or(crate::construction::Annexes::NONE, |u| u.building.annexes)
+    }
+
+    /// The obstruction query's ignore list for `ids` (−1 for none), as `FUN_14114e8a0` adds each
+    /// object: its id, then a building's annexes (`+0xbc0`..`+0xbd8`, in slot order).
+    #[must_use]
+    pub fn query_ignore(&self, ids: &[Option<ObjectId>]) -> Vec<crate::map::spatial::RecordId> {
+        let mut ignore = Vec::new();
+        for &id in ids.iter().flatten() {
+            ignore.push(crate::map::spatial::RecordId::from(id));
+            ignore.extend(
+                self.annexes(id)
+                    .ids()
+                    .map(crate::map::spatial::RecordId::from),
+            );
+        }
+        ignore
+    }
+
     /// Whether object `id` moves now ([`crate::map::spatial::Gait::moving`]).
     #[must_use]
     pub fn moving(&self, id: impl ObjectKey) -> bool {
@@ -304,8 +335,8 @@ pub(crate) struct TestObjects {
 
 #[cfg(test)]
 impl TestObjects {
-    /// Unit `id` gives `gait` ([`crate::movement::tests::unit_with_gait`]); none leaves no unit of
-    /// the id.
+    /// Unit `id` gives `gait` ([`crate::movement::tests::unit_with_gait`]), its building layer
+    /// kept; none leaves no unit of the id.
     pub(crate) fn set_gait(&mut self, id: ObjectId, gait: Option<crate::map::spatial::Gait>) {
         if self.players.is_empty() {
             self.players.push(Player::default());
@@ -313,7 +344,18 @@ impl TestObjects {
         let Some(player) = self.players.first_mut() else {
             return;
         };
-        let made = gait.map(|g| crate::movement::tests::unit_with_gait(id, g));
+        let building = player
+            .objects
+            .iter()
+            .find(|u| u.id == id)
+            .map(|u| u.building.clone());
+        let made = gait.map(|g| {
+            let mut u = crate::movement::tests::unit_with_gait(id, g);
+            if let Some(b) = building {
+                u.building = b;
+            }
+            u
+        });
         player.objects = player
             .objects
             .iter()
@@ -324,9 +366,53 @@ impl TestObjects {
         self.index = ObjectIndex::of(&self.players);
     }
 
+    /// A test's link of `annex` to the building `main`: the annex's `+0xbb8` and the building's
+    /// first empty slot, each a unit of its own (without movement state) if none yet.
+    pub(crate) fn link_annex(&mut self, annex: ObjectId, main: ObjectId) {
+        if self.players.is_empty() {
+            self.players.push(Player::default());
+        }
+        let Some(player) = self.players.first_mut() else {
+            return;
+        };
+        for id in [annex, main] {
+            if player.objects.position_of(id).is_none() {
+                player.objects.push(Unit {
+                    id,
+                    ..Unit::default()
+                });
+            }
+        }
+        for u in &mut player.objects {
+            if u.id == annex {
+                u.building.annex_of = Some(crate::construction::MainBuildingId::new(main));
+            }
+            if u.id == main {
+                let slot = u.building.annexes.ids().count();
+                let _ = u.building.annexes.link(slot, annex);
+            }
+        }
+        self.index = ObjectIndex::of(&self.players);
+    }
+
     /// The units by id.
     pub(crate) fn view(&self) -> ObjectsRef<'_> {
         ObjectsRef::new(&self.players, &self.index)
+    }
+}
+
+#[cfg(test)]
+impl World {
+    /// A test's link of `annex` to the building `main`: the annex's `+0xbb8` and the building's
+    /// first empty slot, as far as the world holds each.
+    pub(crate) fn link_test_annex(&mut self, annex: ObjectId, main: ObjectId) {
+        if let Some((_, a)) = self.object_mut(annex) {
+            a.building.annex_of = Some(crate::construction::MainBuildingId::new(main));
+        }
+        if let Some((_, m)) = self.object_mut(main) {
+            let slot = m.building.annexes.ids().count();
+            let _ = m.building.annexes.link(slot, annex);
+        }
     }
 }
 

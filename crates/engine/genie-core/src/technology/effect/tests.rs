@@ -582,6 +582,8 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
     let mut main = unit_of(20, master_id(30), HitPoints::new(100.0));
     main.life.master_id = master_id(30);
     main.building.construction = Some(built());
+    main.building.annexes =
+        crate::construction::Annexes::new([Some(object_id(21)), None, None, None]);
     let mut annex = unit_of(21, master_id(31), HitPoints::new(50.0));
     annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
     annex.building.construction = Some(built());

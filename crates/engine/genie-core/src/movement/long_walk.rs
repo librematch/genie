@@ -208,7 +208,7 @@ pub(crate) fn tile_plan_for(
     walker: Walker,
     from: Point,
     level_target: Option<ObjectId>,
-    world: &mut Spatial,
+    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
     plan: &mut Planning<'_>,
     ask: TileAsk<'_>,
     out: &mut Path,
@@ -237,8 +237,8 @@ pub(crate) fn tile_plan_for(
         full: !plan.computer,
     };
     let annexes = level_target
-        .filter(|&t| world.annex_of(t).is_none())
-        .map(|t| world.annexes_of(t))
+        .filter(|&t| by_id.annex_of(t).is_none())
+        .map(|t| by_id.annexes(t).ids().collect::<Vec<_>>())
         .unwrap_or_default();
     let (slots, ignore) = plan
         .pathing

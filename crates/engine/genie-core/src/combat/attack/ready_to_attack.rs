@@ -138,7 +138,7 @@ impl Attack {
             return self.fail(unit, g.sprite_rng);
         }
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
-        let gap = crate::movement::gate_gap(g.map, (at, ground), (target, &t), gap, |g| g);
+        let gap = crate::movement::gate_gap(g.map, (at, ground), (target, &t), gap, |g| g, g.by_id);
         if self.reach() < gap {
             if !self.sub_action {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;

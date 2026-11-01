@@ -253,7 +253,7 @@ impl World {
         id: ObjectId,
         new: PlayerId,
     ) -> Result<(), GenieError> {
-        for annex in self.spatial.annexes_of(id) {
+        for annex in self.objects().annexes(id).ids() {
             let Some((q, a)) = self.object(annex) else {
                 continue;
             };

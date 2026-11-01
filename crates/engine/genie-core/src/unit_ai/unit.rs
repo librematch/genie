@@ -50,7 +50,7 @@ impl Unit {
         let combat = crate::objects::masters::master_type::COMBAT
             <= self.master(&c.w.masters, c.player)?.kind;
         if combat
-            && let Some(mask) = c.w.spatial.combat_sight(self.id)?
+            && let Some(mask) = c.w.spatial.combat_sight(self.id, self.building.annex_of)?
             && let Some(q) = crate::vision::visibility::sight_taker(
                 mask,
                 c.player,

@@ -2096,8 +2096,7 @@ fn gate_world() -> World {
     annex.life.master_id = master_id(5);
     annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
     let _ = t.push_live(PlayerId::new(2), annex).unwrap();
-    t.spatial
-        .set_annex(object_id(21), Some(MainBuildingId::new(object_id(20))));
+    t.link_test_annex(object_id(21), object_id(20));
     t
 }
 
@@ -2112,14 +2111,18 @@ fn a_gate_out_of_reach_is_struck_at_its_nearest_part() {
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(21)
     );
-    t.spatial.set_annex(object_id(21), None);
+    t.object_mut(object_id(20))
+        .unwrap()
+        .1
+        .building
+        .annexes
+        .clear();
     assert_eq!(
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(20)
     );
     // within its weapon range and above the least one: the gate itself
-    t.spatial
-        .set_annex(object_id(21), Some(MainBuildingId::new(object_id(20))));
+    t.link_test_annex(object_id(21), object_id(20));
     let mut m4 = t.masters[1].get(master_id(4)).unwrap().clone();
     m4.weapon_range = Distance::new(10.0);
     t.masters[1] = Masters::new([m4.clone()]);

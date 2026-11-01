@@ -70,8 +70,9 @@ impl Unit {
             // each slot (`+0xbc0`..) clears and its annex's `+0xbb8` with it, and each annex takes
             // the building's hit points (`+0x278`), so it dies in its own update; the set_state
             // (FUN_1411dbb70) then finds no annex to take along
-            for annex in c.w.spatial.annexes_of(self.id) {
-                c.w.spatial.set_annex(annex, None);
+            let annexes = self.building.annexes;
+            self.building.annexes.clear();
+            for annex in annexes.ids() {
                 if let Some((_, a)) = c.w.object_mut(annex) {
                     a.building.annex_of = None;
                     a.life.hp = self.life.hp;

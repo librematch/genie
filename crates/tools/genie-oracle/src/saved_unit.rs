@@ -14,6 +14,7 @@ use genie_core::combat::Firepower;
 use genie_core::combat::MissileCount;
 use genie_core::combat::damage::ArmorPair;
 use genie_core::combat::missile::ShooterId;
+use genie_core::construction::Annexes;
 use genie_core::construction::BuilderCount;
 use genie_core::construction::MainBuildingId;
 use genie_core::garrison::RaiderCountdown;
@@ -226,6 +227,12 @@ pub(super) fn unit(
                 .as_deref()
                 .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
                 .map(MainBuildingId::new),
+            annexes: object
+                .tribe_building_object
+                .as_deref()
+                .map_or(Annexes::NONE, |b| {
+                    annexes(&b.mupt_linked_object_references_linked_object_ids)
+                }),
             garrison_time: object
                 .tribe_building_object
                 .as_deref()
@@ -360,6 +367,16 @@ struct BuildingLists {
     pasture_workers: Vec<ObjectId>,
     /// `attackingUnits` (+0xce0): the unallied takers of a foundation with a stack unit.
     attacking_units: Vec<ObjectId>,
+}
+
+/// A main building's annex slots (`+0xbc0`..`+0xbd8`) from the save's linked object ids, −1
+/// for an empty slot.
+fn annexes(ids: &[i32]) -> Annexes {
+    let mut slots = [None; Annexes::SLOTS];
+    for (slot, &id) in slots.iter_mut().zip(ids) {
+        *slot = ObjectId::of_field(id);
+    }
+    Annexes::new(slots)
 }
 
 /// A saved object's [`BuildingLists`].

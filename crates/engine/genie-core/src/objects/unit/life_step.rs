@@ -127,7 +127,8 @@ impl Unit {
             && !(before == ObjectState::DyingSprite && after == ObjectState::Dead)
             && self.master(&c.w.masters, c.player)?.kind == BUILDING
         {
-            for annex in c.w.spatial.annexes_of(self.id) {
+            let annexes = self.building.annexes;
+            for annex in annexes.ids() {
                 if let Some((q, _)) = c.w.object(annex) {
                     c.lend(self, |w| w.set_state(q, annex, after))?;
                 }

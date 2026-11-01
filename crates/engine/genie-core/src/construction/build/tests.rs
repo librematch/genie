@@ -1030,14 +1030,6 @@ fn the_work_starts_the_desolid_annexes_first() {
     world.insert(object_id(10028), at(30.0, master_id(665)));
     world.insert(object_id(10029), at(28.5, master_id(1192)));
     world.insert(object_id(10030), at(31.5, master_id(1192)));
-    world.set_annex(
-        object_id(10029),
-        Some(MainBuildingId::new(object_id(10028))),
-    );
-    world.set_annex(
-        object_id(10030),
-        Some(MainBuildingId::new(object_id(10028))),
-    );
     let foundation = |desolid| Construction {
         progress: Seconds::ZERO,
         desolid,
@@ -1079,6 +1071,9 @@ fn the_work_starts_the_desolid_annexes_first() {
             unit(10030, 31.5, master_id(1192), false),
         ],
     );
+    for post in [10029, 10030] {
+        t.link_test_annex(object_id(post), object_id(10028));
+    }
     assert_eq!(
         t.work_building(object_id(10028), Seconds::new(0.021)),
         Ok(true)

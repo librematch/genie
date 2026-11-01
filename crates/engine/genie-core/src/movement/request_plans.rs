@@ -101,7 +101,7 @@ impl Mover {
             return Ok(Some(step));
         }
         if (!np.found || too_short(&np.path)) && w.level == WaypointLevel::TOP && TILE_PATHER {
-            self.tile_again(me, world, plan, w, np)?;
+            self.tile_again(me, world, plan, w, np, by_id)?;
         }
         if !(np.path.length <= w.distance * DETOUR || np.path.length <= LONG) {
             np.new.repath_time = Seconds::new((plan.object.rand15() as f32 * 0.5) / 32767.0 + 2.0);
@@ -124,7 +124,7 @@ impl Mover {
     ) -> Result<(), GenieError> {
         if self.planner_exists(world, plan) {
             if !self.near_target_path(me, world, plan, w, np, by_id)? {
-                self.first_tile_plan(me, world, plan, w, np)?;
+                self.first_tile_plan(me, world, plan, w, np, by_id)?;
             }
         } else {
             let _ = np.path.insert(0, w.position);
@@ -178,6 +178,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         let target_moves = w.goal.target.is_some_and(|(_, t)| t.moves);
         let target_radius = w
@@ -191,11 +192,11 @@ impl Mover {
             range: w.range,
             target: w.goal.target.map(|(_, t)| t),
         };
-        let r =
-            self.tile_plan(me, world, plan, ask, &mut np.path)?
-                .ok_or(GenieError::unreachable(
-                    "a plan without the planner it tested",
-                ))?;
+        let r = self
+            .tile_plan(me, world, plan, ask, &mut np.path, by_id)?
+            .ok_or(GenieError::unreachable(
+                "a plan without the planner it tested",
+            ))?;
         // the game also tests for 4, which the planner never returns
         if !r.leads() {
             return Ok(());
@@ -412,6 +413,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         let target_radius = w
             .goal
@@ -425,7 +427,7 @@ impl Mover {
             range: w.range,
             target: w.goal.target.map(|(_, t)| t),
         };
-        let Some(r) = self.tile_plan(me, world, plan, ask, &mut other)? else {
+        let Some(r) = self.tile_plan(me, world, plan, ask, &mut other, by_id)? else {
             return Ok(());
         };
         let last = point_or_zero(&other, WaypointIndex::last_of(other.points.len()));

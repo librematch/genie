@@ -316,7 +316,7 @@ impl Mover {
             return Ok(true);
         }
         let player = me_at.map(|p| p.player);
-        let ignore = world.query_ignore(&[Some(me.id), target_id]);
+        let ignore = by_id.query_ignore(&[Some(me.id), target_id]);
         let grow = self.stats.radius.x() * LONG_PATH_GROW;
         let stretches = path.points.iter().zip(path.points.iter().skip(1));
         for (i, (&a, &b)) in stretches.enumerate() {

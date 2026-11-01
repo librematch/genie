@@ -326,6 +326,7 @@ impl World {
                     sprite_override: false,
                 }),
                 annex_of: None,
+                annexes: crate::construction::Annexes::NONE,
                 garrison_time: WorldTime::ZERO,
                 relics: Relics::NONE,
                 livestock_summation: Amount::ZERO,
@@ -368,7 +369,12 @@ impl World {
         };
         let _ = self.push_live(player, unit)?;
         self.settle_building(player, id, &made, (position, desolid), foundation)?;
-        for (&annex, &off) in building.annexes.iter().zip(&building.annex_offsets) {
+        for (slot, (&annex, &off)) in building
+            .annexes
+            .iter()
+            .zip(&building.annex_offsets)
+            .enumerate()
+        {
             let Some(annex) = annex else {
                 continue;
             };
@@ -381,7 +387,7 @@ impl World {
             let ai = Ok(am.unit_ai_type(annex));
             let at = Position::new(position.x() + off.x(), position.y() + off.y(), given_z);
             let (aid, at) = self.make_building(player, annex, ai, at)?;
-            self.link_annex(player, id, aid, &made, &am)?;
+            self.link_annex(player, (id, slot), aid, &made, &am)?;
             self.clear_footprint(player, annex, at.ground(), false)?;
         }
         self.watch_started(player, id)?;
@@ -408,7 +414,8 @@ impl World {
     }
 
     /// The building constructor's link of a new annex `aid` (master `am`) to its building `id`
-    /// (master `made`): the building's slot and the annex's `+0xbb8`; its owner's watched list
+    /// (master `made`): the building's slot `slot` (its master's annex index,
+    /// [`crate::construction::Annexes::link`]) and the annex's `+0xbb8`; its owner's watched list
     /// lets the annex go (`FUN_141091310`) unless the building is a gate (39); a tall annex
     /// master makes it desolid (`FUN_1411cf770`, which an annex's link lets through: its record
     /// and mesh shape go, its own master copy has no height, the watched list lets it go; its
@@ -416,16 +423,16 @@ impl World {
     pub(crate) fn link_annex(
         &mut self,
         player: PlayerId,
-        id: ObjectId,
+        (id, slot): (ObjectId, usize),
         aid: ObjectId,
         made: &Master,
         am: &Master,
     ) -> Result<(), GenieError> {
         let not_held = crate::construction::build::NOT_HELD;
+        let (_, main) = self.object_mut(id).ok_or_else(|| not_held.clone())?;
+        main.building.annexes.link(slot, aid)?;
         let (_, a) = self.object_mut(aid).ok_or_else(|| not_held.clone())?;
-        let main = crate::construction::MainBuildingId::new(id);
-        a.building.annex_of = Some(main);
-        self.spatial.set_annex(aid, Some(main));
+        a.building.annex_of = Some(crate::construction::MainBuildingId::new(id));
         if made.class != class::GATE {
             self.unwatch(player, aid)?;
         }

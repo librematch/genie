@@ -559,13 +559,14 @@ pub(crate) fn gate_gap(
     (id, target): (ObjectId, &Placed),
     own: Distance,
     annex: impl Fn(Distance) -> Distance,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Distance {
     // The class the motion step measures by its annexes (`-0xe85` encoded).
     if target.class != class::GATE {
         return own;
     }
     let mut gap = own;
-    for a in world.annexes_of(id).into_iter().take(2) {
+    for a in by_id.annexes(id).ids().take(2) {
         if let Some(p) = world.get(a) {
             gap = Distance::new(fmath::minss(
                 annex(footprint_gap(at, radius, p.position, p.radius)).get(),

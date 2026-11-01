@@ -23,8 +23,8 @@ use crate::objects::masters::ids;
 use crate::objects::masters::ids::HOUSE;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
-use crate::objects::unit::{Unit, annexes_of};
 use crate::players::Amount;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -57,7 +57,6 @@ impl Unit {
     /// of at most 0).
     pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let master = self.master(&c.w.masters, c.player)?;
         let transforms = master
             .building
@@ -78,7 +77,7 @@ impl Unit {
             return Ok(());
         }
         let locked = gate.locked;
-        let (total, allied) = self.gate_count(&mut c.w.spatial, others, by_id)?;
+        let (total, allied) = self.gate_count(&mut c.w.spatial, by_id)?;
         let gate = self.building.gate.as_mut().ok_or(GenieError::unreachable(
             "a gate whose state went during its update",
         ))?;
@@ -119,20 +118,15 @@ impl Unit {
         })
     }
 
-    /// [`gate_units`] of this gate, its annexes the units of `others` that are its (in id order,
-    /// as made): the units in it and how many of them are of an ally.
+    /// [`gate_units`] of this gate between its annexes (its slots, `+0xbc0`..): the units in it
+    /// and how many of them are of an ally.
     pub(crate) fn gate_count(
         &self,
         spatial: &mut Spatial,
-        others: OthersRef<'_>,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(usize, usize), GenieError> {
-        let (units, allied) = gate_units(
-            spatial,
-            self.id,
-            &annexes_of(self.id, others.own_iter()),
-            by_id,
-        )?;
+        let annexes: Vec<crate::objects::ObjectId> = self.building.annexes.ids().collect();
+        let (units, allied) = gate_units(spatial, self.id, &annexes, by_id)?;
         Ok((units.len(), allied))
     }
 

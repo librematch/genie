@@ -66,17 +66,11 @@ impl World {
     }
 
     /// The world's table by id ([`World::reindex`]) and the spatial index's view of a world
-    /// made from its parts (a load, a test's world): the
-    /// annexes' main buildings (their one writer after it: the routines that link and unlink an
-    /// annex), how the players stand to each other (after it: the diplomacy change,
-    /// [`World::set_relation`]) and each player's masters with a task of action type 0x99.
+    /// made from its parts (a load, a test's world): how the players stand to each other (after
+    /// it: the diplomacy change, [`World::set_relation`]) and each player's masters with a task
+    /// of action type 0x99.
     pub fn sync_world(&mut self) {
         self.reindex();
-        for p in &self.players {
-            for u in p.objects.iter().chain(&p.sleeping) {
-                self.spatial.set_annex(u.id, u.building.annex_of);
-            }
-        }
         self.spatial.relations = self.players.iter().map(|p| p.relations.clone()).collect();
         self.spatial.task_0x99 = self
             .masters

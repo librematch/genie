@@ -222,8 +222,7 @@ impl World {
         let now = self.world_time;
         if crate::map::Distance::ZERO < height {
             let id = self.players.live(player, idx)?.id;
-            let annexes =
-                crate::objects::unit::annexes_of(id, &self.players.player(player)?.objects);
+            let annexes: Vec<ObjectId> = self.objects().annexes(id).ids().collect();
             let (units, _) = crate::construction::gates::gate_units(
                 &mut self.spatial,
                 id,

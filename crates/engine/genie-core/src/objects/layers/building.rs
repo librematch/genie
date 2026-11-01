@@ -28,6 +28,8 @@ pub struct Building {
     pub gather_point: Option<GatherPoint>,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
     pub annex_of: Option<crate::construction::MainBuildingId>,
+    /// A main building's annexes (`+0xbc0`..`+0xbd8`, the save's linked objects).
+    pub annexes: crate::construction::Annexes,
     /// A building's production queue and make action.
     pub production: Option<Production>,
     /// A building's gate lock ([`Gate`]).

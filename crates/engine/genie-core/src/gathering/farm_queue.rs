@@ -272,7 +272,7 @@ impl World {
             if is_building {
                 let mut k = 0;
                 while let Some(&o) = own.get(k) {
-                    own.extend(self.spatial.annexes_of(o));
+                    own.extend(self.objects().annexes(o).ids());
                     k += 1;
                 }
             }

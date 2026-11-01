@@ -29,6 +29,7 @@ building's own steps first, then the builder's or repairer's action.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`annexes.rs`](annexes.rs) | A main building's annexes (`+0xbc0`..`+0xbd8`): its four slots, each an annex or none. |
 | [`builder_count.rs`](builder_count.rs) | The builders or repairers on an object. |
 | [`building_update.rs`](building_update.rs) | A gate's and a farm's update, a building's completion and seconds, the idle swap and the death blast. |
 | [`footprint_waits.rs`](footprint_waits.rs) | A builder's waits for an occupied footprint. |

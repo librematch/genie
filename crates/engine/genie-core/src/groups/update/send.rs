@@ -184,7 +184,7 @@ impl World {
         }
         let mut part = t;
         let mut nearest = self.footprint_gap_squared(unit, t)?;
-        for annex in self.spatial.annexes_of(t.id()).into_iter().take(ANNEXES) {
+        for annex in self.objects().annexes(t.id()).ids().take(ANNEXES) {
             let Some(a) = self.world_object(annex) else {
                 continue;
             };

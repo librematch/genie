@@ -8,7 +8,6 @@ use crate::construction::repair::{CountedIn, RepairReads, Repairee};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
-use crate::map::spatial::Spatial;
 use crate::math::fmath::BVector;
 use crate::movement::Me;
 use crate::movement::Speed;
@@ -262,7 +261,7 @@ pub(crate) fn repair_target(
         && let Some((q, t)) = others.find(target)
     {
         let tm = repair_master(&c.w.masters, q, t)?;
-        for id in reached_ids(&c.w.spatial, t, target, tm.kind == BUILDING) {
+        for id in reached_ids(c.w.objects(), t, target, tm.kind == BUILDING) {
             let Some(o) = others.find(id) else {
                 continue;
             };
@@ -306,7 +305,12 @@ pub(crate) fn repair_target(
 
 /// The objects a repair of `target` (`t`) reaches, in order: the target; for a building, an
 /// annex's main building, then the main building's annexes by id, the target left out.
-fn reached_ids(spatial: &Spatial, t: &Unit, target: ObjectId, building: bool) -> Vec<ObjectId> {
+fn reached_ids(
+    by_id: crate::world::index::ObjectsRef<'_>,
+    t: &Unit,
+    target: ObjectId,
+    building: bool,
+) -> Vec<ObjectId> {
     let mut ids = vec![target];
     if building {
         // the annex's main building, else the target is its own
@@ -317,7 +321,12 @@ fn reached_ids(spatial: &Spatial, t: &Unit, target: ObjectId, building: bool) ->
         if head.id() != target {
             ids.push(head.id());
         }
-        let mut annexes = spatial.annexes_of(head.id());
+        // the target's own slots, else its main building's
+        let mut annexes: Vec<ObjectId> = if head.id() == target {
+            t.building.annexes.ids().collect()
+        } else {
+            by_id.annexes(head.id()).ids().collect()
+        };
         annexes.sort_unstable();
         ids.extend(annexes.iter().copied().filter(|&a| a != target));
     }
@@ -344,7 +353,7 @@ fn repaired(
     };
     let rate = |k: usize| attributes.get(k).copied().unwrap_or(Amount::ZERO);
     let annexes = if om.kind == BUILDING && o.building.annex_of.is_none() {
-        let mut a = c.w.spatial.annexes_of(id);
+        let mut a: Vec<ObjectId> = o.building.annexes.ids().collect();
         a.sort_unstable();
         a
     } else {

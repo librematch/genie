@@ -73,7 +73,7 @@ impl Mover {
             .is_some_and(|p| p.level == WaypointLevel::PLANNED && !p.points.is_empty());
         if self.paths.walked()?.level == WaypointLevel::WALKED
             && parent_is_level_1
-            && self.look_ahead(me, world)?
+            && self.look_ahead(me, world, by_id)?
         {
             return Ok(Next::Again);
         }
@@ -94,9 +94,14 @@ impl Mover {
                         - range)
                         - Distance::new(RANGE_FLOOR);
                     let near = (self.position(), ground_radius);
-                    gate_gap(world, near, (id, t), own, |g| {
-                        (g - range) - Distance::new(RANGE_FLOOR)
-                    })
+                    gate_gap(
+                        world,
+                        near,
+                        (id, t),
+                        own,
+                        |g| (g - range) - Distance::new(RANGE_FLOOR),
+                        by_id,
+                    )
                 });
         if goal.target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
             self.clear_bit_2()?;
@@ -231,7 +236,12 @@ impl Mover {
     /// first within 10 tiles (squared, `DAT_14330ebcc`) that the unit can walk to straight
     /// (`FUN_141142750`) becomes the parent's waypoint; level 0 goes, and the parent asks for a
     /// path (state 2) as the motion step starts again. True when it did.
-    pub(super) fn look_ahead(&mut self, me: &Me, world: &mut Spatial) -> Result<bool, GenieError> {
+    pub(super) fn look_ahead(
+        &mut self,
+        me: &Me,
+        world: &mut Spatial,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Result<bool, GenieError> {
         let target = self.paths.walked()?.target;
         let parent = self.paths.parent()?;
         // the motion step's place of the unit: +0x824, where it last moved to
@@ -243,7 +253,7 @@ impl Mover {
             let p = *parent.points.checked(k.get() as usize)?;
             let d = fmath::sub(p, at);
             if d.x() * d.x() + 0.0 + d.y() * d.y() <= LOOK_AHEAD
-                && self.straight(me, p, target, world)?
+                && self.straight(me, p, target, world, by_id)?
             {
                 break;
             }
@@ -272,6 +282,7 @@ impl Mover {
         p: BVector,
         target: Option<ObjectId>,
         world: &mut Spatial,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (rx, ry, rz) = (
             self.stats.radius.x(),
@@ -283,7 +294,7 @@ impl Mover {
         if !(rx <= x && rz <= y && x <= w as f32 - rx && y <= h as f32 - ry) {
             return Ok(false);
         }
-        let ignore = world.query_ignore(&[Some(me.id), target]);
+        let ignore = by_id.query_ignore(&[Some(me.id), target]);
         // the query starts at +0x824, where the unit last moved to
         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
         let grow = rx * STRAIGHT_GROW;
@@ -329,7 +340,7 @@ impl Mover {
         if !(rx <= x && rz <= y && x <= w as f32 - rx && y <= h as f32 - ry) {
             return Ok(false);
         }
-        let ignore = world.query_ignore(&[Some(me.id), target]);
+        let ignore = by_id.query_ignore(&[Some(me.id), target]);
         // the query starts at +0x824, where the unit last moved to
         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
         let rect = Rect::spanning(from, to);

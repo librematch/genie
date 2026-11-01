@@ -1,6 +1,6 @@
 use crate::fixtures::{action_list, combat_mut, combat_object};
 use crate::masters::{DefaultAction, MasterTable};
-use crate::saved_unit::unit;
+use crate::saved_unit::{annexes, unit};
 use crate::test_ids::object_id;
 use genie_core::combat::missile::ShooterId;
 use genie_core::objects::ObjectId;
@@ -190,4 +190,20 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         u.combat.town_bell,
         genie_core::orders::town_bell::TownBell::default()
     );
+}
+
+/// The save's linked object ids fill a main building's four annex slots in their order, −1 an
+/// empty slot.
+#[test]
+fn the_linked_object_ids_fill_the_annex_slots_in_order() {
+    assert_eq!(
+        annexes(&[12, -1, 14, -1]),
+        genie_core::construction::Annexes::new([
+            Some(object_id(12)),
+            None,
+            Some(object_id(14)),
+            None
+        ])
+    );
+    assert_eq!(annexes(&[]), genie_core::construction::Annexes::NONE);
 }

@@ -341,6 +341,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: TileAsk<'_>,
         out: &mut Path,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<Found>, GenieError> {
         // the smoothing's ignore list: the unit and the level's target object (the planner's
         // argument 12, the object the world holds)
@@ -354,7 +355,7 @@ impl Mover {
             self.walker(me.id),
             self.moved_at.ground(),
             level_target,
-            world,
+            (world, by_id),
             plan,
             ask,
             out,

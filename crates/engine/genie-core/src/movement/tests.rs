@@ -1,5 +1,4 @@
 use super::*;
-use crate::construction::MainBuildingId;
 use crate::groups::MoveReason;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -1444,6 +1443,7 @@ fn a_walk_whose_target_is_gone_walks_as_to_a_point() {
 /// target's is its own.
 #[test]
 fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
+    let mut objects = crate::world::index::TestObjects::default();
     let mut world = Spatial::new(GridSize::new(40, 40));
     let wall = |x: f32, class: ClassId| Placed {
         position: Position::new(x, 10.0, 0.0),
@@ -1464,16 +1464,21 @@ fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
     world.insert(object_id(100), wall(10.0, class::GATE));
     world.insert(object_id(101), wall(12.0, class::WALL));
     world.insert(object_id(102), wall(8.0, class::WALL));
-    world.set_annex(object_id(101), Some(MainBuildingId::new(object_id(100))));
-    world.set_annex(object_id(102), Some(MainBuildingId::new(object_id(100))));
+    objects.link_annex(object_id(101), object_id(100));
+    objects.link_annex(object_id(102), object_id(100));
     let near = (Position::new(13.5, 10.0, 0.0), Footprint::new(0.2, 0.2));
     let gate = *world.get(object_id(100)).unwrap();
     let own = footprint_gap(near.0, near.1, gate.position, gate.radius);
     assert!((own - Distance::new(2.8)).get().abs() < 1e-6);
     // annex 101 lies 0.8 away, less 0.1
-    let gap = gate_gap(&world, near, (object_id(100), &gate), own, |g| {
-        g - ANNEX_GAP
-    });
+    let gap = gate_gap(
+        &world,
+        near,
+        (object_id(100), &gate),
+        own,
+        |g| g - ANNEX_GAP,
+        objects.view(),
+    );
     let annex = footprint_gap(
         near.0,
         near.1,
@@ -1486,8 +1491,14 @@ fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
     let mut post = gate;
     post.class = class::WALL;
     assert_eq!(
-        gate_gap(&world, near, (object_id(100), &post), own, |g| g
-            - Distance::new(1.0)),
+        gate_gap(
+            &world,
+            near,
+            (object_id(100), &post),
+            own,
+            |g| g - Distance::new(1.0),
+            objects.view()
+        ),
         own
     );
 }
@@ -1678,7 +1689,10 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
         crate::map::spatial::Tiles::new(crate::map::GridSize::new(120, 120), vec![2; 14400]),
     );
     // on open ground: waypoint 3 is beyond 10 tiles, waypoint 2 within, so it takes 2
-    assert_eq!(m.look_ahead(&me, &mut w), Ok(true));
+    assert_eq!(
+        m.look_ahead(&me, &mut w, crate::world::index::ObjectsRef::empty()),
+        Ok(true)
+    );
     assert_eq!(m.paths.len(), 1);
     assert_eq!(
         (
@@ -1727,7 +1741,10 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
             }),
         },
     );
-    assert_eq!(m.look_ahead(&me, &mut w), Ok(false));
+    assert_eq!(
+        m.look_ahead(&me, &mut w, crate::world::index::ObjectsRef::empty()),
+        Ok(false)
+    );
     assert_eq!(m.paths.len(), 2);
 }
 

@@ -130,7 +130,10 @@ impl Attack {
     /// What the start does not model, and a target the world does not hold.
     pub(super) fn own_start(
         cmd: &AttackCommand<'_>,
-        world: &crate::map::spatial::Spatial,
+        (world, by_id): (
+            &crate::map::spatial::Spatial,
+            crate::world::index::ObjectsRef<'_>,
+        ),
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
     ) -> Result<(Self, Begun, Vec<Posted>), GenieError> {
@@ -139,8 +142,14 @@ impl Attack {
             .get_known(cmd.target)?
             .ok_or(crate::combat::attack::TARGET_GONE)?;
         let ground = mover.stats.radius.ground();
-        let reach_gap =
-            crate::movement::gate_gap(world, (e.position, ground), (cmd.target, &t), e.gap, |g| g);
+        let reach_gap = crate::movement::gate_gap(
+            world,
+            (e.position, ground),
+            (cmd.target, &t),
+            e.gap,
+            |g| g,
+            by_id,
+        );
         let mut attack = Self::own(cmd.target, e, cmd.arms);
         let mut posted = Vec::new();
         let begun = attack.begin(
@@ -178,7 +187,8 @@ impl Attack {
             .body
             .mover_mut()
             .ok_or(crate::world::ATTACKER_UNMOVING)?;
-        let (mut attack, begun, mut posted) = Self::own_start(cmd, &c.w.spatial, mover, &reads)?;
+        let (mut attack, begun, mut posted) =
+            Self::own_start(cmd, (&c.w.spatial, c.w.objects()), mover, &reads)?;
         if begun.failed_first {
             unit.body.set_anim_speed(Speed::new(1.0));
         }
@@ -199,6 +209,7 @@ impl Attack {
                 object_rng: None,
                 buffer: Some(&mut posted),
                 graphics: &c.w.graphics,
+                by_id: crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index),
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }

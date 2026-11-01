@@ -386,7 +386,8 @@ impl World {
         new: ObjectState,
         master: &Master,
     ) -> Result<(), GenieError> {
-        for annex in self.spatial.annexes_of(id) {
+        let annexes = self.objects().annexes(id);
+        for annex in annexes.ids() {
             if let Some((q, a)) = self.object(annex)
                 && a.master(&self.masters, q)?.kind == BUILDING
             {

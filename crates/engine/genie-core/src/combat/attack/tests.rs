@@ -702,26 +702,30 @@ impl Rig {
         &mut self,
         f: impl FnOnce(&mut Unit, &mut Ground<'_>, &Fight, &AttackReads) -> R,
     ) -> R {
+        // the attacker is out of its slot, as an updating object is
+        let mut unit = self
+            .t
+            .take_out(PlayerId::new(1), ListIndex::new(0))
+            .unwrap();
         let World {
             spatial,
             streams,
             players,
+            index,
             ..
         } = &mut self.t;
         let (object, sprite) = streams.object_and_sprite();
         let mut g = Ground {
+            by_id: crate::world::index::ObjectsRef::new(players, index),
             map: spatial,
             sprite_rng: sprite,
             object_rng: Some(object),
             buffer: None,
             graphics: &NO_GRAPHICS,
         };
-        f(
-            &mut players[1].objects[ListIndex::new(0)],
-            &mut g,
-            &self.f,
-            &self.r,
-        )
+        let r = f(&mut unit, &mut g, &self.f, &self.r);
+        let _ = self.t.put_back(PlayerId::new(1), unit).unwrap();
+        r
     }
 
     /// The attacker.
@@ -1883,6 +1887,19 @@ fn own_start(
     owner: PlayerId,
     mover: &mut Mover,
 ) -> Result<Started, GenieError> {
+    let none = crate::world::index::ObjectsRef::empty();
+    own_start_among((world, none), e, arms, visible, owner, mover)
+}
+
+/// [`own_start`] among the objects `by_id` (a gate's parts).
+fn own_start_among(
+    (world, by_id): (&Spatial, crate::world::index::ObjectsRef<'_>),
+    e: &Engagement,
+    arms: Arms,
+    visible: bool,
+    owner: PlayerId,
+    mover: &mut Mover,
+) -> Result<Started, GenieError> {
     let cmd = AttackCommand {
         target: object_id(7),
         engagement: e,
@@ -1897,7 +1914,7 @@ fn own_start(
         ObjectState::Alive,
         e.speed.get(),
     );
-    let (attack, begun, posted) = Attack::own_start(&cmd, world, mover, &reads)?;
+    let (attack, begun, posted) = Attack::own_start(&cmd, (world, by_id), mover, &reads)?;
     Ok(Started {
         attack,
         arrived: begun.arrived,
@@ -2104,9 +2121,10 @@ fn the_start_faces_the_target_but_for_masters_1704_and_1706() {
 #[test]
 fn a_gate_s_reach_is_to_its_nearest_part() {
     let gate_at = Position::new(13.4, 10.0, 0.0);
+    let parts = [(8, 10.9), (9, 20.0), (10, 10.5)];
     let gated = || {
         let mut world = world_with(7, PlayerId::new(0), class::GATE, gate_at);
-        for (id, x) in [(8, 10.9), (9, 20.0), (10, 10.5)] {
+        for (id, x) in parts {
             world.insert(
                 object_id(id),
                 crate::map::spatial::Placed {
@@ -2114,10 +2132,13 @@ fn a_gate_s_reach_is_to_its_nearest_part() {
                     ..*world.get(object_id(7)).unwrap()
                 },
             );
-            world.set_annex(object_id(id), Some(MainBuildingId::new(object_id(7))));
         }
         world
     };
+    let mut objects = crate::world::index::TestObjects::default();
+    for (id, _) in parts {
+        objects.link_annex(object_id(id), object_id(7));
+    }
     let world = gated();
     let e = Engagement {
         target_class: class::GATE,
@@ -2128,8 +2149,8 @@ fn a_gate_s_reach_is_to_its_nearest_part() {
         None,
         Some(soldier_mover(0.0)),
     );
-    let c = own_start(
-        &world,
+    let c = own_start_among(
+        (&world, objects.view()),
         &e,
         standing_arms(),
         true,
@@ -2159,6 +2180,21 @@ fn a_gate_s_reach_is_to_its_nearest_part() {
         ..Victim::default()
     };
     let mut rig = Rig::on(gated(), 0.0, victim);
+    for id in [7, 8, 9, 10] {
+        let _ = rig
+            .t
+            .push_live(
+                PlayerId::new(0),
+                Unit {
+                    id: object_id(id),
+                    ..Unit::default()
+                },
+            )
+            .unwrap();
+    }
+    for (id, _) in parts {
+        rig.t.link_test_annex(object_id(id), object_id(7));
+    }
     rig.r.can_move = false;
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     let r = rig

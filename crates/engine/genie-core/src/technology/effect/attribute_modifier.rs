@@ -242,18 +242,17 @@ impl World {
             }
             let annexes = match self.object(id) {
                 Some((_, u)) if u.master(&self.masters, p)?.kind == master_type::BUILDING => {
-                    crate::objects::unit::annexes_of(id, &self.players.player(p)?.objects)
+                    u.building.annexes
                 }
                 _ => continue,
             };
-            for annex in annexes {
+            for annex in annexes.ids() {
                 let Some((_, a)) = self.object(annex) else {
                     continue;
                 };
                 let am = a.master(&self.masters, p)?;
-                let own_annexes = am.kind == master_type::BUILDING
-                    && !crate::objects::unit::annexes_of(annex, &self.players.player(p)?.objects)
-                        .is_empty();
+                let own_annexes =
+                    am.kind == master_type::BUILDING && a.building.annexes.ids().next().is_some();
                 if !own_annexes && am.class == class {
                     let _ = self.change_object(annex, change, v, attribute)?;
                 }

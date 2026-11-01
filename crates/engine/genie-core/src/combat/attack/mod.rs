@@ -395,6 +395,8 @@ pub(crate) struct Ground<'a> {
     pub(crate) buffer: Option<&'a mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>>,
     /// The sprites' table, which a `MoveTo` the Attack makes takes its sprite from.
     pub(crate) graphics: &'a crate::objects::Graphics,
+    /// The objects by id: a gate's annexes, which its reach measures.
+    pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
 }
 
 impl Ground<'_> {
@@ -423,11 +425,13 @@ impl Ground<'_> {
 impl World {
     /// The Attack's [`Ground`] in an update: the map, the Sprite and Object streams; the
     /// notifies go to the unit AI at once.
-    pub(crate) const fn attack_ground(&mut self) -> Ground<'_> {
+    pub(crate) fn attack_ground(&mut self) -> Ground<'_> {
         let Self {
             spatial,
             streams,
             graphics,
+            players,
+            index,
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();
@@ -437,6 +441,7 @@ impl World {
             object_rng: Some(object),
             buffer: None,
             graphics,
+            by_id: crate::world::index::ObjectsRef::new(players, index),
         }
     }
 }

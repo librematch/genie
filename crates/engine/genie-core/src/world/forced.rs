@@ -263,35 +263,13 @@ impl World {
         let unit = &self.players.live(p, i)?;
         let id = unit.id;
         let mut forced = g.clone();
-        // the objects inside it keep the slice's order (the game's history, which no save
-        // holds) while they are the same
-        if same_members(&unit.garrison, &forced.garrison) {
-            forced.garrison.clone_from(&unit.garrison);
-        }
-        if let (Some(old), Some(new)) = (unit.combat.ai.as_ref(), forced.combat.ai.as_mut()) {
-            new.hunted = old.hunted;
-            if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
-                n.go_home = o.go_home;
-            }
-        }
-        let (before, state) = (unit.life.state, forced.life.state);
+        keep_unsaved(unit, &mut forced);
+        let before = unit.life.state;
         if forced.position() != unit.position() {
             self.spatial.set_position(id, forced.position())?;
         }
-        if state != before {
-            if before <= ObjectState::Alive && ObjectState::Dying <= state {
-                self.spatial.sight_state(id, ObjectState::Dying)?;
-            }
-            if state != ObjectState::Dying {
-                self.spatial.sight_state(id, state)?;
-            }
-            if before < ObjectState::DyingSprite && ObjectState::Undead < state {
-                let master = forced.master(&self.masters, p)?;
-                forget_resource(&mut self.spatial, Some(master), id, forced.position())?;
-            }
-        }
+        self.follow_state(p, &forced, before)?;
         self.spatial.unfreeze(id);
-        self.spatial.set_annex(id, forced.building.annex_of);
         if let Some(placed) = self.spatial.get(id).copied() {
             let moving = forced.body.mover().is_some_and(Mover::is_moving);
             self.pathing.moved(id, &placed, moving);
@@ -299,6 +277,65 @@ impl World {
         forced.stopped = false;
         *self.players.live_mut(p, i)? = forced;
         Ok(())
+    }
+
+    /// The spatial index follows object `forced`'s (of player `p`) state from `before`: its
+    /// sight dies with it and takes its state, and a resource past state 6 is forgotten.
+    ///
+    /// # Errors
+    ///
+    /// An object the spatial index does not hold, or a master the world does not.
+    fn follow_state(
+        &mut self,
+        p: PlayerId,
+        forced: &Unit,
+        before: ObjectState,
+    ) -> Result<(), GenieError> {
+        let (id, state) = (forced.id, forced.life.state);
+        if state == before {
+            return Ok(());
+        }
+        sight_follows(&mut self.spatial, id, (before, state))?;
+        if before < ObjectState::DyingSprite && ObjectState::Undead < state {
+            let master = forced.master(&self.masters, p)?;
+            forget_resource(&mut self.spatial, Some(master), id, forced.position())?;
+        }
+        Ok(())
+    }
+}
+
+/// Object `id`'s sight follows its state from `before` to `state`: it dies with the object
+/// (state 3 and up from 2 or below), then takes the state unless that is the dying one.
+///
+/// # Errors
+///
+/// An object the spatial index does not hold.
+fn sight_follows(
+    spatial: &mut crate::map::spatial::Spatial,
+    id: ObjectId,
+    (before, state): (ObjectState, ObjectState),
+) -> Result<(), GenieError> {
+    if before <= ObjectState::Alive && ObjectState::Dying <= state {
+        spatial.sight_state(id, ObjectState::Dying)?;
+    }
+    if state != ObjectState::Dying {
+        spatial.sight_state(id, state)?;
+    }
+    Ok(())
+}
+
+/// What the game's object `forced` takes from the slice's `unit` that the save does not hold:
+/// the order of the objects inside it while they are the same (the game's history), a hunted
+/// animal's origin and a boar's flag.
+fn keep_unsaved(unit: &Unit, forced: &mut Unit) {
+    if same_members(&unit.garrison, &forced.garrison) {
+        forced.garrison.clone_from(&unit.garrison);
+    }
+    if let (Some(old), Some(new)) = (unit.combat.ai.as_ref(), forced.combat.ai.as_mut()) {
+        new.hunted = old.hunted;
+        if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
+            n.go_home = o.go_home;
+        }
     }
 }
 
@@ -311,6 +348,35 @@ mod tests {
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
     use crate::world::tests::forage_world;
+
+    /// A forced object's sight follows its state ([`sight_follows`]): from 2 to 3 it dies; from
+    /// 3 on it takes the state; from 2 past 3 it dies and takes the state.
+    #[test]
+    fn a_forced_object_s_sight_follows_its_state() {
+        use crate::map::Distance;
+        use crate::map::spatial::Spatial;
+        use crate::objects::masters::class;
+        let id = object_id(21712);
+        let world = || {
+            crate::world::tests::hands_world(
+                21712,
+                PlayerId::new(0),
+                class::CLASS_0,
+                crate::test_ids::master_id(4),
+                Distance::new(6.0),
+            )
+        };
+        let state = |s: &Spatial| s.sight.as_ref().and_then(|v| v.seer(id)).map(|s| s.state);
+        let mut s = world();
+        assert_eq!(state(&s), Some(ObjectState::Alive));
+        sight_follows(&mut s, id, (ObjectState::Alive, ObjectState::Dying)).unwrap();
+        assert_eq!(state(&s), Some(ObjectState::Dying));
+        sight_follows(&mut s, id, (ObjectState::Dying, ObjectState::Removed)).unwrap();
+        assert_eq!(state(&s), Some(ObjectState::Removed));
+        let mut s = world();
+        sight_follows(&mut s, id, (ObjectState::Alive, ObjectState::DyingSprite)).unwrap();
+        assert_eq!(state(&s), Some(ObjectState::DyingSprite));
+    }
 
     /// The world's own forced values: the frame seed, the game state, the next reusable id and
     /// the pools and unit groups the oracle dumped; a pool not dumped stays the slice's.
