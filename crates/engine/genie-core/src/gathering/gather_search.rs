@@ -24,6 +24,7 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::task_finder::DropSite;
 use crate::vision::SightTiles;
+use crate::world::slots::CheckedIndex;
 
 /// What the searches read of an object in a map tile's list.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -89,12 +90,12 @@ pub struct Builder {
 ///
 /// # Errors
 ///
-/// A farm on a tile for an entry with a farm target.
+/// A farm on a tile for an entry with a farm target, and what `blocked` fails on.
 pub fn more_work(
     entry: Option<&DropSite>,
     builder: &Builder,
     map: GridSize,
-    blocked: Option<&dyn Fn(Tile) -> bool>,
+    blocked: Option<&dyn Fn(Tile) -> Result<bool, GenieError>>,
     objects: &dyn Fn(Tile) -> Result<Vec<Candidate>, GenieError>,
 ) -> Result<Option<Candidate>, GenieError> {
     let Some(entry) = entry.filter(|e| e.auto_work) else {
@@ -122,14 +123,19 @@ pub fn more_work(
     let corner = TileOffset::new(i32::from(x0), i32::from(y0));
     let start =
         Tile::new(builder.position.x() as i32, builder.position.y() as i32).stepped_back(corner);
-    let grid = blocked.and_then(|b| reached(start, GridSize::new(w, h), &|t| b(t.stepped(corner))));
+    let grid = match blocked {
+        Some(b) => reached(start, GridSize::new(w, h), &|t| b(t.stepped(corner)))?,
+        None => None,
+    };
     // gold, stone, food, wood: (the object, its workers, the group's least distance)
     let mut groups: [Option<(Candidate, crate::objects::WorkerCount)>; 4] = [None; 4];
     let mut least = [90.0f32; 4];
     for x in x0..=x1 {
         for y in y0..=y1 {
             let (gx, gy) = (i32::from(x - x0), i32::from(y - y0));
-            if grid.as_ref().is_some_and(|g| !g[(gx * h + gy) as usize]) {
+            if let Some(g) = &grid
+                && !*g.checked((gx * h + gy) as usize)?
+            {
                 continue;
             }
             for o in objects(Tile::new(i32::from(x), i32::from(y)))? {
@@ -150,12 +156,8 @@ pub fn more_work(
                 let Some(resource) = entry.resource_of(o.class, o.state, o.workers) else {
                     continue;
                 };
-                let g = match resource {
-                    attribute::GOLD => 0,
-                    attribute::STONE => 1,
-                    food if food.is_food_load() => 2,
-                    attribute::WOOD => 3,
-                    _ => continue,
+                let Some(g) = group_of(resource) else {
+                    continue;
                 };
                 let dx = o.position.x() - builder.position.x();
                 let dy = o.position.y() - builder.position.y();
@@ -163,48 +165,93 @@ pub fn more_work(
                     dy * dy + dx * dx,
                 )) as f32;
                 let workers = o.workers.plus(-1).max(crate::objects::WorkerCount::ZERO);
-                let take = match groups[g] {
-                    Some((_, kept)) if least[g] <= d => workers < kept,
-                    _ => true,
-                };
-                if take {
-                    groups[g] = Some((o, workers));
-                    if d < least[g] {
-                        least[g] = d;
-                    }
-                }
+                keep(
+                    groups.checked_mut(g)?,
+                    least.checked_mut(g)?,
+                    (o, workers),
+                    d,
+                );
             }
         }
     }
-    // gold, then stone, food and wood, each at a lesser least distance
-    let mut best: Option<(Candidate, f32)> = None;
-    for g in 0..4 {
-        if let Some((o, _)) = groups[g]
-            && best.is_none_or(|(_, d)| least[g] < d)
-        {
-            best = Some((o, least[g]));
+    Ok(pick(&groups, &least))
+}
+
+/// [`more_work`]'s group of a resource: gold 0, stone 1, food 2, wood 3; None for another.
+const fn group_of(resource: AttributeId) -> Option<usize> {
+    match resource {
+        attribute::GOLD => Some(0),
+        attribute::STONE => Some(1),
+        food if food.is_food_load() => Some(2),
+        attribute::WOOD => Some(3),
+        _ => None,
+    }
+}
+
+/// [`more_work`]'s group keeps the object `o` at the distance `d` (with its `workers`) when it
+/// keeps none, or `o` is nearer than its least distance `low`, or as near or nearer with fewer
+/// workers; the least distance falls to `d`.
+fn keep(
+    group: &mut Option<(Candidate, crate::objects::WorkerCount)>,
+    low: &mut f32,
+    (o, workers): (Candidate, crate::objects::WorkerCount),
+    d: f32,
+) {
+    let take = match *group {
+        Some((_, kept)) if *low <= d => workers < kept,
+        _ => true,
+    };
+    if take {
+        *group = Some((o, workers));
+        if d < *low {
+            *low = d;
         }
     }
-    Ok(best.map(|(o, _)| o))
+}
+
+/// [`more_work`]'s pick: gold, then stone, food and wood, each at a lesser least distance.
+fn pick(
+    groups: &[Option<(Candidate, crate::objects::WorkerCount)>; 4],
+    least: &[f32; 4],
+) -> Option<Candidate> {
+    let mut best: Option<(Candidate, f32)> = None;
+    for (group, &low) in groups.iter().zip(least) {
+        if let Some((o, _)) = *group
+            && best.is_none_or(|(_, d)| low < d)
+        {
+            best = Some((o, low));
+        }
+    }
+    best.map(|(o, _)| o)
 }
 
 /// `FUN_1415cc1a0`: the cells of a box of `size` a flood from `start` reaches, by
 /// columns (`[x * height + y]`): every cell next to (left, right, above, below) a cell it
 /// entered and not `blocked`, `start` entered whatever it holds. None when `start` lies outside
 /// the box.
-#[must_use]
-pub fn reached(start: Tile, size: GridSize, blocked: &dyn Fn(Tile) -> bool) -> Option<Vec<bool>> {
+///
+/// # Errors
+///
+/// What `blocked` fails on.
+pub fn reached(
+    start: Tile,
+    size: GridSize,
+    blocked: &dyn Fn(Tile) -> Result<bool, GenieError>,
+) -> Result<Option<Vec<bool>>, GenieError> {
     if !size.holds(start) {
-        return None;
+        return Ok(None);
     }
     // by columns, unlike the grid's own rows
     let cell = |t: Tile| (t.x() * size.height() + t.y()) as usize;
     let mut seen = vec![false; (size.width() * size.height()) as usize];
-    *seen.get_mut(cell(start))? = true;
+    let Some(s) = seen.get_mut(cell(start)) else {
+        return Ok(None);
+    };
+    *s = true;
     let mut todo = vec![start];
     let mut first = true;
     while let Some(t) = todo.pop() {
-        if !std::mem::take(&mut first) && blocked(t) {
+        if !std::mem::take(&mut first) && blocked(t)? {
             continue;
         }
         for n in t.beside() {
@@ -217,7 +264,7 @@ pub fn reached(start: Tile, size: GridSize, blocked: &dyn Fn(Tile) -> bool) -> O
             }
         }
     }
-    Some(seen)
+    Ok(Some(seen))
 }
 
 /// What `ClosestResourceObject` reads of the unit that searches.
@@ -412,12 +459,11 @@ pub fn closest_resource_at<W>(
         let mut seen = vec![false; (side * side) as usize];
         let at = |t: Tile| ((t.y() + oy) * side + t.x() + ox) as usize;
         for c in &pass.seeds {
-            seen[at(c.tile)] = true;
+            *seen.checked_mut(at(c.tile))? = true;
         }
         let mut queue = pass.seeds;
         let mut i = 0;
-        while i < queue.len() {
-            let Cell { tile, steps } = queue[i];
+        while let Some(&Cell { tile, steps }) = queue.get(i) {
             i += 1;
             if !explored(world, tile)? {
                 continue;
@@ -427,8 +473,8 @@ pub fn closest_resource_at<W>(
                 continue;
             }
             if passable(world, tile) {
-                push_neighbours(&mut queue, &mut seen, &at, Cell { tile, steps }, map);
-                msvc::sort(&mut queue[i..], &nearer);
+                push_neighbours(&mut queue, &mut seen, &at, Cell { tile, steps }, map)?;
+                msvc::sort(queue.tail_mut(i)?, &nearer);
             }
             let on_tile = objects(world, tile)?;
             let Some(o) = first_resource(&on_tile, kind)? else {
@@ -500,17 +546,21 @@ fn search_passes(
 /// [`closest_resource_at`]'s spread from a passable `cell`: its neighbours x−1, x+1, y−1, y+1
 /// ([`Tile::beside`]) not seen yet become seen (`at` gives a tile's index in `seen`), and those
 /// on the map join the `queue` a step farther.
+///
+/// # Errors
+///
+/// A neighbour outside `seen`.
 fn push_neighbours(
     queue: &mut Vec<Cell>,
     seen: &mut [bool],
     at: &impl Fn(Tile) -> usize,
     Cell { tile, steps }: Cell,
     map: GridSize,
-) {
+) -> Result<(), GenieError> {
     for n in tile.beside() {
-        let c = at(n);
-        if !seen[c] {
-            seen[c] = true;
+        let c = seen.checked_mut(at(n))?;
+        if !*c {
+            *c = true;
             if map.holds(n) {
                 queue.push(Cell {
                     tile: n,
@@ -519,6 +569,7 @@ fn push_neighbours(
             }
         }
     }
+    Ok(())
 }
 
 /// [`closest_resource_at`]'s sort point and box side: without a site the unit's place and
@@ -682,7 +733,9 @@ mod tests {
     fn a_flood_enters_the_blocked_cells_next_to_what_it_reaches_but_not_past_them() {
         // a wall at x = 2 in a 5 x 3 box: the flood from (0, 1) reaches x 0..=1 and enters the
         // wall's cells, never x 3 or 4
-        let seen = reached(Tile::new(0, 1), GridSize::new(5, 3), &|t| t.x() == 2).unwrap();
+        let seen = reached(Tile::new(0, 1), GridSize::new(5, 3), &|t| Ok(t.x() == 2))
+            .unwrap()
+            .unwrap();
         let col = |x: i32| {
             (0..3)
                 .map(|y| seen[(x * 3 + y) as usize])
@@ -691,7 +744,11 @@ mod tests {
         assert_eq!(col(1), [true; 3]);
         assert_eq!(col(2), [true; 3]);
         assert_eq!(col(3), [false; 3]);
-        assert!(reached(Tile::new(5, 0), GridSize::new(5, 3), &|_| false).is_none());
+        assert!(
+            reached(Tile::new(5, 0), GridSize::new(5, 3), &|_| Ok(false))
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

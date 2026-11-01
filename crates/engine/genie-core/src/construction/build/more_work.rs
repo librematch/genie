@@ -13,6 +13,7 @@ use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::others::OthersRef;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -113,10 +114,9 @@ impl Unit {
             let tiles = crate::pathing::tile_path::GridLevel::TILES;
             let width = i64::from(planner.level_size(tiles).width());
             let cells = planner.level(tiles);
-            let blocked = move |t: Tile| {
-                cells[(width * i64::from(t.y()) + i64::from(t.x())) as usize]
-                    .edges
-                    .is_empty()
+            let blocked = move |t: Tile| -> Result<bool, GenieError> {
+                let cell = (width * i64::from(t.y()) + i64::from(t.x())) as usize;
+                Ok(cells.checked(cell)?.edges.is_empty())
             };
             gather_search::more_work(entry, &builder, spatial.map, Some(&blocked), &objects)?
         };

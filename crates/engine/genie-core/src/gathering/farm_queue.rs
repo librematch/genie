@@ -271,8 +271,8 @@ impl World {
             };
             if is_building {
                 let mut k = 0;
-                while k < own.len() {
-                    own.extend(self.spatial.annexes_of(own[k]));
+                while let Some(&o) = own.get(k) {
+                    own.extend(self.spatial.annexes_of(o));
                     k += 1;
                 }
             }

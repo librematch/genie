@@ -18,6 +18,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
 use crate::technology::Attributes;
 use crate::world::World;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
 /// The livestock a pasture holds (`DAT_143f51db0`, which the static constructor `FUN_140174900`
@@ -108,11 +109,11 @@ impl World {
         let map = self.spatial.map;
         let mut made = 0;
         while made < count && !points.is_empty() {
-            let kind = LIVESTOCK[draw_below(self, LIVESTOCK.len())];
+            let kind = *LIVESTOCK.checked(draw_below(self, LIVESTOCK.len()))?;
             let mut i = draw_below(self, points.len());
             loop {
                 let (x, y) = {
-                    let p = points[i];
+                    let p = points.checked(i)?;
                     (p.x(), p.y())
                 };
                 let (tx, ty) = (cvttss2si(x), cvttss2si(y));
@@ -127,7 +128,7 @@ impl World {
                 i = draw_below(self, points.len());
             }
             let (x, y) = {
-                let p = points[i];
+                let p = points.checked(i)?;
                 (p.x(), p.y())
             };
             if let Some(new) = self.make_new_object(p, kind, Position::new(x, y, at.z()), false)? {
