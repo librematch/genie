@@ -137,7 +137,7 @@ impl Unit {
             } = master.volley_spread;
             let mut all = true;
             if !master.combat_ability.contains(CombatAbility::FULL_VOLLEY) {
-                let k = if 0.0 < x_spread || 0.0 < y_spread {
+                let k = if Distance::ZERO < x_spread || Distance::ZERO < y_spread {
                     let draw = c.w.streams.get(Stream::Object).rand15() as i32;
                     (draw * 2) / 0x7fff + 1
                 } else {
@@ -589,7 +589,7 @@ impl Aimed {
         Self {
             target,
             position: v.position,
-            radius: v.radius.with_height(v.height),
+            radius: v.radius.with_height(v.height.get()),
             class: v.class,
             player: v.player,
         }

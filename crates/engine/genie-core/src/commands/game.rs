@@ -16,6 +16,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 
 /// GAME's packet as `FUN_140e7c330` reads it: the sub-command at `+4` and its arguments.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -299,21 +300,21 @@ impl World {
         match setting {
             1 => owner.dodge_chance = Chance::of_data(byte),
             2 => owner.keep_distance_chance = Chance::of_data(byte),
-            3 => s.easiest_reaction_percentage = i32::from(byte),
-            4 => s.easier_reaction_percentage = i32::from(byte),
+            3 => s.easiest_reaction_percentage = Percent::new(i32::from(byte)),
+            4 => s.easier_reaction_percentage = Percent::new(i32::from(byte)),
             5 => s.task_ungrouped_soldiers = byte,
             6 => s.may_attack_walls = value == 1,
             7 => s.livestock_only_to_tc = value == 1,
             8 => s.disable_build_help = byte == 1,
-            9 => s.local_targeting_mode = i32::from(byte),
-            10 => s.targeting_factor_scalar = i32::from(byte),
+            9 => s.local_targeting_mode = TargetingMode::of_data(i32::from(byte)),
+            10 => s.targeting_factor_scalar = Percent::new(i32::from(byte)),
             0xb => s.trade_attack_evasion = value != 1,
-            0xc => s.boar_lure_destination = byte,
+            0xc => s.boar_lure_destination = LureDestination::of_data(byte),
             0xd => s.preferred_trade_distance = Distance::new(value as f32),
             0xe => s.disable_tower_priority = value != 0,
             0xf => s.attack_move_max_distance = WholeDistance::of_data(value as i32),
             0x10 => s.villager_attack_reset = value != 0,
-            0x11 => s.disable_villager_garrison = value as i32,
+            0x11 => s.disable_villager_garrison = VillagerGarrison::of_data(value as i32),
             0x12 => s.allow_serjeant_building = value != 0,
             _ => {}
         }
@@ -586,7 +587,7 @@ mod tests {
             (Chance::of_data(0x1e), Chance::of_data(40))
         );
         let s = p.ai_settings;
-        assert_eq!(s.easiest_reaction_percentage, 5);
+        assert_eq!(s.easiest_reaction_percentage, Percent::new(5));
         assert!(!s.may_attack_walls && s.livestock_only_to_tc && s.disable_build_help);
         assert!(!s.trade_attack_evasion && s.disable_tower_priority);
         assert_eq!(s.preferred_trade_distance, Distance::new(4_294_967_296.0));

@@ -271,7 +271,7 @@ impl World {
                 .get(cl.id)
                 .is_some_and(|o| o.obstruction.is_some());
             if !look.roo_called
-                && (crate::math::fmath::below_or_unordered(0.0, look.height) || recorded)
+                && (crate::math::fmath::below_or_unordered(0.0, look.height.get()) || recorded)
             {
                 self.pathing.removed(cl.id);
                 self.spatial.drop_record(cl.id);
@@ -350,7 +350,7 @@ impl World {
             speed: Speed::ZERO,
             unknown: None,
             obstruction: (!desolid
-                && !crate::math::fmath::at_most_or_unordered(made.height, 0.0)
+                && !crate::math::fmath::at_most_or_unordered(made.height.get(), 0.0)
                 && record.recorded())
             .then_some(record),
         };

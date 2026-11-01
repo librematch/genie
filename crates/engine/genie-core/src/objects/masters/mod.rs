@@ -259,7 +259,7 @@ pub struct Master {
     pub tall: bool,
     /// `radius_z` (`+0x5e0`): how high a missile may pass over its objects and hit them
     /// (`FUN_14113f740`).
-    pub height: f32,
+    pub height: Distance,
     /// `line_of_sight` (`+0x5d0`).
     pub line_of_sight: Distance,
     /// `+0x606`, its terrain restriction (the save's `terrain_restriction_mask_id`; −1 for none),
@@ -321,7 +321,7 @@ pub struct Master {
     pub outline: Footprint,
     /// `+0x690`: the `.dat`'s `outline_size` z, the height BUILD's scan takes for an object of
     /// obstruction types 11 to 13 (`FUN_14123aee0`).
-    pub outline_height: f32,
+    pub outline_height: Distance,
     /// `+0x5fc`, `clearance_size`: a completed building's foundation terrain covers its position
     /// plus and minus this.
     pub clearance: Footprint,
@@ -457,10 +457,10 @@ pub struct Master {
     /// (`missed_missile_spread`, `+0x860`).
     pub weapon_offset: Offset,
     /// How far a missed missile strays per tile of the way (`missed_missile_spread`, `+0x860`).
-    pub missed_spread: f32,
+    pub missed_spread: crate::combat::missile::MissSpread,
     /// `garrison_firepower` (`+0x870`): what a unit adds to the volleys of a building it is
     /// inside; one at most 0 adds its magnitude.
-    pub garrison_firepower: f32,
+    pub garrison_firepower: crate::combat::Firepower,
     /// `volley_fire_amount` (`+0x8c0`, the `.dat`'s total projectiles): a new object's missiles
     /// per volley (`+0xa00`).
     pub volley_fire: crate::combat::Firepower,

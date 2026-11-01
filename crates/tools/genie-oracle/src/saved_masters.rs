@@ -7,6 +7,7 @@ use genie_core::GenieError;
 use genie_core::combat::Charge;
 use genie_core::combat::Firepower;
 use genie_core::combat::MissileCount;
+use genie_core::combat::missile::MissSpread;
 use genie_core::combat::missile::SmartMode;
 use genie_core::combat::missile::VanishMode;
 use genie_core::map::Distance;
@@ -216,7 +217,7 @@ pub(super) fn work_masters(
         work.class = ClassId::of_master(s.read_temp_5);
         work.radius = Footprint::new(s.radius_x, s.radius_y);
         work.tall = 0.0 < s.radius_z;
-        work.height = s.radius_z;
+        work.height = Distance::new(s.radius_z);
         work.obstruction_type = ObstructionType::from(s.obstruction_type);
         work.buildable_on = s.can_be_built_on;
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
@@ -254,9 +255,9 @@ pub(super) fn work_masters(
             work.volley_fire = Firepower::new(c.volley_fire_amount);
             work.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
             work.volley_spread = VolleySpread {
-                x: c.volley_x_spread,
-                y: c.volley_y_spread,
-                start: c.volley_start_spread_adjustment,
+                x: Distance::new(c.volley_x_spread),
+                y: Distance::new(c.volley_y_spread),
+                start: Distance::new(c.volley_start_spread_adjustment),
             };
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);
             work.volley_missile = id(c.volley_missile_id);
@@ -281,7 +282,7 @@ pub(super) fn work_masters(
             work.missile = MasterField::of_data(rc.missile_id);
             work.weapon_offset =
                 Offset::new(rc.weapon_offset_x, rc.weapon_offset_y, rc.weapon_offset_z);
-            work.missed_spread = rc.missed_missile_spread;
+            work.missed_spread = MissSpread::new(rc.missed_missile_spread);
             work.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
             work.fire_frame = Frame::of_data(rc.fire_missile_at_frame);
             work.interrupt_frame = Frame::of_data(rc.interrupt_frame);
@@ -305,7 +306,7 @@ pub(super) fn work_masters(
             work.area_effect = Distance::new(rc.area_effect_range);
             work.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
             work.area_damage = DamageShare::new(rc.area_damage);
-            work.garrison_firepower = rc.garrison_firepower;
+            work.garrison_firepower = Firepower::new(rc.garrison_firepower);
         }
         work.storage = s
             .attribute

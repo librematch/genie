@@ -86,7 +86,7 @@ pub(super) fn in_table(masters: &Masters, id: MasterId) -> bool {
 /// 38 amounts, over its reload (none at most 1e-7).
 #[must_use]
 pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) -> f32 {
-    let g = master.garrison_firepower;
+    let g = master.garrison_firepower.get();
     // COMISS 0, g; JC: an unordered firepower goes on
     if g <= 0.0 {
         return g.abs();

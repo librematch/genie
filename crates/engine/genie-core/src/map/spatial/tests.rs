@@ -1538,7 +1538,7 @@ fn a_foundation_not_allied_both_ways_or_a_dead_object_occupies_no_footprint() {
     s.insert(object_id(33990), wall);
     let look = |state: ObjectState, kind: MasterKind, desolid: bool| ClearLook {
         hp: HitPoints::new(1.0),
-        height: 1.0,
+        height: Distance::new(1.0),
         roo_called: false,
         kind,
         state,

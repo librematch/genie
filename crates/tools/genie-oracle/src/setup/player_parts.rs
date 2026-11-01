@@ -11,6 +11,7 @@ use genie_core::players::history::Share;
 use genie_core::players::history::Tally;
 use genie_core::players::history::TimeSlice;
 use genie_core::world::WorldTime;
+use genie_core::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 
 /// A player's AI settings as saved (`WorldPlayerBase::save`, `FUN_14166b820`), which GAME's
 /// sub-command 0xb sets.
@@ -18,21 +19,21 @@ pub(super) const fn ai_settings(
     b: &genie_save::generated::world::WorldPlayerBase,
 ) -> genie_core::world::AiSettings {
     genie_core::world::AiSettings {
-        easiest_reaction_percentage: b.easiest_reaction_percentage,
-        easier_reaction_percentage: b.easier_reaction_percentage,
+        easiest_reaction_percentage: Percent::new(b.easiest_reaction_percentage),
+        easier_reaction_percentage: Percent::new(b.easier_reaction_percentage),
         task_ungrouped_soldiers: b.task_ungrouped_soldiers,
         may_attack_walls: b.may_attack_walls != 0,
         livestock_only_to_tc: b.livestock_only_to_tc != 0,
         disable_build_help: b.disable_build_help != 0,
-        local_targeting_mode: b.local_targeting_mode,
-        targeting_factor_scalar: b.targeting_factor_scalar,
+        local_targeting_mode: TargetingMode::of_data(b.local_targeting_mode),
+        targeting_factor_scalar: Percent::new(b.targeting_factor_scalar),
         preferred_trade_distance: Distance::new(b.preferred_trade_distance),
         disable_tower_priority: b.disable_tower_priority != 0,
         trade_attack_evasion: b.trade_attack_evasion != 0,
         villager_attack_reset: b.villager_attack_reset != 0,
-        boar_lure_destination: b.boar_lure_destination,
+        boar_lure_destination: LureDestination::of_data(b.boar_lure_destination),
         attack_move_max_distance: WholeDistance::of_data(b.attack_move_max_distance),
-        disable_villager_garrison: b.disable_villager_garrison,
+        disable_villager_garrison: VillagerGarrison::of_data(b.disable_villager_garrison),
         allow_serjeant_building: b.allow_serjeant_building != 0,
     }
 }

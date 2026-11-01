@@ -1148,7 +1148,7 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
             ClassAmount::new(24, 0),
             ClassAmount::new(17, 0),
         ],
-        garrison_firepower: -2.5,
+        garrison_firepower: Firepower::new(-2.5),
         ..Master::default()
     };
     let masters = Masters::new([arrow, tc.clone(), villager.clone()]);
@@ -1166,7 +1166,7 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
     );
     // one above 0 times the melee, pierce, class 31 and 38 amounts over the reload
     let armed = Master {
-        garrison_firepower: 0.5,
+        garrison_firepower: Firepower::new(0.5),
         ..villager
     };
     assert_eq!(firepower(&armed, &masters, Seconds::ZERO), 0.75);
@@ -1264,7 +1264,7 @@ fn a_volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 4)],
         missile: MasterField::of(Some(ids::FARM)),
-        garrison_firepower: 1.0,
+        garrison_firepower: Firepower::new(1.0),
         volley_fire: Firepower::new(3.0),
         volley_missile,
         ..Master::default()
@@ -1305,7 +1305,7 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
         id: master_id(79),
         kind: master_type::COMBAT,
         reload: Seconds::new(1.0),
-        garrison_firepower: 1.0,
+        garrison_firepower: Firepower::new(1.0),
         volley_fire: Firepower::new(1e10),
         volley_missile: Some(master_id(54)),
         ..Master::default()
@@ -1333,7 +1333,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
         class: class::CLASS_0,
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 2)],
-        garrison_firepower: 1.0,
+        garrison_firepower: Firepower::new(1.0),
         object_flags: ObjectFlags::from_bits_retain(8 | (1122 << 16)),
         ..Master::default()
     };
@@ -1343,7 +1343,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
         class: class::CLASS_36,
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 6)],
-        garrison_firepower: 1.0,
+        garrison_firepower: Firepower::new(1.0),
         ..Master::default()
     };
     let masters = Masters::new([foot.clone(), mounted.clone()]);

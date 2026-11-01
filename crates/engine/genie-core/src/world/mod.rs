@@ -55,6 +55,7 @@ pub use crate::world::player::{AiSettings, Formations, Player};
 use genie_diff::Diff;
 
 mod after_step;
+mod ai_values;
 mod clock;
 mod forced;
 mod object_step;
@@ -63,6 +64,7 @@ pub mod settings;
 mod setup;
 mod world_update;
 
+pub use self::ai_values::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 pub use self::clock::{Millis, Seconds, WholeSeconds, WorldTime};
 pub use self::forced::GameState;
 pub use self::world_update::{scenario_mode, standard_mode};

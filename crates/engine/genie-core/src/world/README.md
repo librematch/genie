@@ -33,6 +33,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | File | What it holds |
 | --- | --- |
 | [`after_step.rs`](after_step.rs) | An object's step and what follows it (`World::step_object`): what its `Step` gathered, applied to the world in the order the game's update makes them. |
+| [`ai_values.rs`](ai_values.rs) | The values of a player's AI settings (`crate::world::AiSettings`). |
 | [`checkpoint.rs`](checkpoint.rs) | The per-player 11-word state block that recorded games checkpoint every N syncs. |
 | [`clock.rs`](clock.rs) | The world's clock in the game's milliseconds: a moment of it (`WorldTime`) and a span (`Millis`). |
 | [`forced.rs`](forced.rs) | The forced replay (dev only): the game's state after a tick (`GameState`) and the step that forces it on the world. |

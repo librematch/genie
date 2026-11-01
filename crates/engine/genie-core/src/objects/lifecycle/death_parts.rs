@@ -111,7 +111,7 @@ pub(crate) fn combat_dies(
         return Ok(());
     }
     let desolid = u.construction.is_some_and(|c| c.desolid);
-    if master.kind < BUILDING || (!desolid && 0.0 < master.height) {
+    if master.kind < BUILDING || (!desolid && crate::map::Distance::ZERO < master.height) {
         pathing.removed(u.id);
         spatial.drop_record(u.id);
     }

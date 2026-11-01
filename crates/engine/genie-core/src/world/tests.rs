@@ -8278,9 +8278,9 @@ fn gate_world() -> World {
     t.masters = vec![
         Masters::default(),
         Masters::new([
-            gate_master(88, 91, 0.0),
-            gate_master(91, 88, 2.0),
-            gate_master(92, -1, 0.0),
+            gate_master(88, 91, crate::map::Distance::new(0.0)),
+            gate_master(91, 88, crate::map::Distance::new(2.0)),
+            gate_master(92, -1, crate::map::Distance::new(0.0)),
             soldier,
         ]),
     ];
@@ -16018,9 +16018,9 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         hit_chance: HitChance::of_data(hit_chance),
         max_volley: crate::combat::MissileCount::of_data(max_volley),
         volley_spread: VolleySpread {
-            x: spread,
-            y: spread,
-            start: 0.0,
+            x: Distance::new(spread),
+            y: Distance::new(spread),
+            start: Distance::ZERO,
         },
         moving: Some(crate::gathering::hunt::tests::walker().stats),
         ..Master::default()
@@ -16054,7 +16054,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         class: class::PREDATOR,
         hit_points: MasterHitPoints::of_data(5),
         radius: Footprint::new(0.2, 0.2),
-        height: 1.5,
+        height: crate::map::Distance::new(1.5),
         terrain_bonus: RestrictionField::NONE,
         ..Master::default()
     };
@@ -16325,7 +16325,8 @@ fn a_fired_missile_joins_its_owner_s_list_at_its_making() {
 fn a_missed_missile_strays_and_lands_on_the_ground() {
     let mut t = archer_world(0, 0, 0.0);
     for m in &mut t.masters {
-        m.get_mut(master_id(4)).unwrap().missed_spread = 2.0;
+        m.get_mut(master_id(4)).unwrap().missed_spread =
+            crate::combat::missile::MissSpread::new(2.0);
     }
     for _ in 0..6 {
         t.tick(Millis::new(100));

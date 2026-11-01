@@ -351,7 +351,10 @@ impl World {
                         .object(id)
                         .and_then(|(_, u)| u.construction.as_ref())
                         .is_some_and(|c| c.desolid);
-                    if master.kind == master_type::BUILDING && !desolid && 0.0 < master.height {
+                    if master.kind == master_type::BUILDING
+                        && !desolid
+                        && crate::map::Distance::ZERO < master.height
+                    {
                         self.give_record(id, &master);
                     }
                 }
@@ -380,7 +383,7 @@ impl World {
             .spatial
             .get(id)
             .is_some_and(|o| o.obstruction.is_some());
-        if 0.0 < master.height || recorded {
+        if crate::map::Distance::ZERO < master.height || recorded {
             self.spatial.drop_record(id);
             self.pathing.removed(id);
         }
@@ -395,7 +398,7 @@ impl World {
         };
         if ObjectState::Removed <= u.life.state
             || u.life.inside.is_some()
-            || crate::math::fmath::at_most_or_unordered(master.height, 0.0)
+            || crate::math::fmath::at_most_or_unordered(master.height.get(), 0.0)
         {
             return;
         }

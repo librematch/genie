@@ -57,7 +57,7 @@ pub struct Searcher {
     /// The game mode is a scenario's (`FUN_141302540`).
     pub scenario: bool,
     /// Its owner's targeting mode and factor (`player+0x614`, `+0x618`).
-    pub targeting: (i32, i32),
+    pub targeting: (crate::world::TargetingMode, crate::world::Percent),
     /// The order history's weights ([`order_weights`]).
     ///
     /// [`order_weights`]: crate::unit_ai::best_target::statistics::order_weights

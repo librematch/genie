@@ -420,7 +420,7 @@ impl World {
         if made.class != class::GATE {
             self.unwatch(player, aid)?;
         }
-        if 0.0 < am.height {
+        if Distance::ZERO < am.height {
             let (_, a) = self.object_mut(aid).ok_or_else(|| not_held.clone())?;
             let c = a
                 .construction

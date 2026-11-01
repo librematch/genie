@@ -271,7 +271,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     }
     let master = Master {
         id: ids::HOUSE,
-        height: 2.0,
+        height: Distance::new(2.0),
         obstruction_type: ObstructionType::TYPE_2,
         obstruction_class: ObstructionClass::UNIT,
         ..Master::default()
@@ -297,7 +297,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     t.give_record(
         object_id(1),
         &Master {
-            height: 0.0,
+            height: Distance::new(0.0),
             ..master
         },
     );
@@ -547,7 +547,7 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     let mut archer_master = combat(master_id(4), class::CLASS_0, 30);
     archer_master.reload = Seconds::new(2.0);
     archer_master.weapons = vec![ClassAmount::new(3, 4)];
-    archer_master.garrison_firepower = 1.0;
+    archer_master.garrison_firepower = crate::combat::Firepower::new(1.0);
     t.masters = vec![Masters::new([archer_master, tower_master])];
     // the tower's rate: 5 / 2 = 2.5; the archer's share 4 / 2 / 2.5 = 0.8, then 6 / 2 / 2.5
     t.do_effect(

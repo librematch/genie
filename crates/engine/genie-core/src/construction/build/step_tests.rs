@@ -875,7 +875,7 @@ fn stump(t: &mut World) {
         kind: master_type::STATIC,
         class: class::TREE,
         radius: Footprint::new(0.5, 0.5),
-        height: 1.0,
+        height: Distance::new(1.0),
         ..Master::default()
     };
     for masters in &mut t.masters {

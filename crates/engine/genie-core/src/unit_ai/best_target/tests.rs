@@ -97,7 +97,11 @@ fn the_scores_rank_and_sort_the_entries() {
     st.add(&candidate(9, Distance::new(4.0), 0.0));
     let mut weights = ByCategory::default();
     weights[category_of(1)] = OrderWeight::new(0.5);
-    st.score(&weights, (0, 0), &mut |_| Ok(false)).unwrap();
+    let targeting = (
+        crate::world::TargetingMode::of_data(0),
+        crate::world::Percent::new(0),
+    );
+    st.score(&weights, targeting, &mut |_| Ok(false)).unwrap();
     let scores: Vec<(f32, f32, f32, f32)> = st
         .entries
         .iter()

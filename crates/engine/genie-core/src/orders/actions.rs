@@ -220,7 +220,7 @@ impl World {
         self.transform_building(player, idx, new)?;
         let height = self.master(player, new)?.height;
         let now = self.world_time;
-        if 0.0 < height {
+        if crate::map::Distance::ZERO < height {
             let id = self.players.live(player, idx)?.id;
             let annexes =
                 crate::objects::unit::annexes_of(id, &self.players.player(player)?.objects);

@@ -30,6 +30,7 @@ use genie_diff::Diff;
 
 mod arc_ratio;
 mod hit_mode;
+mod miss_spread;
 mod missile_modes;
 mod missile_state;
 mod projectile_type;
@@ -38,6 +39,7 @@ pub(crate) mod unit;
 
 pub use self::arc_ratio::ArcRatio;
 pub use self::hit_mode::HitMode;
+pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
 pub use self::projectile_type::ProjectileType;
@@ -221,7 +223,8 @@ pub fn volley_count(
 /// `FUN_14120c0a0`'s scatter of a volley's extra missile along a spread: an Object-stream draw
 /// over 32767 of the spread, less half of it.
 #[must_use]
-pub fn scatter(draw: u32, spread: f32) -> f32 {
+pub fn scatter(draw: u32, spread: Distance) -> f32 {
+    let spread = spread.get();
     (draw as i32 as f32 * spread) / VOLLEY_SCALE - spread * VOLLEY_HALF
 }
 
@@ -235,10 +238,11 @@ pub fn volley_spawn_point(
     at: Position,
     angle: Angle,
     offset: Offset,
-    adjustment: f32,
+    adjustment: Distance,
     scatter: GroundOffset,
     building_at: Option<Point>,
 ) -> Position {
+    let adjustment = adjustment.get();
     let (ox, oy) = (offset.x(), offset.y());
     let offset = if 0.0 < adjustment {
         Offset::new(
@@ -283,7 +287,7 @@ pub struct Aimer {
     /// The firing object's master's `base_hit_chance` (`+0x83e`).
     pub hit_chance: HitChance,
     /// Its `missed_missile_spread` (`+0x860`).
-    pub spread: f32,
+    pub spread: MissSpread,
     /// Its class.
     pub class: ClassId,
 }
@@ -344,7 +348,7 @@ pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, Gen
         if *hit_mode == HitMode::TARGET_ALONE {
             *hit_mode = HitMode::MISSED;
         }
-        gap *= aimer.spread;
+        gap *= aimer.spread.get();
         // the missile's attack count (`+0x900`, its firer's when fired): master 528 strays by its
         // share, 527 and the others by all of it
         // DIVSS hands on a NaN distance quieted, which it is already: its bits stay on any host
@@ -580,7 +584,7 @@ mod tests {
     fn a_missile_misses_by_its_spread_and_master_528_by_its_attack_count_s_share() {
         let aimer = Aimer {
             hit_chance: HitChance::of_data(70),
-            spread: 0.5,
+            spread: MissSpread::new(0.5),
             class: class::CLASS_0,
         };
         // the target 3 east and 4 north: a ground distance of 5
@@ -729,8 +733,8 @@ mod tests {
             1
         );
         // a spread of 0.5: from a quarter short to a quarter past
-        assert_eq!(scatter(0, 0.5), -0.25);
-        assert_eq!(scatter(0x7fff, 0.5), 0.25);
+        assert_eq!(scatter(0, Distance::new(0.5)), -0.25);
+        assert_eq!(scatter(0x7fff, Distance::new(0.5)), 0.25);
         // the reach adds 6 to the range
         assert_eq!(
             volley_reach(Footprint::new(2.0, 0.0), Distance::new(6.0)),
@@ -747,7 +751,7 @@ mod tests {
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
-            0.0,
+            Distance::new(0.0),
             GroundOffset::ZERO,
             None,
         );
@@ -757,7 +761,7 @@ mod tests {
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
-            0.5,
+            Distance::new(0.5),
             GroundOffset::new(0.0, 0.25),
             None,
         );
@@ -767,7 +771,7 @@ mod tests {
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
-            0.0,
+            Distance::new(0.0),
             GroundOffset::ZERO,
             Some(Point::new(11.0, 10.0)),
         );
@@ -776,7 +780,7 @@ mod tests {
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
-            0.0,
+            Distance::new(0.0),
             GroundOffset::ZERO,
             Some(Point::new(13.0, 10.0)),
         );

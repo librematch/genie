@@ -38,9 +38,9 @@ pub struct Formations {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AiSettings {
     /// `easiest_reaction_percentage` (`+0x608`, setting 3).
-    pub easiest_reaction_percentage: i32,
+    pub easiest_reaction_percentage: crate::world::Percent,
     /// `easier_reaction_percentage` (`+0x60c`, setting 4).
-    pub easier_reaction_percentage: i32,
+    pub easier_reaction_percentage: crate::world::Percent,
     /// `task_ungrouped_soldiers` (`+0x610`, setting 5).
     pub task_ungrouped_soldiers: u8,
     /// `may_attack_walls` (`+0x611`, setting 6).
@@ -50,9 +50,9 @@ pub struct AiSettings {
     /// `disable_build_help` (`+0x613`, setting 8).
     pub disable_build_help: bool,
     /// `local_targeting_mode` (`+0x614`, setting 9).
-    pub local_targeting_mode: i32,
+    pub local_targeting_mode: crate::world::TargetingMode,
     /// `targeting_factor_scalar` (`+0x618`, setting 10).
-    pub targeting_factor_scalar: i32,
+    pub targeting_factor_scalar: crate::world::Percent,
     /// `preferredTradeDistance` (`+0x61c`, setting 0xd).
     pub preferred_trade_distance: Distance,
     /// `disableTowerPriority` (`+0x620`, setting 0xe).
@@ -62,11 +62,11 @@ pub struct AiSettings {
     /// `mVillagerAttackReset` (`+0x622`, setting 0x10).
     pub villager_attack_reset: bool,
     /// `boarLureDestination` (`+0x623`, setting 0xc).
-    pub boar_lure_destination: u8,
+    pub boar_lure_destination: crate::world::LureDestination,
     /// `mAttackMoveMaxDistance` (`+0x624`, setting 0xf).
     pub attack_move_max_distance: crate::map::WholeDistance,
     /// `mDisableVillagerGarrison` (`+0x650`, setting 0x11).
-    pub disable_villager_garrison: i32,
+    pub disable_villager_garrison: crate::world::VillagerGarrison,
     /// `mAllowSerjeantBuilding` (`+0x660`, setting 0x12).
     pub allow_serjeant_building: bool,
 }

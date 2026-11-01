@@ -1,6 +1,6 @@
 //! The RGE combat and missile masters' setters: the armor and attack amounts.
 
-use crate::combat::missile::{ArcRatio, HitMode, SmartMode, VanishMode};
+use crate::combat::missile::{ArcRatio, HitMode, MissSpread, SmartMode, VanishMode};
 use crate::map::Distance;
 use crate::objects::Frame;
 use crate::objects::masters::BlastLevel;
@@ -55,12 +55,12 @@ impl Master {
             a::SHOWN_RANGE => self.shown.range = Distance::new(v),
             a::SHOWN_MELEE_ARMOR => self.shown.melee_armor = DamageAmount::of_effect(v),
             a::COMBAT_ABILITY => self.combat_ability = CombatAbility::from_bits_retain(low8(v)),
-            a::ATTACK_DISPERSION => self.missed_spread = v,
+            a::ATTACK_DISPERSION => self.missed_spread = MissSpread::new(v),
             a::ATTACK_GRAPHIC => set_sprite(&mut self.attack_sprite, cvttss2si(v), world),
             a::AREA_DAMAGE => self.area_damage = DamageShare::new(v),
             a::DAMAGE_REFLECTION => self.reflection = DamageShare::new(v),
             a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire = DamageShare::new(v),
-            a::GARRISON_FIREPOWER => self.garrison_firepower = v,
+            a::GARRISON_FIREPOWER => self.garrison_firepower = crate::combat::Firepower::new(v),
             a::DISPLACEMENT_X => self.weapon_offset = self.weapon_offset.with_x(v),
             a::DISPLACEMENT_Y => self.weapon_offset = self.weapon_offset.with_y(v),
             a::DISPLACEMENT_Z => self.weapon_offset = self.weapon_offset.with_z(v),
@@ -142,12 +142,12 @@ impl Master {
                     self.combat_ability.bits().wrapping_add(low8(v)),
                 );
             }
-            a::ATTACK_DISPERSION => self.missed_spread += v,
+            a::ATTACK_DISPERSION => self.missed_spread += MissSpread::new(v),
             a::ATTACK_GRAPHIC => add_sprite(&mut self.attack_sprite, v, world),
             a::AREA_DAMAGE => self.area_damage += DamageShare::new(v),
             a::DAMAGE_REFLECTION => self.reflection += DamageShare::new(v),
             a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire += DamageShare::new(v),
-            a::GARRISON_FIREPOWER => self.garrison_firepower += v,
+            a::GARRISON_FIREPOWER => self.garrison_firepower += crate::combat::Firepower::new(v),
             a::DISPLACEMENT_X => {
                 self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() + v);
             }

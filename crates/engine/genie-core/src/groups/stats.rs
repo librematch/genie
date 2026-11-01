@@ -904,7 +904,7 @@ mod tests {
             let mut t = searched_world();
             for masters in &mut t.masters {
                 *masters = Masters::new(masters.iter().cloned().map(|mut m| {
-                    m.height = 1.0;
+                    m.height = Distance::new(1.0);
                     m.spacing_modifier = spacing;
                     m
                 }));

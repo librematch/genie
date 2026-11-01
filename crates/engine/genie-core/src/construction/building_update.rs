@@ -66,7 +66,7 @@ impl Unit {
         if master.class != class::GATE || !transforms || self.life.state != ObjectState::Alive {
             return Ok(());
         }
-        let height = master.height;
+        let height = master.height.get();
         let gate = self
             .gate
             .as_mut()

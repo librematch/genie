@@ -884,7 +884,7 @@ mod clearing_tests {
                 kind: COMBAT,
                 class: class::CLASS_40,
                 radius: Footprint::new(0.5, 0.5),
-                height: 1.0,
+                height: crate::map::Distance::new(1.0),
                 tall: true,
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: 1,

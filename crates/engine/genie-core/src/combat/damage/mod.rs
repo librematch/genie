@@ -172,7 +172,7 @@ pub struct Victim {
     pub radius: Footprint,
     /// Its master's `radius_z` (`+0x5e0`): a missile meets it within that height above it
     /// (`FUN_14113f740`).
-    pub height: f32,
+    pub height: Distance,
     /// Its master's first storage amount (`+0x610`), which a gatherer reads.
     pub storage: Amount,
     /// Its master's `attribute_max_amount`.

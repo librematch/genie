@@ -132,7 +132,7 @@ impl PlaceMap for WorldMap<'_> {
                             .attribute_type
                             .is_some_and(|k| k.is_resource() || k.is_food_load()),
                     hp: unit.life.hp,
-                    outline: master.outline.with_height(master.outline_height),
+                    outline: master.outline.with_height(master.outline_height.get()),
                     forest_tile: t.spatial.terrain.as_ref().is_some_and(|ter| {
                         ter.kind(Tile::new(
                             placed.position.x() as i32,

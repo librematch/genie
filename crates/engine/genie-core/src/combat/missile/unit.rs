@@ -302,7 +302,7 @@ impl Unit {
                 ))?;
             if crate::combat::missile::meets_height(
                 p.position.z(),
-                m.height,
+                m.height.get(),
                 at.z(),
                 stats.radius.z(),
             ) {

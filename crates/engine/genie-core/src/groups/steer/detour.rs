@@ -447,7 +447,7 @@ pub(super) struct Rounder<'d> {
     pub(super) restriction: crate::map::RestrictionId,
     pub(super) grow: Distance,
     pub(super) radius: Footprint,
-    pub(super) height: f32,
+    pub(super) height: Distance,
     pub(super) solid: bool,
     pub(super) differentiators: &'d [ObjectId],
 }
@@ -504,14 +504,14 @@ pub(super) fn one_step_toward(
     let dir = BVector::new(dir.x() / len, dir.height() / len, dir.y() / len);
     let mut step = fmath::add(r.at, fmath::scale(1.0, dir));
     let (w, h) = (map.width(), map.height());
-    let (top_x, top_y) = (w as f32 - r.radius.x(), h as f32 - r.height);
+    let (top_x, top_y) = (w as f32 - r.radius.x(), h as f32 - r.height.get());
     if r.radius.x() > step.x() {
         step = step.with_x(r.radius.x());
     } else if step.x() > top_x {
         step = step.with_x(top_x);
     }
-    if r.height > step.y() {
-        step = step.with_y(r.height);
+    if r.height.get() > step.y() {
+        step = step.with_y(r.height.get());
     } else if step.y() > top_y {
         step = step.with_y(top_y);
     }

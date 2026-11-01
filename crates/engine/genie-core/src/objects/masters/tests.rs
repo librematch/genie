@@ -220,7 +220,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
             |m| f32::from(m.occlusion.get()),
             [3.0, 5.0, 5.0],
         ),
-        (a::SIZE_Z, |m| m.height, [3.0, 5.0, 10.0]),
+        (a::SIZE_Z, |m| m.height.get(), [3.0, 5.0, 10.0]),
         (
             a::CAN_BE_BUILT_ON,
             |m| f32::from(m.blast_defense.get()),
@@ -454,7 +454,11 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
             |m| f32::from(m.combat_ability.bits()),
             [3.0, 5.0, 5.0],
         ),
-        (a::ATTACK_DISPERSION, |m| m.missed_spread, [3.0, 5.0, 10.0]),
+        (
+            a::ATTACK_DISPERSION,
+            |m| m.missed_spread.get(),
+            [3.0, 5.0, 10.0],
+        ),
         (
             a::ATTACK_GRAPHIC,
             |m| sprite_value(m.attack_sprite),
@@ -473,7 +477,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::GARRISON_FIREPOWER,
-            |m| m.garrison_firepower,
+            |m| m.garrison_firepower.get(),
             [3.0, 5.0, 10.0],
         ),
         (a::DISPLACEMENT_X, |m| m.weapon_offset.x(), [3.0, 5.0, 10.0]),
@@ -620,12 +624,12 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SPAWNING_AREA_WIDTH,
-            |m| m.volley_spread.x,
+            |m| m.volley_spread.x.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             a::SPAWNING_AREA_RANDOMNESS,
-            |m| m.volley_spread.start,
+            |m| m.volley_spread.start.get(),
             [3.0, 5.0, 10.0],
         ),
         // the selected entry plus ten times the count, as the damage sprites'
@@ -1258,9 +1262,9 @@ fn the_combat_master_s_own_values_change() {
     assert_eq!(
         m.volley_spread,
         VolleySpread {
-            x: 0.0,
-            y: 0.0,
-            start: 0.5
+            x: Distance::new(0.0),
+            y: Distance::new(0.0),
+            start: Distance::new(0.5)
         }
     );
     assert_eq!(

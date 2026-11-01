@@ -705,7 +705,7 @@ fn rounder(at: BVector) -> detour::Rounder<'static> {
         restriction: RestrictionId::named(0),
         grow: Distance::new(0.1),
         radius: Footprint::new(0.2, 0.2),
-        height: 0.5,
+        height: Distance::new(0.5),
         solid: true,
         differentiators: &[],
     }

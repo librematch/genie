@@ -88,7 +88,7 @@ fn on_map(
 const fn seen(hp: HitPoints, height: f32) -> ClearLook {
     ClearLook {
         hp,
-        height,
+        height: Distance::new(height),
         roo_called: false,
         kind: master_type::STATIC,
         state: ObjectState::Alive,

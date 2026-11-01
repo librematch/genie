@@ -493,7 +493,7 @@ mod stack_tests {
             kind: master_type::BUILDING,
             class: class::BUILDING,
             radius: Footprint::new(r, r),
-            height: z,
+            height: Distance::new(z),
             tall: 0.0 < z,
             obstruction_type: kind,
             obstruction_class: ObstructionClass::UNIT,
@@ -816,7 +816,7 @@ mod stack_tests {
                 m.build_time = WholeSeconds::ZERO;
                 m.obstruction_type = ObstructionType::CIRCLE;
                 m.obstruction_class = ObstructionClass::UNIT;
-                m.height = height;
+                m.height = Distance::new(height);
                 m.building.as_mut().unwrap().annexes = [None; 4];
             }
             let (id, _) = t

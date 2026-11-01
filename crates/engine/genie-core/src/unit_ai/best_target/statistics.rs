@@ -295,7 +295,7 @@ impl Statistics {
     pub fn score(
         &mut self,
         weights: &ByCategory<OrderWeight>,
-        (mode, factor): (i32, i32),
+        (mode, factor): (crate::world::TargetingMode, crate::world::Percent),
         armored: &mut dyn FnMut(ObjectId) -> Result<bool, crate::GenieError>,
     ) -> Result<(), crate::GenieError> {
         let kill_span = self.kill_time.span();
@@ -308,8 +308,8 @@ impl Statistics {
             self.moving_distance.least.get(),
         );
         for e in &mut self.entries {
-            let top = if mode == 1 {
-                factor as f32 * PER_CENT
+            let top = if mode == crate::world::TargetingMode::KILL_TIME {
+                factor.as_f32() * PER_CENT
             } else {
                 1.0
             };
@@ -341,8 +341,8 @@ impl Statistics {
                 TargetScore::new(weights[k].get() * SCORE)
             });
             e.total = ((e.kill_score + e.distance_score) + e.weight) + e.bonus;
-            if mode == 2 && armored(e.id)? {
-                e.total *= factor as f32 * PER_CENT;
+            if mode == crate::world::TargetingMode::ARMORED && armored(e.id)? {
+                e.total *= factor.as_f32() * PER_CENT;
             }
         }
         Ok(())

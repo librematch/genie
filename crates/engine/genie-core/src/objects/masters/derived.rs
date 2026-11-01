@@ -67,7 +67,7 @@ impl Master {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::SIZE_X | a::SIZE_Y | a::SIZE_Z => {
-                stats.radius = self.radius.with_height(self.height);
+                stats.radius = self.radius.with_height(self.height.get());
             }
             a::MOVEMENT_SPEED | a::STANDING_GRAPHIC | a::WALKING_GRAPHIC | a::RUNNING_GRAPHIC => {
                 stats.base = self.max_speed;
@@ -115,9 +115,9 @@ impl Master {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::SIZE_X | a::SIZE_Y | a::SIZE_Z => {
-                self.tall = 0.0 < self.height;
+                self.tall = crate::map::Distance::ZERO < self.height;
                 if let Some(m) = self.missile_stats.as_mut() {
-                    m.radius = self.radius.with_height(self.height);
+                    m.radius = self.radius.with_height(self.height.get());
                 }
             }
             a::MOVEMENT_SPEED => {

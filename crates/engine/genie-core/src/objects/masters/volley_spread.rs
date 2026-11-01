@@ -10,16 +10,19 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct VolleySpread {
     /// `volley_x_spread` (`+0x8c8`, the attribute "Spawning Area Width").
-    pub x: f32,
+    pub x: crate::map::Distance,
     /// `volley_y_spread` (`+0x8cc`, "Spawning Area Length").
-    pub y: f32,
+    pub y: crate::map::Distance,
     /// `volley_start_spread_adjustment` (`+0x8d0`, "Spawning Area Randomness").
-    pub start: f32,
+    pub start: crate::map::Distance,
 }
 
 impl VolleySpread {
     /// The value an effect's attribute changes: its width, its length, else its randomness.
-    pub(crate) const fn lane_mut(&mut self, attribute: MasterAttribute) -> &mut f32 {
+    pub(crate) const fn lane_mut(
+        &mut self,
+        attribute: MasterAttribute,
+    ) -> &mut crate::map::Distance {
         match attribute {
             a::SPAWNING_AREA_WIDTH => &mut self.x,
             a::SPAWNING_AREA_LENGTH => &mut self.y,
@@ -37,15 +40,15 @@ mod tests {
     #[test]
     fn each_spawning_area_attribute_changes_its_value() {
         let mut s = VolleySpread::default();
-        *s.lane_mut(a::SPAWNING_AREA_LENGTH) = 2.0;
-        *s.lane_mut(a::SPAWNING_AREA_RANDOMNESS) = 3.0;
-        *s.lane_mut(a::SPAWNING_AREA_WIDTH) = 1.0;
+        *s.lane_mut(a::SPAWNING_AREA_LENGTH) = crate::map::Distance::new(2.0);
+        *s.lane_mut(a::SPAWNING_AREA_RANDOMNESS) = crate::map::Distance::new(3.0);
+        *s.lane_mut(a::SPAWNING_AREA_WIDTH) = crate::map::Distance::new(1.0);
         assert_eq!(
             s,
             VolleySpread {
-                x: 1.0,
-                y: 2.0,
-                start: 3.0
+                x: crate::map::Distance::new(1.0),
+                y: crate::map::Distance::new(2.0),
+                start: crate::map::Distance::new(3.0)
             }
         );
     }

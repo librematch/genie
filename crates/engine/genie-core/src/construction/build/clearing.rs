@@ -50,7 +50,7 @@ pub struct ClearLook {
     /// `+0x278`.
     pub hp: HitPoints,
     /// Its master's `radius_z` (`+0x5e0`).
-    pub height: f32,
+    pub height: crate::map::Distance,
     /// `+0x686`.
     pub roo_called: bool,
     /// Its master's type.
@@ -225,18 +225,19 @@ pub(super) fn clearing_takes(
         return Ok(None);
     }
     // COMISS 0 against the height, JNC: a flag master of height 0 or less stays
-    if FLAG_MASTERS.contains(&o.master) && !below_or_unordered(0.0, seen.height) {
+    if FLAG_MASTERS.contains(&o.master) && !below_or_unordered(0.0, seen.height.get()) {
         return Ok(None);
     }
     // the destroy's death part (FUN_14121cc40 below state 3) drops the record and sets +0x686
     // first; then FUN_141189670: COMISS 0 against the height, JC drops the record (a NaN too),
     // else the record held (`+0x658`) does
     let dies = COMBAT <= seen.kind && seen.state < ObjectState::Dying && !seen.roo_called;
-    let destroy_drops = dies && (seen.kind < BUILDING || (!seen.desolid && 0.0 < seen.height));
+    let destroy_drops = dies
+        && (seen.kind < BUILDING || (!seen.desolid && crate::map::Distance::ZERO < seen.height));
     let roo_drops = site.trees
         && !seen.roo_called
         && !dies
-        && (below_or_unordered(0.0, seen.height) || o.obstruction.is_some());
+        && (below_or_unordered(0.0, seen.height.get()) || o.obstruction.is_some());
     Ok(Some(Cleared {
         id,
         wall: o.class == class::WALL,

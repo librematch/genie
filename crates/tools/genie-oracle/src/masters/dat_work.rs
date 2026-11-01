@@ -154,7 +154,7 @@ pub(super) fn dat_work(
         task_by_group: TaskGroup::of_data(unit.bird.as_ref().map_or(0, |b| b.task_swap_group)),
         radius: Radii::from(unit.collision_size).ground(),
         tall: 0.0 < Radii::from(unit.collision_size).z(),
-        height: Radii::from(unit.collision_size).z(),
+        height: Distance::new(Radii::from(unit.collision_size).z()),
         obstruction_type: ObstructionType::from(unit.obstruction_type),
         buildable_on: unit.can_be_built_on,
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
@@ -214,7 +214,7 @@ pub(super) fn dat_work(
             .and_then(SpriteId::of_data),
         clearance: Footprint::from(unit.clearance_size),
         outline: Radii::from(unit.outline_size).ground(),
-        outline_height: Radii::from(unit.outline_size).z(),
+        outline_height: Distance::new(Radii::from(unit.outline_size).z()),
         terrain_bonus: RestrictionField::of_data(
             unit.type50.as_ref().map_or(-1, |t| t.defense_terrain_bonus),
         ),
@@ -264,7 +264,7 @@ pub(super) fn dat_work(
             .type50
             .as_ref()
             .and_then(|t| t.garrison_firepower)
-            .unwrap_or(0.0),
+            .map_or(Firepower::ZERO, Firepower::new),
         volley_fire: Firepower::new(unit.creatable.as_ref().map_or(0.0, |c| c.total_projectiles)),
         // the DE master's mSpacingModifier (+0x8b8), the data file's "flank attack modifier"
         spacing_modifier: unit
@@ -281,7 +281,11 @@ pub(super) fn dat_work(
             .as_ref()
             .map_or_else(VolleySpread::default, |c| {
                 let [x, y, start] = c.projectile_spawning_area;
-                VolleySpread { x, y, start }
+                VolleySpread {
+                    x: Distance::new(x),
+                    y: Distance::new(y),
+                    start: Distance::new(start),
+                }
             }),
         volley_missile: unit
             .creatable

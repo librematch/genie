@@ -52,7 +52,7 @@ impl Master {
             }
             a::FOG_VISIBILITY => self.fog_visibility = FogVisibility::of_data(low8(v)),
             a::OCCLUSION_MODE => self.occlusion = Occlusion::of_data(low8(v)),
-            a::SIZE_Z => self.height = v,
+            a::SIZE_Z => self.height = Distance::new(v),
             a::CAN_BE_BUILT_ON | a::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense = BlastDefense::new(low8(v));
             }
@@ -200,7 +200,7 @@ impl Master {
                 }
             }
             a::OCCLUSION_MODE => self.occlusion = self.occlusion.plus(low8(v)),
-            a::SIZE_Z => self.height += v,
+            a::SIZE_Z => self.height += Distance::new(v),
             a::CAN_BE_BUILT_ON | a::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense =
                     BlastDefense::new(self.blast_defense.get().wrapping_add(low8(v)));
