@@ -49,7 +49,7 @@ impl UnitList {
     #[must_use]
     pub fn first(&self, most: usize) -> &[Option<ObjectId>] {
         let n = usize::from(self.count).min(most).min(self.ids.len());
-        &self.ids[..n]
+        self.ids.get(..n).unwrap_or_default()
     }
 }
 

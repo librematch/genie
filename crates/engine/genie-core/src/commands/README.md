@@ -51,6 +51,7 @@ building commands, the unit commands and the players' each have their own dispat
 | [`patrol.rs`](patrol.rs) | PATROL (0x15): the player's units patrol through waypoints. |
 | [`placement.rs`](placement.rs) | BUILD's tests before its foundation: a farm on rice terrain, the pending debit, the builders, the placement test and the payment. |
 | [`production.rs`](production.rs) | QUEUE: a building's production queue, its load, its units and technologies, and a new entry's costs. |
+| [`production_techs.rs`](production_techs.rs) | QUEUE's technologies: a building's researches, paid and queued, joining its last entry or a new one. |
 | [`queue.rs`](queue.rs) | QUEUE (0x81): units of one master at the player's buildings. |
 | [`research.rs`](research.rs) | RESEARCH (0x65): a technology at the player's buildings. |
 | [`resign.rs`](resign.rs) | RESIGN (0x0b): a player resigns or drops. |

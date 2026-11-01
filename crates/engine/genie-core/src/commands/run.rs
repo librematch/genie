@@ -56,8 +56,8 @@ impl World {
             };
             let player = self.players.player_mut(p)?;
             let unit = match place {
-                crate::orders::Place::Live(..) => &mut player.objects[i],
-                crate::orders::Place::Sleeping(..) => &mut player.sleeping[i],
+                crate::orders::Place::Live(..) => player.objects.checked_mut(i)?,
+                crate::orders::Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
             };
             if let Some(ai) = unit.ai.as_mut() {
                 ai.reset_for_order(self.streams.get(Stream::Ai));

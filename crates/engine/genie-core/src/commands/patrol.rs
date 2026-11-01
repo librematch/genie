@@ -40,9 +40,11 @@ impl Waypoints {
     /// None without 1 to 10, where they do nothing.
     #[must_use]
     pub fn used(&self) -> Option<&[Point]> {
-        (1..=10)
-            .contains(&self.count)
-            .then(|| &self.points[..usize::from(self.count)])
+        if (1..=10).contains(&self.count) {
+            self.points.get(..usize::from(self.count))
+        } else {
+            None
+        }
     }
 }
 

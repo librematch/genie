@@ -34,6 +34,7 @@ mod packet_values;
 pub mod patrol;
 mod placement;
 mod production;
+mod production_techs;
 pub mod queue;
 pub mod research;
 pub mod resign;
@@ -334,6 +335,8 @@ impl World {
         if self.last_commanded.len() <= player.index() {
             self.last_commanded.resize(player.index() + 1, Vec::new());
         }
-        self.last_commanded[player.index()] = units;
+        if let Some(slot) = self.last_commanded.get_mut(player.index()) {
+            *slot = units;
+        }
     }
 }

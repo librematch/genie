@@ -15,6 +15,7 @@ use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{RICE_FARM, World};
 
@@ -48,7 +49,8 @@ impl World {
         let mut listed = [0i16; 4];
         for (resource, amount, _) in crate::objects::masters::cost_entries(&site.cost) {
             if let Some(r) = resource.is_resource().then(|| resource.index()) {
-                listed[r] = listed[r].wrapping_add(amount.get());
+                let entry = listed.checked_mut(r)?;
+                *entry = entry.wrapping_add(amount.get());
             }
         }
         for (debit, amount) in self

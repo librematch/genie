@@ -34,6 +34,7 @@ use crate::objects::masters::{MasterId, player_master};
 use crate::orders::Place;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
 /// The snap's half tile and its step up (`FUN_141123ac0`).
@@ -268,7 +269,8 @@ impl World {
             let k = share(i, capable, placed.len()).ok_or(GenieError::unsupported(
                 "a wall builder past the foundations the game shares out",
             ))?;
-            self.wall_builder_takes(w, id, &placed, placed[k])?;
+            let site = *placed.checked(k)?;
+            self.wall_builder_takes(w, id, &placed, site)?;
         }
         Ok(())
     }

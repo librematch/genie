@@ -405,7 +405,7 @@ impl World {
             drop_sites: &self.drop_sites,
         };
         let owner = world.players.player(player)?;
-        let unit = &owner.objects[idx];
+        let unit = owner.objects.checked(idx)?;
         let actor = Actor {
             id: unit.id,
             master: unit.master_in(Some(masters))?,

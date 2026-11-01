@@ -21,6 +21,7 @@ use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{BLOCKS_RESEARCH, World};
 
@@ -314,10 +315,10 @@ impl World {
         ))?;
         let get = |i: AttributeId| crate::technology::Attributes::get(owner, i);
         let factors = crate::technology::factors(tech_id, &get)?;
-        let listed = owner.techs[tech].listed_costs(def, factors)?;
+        let listed = owner.techs.checked(tech)?.listed_costs(def, factors)?;
         debit_listed(self.players.player_mut(player)?, listed);
         let owner = self.players.player(player)?;
-        let state = &owner.techs[tech];
+        let state = owner.techs.checked(tech)?;
         let repeatable = state.repeatable(def, false);
         if def.kind == crate::technology::TechType::SHARED {
             return Err(GenieError::unsupported(
@@ -335,44 +336,9 @@ impl World {
         if state.state != ResearchState::Available && !repeatable {
             return Ok(());
         }
-        let Some(i) = owner.objects.position_of(building_id) else {
-            let elsewhere = self.players.iter().any(|q| {
-                q.objects
-                    .iter()
-                    .chain(&q.sleeping)
-                    .any(|u| Some(u.id) == building_id)
-            });
-            return if elsewhere {
-                Err(GenieError::unsupported(
-                    "RESEARCH at another player's object",
-                ))
-            } else {
-                Ok(())
-            };
+        let Some(i) = self.researching_building(player, building_id, state)? else {
+            return Ok(());
         };
-        let building = &owner.objects[i];
-        let master = building.master(&self.masters, player)?;
-        let at = state
-            .locations
-            .iter()
-            .any(|l| l.building == Some(building.life.master_id));
-        if master.kind != BUILDING || building.life.state != ObjectState::Alive || !at {
-            return Ok(());
-        }
-        if owner.computer {
-            return Err(GenieError::unsupported(
-                "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)",
-            ));
-        }
-        let top = building.top_action_kind();
-        if building.unmodelled_action.is_some() {
-            return Err(GenieError::unsupported(
-                "RESEARCH at a building with an unmodelled action",
-            ));
-        }
-        if top.is_some_and(|k| BLOCKS_RESEARCH.contains(&k)) {
-            return Ok(());
-        }
         if self.queue_research(player, i, tech_id, r.shift)? {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
@@ -391,6 +357,63 @@ impl World {
         Ok(())
     }
 
+    /// [`World::research`]'s building `building_id` of `player` that takes the technology of
+    /// `state`: a building of master type 80 alive (state 2) whose master is among the
+    /// technology's locations and without a top action of 0x7b to 0x7d. None for another one,
+    /// and for an id no player holds.
+    ///
+    /// # Errors
+    ///
+    /// Another player's object, a computer player's building and a building with an unmodelled
+    /// action.
+    fn researching_building(
+        &self,
+        player: PlayerId,
+        building_id: Option<ObjectId>,
+        state: &crate::technology::TechState,
+    ) -> Result<Option<ListIndex>, GenieError> {
+        let owner = self.players.player(player)?;
+        let Some(i) = owner.objects.position_of(building_id) else {
+            let elsewhere = self.players.iter().any(|q| {
+                q.objects
+                    .iter()
+                    .chain(&q.sleeping)
+                    .any(|u| Some(u.id) == building_id)
+            });
+            return if elsewhere {
+                Err(GenieError::unsupported(
+                    "RESEARCH at another player's object",
+                ))
+            } else {
+                Ok(None)
+            };
+        };
+        let building = owner.objects.checked(i)?;
+        let master = building.master(&self.masters, player)?;
+        let at = state
+            .locations
+            .iter()
+            .any(|l| l.building == Some(building.life.master_id));
+        if master.kind != BUILDING || building.life.state != ObjectState::Alive || !at {
+            return Ok(None);
+        }
+        if owner.computer {
+            return Err(GenieError::unsupported(
+                "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)",
+            ));
+        }
+        let top = building.top_action_kind();
+        if building.unmodelled_action.is_some() {
+            return Err(GenieError::unsupported(
+                "RESEARCH at a building with an unmodelled action",
+            ));
+        }
+        if top.is_some_and(|k| BLOCKS_RESEARCH.contains(&k)) {
+            return Ok(None);
+        }
+        Ok(Some(i))
+    }
+
     /// `FUN_1411d70f0` for the building at `i` of `player`: one research, five with `shift`
     /// unless the technology allows only one at a time or its effect upgrades a unit, queued by
     /// the building's part with no master and no button ([`World::queue_at`]). True when any
@@ -404,8 +427,8 @@ impl World {
         shift: bool,
     ) -> Result<bool, GenieError> {
         let t = tech.index();
-        let def = &self.techs[t];
-        let state = &self.players.player(player)?.techs[t];
+        let def = self.techs.checked(t)?;
+        let state = self.players.player(player)?.techs.checked(t)?;
         let one = !state.allow_multiple || def.upgrades();
         let count: u16 = if !shift || one { 1 } else { 5 };
         self.queue_at(player, i, None, count, Some(tech), QueueButton::NONE)

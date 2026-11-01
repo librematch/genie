@@ -19,6 +19,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
 use crate::players::PlayerId;
 use crate::world::WholeSeconds;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::collections::BTreeMap;
 
@@ -135,7 +136,7 @@ impl World {
             ))?
             .position;
         let (_, first) = self
-            .object(units[0])
+            .object(*units.checked(0)?)
             .ok_or(GenieError::unsupported("a unit sent off that is gone"))?;
         let mover = first.body.mover().ok_or(GenieError::unsupported(
             "a unit sent off without movement state",

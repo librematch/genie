@@ -17,6 +17,7 @@ use crate::players::PlayerId;
 use crate::players::Stance;
 use crate::players::attribute;
 use crate::world::World;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 
@@ -185,7 +186,11 @@ impl World {
     /// entry of gold (`FUN_141630ef0` with 3) takes its cost.
     fn game_treason(&mut self, p: PlayerId) -> Result<(), GenieError> {
         if self.has_treason_building(p) {
-            self.players.player_mut(p)?.pending_debit[attribute::GOLD.index()] -= TREASON_COST;
+            *self
+                .players
+                .player_mut(p)?
+                .pending_debit
+                .checked_mut(attribute::GOLD.index())? -= TREASON_COST;
             self.treason(p)?;
         }
         Ok(())
@@ -259,7 +264,7 @@ impl World {
             if self.allow_gaia_capture.len() <= p.index() {
                 self.allow_gaia_capture.resize(p.index() + 1, false);
             }
-            self.allow_gaia_capture[p.index()] = value != 0;
+            *self.allow_gaia_capture.checked_mut(p.index())? = value != 0;
             return Ok(());
         }
         let owner = self.players.player_mut(p)?;
