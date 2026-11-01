@@ -131,7 +131,9 @@ impl World {
         let cart = self.players.player_mut(p)?.objects.take_out(idx)?;
         let result = (|| {
             let (before, rest) = self.players.split_at_mut(p.index());
-            let (player, after) = rest.split_first_mut().expect("p is a player");
+            let (player, after) = rest.split_first_mut().ok_or(GenieError::unreachable(
+                "a cart's player outside the players",
+            ))?;
             let mut w = ResourceWorld {
                 player: p,
                 spatial: &mut self.spatial,

@@ -77,7 +77,9 @@ impl Unit {
         }
         let locked = gate.locked;
         let (total, allied) = self.gate_count(&mut c.w.spatial, others)?;
-        let gate = self.gate.as_mut().expect("held above");
+        let gate = self.gate.as_mut().ok_or(GenieError::unreachable(
+            "a gate whose state went during its update",
+        ))?;
         if shut && 0 < allied && !locked {
             gate.close_timer = Seconds::ZERO;
             return self.toggle_own_gate(c, GATE_SHUT_HEIGHT <= height);

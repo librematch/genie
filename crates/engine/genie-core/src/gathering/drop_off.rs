@@ -87,7 +87,10 @@ impl Unit {
     /// class (the AI's `+0x58`, else the Gather's `mTargetType`); none for none, a class of no
     /// group, or a unit without a unit AI.
     fn after_drop_search(&self, c: &mut Step<'_>) -> Result<Option<ObjectId>, GenieError> {
-        let gather = self.actions.gather().expect("the caller's gather");
+        let gather = self
+            .actions
+            .gather()
+            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let Some(ai) = self.ai.as_ref() else {
             return Ok(None);
         };
@@ -118,7 +121,10 @@ impl Unit {
             self.actions.gather().and_then(|g| g.target_class),
         );
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
-        let gather = self.actions.gather_mut().expect("the caller's gather");
+        let gather = self
+            .actions
+            .gather_mut()
+            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
             if farm_waits {
                 return Err(GenieError::unsupported(
@@ -139,7 +145,10 @@ impl Unit {
         }
         let carry_to = gather.carry_to;
         let shows = self.idle_sprite(c)?;
-        let gather = self.actions.gather_mut().expect("the caller's gather");
+        let gather = self
+            .actions
+            .gather_mut()
+            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         gather.tear_down(self.body.mover_mut())?;
         gather.state = GatherState::Idle;
         gather.timer = Seconds::ZERO;
@@ -166,7 +175,10 @@ impl Unit {
         &self,
         c: &Step<'_>,
     ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
-        let gather = self.actions.gather().expect("the caller's gather");
+        let gather = self
+            .actions
+            .gather()
+            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let master = self.master(&c.w.masters, c.player)?;
         let standing = master
             .standing_sprite
@@ -250,7 +262,9 @@ impl Unit {
                         .player_mut(c.player)?
                         .objects
                         .by_id_mut(found)
-                        .expect("found above");
+                        .ok_or(GenieError::unreachable(
+                            "an object found above its player lost",
+                        ))?;
                 u.taken(false, by.id);
             } else {
                 let by = self.releaser(c)?;
@@ -334,7 +348,10 @@ impl Unit {
                 "a gather's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let gather = self.actions.gather().expect("the caller's gather");
+        let gather = self
+            .actions
+            .gather()
+            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
         let (site, gap) =
             self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;
@@ -371,7 +388,7 @@ impl Unit {
                 "a hunt's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let hunt = self.actions.hunt().expect("the caller's hunt");
+        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) =
             self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;

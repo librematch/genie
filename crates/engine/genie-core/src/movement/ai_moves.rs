@@ -354,7 +354,9 @@ impl Unit {
             .or_else(|| object_sprite(own))
             .and_then(|id| c.w.graphics.get(id).copied());
         let here = self.position();
-        let mover = self.body.mover_mut().expect("tested above");
+        let mover = self.body.mover_mut().ok_or(GenieError::unreachable(
+            "a walker tested above without its mover",
+        ))?;
         let move_to = MoveToAction::to_object(
             &c.w.spatial,
             here,

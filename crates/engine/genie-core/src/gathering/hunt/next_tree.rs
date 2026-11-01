@@ -37,7 +37,7 @@ impl Unit {
             let d = crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy);
             d.partial_cmp(&limit.get()) != Some(std::cmp::Ordering::Less)
         };
-        let hunt = self.actions.hunt().expect("the caller's");
+        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         if let Some(within) = within
             && beyond(hunt.point, self.position(), within)
         {
@@ -111,7 +111,10 @@ impl Unit {
             c.w.world_time,
         )?;
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
-        let hunt = self.actions.hunt_mut().expect("the caller's");
+        let hunt = self
+            .actions
+            .hunt_mut()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let old = hunt.target;
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = crate::combat::attack::arms(master, &c.w.graphics, hunt.task.sprites, moving);

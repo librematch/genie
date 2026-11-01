@@ -2,7 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::damage::Victim;
-use crate::math::rng::{Stream, Well512};
+use crate::math::rng::Well512;
 use crate::movement::move_to::Walk;
 use crate::movement::{Me, Planning};
 use crate::objects::ListIndex;
@@ -69,7 +69,7 @@ pub(crate) struct Beside<'b> {
 impl World {
     /// A walk at `pace` ([`Step::walk`]) and the world's parts beside it, each its own
     /// borrow.
-    pub(crate) fn walk_beside<'b>(
+    pub(crate) const fn walk_beside<'b>(
         &'b mut self,
         pace: Pace,
         body: &'b mut crate::objects::layers::Body,
@@ -82,7 +82,7 @@ impl World {
             streams,
             ..
         } = self;
-        let (object, sprite_rng) = streams.two(Stream::Object, Stream::Sprite);
+        let (object, sprite_rng) = streams.object_and_sprite();
         let walk = Walk {
             body,
             me,
@@ -242,7 +242,7 @@ impl Step<'_> {
         me: Me,
     ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
         let computer = self.w.players.player(self.player)?.computer;
-        let (object, sprite) = self.w.streams.two(Stream::Object, Stream::Sprite);
+        let (object, sprite) = self.w.streams.object_and_sprite();
         Ok((
             Walk {
                 body,

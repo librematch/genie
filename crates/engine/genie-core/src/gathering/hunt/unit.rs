@@ -37,7 +37,10 @@ impl Unit {
     /// `FUN_140ac5210`'s) and the timer starts at −10 s. A hunt of class 10 would end its search
     /// (`set_state` 2), not modelled.
     pub(crate) fn hunt_set_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let hunt = self.actions.hunt_mut().expect("the caller's hunt");
+        let hunt = self
+            .actions
+            .hunt_mut()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         if hunt.target_class != Some(class::PREDATOR) {
             let target = hunt.target.take();
             self.hunt_release(c, [target])?;
@@ -50,7 +53,10 @@ impl Unit {
     /// starts at −10 s. A human player's hunt of class 10 is done instead (`set_state` 2: the
     /// target and the second target go), a computer player's would end (1), not modelled.
     pub(crate) fn hunt_search_state(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let hunt = self.actions.hunt_mut().expect("the caller's hunt");
+        let hunt = self
+            .actions
+            .hunt_mut()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let task = hunt.task;
         if hunt.target_class == Some(class::PREDATOR) {
             // a human player's hunt is done (set_state 2), a computer player's ends (1)
@@ -119,7 +125,7 @@ impl Unit {
     /// found 0, and the hunt's class goes (−1).
     pub(crate) fn hunt_search_notify(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let others = OthersRef::of(&c.w.players, c.player)?;
-        let hunt = self.actions.hunt().expect("the caller's hunt");
+        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
         let master = self.master(&c.w.masters, c.player)?;
         let site = if let Some(carry) = carry_to {
@@ -147,7 +153,7 @@ impl Unit {
                 None => {
                     self.actions
                         .hunt_mut()
-                        .expect("the caller's hunt")
+                        .ok_or(crate::gathering::hunt::NO_HUNT)?
                         .target_class = None;
                     0
                 }
@@ -185,7 +191,7 @@ impl Unit {
         if self
             .actions
             .hunt()
-            .expect("the caller's hunt")
+            .ok_or(crate::gathering::hunt::NO_HUNT)?
             .target
             .is_some()
         {
@@ -206,7 +212,7 @@ impl Unit {
     /// with the hunter's engagement and arms). A chase that starts arrived, or fails, is not
     /// modelled.
     fn hunt_back_to_target(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let hunt = self.actions.hunt().expect("the caller's hunt");
+        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         let master = self.master(&c.w.masters, c.player)?;
         let v = victim(c, hunt.target)?.ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold live",
@@ -242,7 +248,10 @@ impl Unit {
         )?;
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = crate::combat::attack::arms(master, &c.w.graphics, hunt.task.sprites, moving);
-        let hunt = self.actions.hunt_mut().expect("the caller's hunt");
+        let hunt = self
+            .actions
+            .hunt_mut()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let site = hunt.carry_to.take();
         let by = self.releaser(c)?;
         if site.is_some() {
@@ -310,7 +319,7 @@ impl Unit {
         &mut self,
         c: &mut Step<'_>,
     ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
-        let hunt = self.actions.hunt().expect("the caller's hunt");
+        let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         let ai = self.ai.as_ref().ok_or(GenieError::unsupported(
             "a hunt without a unit AI after its drop-off",
         ))?;
@@ -380,7 +389,11 @@ impl Unit {
             id: self.id,
             group: self.group.id,
             action_state: ActionState::new(
-                self.actions.hunt().expect("the caller's hunt").state.get(),
+                self.actions
+                    .hunt()
+                    .ok_or(crate::gathering::hunt::NO_HUNT)?
+                    .state
+                    .get(),
             ),
         };
         let mut plan = Planning {
@@ -436,7 +449,10 @@ impl Unit {
             ));
         }
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
-        let hunt = self.actions.hunt_mut().expect("the caller's hunt");
+        let hunt = self
+            .actions
+            .hunt_mut()
+            .ok_or(crate::gathering::hunt::NO_HUNT)?;
         if hunt.point.x() == -1.0 || hunt.point.y() == -1.0 {
             return Err(GenieError::unsupported(
                 "a hunt without a point that found nothing after its drop-off (set_state 2)",

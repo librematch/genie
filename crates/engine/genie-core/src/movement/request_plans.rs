@@ -188,9 +188,11 @@ impl Mover {
             range: w.range,
             target: w.goal.target.map(|(_, t)| t),
         };
-        let r = self
-            .tile_plan(me, world, plan, ask, &mut np.path)?
-            .expect("the planner exists");
+        let r =
+            self.tile_plan(me, world, plan, ask, &mut np.path)?
+                .ok_or(GenieError::unreachable(
+                    "a plan without the planner it tested",
+                ))?;
         // the game also tests for 4, which the planner never returns
         if !r.leads() {
             return Ok(());

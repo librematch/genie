@@ -247,7 +247,10 @@ impl UnitView<'_, '_> {
             radius: master.radius,
         };
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE;
-        let attack = unit.actions.attack_mut().expect("the caller's own Attack");
+        let attack = unit
+            .actions
+            .attack_mut()
+            .ok_or(crate::combat::attack::unit::NO_ATTACK)?;
         let w = attack.work(Some(target_mark), main, &wielder, |_| can_move);
         let by = Releaser {
             id: unit.id,

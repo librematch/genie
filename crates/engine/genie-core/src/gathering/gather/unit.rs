@@ -35,7 +35,8 @@ use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
 /// The Gather's update, or what follows it, without the Gather its caller found.
-const NO_GATHER: GenieError = GenieError::unreachable("a Gather's update without its Gather");
+pub(crate) const NO_GATHER: GenieError =
+    GenieError::unreachable("a Gather's update without its Gather");
 
 impl Unit {
     /// The Gather's update (slot 6, `0x140a8e1d0`). It first checks its targets: a target gone

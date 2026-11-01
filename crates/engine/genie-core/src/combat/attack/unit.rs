@@ -20,7 +20,8 @@ use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
 /// The unit's own Attack's update without its Attack: the caller's test.
-const NO_ATTACK: GenieError = GenieError::unreachable("an Attack's update without its Attack");
+pub(super) const NO_ATTACK: GenieError =
+    GenieError::unreachable("an Attack's update without its Attack");
 
 impl Unit {
     /// The unit's own Attack in its update: after its target went

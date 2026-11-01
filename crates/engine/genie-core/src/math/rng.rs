@@ -266,27 +266,10 @@ impl Streams {
         }
     }
 
-    /// Three different streams at once.
-    ///
-    /// # Panics
-    ///
-    /// When two of them are the same stream.
-    pub fn three(&mut self, a: Stream, b: Stream, c: Stream) -> [&mut Well512; 3] {
-        self.rngs
-            .get_disjoint_mut([a as usize, b as usize, c as usize])
-            .expect("three different streams")
-    }
-
-    /// Two different streams at once.
-    ///
-    /// # Panics
-    ///
-    /// When `a` and `b` are the same stream.
-    pub fn two(&mut self, a: Stream, b: Stream) -> (&mut Well512, &mut Well512) {
-        self.rngs
-            .get_disjoint_mut([a as usize, b as usize])
-            .expect("two different streams")
-            .into()
+    /// The Object and the Sprite streams at once (an attacker's update draws from both).
+    pub const fn object_and_sprite(&mut self) -> (&mut Well512, &mut Well512) {
+        let [_, _, sprite, _, _, object, _, _, _, _, _] = &mut self.rngs;
+        (object, sprite)
     }
 }
 

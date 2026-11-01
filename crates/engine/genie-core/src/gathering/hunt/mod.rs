@@ -29,7 +29,7 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 /// A hunter's update without its Hunt: the caller's test.
-pub(super) const NO_HUNT: crate::GenieError =
+pub(crate) const NO_HUNT: crate::GenieError =
     crate::GenieError::unreachable("a hunter's update without its Hunt");
 
 mod drop_off;

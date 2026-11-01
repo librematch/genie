@@ -703,7 +703,7 @@ impl Rig {
             players,
             ..
         } = &mut self.t;
-        let (object, sprite) = streams.two(Stream::Object, Stream::Sprite);
+        let (object, sprite) = streams.object_and_sprite();
         let mut g = Ground {
             map: spatial,
             sprite_rng: sprite,

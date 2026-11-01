@@ -455,7 +455,11 @@ impl Mover {
                 Next::Again => continue,
                 // a link of another type: on past the request (state 4 or 5) to the walk
                 Next::Dispatch => {}
-                Next::LoopEnd => unreachable!("only a reached waypoint ends a loop's step"),
+                Next::LoopEnd => {
+                    return Err(GenieError::unreachable(
+                        "a loop's end outside a reached waypoint",
+                    ));
+                }
             }
             let (now, computer) = plan
                 .as_deref()

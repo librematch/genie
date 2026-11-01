@@ -273,7 +273,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
         return Ok(None);
     };
     if sleeps {
-        let (_, u) = c.w.object_mut(v.id).expect("located");
+        let (_, u) = c.w.object_mut(v.id).ok_or(NOT_LOCATED)?;
         u.life.hp = v.hp;
         u.life.amount = v.amount;
         if crate::math::fmath::at_most_or_unordered(1.0, v.hp.get()) {
@@ -281,7 +281,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
         }
         let _ = c.w.wake_sleeper(v.id)?;
     }
-    let (_, u) = c.w.object_mut(v.id).expect("located");
+    let (_, u) = c.w.object_mut(v.id).ok_or(NOT_LOCATED)?;
     u.life.hp = v.hp;
     u.life.amount = v.amount;
     u.life.goto_sleep = v.goto_sleep;
@@ -312,7 +312,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
     }
     for &a in struck.map_or(&[][..], |b| &b.annexes) {
         if let Some((_, _, false)) = c.w.locate(a) {
-            let (_, x) = c.w.object_mut(a).expect("located");
+            let (_, x) = c.w.object_mut(a).ok_or(NOT_LOCATED)?;
             x.life.hp = v.hp;
         }
     }
@@ -594,3 +594,7 @@ pub(crate) fn paid_cost(master: &Master) -> Amount {
     }
     cost
 }
+
+/// A victim the world located without its object.
+const NOT_LOCATED: GenieError =
+    GenieError::unreachable("a victim the world located without its object");

@@ -18,7 +18,7 @@ use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
-use crate::math::rng::{Stream, Well512};
+use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, TargetMoved};
 use crate::objects::ObjectId;
@@ -423,14 +423,14 @@ impl Ground<'_> {
 impl World {
     /// The Attack's [`Ground`] in an update: the map, the Sprite and Object streams; the
     /// notifies go to the unit AI at once.
-    pub(crate) fn attack_ground(&mut self) -> Ground<'_> {
+    pub(crate) const fn attack_ground(&mut self) -> Ground<'_> {
         let Self {
             spatial,
             streams,
             graphics,
             ..
         } = self;
-        let (object, sprite) = streams.two(Stream::Object, Stream::Sprite);
+        let (object, sprite) = streams.object_and_sprite();
         Ground {
             map: spatial,
             sprite_rng: sprite,
