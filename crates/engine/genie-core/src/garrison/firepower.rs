@@ -29,7 +29,7 @@ pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) 
     weapons
         .iter()
         .filter(|w| counts(w.class))
-        .fold(0.0, |sum, w| sum + f32::from(w.amount))
+        .fold(0.0, |sum, w| sum + w.amount.as_f32())
 }
 
 /// `FUN_14120dc10`: the attack rate of an object of `master` (its reload powerup `+0xa28`
@@ -106,7 +106,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
             for &ClassAmount { class, amount } in &m.weapons {
                 if matches!(class, DamageClass::PIERCE | DamageClass::CLASS_38) {
                     // IMUL EAX, R8D then CVTDQ2PS
-                    sum += i32::from(amount).wrapping_mul(extra) as f32;
+                    sum += i32::from(amount.get()).wrapping_mul(extra) as f32;
                 }
             }
         }
@@ -120,7 +120,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
                 | DamageClass::CLASS_31
                 | DamageClass::CLASS_38
         ) {
-            sum += f32::from(amount);
+            sum += amount.as_f32();
         }
     }
     let reload = (master.reload - reload_powerup).get();

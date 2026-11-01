@@ -54,6 +54,7 @@ use crate::map::Tile;
 use crate::objects::HpPowerup;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ClassAmount;
+use crate::objects::masters::DamageAmount;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -132,30 +133,30 @@ fn hunter() -> Victim {
 fn a_wall_foundation_s_pierce_armor_is_computed_as_any_other() {
     let a = Armored {
         armors: vec![ClassAmount::new(4, 2), ClassAmount::new(3, 5)],
-        base_armor: 1,
+        base_armor: DamageAmount::new(1),
         ..Armored::default()
     };
     assert_eq!(
         class_armor(&a, OwnSlot::Pierce, class::WALL, ObjectState::Foundation),
-        5
+        DamageAmount::new(5)
     );
     assert_eq!(
         class_armor(&a, OwnSlot::Pierce, class::WALL, ObjectState::Alive),
-        5
+        DamageAmount::new(5)
     );
     let none = Armored {
         armors: vec![ClassAmount::new(4, 2)],
-        base_armor: 1,
+        base_armor: DamageAmount::new(1),
         ..Armored::default()
     };
     assert_eq!(
         class_armor(&none, OwnSlot::Pierce, class::WALL, ObjectState::Foundation),
-        2
+        DamageAmount::new(2)
     );
     // its melee armor (FUN_141213810's wall foundation) is 0
     assert_eq!(
         class_armor(&a, OwnSlot::Melee, class::WALL, ObjectState::Foundation),
-        0
+        DamageAmount::new(0)
     );
 }
 
@@ -299,7 +300,7 @@ fn a_hunter_strikes_its_sheep_for_twelve() {
     // armor above the attack does nothing, and a hit does at least one
     let mut armored = self::sheep();
     let x = armored.armored.as_mut().unwrap();
-    (x.armors, x.base_armor) = (vec![ClassAmount::new(4, 10)], 10000);
+    (x.armors, x.base_armor) = (vec![ClassAmount::new(4, 10)], DamageAmount::new(10000));
     assert_eq!(
         armor_damage(
             &armored,
@@ -453,14 +454,14 @@ fn the_bonus_damage_adds_to_the_first_melee_weapon() {
 fn a_combat_object_shows_its_attack_armor_and_range() {
     let (sheep, mut v) = (sheep(), hunter());
     let none = Shown::default();
-    assert_eq!(shown_attack(&v, &none), 3);
+    assert_eq!(shown_attack(&v, &none), DamageAmount::new(3));
     v.source.attack_powerup = 1.7;
-    assert_eq!(shown_attack(&v, &none), 4);
+    assert_eq!(shown_attack(&v, &none), DamageAmount::new(4));
     let mut far = v.clone();
     far.weapons = vec![ClassAmount::new(13, 6), ClassAmount::new(11, -2)];
-    assert_eq!(shown_attack(&far, &none), 7);
+    assert_eq!(shown_attack(&far, &none), DamageAmount::new(7));
     far.kind = master_type::RGE_COMBAT;
-    assert_eq!(shown_attack(&far, &none), 6);
+    assert_eq!(shown_attack(&far, &none), DamageAmount::new(6));
     // the bonus against its attack's target
     v.bonus_tasks = vec![crate::objects::masters::Task {
         action_type: BONUS_DAMAGE,
@@ -473,16 +474,16 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
         target: Some(&sheep),
         ..Shown::default()
     };
-    assert_eq!(shown_attack(&v, &at_sheep), 4 + 3);
+    assert_eq!(shown_attack(&v, &at_sheep), DamageAmount::new(4 + 3));
     v.bonus_tasks.clear();
     // a ready charge of type 1 for every target, or for its target's class group
     (v.source.charge_type, v.source.max_charge, v.source.charge) =
         (ChargeType::ATTACK, Charge::new(5.0), Charge::new(5.5));
     v.source.charge_target = ChargeTarget::EVERY;
-    assert_eq!(shown_attack(&v, &none), 4 + 5);
+    assert_eq!(shown_attack(&v, &none), DamageAmount::new(4 + 5));
     v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
-    assert_eq!(shown_attack(&v, &none), 4);
-    assert_eq!(shown_attack(&v, &at_sheep), 4 + 5);
+    assert_eq!(shown_attack(&v, &none), DamageAmount::new(4));
+    assert_eq!(shown_attack(&v, &at_sheep), DamageAmount::new(4 + 5));
     // a ready charge of type 6 shows the projectile's best fighting attack, and its range
     // the charge event
     (v.source.charge_type, v.source.charge_target) = (ChargeType::of_data(6), ChargeTarget::EVERY);
@@ -497,11 +498,11 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
         range_powerup: Distance::new(1.0),
         ..Shown::default()
     };
-    assert_eq!(shown_attack(&v, &shot), 9);
+    assert_eq!(shown_attack(&v, &shot), DamageAmount::new(9));
     v.source.weapon_range = Distance::new(4.0);
     assert_eq!(shown_range(&v, &shot), Distance::new(1.0 + (2.0 + 4.0)));
     v.source.charge = Charge::new(0.5);
-    assert_eq!(shown_attack(&v, &shot), 4);
+    assert_eq!(shown_attack(&v, &shot), DamageAmount::new(4));
     assert_eq!(shown_range(&v, &shot), Distance::new(5.0));
     v.kind = master_type::RGE_COMBAT;
     v.source.charge = Charge::new(1.0);
@@ -510,15 +511,15 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     // without the powerup; else its best of any, else its base armor
     let mut a = hunter();
     a.armored.as_mut().unwrap().armor_powerups = ArmorPair::new(2, 0);
-    assert_eq!(shown_melee_armor(&a), Ok(2));
+    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(2)));
     (a.class, a.state) = (class::WALL, ObjectState::Foundation);
-    assert_eq!(shown_melee_armor(&a), Ok(0));
+    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(0)));
     a.kind = master_type::RGE_COMBAT;
     a.armored.as_mut().unwrap().armors = vec![ClassAmount::new(3, 5), ClassAmount::new(11, 7)];
-    assert_eq!(shown_melee_armor(&a), Ok(7));
+    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(7)));
     a.armored.as_mut().unwrap().armors.clear();
-    a.armored.as_mut().unwrap().base_armor = -1;
-    assert_eq!(shown_melee_armor(&a), Ok(-1));
+    a.armored.as_mut().unwrap().base_armor = DamageAmount::new(-1);
+    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(-1)));
     a.armored = None;
     assert!(shown_melee_armor(&a).is_err());
 }

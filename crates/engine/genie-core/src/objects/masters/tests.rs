@@ -412,7 +412,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
             [3.0, 5.0, 10.0],
         ),
         (a::MAXIMUM_RANGE, |m| m.weapon_range.get(), [3.0, 5.0, 10.0]),
-        (a::BASE_ARMOR, |m| f32::from(m.base_armor), [3.0, 5.0, 10.0]),
+        (a::BASE_ARMOR, |m| m.base_armor.as_f32(), [3.0, 5.0, 10.0]),
         (
             a::PROJECTILE_UNIT,
             |m| f32::from(m.missile.get()),
@@ -438,13 +438,13 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SHOWN_ATTACK,
-            |m| f32::from(m.shown.attack),
+            |m| m.shown.attack.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (a::SHOWN_RANGE, |m| m.shown.range.get(), [3.0, 5.0, 10.0]),
         (
             a::SHOWN_MELEE_ARMOR,
-            |m| f32::from(m.shown.melee_armor),
+            |m| m.shown.melee_armor.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -504,7 +504,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SHOWN_PIERCE_ARMOR,
-            |m| f32::from(m.shown.pierce_armor),
+            |m| m.shown.pierce_armor.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -805,15 +805,15 @@ fn armor_and_attack_change_the_class_in_the_amount_s_high_byte() {
 #[test]
 fn some_combat_shorts_multiply_by_the_truncated_amount() {
     let mut m = of_type(master_type::RGE_COMBAT);
-    m.base_armor = 3;
+    m.base_armor = DamageAmount::new(3);
     m.fire_frame = crate::objects::Frame::of_data(5);
-    m.shown.attack = 7;
+    m.shown.attack = DamageAmount::new(7);
     m.multiply_attribute(attribute::BASE_ARMOR, 1.5, &world(false));
-    assert_eq!(m.base_armor, 5);
+    assert_eq!(m.base_armor, DamageAmount::new(5));
     m.multiply_attribute(attribute::FRAME_DELAY, 2.9, &world(false));
     assert_eq!(m.fire_frame, crate::objects::Frame::of_data(10));
     m.multiply_attribute(attribute::SHOWN_ATTACK, 3.5, &world(false));
-    assert_eq!(m.shown.attack, 21);
+    assert_eq!(m.shown.attack, DamageAmount::new(21));
     m.add_attribute(attribute::ROTATION_SPEED, 0.25, &world(false));
     assert_eq!(m.turn_speed, Seconds::new(0.25));
     m.set_attribute(attribute::DISPLACEMENT_Y, 0.75, &world(false));

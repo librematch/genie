@@ -5,11 +5,11 @@ use crate::combat::damage::{
     EPSILON, ONE, Victim, charge_hit, charged, master_melee_armor, melee_armor, range_charge_hit,
 };
 use crate::map::Distance;
-use crate::math::conversions::cvttss2si;
 use crate::objects::HitPoints;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeTarget;
+use crate::objects::masters::DamageAmount;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -137,7 +137,10 @@ pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>) -> bool {
 
 /// The best amount of `weapons` above 0 (the first of a tie), of a melee, pierce or class-31
 /// weapon with `fighting`.
-pub(super) fn best_attack(weapons: &[crate::objects::masters::ClassAmount], fighting: bool) -> i16 {
+pub(super) fn best_attack(
+    weapons: &[crate::objects::masters::ClassAmount],
+    fighting: bool,
+) -> DamageAmount {
     weapons
         .iter()
         .filter(|w| {
@@ -149,12 +152,12 @@ pub(super) fn best_attack(weapons: &[crate::objects::masters::ClassAmount], figh
                         | crate::objects::masters::DamageClass::CLASS_31
                 )
         })
-        .fold(0, |m, w| if m < w.amount { w.amount } else { m })
-}
-
-/// A float as `(short)(int)` takes it: `CVTTSS2SI`, then its low 16 bits.
-pub(super) fn whole(f: f32) -> i16 {
-    cvttss2si(f) as i16
+        .fold(
+            DamageAmount::ZERO,
+            |m, w| {
+                if m < w.amount { w.amount } else { m }
+            },
+        )
 }
 
 /// Slot 0x878 of a combat object, the attack it shows (`FUN_141085c70`; a combat unit's or
@@ -162,12 +165,12 @@ pub(super) fn whole(f: f32) -> i16 {
 /// charge projectile's master among its player's, that master's best melee, pierce or class-31
 /// attack (`FUN_1410d5740`). Else its best melee, pierce or class-31 attack, without one its best
 /// attack (from 0), plus its attack powerup (`+0xa24`, slot 0x6d8) and stinger (`+0xb48`, slot
-/// 0x768, 0 as [`Victim::most_hp`] says), each as a whole number ([`whole`]), plus the bonus
+/// 0x768, 0 as [`Victim::most_hp`] says), each as a whole number ([`DamageAmount::of_effect`]), plus the bonus
 /// damage of its tasks against its attack's target ([`bonus_damage`]); a ready charge of type 1
 /// or 3 adds the charge (`+0x9e0`). A combat object of type 50 or 60 has no powerups (its slots
 /// answer 0). The sums wrap at 16 bits.
 #[must_use]
-pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> i16 {
+pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
     let a = &v.source;
     let charge = charge_shown(v, s.target);
     if charge
@@ -177,16 +180,18 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> i16 {
         return best_attack(weapons, true);
     }
     let mut attack = best_attack(&v.weapons, true);
-    if attack == 0 {
+    if attack == DamageAmount::ZERO {
         attack = best_attack(&v.weapons, false);
     }
     let powerup = if v.tribe() { a.attack_powerup } else { 0.0 };
-    attack = attack.wrapping_add(whole(powerup)).wrapping_add(whole(0.0));
+    attack = attack
+        .plus(DamageAmount::of_effect(powerup))
+        .plus(DamageAmount::of_effect(0.0));
     if let Some(t) = s.target {
-        attack = attack.wrapping_add(whole(bonus_damage(v, t)));
+        attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, t)));
     }
     if charge && a.charge_type.adds_to_attack() {
-        attack = attack.wrapping_add(whole(a.charge.get()));
+        attack = attack.plus(DamageAmount::of_effect(a.charge.get()));
     }
     attack
 }
@@ -198,7 +203,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> i16 {
 /// # Errors
 ///
 /// An object without combat values (a type below 50).
-pub fn shown_melee_armor(v: &Victim) -> Result<i16, GenieError> {
+pub fn shown_melee_armor(v: &Victim) -> Result<DamageAmount, GenieError> {
     let a = v.armored.as_ref().ok_or(GenieError::unreachable(
         "the melee armor of an object without combat values",
     ))?;

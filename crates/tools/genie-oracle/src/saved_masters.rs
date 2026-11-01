@@ -292,7 +292,7 @@ pub(super) fn work_masters(
                 .iter()
                 .map(|&w| ClassAmount::new((w & 0xffff) as i16, (w >> 16) as i16))
                 .collect();
-            work.base_armor = rc.base_armor;
+            work.base_armor = genie_core::objects::masters::DamageAmount::new(rc.base_armor);
             work.armors = rc
                 .armor
                 .iter()

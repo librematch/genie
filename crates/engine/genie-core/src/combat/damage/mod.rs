@@ -304,7 +304,7 @@ pub struct Armored {
     /// `invulnerability_level`, `special_attack_flag`, hit points and `friendly_fire_damage`.
     pub armors: Vec<crate::objects::masters::ClassAmount>,
     /// Its master's base armor for a class it does not list.
-    pub base_armor: i16,
+    pub base_armor: crate::objects::masters::DamageAmount,
     /// Its master's `defense_terrain_bonus`.
     pub terrain_bonus: crate::objects::masters::RestrictionField,
     /// Its master's `bonus_damage_resistance`.

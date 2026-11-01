@@ -9,6 +9,7 @@ use crate::objects::Regeneration;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeType;
+use crate::objects::masters::DamageAmount;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::InvulnerabilityLevel;
 use crate::objects::masters::MasterAttribute;
@@ -58,7 +59,7 @@ impl Master {
             | a::TRAIN_TIME
             | a::TRAIN_LOCATIONS_ENTRY_MOD
             | a::TRAIN_LOCATIONS_TOTAL_NUM => self.set_train_attribute(attribute, v),
-            a::SHOWN_PIERCE_ARMOR => self.shown.pierce_armor = low16(v),
+            a::SHOWN_PIERCE_ARMOR => self.shown.pierce_armor = DamageAmount::of_effect(v),
             a::MAXIMUM_CHARGE
             | a::RECHARGE_RATE
             | a::CHARGE_EVENT
@@ -222,7 +223,7 @@ impl Master {
                     HeroFlags::from_bits_retain(self.hero_flag.bits().wrapping_add(low8(v)));
             }
             a::SHOWN_PIERCE_ARMOR => {
-                self.shown.pierce_armor = self.shown.pierce_armor.wrapping_add(low16(v));
+                self.shown.pierce_armor = self.shown.pierce_armor.plus(DamageAmount::of_effect(v));
             }
             a::MAXIMUM_CHARGE => self.max_charge += Charge::new(v),
             a::RECHARGE_RATE => self.recharge_rate += ChargeRate::new(v),
@@ -296,7 +297,7 @@ impl Master {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::SHOWN_PIERCE_ARMOR => {
-                self.shown.pierce_armor = self.shown.pierce_armor.wrapping_mul(low16(v));
+                self.shown.pierce_armor = self.shown.pierce_armor.times(low16(v));
             }
             a::MAXIMUM_CHARGE => self.max_charge *= v,
             a::RECHARGE_RATE => self.recharge_rate *= v,

@@ -25,8 +25,8 @@ use crate::world::others::OthersRef;
 pub(super) fn attacks(m: &crate::objects::masters::Master) -> f32 {
     m.weapons
         .iter()
-        .filter(|w| 0 < w.amount)
-        .fold(0.0, |sum, w| sum + f32::from(w.amount))
+        .filter(|w| crate::objects::masters::DamageAmount::ZERO < w.amount)
+        .fold(0.0, |sum, w| sum + w.amount.as_f32())
 }
 
 /// The hit points (`DAT_14330ebc8`) and the range (`DAT_142e7f384`) below which a villager
@@ -225,10 +225,13 @@ impl WorldPicker<'_> {
             range_powerup: o.range_powerup,
         };
         let attack = crate::combat::damage::shown_attack(&v, &shown);
-        if 4 < attack || (3 < attack && HARMLESS_HP <= HitPoints::of_master(om.hit_points).get()) {
+        let amount = crate::objects::masters::DamageAmount::new;
+        if amount(4) < attack
+            || (amount(3) < attack && HARMLESS_HP <= HitPoints::of_master(om.hit_points).get())
+        {
             return Ok(false);
         }
-        if 0 < crate::combat::damage::shown_melee_armor(&v)? {
+        if amount(0) < crate::combat::damage::shown_melee_armor(&v)? {
             return Ok(false);
         }
         Ok(crate::combat::damage::shown_range(&v, &shown) <= HARMLESS_RANGE)
@@ -458,7 +461,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
                 |best, a| if best < a.amount { a.amount } else { best },
             )
         });
-        Ok(100 <= armor.wrapping_add(t.armor_powerups.pierce))
+        Ok(crate::objects::masters::DamageAmount::new(100) <= armor.plus(t.armor_powerups.pierce))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).

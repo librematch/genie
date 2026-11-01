@@ -12,13 +12,16 @@ use crate::objects::masters::{
     AttributeWorld, Master, PERCENT, ROUND, add_sprite, attribute, class_amount, handicapped, low8,
     low16, set_sprite,
 };
-use crate::objects::masters::{ClassAmount, DamageClass};
+use crate::objects::masters::{ClassAmount, DamageAmount, DamageClass};
 use crate::objects::masters::{MasterField, RestrictionField};
 use crate::world::Seconds;
 
 impl Master {
     /// The armor (`+0x808`) or attack (`+0x818`) entry of `class`, the first in the list.
-    pub(super) fn class_entry(list: &mut [ClassAmount], class: DamageClass) -> Option<&mut i16> {
+    pub(super) fn class_entry(
+        list: &mut [ClassAmount],
+        class: DamageClass,
+    ) -> Option<&mut DamageAmount> {
         list.iter_mut()
             .find(|e| e.class == class)
             .map(|e| &mut e.amount)
@@ -40,7 +43,7 @@ impl Master {
             a::ATTACK_RELOAD_TIME => self.reload = Seconds::new(v),
             a::ACCURACY_PERCENT => self.hit_chance = HitChance::of_data(low16(v)),
             a::MAXIMUM_RANGE => self.weapon_range = Distance::new(v),
-            a::BASE_ARMOR => self.base_armor = low16(v),
+            a::BASE_ARMOR => self.base_armor = DamageAmount::of_effect(v),
             a::PROJECTILE_UNIT => self.missile = MasterField::of_data(low16(v)),
             a::TERRAIN_DEFENSE_BONUS => self.terrain_bonus = RestrictionField::of_data(low16(v)),
             a::MINIMUM_RANGE => self.min_range = Distance::new(v),
@@ -48,9 +51,9 @@ impl Master {
             a::BONUS_DAMAGE_RESISTANCE => self.resistance = DamageShare::new(v),
             a::FRAME_DELAY => self.fire_frame = Frame::of_data(low16(v)),
             a::BLAST_ATTACK_LEVEL => self.blast_level = BlastLevel::from_bits_retain(low8(v)),
-            a::SHOWN_ATTACK => self.shown.attack = low16(v),
+            a::SHOWN_ATTACK => self.shown.attack = DamageAmount::of_effect(v),
             a::SHOWN_RANGE => self.shown.range = Distance::new(v),
-            a::SHOWN_MELEE_ARMOR => self.shown.melee_armor = low16(v),
+            a::SHOWN_MELEE_ARMOR => self.shown.melee_armor = DamageAmount::of_effect(v),
             a::COMBAT_ABILITY => self.combat_ability = CombatAbility::from_bits_retain(low8(v)),
             a::ATTACK_DISPERSION => self.missed_spread = v,
             a::ATTACK_GRAPHIC => set_sprite(&mut self.attack_sprite, cvttss2si(v), world),
@@ -86,7 +89,9 @@ impl Master {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.weapons, class) {
                     *e = match handicapped(world.handicap, class) {
-                        Some(f) if *e == 0 => low16(f32::from(amount) * f),
+                        Some(f) if *e == DamageAmount::ZERO => {
+                            DamageAmount::of_effect(amount.as_f32() * f)
+                        }
                         _ => amount,
                     };
                 }
@@ -110,7 +115,7 @@ impl Master {
             a::ATTACK_RELOAD_TIME => self.reload += Seconds::new(v),
             a::ACCURACY_PERCENT => self.hit_chance = self.hit_chance.plus(low16(v)),
             a::MAXIMUM_RANGE => self.weapon_range += Distance::new(v),
-            a::BASE_ARMOR => self.base_armor = self.base_armor.wrapping_add(low16(v)),
+            a::BASE_ARMOR => self.base_armor = self.base_armor.plus(DamageAmount::of_effect(v)),
             a::PROJECTILE_UNIT => {
                 self.missile = self.missile.plus(low16(v));
             }
@@ -125,10 +130,12 @@ impl Master {
                 self.blast_level =
                     BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_add(low8(v)));
             }
-            a::SHOWN_ATTACK => self.shown.attack = self.shown.attack.wrapping_add(low16(v)),
+            a::SHOWN_ATTACK => {
+                self.shown.attack = self.shown.attack.plus(DamageAmount::of_effect(v));
+            }
             a::SHOWN_RANGE => self.shown.range += Distance::new(v),
             a::SHOWN_MELEE_ARMOR => {
-                self.shown.melee_armor = self.shown.melee_armor.wrapping_add(low16(v));
+                self.shown.melee_armor = self.shown.melee_armor.plus(DamageAmount::of_effect(v));
             }
             a::COMBAT_ABILITY => {
                 self.combat_ability = CombatAbility::from_bits_retain(
@@ -168,15 +175,17 @@ impl Master {
             a::ARMOR => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.armors, class) {
-                    *e = e.wrapping_add(amount);
+                    *e = e.plus(amount);
                 }
             }
             a::ATTACK => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.weapons, class) {
                     *e = match handicapped(world.handicap, class) {
-                        Some(f) if *e == 0 => low16(f32::from(amount) * f),
-                        _ => e.wrapping_add(amount),
+                        Some(f) if *e == DamageAmount::ZERO => {
+                            DamageAmount::of_effect(amount.as_f32() * f)
+                        }
+                        _ => e.plus(amount),
                     };
                 }
             }
@@ -203,7 +212,9 @@ impl Master {
                     HitChance::of_data(low16(f32::from(self.hit_chance.get()) * v + ROUND));
             }
             a::MAXIMUM_RANGE => self.weapon_range *= v,
-            a::BASE_ARMOR => self.base_armor = low16(f32::from(self.base_armor) * v + ROUND),
+            a::BASE_ARMOR => {
+                self.base_armor = DamageAmount::of_effect(self.base_armor.as_f32() * v + ROUND);
+            }
             a::PROJECTILE_UNIT => {
                 self.missile =
                     MasterField::of_data(low16(f32::from(self.missile.get()) * v + ROUND));
@@ -222,10 +233,10 @@ impl Master {
                 self.blast_level =
                     BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_mul(low8(v)));
             }
-            a::SHOWN_ATTACK => self.shown.attack = self.shown.attack.wrapping_mul(low16(v)),
+            a::SHOWN_ATTACK => self.shown.attack = self.shown.attack.times(low16(v)),
             a::SHOWN_RANGE => self.shown.range *= v,
             a::SHOWN_MELEE_ARMOR => {
-                self.shown.melee_armor = self.shown.melee_armor.wrapping_mul(low16(v));
+                self.shown.melee_armor = self.shown.melee_armor.times(low16(v));
             }
             a::ATTACK_DISPERSION => self.missed_spread *= v,
             a::AREA_DAMAGE => self.area_damage *= v,
@@ -259,17 +270,17 @@ impl Master {
             a::ARMOR => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.armors, class) {
-                    *e = low16(f32::from(amount) / PERCENT * f32::from(*e) + ROUND);
+                    *e = DamageAmount::of_effect(amount.as_f32() / PERCENT * e.as_f32() + ROUND);
                 }
             }
             a::ATTACK => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.weapons, class) {
                     let share = match handicapped(world.handicap, class) {
-                        Some(f) if *e == 0 => f32::from(amount) * f,
-                        _ => f32::from(amount),
+                        Some(f) if *e == DamageAmount::ZERO => amount.as_f32() * f,
+                        _ => amount.as_f32(),
                     };
-                    *e = low16(f32::from(*e) * (share / PERCENT) + ROUND);
+                    *e = DamageAmount::of_effect(e.as_f32() * (share / PERCENT) + ROUND);
                 }
             }
             _ => {}

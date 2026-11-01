@@ -348,7 +348,7 @@ pub struct Master {
     /// blasts that reach it); and what an attacker of it reads: `area_effect_range` (`+0x82c`),
     /// `area_effect_level` (`+0x830`), `area_damage` (`+0x834`), `max_charge` (`+0x918`) and
     /// `charge_target` (`+0x924`).
-    pub base_armor: i16,
+    pub base_armor: DamageAmount,
     /// Its armor classes (class, amount; `+0x808`, count `+0x802`).
     pub armors: Vec<ClassAmount>,
     /// `bonus_damage_resistance` (`+0x824`).
@@ -586,13 +586,13 @@ pub struct Trail {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Shown {
     /// `+0x856`, `orig_weapon`.
-    pub attack: i16,
+    pub attack: DamageAmount,
     /// `+0x858`, `orig_weapon_range`.
     pub range: Distance,
     /// `+0x854`, `orig_armor`.
-    pub melee_armor: i16,
+    pub melee_armor: DamageAmount,
     /// `+0x8b0`, `orig_pierce_armor`.
-    pub pierce_armor: i16,
+    pub pierce_armor: DamageAmount,
 }
 
 /// A player's masters by id.
@@ -614,6 +614,7 @@ pub mod class;
 mod class_id;
 mod class_mask;
 mod combat_ability;
+mod damage_amount;
 mod damage_class;
 mod damage_share;
 mod fly_mode;
@@ -663,6 +664,7 @@ pub use self::class_id::ClassId;
 pub use self::class_mask::ClassMask;
 pub use self::combat_ability::CombatAbility;
 pub use self::conversion_adjust::ConversionAdjust;
+pub use self::damage_amount::DamageAmount;
 pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::damage_share::DamageShare;
 pub use self::fly_mode::FlyMode;

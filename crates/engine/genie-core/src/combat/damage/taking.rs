@@ -269,7 +269,7 @@ pub(super) fn take_static(
         0.0f32
     };
     for w in weapons {
-        damage += f32::from(w.amount) * factor;
+        damage += w.amount.as_f32() * factor;
     }
     t.hp -= HitPoints::new(damage);
     if t.hp < HitPoints::new(1.0) {

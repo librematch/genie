@@ -44,7 +44,7 @@ pub struct ClassAmount {
     /// The class.
     pub class: DamageClass,
     /// The amount.
-    pub amount: i16,
+    pub amount: crate::objects::masters::DamageAmount,
 }
 
 impl ClassAmount {
@@ -53,7 +53,7 @@ impl ClassAmount {
     pub const fn new(class: i16, amount: i16) -> Self {
         Self {
             class: DamageClass(class),
-            amount,
+            amount: crate::objects::masters::DamageAmount::new(amount),
         }
     }
 }
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn an_entry_holds_its_class_and_amount() {
         let e = ClassAmount::new(4, -2);
-        assert_eq!((e.class, e.amount), (DamageClass::MELEE, -2));
+        assert_eq!((e.class, e.amount.get()), (DamageClass::MELEE, -2));
         assert_eq!(DamageClass::PIERCE.get(), 3);
         assert_eq!(DamageClass::from(38), DamageClass::CLASS_38);
     }

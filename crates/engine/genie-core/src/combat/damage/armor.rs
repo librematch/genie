@@ -12,21 +12,26 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MISSILE;
-use crate::objects::masters::{ClassAmount, DamageClass};
+use crate::objects::masters::{ClassAmount, DamageAmount, DamageClass};
 
 /// `FUN_141085450`, a combat object's melee armor as its master holds it: its best armor of
 /// class 4 above −32768, else its best of any, else its base armor.
-pub(super) fn master_melee_armor(a: &Armored) -> i16 {
+pub(super) fn master_melee_armor(a: &Armored) -> DamageAmount {
     let best = |of: Option<DamageClass>| {
         a.armors
             .iter()
             .filter(|e| of.is_none_or(|c| c == e.class))
-            .fold(i16::MIN, |m, e| if m < e.amount { e.amount } else { m })
+            .fold(
+                DamageAmount::LEAST,
+                |m, e| {
+                    if m < e.amount { e.amount } else { m }
+                },
+            )
     };
     let mut armor = best(Some(DamageClass::MELEE));
-    if armor == i16::MIN {
+    if armor == DamageAmount::LEAST {
         armor = best(None);
-        if armor == i16::MIN {
+        if armor == DamageAmount::LEAST {
             armor = a.base_armor;
         }
     }
@@ -36,10 +41,10 @@ pub(super) fn master_melee_armor(a: &Armored) -> i16 {
 /// Slot 0x868 of a combat unit or building (`FUN_141213810`): [`master_melee_armor`] plus its
 /// melee armor powerup (`+0xa48`, slot 0x708) and stinger (`+0xb4c`, slot 0x770, 0 as
 /// [`Victim::most_hp`] says), each as 16 bits; a wall foundation (class 27 in state 0) has none.
-pub(super) fn melee_armor(a: &Armored, own_class: ClassId, state: ObjectState) -> i16 {
-    let armor = master_melee_armor(a).wrapping_add(a.armor_powerups.melee);
+pub(super) fn melee_armor(a: &Armored, own_class: ClassId, state: ObjectState) -> DamageAmount {
+    let armor = master_melee_armor(a).plus(a.armor_powerups.melee);
     if own_class == class::WALL && state == ObjectState::Foundation {
-        return 0;
+        return DamageAmount::ZERO;
     }
     armor
 }
@@ -53,28 +58,28 @@ pub(super) fn class_armor(
     class: OwnSlot,
     own_class: ClassId,
     state: ObjectState,
-) -> i16 {
-    let best = |c: DamageClass, from: i16| {
+) -> DamageAmount {
+    let best = |c: DamageClass, from: DamageAmount| {
         a.armors
             .iter()
             .filter(|e| e.class == c)
             .fold(from, |m, e| if m < e.amount { e.amount } else { m })
     };
-    let any = |from: i16| {
+    let any = |from: DamageAmount| {
         a.armors
             .iter()
             .fold(from, |m, e| if m < e.amount { e.amount } else { m })
     };
     match class {
-        OwnSlot::Melee => melee_armor(a, own_class, state).wrapping_sub(a.armor_removed.melee),
+        OwnSlot::Melee => melee_armor(a, own_class, state).minus(a.armor_removed.melee),
         OwnSlot::Pierce => {
-            let mut armor = best(DamageClass::PIERCE, -1);
-            if armor == -1 {
+            let mut armor = best(DamageClass::PIERCE, DamageAmount::NO_CLASS);
+            if armor == DamageAmount::NO_CLASS {
                 armor = any(a.base_armor);
             }
             armor
-                .wrapping_add(a.armor_powerups.pierce)
-                .wrapping_sub(a.armor_removed.pierce)
+                .plus(a.armor_powerups.pierce)
+                .minus(a.armor_removed.pierce)
         }
     }
 }
@@ -110,7 +115,7 @@ pub(super) fn weapon_armor(
     kind: MasterKind,
     own_class: ClassId,
     state: ObjectState,
-) -> i16 {
+) -> DamageAmount {
     let mut armor = a.base_armor;
     for e in &a.armors {
         if e.class != class {
@@ -122,7 +127,7 @@ pub(super) fn weapon_armor(
             && attacker.ability.contains(CombatAbility::IGNORES_ARMOR)
             && !a.ability.contains(CombatAbility::RESISTS_IGNORING)
         {
-            armor = 0;
+            armor = DamageAmount::ZERO;
             continue;
         }
         armor = e.amount;
@@ -185,8 +190,8 @@ pub fn armor_damage(
     let mut charged = false;
     let mut bonused = false;
     for &ClassAmount { class, amount } in weapons {
-        let armor_f = f32::from(weapon_armor(a, class, attacker, kind, own_class, state));
-        let mut attack = f32::from(amount);
+        let armor_f = weapon_armor(a, class, attacker, kind, own_class, state).as_f32();
+        let mut attack = amount.as_f32();
         let pierce_or_melee = matches!(
             class,
             DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
@@ -217,7 +222,7 @@ pub fn armor_damage(
         }
         let mut armor_f = armor_f;
         let mut below = false;
-        if attack < 0.0 && attack < armor_f && armor_f != f32::from(a.base_armor) {
+        if attack < 0.0 && attack < armor_f && armor_f != a.base_armor.as_f32() {
             armor_f = if armor_f < 0.0 { armor_f } else { 0.0 };
             below = true;
         }
