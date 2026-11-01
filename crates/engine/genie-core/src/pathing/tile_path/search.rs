@@ -3,7 +3,8 @@
 
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{
-    CellEdges, CellKind, EARLY_LEFT, EARLY_START, GridLevel, NO_COST, Planner, SHORTCUT_COST,
+    CellEdges, CellIndex, CellKind, EARLY_LEFT, EARLY_START, GridLevel, NO_COST, Planner,
+    SHORTCUT_COST,
 };
 use crate::{math::fmath, math::msvc};
 
@@ -19,8 +20,8 @@ const STEPS: [(CellEdges, i16, i16, CellEdges); 4] = [
 /// A search node (`0x28` bytes, from the planner's pool `+0x428`, `FUN_140f79c90`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Node {
-    /// `+0`: the cell's index.
-    pub(super) cell: usize,
+    /// `+0`: the cell's place in the grid.
+    pub(super) cell: CellIndex,
     /// `+8`, `+0xa`: the cell at its level.
     pub(super) at: PlanTile,
     /// `+0xc`, `+0xe`: the tile the cost is measured from.

@@ -5,7 +5,8 @@ use crate::map::GridSize;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::{
-    Cell, CellEdges, CellKind, GridLevel, NO_COST, Node, OpenList, PlanRect, PlanTile,
+    Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, Node, OpenList, PlanRect,
+    PlanTile,
 };
 
 /// A terrain restriction's planner (`0x4a8` bytes, built by `FUN_140f74f90`).
@@ -16,7 +17,7 @@ pub struct Planner {
     /// Per level: `+0x3f0` its width, `+0x3f8` its height (as shorts), `+0x3e0` its first cell.
     pub(super) levels: [GridSize; 4],
     pub(super) offsets: [i32; 4],
-    pub(super) cells: Vec<Cell>,
+    pub(super) cells: Cells,
     /// `+0x3c0`: the restriction's passability per terrain.
     pub(super) passable: Vec<f32>,
     /// Each tile's terrain (the map's tile `+9`), row by row.
@@ -82,7 +83,7 @@ impl Planner {
             size: GridSize::new(i32::from(w), i32::from(h)),
             levels,
             offsets,
-            cells: vec![Cell::EMPTY; total],
+            cells: Cells::cleared(total),
             passable,
             terrain,
             region: PlanRect::default(),
@@ -118,10 +119,10 @@ impl Planner {
     /// The grid of `level`, row by row.
     #[must_use]
     pub fn level(&self, level: GridLevel) -> &[Cell] {
-        let start = self.offsets[level.index()] as usize;
+        let start = CellIndex::new(self.offsets[level.index()] as usize);
         let size = self.levels[level.index()];
         let n = (size.width() * size.height()) as usize;
-        &self.cells[start..start + n]
+        self.cells.run(start, n)
     }
 
     /// The size of `level`'s grid in cells.
@@ -131,12 +132,12 @@ impl Planner {
     }
 
     /// The cell `at` of `level`'s place in the cells.
-    pub(super) fn index(&self, level: GridLevel, at: PlanTile) -> usize {
+    pub(super) fn index(&self, level: GridLevel, at: PlanTile) -> CellIndex {
         let l = level.index();
         let i = i64::from(self.levels[l].width()) * i64::from(at.y())
             + i64::from(at.x())
             + i64::from(self.offsets[l]);
-        usize::try_from(i).expect("a cell outside the planner's grid")
+        CellIndex::new(usize::try_from(i).expect("a cell outside the planner's grid"))
     }
 
     pub(super) fn cell(&self, level: GridLevel, at: PlanTile) -> Cell {

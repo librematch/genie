@@ -404,7 +404,7 @@ fn a_closed_rectangle_closes_the_node_cells_under_it() {
 #[test]
 fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
     let node = |f: f32| Node {
-        cell: 0,
+        cell: CellIndex::new(0),
         at: PlanTile::new(0, 0),
         entry: PlanTile::new(0, 0),
         f,
@@ -472,4 +472,22 @@ fn a_grid_level_steps_between_the_tiles_and_the_top() {
     assert_eq!(GridLevel::TOP.down(), GridLevel::new(2));
     assert_eq!((GridLevel::TOP.get(), GridLevel::TOP.index()), (3, 3));
     assert!(GridLevel::TILES < GridLevel::TOP);
+}
+
+/// The grid reads and changes a cell by its place, and gives a level's run of cells.
+#[test]
+fn the_grid_reads_a_cell_by_its_place() {
+    let mut cells = Cells::cleared(4);
+    cells[CellIndex::new(2)].kind = CellKind::NODE;
+    assert_eq!(cells[CellIndex::new(2)].kind, CellKind::NODE);
+    assert_eq!(
+        cells.run(CellIndex::new(1), 2),
+        &[
+            Cell::EMPTY,
+            Cell {
+                edges: CellEdges::NONE,
+                kind: CellKind::NODE
+            }
+        ]
+    );
 }

@@ -3,7 +3,7 @@
 use crate::map::Distance;
 use crate::map::Point;
 use crate::pathing::tile_path::{
-    CellEdges, CellKind, FAR_SIDE, GridLevel, HALF, ONE, PlanRect, PlanTile, Planner,
+    CellEdges, CellIndex, CellKind, FAR_SIDE, GridLevel, HALF, ONE, PlanRect, PlanTile, Planner,
 };
 
 /// A search's request: from a point to a goal with its ranges, as the planner's entry passes
@@ -114,7 +114,7 @@ impl Planner {
     }
 
     /// Toggle a cell's goal mark; true when it changed.
-    pub(super) fn toggle_goal(&mut self, i: usize, set: bool) -> bool {
+    pub(super) fn toggle_goal(&mut self, i: CellIndex, set: bool) -> bool {
         let b1 = self.cells[i].kind;
         if set == b1.contains(CellKind::GOAL) {
             return false;

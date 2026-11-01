@@ -20,7 +20,7 @@ passability and the blocked tiles. A change to a building's tiles rebuilds the c
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`cell.rs`](cell.rs) | A planner grid's cell (`Cell`): its edges with the search's marks (`CellEdges`) and its kind (`CellKind`), the grid's two bytes. |
+| [`cell.rs`](cell.rs) | A planner grid's cell (`Cell`): its edges with the search's marks (`CellEdges`) and its kind (`CellKind`), the grid's two bytes; the grid (`Cells`) by a cell's place (`CellIndex`). |
 | [`goal_marks.rs`](goal_marks.rs) | A search's request and goal: its ranges and the marks of the cells and tiles within them. |
 | [`grid.rs`](grid.rs) | A terrain restriction's planner (`Planner`) and its four-level grid: built, read and rebuilt over a changed rectangle. |
 | [`grid_level.rs`](grid_level.rs) | A level of a planner's grid (`GridLevel`). |

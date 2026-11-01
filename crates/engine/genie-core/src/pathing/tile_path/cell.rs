@@ -1,5 +1,6 @@
 //! A planner grid's cell ([`Cell`]): its edges with the search's marks ([`CellEdges`]) and its
-//! kind ([`CellKind`]), the grid's two bytes.
+//! kind ([`CellKind`]), the grid's two bytes; the grid ([`Cells`]) by a cell's place
+//! ([`CellIndex`]).
 
 bitflags::bitflags! {
     /// A cell's byte 0: the edges a unit can cross to the cells beside it and, during a search,
@@ -123,5 +124,53 @@ impl Cell {
     #[must_use]
     pub const fn bytes(self) -> [u8; 2] {
         [self.edges.bits(), self.kind.bits()]
+    }
+}
+
+/// A cell's place in a planner's grid: the levels one after another, the tiles first, each
+/// row by row (`+0x3d8`'s index, a node's `+0`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) struct CellIndex(
+    /// The place.
+    usize,
+);
+
+impl CellIndex {
+    /// Place `i`.
+    #[must_use]
+    pub(super) const fn new(i: usize) -> Self {
+        Self(i)
+    }
+}
+
+/// A planner's grid (`+0x3d8`): every level's cells, read and changed by [`CellIndex`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(super) struct Cells(Vec<Cell>);
+
+impl Cells {
+    /// `total` cleared cells.
+    #[must_use]
+    pub(super) fn cleared(total: usize) -> Self {
+        Self(vec![Cell::EMPTY; total])
+    }
+
+    /// The `n` cells from place `start` on (a level's).
+    #[must_use]
+    pub(super) fn run(&self, start: CellIndex, n: usize) -> &[Cell] {
+        &self.0[start.0..start.0 + n]
+    }
+}
+
+impl std::ops::Index<CellIndex> for Cells {
+    type Output = Cell;
+
+    fn index(&self, i: CellIndex) -> &Cell {
+        &self.0[i.0]
+    }
+}
+
+impl std::ops::IndexMut<CellIndex> for Cells {
+    fn index_mut(&mut self, i: CellIndex) -> &mut Cell {
+        &mut self.0[i.0]
     }
 }
