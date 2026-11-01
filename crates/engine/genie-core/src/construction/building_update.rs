@@ -281,7 +281,7 @@ impl Unit {
                 continue;
             };
             let kind = u.master(&c.w.masters, c.player)?.kind;
-            if kind == COMBAT && u.raider_countdown.runs() {
+            if kind == COMBAT && u.combat.raider_countdown.runs() {
                 return Err(GenieError::unsupported(
                     "a unit inside whose raider_build_countdown runs (FUN_1411e7220)",
                 ));

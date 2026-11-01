@@ -571,7 +571,14 @@ pub(super) fn garrison_firepower(turns: &mut World) {
             .objects
             .iter()
             .chain(&player.sleeping)
-            .filter_map(|u| Some((u.id, u.life.inside?, u.life.master_id, u.reload_powerup)))
+            .filter_map(|u| {
+                Some((
+                    u.id,
+                    u.life.inside?,
+                    u.life.master_id,
+                    u.combat.reload_powerup,
+                ))
+            })
             .collect();
         for (id, building, master, reload_powerup) in units {
             let Some(b) = player
@@ -592,9 +599,9 @@ pub(super) fn garrison_firepower(turns: &mut World) {
             let Some(bm) = masters.get(b.life.master_id) else {
                 continue;
             };
-            let rate = genie_core::garrison::attack_rate(bm, masters, b.reload_powerup);
+            let rate = genie_core::garrison::attack_rate(bm, masters, b.combat.reload_powerup);
             match genie_core::garrison::share(me, masters, reload_powerup, rate) {
-                Ok(share) => b.firepower += share,
+                Ok(share) => b.combat.firepower += share,
                 Err(e) => b.unmodelled_action = Some(e),
             }
         }

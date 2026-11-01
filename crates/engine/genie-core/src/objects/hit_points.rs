@@ -84,7 +84,7 @@ pub(crate) fn regeneration_rate(master: &Master, unit: &Unit) -> Regeneration {
     } else {
         Regeneration::ZERO
     };
-    unit.regen_stinger + (unit.regen_powerup + (bonus + master.regeneration))
+    unit.combat.regen_stinger + (unit.combat.regen_powerup + (bonus + master.regeneration))
 }
 
 impl Unit {
@@ -111,7 +111,7 @@ impl Unit {
         }
         let _ = crate::combat::damage::heal_hp(
             &mut self.life.hp,
-            &mut self.hp_powerup,
+            &mut self.combat.hp_powerup,
             hit_points,
             amount,
         );
@@ -124,7 +124,7 @@ impl Unit {
     pub(crate) fn gain_hp(&mut self, master: &Master, amount: HitPoints) {
         crate::combat::damage::gain_hp(
             &mut self.life.hp,
-            &mut self.hp_powerup,
+            &mut self.combat.hp_powerup,
             master.hit_points,
             amount,
         );
@@ -137,7 +137,7 @@ impl Unit {
     /// active stingers (`+0xb58`, `+0x954`) and a surviving one's hit point transforms
     /// (`FUN_141204450`); [`crate::combat::damage::lose`] is the same loss on a hit's victim.
     pub(crate) fn lose_hp(&mut self, master: &Master, d: HitPoints) {
-        let Some(d) = self.hp_powerup.absorb(d) else {
+        let Some(d) = self.combat.hp_powerup.absorb(d) else {
             return;
         };
         let floor = master.invulnerability.floor(master.hit_points);
@@ -172,7 +172,7 @@ impl Unit {
         if !below_or_unordered(REGENERATION_EPSILON, rate.abs()) {
             return;
         }
-        let held = dt_seconds + self.regen_timer;
+        let held = dt_seconds + self.combat.regen_timer;
         let per = (REGENERATION_MINUTE / rate).abs();
         let points = if below_or_unordered(REGENERATION_EPSILON, per.abs()) {
             held.get() / per
@@ -181,12 +181,12 @@ impl Unit {
         };
         let fraction = points % REGENERATION_POINT;
         let whole = points - fraction;
-        self.regen_timer = Seconds::new(fraction * per);
+        self.combat.regen_timer = Seconds::new(fraction * per);
         if at_most_or_unordered(whole, 0.0) {
             return;
         }
-        let most = HitPoints::of_master(master.hit_points).get() + self.hp_powerup.max.get();
-        let now = (self.hp_powerup.room() + self.life.hp).get();
+        let most = HitPoints::of_master(master.hit_points).get() + self.combat.hp_powerup.max.get();
+        let now = (self.combat.hp_powerup.room() + self.life.hp).get();
         if at_most_or_unordered(rate, 0.0) {
             let amount = if at_most_or_unordered(whole, now) {
                 whole
@@ -209,8 +209,8 @@ impl Unit {
         }
         // at its most hit points (slot 0xc0 at least slot 200, `COMISS`: a NaN is not) the
         // armor its charge's hits took (`+0x9e4`, `+0x9e6`) comes back
-        if most <= (self.hp_powerup.room() + self.life.hp).get() {
-            self.armor_removed = ArmorPair::ZERO;
+        if most <= (self.combat.hp_powerup.room() + self.life.hp).get() {
+            self.combat.armor_removed = ArmorPair::ZERO;
         }
     }
 
@@ -218,7 +218,7 @@ impl Unit {
     /// (`+0xa38`) above its room (`+0xa3c`; `COMISS`/`JBE`, a NaN is not) comes off the hit points
     /// (`MAXSS` with 1: not below 1, a NaN becomes 1) and the powerup takes the room.
     pub(crate) fn clamp_hp_powerup(&mut self) {
-        let p = self.hp_powerup;
+        let p = self.combat.hp_powerup;
         if crate::math::fmath::at_most_or_unordered(p.taken.get(), p.max.get()) {
             return;
         }
@@ -226,7 +226,7 @@ impl Unit {
             self.life.hp.get() - p.room().get().abs(),
             HP_POWERUP_FLOOR,
         ));
-        self.hp_powerup.taken = p.max;
+        self.combat.hp_powerup.taken = p.max;
     }
 }
 

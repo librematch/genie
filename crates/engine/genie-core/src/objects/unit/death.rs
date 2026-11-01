@@ -112,7 +112,7 @@ impl Unit {
         }
         // the static update's sprite after the death (0x14118ad50): a building's by its build
         // points (its destruction sprite unbuilt), any other combat object's slot 0x7a0's
-        let look = self.abilities.look.as_ref();
+        let look = self.combat.abilities.look.as_ref();
         let shown = if master.kind == BUILDING {
             let built = self
                 .construction
@@ -164,7 +164,7 @@ impl Unit {
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
             masters: c.w.masters.of(c.player),
             computer: c.w.players.player(c.player)?.computer,
-            ai: self.ai.is_some(),
+            ai: self.combat.ai.is_some(),
         };
         let part = completion.first_part(construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
@@ -204,7 +204,7 @@ impl Unit {
             c.w.world_time,
         )?;
         if started {
-            self.firepower = master.volley_fire;
+            self.combat.firepower = master.volley_fire;
             let (p, id) = (c.player, self.id);
             c.lend(self, |w| w.watch_started(p, id))?;
         }

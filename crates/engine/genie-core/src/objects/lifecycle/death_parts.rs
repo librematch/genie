@@ -230,7 +230,7 @@ pub(crate) fn built_death(
 /// population headroom of a house, a town centre or a castle; slot 0xf8 with the amount
 /// negated), then the population it holds itself (`+0x308` 4: the amount leaves, and it holds
 /// nothing after, `FUN_14119d310` with −1 and 0); then each entry of mode 16 leaves its own store
-/// ([`Unit::store`]) when the store holds its attribute.
+/// ([`Combat::store`](crate::objects::layers::Combat::store)) when the store holds its attribute.
 pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId, Amount)> {
     let mut adds = Vec::new();
     for &(kind, amount, flag) in &master.storage {
@@ -251,7 +251,7 @@ pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId,
         if let Some(kind) = kind
             && Amount::ZERO < amount
             && flag & 0x10 != 0
-            && let Some(e) = u.store.iter_mut().find(|e| e.0 == kind)
+            && let Some(e) = u.combat.store.iter_mut().find(|e| e.0 == kind)
         {
             e.1 -= amount;
         }

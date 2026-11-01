@@ -279,7 +279,7 @@ impl World {
             } else if kind == BUILDING && takes_villagers && near(self)? {
                 shelters.buildings.push(ContainerId::new(id));
                 shelters.counts.push(self.garrisoned(id)?);
-                self.players.live_mut(owner, here)?.town_bell.flag = true;
+                self.players.live_mut(owner, here)?.combat.town_bell.flag = true;
             }
         }
         self.shelter(owner, &units, &shelters, true, false)
@@ -318,12 +318,12 @@ impl World {
             if m.kind != BUILDING
                 || ObjectState::Dying <= b.life.state
                 || !takes_villagers
-                || !b.town_bell.flag
+                || !b.combat.town_bell.flag
             {
                 continue;
             }
             let id = b.id;
-            self.players.live_mut(owner, idx)?.town_bell.flag = false;
+            self.players.live_mut(owner, idx)?.combat.town_bell.flag = false;
             let (b_at, b_radius) = self.ground(id)?;
             // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
             let gap = footprint_gap_squared(b_at, b_radius, at, radius);
@@ -443,7 +443,7 @@ impl World {
         let Some(crate::orders::Place::Live(up, ui)) = self.place(id) else {
             return Ok(false);
         };
-        if !self.players.live(up, ui)?.town_bell.flag {
+        if !self.players.live(up, ui)?.combat.town_bell.flag {
             return Ok(false);
         }
         let (x, y) = (point.x(), point.y());
@@ -474,7 +474,7 @@ impl World {
             )?,
         }
         if let Some((_, u)) = self.object_mut(id) {
-            u.town_bell.flag = false;
+            u.combat.town_bell.flag = false;
         }
         Ok(true)
     }
@@ -518,7 +518,7 @@ impl World {
         };
         self.record_town_bell(player, idx)?;
         if let Some(flag) = takes {
-            self.players.live_mut(player, idx)?.town_bell.flag = flag;
+            self.players.live_mut(player, idx)?.combat.town_bell.flag = flag;
         }
         Ok(())
     }
@@ -537,7 +537,7 @@ impl World {
     ) -> Result<(), GenieError> {
         use crate::orders::town_bell::BackToWork;
         let unit = &self.players.live(player, idx)?;
-        if unit.town_bell.flag {
+        if unit.combat.town_bell.flag {
             return Ok(());
         }
         if unit.unmodelled_action.is_some() {
@@ -555,6 +555,7 @@ impl World {
         }
         if found.is_none() {
             let own = unit
+                .combat
                 .ai
                 .as_ref()
                 .and_then(|ai| own_order_target(ai, unit.id));
@@ -570,7 +571,7 @@ impl World {
             Some(GATHER) => actions.gather().and_then(|g| g.target_class),
             _ => None,
         };
-        let ai = unit.ai.as_ref().ok_or(GenieError::unsupported(
+        let ai = unit.combat.ai.as_ref().ok_or(GenieError::unsupported(
             "a town-bell record of a unit without a unit AI",
         ))?;
         let target2 = unit.top_second_target().and_then(held).map(|(_, t)| t.id);
@@ -581,7 +582,11 @@ impl World {
             target2,
             point,
         };
-        self.players.live_mut(player, idx)?.town_bell.record(now);
+        self.players
+            .live_mut(player, idx)?
+            .combat
+            .town_bell
+            .record(now);
         Ok(())
     }
 }
@@ -819,7 +824,7 @@ mod tests {
                 [1000, 1001, 1002].map(|id| enter(&t, id)),
                 [Some(object_id(100)), None, None]
             );
-            assert!(t.object(object_id(100)).unwrap().1.town_bell.flag);
+            assert!(t.object(object_id(100)).unwrap().1.combat.town_bell.flag);
         }
 
         #[test]
@@ -858,7 +863,12 @@ mod tests {
             // record; villager 1001 outside, filed under class 4, walks back to its record's
             // point (slot 0x340); 1002 has no flag and stays; 1003 is not filed and stays
             let mut t = let_out_world();
-            t.object_mut(object_id(100)).unwrap().1.town_bell.flag = true;
+            t.object_mut(object_id(100))
+                .unwrap()
+                .1
+                .combat
+                .town_bell
+                .flag = true;
             inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
             walker(
                 &mut t,
@@ -886,30 +896,36 @@ mod tests {
                 (1001, Point::new(3.5, 3.5)),
                 (1002, Point::new(2.5, 2.5)),
             ] {
-                let v = &mut t.object_mut(object_id(id)).unwrap().1.town_bell;
+                let v = &mut t.object_mut(object_id(id)).unwrap().1.combat.town_bell;
                 v.flag = id != 1002;
                 v.work = crate::orders::town_bell::BackToWork {
                     point,
                     ..crate::orders::town_bell::BackToWork::NONE
                 };
             }
-            t.object_mut(object_id(1003)).unwrap().1.town_bell.flag = true;
             t.object_mut(object_id(1003))
                 .unwrap()
                 .1
+                .combat
+                .town_bell
+                .flag = true;
+            t.object_mut(object_id(1003))
+                .unwrap()
+                .1
+                .combat
                 .town_bell
                 .work
                 .point = Point::new(1.5, 1.5);
             tracked(&mut t, VILLAGER, &[1000, 1001, 1002]);
             t.town_bell(player_id(1), object_id(100), false).unwrap();
-            assert!(!t.object(object_id(100)).unwrap().1.town_bell.flag);
+            assert!(!t.object(object_id(100)).unwrap().1.combat.town_bell.flag);
             let v = t.object(object_id(1000)).unwrap().1;
-            assert_eq!((v.life.inside, v.town_bell.flag), (None, false));
+            assert_eq!((v.life.inside, v.combat.town_bell.flag), (None, false));
             let goal = |t: &World, id: i32| {
                 let u = t.object(object_id(id)).unwrap().1;
                 (
                     u.actions.move_to().copied().and_then(|m| m.goal()),
-                    u.town_bell.flag,
+                    u.combat.town_bell.flag,
                 )
             };
             assert_eq!(goal(&t, 1001), (Some(Position::new(3.5, 3.5, 0.0)), false));
@@ -924,7 +940,7 @@ mod tests {
                 VILLAGER,
                 Point::new(5.5, 5.5),
             );
-            let v = &mut t.object_mut(object_id(1001)).unwrap().1.town_bell;
+            let v = &mut t.object_mut(object_id(1001)).unwrap().1.combat.town_bell;
             v.flag = true;
             v.work.point = Point::new(3.5, -1.0);
             tracked(&mut t, VILLAGER, &[1001]);
@@ -938,7 +954,12 @@ mod tests {
             // record, 1001 outside, filed under class 4, walks back to its record's point
             let world = || {
                 let mut t = let_out_world();
-                t.object_mut(object_id(100)).unwrap().1.town_bell.flag = true;
+                t.object_mut(object_id(100))
+                    .unwrap()
+                    .1
+                    .combat
+                    .town_bell
+                    .flag = true;
                 inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
                 walker(
                     &mut t,
@@ -948,7 +969,7 @@ mod tests {
                     Point::new(5.5, 5.5),
                 );
                 for (id, point) in [(1000, Point::new(4.5, 4.5)), (1001, Point::new(3.5, 3.5))] {
-                    let v = &mut t.object_mut(object_id(id)).unwrap().1.town_bell;
+                    let v = &mut t.object_mut(object_id(id)).unwrap().1.combat.town_bell;
                     v.flag = true;
                     v.work = crate::orders::town_bell::BackToWork {
                         point,
@@ -960,14 +981,14 @@ mod tests {
             };
             let mut t = world();
             t.all_back_to_work(player_id(1), object_id(100)).unwrap();
-            assert!(t.object(object_id(100)).unwrap().1.town_bell.flag);
+            assert!(t.object(object_id(100)).unwrap().1.combat.town_bell.flag);
             let v = t.object(object_id(1000)).unwrap().1;
-            assert_eq!((v.life.inside, v.town_bell.flag), (None, false));
+            assert_eq!((v.life.inside, v.combat.town_bell.flag), (None, false));
             let u = t.object(object_id(1001)).unwrap().1;
             assert_eq!(
                 (
                     u.actions.move_to().copied().and_then(|m| m.goal()),
-                    u.town_bell.flag
+                    u.combat.town_bell.flag
                 ),
                 (Some(Position::new(3.5, 3.5, 0.0)), false)
             );

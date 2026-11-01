@@ -488,7 +488,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         );
         let p = &mut t.players[1];
         p.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
-        p.objects[ListIndex::new(2)].ai = Some(UnitAi {
+        p.objects[ListIndex::new(2)].combat.ai = Some(UnitAi {
             ai_type: UnitAiType::PREDATOR,
             current_order: None,
             current_action: None,
@@ -515,6 +515,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         Amount::new(2.0)
     );
     let completed = p.objects[ListIndex::new(2)]
+        .combat
         .ai
         .as_ref()
         .unwrap()
@@ -537,6 +538,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         target_type: None,
     };
     t.players[1].objects[ListIndex::new(2)]
+        .combat
         .ai
         .as_mut()
         .unwrap()
@@ -551,6 +553,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     .unwrap();
     let made = t.players[1].objects.last().unwrap();
     let queued = made
+        .combat
         .ai
         .as_ref()
         .map(|ai| ai.orders.clone())
@@ -665,7 +668,7 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
         );
         let p = &mut t.players[1];
         p.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
-        p.objects[ListIndex::new(2)].ai = Some(UnitAi {
+        p.objects[ListIndex::new(2)].combat.ai = Some(UnitAi {
             ai_type: UnitAiType::PREDATOR,
             current_order: None,
             current_action: None,
@@ -830,8 +833,8 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
     let walked = |notified| {
         let mut t = crate::world::tests::forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
-        u.town_bell.flag = true;
-        u.ai.as_mut().unwrap().orders.push(queued_move());
+        u.combat.town_bell.flag = true;
+        u.combat.ai.as_mut().unwrap().orders.push(queued_move());
         t.gather_move(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -843,8 +846,8 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
     };
     let u = walked(true);
     assert_eq!(u.body.mover().unwrap().waiting, 1);
-    assert!(!u.town_bell.flag);
-    let ai = u.ai.as_ref().unwrap();
+    assert!(!u.combat.town_bell.flag);
+    let ai = u.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (Some(OrderKind::Move), Some(ActionKind::Move), None)
@@ -865,7 +868,7 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
         })
     );
     let unloaded = walked(false);
-    assert_eq!(unloaded.ai.as_ref().unwrap().orders, [queued_move()]);
+    assert_eq!(unloaded.combat.ai.as_ref().unwrap().orders, [queued_move()]);
     assert_eq!(
         unloaded.actions.move_to().copied(),
         u.actions.move_to().copied()
@@ -893,7 +896,7 @@ fn a_gather_point_s_walk_waits_without_speed_and_stops_at_the_unmodelled() {
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.body.mover().unwrap().waiting, 1);
     assert_eq!(u.actions.move_to().copied(), None);
-    assert_eq!(u.ai.as_ref().unwrap().current_order, None);
+    assert_eq!(u.combat.ai.as_ref().unwrap().current_order, None);
     // a second walk finds the first's `MoveTo`
     let mut t = crate::world::tests::forage_world();
     t.gather_move(

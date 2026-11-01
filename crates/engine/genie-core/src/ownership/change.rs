@@ -487,7 +487,7 @@ pub(crate) fn change_hands(
     if let Some(a) = u.actions.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }
-    if let Some(ai) = u.ai.as_mut() {
+    if let Some(ai) = u.combat.ai.as_mut() {
         ai.clear_notifies(world_time.since_start())?;
     }
     u.post_own(NotifyKind::OWNER_CHANGED, [new.index() as i32, 0, 0])?;

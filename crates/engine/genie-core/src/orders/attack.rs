@@ -54,7 +54,7 @@ impl World {
             u,
             master,
             (self.masters.of(player), &self.graphics),
-            u.ai.as_ref(),
+            u.combat.ai.as_ref(),
             (held.computer, world_time),
         );
         let own = crate::combat::victims::victim_of(
@@ -132,7 +132,7 @@ impl World {
             .mover()
             .map_or(Speed::ZERO, |m| m.stats.speed);
         let e = crate::combat::attack::engagement(
-            self.players.live(player, idx)?.ai.as_ref(),
+            self.players.live(player, idx)?.combat.ai.as_ref(),
             speed,
             master,
             &me_at,
@@ -147,7 +147,7 @@ impl World {
             .with("object", unit.id)
             .with("master", unit.life.master_id));
         }
-        unit.attack_count = crate::combat::AttackCount::ZERO;
+        unit.combat.attack_count = crate::combat::AttackCount::ZERO;
         crate::objects::sprite::new_sprite(
             &mut unit.sprite,
             unit.body.move_stats_mut(),
@@ -168,7 +168,7 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         for (kind, p) in posted {
-            if let Some(ai) = unit.ai.as_mut() {
+            if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.post(crate::unit_ai::Notify::own(id, kind, p), state)?;
             }
         }
@@ -220,13 +220,13 @@ impl World {
     ) -> Result<(), GenieError> {
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.set_action(Some(ActionKind::Attack));
             ai.set_target(Some(aim.aimed), aim.aimed_class.or_none(), aim.at);
         }
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.last_retarget_time = world_time;
             ai.notify_work(
                 Some(OrderKind::Attack),

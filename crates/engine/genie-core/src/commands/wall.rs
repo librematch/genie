@@ -370,6 +370,7 @@ impl World {
         let direct = self
             .players
             .live(q, idx)?
+            .combat
             .ai
             .as_ref()
             .is_none_or(|ai| !w.queued && (!w.commits || !ai.has_unready_order()));
@@ -382,7 +383,7 @@ impl World {
                 self.queue_build(q, idx, (player, f, master), p)?;
             }
             if w.commits
-                && let Some(ai) = self.players.live_mut(q, idx)?.ai.as_mut()
+                && let Some(ai) = self.players.live_mut(q, idx)?.combat.ai.as_mut()
             {
                 // the readiness pass with 0: every queued order is ready
                 crate::orders::readiness(&mut ai.orders, false);

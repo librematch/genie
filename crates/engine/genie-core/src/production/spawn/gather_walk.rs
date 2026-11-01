@@ -77,7 +77,7 @@ impl World {
                 "a gather point's move of a unit not in state 2",
             ));
         }
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             if notified {
                 ai.orders.clear();
             }
@@ -95,7 +95,7 @@ impl World {
             ai.clear_notifies(world_time.since_start())?;
         }
         if villager {
-            unit.town_bell.flag = false;
+            unit.combat.town_bell.flag = false;
         }
         unit.actions
             .set_move_to(Some(crate::movement::move_to::MoveToAction {

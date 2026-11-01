@@ -93,7 +93,7 @@ impl Unit {
                             c.w.object_state(t).is_some_and(|s| ObjectState::Undead < s)
                         })
                 })
-        }) && self.ai.as_ref().is_some_and(|ai| {
+        }) && self.combat.ai.as_ref().is_some_and(|ai| {
             let class = ai
                 .target_class
                 .or_else(|| self.actions.hunt().and_then(|h| h.target_class));
@@ -214,6 +214,7 @@ impl Unit {
             computer: c.w.players.player(c.player)?.computer,
             villager: master.class == class::VILLAGER,
             stance: self
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
@@ -280,6 +281,7 @@ impl Unit {
             computer: c.w.players.player(c.player)?.computer,
             villager: master.class == class::VILLAGER,
             stance: self
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),

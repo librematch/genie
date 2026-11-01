@@ -32,7 +32,7 @@ fn walking_forager() -> World {
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         wait: MoveWait::default(),
     }));
-    let ai = u.ai.as_mut().unwrap();
+    let ai = u.combat.ai.as_mut().unwrap();
     (ai.current_order, ai.current_action, ai.current_target) = (
         Some(OrderKind::Move),
         Some(ActionKind::Move),
@@ -71,7 +71,7 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     let m = u.body.mover().unwrap();
     assert_eq!(m.animated.speed, Speed::new(0.0));
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.0);
-    let ai = u.ai.as_ref().unwrap();
+    let ai = u.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (None, None, None)
@@ -85,18 +85,19 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     assert_eq!(u.actions.move_to().copied(), None);
     let kept = |ai: &crate::unit_ai::UnitAi| (ai.current_order, ai.current_target);
     assert_eq!(
-        kept(u.ai.as_ref().unwrap()),
+        kept(u.combat.ai.as_ref().unwrap()),
         (Some(OrderKind::Move), Some(object_id(600)))
     );
     let mut t = walking_forager();
     t.players[1].objects[ListIndex::new(0)]
+        .combat
         .ai
         .as_mut()
         .unwrap()
         .current_action = Some(ActionKind::HeroPower);
     let (u, _) = stopped(t, class::VILLAGER).unwrap();
     assert_eq!(
-        kept(u.ai.as_ref().unwrap()),
+        kept(u.combat.ai.as_ref().unwrap()),
         (Some(OrderKind::Move), Some(object_id(600)))
     );
 }

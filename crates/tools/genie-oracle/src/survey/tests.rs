@@ -78,7 +78,10 @@ fn a_stopped_player_is_listed_and_compared_no_more() {
 fn the_scope_widens_the_compared_fields() {
     let unit = |attack_count, idle_variant| Unit {
         id: object_id(1),
-        attack_count: genie_core::combat::AttackCount::of_data(attack_count),
+        combat: genie_core::objects::layers::Combat {
+            attack_count: genie_core::combat::AttackCount::of_data(attack_count),
+            ..Default::default()
+        },
         idle_variant,
         ..Unit::default()
     };
@@ -90,6 +93,6 @@ fn the_scope_widens_the_compared_fields() {
             .collect()
     };
     assert_eq!(fields(Scope::Saved), Vec::<String>::new());
-    assert_eq!(fields(Scope::SavedWithGaps), ["attack_count"]);
-    assert_eq!(fields(Scope::All), ["attack_count", "idle_variant"]);
+    assert_eq!(fields(Scope::SavedWithGaps), ["combat.attack_count"]);
+    assert_eq!(fields(Scope::All), ["combat.attack_count", "idle_variant"]);
 }

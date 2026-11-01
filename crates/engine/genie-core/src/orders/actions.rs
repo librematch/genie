@@ -90,10 +90,12 @@ impl World {
         (order, action): (Option<OrderKind>, Option<ActionKind>),
     ) -> Result<(), GenieError> {
         let u = &self.players.live(player, idx)?;
-        let Some(target) =
-            u.ai.as_ref()
-                .and_then(|a| a.current_target)
-                .filter(|t| !t.is_recyclable())
+        let Some(target) = u
+            .combat
+            .ai
+            .as_ref()
+            .and_then(|a| a.current_target)
+            .filter(|t| !t.is_recyclable())
         else {
             return Ok(());
         };
@@ -114,7 +116,7 @@ impl World {
             category: crate::unit_ai::best_target::category(t.life.master_id, class),
             target_position: t.moved_vector(),
         };
-        if let Some(ai) = self.players.live_mut(player, idx)?.ai.as_mut() {
+        if let Some(ai) = self.players.live_mut(player, idx)?.combat.ai.as_mut() {
             ai.remember_order(record);
         }
         Ok(())
@@ -480,7 +482,7 @@ pub(crate) fn switch_master(
     // in state 2 the volleys (`+0xa00`) are the new master's volley fire, the shares of the
     // units inside dropped
     if unit.life.state == ObjectState::Alive {
-        unit.firepower = next.volley_fire;
+        unit.combat.firepower = next.volley_fire;
     }
     Ok(switched)
 }

@@ -90,7 +90,7 @@ impl UnitView<'_, '_> {
         let visible = self.target_visible(&t, t_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
-        let look = unit.abilities.look.as_ref();
+        let look = unit.combat.abilities.look.as_ref();
         let arms = crate::combat::attack::arms_looking(
             master,
             look,
@@ -116,7 +116,7 @@ impl UnitView<'_, '_> {
             self.c.w.world_time,
         )?;
         // the constructor clears +0x900 for a target other than its own (none yet)
-        unit.attack_count = crate::combat::AttackCount::ZERO;
+        unit.combat.attack_count = crate::combat::AttackCount::ZERO;
         if unit.life.inside.is_some() {
             return self
                 .attack_from_inside(crate::combat::attack::Attack::own(target, &e, arms), by);
@@ -258,7 +258,7 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         if w.clears_count {
-            unit.attack_count = crate::combat::AttackCount::ZERO;
+            unit.combat.attack_count = crate::combat::AttackCount::ZERO;
         }
         if let Some(old) = w.lets_go {
             self.release(old, by)?;

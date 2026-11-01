@@ -106,7 +106,7 @@ impl crate::world::World {
         let c = u.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         c.progress = Seconds::of_master(c.build_time);
         let mut gains = Vec::new();
-        hand_storage(master, &mut gains, Some(&mut u.store));
+        hand_storage(master, &mut gains, Some(&mut u.combat.store));
         self.players.player_mut(p)?.add_attributes(gains)
     }
 

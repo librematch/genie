@@ -222,7 +222,7 @@ impl World {
     pub(super) fn other_load(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             let n = crate::unit_ai::Notify::own(id, crate::unit_ai::NotifyKind::OTHER_LOAD, [0; 3]);
             let _ = ai.accept(n, state);
         }
@@ -269,7 +269,7 @@ impl World {
         };
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             let order = crate::unit_ai::QueuedOrder {
                 issuer: Some(Issuer::Object(id)),
                 order: OrderKind::OnTarget,
@@ -297,7 +297,7 @@ impl World {
     /// unit AI only looks the records up.
     pub(crate) fn queue_way_back(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
         use crate::orders::town_bell::RecordTarget;
-        let mut bell = self.players.live(p, idx)?.town_bell;
+        let mut bell = self.players.live(p, idx)?.combat.town_bell;
         let lookup = |t: ObjectId| -> Result<Option<RecordTarget>, GenieError> {
             let Some((op, o)) = self.object(t) else {
                 return Ok(None);
@@ -332,8 +332,8 @@ impl World {
             ),
         };
         let unit = self.players.live_mut(p, idx)?;
-        unit.town_bell = bell;
-        let Some(ai) = unit.ai.as_mut() else {
+        unit.combat.town_bell = bell;
+        let Some(ai) = unit.combat.ai.as_mut() else {
             return Ok(());
         };
         let (id, target_type, owner, at) = target;

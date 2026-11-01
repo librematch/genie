@@ -35,7 +35,7 @@ impl World {
             let unit = &self.players.live(p, idx)?;
             let master = unit.master(&self.masters, p)?;
             let (class, id) = (master.class, master.id);
-            let explorer = unit.ai.as_ref().is_some_and(|ai| {
+            let explorer = unit.combat.ai.as_ref().is_some_and(|ai| {
                 matches!(
                     ai.current_action,
                     Some(ActionKind::AutoScout | ActionKind::Explore)
@@ -57,7 +57,7 @@ impl World {
                 }
                 self.cancel_queue(p, idx)?;
             }
-            if let Some(ai) = self.players.live_mut(p, idx)?.ai.as_mut() {
+            if let Some(ai) = self.players.live_mut(p, idx)?.combat.ai.as_mut() {
                 ai.orders.clear();
             }
         }
@@ -104,7 +104,7 @@ impl World {
         let trading = unit.top_action_kind() == Some(action_type::TRADE)
             && crate::math::fmath::below_or_unordered(0.0, unit.life.amount.get())
             && unit.life.attribute_type.is_some();
-        let Some(ai) = unit.ai.as_ref() else {
+        let Some(ai) = unit.combat.ai.as_ref() else {
             return Ok(());
         };
         if class == class::LIVESTOCK || ai.current_action == Some(ActionKind::HeroPower) || trading

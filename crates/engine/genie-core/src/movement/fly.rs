@@ -441,7 +441,10 @@ mod tests {
                 master_id: master_id(96),
                 ..Lifecycle::default()
             },
-            ai: Some(UnitAi::default()),
+            combat: crate::objects::layers::Combat {
+                ai: Some(UnitAi::default()),
+                ..Default::default()
+            },
             ..Unit::default()
         };
         bird.actions.set_fly(Some(fly));
@@ -516,7 +519,11 @@ mod tests {
 
     /// The notifies 0x1f9 the hawk's unit AI holds.
     fn failures(t: &World) -> usize {
-        let ai = t.players[0].objects[ListIndex::new(0)].ai.as_ref().unwrap();
+        let ai = t.players[0].objects[ListIndex::new(0)]
+            .combat
+            .ai
+            .as_ref()
+            .unwrap();
         let failed = ai.notifies.iter();
         failed
             .filter(|n| n.kind == crate::unit_ai::NotifyKind::ACTION_FAILED)

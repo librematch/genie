@@ -92,7 +92,7 @@ impl World {
         // capacity and the task's productivity attribute (none: 1.0)
         let productivity = unit.actions.gather().and_then(|g| g.task.productivity);
         let rate = crate::gathering::gather::StopRate {
-            work_rate: unit.work_rate_powerup + me.work_rate,
+            work_rate: unit.combat.work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
             productivity: crate::gathering::gather::productivity_of(
                 productivity,
@@ -349,7 +349,7 @@ impl World {
         // the constructor's time per stop: the gatherer's work rate (its master's plus its
         // powerup, slot 0x6e8), capacity and productivity attribute (none: 1.0)
         let rate = crate::gathering::gather::StopRate {
-            work_rate: unit.work_rate_powerup + me.work_rate,
+            work_rate: unit.combat.work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
             productivity: crate::gathering::gather::productivity_of(
                 task.productivity,
@@ -364,7 +364,7 @@ impl World {
         )?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let (Some(ai), Some((point, clears))) = (unit.ai.as_mut(), notify) {
+        if let (Some(ai), Some((point, clears))) = (unit.combat.ai.as_mut(), notify) {
             ai.notify_work(
                 Some(OrderKind::Gather),
                 Some(ActionKind::Gather),
@@ -458,7 +458,7 @@ impl World {
             .ok_or(crate::world::TARGET_UNPLACED)?;
         let speed = unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         crate::combat::attack::engagement(
-            unit.ai.as_ref(),
+            unit.combat.ai.as_ref(),
             speed,
             master,
             me,
@@ -529,7 +529,7 @@ impl World {
         quarry.drop_site = self.drops_at_main(player, idx, target)?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut().filter(|_| notify) {
+        if let Some(ai) = unit.combat.ai.as_mut().filter(|_| notify) {
             ai.notify_work(
                 Some(OrderKind::Hunt),
                 Some(ActionKind::Hunt),

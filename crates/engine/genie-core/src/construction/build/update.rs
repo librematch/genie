@@ -153,7 +153,7 @@ impl BuildAction {
         if computer || !pasture || !built {
             return Ok(false);
         }
-        let Some(ai) = builder.ai.as_mut() else {
+        let Some(ai) = builder.combat.ai.as_mut() else {
             return Ok(false);
         };
         ai.end_order_and_action()?;
@@ -352,6 +352,7 @@ impl BuildAction {
         Ok(GiveUp {
             waits: reads.class == Some(class::VILLAGER) && !computer,
             stance: builder
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),

@@ -82,6 +82,7 @@ impl World {
         // the building unit AI's command queue (`+0x1f0`, saved as `savedOrder`): without a
         // gather point its first location is the spot's goal (FUN_1411d12d0, slot 0x220)
         let queue = building
+            .combat
             .ai
             .as_ref()
             .map(|a| a.building_orders.clone())
@@ -109,7 +110,7 @@ impl World {
         owner.tracker.unplace(Some(master), class);
         let building = owner.objects.checked_mut(i)?;
         let (building_id, state) = (building.id, building.life.state);
-        if let Some(ai) = building.ai.as_mut() {
+        if let Some(ai) = building.combat.ai.as_mut() {
             ai.post(
                 Notify::own(
                     building_id,
@@ -165,7 +166,7 @@ impl World {
                 .flatten()
                 .map(|(tp, t)| (tp, t.life.master_id));
             if let Some((tp, tm)) = target {
-                let ai = self.players.live(p, new)?.ai.as_ref();
+                let ai = self.players.live(p, new)?.combat.ai.as_ref();
                 // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`):
                 // an order whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
                 let relic_order = |q: &crate::unit_ai::QueuedOrder| {
@@ -188,7 +189,7 @@ impl World {
             }
             let unit = self.players.live_mut(p, new)?;
             let state = unit.life.state;
-            if let Some(ai) = unit.ai.as_mut() {
+            if let Some(ai) = unit.combat.ai.as_mut() {
                 let order = crate::unit_ai::QueuedOrder {
                     priority: crate::unit_ai::OrderPriority::COMMAND,
                     point: o.point.with_z(z),
@@ -401,7 +402,12 @@ impl World {
                 master_id: master,
                 master: made.life,
             },
-            ai,
+            combat: crate::objects::layers::Combat {
+                ai,
+                // the TRIBE combat setup (FUN_14121df60): the master's volley fire
+                firepower: made.volley_fire,
+                ..Default::default()
+            },
             // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
             // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             body: crate::objects::layers::Body::Moving(Mover::new_object(
@@ -415,9 +421,6 @@ impl World {
             attackable: true,
             pasture: None,
             my_pasture: None,
-            combat: true,
-            // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-            firepower: made.volley_fire,
             sprite: Some(sprite),
             // livestock's default task, the Artifact, starts once its action list is empty
             default_artifact: made

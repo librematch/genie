@@ -176,7 +176,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let dt = self.dt_seconds;
         let unit = self.players.live_mut(p, i)?;
-        if !movement_damage_due(&mut unit.abilities.movement_damage_timer, dt) {
+        if !movement_damage_due(&mut unit.combat.abilities.movement_damage_timer, dt) {
             return Ok(());
         }
         let moving = unit
@@ -208,8 +208,11 @@ impl World {
                     if !struck(&hitter, range, &b) {
                         continue;
                     }
-                    self.players.live_mut(p, i)?.abilities.movement_damage_timer =
-                        Seconds::new(task.work_val2.get());
+                    self.players
+                        .live_mut(p, i)?
+                        .combat
+                        .abilities
+                        .movement_damage_timer = Seconds::new(task.work_val2.get());
                     self.movement_hit(b, owner, HitPoints::new(task.work_val1.get()))?;
                 }
             }
@@ -295,7 +298,7 @@ impl World {
         u.life.hp = v.hp;
         u.life.amount = v.amount;
         if let Some(a) = v.armored.as_ref() {
-            u.hp_powerup = a.hp_powerup;
+            u.combat.hp_powerup = a.hp_powerup;
         }
         if killed && b.kind == COMBAT {
             self.count_kill(b.id, owner)?;

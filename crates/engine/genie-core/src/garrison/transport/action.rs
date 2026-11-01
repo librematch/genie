@@ -404,7 +404,7 @@ impl TransportAction {
         let walks = start || state == MoveTo::Moving;
         let ask = if start {
             UnitAi::path_ask(
-                unit.ai.as_mut(),
+                unit.combat.ai.as_mut(),
                 unit.body.position().ground(),
                 self.point.ground(),
             )

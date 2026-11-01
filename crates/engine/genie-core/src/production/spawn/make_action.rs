@@ -165,7 +165,7 @@ impl World {
                     }
                     return Ok(false);
                 }
-                if let Some(ai) = self.players.live_mut(p, i)?.ai.as_mut() {
+                if let Some(ai) = self.players.live_mut(p, i)?.combat.ai.as_mut() {
                     ai.set_action(Some(ActionKind::Make));
                 }
                 Making::Unit(MakeObj::for_entry(&first))
@@ -320,7 +320,7 @@ impl World {
             MakeObjState::New | MakeObjState::NoSpot => return Ok(UpdateCode::UNDER_WAY),
         }
         let site = building.master(&self.masters, p)?;
-        let rate = building.work_rate_powerup + site.work_rate;
+        let rate = building.combat.work_rate_powerup + site.work_rate;
         let made = make.master.and_then(|m| player_master(&self.masters, p, m));
         let time = Seconds::of_master(make.time(made, building.life.master_id)).get();
         let progress = Seconds::new(rate * dt_seconds) + make.progress;
@@ -407,7 +407,7 @@ impl World {
         }
         let building = self.players.live_mut(p, i)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(ai) = building.ai.as_mut() {
+        if let Some(ai) = building.combat.ai.as_mut() {
             ai.post(
                 Notify::own(
                     id,

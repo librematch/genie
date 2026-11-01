@@ -49,7 +49,7 @@ impl Unit {
     /// disarm posts to the unit AI; codes 1 and 3 delete it.
     fn attack_lost_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
         let master = self.master(&c.w.masters, c.player)?;
-        let armed = armed(master, self.firepower);
+        let armed = armed(master, self.combat.firepower);
         let master_class = master.class;
         let walking = self
             .actions
@@ -91,7 +91,7 @@ impl Unit {
             self,
             master,
             (c.w.masters.of(c.player), &c.w.graphics),
-            self.ai.as_ref(),
+            self.combat.ai.as_ref(),
             (computer, c.w.world_time),
         );
         let code = attack.update_gone(c, self, me, &r, master_class);
@@ -125,7 +125,7 @@ impl Unit {
             self,
             master,
             (c.w.masters.of(c.player), &c.w.graphics),
-            self.ai.as_ref(),
+            self.combat.ai.as_ref(),
             (computer, c.w.world_time),
         );
         let victim = victim(c, attack.target)?.ok_or(GenieError::unsupported(
@@ -153,16 +153,18 @@ impl Unit {
     pub(crate) fn run_down_attack_timers(&mut self, c: &Step<'_>) {
         // RGE_Combat_Object::update (0x14107dfb0): the attack timer runs down by dt times
         // `+0x87c` (a terrain look's rate, [`crate::combat::abilities`])
-        if Seconds::ZERO < self.attack_timer {
-            self.attack_timer -= c.dt.seconds() * self.abilities.attack_rate;
-            if self.attack_timer < Seconds::ZERO {
-                self.attack_timer = Seconds::ZERO;
+        if Seconds::ZERO < self.combat.attack_timer {
+            self.combat.attack_timer -= c.dt.seconds() * self.combat.abilities.attack_rate;
+            if self.combat.attack_timer < Seconds::ZERO {
+                self.combat.attack_timer = Seconds::ZERO;
             }
         }
         // then a reload world time past ends the volley under way (`+0xa04`) and is none
-        if self.reload_worldtime != WorldTime::ZERO && self.reload_worldtime < c.w.world_time {
-            self.next_volley = crate::combat::MissileCount::ZERO;
-            self.reload_worldtime = WorldTime::ZERO;
+        if self.combat.reload_worldtime != WorldTime::ZERO
+            && self.combat.reload_worldtime < c.w.world_time
+        {
+            self.combat.next_volley = crate::combat::MissileCount::ZERO;
+            self.combat.reload_worldtime = WorldTime::ZERO;
         }
     }
 

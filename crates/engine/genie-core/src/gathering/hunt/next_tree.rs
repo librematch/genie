@@ -103,7 +103,7 @@ impl Unit {
         let (me_at, them) = (at(self.id)?, at(found)?);
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.ai.as_ref(),
+            self.combat.ai.as_ref(),
             speed,
             master,
             me_at,

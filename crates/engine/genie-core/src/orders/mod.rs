@@ -427,8 +427,8 @@ impl World {
             player,
             state: u.life.state,
             held: u.life.held(),
-            hp: u.life.hp + u.hp_powerup.room(),
-            max_hp: HitPoints::of_master(master.hit_points) + u.hp_powerup.max,
+            hp: u.life.hp + u.combat.hp_powerup.room(),
+            max_hp: HitPoints::of_master(master.hit_points) + u.combat.hp_powerup.max,
             attackable: u.attackable,
             pasture: u.pasture,
             top_action: u.top_action_kind(),
@@ -461,12 +461,12 @@ pub(crate) fn readiness(orders: &mut Vec<crate::unit_ai::QueuedOrder>, drop_read
 /// sets `+0xa2c` to slot 0x1b8 × 0.05 and takes a sight powerup (`+0xad4`) off (slots 0x1d8,
 /// 0x1d0): none of them is held.
 const fn clear_powerups(unit: &mut Unit) {
-    unit.attack_powerup = crate::combat::AttackPowerup::ZERO;
-    unit.range_powerup = Distance::ZERO;
-    unit.reload_powerup = Seconds::ZERO;
-    unit.work_rate_powerup = WorkRate::ZERO;
-    unit.hp_powerup.max = HitPoints::ZERO;
-    unit.armor_powerups = ArmorPair::ZERO;
+    unit.combat.attack_powerup = crate::combat::AttackPowerup::ZERO;
+    unit.combat.range_powerup = Distance::ZERO;
+    unit.combat.reload_powerup = Seconds::ZERO;
+    unit.combat.work_rate_powerup = WorkRate::ZERO;
+    unit.combat.hp_powerup.max = HitPoints::ZERO;
+    unit.combat.armor_powerups = ArmorPair::ZERO;
 }
 
 /// `FUN_140c4da50`: the target of the first order in unit AI `ai`'s queue (`+0x20`, count

@@ -72,12 +72,15 @@ fn member(id: i32, x: f32, y: f32) -> Unit {
     mover.moved_at = Position::new(x, y, 0.0);
     let mut u = Unit {
         id: object_id(id),
-        ai: Some(UnitAi {
-            current_order: None,
-            current_action: None,
-            current_target: None,
-            ..UnitAi::default()
-        }),
+        combat: crate::objects::layers::Combat {
+            ai: Some(UnitAi {
+                current_order: None,
+                current_action: None,
+                current_target: None,
+                ..UnitAi::default()
+            }),
+            ..Default::default()
+        },
         body: crate::objects::layers::Body::new(Position::new(x, y, 0.0), None, Some(mover)),
         ..Unit::default()
     };
@@ -304,7 +307,7 @@ fn a_member_in_place_or_failing_too_often() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.members[0].specific_move.consecutive_move_failures, 0);
     assert_eq!(
-        unit(&t, 10).ai.as_ref().unwrap().state_position,
+        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
         Point::new(5.0, 5.0)
     );
     let mut t = world();
@@ -330,7 +333,7 @@ fn a_member_in_place_or_failing_too_often() {
     assert_eq!(g.flags & GroupFlags::CATCHING_UP, GroupFlags::CATCHING_UP);
     assert_eq!(mover(&t, 10).animated.speed, Speed::new(0.0));
     assert_eq!(
-        unit(&t, 10).ai.as_ref().unwrap().state_position,
+        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
         Point::ORIGIN
     );
     // a NaN gap is not in place
@@ -365,6 +368,7 @@ fn a_busy_member_stops_and_its_slot_counts_it_there() {
     ] {
         let mut t = world();
         t.players[1].objects[ListIndex::new(0)]
+            .combat
             .ai
             .as_mut()
             .unwrap()
@@ -401,7 +405,7 @@ fn a_far_member_turns_and_walks_to_its_slot() {
     );
     assert_eq!(state(&t, 0), SlotState::Steering);
     assert_eq!(
-        unit(&t, 10).ai.as_ref().unwrap().state_position,
+        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
         Point::new(10.0, 5.0)
     );
 }
@@ -534,7 +538,7 @@ fn a_due_slot_takes_its_member() {
     t.steer_to_slot(group_id(1), 0, 0, &[]).unwrap();
     assert_eq!(mover(&t, 10).stats.speed, Speed::new(0.8));
     assert_eq!(
-        unit(&t, 10).ai.as_ref().unwrap().state_position,
+        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
         Point::ORIGIN
     );
 }
@@ -655,13 +659,13 @@ fn the_members_moves_end_wait_or_stop() {
         }
     );
     assert_eq!(
-        unit(&t, 10).ai.as_ref().unwrap().state_position,
+        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
         Point::new(10.0, 5.0)
     );
     assert_eq!(g.members[1].specific_move.timer, Seconds::new(1.0 - DT));
     assert_eq!(g.members[1].specific_move.reason, MoveReason::DETOUR);
     assert_eq!(
-        unit(&t, 11).ai.as_ref().unwrap().state_position,
+        unit(&t, 11).combat.ai.as_ref().unwrap().state_position,
         Point::ORIGIN
     );
     assert_eq!(mover(&t, 12).animated.speed, Speed::new(0.0));
@@ -684,7 +688,7 @@ fn the_members_moves_end_wait_or_stop() {
     );
     assert_eq!(mover(&t2, 11).animated.speed, Speed::new(0.0));
     assert_eq!(
-        unit(&t2, 11).ai.as_ref().unwrap().state_position,
+        unit(&t2, 11).combat.ai.as_ref().unwrap().state_position,
         Point::new(6.0, 9.0)
     );
 }

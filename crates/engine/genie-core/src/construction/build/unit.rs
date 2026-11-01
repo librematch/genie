@@ -102,7 +102,7 @@ impl Unit {
         let built = foundation.map(|u| u.life.master_id);
         let stack_made = foundation.and_then(|u| u.stack_made);
         let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> =
-            self.ai.as_ref().map_or_else(Vec::new, |ai| {
+            self.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
                 ai.orders
                     .iter()
                     .filter(|o| o.order == OrderKind::Build)
@@ -194,7 +194,7 @@ impl Unit {
                 .and_then(|v| v.seer(t))
                 .is_some_and(|s| ObjectState::Dead < s.state),
         };
-        self.ai.as_ref().map_or_else(Vec::new, |ai| {
+        self.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
             ai.orders
                 .iter()
                 .filter(|o| DROPPED_ORDERS.contains(&o.order))

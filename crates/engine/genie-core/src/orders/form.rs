@@ -133,7 +133,7 @@ impl World {
         else {
             return Ok(());
         };
-        let marching = unit.ai.as_ref().is_some_and(|ai| {
+        let marching = unit.combat.ai.as_ref().is_some_and(|ai| {
             matches!(
                 ai.current_order,
                 Some(OrderKind::Defend | OrderKind::Follow)

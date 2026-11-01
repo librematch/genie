@@ -386,7 +386,7 @@ impl World {
             crate::orders::Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
         u.group.id = Some(group);
-        if let Some(ai) = u.ai.as_mut() {
+        if let Some(ai) = u.combat.ai.as_mut() {
             if ai
                 .current_action
                 .is_some_and(|a| CLEARED_ACTIONS.contains(&a))
@@ -705,7 +705,7 @@ mod tests {
     fn the_statistics_call_for_the_formation_type_by_the_motion_flags() {
         let mut t = three();
         for u in &mut t.players[1].objects {
-            u.ai = Some(crate::unit_ai::UnitAi {
+            u.combat.ai = Some(crate::unit_ai::UnitAi {
                 ai_type: crate::unit_ai::SOLDIER_AI,
                 ..crate::unit_ai::UnitAi::default()
             });
@@ -741,7 +741,7 @@ mod tests {
     fn the_stances_reach_a_sleeping_member() {
         let mut t = three();
         for u in &mut t.players[1].objects {
-            u.ai = Some(crate::unit_ai::UnitAi::default());
+            u.combat.ai = Some(crate::unit_ai::UnitAi::default());
         }
         let asleep = t.players[1].objects.remove(ListIndex::new(2)).unwrap();
         t.players[1].sleeping.push(asleep);
@@ -749,6 +749,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             t.players[1].sleeping[ListIndex::new(0)]
+                .combat
                 .ai
                 .as_ref()
                 .unwrap()
@@ -757,6 +758,7 @@ mod tests {
         );
         assert_eq!(
             t.players[1].objects[ListIndex::new(0)]
+                .combat
                 .ai
                 .as_ref()
                 .unwrap()
@@ -773,7 +775,7 @@ mod tests {
         let with = |stances: [UnitStance; 3]| {
             let mut t = three();
             for (u, stance) in t.players[1].objects.iter_mut().zip(stances) {
-                u.ai = Some(crate::unit_ai::UnitAi {
+                u.combat.ai = Some(crate::unit_ai::UnitAi {
                     stance,
                     ..crate::unit_ai::UnitAi::default()
                 });

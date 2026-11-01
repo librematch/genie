@@ -522,8 +522,10 @@ impl Unit {
                 .as_ref()
                 .and_then(|v| v.seer(self.id))
                 .map(|s| s.capture);
+        let combat = crate::objects::masters::master_type::COMBAT
+            <= self.master(&c.w.masters, c.player)?.kind;
         let r = ArtifactReads {
-            searches: !(self.combat && capture == Some(CaptureKind::NONE)),
+            searches: !(combat && capture == Some(CaptureKind::NONE)),
             by,
         };
         // written back before an error too: the stop's context reads the list

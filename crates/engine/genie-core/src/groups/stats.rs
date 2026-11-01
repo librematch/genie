@@ -187,9 +187,11 @@ impl World {
             };
             let master = u.master(&self.masters, p)?;
             let unit = FormationUnit::of(master);
-            let ai =
-                u.ai.as_ref()
-                    .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
+            let ai = u
+                .combat
+                .ai
+                .as_ref()
+                .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
             let view = MemberView {
                 id,
                 unit,
@@ -294,9 +296,11 @@ impl World {
         let (p, u) = self.object(id).ok_or(GenieError::unsupported(
             "a group member's search for a unit not held",
         ))?;
-        let ai =
-            u.ai.as_ref()
-                .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
+        let ai = u
+            .combat
+            .ai
+            .as_ref()
+            .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
         let ai_type = ai.ai_type;
         if self.players.player(p)?.computer {
             return Err(GenieError::unsupported(
@@ -326,7 +330,7 @@ impl World {
         ))?;
         if fresh {
             let enemies = !lists[UnitRelation::ENEMY].is_empty();
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.ai.as_mut()) {
+            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
                 ai.alert_mode = enemies;
                 if enemies {
                     ai.time_since_enemy = Seconds::ZERO;
@@ -623,7 +627,7 @@ mod tests {
         };
         charging(&mut t, 6, -1);
         assert_eq!(range(&t, Some(object_id(20))), Distance::new(1.0));
-        t.players[1].objects[ListIndex::new(0)].charge = Charge::new(1.0);
+        t.players[1].objects[ListIndex::new(0)].combat.charge = Charge::new(1.0);
         assert_eq!(range(&t, Some(object_id(20))), Distance::new(3.0));
         assert_eq!(range(&t, None), Distance::new(1.0));
         charging(&mut t, 7, 1 << 5);
@@ -653,7 +657,7 @@ mod tests {
             u
         };
         let mut soldier = unit(10, master_id(4), 5.0, 5.0);
-        soldier.ai = Some(crate::unit_ai::UnitAi {
+        soldier.combat.ai = Some(crate::unit_ai::UnitAi {
             ai_type: crate::unit_ai::SOLDIER_AI,
             ..crate::unit_ai::UnitAi::default()
         });
@@ -771,6 +775,7 @@ mod tests {
     fn a_member_s_search_lists_its_enemies_then_the_neutrals_it_attacks() {
         let mut t = searched_world();
         t.players[1].objects[ListIndex::new(0)]
+            .combat
             .ai
             .as_mut()
             .unwrap()
@@ -778,7 +783,11 @@ mod tests {
         let mut objects = Vec::new();
         t.member_objects(object_id(10), &mut objects).unwrap();
         assert_eq!(objects, [object_id(20), object_id(30)]);
-        let ai = t.players[1].objects[ListIndex::new(0)].ai.as_ref().unwrap();
+        let ai = t.players[1].objects[ListIndex::new(0)]
+            .combat
+            .ai
+            .as_ref()
+            .unwrap();
         assert_eq!((ai.alert_mode, ai.time_since_enemy), (true, Seconds::ZERO));
         t.member_objects(object_id(10), &mut objects).unwrap();
         assert_eq!(objects, [object_id(20), object_id(30)]);
@@ -817,6 +826,7 @@ mod tests {
                 })
                 .unwrap();
             t.players[1].objects[ListIndex::new(0)]
+                .combat
                 .ai
                 .as_mut()
                 .unwrap()
@@ -830,6 +840,7 @@ mod tests {
             (
                 objects,
                 t.players[1].objects[ListIndex::new(0)]
+                    .combat
                     .ai
                     .as_ref()
                     .unwrap()

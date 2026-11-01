@@ -96,7 +96,7 @@ impl World {
         }
         let (t, def) = self.research_tech(p, r.tech)?;
         let master = building.life.master_id;
-        let rate = building.work_rate_powerup + self.master(p, master)?.work_rate;
+        let rate = building.combat.work_rate_powerup + self.master(p, master)?.work_rate;
         let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, false);
         let shared = def.kind == crate::technology::TechType::SHARED;
@@ -180,7 +180,7 @@ impl World {
         {
             r.state = MakeTechState::Done;
         }
-        if let Some(ai) = building.ai.as_mut() {
+        if let Some(ai) = building.combat.ai.as_mut() {
             ai.post(
                 Notify::own(
                     id,
@@ -228,7 +228,7 @@ impl World {
         }
         let building = self.players.live_mut(p, i)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(ai) = building.ai.as_mut() {
+        if let Some(ai) = building.combat.ai.as_mut() {
             ai.post(
                 Notify::own(
                     id,

@@ -421,7 +421,7 @@ impl crate::world::World {
             .base_mut()
             .inside_at(inner_id, at, &mut self.spatial);
         self.leave_container((p, i), (up, ui), made, spot.with_height(at.z()))?;
-        if let Some(ai) = self.players.live_mut(up, ui)?.ai.as_mut() {
+        if let Some(ai) = self.players.live_mut(up, ui)?.combat.ai.as_mut() {
             ai.state_position = spot;
         }
         Ok(())

@@ -117,7 +117,7 @@ impl World {
                     .objects
                     .by_id_mut(id)
                     .or_else(|| player.sleeping.by_id_mut(id))?;
-                unit.ai.as_mut()
+                unit.combat.ai.as_mut()
             });
             if let Some(ai) = ai {
                 ai.reset_for_order(self.streams.get(Stream::Ai));
@@ -130,7 +130,7 @@ impl World {
     pub(super) fn start_patrol_timers(&mut self, ids: &[Option<ObjectId>], reset: bool) {
         let dt = self.dt;
         for (i, &id) in ids.iter().enumerate() {
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.ai.as_mut()) {
+            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
                 ai.idle_timer = Millis::ZERO;
                 let timeout = patrol_timeout(i, dt);
                 ai.adjusted_idle_timeout = timeout;
@@ -351,7 +351,8 @@ impl World {
             return Ok(());
         };
         if !sweep.patrol
-            && u.ai
+            && u.combat
+                .ai
                 .as_ref()
                 .is_some_and(|ai| sweep.queued || (!sweep.ignore_pending && ai.has_unready_order()))
         {
@@ -399,7 +400,7 @@ impl World {
             None => return Ok(()),
         };
         let rng = self.streams.get(Stream::Ai);
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             let shown = waypoints.last().copied().unwrap_or_default();
             ai.set_order(
                 Some(if sweep.patrol {

@@ -55,11 +55,11 @@ impl Unit {
     ) -> Result<Option<crate::combat::damage::Kill>, GenieError> {
         self.life.hp = own.hp;
         if let Some(a) = own.armored.as_ref() {
-            self.hp_powerup = a.hp_powerup;
+            self.combat.hp_powerup = a.hp_powerup;
         }
-        self.charge = own.source.charge;
-        self.charge_hit = own.source.charge_hit;
-        if let Some(ai) = self.ai.as_mut() {
+        self.combat.charge = own.source.charge;
+        self.combat.charge_hit = own.source.charge_hit;
+        if let Some(ai) = self.combat.ai.as_mut() {
             for &(attacker, p) in &own.damaged {
                 let n = Notify {
                     caller: attacker,
@@ -129,8 +129,9 @@ impl Unit {
         let (first, extra) = if master.max_volley == MissileCount::ZERO {
             (true, 0)
         } else {
-            let count = crate::combat::missile::volley_count(self.firepower, master.max_volley);
-            let old = self.next_volley;
+            let count =
+                crate::combat::missile::volley_count(self.combat.firepower, master.max_volley);
+            let old = self.combat.next_volley;
             let mut n = count - old.counted();
             let VolleySpread {
                 x: x_spread,
@@ -146,15 +147,15 @@ impl Unit {
                     1
                 };
                 if k < n {
-                    self.next_volley = self.next_volley.plus(k as u8);
+                    self.combat.next_volley = self.combat.next_volley.plus(k as u8);
                     // an immediate 0.05
-                    self.attack_timer = Seconds::new(0.05);
+                    self.combat.attack_timer = Seconds::new(0.05);
                     n = k;
                     all = false;
                 }
             }
             if all {
-                self.next_volley = MissileCount::ZERO;
+                self.combat.next_volley = MissileCount::ZERO;
                 if notifies {
                     self.post_own(NotifyKind::ACTION_EXECUTED, [600, -1, 0])?;
                 }
@@ -207,7 +208,7 @@ impl Unit {
     /// spare friends notifies (0x20f). Not held: the damaged flag of masters 83, 293, 122 and 216
     /// (`+0x683`).
     pub(crate) fn fire(&mut self, c: &mut Step<'_>, aimed: &Aimed) -> Result<(), GenieError> {
-        self.attack_count = self.attack_count.next();
+        self.combat.attack_count = self.combat.attack_count.next();
         let master = self.master(&c.w.masters, c.player)?;
         if master.charge_type.ranged() {
             return Err(GenieError::unsupported(
@@ -232,7 +233,7 @@ impl Unit {
                 spread: master.missed_spread,
                 class: master.class,
             },
-            attack_count: self.attack_count,
+            attack_count: self.combat.attack_count,
         };
         let (weapon_range, blast_level) = (master.weapon_range, master.blast_level);
         self.launch(c, aimed, &shot)?;
@@ -544,7 +545,10 @@ impl Unit {
                 step: Offset::ZERO,
             }),
             // its +0x900, the firing object's attack count when fired
-            attack_count: self.attack_count,
+            combat: crate::objects::layers::Combat {
+                attack_count: self.combat.attack_count,
+                ..Default::default()
+            },
             actions: ActionList::default().with_missile(Some(action)),
             attackable: true,
             pasture: None,

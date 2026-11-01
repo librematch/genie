@@ -381,6 +381,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
         let masters = turns.masters.get(p);
         for unit in player.objects.iter_mut().chain(player.sleeping.iter_mut()) {
             let Some(ai) = unit
+                .combat
                 .ai
                 .as_mut()
                 .filter(|ai| ai.ai_type == genie_core::unit_ai::UnitAiType::HUNTED)

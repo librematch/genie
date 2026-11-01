@@ -197,7 +197,7 @@ impl Attack {
         }
         if f.own.class == class::PREDATOR
             && r.ai_type == Some(BOAR_AI)
-            && let Some(home) = unit.ai.as_mut().and_then(|ai| ai.home.as_mut())
+            && let Some(home) = unit.combat.ai.as_mut().and_then(|ai| ai.home.as_mut())
         {
             home.go_home = true;
         }
@@ -271,7 +271,7 @@ impl Attack {
 
 /// `FUN_140c5e1e0` at once: the unit AI forgets its target ([`crate::unit_ai::UnitAi::remove_target`]).
 fn forget_target(unit: &mut Unit) {
-    if let Some(ai) = unit.ai.as_mut() {
+    if let Some(ai) = unit.combat.ai.as_mut() {
         ai.remove_target();
     }
 }

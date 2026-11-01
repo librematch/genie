@@ -95,7 +95,7 @@ impl World {
         if unit.undeletable
             || master.kind < DELETABLE_TYPE
             || UNDELETABLE.contains(&master.class)
-            || unit.capture_flag == CaptureKind::AGAIN
+            || unit.combat.capture_flag == CaptureKind::AGAIN
         {
             return Ok(());
         }

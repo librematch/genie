@@ -367,7 +367,11 @@ fn repair_of(t: &crate::world::World) -> RepairAction {
 
 /// The notifies the repairer's unit AI heard, each with the repair's action value.
 fn heard(t: &crate::world::World) -> Vec<crate::unit_ai::NotifyKind> {
-    let ai = t.players[1].objects[ListIndex::new(0)].ai.as_ref().unwrap();
+    let ai = t.players[1].objects[ListIndex::new(0)]
+        .combat
+        .ai
+        .as_ref()
+        .unwrap();
     let repair = crate::unit_ai::ActionKind::Repair.value();
     ai.notifies
         .iter()
@@ -686,12 +690,12 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         )
     );
     let h = &mut t.players[1].objects[ListIndex::new(1)];
-    (h.life.hp, h.armor_removed) = (HitPoints::new(549.99), ArmorPair::new(3, 4));
+    (h.life.hp, h.combat.armor_removed) = (HitPoints::new(549.99), ArmorPair::new(3, 4));
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     assert_eq!(repair_of(&t).state, RepairState::Done);
     assert_eq!(the_house(&t), (550.0, 0, 0));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(1)].armor_removed,
+        t.players[1].objects[ListIndex::new(1)].combat.armor_removed,
         ArmorPair::ZERO
     );
     assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);

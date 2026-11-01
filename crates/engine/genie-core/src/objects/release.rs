@@ -44,7 +44,7 @@ pub(crate) fn released(
     by: Releaser,
 ) -> Result<(), GenieError> {
     let state = u.life.state;
-    match (released_fields(u, kind, listed, by), u.ai.as_mut()) {
+    match (released_fields(u, kind, listed, by), u.combat.ai.as_mut()) {
         (Some(n), Some(ai)) => ai.post(n, state),
         _ => Ok(()),
     }
@@ -72,7 +72,8 @@ pub(crate) fn released_fields(
     if kind < ANIMATED && u.workers == crate::objects::WorkerCount::ZERO && alive {
         u.life.goto_sleep = true;
     }
-    (u.combat && !by.id.is_recyclable()).then(|| Notify {
+    // a combat object's (types 50 and up) unit AI
+    (COMBAT <= kind && !by.id.is_recyclable()).then(|| Notify {
         caller: Some(by.id),
         recipient: u.id,
         kind: crate::unit_ai::NotifyKind::NO_LONGER_ON_ME,

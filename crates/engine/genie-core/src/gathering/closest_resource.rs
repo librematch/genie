@@ -273,6 +273,7 @@ impl Unit {
     ) -> Result<Option<ObjectId>, GenieError> {
         let others = OthersRef::of(&c.w.players, c.player)?;
         let current = self
+            .combat
             .ai
             .as_ref()
             .ok_or(GenieError::unsupported(

@@ -572,6 +572,7 @@ fn completed(t: &World) -> usize {
     t.object(object_id(1000))
         .unwrap()
         .1
+        .combat
         .ai
         .as_ref()
         .unwrap()
@@ -1759,7 +1760,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     ));
     let tc = &mut t.players[1].objects[ListIndex::new(0)];
     tc.place_for_test(Position::new(10.0, 10.0, 0.0));
-    tc.firepower = Firepower::new(1.0);
+    tc.combat.firepower = Firepower::new(1.0);
     t.spatial.insert(
         object_id(100),
         crate::map::spatial::Placed {
@@ -1820,7 +1821,7 @@ fn a_gather_point_on_its_own_building_takes_the_new_unit_in() {
         ),
         (Some(container_id(100)), state, false, false)
     );
-    assert_eq!(v.town_bell.work.target, Some(object_id(100)));
+    assert_eq!(v.combat.town_bell.work.target, Some(object_id(100)));
     assert_eq!(
         t.object(object_id(100)).unwrap().1.garrison,
         [object_id(1000)]
@@ -1836,7 +1837,7 @@ fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
     walker.stats = standing();
     v.body.put_mover(Some(walker));
     v.group.id = Some(group_id(7));
-    v.town_bell.flag = true;
+    v.combat.town_bell.flag = true;
     t.players[1].objects.push(v);
     t.spatial.insert(
         object_id(400),
@@ -1895,7 +1896,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.stats = standing();
     v.body.put_mover(Some(walker));
-    v.ai = Some(crate::unit_ai::UnitAi {
+    v.combat.ai = Some(crate::unit_ai::UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
         current_action: None,
@@ -2047,20 +2048,20 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
     let v = &mut t.players[2].objects[ListIndex::new(0)];
-    v.town_bell.flag = true;
-    v.town_bell.work = crate::orders::town_bell::BackToWork {
+    v.combat.town_bell.flag = true;
+    v.combat.town_bell.work = crate::orders::town_bell::BackToWork {
         point: Point::new(4.5, 4.5),
         ..crate::orders::town_bell::BackToWork::NONE
     };
     // the building's last unit inside: the volleys go back to the master's volley fire
-    t.players[1].objects[ListIndex::new(0)].firepower = Firepower::new(2.0);
+    t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(2.0);
     t.go_back_to_work(player_id(1), &object_ids([100])).unwrap();
     let v = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(v.life.inside, None);
-    assert!(!v.town_bell.flag);
+    assert!(!v.combat.town_bell.flag);
     assert_eq!(t.players[1].objects[ListIndex::new(0)].garrison.len(), 0);
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].firepower,
+        t.players[1].objects[ListIndex::new(0)].combat.firepower,
         Firepower::new(1.0)
     );
     assert!(t.spatial.get_known(object_id(2000)).unwrap().is_some());
@@ -2069,14 +2070,19 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
-    t.players[2].objects[ListIndex::new(0)].town_bell.work.point = Point::new(4.5, 4.5);
-    t.players[1].objects[ListIndex::new(0)].firepower = Firepower::new(f32::NAN);
+    t.players[2].objects[ListIndex::new(0)]
+        .combat
+        .town_bell
+        .work
+        .point = Point::new(4.5, 4.5);
+    t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(f32::NAN);
     assert!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(2000))
             .unwrap()
     );
     assert!(
         t.players[1].objects[ListIndex::new(0)]
+            .combat
             .firepower
             .get()
             .is_nan()
@@ -2085,10 +2091,11 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         t.players[1].objects[ListIndex::new(0)].garrison,
         [object_id(1000)]
     );
-    t.players[1].objects[ListIndex::new(0)].firepower = Firepower::new(0.5);
+    t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(0.5);
     t.object_mut(object_id(1000))
         .unwrap()
         .1
+        .combat
         .town_bell
         .work
         .point = Point::new(4.5, 15.5);
@@ -2097,7 +2104,7 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
             .unwrap()
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].firepower,
+        t.players[1].objects[ListIndex::new(0)].combat.firepower,
         Firepower::new(1.0)
     );
     // a unit not a villager stays inside
@@ -2125,8 +2132,8 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
         let mut t = let_out_world();
         inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
         let (_, v) = t.object_mut(object_id(1000)).unwrap();
-        v.ai = Some(crate::unit_ai::UnitAi::default());
-        v.town_bell.work = BackToWork {
+        v.combat.ai = Some(crate::unit_ai::UnitAi::default());
+        v.combat.town_bell.work = BackToWork {
             target: Some(object_id(7)),
             target_class: class_of(class),
             action,
@@ -2137,7 +2144,14 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
             t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(1000))
                 .unwrap()
         );
-        let ai = t.object(object_id(1000)).unwrap().1.ai.as_ref().unwrap();
+        let ai = t
+            .object(object_id(1000))
+            .unwrap()
+            .1
+            .combat
+            .ai
+            .as_ref()
+            .unwrap();
         let heard: Vec<_> = ai.notifies.iter().map(|n| (n.kind, n.p)).collect();
         if searches {
             assert_eq!(ai.current_action, Some(ActionKind::Gather));
@@ -2191,7 +2205,7 @@ fn a_unit_ais_test_takes_a_building_or_transport_that_takes_its_unit_in() {
 pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point) {
     let mut v = unit(id, m, HitPoints::new(25.0));
     v.place_for_test(at.with_height(0.0));
-    v.ai = Some(crate::unit_ai::UnitAi {
+    v.combat.ai = Some(crate::unit_ai::UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
         current_action: None,
@@ -2403,7 +2417,7 @@ fn a_garrison_through_the_unit_ais_queues_their_enter_orders() {
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.actions.enter().copied(), None);
     assert_eq!(
-        v.ai.as_ref().unwrap().orders,
+        v.combat.ai.as_ref().unwrap().orders,
         [crate::unit_ai::QueuedOrder {
             issuer: Some(Issuer::Object(object_id(1000))),
             order: OrderKind::Enter,
@@ -2465,12 +2479,18 @@ fn a_garrison_into_a_transport_pairs_the_units_whose_class_has_the_flags() {
     )
     .unwrap();
     let orders = |t: &World, id| {
-        t.object(object_id(id)).unwrap().1.ai.as_ref().map(|ai| {
-            ai.orders
-                .iter()
-                .map(|o| (o.order, o.target))
-                .collect::<Vec<_>>()
-        })
+        t.object(object_id(id))
+            .unwrap()
+            .1
+            .combat
+            .ai
+            .as_ref()
+            .map(|ai| {
+                ai.orders
+                    .iter()
+                    .map(|o| (o.order, o.target))
+                    .collect::<Vec<_>>()
+            })
     };
     assert_eq!(
         orders(&t, 1000),
@@ -2662,7 +2682,14 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
         )
     );
     // the unit AI holds the enter order and action, the ship its target
-    let ai = t.object(object_id(1000)).unwrap().1.ai.clone().unwrap();
+    let ai = t
+        .object(object_id(1000))
+        .unwrap()
+        .1
+        .combat
+        .ai
+        .clone()
+        .unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (
@@ -2844,7 +2871,7 @@ fn coast_world(ship: Point) -> World {
     mover.moved_at = ship.with_height(0.0);
     let s = t.object_mut(object_id(200)).unwrap().1;
     s.body.put_mover(Some(mover));
-    s.ai = Some(crate::unit_ai::UnitAi {
+    s.combat.ai = Some(crate::unit_ai::UnitAi {
         ai_type: UnitAiType::TRANSPORT,
         current_order: None,
         current_action: None,
@@ -2917,7 +2944,7 @@ fn an_unload_command_sends_a_transport_toward_the_shore() {
             false
         )
     );
-    let ai = ship.ai.as_ref().unwrap();
+    let ai = ship.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (
@@ -3045,7 +3072,7 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
             Some(MoveTo::Start)
         )
     );
-    let ai = ship.ai.as_ref().unwrap();
+    let ai = ship.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (
@@ -3119,7 +3146,7 @@ fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
         ship.actions.transport().map(|tr| tr.mode),
         Some(TransportMode::NEW)
     );
-    let ai = ship.ai.as_ref().unwrap();
+    let ai = ship.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_target, ai.target_class),
         (Some(object_id(4000)), class_of(52))
@@ -3184,7 +3211,7 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
     assert_eq!(v.position(), spot.with_height(0.0));
-    assert_eq!(v.ai.as_ref().unwrap().state_position, spot);
+    assert_eq!(v.combat.ai.as_ref().unwrap().state_position, spot);
     assert_eq!(
         t.spatial.get(object_id(1000)).map(|p| p.position),
         Some(spot.with_height(0.0))
@@ -3287,8 +3314,8 @@ fn a_unit_inside_a_transport_unloaded_goes_ashore_about_it() {
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
     assert_eq!(v.position(), spot.with_height(0.0));
-    assert_eq!(v.ai.as_ref().unwrap().state_position, spot);
-    assert!(!v.town_bell.flag);
+    assert_eq!(v.combat.ai.as_ref().unwrap().state_position, spot);
+    assert!(!v.combat.town_bell.flag);
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
     assert_eq!(ship.actions.transport().copied(), None);
@@ -3398,9 +3425,9 @@ fn a_villager_beside_a_ship_enters_it_at_once() {
     assert_eq!(v.life.inside, Some(container_id(200)));
     assert_eq!(v.position().ground(), Point::new(5.5, 20.5));
     assert_eq!(v.actions.enter().map(|e| e.state), Some(EnterState::Done));
-    assert!(!v.town_bell.flag);
+    assert!(!v.combat.town_bell.flag);
     assert_eq!(
-        v.town_bell.work,
+        v.combat.town_bell.work,
         crate::orders::town_bell::BackToWork {
             target: Some(object_id(200)),
             target_class: None,
@@ -3544,8 +3571,8 @@ fn unload_of_a_building_lets_every_unit_inside_out() {
         .insert(0, object_id(1500));
     for id in [1000, 1001] {
         let v = t.object_mut(object_id(id)).unwrap().1;
-        v.town_bell.flag = true;
-        v.ai = Some(crate::unit_ai::UnitAi {
+        v.combat.town_bell.flag = true;
+        v.combat.ai = Some(crate::unit_ai::UnitAi {
             orders: vec![crate::unit_ai::QueuedOrder::default()],
             ..crate::unit_ai::UnitAi::default()
         });
@@ -3566,12 +3593,12 @@ fn unload_of_a_building_lets_every_unit_inside_out() {
     for id in [1000, 1001] {
         let v = t.object(object_id(id)).unwrap().1;
         assert_eq!(v.life.inside, None, "{id}");
-        assert!(!v.town_bell.flag, "{id}");
-        assert!(v.ai.as_ref().unwrap().orders.is_empty(), "{id}");
+        assert!(!v.combat.town_bell.flag, "{id}");
+        assert!(v.combat.ai.as_ref().unwrap().orders.is_empty(), "{id}");
     }
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
-    t.players[1].objects[ListIndex::new(0)].ai = Some(crate::unit_ai::UnitAi {
+    t.players[1].objects[ListIndex::new(0)].combat.ai = Some(crate::unit_ai::UnitAi {
         building_orders: vec![crate::unit_ai::QueuedOrder::default()],
         ..crate::unit_ai::UnitAi::default()
     });
@@ -3596,8 +3623,8 @@ fn unload_lets_a_unit_out_of_the_building_it_is_inside() {
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(1), 1001, VILLAGER);
     let v = t.object_mut(object_id(1000)).unwrap().1;
-    v.town_bell.flag = true;
-    v.ai = Some(crate::unit_ai::UnitAi::default());
+    v.combat.town_bell.flag = true;
+    v.combat.ai = Some(crate::unit_ai::UnitAi::default());
     UnloadCommand {
         player: player_id(1),
         units: unit_list(object_ids([1000])),
@@ -3609,7 +3636,7 @@ fn unload_lets_a_unit_out_of_the_building_it_is_inside() {
     .unwrap();
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
-    assert!(!v.town_bell.flag);
+    assert!(!v.combat.town_bell.flag);
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].garrison,
         [object_id(1001)]
@@ -3624,7 +3651,7 @@ fn a_unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     let v = t.object_mut(object_id(1000)).unwrap().1;
-    v.ai = Some(crate::unit_ai::UnitAi {
+    v.combat.ai = Some(crate::unit_ai::UnitAi {
         current_action: Some(ActionKind::Gather),
         current_target: Some(object_id(77)),
         stance: UnitStance::DEFENSIVE,
@@ -3642,7 +3669,7 @@ fn a_unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
     );
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
-    let ai = v.ai.as_ref().unwrap();
+    let ai = v.combat.ai.as_ref().unwrap();
     assert_eq!(
         (
             ai.current_action,
@@ -3663,7 +3690,7 @@ fn a_unit_on_the_map_let_out_moves_beside_the_building() {
     let mut t = let_out_world();
     let tc_at = t.players[1].objects[ListIndex::new(0)].position();
     walker(&mut t, PlayerId::new(1), 1000, VILLAGER, tc_at.ground());
-    let firepower = t.players[1].objects[ListIndex::new(0)].firepower;
+    let firepower = t.players[1].objects[ListIndex::new(0)].combat.firepower;
     assert_eq!(
         t.let_out(
             PlayerId::new(1),
@@ -3681,7 +3708,7 @@ fn a_unit_on_the_map_let_out_moves_beside_the_building() {
         v.position()
     );
     let tc = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!((tc.garrison.len(), tc.firepower), (0, firepower));
+    assert_eq!((tc.garrison.len(), tc.combat.firepower), (0, firepower));
 }
 
 #[test]
@@ -3708,12 +3735,16 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     }
     assert_eq!(t.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
     // a raider inside a building: its +0xc2c share is not kept
-    t.object_mut(object_id(1000)).unwrap().1.raider_countdown = RaiderCountdown::of_data(20);
+    t.object_mut(object_id(1000))
+        .unwrap()
+        .1
+        .combat
+        .raider_countdown = RaiderCountdown::of_data(20);
     assert!(t.garrisoned(object_id(100)).is_err());
     // a transport has no +0xc2c term
     let mut u = unit(3000, VILLAGER, HitPoints::new(25.0));
     u.life.inside = Some(ContainerId::new(object_id(200)));
-    u.raider_countdown = RaiderCountdown::of_data(20);
+    u.combat.raider_countdown = RaiderCountdown::of_data(20);
     t.players[1].objects.push(u);
     assert_eq!(t.garrisoned(object_id(200)), Ok(InsideCount::ONE));
 }
@@ -3799,6 +3830,7 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.actions.transport().copied(), None);
     let heard: Vec<_> = ship
+        .combat
         .ai
         .as_ref()
         .unwrap()
@@ -3890,7 +3922,7 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), done);
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.actions.transport().copied(), None);
-    assert_eq!(ship.ai.as_ref().unwrap().notifies, []);
+    assert_eq!(ship.combat.ai.as_ref().unwrap().notifies, []);
     assert_eq!(
         t.object(object_id(1000)).unwrap().1.life.inside,
         Some(container_id(200))
@@ -3908,7 +3940,7 @@ fn let_out_beside_a_second_centre(
 ) -> (Result<bool, GenieError>, World) {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
-    t.object_mut(object_id(1000)).unwrap().1.ai = Some(crate::unit_ai::UnitAi {
+    t.object_mut(object_id(1000)).unwrap().1.combat.ai = Some(crate::unit_ai::UnitAi {
         current_action: Some(ActionKind::Gather),
         current_target: Some(object_id(77)),
         stance: UnitStance::DEFENSIVE,
@@ -3948,7 +3980,7 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
     assert_eq!(
-        v.ai.as_ref().map(|a| a.current_target),
+        v.combat.ai.as_ref().map(|a| a.current_target),
         Some(Some(object_id(77)))
     );
     assert_eq!(v.top_action(), None);
@@ -3964,7 +3996,7 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
     assert_eq!(r, Ok(true));
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
-    assert_eq!(v.ai.as_ref().map(|a| a.current_target), Some(None));
+    assert_eq!(v.combat.ai.as_ref().map(|a| a.current_target), Some(None));
     assert_eq!(v.top_action(), None);
 }
 

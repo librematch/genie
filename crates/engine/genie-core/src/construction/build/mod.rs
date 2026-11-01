@@ -777,11 +777,19 @@ mod stack_tests {
         );
         // the tower's unit AI for the town centre, the building's for the annexes
         assert_eq!(
-            unit(object_id(8768)).ai.as_ref().map(|ai| ai.ai_type),
+            unit(object_id(8768))
+                .combat
+                .ai
+                .as_ref()
+                .map(|ai| ai.ai_type),
             Some(UnitAiType::TOWER)
         );
         assert_eq!(
-            unit(object_id(8769)).ai.as_ref().map(|ai| ai.ai_type),
+            unit(object_id(8769))
+                .combat
+                .ai
+                .as_ref()
+                .map(|ai| ai.ai_type),
             Some(UnitAiType::BUILDING)
         );
         // the foundation lacked 0.84 of its 2400 hit points after its last work: the town
@@ -790,7 +798,7 @@ mod stack_tests {
         assert_eq!(
             (
                 unit(object_id(8768)).life.hp,
-                unit(object_id(8768)).store.clone()
+                unit(object_id(8768)).combat.store.clone()
             ),
             (
                 HitPoints::new(2400.0 - lacked),

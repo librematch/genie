@@ -119,6 +119,7 @@ impl Unit {
         if step.gave_up {
             let villager = self.master(&c.w.masters, c.player)?.class == class::VILLAGER;
             let stance = self
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
@@ -154,7 +155,7 @@ impl Unit {
         };
         let target = move_to.target;
         let state = c.w.object_state(target);
-        let mut inbox = Inbox::of(&mut self.ai, self.id, self.life.state);
+        let mut inbox = Inbox::of(&mut self.combat.ai, self.id, self.life.state);
         let code = move_to.check_held(state, &mut inbox)?;
         let releases = code.is_some() && !move_to.quiet;
         if releases && let Some(target) = target {
@@ -181,7 +182,7 @@ impl Unit {
                 };
                 let ask = match point {
                     Some(p) if move_to.state == MoveTo::Start => {
-                        UnitAi::path_ask(self.ai.as_mut(), self.body.position().ground(), p)
+                        UnitAi::path_ask(self.combat.ai.as_mut(), self.body.position().ground(), p)
                     }
                     _ => crate::movement::PathAsk::default(),
                 };
@@ -195,7 +196,7 @@ impl Unit {
                 .ok();
                 let graphic =
                     |id: Option<SpriteId>| id.and_then(|id| c.w.graphics.get(id).copied());
-                let look = self.abilities.look.as_ref();
+                let look = self.combat.abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
                 let (walk, rng) = c.walk_and_sprites(&mut self.body, me)?;

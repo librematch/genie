@@ -181,7 +181,10 @@ impl Unit {
         if !self.life.goto_sleep {
             return Ok(false);
         }
-        if self.life.class != Class::Static || self.body.mover().is_some() || self.ai.is_some() {
+        if self.life.class != Class::Static
+            || self.body.mover().is_some()
+            || self.combat.ai.is_some()
+        {
             return Err(GenieError::unsupported(
                 "an object above the static type goes to sleep",
             ));

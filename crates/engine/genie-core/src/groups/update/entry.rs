@@ -161,7 +161,7 @@ impl World {
             let leaves = match self.world_object(id) {
                 None | Some(WorldObject::Ghost(..)) => true,
                 Some(WorldObject::Unit(p, u)) => {
-                    u.ai.is_none() || u.life.hp < HitPoints::new(1.0) || Some(p) != owner
+                    u.combat.ai.is_none() || u.life.hp < HitPoints::new(1.0) || Some(p) != owner
                 }
             };
             if leaves && self.remove_unit(group, id, None, false)? {

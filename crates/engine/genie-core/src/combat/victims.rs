@@ -290,16 +290,16 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
         m.decay = v.decay;
     }
     if let Some(a) = v.armored.as_ref() {
-        u.hp_powerup = a.hp_powerup;
+        u.combat.hp_powerup = a.hp_powerup;
     }
     // a shield spends its charge
-    u.charge = v.source.charge;
+    u.combat.charge = v.source.charge;
     let struck = v.building.as_ref().filter(|b| b.struck);
     if let Some(b) = struck {
         u.damaged_lately = b.damaged_lately;
     }
     // the damage notify (500) to its unit AI
-    if let Some(ai) = u.ai.as_mut() {
+    if let Some(ai) = u.combat.ai.as_mut() {
         for &(attacker, p) in &damaged {
             let n = Notify {
                 caller: attacker,

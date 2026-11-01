@@ -227,6 +227,7 @@ impl ExploreAction {
         let gives_up = GiveUp {
             waits: villager && !c.w.players.player(c.player)?.computer,
             stance: explorer
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),

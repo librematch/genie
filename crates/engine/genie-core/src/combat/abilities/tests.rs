@@ -947,6 +947,7 @@ fn a_moving_unit_s_movement_damage_hits_the_enemies_about_it() {
     assert_eq!(hp(&t, object_id(40)), HitPoints::new(30.0));
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
+            .combat
             .abilities
             .movement_damage_timer,
         Seconds::new(3.0)
@@ -956,12 +957,14 @@ fn a_moving_unit_s_movement_damage_hits_the_enemies_about_it() {
     assert_eq!(hp(&t, object_id(20)), HitPoints::new(25.0));
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
+            .combat
             .abilities
             .movement_damage_timer,
         Seconds::new(2.5)
     );
     // standing, no hit even when due
     t.players[1].objects[ListIndex::new(0)]
+        .combat
         .abilities
         .movement_damage_timer = Seconds::ZERO;
     t.players[1].objects[ListIndex::new(0)]
@@ -1062,9 +1065,9 @@ fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() 
     run(&mut t, PlayerId::new(1), 70);
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.body.mover().unwrap().factor, 0.35);
-    assert_eq!(u.abilities.attack_rate, 1.0);
+    assert_eq!(u.combat.abilities.attack_rate, 1.0);
     assert_eq!(
-        u.abilities.look,
+        u.combat.abilities.look,
         Some(Look {
             standing: Some(SpriteId::named(19599)),
             walking: Some(SpriteId::named(19601)),
@@ -1083,7 +1086,10 @@ fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() 
     run(&mut t, PlayerId::new(1), 70);
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.body.mover().unwrap().factor, 1.0);
-    assert_eq!((u.abilities.attack_rate, u.abilities.look), (1.0, None));
+    assert_eq!(
+        (u.combat.abilities.attack_rate, u.combat.abilities.look),
+        (1.0, None)
+    );
 }
 
 #[test]

@@ -320,10 +320,10 @@ impl AttackReads {
                 .and_then(|s| graphics.get(s))
                 .copied(),
             volleys: masters.is_some_and(|m| volleys(master, m)),
-            reload: unit.reload_stinger + (master.reload - unit.reload_powerup),
+            reload: unit.combat.reload_stinger + (master.reload - unit.combat.reload_powerup),
             hit_chance: master.hit_chance,
-            armed: crate::combat::volley::armed(master, unit.firepower),
-            swing_sprites: swing_sprites(unit.abilities.look.as_ref(), master, graphics),
+            armed: crate::combat::volley::armed(master, unit.combat.firepower),
+            swing_sprites: swing_sprites(unit.combat.abilities.look.as_ref(), master, graphics),
             computer,
             world_time: now,
             can_move: ai
@@ -333,8 +333,8 @@ impl AttackReads {
             queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),
             ai_type: ai.map(|ai| ai.ai_type),
-            volley_under_way: unit.next_volley != crate::combat::MissileCount::ZERO,
-            move_defaults: MoveDefaults::of(master, unit.abilities.look.as_ref()),
+            volley_under_way: unit.combat.next_volley != crate::combat::MissileCount::ZERO,
+            move_defaults: MoveDefaults::of(master, unit.combat.abilities.look.as_ref()),
         }
     }
 }

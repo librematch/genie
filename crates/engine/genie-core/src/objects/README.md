@@ -9,9 +9,10 @@ missile. This folder holds the object itself and the parts that every object has
 - `sprite.rs` holds the object's active sprite and the clock that animates it. A hit lands on a
   frame of the attack sprite.
 - `facing.rs` holds the object's angle and its facet in the sprite.
-- `layers.rs` holds the object's layers below its actions (FD-045): the static layer with its
-  place, animated with its animation speed, or moving with its mover. Every layer holds the
-  static one. The place has one setter, which moves the world's index with it (D15).
+- `layers/` holds the object's layers (FD-045): below its actions the static layer with its
+  place, animated with its animation speed, or moving with its mover (every layer holds the
+  static one; the place has one setter, which moves the world's index with it, D15), and the
+  combat layer.
 - `actions.rs` holds the object's action list: one `Action` per kind it holds, the current one
   first.
 - `release.rs` handles an object that leaves the world, and the release of a target by the
@@ -45,7 +46,6 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`hit_points.rs`](hit_points.rs) | A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and 80): the heal, the gain and the loss, the regeneration and the powerup's clamp (slots 0x110, 0xb8 and 0x260, and the update's checks). |
 | [`hp.rs`](hp.rs) | An object's hit points (`HitPoints`), with the game's `f32` operations, and a master's whole hit points (`MasterHitPoints`). |
 | [`id_table.rs`](id_table.rs) | A table of values by object id: a dense column per sign of the id, so that a lookup indexes and a walk takes the ids in a sorted map's order, the most negative first (the order the side tables kept as `BTreeMap`s). |
-| [`layers.rs`](layers.rs) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |
 | [`lines.rs`](lines.rs) | The unit lines (`resources/_common/dat/unitlines.json`): each line names the masters of one upgrade chain, its first master first. |
 | [`list_index.rs`](list_index.rs) | An object's place in its player's list (`ListIndex`) and a list's places (`Places`). |
 | [`mod.rs`](mod.rs) | One object and what every object has and runs: the object the engine tracks (`unit::Unit`) with its update, its actions' holdings and stops, its life and death, its release, its sprite and facing, and the masters it is made from. |
@@ -64,6 +64,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`update_code.rs`](update_code.rs) | What an action's update answers its list. |
 | [`work_rate.rs`](work_rate.rs) | A worker's work rate (`WorkRate`), with the game's `f32` operations. |
 | [`worker_count.rs`](worker_count.rs) | The count of the actions that work on an object, and the caps on it. |
+| [`layers/`](layers/) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |
 | [`lifecycle/`](lifecycle/) | What happens to an object once it is dead: the state steps of `RGE_Static_Object::update` (158041 `0x14118ad50`) and `RGE_Animated_Object::update` (`0x141071880`), up to the update that returns 1 and so takes the object off its player's list (`RGE_Object_List::update`, `0x141166550`). |
 | [`masters/`](masters/) | What the engine reads of a player's masters: the tasks a unit can do and the masters a unit changes into to do them, and how an effect changes a master: the attribute setters (slots 0x18, 0x20 and 0x28 of every master type, `Master::set_attribute`), the master copy of an upgrade (slot 8, `Master::copy_from`) and the values the slice derives from a master (`Master::follow`). |
 | [`unit/`](unit/) | What the slice tracks of one object (`Unit`) and its update, action by action. |

@@ -158,12 +158,15 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             attribute_type: None,
             ..Lifecycle::default()
         },
-        ai: Some(UnitAi {
-            ai_type: crate::unit_ai::CIVILIAN,
-            current_target: None,
-            last_target: None,
-            ..UnitAi::default()
-        }),
+        combat: crate::objects::layers::Combat {
+            ai: Some(UnitAi {
+                ai_type: crate::unit_ai::CIVILIAN,
+                current_target: None,
+                last_target: None,
+                ..UnitAi::default()
+            }),
+            ..Default::default()
+        },
         actions: ActionList::default().with_build(Some(build)),
         sprite: Some(ActiveSprite::start(
             graphic(WALKING),
@@ -296,7 +299,7 @@ fn stands(t: &World) -> bool {
 
 /// The notifies the builder's unit AI heard.
 fn heard(t: &World) -> Vec<(NotifyKind, [i32; 3])> {
-    let ai = builder(t).ai.as_ref().unwrap();
+    let ai = builder(t).combat.ai.as_ref().unwrap();
     ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
 }
 
@@ -1031,6 +1034,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
             .objects
             .by_id(object_id(6))
             .unwrap()
+            .combat
             .ai
             .as_ref()
             .unwrap();
@@ -1074,7 +1078,7 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
     h.stack_made = Some(object_id(10031));
     let v = own(&mut t, BUILDER);
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(7.0));
-    let ai = v.ai.as_mut().unwrap();
+    let ai = v.combat.ai.as_mut().unwrap();
     (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(ActionKind::Build));
     assert_eq!(code(&mut t, 20), HeadCode::Deletes);
     let b = build(&t);
@@ -1087,7 +1091,7 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
         [ActionKind::Build.value(), 10031, 0],
     );
     assert_eq!(heard(&t), [built]);
-    let ai = builder(&t).ai.as_ref().unwrap();
+    let ai = builder(&t).combat.ai.as_ref().unwrap();
     assert_eq!((ai.current_order, ai.current_action), (None, None));
     assert_eq!((house(&t).0, house(&t).1), (0, 0));
     assert_eq!(t.players[1].attributes[0], Amount::new(7.0));
@@ -1215,7 +1219,7 @@ fn a_villager_works_the_farm_it_built() {
         target: Some(object_id(99)),
         ..QueuedOrder::default()
     };
-    let ai = own(&mut t, BUILDER).ai.as_mut().unwrap();
+    let ai = own(&mut t, BUILDER).combat.ai.as_mut().unwrap();
     ai.orders = vec![order(OrderKind::Build), order(OrderKind::Hunt)];
     let worked = update(&mut t, 20).unwrap();
     // the work command within the update: [`site_world`]'s villager has no farm task, so it
@@ -1223,7 +1227,7 @@ fn a_villager_works_the_farm_it_built() {
     // left its Hunt order in
     let walks = Some(crate::movement::move_to::MOVE_TO);
     assert_eq!(worked, (HeadCode::Keeps, (walks, Some(HOUSE))));
-    assert_eq!(builder(&t).ai.as_ref().unwrap().orders, vec![]);
+    assert_eq!(builder(&t).combat.ai.as_ref().unwrap().orders, vec![]);
 }
 
 /// A builder beside its foundation works in its first update (state 6); census v5's 208 stops
@@ -1532,14 +1536,14 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         ..QueuedOrder::default()
     };
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), lone(AT_HOUSE));
-    let ai = own(&mut t, BUILDER).ai.as_mut().unwrap();
+    let ai = own(&mut t, BUILDER).combat.ai.as_mut().unwrap();
     ai.current_order = Some(OrderKind::Hunt);
     ai.orders = vec![
         order(OrderKind::Hunt, Some(object_id(77))),
         order(OrderKind::Build, Some(object_id(78))),
     ];
     assert_eq!(code(&mut t, 250), HeadCode::Deletes);
-    let ai = builder(&t).ai.as_ref().unwrap();
+    let ai = builder(&t).combat.ai.as_ref().unwrap();
     assert_eq!(
         ai.orders,
         vec![order(OrderKind::Build, Some(object_id(78)))]
@@ -1548,10 +1552,10 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
     assert_eq!((build(&t).state, wood(&t).1), (BuildState::Done, 10.0));
     assert!(stands(&t));
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), lone(AT_HOUSE));
-    let ai = own(&mut t, BUILDER).ai.as_mut().unwrap();
+    let ai = own(&mut t, BUILDER).combat.ai.as_mut().unwrap();
     ai.orders = vec![order(OrderKind::OnTarget, Some(object_id(77)))];
     assert_eq!(code(&mut t, 250), HeadCode::Keeps);
-    assert_eq!(builder(&t).ai.as_ref().unwrap().orders.len(), 0);
+    assert_eq!(builder(&t).combat.ai.as_ref().unwrap().orders.len(), 0);
     assert_eq!(heard(&t), [SEARCH]);
     assert_eq!(
         (build(&t).state, build(&t).site),
@@ -1562,7 +1566,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         Position::new(14.0, 10.5, 0.0),
         lone(Position::new(-1.0, -1.0, -1.0)),
     );
-    own(&mut t, BUILDER).ai = None;
+    own(&mut t, BUILDER).combat.ai = None;
     own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
     assert_eq!((build(&t).state, wood(&t).2), (BuildState::Halted, 0));
@@ -1571,7 +1575,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         Position::new(14.0, 10.5, 0.0),
         lone(Position::new(5.0, 6.0, 0.0)),
     );
-    own(&mut t, BUILDER).ai = None;
+    own(&mut t, BUILDER).combat.ai = None;
     let _ = code(&mut t, 250);
     let walk = build(&t).move_to.unwrap();
     assert_eq!(
@@ -1658,6 +1662,7 @@ fn sent_off(t: &World) -> usize {
         .objects
         .by_id(object_id(6))
         .unwrap()
+        .combat
         .ai
         .as_ref()
         .unwrap();

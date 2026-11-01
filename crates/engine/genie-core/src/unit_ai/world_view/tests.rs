@@ -148,7 +148,10 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
     let unit = |id, x, master_id, ai: Option<UnitAi>| Unit {
         id,
         body: crate::objects::layers::Body::at(Position::new(x, 10.0, 0.0)),
-        ai,
+        combat: crate::objects::layers::Combat {
+            ai,
+            ..Default::default()
+        },
         life: crate::objects::lifecycle::Lifecycle {
             master_id,
             state: ObjectState::Alive,

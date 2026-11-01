@@ -91,7 +91,10 @@ fn hull() -> crate::objects::unit::Unit {
             SHOWN,
             &mut Well512::default(),
         )),
-        ai: Some(crate::unit_ai::UnitAi::default()),
+        combat: crate::objects::layers::Combat {
+            ai: Some(crate::unit_ai::UnitAi::default()),
+            ..Default::default()
+        },
         ..crate::objects::unit::Unit::default()
     };
     unit.life.state = ObjectState::Alive;
@@ -114,7 +117,7 @@ fn left(unit: &crate::objects::unit::Unit) -> Left {
     Left {
         stopped: unit.body.anim_speed() == Some(Speed::new(0.0)),
         stands: unit.sprite.map(|s| s.graphic.id) == Some(STANDING.id),
-        posted: unit.ai.as_ref().map_or_else(Vec::new, |ai| {
+        posted: unit.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
             ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
         }),
     }

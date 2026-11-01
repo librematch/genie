@@ -277,7 +277,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
-        if u.ai.is_none() {
+        if u.combat.ai.is_none() {
             return Ok(());
         }
         let s = g

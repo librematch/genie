@@ -367,7 +367,7 @@ impl World {
         // the splitter tests a unit with a unit AI only
         let keeps = |id: ObjectId| -> Result<bool, GenieError> {
             let (p, u) = self.object(id).ok_or_else(|| object_gone(id))?;
-            if u.ai.is_none() {
+            if u.combat.ai.is_none() {
                 return Ok(true);
             }
             self.ai_takes(bp, b, p, u.life.master_id)
@@ -394,7 +394,7 @@ impl World {
             {
                 continue;
             }
-            if through_ai && unit.ai.is_some() {
+            if through_ai && unit.combat.ai.is_some() {
                 let state = unit.life.state;
                 let order = crate::unit_ai::QueuedOrder {
                     issuer: Some(crate::unit_ai::Issuer::Object(id)),
@@ -411,6 +411,7 @@ impl World {
                 let ai = self
                     .players
                     .live_mut(p, idx)?
+                    .combat
                     .ai
                     .as_mut()
                     .ok_or(NO_UNIT_AI)?;

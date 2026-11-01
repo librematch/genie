@@ -142,7 +142,10 @@ fn a_missile_without_its_action_keeps_flying() {
     assert_eq!(flying.fired_from, Some(ShooterId::new(object_id(900))));
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());
-    assert_eq!(u.attack_count, genie_core::combat::AttackCount::of_data(2));
+    assert_eq!(
+        u.combat.attack_count,
+        genie_core::combat::AttackCount::of_data(2)
+    );
 }
 
 /// The town bell's back-to-work records import with their actions; an action value none names
@@ -162,9 +165,12 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         None,
         PLAYERS,
     );
-    assert!(u.town_bell.flag);
+    assert!(u.combat.town_bell.flag);
     assert_eq!(
-        (u.town_bell.work.action, u.town_bell.before_building.action),
+        (
+            u.combat.town_bell.work.action,
+            u.combat.town_bell.before_building.action
+        ),
         (Some(ActionKind::Gather), None)
     );
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
@@ -181,7 +187,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         Some(genie_core::ErrorKind::InvalidInput)
     );
     assert_eq!(
-        u.town_bell,
+        u.combat.town_bell,
         genie_core::orders::town_bell::TownBell::default()
     );
 }

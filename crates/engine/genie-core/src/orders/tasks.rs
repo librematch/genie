@@ -134,14 +134,14 @@ impl World {
         };
         let build_task = crate::construction::build::BuildTask::of(
             task,
-            builder.work_rate + unit.work_rate_powerup,
+            builder.work_rate + unit.combat.work_rate_powerup,
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = crate::movement::move_to::MoveToReads::of(unit, builder, &self.graphics);
         let build = crate::construction::build::BuildAction::start(to, build_task, &move_reads)?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Build),
                 Some(ActionKind::Build),
@@ -216,7 +216,7 @@ impl World {
         // the task finder found the task on the target, which the world holds
         let (repair, class) = self.new_repair(player, idx, target, task)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Repair),
                 Some(ActionKind::Repair),
@@ -291,7 +291,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let class = self.repair_retarget(player, idx, target)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Repair),
                 Some(ActionKind::Repair),
@@ -392,7 +392,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let class = self.build_take(player, idx, target)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Build),
                 Some(ActionKind::Build),

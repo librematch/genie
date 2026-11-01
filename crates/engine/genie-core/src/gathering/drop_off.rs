@@ -66,7 +66,7 @@ impl Unit {
                 .and_then(|v| v.seer(id))
                 .is_some_and(|s| ObjectState::Dead < s.state),
         };
-        let Some(ai) = self.ai.as_mut() else {
+        let Some(ai) = self.combat.ai.as_mut() else {
             return Ok(false);
         };
         ai.orders.retain(|o| {
@@ -91,7 +91,7 @@ impl Unit {
             .actions
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
-        let Some(ai) = self.ai.as_ref() else {
+        let Some(ai) = self.combat.ai.as_ref() else {
             return Ok(None);
         };
         let class = ai.target_class.or(gather.target_class);
@@ -218,7 +218,7 @@ impl Unit {
         );
         let walks = self.move_walks(&c.w.masters, c.player, &c.w.graphics)?;
         let rate = crate::gathering::gather::StopRate {
-            work_rate: self.work_rate_powerup + master.work_rate,
+            work_rate: self.combat.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: crate::gathering::gather::productivity_of(
                 self.actions.gather().and_then(|g| g.task.productivity),
@@ -361,7 +361,7 @@ impl Unit {
             .map_or(Position::ORIGIN, |s| s.position);
         let sprites = SpriteReads::of(
             self.master_in(c.masters)?,
-            self.abilities.look.as_ref(),
+            self.combat.abilities.look.as_ref(),
             graphics,
         );
         let walks = Walks::of(sprites, self);
@@ -403,7 +403,7 @@ impl Unit {
             .map_or(Position::ORIGIN, |s| s.position);
         let sprites = SpriteReads::of(
             self.master_in(c.masters)?,
-            self.abilities.look.as_ref(),
+            self.combat.abilities.look.as_ref(),
             graphics,
         );
         let walks = Walks::of(sprites, self);

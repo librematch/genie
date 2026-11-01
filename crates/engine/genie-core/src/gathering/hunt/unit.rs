@@ -239,7 +239,7 @@ impl Unit {
         );
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.ai.as_ref(),
+            self.combat.ai.as_ref(),
             speed,
             master,
             me_at,
@@ -282,7 +282,7 @@ impl Unit {
     /// `FUN_140c64b50`) and the hunt ends (`set_state(1)`; its update returns 1, whose deletion
     /// lets the drop site go): its unit AI runs the queued order. True when it ends.
     fn hunt_drop_orders(&mut self, c: &Step<'_>) -> Result<bool, GenieError> {
-        let ai = self.ai.as_mut().ok_or(GenieError::unsupported(
+        let ai = self.combat.ai.as_mut().ok_or(GenieError::unsupported(
             "a hunt without a unit AI after its drop-off",
         ))?;
         let spatial: &Spatial = &c.w.spatial;
@@ -320,7 +320,7 @@ impl Unit {
         c: &mut Step<'_>,
     ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
         let hunt = self.actions.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
-        let ai = self.ai.as_ref().ok_or(GenieError::unsupported(
+        let ai = self.combat.ai.as_ref().ok_or(GenieError::unsupported(
             "a hunt without a unit AI after its drop-off",
         ))?;
         let class = ai.target_class.or(hunt.target_class);
@@ -426,7 +426,7 @@ impl Unit {
             farm: &farm,
         })?;
         // FUN_140c63e20's alert: enemies found set the alert mode and its time again
-        let ai = self.ai.as_mut().ok_or(GenieError::unsupported(
+        let ai = self.combat.ai.as_mut().ok_or(GenieError::unsupported(
             "a hunt without a unit AI after its drop-off",
         ))?;
         ai.alert(result, c.dt.seconds());
@@ -512,7 +512,7 @@ impl Unit {
         );
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.ai.as_ref(),
+            self.combat.ai.as_ref(),
             speed,
             master,
             me_at,

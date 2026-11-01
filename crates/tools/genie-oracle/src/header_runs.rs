@@ -151,7 +151,7 @@ pub(super) fn lane_block(section: &PlayerSection<'_>, id: u32, simulated: &Playe
             state: unit.life.state,
             amount_held: unit.life.amount,
             position: unit.position(),
-            retarget_timer: unit.ai.as_ref().map(|ai| ai.retarget_timer),
+            retarget_timer: unit.combat.ai.as_ref().map(|ai| ai.retarget_timer),
             top_action: checkpoint_action(unit),
         })
         .collect();
@@ -228,6 +228,7 @@ pub fn word9_terms(
                 .map_or(-1, |_| i32::from(ARTIFACT_TYPE.get())),
             state: unit.actions.artifact().map_or(0, |a| a.state.get()),
             retarget: unit
+                .combat
                 .ai
                 .as_ref()
                 .map_or(0, |ai| ai.retarget_timer.get() as i32),

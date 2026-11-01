@@ -1,14 +1,9 @@
 //! What the slice tracks of one object ([`Unit`]) and its update, action by action.
 
-use crate::combat::Charge;
-use crate::combat::damage::ArmorPair;
-use crate::map::Distance;
 use crate::map::Position;
-use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
-use crate::objects::WorkRate;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::MasterId;
@@ -16,11 +11,8 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::MISSILE;
 use crate::objects::masters::master_type::TREE;
-use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::AttributeId;
-use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
 
@@ -34,7 +26,6 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::ActiveSprite;
 use crate::ownership::capture::Captured;
 use crate::production::Production;
-use crate::unit_ai::UnitAi;
 use crate::world::Gate;
 use crate::world::step::Step;
 
@@ -59,8 +50,6 @@ pub struct Unit {
     pub footprint_waits: crate::construction::FootprintWaits,
     /// Its life cycle: state, hit points, master, what it holds, its dying sprite.
     pub life: Lifecycle,
-    /// Its unit AI, when it has one.
-    pub ai: Option<UnitAi>,
     /// A default task other than the Artifact action. `RGE_Action_Object::update` (0x14106ac90)
     /// starts it in an object's first update if the object is still in state 2 after its static
     /// step; the slice does not model it, so that update stops the player.
@@ -70,10 +59,6 @@ pub struct Unit {
     pub production: Option<Production>,
     /// A building's gather point, which its new units go to.
     pub gather_point: Option<GatherPoint>,
-    /// `+0x9e8` (`num_builders`) of a combat object that is no building: the Repair actions
-    /// counted among its repairers. A building's is its construction's
-    /// ([`Construction::builders`]).
-    pub builders: crate::construction::BuilderCount,
     /// Its layers below the action layer ([`Body`]): the static layer with its place (every
     /// object), the animated layer (`+0x7b8`, types 20 and up) and the moving one with its
     /// movement state (types 30 and up).
@@ -81,10 +66,13 @@ pub struct Unit {
     /// Its action list (`RGE_Action_List`, [`ActionList`]): the actions it holds, its current one
     /// first.
     pub actions: ActionList,
+    /// Its combat layer (`RGE_Combat_Object`, `TRIBE_Combat_Object`, [`Combat`]): the game's
+    /// defaults on an object below type 50.
+    ///
+    /// [`Combat`]: crate::objects::layers::Combat
+    pub combat: crate::objects::layers::Combat,
     /// A building's construction.
     pub construction: Option<Construction>,
-    /// `+0xa30`, `mWorkRatePowerup`: what the unit adds to its master's work rate.
-    pub work_rate_powerup: WorkRate,
     /// `+0x68a`, `unit_attackable_flag`.
     pub attackable: bool,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes the
@@ -98,45 +86,12 @@ pub struct Unit {
     pub my_pasture: Option<crate::gathering::PastureId>,
     /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
     pub undeletable: bool,
-    /// `capture_flag` (`+0x924`).
-    pub capture_flag: CaptureKind,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
     pub annex_of: Option<crate::construction::MainBuildingId>,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).
     pub group: crate::groups::GroupLink,
-    /// `mHitpointsPowerup` and `mHitpointsMaxPowerup` (`+0xa38`, `+0xa3c`), which the task finder
-    /// adds to the hit points.
-    pub hp_powerup: HpPowerup,
-    /// `berserker_timer` (`+0xa10`): the seconds the regeneration holds back toward its next
-    /// whole hit point ([`Unit::regenerate`]).
-    pub regen_timer: Seconds,
-    /// `mRegenerationRatePowerup` (`+0xa34`), which the regeneration rate adds to its master's
-    /// ([`regeneration_rate`]).
-    ///
-    /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
-    pub regen_powerup: crate::objects::Regeneration,
-    /// `mRegenerationStinger` (`+0xb3c`), which the regeneration rate adds last
-    /// ([`regeneration_rate`]).
-    ///
-    /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
-    pub regen_stinger: crate::objects::Regeneration,
     /// A missile's own part with its action ([`crate::combat::missile`]).
     pub missile: Option<crate::combat::missile::Missile>,
-    /// `+0x900`, `attack_count`: the swings that fired a missile (`FUN_141081020`); a missile's
-    /// is its firing object's when fired.
-    #[diff(
-        gap = "differs on 380 of MarvinBlue/426048731's samples (9181 at update 1075: genie 0, game 1): the resets on a new target (FUN_140a7c210, FUN_140a82a10) are not checked"
-    )]
-    pub attack_count: crate::combat::AttackCount,
-    /// `+0xa00` (not saved): a combat object's missiles per volley, its master's volley fire plus
-    /// the shares of the units inside it ([`crate::garrison::share`]).
-    #[diff(unsaved)]
-    pub firepower: crate::combat::Firepower,
-    /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired.
-    pub next_volley: crate::combat::MissileCount,
-    /// `mReloadWorldtime` (`+0x920`, slots 0x248 and 0x250): the world time its attack timer
-    /// runs out at (`FUN_141089820`), 0 for none; once past, the volley under way is over.
-    pub reload_worldtime: WorldTime,
     /// The objects inside it (`+0x2f8`), in the order they came in (`FUN_141164af0`); one that
     /// leaves takes the last one's place (`FUN_141166450`).
     /// Not saved as a list: a load lists them by each one's `+0x2f0` in the objects' order.
@@ -163,9 +118,6 @@ pub struct Unit {
     /// `+0x1c`), which its standing sprite takes once built; 0 from its constructor and the load.
     #[diff(unsaved)]
     pub build_frame: crate::objects::Frame,
-    /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
-    /// building.
-    pub raider_countdown: crate::garrison::RaiderCountdown,
     /// A building's gate lock ([`Gate`]).
     pub gate: Option<Gate>,
     /// Its active sprite, held from an attack's swing on; None while the slice does not know it.
@@ -174,33 +126,6 @@ pub struct Unit {
         gap = "the actions' sprite changes are ported only in part (the attack's swing, the idle swap)"
     )]
     pub sprite: Option<ActiveSprite>,
-    /// `+0x91c`, `attack_timer`: the time until it may attack again; `mReloadStinger` and
-    /// `mReloadPowerup` (`+0xb40`, `+0xa28`), which change its reload time.
-    pub attack_timer: Seconds,
-    /// What its master's passive abilities keep on it ([`crate::combat::abilities`]): the movement damage
-    /// timer, the attack timer's rate and its terrain look.
-    pub abilities: crate::combat::abilities::Abilities,
-    /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
-    pub reload_stinger: Seconds,
-    /// `mReloadPowerup` (`+0xa28`), taken off its master's reload time.
-    pub reload_powerup: Seconds,
-    /// What a hit reads of its unit and its target besides the masters: `+0xa24`
-    /// (`mAttackPowerup`, the attacker's slot 0x6d8), the armor powerups (`+0xa48` melee,
-    /// `+0xa4c` pierce, slots 0x708 and 0x710; whole numbers), the armor attacks removed
-    /// (`+0x9e4`, `+0x9e6`), the charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack`
-    /// (`+0x8a8`: its last hit was its charge's).
-    pub attack_powerup: crate::combat::AttackPowerup,
-    /// `mMaxRangePowerup` (`+0xa40`, slot 0x700): what its shown range adds
-    /// ([`crate::combat::damage::shown_range`]).
-    pub range_powerup: Distance,
-    /// Its melee and pierce armor powerups (`+0xa48`, `+0xa4c`, read as 16 bits).
-    pub armor_powerups: ArmorPair,
-    /// The melee and pierce armor taken off it by charge hits (`+0x9e4`, `+0x9e6`).
-    pub armor_removed: ArmorPair,
-    /// Its charge (`+0x9e0`).
-    pub charge: Charge,
-    /// `mHitSomethingValidForChargeAttack` (`+0x8a8`): its last hit was its charge's.
-    pub charge_hit: bool,
     /// `+0x78c`: which of its master's standing sprites its idle swap last showed (1 the second,
     /// [`Master::standing_sprite_2`]); not saved, 0 at a load and from the constructor.
     #[diff(unsaved)]
@@ -213,11 +138,6 @@ pub struct Unit {
     /// `+0x650`, `mLastHumanOrderTime`: the world time of the last order a human gave it
     /// (`FUN_140e5e780`, for a unit with a unit AI); an animal's idle check lowers it to 5000.
     pub last_human_order: WorldTime,
-    /// A combat object's town-bell flag and back-to-work records ([`crate::orders::town_bell`]).
-    pub town_bell: crate::orders::town_bell::TownBell,
-    /// The object is a combat object (types 50 and up): its update keeps its sight mask and its
-    /// records in the objects-in-sight registry.
-    pub combat: bool,
     /// What its master's default task would start once its action list is empty, when the
     /// slice does not model it (None: nothing, as a wild animal's Explore).
     #[diff(unsaved, eq)]
@@ -249,10 +169,6 @@ pub struct Unit {
     /// A building's `+0xcb0` (`FUN_1411c5f70`): the id of the object its completion's stack unit
     /// made ([`crate::world::World::stack_unit`]); None before (the save does not hold it).
     pub stack_made: Option<ObjectId>,
-    /// A building's own store (`+0xae0`, `FUN_1411abad0`'s map by attribute): what its storage
-    /// entries of mode 16 put in at its completion and take out at its death
-    /// (`FUN_1411e6580`).
-    pub store: Vec<(AttributeId, Amount)>,
     /// `+0x6c0` (`FUN_141185010`): the master of its own its master pointer (`+0xa0`) reads, a
     /// copy (`FUN_141186d10`, the master's slot 0x48) of the one it read when it took it; None
     /// while it reads its player's. An ownership change gives it one ([`change_hands`]).

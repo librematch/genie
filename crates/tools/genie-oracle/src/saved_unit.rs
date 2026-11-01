@@ -98,54 +98,134 @@ pub(super) fn unit(
     let mut unit = Unit {
         id,
         life,
-        ai,
+        combat: genie_core::objects::layers::Combat {
+            ai,
+            work_rate_powerup: object
+                .combat()
+                .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
+            capture_flag: object
+                .combat()
+                .map_or(genie_core::ownership::CaptureKind::NONE, |c| {
+                    genie_core::ownership::CaptureKind::of_data(c.rge_combat_object.capture_flag)
+                }),
+            hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {
+                taken: HitPoints::new(c.hitpoints_powerup),
+                max: HitPoints::new(c.hitpoints_max_powerup),
+            }),
+            regen_timer: object
+                .combat()
+                .map_or(Seconds::ZERO, |c| Seconds::new(c.berserker_timer)),
+            // a building's +0x9e8 is its construction's
+            builders: object
+                .combat()
+                .filter(|_| object.tribe_building_object.is_none())
+                .map_or(BuilderCount::NONE, |c| {
+                    BuilderCount::of_data(c.num_builders)
+                }),
+            regen_powerup: Regeneration::new(
+                object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
+            ),
+            regen_stinger: Regeneration::new(
+                object.combat().map_or(0.0, |c| c.regeneration_stinger),
+            ),
+            town_bell,
+            next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
+            raider_countdown: RaiderCountdown::of_data(
+                object.combat().map_or(0, |c| c.raider_build_countdown),
+            ),
+            reload_worldtime: WorldTime::from_millis(
+                object
+                    .combat()
+                    .and_then(|c| c.rge_combat_object.reload_worldtime)
+                    .unwrap_or(0),
+            ),
+            // the load's (FUN_14121ec90): the master's volley fire; the shares of the units inside
+            // follow in `garrison_firepower`
+            firepower: objects
+                .master(s.master_obj)
+                .and_then(|m| {
+                    m.tribe_master_combat_object.as_deref().or_else(|| {
+                        m.tribe_master_building_object
+                            .as_deref()
+                            .map(|b| &b.tribe_master_combat_object)
+                    })
+                })
+                .map_or(Firepower::ZERO, |c| Firepower::new(c.volley_fire_amount)),
+            attack_timer: object.combat().map_or(Seconds::ZERO, |c| {
+                Seconds::new(c.rge_combat_object.attack_timer)
+            }),
+            // the movement damage timer (+0x9a4) is saved; the attack timer's rate and the terrain
+            // look are not (the constructor's 1 and none, until the first update's abilities)
+            abilities: genie_core::combat::abilities::Abilities {
+                movement_damage_timer: object
+                    .combat()
+                    .map_or(Seconds::ZERO, |c| Seconds::new(c.movement_damage_timer)),
+                ..genie_core::combat::abilities::Abilities::default()
+            },
+            reload_stinger: object
+                .combat()
+                .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_stinger)),
+            reload_powerup: object
+                .combat()
+                .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_powerup)),
+            attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |c| c.attack_powerup)),
+            range_powerup: object
+                .combat()
+                .map_or(Distance::ZERO, |c| Distance::new(c.max_range_powerup)),
+            armor_powerups: object.combat().map_or(ArmorPair::ZERO, |c| {
+                ArmorPair::new(c.melee_armor_powerup as i16, c.pierce_armor_powerup as i16)
+            }),
+            armor_removed: object.combat().map_or(ArmorPair::ZERO, |c| {
+                ArmorPair::new(c.melee_armor_removed, c.pierce_armor_removed)
+            }),
+            charge: object
+                .combat()
+                .map_or(Charge::ZERO, |c| Charge::new(c.charge)),
+            charge_hit: object
+                .combat()
+                .is_some_and(|c| c.rge_combat_object.hit_something_valid_for_charge_attack != 0),
+            attack_count: object
+                .combat()
+                .map(|c| &c.rge_combat_object)
+                .or_else(|| {
+                    object
+                        .rge_object
+                        .as_deref()
+                        .and_then(|r| r.rge_missile_object.as_deref())
+                        .map(|m| &m.rge_combat_object)
+                })
+                .map_or(AttackCount::ZERO, |c| AttackCount::of_data(c.attack_count)),
+            // the combat object's localResourceStore (+0xae0), a map by attribute saved in its order
+            store: object
+                .combat()
+                .map(|c| {
+                    c.local_resource_store
+                        .iter()
+                        .filter_map(|e| {
+                            Some((
+                                AttributeId::of_index(usize::from(e.attribute_idx))?,
+                                Amount::new(e.value),
+                            ))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+        },
         construction: construction(object, s, objects),
-        work_rate_powerup: object
-            .combat()
-            .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
         attackable: s.unit_attackable_flag != 0,
         untargetable: s.unit_targeting_flag == 0,
         under_attack: s.under_attack_value != 0,
         pasture: PastureId::of_field(s.parent_pasture_id),
         my_pasture: PastureId::of_field(s.my_pasture_id),
         undeletable: s.deletion_enabled == 0,
-        capture_flag: object
-            .combat()
-            .map_or(genie_core::ownership::CaptureKind::NONE, |c| {
-                genie_core::ownership::CaptureKind::of_data(c.rge_combat_object.capture_flag)
-            }),
         annex_of: object
             .tribe_building_object
             .as_deref()
             .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
             .map(MainBuildingId::new),
         group: group_link(s),
-        hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {
-            taken: HitPoints::new(c.hitpoints_powerup),
-            max: HitPoints::new(c.hitpoints_max_powerup),
-        }),
-        regen_timer: object
-            .combat()
-            .map_or(Seconds::ZERO, |c| Seconds::new(c.berserker_timer)),
-        // a building's +0x9e8 is its construction's
-        builders: object
-            .combat()
-            .filter(|_| object.tribe_building_object.is_none())
-            .map_or(BuilderCount::NONE, |c| {
-                BuilderCount::of_data(c.num_builders)
-            }),
-        regen_powerup: Regeneration::new(
-            object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
-        ),
-        regen_stinger: Regeneration::new(object.combat().map_or(0.0, |c| c.regeneration_stinger)),
         workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
-        town_bell,
-        combat: object.combat().is_some(),
-        next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
-        raider_countdown: RaiderCountdown::of_data(
-            object.combat().map_or(0, |c| c.raider_build_countdown),
-        ),
         garrison_time: object
             .tribe_building_object
             .as_deref()
@@ -169,54 +249,6 @@ pub(super) fn unit(
         livestock: lists.livestock,
         pasture_workers: lists.pasture_workers,
         attacking_units: lists.attacking_units,
-        reload_worldtime: WorldTime::from_millis(
-            object
-                .combat()
-                .and_then(|c| c.rge_combat_object.reload_worldtime)
-                .unwrap_or(0),
-        ),
-        // the load's (FUN_14121ec90): the master's volley fire; the shares of the units inside
-        // follow in `garrison_firepower`
-        firepower: objects
-            .master(s.master_obj)
-            .and_then(|m| {
-                m.tribe_master_combat_object.as_deref().or_else(|| {
-                    m.tribe_master_building_object
-                        .as_deref()
-                        .map(|b| &b.tribe_master_combat_object)
-                })
-            })
-            .map_or(Firepower::ZERO, |c| Firepower::new(c.volley_fire_amount)),
-        attack_timer: object.combat().map_or(Seconds::ZERO, |c| {
-            Seconds::new(c.rge_combat_object.attack_timer)
-        }),
-        // the movement damage timer (+0x9a4) is saved; the attack timer's rate and the terrain
-        // look are not (the constructor's 1 and none, until the first update's abilities)
-        abilities: genie_core::combat::abilities::Abilities {
-            movement_damage_timer: object
-                .combat()
-                .map_or(Seconds::ZERO, |c| Seconds::new(c.movement_damage_timer)),
-            ..genie_core::combat::abilities::Abilities::default()
-        },
-        reload_stinger: object
-            .combat()
-            .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_stinger)),
-        reload_powerup: object
-            .combat()
-            .map_or(Seconds::ZERO, |c| Seconds::new(c.reload_powerup)),
-        attack_powerup: AttackPowerup::new(object.combat().map_or(0.0, |c| c.attack_powerup)),
-        range_powerup: object
-            .combat()
-            .map_or(Distance::ZERO, |c| Distance::new(c.max_range_powerup)),
-        armor_powerups: object.combat().map_or(ArmorPair::ZERO, |c| {
-            ArmorPair::new(c.melee_armor_powerup as i16, c.pierce_armor_powerup as i16)
-        }),
-        armor_removed: object.combat().map_or(ArmorPair::ZERO, |c| {
-            ArmorPair::new(c.melee_armor_removed, c.pierce_armor_removed)
-        }),
-        charge: object
-            .combat()
-            .map_or(Charge::ZERO, |c| Charge::new(c.charge)),
         // the animated layer (types 20 and up); a moving object's mover takes it below
         body: genie_core::objects::layers::Body::new(
             Position::new(s.t_x, s.t_y, s.t_z),
@@ -229,22 +261,8 @@ pub(super) fn unit(
         ),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
         sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
-        charge_hit: object
-            .combat()
-            .is_some_and(|c| c.rge_combat_object.hit_something_valid_for_charge_attack != 0),
         gather_point: gather,
         gate: saved_gate(object),
-        attack_count: object
-            .combat()
-            .map(|c| &c.rge_combat_object)
-            .or_else(|| {
-                object
-                    .rge_object
-                    .as_deref()
-                    .and_then(|r| r.rge_missile_object.as_deref())
-                    .map(|m| &m.rge_combat_object)
-            })
-            .map_or(AttackCount::ZERO, |c| AttackCount::of_data(c.attack_count)),
         roo_called: s.rooalready_called != 0,
         // mIsOnMangroveShallows (+0xcd0); build 158041's saves all hold it (its version gate
         // 0x421999 lies before them)
@@ -253,21 +271,6 @@ pub(super) fn unit(
             .as_deref()
             .and_then(|b| b.is_on_mangrove_shallows)
             .is_some_and(|v| v != 0),
-        // the combat object's localResourceStore (+0xae0), a map by attribute saved in its order
-        store: object
-            .combat()
-            .map(|c| {
-                c.local_resource_store
-                    .iter()
-                    .filter_map(|e| {
-                        Some((
-                            AttributeId::of_index(usize::from(e.attribute_idx))?,
-                            Amount::new(e.value),
-                        ))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default(),
         ..Unit::default()
     };
     let imported = if saved {

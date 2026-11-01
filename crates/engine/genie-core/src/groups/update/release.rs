@@ -60,7 +60,7 @@ impl World {
         let Some((_, unit)) = self.object(id) else {
             return Ok(());
         };
-        if unit.ai.is_none() {
+        if unit.combat.ai.is_none() {
             return Ok(());
         }
         let top = self.top_target_object(unit);

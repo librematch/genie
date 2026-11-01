@@ -264,7 +264,7 @@ impl Attack {
         let mut g = c.w.attack_ground();
         match after_hit(
             ranged,
-            unit.attack_timer,
+            unit.combat.attack_timer,
             self.target.is_some(),
             self.arms.interrupt_frame,
             self.arms.fire_frame,

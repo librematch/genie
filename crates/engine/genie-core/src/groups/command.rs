@@ -283,7 +283,7 @@ impl World {
             .collect();
         for id in ids {
             // FUN_1415417a0 finds a sleeping member too
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.ai.as_mut()) {
+            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
                 ai.clear_notifies(world_time.since_start())?;
             }
         }
@@ -886,7 +886,10 @@ mod tests {
         t.groups.get_mut(group_id(1)).unwrap().motion.paths = vec![walked, top];
         let asleep = t.players[1].objects.remove(ListIndex::new(0)).unwrap();
         t.players[1].sleeping.push(Unit {
-            ai: Some(crate::unit_ai::UnitAi::default()),
+            combat: crate::objects::layers::Combat {
+                ai: Some(crate::unit_ai::UnitAi::default()),
+                ..Default::default()
+            },
             ..asleep
         });
         assert!(
@@ -899,6 +902,7 @@ mod tests {
                 .contains(GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN)
         );
         let ai = t.players[1].sleeping[ListIndex::new(0)]
+            .combat
             .ai
             .as_ref()
             .unwrap();

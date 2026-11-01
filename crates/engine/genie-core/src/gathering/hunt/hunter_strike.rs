@@ -101,20 +101,20 @@ impl Unit {
             .unwrap_or(Amount::new(1.0));
         let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
         Ok(HuntReads {
-            defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
             attack: AttackReads::of(
                 self,
                 master,
                 (c.w.masters.of(c.player), &c.w.graphics),
-                self.ai.as_ref(),
+                self.combat.ai.as_ref(),
                 (owner.computer, c.w.world_time),
             ),
-            work_rate: self.work_rate_powerup + master.work_rate,
+            work_rate: self.combat.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity,
             stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),
-            has_ai: self.ai.is_some(),
-            ai_class: self.ai.as_ref().and_then(|ai| ai.target_class),
+            has_ai: self.combat.ai.is_some(),
+            ai_class: self.combat.ai.as_ref().and_then(|ai| ai.target_class),
             tree_searched: tree_lost,
             predator_hunts_end: c.w.settings.predator_hunts_end(),
             sprites: HuntSprites {
@@ -133,7 +133,7 @@ impl Unit {
     /// that finds none, searches (`set_state(3)` with the target kept,
     /// [`Unit::hunt_search_state`]).
     pub(crate) fn hunt_attack_failed(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let tree = self.ai.as_ref().is_some_and(|ai| {
+        let tree = self.combat.ai.as_ref().is_some_and(|ai| {
             let class = ai
                 .target_class
                 .or_else(|| self.actions.hunt().and_then(|h| h.target_class));
@@ -175,7 +175,7 @@ impl Unit {
         let (me_at, them) = (at(Some(self.id))?, at(action.target)?);
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.ai.as_ref(),
+            self.combat.ai.as_ref(),
             speed,
             master,
             me_at,

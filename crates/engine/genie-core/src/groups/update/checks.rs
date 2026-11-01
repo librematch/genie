@@ -67,7 +67,8 @@ impl World {
                 continue;
             }
             if let WorldObject::Unit(p, u) = object
-                && u.ai
+                && u.combat
+                    .ai
                     .as_ref()
                     .is_some_and(|ai| ai.current_action == Some(ActionKind::Attack))
             {
@@ -141,7 +142,7 @@ impl World {
         {
             return Ok(false);
         }
-        if u.ai.as_ref().is_some_and(|ai| !ai.orders.is_empty()) {
+        if u.combat.ai.as_ref().is_some_and(|ai| !ai.orders.is_empty()) {
             return Ok(false);
         }
         u.interruptible()
@@ -286,7 +287,7 @@ impl World {
             let Some(WorldObject::Unit(_, u)) = self.world_object(m.id) else {
                 continue;
             };
-            let Some(ai) = u.ai.as_ref() else {
+            let Some(ai) = u.combat.ai.as_ref() else {
                 continue;
             };
             let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
@@ -316,7 +317,7 @@ impl World {
             let Some(WorldObject::Unit(_, u)) = self.world_object(m.id) else {
                 continue;
             };
-            let Some(ai) = u.ai.as_ref() else {
+            let Some(ai) = u.combat.ai.as_ref() else {
                 continue;
             };
             let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
@@ -482,7 +483,7 @@ impl World {
         }
         // the slots of a combat object read its terrain look ([`crate::objects::sprite::standing`]); a
         // trade cart's goods are passed above
-        let look = u.abilities.look.as_ref();
+        let look = u.combat.abilities.look.as_ref();
         let sprite = match shown {
             Shown::Standing => crate::objects::sprite::standing(master, look, false),
             Shown::Walking => crate::objects::sprite::walking(master, look, false),
@@ -572,7 +573,7 @@ impl Unit {
                 return Ok(false);
             }
         }
-        if let Some(ai) = u.ai.as_ref() {
+        if let Some(ai) = u.combat.ai.as_ref() {
             let action = ai.current_action;
             if action != Some(ActionKind::GroupAside) {
                 // on the chosen action the order decides

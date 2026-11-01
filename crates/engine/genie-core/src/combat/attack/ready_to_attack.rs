@@ -216,7 +216,7 @@ impl Attack {
             return Ok(Readiness::Waiting);
         }
         Ok(
-            if crate::math::fmath::at_most_or_unordered(unit.attack_timer.get(), 0.0) {
+            if crate::math::fmath::at_most_or_unordered(unit.combat.attack_timer.get(), 0.0) {
                 Readiness::Ready
             } else {
                 Readiness::Waiting

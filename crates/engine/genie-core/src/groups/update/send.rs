@@ -151,7 +151,7 @@ impl World {
             .players
             .get_mut(player.index())
             .and_then(|p| p.objects.by_id_mut(id))
-            .and_then(|u| u.ai.as_mut())
+            .and_then(|u| u.combat.ai.as_mut())
         {
             ai.set_randomized_retarget_timer(span, rng);
         }

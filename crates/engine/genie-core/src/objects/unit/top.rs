@@ -88,7 +88,7 @@ impl Unit {
         if let Some(a) = self.top_action() {
             why = why.with("action", format_args!("{} state {}", a.kind, a.state));
         }
-        if let Some(ai) = &self.ai {
+        if let Some(ai) = &self.combat.ai {
             why = why.with(
                 "unit AI",
                 format_args!(

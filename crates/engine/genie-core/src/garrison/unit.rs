@@ -120,10 +120,11 @@ impl Unit {
             start,
             waits: villager && !c.w.players.player(c.player)?.computer,
             stance: self
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
-            defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
         })
     }
 
@@ -191,7 +192,7 @@ impl Unit {
         let reads = crate::garrison::transport::TransportReads {
             radius: master.radius,
             restriction: master.terrain_restriction,
-            defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
             given,
             standing: master
                 .standing_sprite
@@ -451,7 +452,7 @@ impl Unit {
         let (at, state, reload) = (
             building.position(),
             building.life.state,
-            building.reload_powerup,
+            building.combat.reload_powerup,
         );
         self.body.base_mut().go_inside(id, at, &mut c.w.spatial);
         c.w.pathing.removed(id);
@@ -494,12 +495,12 @@ impl Unit {
         let firepower = if me.kind == COMBAT {
             let own = c.w.masters.of(bp).unwrap_or(masters);
             let rate = crate::garrison::attack_rate(bm, own, reload);
-            crate::garrison::share(me, masters, self.reload_powerup, rate)?
+            crate::garrison::share(me, masters, self.combat.reload_powerup, rate)?
         } else {
             crate::combat::Firepower::ZERO
         };
         if let Some((_, b)) = c.w.object_mut(target) {
-            b.firepower += firepower;
+            b.combat.firepower += firepower;
             b.garrison.push(self.id);
         }
         Ok(())
@@ -567,21 +568,19 @@ impl Unit {
         if me.class != class::VILLAGER && me.id != MASTER_1808 {
             return Ok(());
         }
-        if !self.town_bell.flag {
-            let action =
-                self.ai
-                    .as_ref()
-                    .map(|ai| ai.current_action)
-                    .ok_or(GenieError::unsupported(
-                        "a town-bell record of a unit without a unit AI",
-                    ))?;
-            self.town_bell.record(crate::orders::town_bell::BackToWork {
-                target: target.map(ContainerId::id),
-                target_class: None,
-                action,
-                target2: None,
-                point: at.ground(),
-            });
+        if !self.combat.town_bell.flag {
+            let action = self.combat.ai.as_ref().map(|ai| ai.current_action).ok_or(
+                GenieError::unsupported("a town-bell record of a unit without a unit AI"),
+            )?;
+            self.combat
+                .town_bell
+                .record(crate::orders::town_bell::BackToWork {
+                    target: target.map(ContainerId::id),
+                    target_class: None,
+                    action,
+                    target2: None,
+                    point: at.ground(),
+                });
         }
         if bm.kind == BUILDING
             && state == ObjectState::Alive
@@ -589,7 +588,7 @@ impl Unit {
                 .building
                 .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS))
         {
-            self.town_bell.flag = true;
+            self.combat.town_bell.flag = true;
         }
         Ok(())
     }

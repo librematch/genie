@@ -254,15 +254,15 @@ impl World {
             (a::HERO_STATUS, Change::Set | Change::Add) => Ok(()),
             (a::MAXIMUM_CHARGE, _) => {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                u.charge = charge_after(u.charge, master.max_charge, change, v);
+                u.combat.charge = charge_after(u.combat.charge, master.max_charge, change, v);
                 Ok(())
             }
             (a::TOTAL_MISSILES, _) => {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                u.firepower = match change {
+                u.combat.firepower = match change {
                     Change::Set => Firepower::new(v),
-                    Change::Add => Firepower::new(v) + u.firepower,
-                    Change::Multiply => Firepower::new(v * u.firepower.get()),
+                    Change::Add => Firepower::new(v) + u.combat.firepower,
+                    Change::Multiply => Firepower::new(v * u.combat.firepower.get()),
                 };
                 Ok(())
             }

@@ -657,7 +657,10 @@ fn a_build_takes_its_task_move_to_and_site() {
     b.target_id = 30;
     b.target2_id = 31;
     let unit = Unit {
-        work_rate_powerup: WorkRate::new(0.5),
+        combat: genie_core::objects::layers::Combat {
+            work_rate_powerup: WorkRate::new(0.5),
+            ..Default::default()
+        },
         ..Unit::default()
     };
     let objects = PlayerObjects::default();

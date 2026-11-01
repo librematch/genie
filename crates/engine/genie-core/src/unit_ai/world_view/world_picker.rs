@@ -118,7 +118,8 @@ impl WorldPicker<'_> {
         let (_, p, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
             "a priest's conversion test of an object the slice does not hold",
         ))?;
-        if p.ai
+        if p.combat
+            .ai
             .as_ref()
             .is_none_or(|a| a.ai_type != crate::unit_ai::PRIEST_AI)
         {
@@ -223,7 +224,7 @@ impl WorldPicker<'_> {
                 .and_then(|id| player_master(self.every, q, id))
                 .map(|m| &m.weapons[..]),
             charge_event: om.charge_event,
-            range_powerup: o.range_powerup,
+            range_powerup: o.combat.range_powerup,
         };
         let attack = crate::combat::damage::shown_attack(&v, &shown);
         let amount = crate::objects::masters::DamageAmount::new;
@@ -249,7 +250,7 @@ impl WorldPicker<'_> {
         let Some((_, t, _, tm)) = self.held(target)? else {
             return Ok(NearestAttacker::NoUnitAi);
         };
-        let Some(ai) = t.ai.as_ref() else {
+        let Some(ai) = t.combat.ai.as_ref() else {
             return Ok(NearestAttacker::NoUnitAi);
         };
         let mut best: Option<(f32, ObjectId)> = None;
@@ -292,7 +293,7 @@ impl WorldPicker<'_> {
             master: t.life.master_id,
             combat_level: m.combat_level,
             capture,
-            has_ai: t.ai.is_some(),
+            has_ai: t.combat.ai.is_some(),
             inside: t.life.inside.is_some(),
             targeting: !t.untargetable,
             attackable: t.attackable,
@@ -368,7 +369,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             owner,
             allied: crate::unit_ai::task_finder::allied(self.relations, self.player, owner, true),
             state: t.life.state,
-            has_ai: t.ai.is_some(),
+            has_ai: t.combat.ai.is_some(),
             inside: t.life.inside.is_some(),
             master: t.life.master_id,
             class: m.class,
@@ -439,7 +440,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             reach: self.attacker.range_against()?,
             damage,
             hp: t.life.hp,
-            reload: me.reload_stinger + (mm.reload - me.reload_powerup),
+            reload: me.combat.reload_stinger + (mm.reload - me.combat.reload_powerup),
             workable: self.converts(self.me, id, false)?,
             current: self.seeker.is_some_and(|s| s.target == Some(id)),
         })
@@ -462,7 +463,8 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
                 |best, a| if best < a.amount { a.amount } else { best },
             )
         });
-        Ok(crate::objects::masters::DamageAmount::new(100) <= armor.plus(t.armor_powerups.pierce))
+        Ok(crate::objects::masters::DamageAmount::new(100)
+            <= armor.plus(t.combat.armor_powerups.pierce))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).

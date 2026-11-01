@@ -92,7 +92,7 @@ impl<'g> MoveToReads<'g> {
     #[must_use]
     pub fn of(unit: &Unit, master: &Master, graphics: &'g crate::objects::Graphics) -> Self {
         Self {
-            sprites: SpriteReads::of(master, unit.abilities.look.as_ref(), graphics),
+            sprites: SpriteReads::of(master, unit.combat.abilities.look.as_ref(), graphics),
             state: unit.life.state,
             speed: unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
             at: unit.position(),

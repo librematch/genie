@@ -268,7 +268,7 @@ impl World {
         if same_members(&unit.garrison, &forced.garrison) {
             forced.garrison.clone_from(&unit.garrison);
         }
-        if let (Some(old), Some(new)) = (unit.ai.as_ref(), forced.ai.as_mut()) {
+        if let (Some(old), Some(new)) = (unit.combat.ai.as_ref(), forced.combat.ai.as_mut()) {
             new.hunted = old.hunted;
             if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
                 n.go_home = o.go_home;
@@ -397,11 +397,11 @@ mod tests {
         let hunted = Some(crate::unit_ai::Hunted::default());
         let forager = &mut t.players[1].objects[ListIndex::new(0)];
         forager.stopped = true;
-        forager.ai.as_mut().unwrap().hunted = hunted;
+        forager.combat.ai.as_mut().unwrap().hunted = hunted;
         let mut theirs = t.players[1].objects.clone();
         theirs[ListIndex::new(0)].place_for_test(Position::new(29.5, 88.5, 0.0));
         theirs[ListIndex::new(0)].stopped = false;
-        theirs[ListIndex::new(0)].ai.as_mut().unwrap().hunted = None;
+        theirs[ListIndex::new(0)].combat.ai.as_mut().unwrap().hunted = None;
         let mut game = GameState {
             players: vec![vec![], theirs.as_slice().to_vec()],
             ..GameState::default()
@@ -413,7 +413,7 @@ mod tests {
             (forager.position(), forager.stopped),
             (Position::new(29.5, 88.5, 0.0), false)
         );
-        assert_eq!(forager.ai.as_ref().unwrap().hunted, hunted);
+        assert_eq!(forager.combat.ai.as_ref().unwrap().hunted, hunted);
         assert_eq!(
             t.spatial.get(object_id(9175)).map(|p| p.position),
             Some(Position::new(29.5, 88.5, 0.0))

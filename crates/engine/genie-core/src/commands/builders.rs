@@ -75,6 +75,7 @@ impl World {
                 continue;
             }
             let to_queue = unit
+                .combat
                 .ai
                 .as_ref()
                 .is_some_and(|ai| queued || (commits && ai.has_unready_order()));
@@ -133,7 +134,7 @@ impl World {
         commits: bool,
     ) -> Result<(), GenieError> {
         self.queue_build(q, idx, site, position)?;
-        if commits && let Some(ai) = self.players.live_mut(q, idx)?.ai.as_mut() {
+        if commits && let Some(ai) = self.players.live_mut(q, idx)?.combat.ai.as_mut() {
             crate::orders::readiness(&mut ai.orders, false);
         }
         Ok(())
@@ -150,7 +151,7 @@ impl World {
         kind: MasterKind,
     ) -> Result<(), GenieError> {
         if crate::objects::masters::master_type::COMBAT <= kind
-            && let Some(ai) = self.players.live_mut(q, idx)?.ai.as_mut()
+            && let Some(ai) = self.players.live_mut(q, idx)?.combat.ai.as_mut()
         {
             ai.orders.clear();
         }
@@ -243,7 +244,7 @@ impl World {
             gap: footprint_gap(unit.position(), builder.radius, position, site.radius),
             state: self.object_state(foundation),
         };
-        let task = BuildTask::of(task, builder.work_rate + unit.work_rate_powerup);
+        let task = BuildTask::of(task, builder.work_rate + unit.combat.work_rate_powerup);
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = MoveToReads::of(unit, builder, &self.graphics);
         Ok((with, BuildAction::start(to, task, &move_reads)?))
@@ -279,7 +280,7 @@ impl World {
             ready: true,
             target_type: Some(crate::unit_ai::OrderTargetType::of_master(master)),
         };
-        let ai = unit.ai.as_mut().ok_or(GenieError::unsupported(
+        let ai = unit.combat.ai.as_mut().ok_or(GenieError::unsupported(
             "a queued build order without a unit AI",
         ))?;
         let _ = ai.queue_order(state, order, false, false)?;
@@ -315,7 +316,7 @@ impl World {
         // the work command's notify (slot 0x828): the build order and the foundation, with
         // the point slot 0x128 passes (BUILD's x and y, on the ground)
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Build),
                 Some(ActionKind::Build),
@@ -433,7 +434,7 @@ impl World {
         let move_reads = MoveToReads::of(unit, builder, &self.graphics);
         let build = BuildAction::start(
             to,
-            BuildTask::of(&task, builder.work_rate + unit.work_rate_powerup),
+            BuildTask::of(&task, builder.work_rate + unit.combat.work_rate_powerup),
             &move_reads,
         )?;
         if let Some(m) = switch.map(|m| m.id) {

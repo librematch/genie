@@ -64,7 +64,7 @@ impl crate::world::World {
             ),
             masters: self.masters.of(owner),
             computer: self.players.player(owner)?.computer,
-            ai: u.ai.is_some(),
+            ai: u.combat.ai.is_some(),
         };
         let part = completion.first_part(&construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
@@ -114,7 +114,7 @@ impl crate::world::World {
             &mut self.pathing,
             now,
         )? {
-            u.firepower = volley;
+            u.combat.firepower = volley;
             self.watch_started(owner, id)?;
         }
         Ok(())
@@ -240,7 +240,8 @@ impl crate::world::World {
     ) -> Result<(), GenieError> {
         let (_, old) = self.object(building).ok_or(NOT_HELD)?;
         let (orders, gather) = (
-            old.ai
+            old.combat
+                .ai
                 .as_ref()
                 .map(|ai| ai.building_orders.clone())
                 .unwrap_or_default(),
@@ -303,7 +304,7 @@ impl crate::world::World {
         let now = self.world_time;
         let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
         if building_made {
-            if let Some(ai) = nu.ai.as_mut().filter(|_| !orders.is_empty()) {
+            if let Some(ai) = nu.combat.ai.as_mut().filter(|_| !orders.is_empty()) {
                 ai.building_orders.extend(orders);
             }
             if let Some(g) = point {

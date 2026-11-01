@@ -306,7 +306,7 @@ impl Lets<'_> {
             return Ok(());
         };
         let state = me.life.state;
-        if let Some(ai) = me.ai.as_mut() {
+        if let Some(ai) = me.combat.ai.as_mut() {
             return ai.post(n, state);
         }
         self.own_notifies.push((n, state));

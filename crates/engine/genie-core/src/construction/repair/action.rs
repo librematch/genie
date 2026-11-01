@@ -394,7 +394,7 @@ impl RepairAction {
                 if COMBAT <= kind
                     && let Some((_, u)) = c.w.object_mut(self.target)
                 {
-                    u.armor_removed = ArmorPair::ZERO;
+                    u.combat.armor_removed = ArmorPair::ZERO;
                 }
                 self.set_state(c, repairer, RepairState::Done, reads)
             }

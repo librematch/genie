@@ -42,7 +42,7 @@ impl World {
         clears: bool,
     ) -> Result<(), GenieError> {
         let (action, target, class) = self.new_enter(player, idx, target, task)?;
-        if let Some(ai) = self.players.live_mut(player, idx)?.ai.as_mut() {
+        if let Some(ai) = self.players.live_mut(player, idx)?.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Enter),
                 Some(ActionKind::Enter),
@@ -105,7 +105,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(player, idx)?;
         let state = unit.life.state;
-        match (failed, unit.ai.as_mut()) {
+        match (failed, unit.combat.ai.as_mut()) {
             (Some(n), Some(ai)) => ai.post(n, state),
             _ => Ok(()),
         }

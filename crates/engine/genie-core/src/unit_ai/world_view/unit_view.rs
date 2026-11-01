@@ -83,7 +83,7 @@ impl UnitView<'_, '_> {
     ) -> Result<bool, GenieError> {
         let others = owner_view(&self.c.w.players, self.c.player, self.new_owner)?;
         let find = |id: ObjectId| others.find(id);
-        let Some(ai) = u.ai.as_ref() else {
+        let Some(ai) = u.combat.ai.as_ref() else {
             return Ok(false);
         };
         let patrolling = match u.group.id.and_then(|id| self.c.w.groups.get(id)) {

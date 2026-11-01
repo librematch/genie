@@ -180,7 +180,7 @@ impl Watch {
         tracing::enabled!(target: STATE, tracing::Level::DEBUG).then(|| Self {
             object_state: u.life.state,
             action: u.top_action().map(|a| (a.kind.get(), a.state.get())),
-            order: u.ai.as_ref().map(|ai| {
+            order: u.combat.ai.as_ref().map(|ai| {
                 [
                     crate::unit_ai::OrderKind::field(ai.current_order),
                     crate::unit_ai::ActionKind::field(ai.current_action),

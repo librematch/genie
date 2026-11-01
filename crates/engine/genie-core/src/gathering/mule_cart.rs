@@ -38,6 +38,7 @@ impl World {
         let Some(current) = self
             .players
             .live(p, idx)?
+            .combat
             .ai
             .as_ref()
             .map(|ai| ai.current_target)
@@ -60,6 +61,7 @@ impl World {
             let target = self
                 .players
                 .live(p, idx)?
+                .combat
                 .ai
                 .as_ref()
                 .and_then(|ai| ai.current_target);
@@ -104,6 +106,7 @@ impl World {
         let current = self
             .players
             .live(p, idx)?
+            .combat
             .ai
             .as_ref()
             .and_then(|ai| ai.current_target);

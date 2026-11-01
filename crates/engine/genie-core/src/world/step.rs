@@ -122,7 +122,7 @@ impl Step<'_> {
         // which no routine on the lent unit may reach
         let side = self.side_notifies.is_some();
         if side {
-            me.ai = Some(UnitAi::default());
+            me.combat.ai = Some(UnitAi::default());
         }
         let lent = std::mem::replace(me, Unit::taken_out());
         let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
@@ -131,7 +131,7 @@ impl Step<'_> {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
         })?;
         *me = own.take_out(i)?;
-        let stand_in = if side { me.ai.take() } else { None };
+        let stand_in = if side { me.combat.ai.take() } else { None };
         let answer = answer?;
         if side && stand_in != Some(UnitAi::default()) {
             return Err(GenieError::unreachable(
@@ -180,7 +180,7 @@ impl Step<'_> {
         n: crate::unit_ai::Notify,
     ) -> Result<(), GenieError> {
         let state = me.life.state;
-        if let Some(ai) = me.ai.as_mut() {
+        if let Some(ai) = me.combat.ai.as_mut() {
             return ai.post(n, state);
         }
         if let Some(own) = self.side_notifies.as_mut() {

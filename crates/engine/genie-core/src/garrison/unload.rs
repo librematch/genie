@@ -139,9 +139,9 @@ impl World {
         let kind = self.players.live(up, ui)?.master(&self.masters, up)?.kind;
         let u = self.players.live_mut(up, ui)?;
         if COMBAT <= kind {
-            u.town_bell.flag = false;
+            u.combat.town_bell.flag = false;
         }
-        if let Some(ai) = u.ai.as_mut() {
+        if let Some(ai) = u.combat.ai.as_mut() {
             ai.orders.clear();
         }
         Ok(())
@@ -166,6 +166,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let unit = self.players.live(player, idx)?;
         if unit
+            .combat
             .ai
             .as_ref()
             .is_some_and(|ai| !ai.building_orders.is_empty())
@@ -193,9 +194,9 @@ impl World {
             let u = self.players.live_mut(up, ui)?;
             // a unit (type 70) is no longer under the town bell (`+0x9dc`)
             if COMBAT <= kind {
-                u.town_bell.flag = false;
+                u.combat.town_bell.flag = false;
             }
-            if let Some(ai) = u.ai.as_mut() {
+            if let Some(ai) = u.combat.ai.as_mut() {
                 ai.orders.clear();
             }
         }
@@ -258,14 +259,14 @@ impl World {
         self.leave_container((hp, hi), (up, ui), &made, spot.with_height(at.z()))?;
         let unit = self.players.live_mut(up, ui)?;
         let place = (unit.position().ground(), Some(made.class));
-        if unit.ai.is_some() {
+        if unit.combat.ai.is_some() {
             self.run_ai_calls((up, ui), |ai, side, rng| {
                 let stance = ai.stance;
                 crate::orders::set_stance(ai, stance, place, side, rng)
             })?;
         }
         if COMBAT <= made.kind {
-            self.players.live_mut(up, ui)?.town_bell.flag = false;
+            self.players.live_mut(up, ui)?.combat.town_bell.flag = false;
         }
         Ok(())
     }
@@ -312,7 +313,7 @@ impl World {
             ready: true,
             target_type: Some(crate::unit_ai::OrderTargetType::of_master(master.id)),
         };
-        if unit.ai.is_none() {
+        if unit.combat.ai.is_none() {
             return Ok(());
         }
         self.run_unit_ai((player, idx), |ai, at, side, computer, rng| {
@@ -389,7 +390,7 @@ impl World {
                 _ => return Ok(false),
             },
         };
-        let mut bell = self.players.live(up, ui)?.town_bell;
+        let mut bell = self.players.live(up, ui)?.combat.town_bell;
         let lookup = |t: ObjectId| -> Result<Option<RecordTarget>, GenieError> {
             let Some((op, o)) = self.object(t) else {
                 return Ok(None);
@@ -405,10 +406,10 @@ impl World {
             }))
         };
         let (found, record) = bell.back_to_work(&lookup)?;
-        self.players.live_mut(up, ui)?.town_bell = bell;
+        self.players.live_mut(up, ui)?.combat.town_bell = bell;
         if found.is_none() && record.target_class.is_some() && record.action.is_some() {
             let unit = self.players.live_mut(up, ui)?;
-            if let Some(ai) = unit.ai.as_mut() {
+            if let Some(ai) = unit.combat.ai.as_mut() {
                 ai.set_action(record.action);
             }
             unit.post_own(
@@ -425,7 +426,7 @@ impl World {
         };
         let out = self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?;
         if out && let Some((_, u)) = self.object_mut(id) {
-            u.town_bell.flag = false;
+            u.combat.town_bell.flag = false;
         }
         Ok(out)
     }

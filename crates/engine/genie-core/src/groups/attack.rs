@@ -443,7 +443,7 @@ impl World {
             tm.class,
             tm.kind,
         );
-        Ok(works && Charge::new(1.0) <= u.charge)
+        Ok(works && Charge::new(1.0) <= u.combat.charge)
     }
 }
 

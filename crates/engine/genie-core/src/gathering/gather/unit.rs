@@ -125,7 +125,7 @@ impl Unit {
     ) -> Result<Walks<'g>, GenieError> {
         let sprites = SpriteReads::of(
             self.master(every, player)?,
-            self.abilities.look.as_ref(),
+            self.combat.abilities.look.as_ref(),
             graphics,
         );
         Ok(Walks::of(sprites, self))
@@ -150,7 +150,7 @@ impl Unit {
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
         Ok(crate::gathering::gather::GatherReads {
-            work_rate: self.work_rate_powerup + master.work_rate,
+            work_rate: self.combat.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: (task.productivity)
                 .and_then(|i| attributes.get(i.index()))
@@ -164,9 +164,10 @@ impl Unit {
                 standing: g(master.standing_sprite),
             },
             class: master.class,
-            defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
             master: self.life.master_id,
             stance: self
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),

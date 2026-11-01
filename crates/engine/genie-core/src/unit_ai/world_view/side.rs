@@ -113,7 +113,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             let Some((owner, u)) = find(r.id) else {
                 continue;
             };
-            if u.ai.is_none() || ObjectState::Dying <= u.life.state {
+            if u.combat.ai.is_none() || ObjectState::Dying <= u.life.state {
                 continue;
             }
             let m = u.master(&self.c.w.masters, owner)?;
@@ -170,7 +170,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             owner,
             combat_level: m.combat_level,
             state: u.life.state,
-            target: u.ai.as_ref().and_then(|a| a.current_target),
+            target: u.combat.ai.as_ref().and_then(|a| a.current_target),
             gap_squared: footprint_gap_squared(
                 self.unit.position(),
                 me.radius,
@@ -356,7 +356,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let posted = held
             .into_iter()
             .try_for_each(|(n, state)| ai.post(n, state));
-        self.unit.ai = Some(std::mem::take(ai));
+        self.unit.combat.ai = Some(std::mem::take(ai));
         std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
         let class = self
             .unit
@@ -366,7 +366,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             .and_then(|class| posted.and_then(|()| self.unit.run_effect(e, Some(class), self.c)));
         std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
         self.c.side_notifies = Some(Vec::new());
-        *ai = self.unit.ai.take().ok_or_else(|| {
+        *ai = self.unit.combat.ai.take().ok_or_else(|| {
             GenieError::unreachable("a call of the unit AI took the unit's AI")
                 .with("object", self.unit.id)
         })?;
@@ -527,7 +527,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         Ok(Some(crate::unit_ai::TargetFlags {
             owner: seen.owner,
             kind,
-            capture: u.capture_flag,
+            capture: u.combat.capture_flag,
             pasture: u.pasture,
             untargetable: u.untargetable,
             attackable: u.attackable,

@@ -291,7 +291,7 @@ impl World {
             );
         if master_type::COMBAT <= kind {
             let u = self.object_at_mut(place)?;
-            u.firepower += new.volley_fire - old.volley_fire;
+            u.combat.firepower += new.volley_fire - old.volley_fire;
         }
         if master_type::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
             self.show_if(place, old.attack_sprite, new.attack_sprite)?;
@@ -498,7 +498,7 @@ impl World {
         {
             let more = (new.max_charge - old.max_charge).abs();
             if Charge::ZERO < more {
-                self.object_at_mut(place)?.charge += more;
+                self.object_at_mut(place)?.combat.charge += more;
             }
         }
         self.object_at_mut(place)?.life.hp =
@@ -573,7 +573,7 @@ impl World {
         let ai = new.unit_ai_type(new.id).and_then(|t| {
             crate::unit_ai::UnitAi::constructed(t, &made, self.streams.get(Stream::Ai))
         });
-        self.object_at_mut(place)?.ai = ai;
+        self.object_at_mut(place)?.combat.ai = ai;
         Ok(())
     }
 
@@ -1101,7 +1101,7 @@ mod tests {
         );
         (v.life.attribute_type, v.life.amount) =
             (Some(AttributeId::numbered(17)), Amount::new(10.0));
-        v.firepower = crate::combat::Firepower::new(1.0);
+        v.combat.firepower = crate::combat::Firepower::new(1.0);
         let player = crate::world::Player {
             objects: vec![v].into(),
             attributes: vec![Amount::ZERO; 300],
@@ -1126,7 +1126,7 @@ mod tests {
         .unwrap();
         let v = &t.players[0].objects[ListIndex::new(0)];
         assert_eq!(
-            (v.life.master_id, v.life.hp, v.firepower),
+            (v.life.master_id, v.life.hp, v.combat.firepower),
             (
                 master_id(6),
                 HitPoints::new(50.0),
@@ -1754,7 +1754,7 @@ mod tests {
             t.upgrade_hit_points(Place::Live(PlayerId::new(0), ListIndex::new(0)), (old, new))
                 .unwrap();
             let u = &t.players[0].objects[ListIndex::new(0)];
-            (u.life.hp, u.sprite.map(|s| s.graphic.id), u.charge)
+            (u.life.hp, u.sprite.map(|s| s.graphic.id), u.combat.charge)
         };
         assert_eq!(
             upgraded(&old, &new, 300),

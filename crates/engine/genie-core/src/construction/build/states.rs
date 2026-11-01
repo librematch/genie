@@ -198,7 +198,7 @@ impl BuildAction {
             ));
         }
         let built = site.map(|s| (s.id, s.life.state));
-        let ai = builder.ai.as_mut().ok_or(GenieError::unsupported(
+        let ai = builder.combat.ai.as_mut().ok_or(GenieError::unsupported(
             "a builder without a unit AI after its work",
         ))?;
         if works_it {
@@ -335,7 +335,7 @@ impl BuildAction {
         self.leave(c, builder)?;
         self.state = BuildState::Idle;
         let mut left = 0;
-        if let Some(ai) = builder.ai.as_mut() {
+        if let Some(ai) = builder.combat.ai.as_mut() {
             drop_done_orders(ai, built, &reads.build_targets);
             left = ai.orders.len();
             if left != 0 {

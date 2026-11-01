@@ -643,7 +643,7 @@ impl Rig {
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         unit.life.state = ObjectState::Alive;
         unit.life.master_id = master_id(4);
-        unit.ai = Some(UnitAi {
+        unit.combat.ai = Some(UnitAi {
             current_action: Some(ActionKind::Attack),
             ..UnitAi::default()
         });
@@ -744,7 +744,7 @@ impl Rig {
 
     /// The notifies the attacker posted to its unit AI: kind and parameters, in order.
     pub(crate) fn posted(&self) -> Vec<(NotifyKind, [i32; 3])> {
-        self.unit().ai.as_ref().map_or_else(Vec::new, |ai| {
+        self.unit().combat.ai.as_ref().map_or_else(Vec::new, |ai| {
             ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
         })
     }
@@ -1154,11 +1154,11 @@ fn an_attack_on_a_target_out_of_sight_fails() {
     let run = |a: &mut Attack, class, ai_type, queue_empty| {
         let mut rig = Rig::on_the_path(Victim::default()).holding(77, PlayerId::new(1));
         (rig.f.own.class, rig.r.ai_type, rig.r.queue_empty) = (class, ai_type, queue_empty);
-        let ai = rig.unit_mut().ai.as_mut().unwrap();
+        let ai = rig.unit_mut().combat.ai.as_mut().unwrap();
         ai.current_target = Some(object_id(77));
         ai.home = Some(crate::unit_ai::Home::default());
         let code = rig.run(100, |c, u, f, r| a.out_of_sight(c, u, f, r));
-        let ai = rig.unit().ai.as_ref().unwrap();
+        let ai = rig.unit().combat.ai.as_ref().unwrap();
         let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().go_home);
         let let_go = rig.workers(77, PlayerId::new(1)) == Some(0);
         (code, let_go, forgot, home, rig.posted())
@@ -1406,7 +1406,7 @@ fn ready_to_attack_s_at_once_test_and_its_nan_paths() {
             0.8,
             victim,
         );
-        rig.unit_mut().attack_timer = Seconds::new(timer);
+        rig.unit_mut().combat.attack_timer = Seconds::new(timer);
         let mut a = soldier_attack(7, range, 0.0, point);
         let r = rig
             .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip))
@@ -2184,7 +2184,7 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
             0.0,
             victim,
         );
-        rig.unit_mut().attack_timer = Seconds::new(timer);
+        rig.unit_mut().combat.attack_timer = Seconds::new(timer);
         rig.r.can_move = false;
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.arms.sprite = Some(attack_sprite);
@@ -2352,7 +2352,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     attack.arms.idle_sprite = Some(stand);
     centre.actions.set_attack(Some(attack));
     // its unit AI on the attack's action, which takes the Attack's invalidation
-    centre.ai = Some(UnitAi {
+    centre.combat.ai = Some(UnitAi {
         current_action: Some(ActionKind::Attack),
         ..UnitAi::default()
     });
@@ -2370,7 +2370,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
         ),
         (Some(SpriteId::named(9)), Some(Speed::new(1.0)))
     );
-    let posted = &centre.ai.as_ref().unwrap().notifies;
+    let posted = &centre.combat.ai.as_ref().unwrap().notifies;
     assert!(
         posted
             .iter()
@@ -2470,7 +2470,7 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
     swing_at(&mut t, &mut a, 5).unwrap();
     assert_eq!((a.pending, missiles(&t).len()), (false, 1));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].attack_timer,
+        t.players[1].objects[ListIndex::new(0)].combat.attack_timer,
         Seconds::new(2.0 - 5.0 * 0.1)
     );
     let rest = 2.0 - 10.0 * 0.1;
@@ -3244,12 +3244,19 @@ fn an_attack_on_a_dead_target_posts_by_its_unit_ai() {
     let lost = |order: AiOrder, set: fn(&mut Rig)| {
         let (mut rig, mut a) = on_target(dead, true, (AttackState::Ready, false));
         rig.r.ai_order = order;
-        rig.unit_mut().ai.as_mut().unwrap().current_target = Some(object_id(7));
+        rig.unit_mut().combat.ai.as_mut().unwrap().current_target = Some(object_id(7));
         set(&mut rig);
         let code = rig
             .run(20, |c, u, f, r| a.lost(c, u, f, r))
             .map_err(|e| e.reason().to_owned());
-        let forgot = rig.unit().ai.as_ref().unwrap().current_target.is_none();
+        let forgot = rig
+            .unit()
+            .combat
+            .ai
+            .as_ref()
+            .unwrap()
+            .current_target
+            .is_none();
         (
             code,
             rig.posted(),

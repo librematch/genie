@@ -109,6 +109,7 @@ impl Unit {
         if class != class::LIVESTOCK
             && !trading
             && self
+                .combat
                 .ai
                 .as_ref()
                 .is_some_and(|ai| ai.current_action != Some(ActionKind::HeroPower))
@@ -161,7 +162,7 @@ impl Unit {
             return Err(HANDS_LEFT);
         }
         let _ = self.change_owner(c, new)?;
-        self.capture_flag = CaptureKind::NONE;
+        self.combat.capture_flag = CaptureKind::NONE;
         if let Some(s) = c.w.spatial.sight.as_mut().and_then(|v| v.seer_mut(self.id)) {
             s.capture = CaptureKind::NONE;
         }

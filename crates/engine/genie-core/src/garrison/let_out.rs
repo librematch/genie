@@ -73,10 +73,12 @@ impl World {
         // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
         // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
         // point that is not on the building, else none
-        let queue_first =
-            b.ai.as_ref()
-                .and_then(|a| a.building_orders.first())
-                .map(|o| o.point.ground());
+        let queue_first = b
+            .combat
+            .ai
+            .as_ref()
+            .and_then(|a| a.building_orders.first())
+            .map(|o| o.point.ground());
         let toward = if point.x() == NO_POINT {
             match (gather, queue_first) {
                 (None, Some(q)) => Some(q),
@@ -151,15 +153,15 @@ impl World {
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
         let b = self.players.live_mut(player, container)?;
         if let Some(share) = share {
-            b.firepower -= share;
+            b.combat.firepower -= share;
         }
         // the unit out of its list (`FUN_141197e10`)
         if let Some(k) = b.garrison.iter().position(|&g| g == id) {
             let _ = b.garrison.swap_remove(k);
         }
         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
-        if b.garrison.is_empty() || b.firepower < bm.volley_fire {
-            b.firepower = bm.volley_fire;
+        if b.garrison.is_empty() || b.combat.firepower < bm.volley_fire {
+            b.combat.firepower = bm.volley_fire;
         }
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (b_at, b_radius) = (b.position(), bm.radius);
@@ -190,7 +192,7 @@ impl World {
         self.pathing.tiles_changed(self.spatial.take_changes());
         unit.life.inside = None;
         // a unit out of its container no longer counts down to its raid (`+0x9a0` 0)
-        unit.raider_countdown = crate::garrison::RaiderCountdown::NONE;
+        unit.combat.raider_countdown = crate::garrison::RaiderCountdown::NONE;
         // the position setter's end: a place off where it last moved to is a move
         if let Some(m) = unit.body.mover_mut() {
             m.mark_move(at, world_time);
@@ -230,8 +232,8 @@ impl World {
         };
         let b = self.players.live(player, container)?;
         let unit = self.players.live(up, ui)?;
-        let rate = attack_rate(bm, own, b.reload_powerup);
-        Ok(Some(share(made, theirs, unit.reload_powerup, rate)?))
+        let rate = attack_rate(bm, own, b.combat.reload_powerup);
+        Ok(Some(share(made, theirs, unit.combat.reload_powerup, rate)?))
     }
 
     /// [`World::let_out`]'s end once the unit stands at its spot: the work given, the gather
@@ -265,7 +267,7 @@ impl World {
         let to = match let_out_aim(gather, point, bid) {
             LetOutAim::Target(g) => {
                 if self.object(g.target).is_some() {
-                    if let Some(ai) = self.players.live_mut(up, ui)?.ai.as_mut() {
+                    if let Some(ai) = self.players.live_mut(up, ui)?.combat.ai.as_mut() {
                         ai.remove_target();
                     }
                     // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
@@ -283,7 +285,7 @@ impl World {
             // without a unit AI stays where it came out
             let unit = self.players.live_mut(up, ui)?;
             let place = (unit.position().ground(), Some(class));
-            if unit.ai.is_some() {
+            if unit.combat.ai.is_some() {
                 self.run_ai_calls((up, ui), |ai, side, rng| {
                     ai.stop_with(true, Some(place), side, rng)?;
                     ai.remove_target();
@@ -295,7 +297,7 @@ impl World {
         }
         // a move to the point: the unit AI forgets its target (`FUN_140c5e1e0`), then slot 0x2a0
         // and slot 0x128 with no target, `+0xa14` 0
-        if let Some(ai) = self.players.live_mut(up, ui)?.ai.as_mut() {
+        if let Some(ai) = self.players.live_mut(up, ui)?.combat.ai.as_mut() {
             ai.remove_target();
         }
         self.gather_move(up, ui, to.with_height(0.0), false)?;

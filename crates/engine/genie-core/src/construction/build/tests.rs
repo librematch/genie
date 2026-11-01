@@ -1084,7 +1084,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     assert!(!post.desolid);
     assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
     assert_eq!(
-        u(object_id(10029)).firepower,
+        u(object_id(10029)).combat.firepower,
         crate::combat::Firepower::new(2.0)
     );
     assert!(
@@ -1097,7 +1097,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     assert_eq!(
         (
             u(object_id(10030)).construction.unwrap(),
-            u(object_id(10030)).firepower
+            u(object_id(10030)).combat.firepower
         ),
         (foundation(false), crate::combat::Firepower::new(0.0))
     );

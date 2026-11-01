@@ -375,7 +375,7 @@ fn import_build(
         .map(|s| saved_move_to(s, saved.graphics, true))
         .transpose()?;
     let mut task = work(saved.s.master_obj)?;
-    task.work_rate += unit.work_rate_powerup;
+    task.work_rate += unit.combat.work_rate_powerup;
     unit.actions.set_build(Some(BuildAction {
         target: ObjectId::of_field(base.target_id),
         state: genie_core::construction::build::BuildState::of_byte(base.state)?,

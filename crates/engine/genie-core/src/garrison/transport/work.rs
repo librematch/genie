@@ -115,7 +115,7 @@ impl crate::world::World {
             None => None,
         };
         let unit = self.players.live_mut(p, i)?;
-        if let Some(ai) = unit.ai.as_mut() {
+        if let Some(ai) = unit.combat.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Transport),
                 Some(ActionKind::Transport),

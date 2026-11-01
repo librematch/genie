@@ -70,9 +70,10 @@ impl Unit {
             counted_in,
             radius: own.radius,
             scenario: c.w.settings.game_mode.scenario(),
-            rate: self.work_rate_powerup + own.work_rate,
+            rate: self.combat.work_rate_powerup + own.work_rate,
             waits: own.class == class::VILLAGER && !c.w.players.player(c.player)?.computer,
             stance: self
+                .combat
                 .ai
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
@@ -85,7 +86,7 @@ impl Unit {
     pub(crate) const fn repairers(&self) -> crate::construction::BuilderCount {
         match &self.construction {
             Some(k) => k.builders,
-            None => self.builders,
+            None => self.combat.builders,
         }
     }
 
@@ -93,7 +94,7 @@ impl Unit {
     pub(crate) const fn repairers_mut(&mut self) -> &mut crate::construction::BuilderCount {
         match &mut self.construction {
             Some(k) => &mut k.builders,
-            None => &mut self.builders,
+            None => &mut self.combat.builders,
         }
     }
 
@@ -133,7 +134,7 @@ impl Unit {
             radius: master.map_or(Footprint::ZERO, |m| m.radius),
             speed: self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
             scenario,
-            firepower: self.firepower,
+            firepower: self.combat.firepower,
             capture,
         }
     }
@@ -167,7 +168,7 @@ impl Unit {
     /// waypoint outside the path is the game's static zero point): that move, the caller's
     /// ([`Unit::ai_move`]). None without a saved patrol.
     pub(crate) fn restore_patrol(&mut self) -> Option<AiMove> {
-        let ai = self.ai.as_ref()?;
+        let ai = self.combat.ai.as_ref()?;
         let saved = ai.patrol_path.as_ref()?;
         let points = saved.path.points.clone();
         let w = ai
@@ -350,7 +351,7 @@ fn repaired(
         master: om.id,
         master_hp: om.hit_points,
         hp: o.life.hp,
-        hp_powerup: o.hp_powerup,
+        hp_powerup: o.combat.hp_powerup,
         main: if om.kind == BUILDING {
             o.annex_of
         } else {
@@ -375,7 +376,7 @@ fn repair_write_back(
         }
         if let Some((_, u)) = w.object_mut(now.id) {
             u.life.hp = now.hp;
-            u.hp_powerup = now.hp_powerup;
+            u.combat.hp_powerup = now.hp_powerup;
         }
     }
 }

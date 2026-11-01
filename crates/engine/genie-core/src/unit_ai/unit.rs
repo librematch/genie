@@ -47,7 +47,9 @@ impl Unit {
         // an object others take over by seeing it (`+0x924` 1) gives it to the first player that
         // sees it ([`crate::vision::visibility::sight_taker`]) when that one has its master
         let mut captured = captured;
-        if self.combat
+        let combat = crate::objects::masters::master_type::COMBAT
+            <= self.master(&c.w.masters, c.player)?.kind;
+        if combat
             && let Some(mask) = c.w.spatial.combat_sight(self.id)?
             && let Some(q) = crate::vision::visibility::sight_taker(
                 mask,
@@ -141,7 +143,7 @@ impl Unit {
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
             ranged: master.is_some_and(|m| m.missile.master().is_some()),
-            firepower: self.firepower,
+            firepower: self.combat.firepower,
             capture: self.capture_kind(c),
             master: self.life.master_id,
             scenario: c.w.settings.game_mode.scenario(),
@@ -228,7 +230,7 @@ impl Unit {
         (player, computer): (PlayerId, bool),
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        let mut ai = self.ai.take().ok_or(NO_UNIT_AI)?;
+        let mut ai = self.combat.ai.take().ok_or(NO_UNIT_AI)?;
         // the AI stream is the AI's while it runs: no world routine the side calls draws from it
         let held = c.w.streams.get(Stream::Ai).clone();
         let mut ai_stream = held.clone();
@@ -246,7 +248,7 @@ impl Unit {
         let result = f(&mut ai, &mut side, &mut ai_stream);
         let own = std::mem::replace(&mut c.side_notifies, outer).unwrap_or_default();
         let posted = own.into_iter().try_for_each(|(n, state)| ai.post(n, state));
-        self.ai = Some(ai);
+        self.combat.ai = Some(ai);
         let stream = c.w.streams.get(Stream::Ai);
         if *stream != held {
             return Err(GenieError::unreachable(
@@ -279,7 +281,7 @@ impl Unit {
             &mut Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {
-        let Some(ai_type) = self.ai.as_ref().map(|ai| ai.ai_type) else {
+        let Some(ai_type) = self.combat.ai.as_ref().map(|ai| ai.ai_type) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one",
             ));
@@ -320,7 +322,7 @@ impl Unit {
             &mut Well512,
         ) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        let Some(ai_type) = self.ai.as_ref().map(|ai| ai.ai_type) else {
+        let Some(ai_type) = self.combat.ai.as_ref().map(|ai| ai.ai_type) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one",
             ));
@@ -389,19 +391,20 @@ impl Unit {
         // RGE_Combat_Object::update: on the owner's turn the full update (slot 4), else
         // FUN_140c68980 for a unit not inside another; a dead unit's full update only adds the
         // world's dt to its time since the last enemy sighting (`+0x1b4`) before it returns
-        if turn.is_some() && self.ai.is_some() && after.is_none() {
+        if turn.is_some() && self.combat.ai.is_some() && after.is_none() {
             // the full update's start lets the unit AIs' search cache go
             c.w.spatial.forget_search();
         }
         if turn.is_some()
             && after.is_none()
             && !self.life.is_alive()
-            && let Some(ai) = self.ai.as_mut()
+            && let Some(ai) = self.combat.ai.as_mut()
         {
             ai.time_since_enemy += c.dt.seconds();
         }
         let runs = turn.is_some() || self.life.inside.is_none();
         let Some(orders) = self
+            .combat
             .ai
             .as_ref()
             .filter(|_| self.life.is_alive() && runs)
@@ -419,6 +422,7 @@ impl Unit {
         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
         let world_time = c.w.world_time;
         let ai_type = self
+            .combat
             .ai
             .as_ref()
             .map_or(UnitAiType::of_value(0), |ai| ai.ai_type);
@@ -456,7 +460,7 @@ impl Unit {
         c: &Step<'_>,
         viewer: PlayerId,
     ) -> Result<Option<crate::unit_ai::Seen>, GenieError> {
-        match self.ai.as_ref().and_then(|ai| ai.current_target) {
+        match self.combat.ai.as_ref().and_then(|ai| ai.current_target) {
             None => Ok(None),
             Some(t) if t == self.id => c.w.seen_of(self, c.player, viewer).map(Some),
             Some(t) => c.w.seen(Some(t), viewer),
@@ -474,7 +478,7 @@ impl Unit {
         view: &OwnerView,
         master: Option<&Master>,
     ) -> Result<Vec<crate::unit_ai::UnitSeen>, GenieError> {
-        let Some(ai) = self.ai.as_ref() else {
+        let Some(ai) = self.combat.ai.as_ref() else {
             return Ok(Vec::new());
         };
         let damaged = ai
@@ -511,7 +515,7 @@ impl Unit {
                 owner,
                 combat_level: m.combat_level,
                 state: u.life.state,
-                target: u.ai.as_ref().and_then(|a| a.current_target),
+                target: u.combat.ai.as_ref().and_then(|a| a.current_target),
                 gap_squared: footprint_gap_squared(
                     self.position(),
                     me.radius,
@@ -546,7 +550,7 @@ impl Unit {
     /// The unit's notifies to itself ([`crate::unit_ai::Inbox`]); an action that walks borrows
     /// its fields beside the unit's body instead.
     pub(crate) const fn inbox(&mut self) -> crate::unit_ai::Inbox<'_> {
-        crate::unit_ai::Inbox::of(&mut self.ai, self.id, self.life.state)
+        crate::unit_ai::Inbox::of(&mut self.combat.ai, self.id, self.life.state)
     }
 
     /// The units in the way the motion step told the unit AI of ([`crate::unit_ai::NotifyKind::IN_THE_WAY`],

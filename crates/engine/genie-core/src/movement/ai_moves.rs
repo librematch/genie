@@ -122,7 +122,7 @@ impl Unit {
         }
         self.clear_own_actions(releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
-        let look = self.abilities.look.as_ref();
+        let look = self.combat.abilities.look.as_ref();
         let sprite = ai_sprite(master, m.walk)
             .or_else(|| point_sprite(master, look, false))
             .and_then(|id| graphics.get(id).copied());
@@ -211,7 +211,7 @@ impl Unit {
     ) -> Result<SpriteReads<'g>, GenieError> {
         Ok(SpriteReads::of(
             self.master_in(masters)?,
-            self.abilities.look.as_ref(),
+            self.combat.abilities.look.as_ref(),
             graphics,
         ))
     }

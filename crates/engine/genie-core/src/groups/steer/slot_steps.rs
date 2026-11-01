@@ -245,7 +245,7 @@ impl World {
     /// `to`'s x and y (`LAB_141027c88`).
     pub(super) fn set_state_position(&mut self, id: ObjectId, to: BVector) {
         if let Some((_, u)) = self.object_mut(id)
-            && let Some(ai) = u.ai.as_mut()
+            && let Some(ai) = u.combat.ai.as_mut()
         {
             ai.state_position = to.ground();
         }

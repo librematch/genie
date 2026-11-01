@@ -275,7 +275,7 @@ impl BuildAction {
             self.restart(c, builder)?;
             return Ok(HeadCode::Keeps);
         }
-        if let Some(ai) = builder.ai.as_mut() {
+        if let Some(ai) = builder.combat.ai.as_mut() {
             let gone = &reads.gone_orders;
             ai.orders
                 .retain(|o| !(DROPPED_ORDERS.contains(&o.order) && gone.contains(&o.target)));
