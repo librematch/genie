@@ -95,7 +95,7 @@ impl Spatial {
             };
             let kind = o.kind.filed();
             if !kind.tested()
-                || self.gaits.get(&id).is_some_and(|g| g.moving)
+                || self.gaits.get(id).is_some_and(|g| g.moving)
                 || ignore.contains(&RecordId::from(id))
                 || !self.visits(p, kind, grown)
             {

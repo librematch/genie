@@ -580,13 +580,13 @@ pub struct Spatial {
     records: RecordCells,
     /// The objects inside others (`+0x2f0`): off the tiles' lists and the obstruction manager,
     /// without a record, at their container's x and y; a lookup by id still finds them.
-    inside: BTreeMap<ObjectId, Placed>,
+    inside: crate::objects::IdTable<Placed>,
     tiles: Tiles,
     /// The tile rectangles (x0, y0, x1, y1) whose static marks changed, for the planners
     /// ([`Spatial::take_changes`]).
     changed: Vec<PlanRect>,
     /// The seconds since each frozen object froze.
-    frozen_for: BTreeMap<ObjectId, Seconds>,
+    frozen_for: crate::objects::IdTable<Seconds>,
     /// What a stopped player's units may have done since: the fastest any of the players' unit
     /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
     /// range), for [`Spatial::check_known`]. 0 when not set.
@@ -594,11 +594,11 @@ pub struct Spatial {
     /// The farthest any of the players' units acts beyond its footprint.
     pub reach: Distance,
     /// What the walk reads of the moving objects it meets ([`Gait`]).
-    gaits: BTreeMap<ObjectId, Gait>,
+    gaits: crate::objects::IdTable<Gait>,
     /// Each player's scout map (`player+0x1370`, `mIsScoutMapEnabled` `+0x1368`), once made.
     scout_maps: BTreeMap<PlayerId, crate::movement::explore::InfluenceMap>,
     /// Each annex's main building (`+0xbb8`), which the walk's avoidance takes for the annex.
-    annexes: BTreeMap<ObjectId, crate::construction::MainBuildingId>,
+    annexes: crate::objects::IdTable<crate::construction::MainBuildingId>,
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.
     pub relations: crate::players::ByPlayer<crate::players::Relations>,
     /// What each player's queries make of the other players' objects (`player+0x278`, the

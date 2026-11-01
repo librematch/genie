@@ -85,7 +85,7 @@ impl Spatial {
             let kind = o.kind.filed();
             kind.tested()
                 && !ignore.contains(&RecordId::from(id))
-                && !self.gaits.get(&id).is_some_and(|g| g.moving)
+                && !self.gaits.get(id).is_some_and(|g| g.moving)
                 && self.visits(p, kind, query)
                 && meets(kind, p.bounds())
         }))

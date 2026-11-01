@@ -212,7 +212,7 @@ impl Spatial {
                 let _ = self.gaits.insert(id, g);
             }
             None => {
-                let _ = self.gaits.remove(&id);
+                let _ = self.gaits.remove(id);
             }
         }
     }
@@ -223,7 +223,7 @@ impl Spatial {
         let Some(id) = id.key() else {
             return;
         };
-        if let Some(g) = self.gaits.get_mut(&id) {
+        if let Some(g) = self.gaits.get_mut(id) {
             g.human_order = human_order;
         }
     }
@@ -236,7 +236,7 @@ impl Spatial {
         let Some(id) = id.key() else {
             return;
         };
-        if let Some(g) = self.gaits.get_mut(&id) {
+        if let Some(g) = self.gaits.get_mut(id) {
             g.last_move = last_move;
         }
     }
@@ -244,7 +244,7 @@ impl Spatial {
     /// What the walk reads of the moving object `id`.
     #[must_use]
     pub fn gait(&self, id: impl ObjectKey) -> Option<Gait> {
-        self.gaits.get(&id.key()?).copied()
+        self.gaits.get(id.key()?).copied()
     }
 
     /// An annex's main building, or none.
@@ -254,7 +254,7 @@ impl Spatial {
                 let _ = self.annexes.insert(id, m);
             }
             None => {
-                let _ = self.annexes.remove(&id);
+                let _ = self.annexes.remove(id);
             }
         }
     }
@@ -277,14 +277,14 @@ impl Spatial {
         self.annexes
             .iter()
             .filter(|&(_, &m)| m.id() == main)
-            .map(|(&a, _)| a)
+            .map(|(a, _)| a)
             .collect()
     }
 
     /// The main building of the annex `id`, if it is one.
     #[must_use]
     pub fn annex_of(&self, id: impl ObjectKey) -> Option<MainBuildingId> {
-        self.annexes.get(&id.key()?).copied()
+        self.annexes.get(id.key()?).copied()
     }
 
     /// `FUN_141663dc0` with the ally flag ([`Spatial::allied`]), for the walk's avoidance.
@@ -405,7 +405,7 @@ impl Spatial {
             {
                 continue;
             }
-            let g = if self.gaits.get(&id).is_some_and(|g| g.moving) {
+            let g = if self.gaits.get(id).is_some_and(|g| g.moving) {
                 let player = player.ok_or(GenieError::unsupported("a walker without a place"))?;
                 if self.allied(p.player, player) {
                     ally_factor * grow

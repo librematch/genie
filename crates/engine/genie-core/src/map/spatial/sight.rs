@@ -62,13 +62,13 @@ impl Spatial {
         };
         // an animal inside another object (in this update, its Artifact's Enter got it in)
         // searches about its record there
-        let p = self
-            .objects
-            .get(me)
-            .or_else(|| self.inside.get(&me))
-            .ok_or(GenieError::unsupported(
-                "an owner search of an object the world does not hold",
-            ))?;
+        let p =
+            self.objects
+                .get(me)
+                .or_else(|| self.inside.get(me))
+                .ok_or(GenieError::unsupported(
+                    "an owner search of an object the world does not hold",
+                ))?;
         let reach = (p.radius.x() as i32 as i16).wrapping_add(3);
         let (x, y) = (p.position.x(), p.position.y());
         let (x0, x1) = (
@@ -398,7 +398,7 @@ impl Spatial {
         let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) else {
             return Ok(None);
         };
-        let main = self.annexes.get(&id).and_then(|main| {
+        let main = self.annexes.get(id).and_then(|main| {
             let place = self.objects.get(main.id())?.position;
             Some((place, v.seer(*main).map_or(0, |s| s.umv)))
         });

@@ -39,15 +39,15 @@ impl Spatial {
             manager_buffer: None,
             objects: crate::objects::IdTable::new(),
             records: RecordCells::default(),
-            inside: BTreeMap::new(),
+            inside: crate::objects::IdTable::new(),
             tiles,
             changed: Vec::new(),
-            frozen_for: BTreeMap::new(),
+            frozen_for: crate::objects::IdTable::new(),
             fastest: 0.0,
             reach: Distance::ZERO,
-            gaits: BTreeMap::new(),
+            gaits: crate::objects::IdTable::new(),
             scout_maps: BTreeMap::new(),
-            annexes: BTreeMap::new(),
+            annexes: crate::objects::IdTable::new(),
             relations: crate::players::ByPlayer::default(),
             unit_diplomacy: crate::players::ByPlayer::default(),
             task_0x99: Vec::new(),
@@ -213,7 +213,7 @@ impl Spatial {
     #[must_use]
     pub fn get(&self, id: impl ObjectKey) -> Option<&Placed> {
         let id = id.key()?;
-        self.objects.get(id).or_else(|| self.inside.get(&id))
+        self.objects.get(id).or_else(|| self.inside.get(id))
     }
 
     /// An object whose place the slice knows: an object of a player the slice stopped is known
@@ -234,7 +234,9 @@ impl Spatial {
     pub fn freeze(&mut self, id: ObjectId) {
         if let Some(p) = self.objects.get_mut(id) {
             let _ = p.unknown.get_or_insert(0.0);
-            let _ = self.frozen_for.entry(id).or_insert(Seconds::ZERO);
+            if !self.frozen_for.contains_key(id) {
+                let _ = self.frozen_for.insert(id, Seconds::ZERO);
+            }
         }
     }
 
@@ -243,7 +245,7 @@ impl Spatial {
         if let Some(p) = self.objects.get_mut(id) {
             p.unknown = None;
         }
-        let _ = self.frozen_for.remove(&id);
+        let _ = self.frozen_for.remove(id);
     }
 
     /// A tick of `dt` seconds passed: every frozen object may have moved its speed times dt.
@@ -333,12 +335,7 @@ impl Spatial {
             let moved = if Speed::ZERO < q.speed {
                 u
             } else {
-                self.fastest
-                    * self
-                        .frozen_for
-                        .get(&other)
-                        .copied()
-                        .unwrap_or(Seconds::ZERO)
+                self.fastest * self.frozen_for.get(other).copied().unwrap_or(Seconds::ZERO)
             };
             let grow = moved + self.reach.get();
             rect.overlaps(q.bounds().grown(Distance::new(grow)))
@@ -349,7 +346,7 @@ impl Spatial {
     pub(super) fn frozen(&self) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         self.frozen_for
             .keys()
-            .filter_map(|&id| self.objects.get(id).map(|p| (id, p)))
+            .filter_map(|id| self.objects.get(id).map(|p| (id, p)))
             .filter(|(_, p)| p.unknown.is_some())
     }
 
@@ -357,8 +354,8 @@ impl Spatial {
     /// earlier record marked.
     pub fn insert(&mut self, id: ObjectId, placed: Placed) {
         self.remove(id);
-        if placed.unknown.is_some() {
-            let _ = self.frozen_for.entry(id).or_insert(Seconds::ZERO);
+        if placed.unknown.is_some() && !self.frozen_for.contains_key(id) {
+            let _ = self.frozen_for.insert(id, Seconds::ZERO);
         }
         if let Some(o) = placed.obstruction.filter(|o| o.kind.marks_tiles()) {
             self.tiles.mark(&placed, o);
@@ -427,7 +424,7 @@ impl Spatial {
     /// The record of object `id` inside another ([`Spatial::go_inside`]) becomes `placed` (a master
     /// change inside, which touches no tile, list nor record); nothing for an object not inside.
     pub fn set_inside_record(&mut self, id: ObjectId, placed: Placed) {
-        if let Some(p) = self.inside.get_mut(&id) {
+        if let Some(p) = self.inside.get_mut(id) {
             *p = placed;
         }
     }
@@ -435,7 +432,7 @@ impl Spatial {
     /// The record of object `id` inside another takes the place `at` (its object's copy of the
     /// container's place); nothing for an object not inside.
     pub fn set_inside_position(&mut self, id: ObjectId, at: Position) {
-        if let Some(p) = self.inside.get_mut(&id) {
+        if let Some(p) = self.inside.get_mut(id) {
             p.position = at;
         }
     }
@@ -443,12 +440,12 @@ impl Spatial {
     /// The object `id` comes out of the object it was inside ([`Spatial::go_inside`]): its record,
     /// which the caller puts on the map again.
     pub fn come_out(&mut self, id: ObjectId) -> Option<Placed> {
-        self.inside.remove(&id)
+        self.inside.remove(id)
     }
 
     /// The object `id` leaves the world.
     pub fn remove(&mut self, id: ObjectId) {
-        let _ = self.inside.remove(&id);
+        let _ = self.inside.remove(id);
         if let Some(gone) = self.objects.remove(id) {
             self.refile(id);
             if let Some(i) = self.tiles.tile_of(gone.position) {

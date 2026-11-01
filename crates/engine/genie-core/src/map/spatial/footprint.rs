@@ -315,7 +315,7 @@ impl Spatial {
             else {
                 return false;
             };
-            if still && self.gaits.get(&id).is_some_and(|g| g.moving) {
+            if still && self.gaits.get(id).is_some_and(|g| g.moving) {
                 return false;
             }
             if !self.visits(p, o.kind, rect) {
