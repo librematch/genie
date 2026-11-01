@@ -267,7 +267,6 @@ mod tests {
     use crate::map::Restriction;
     use crate::map::spatial::Placed;
     use crate::math::rng::Well512;
-    use crate::movement::Speed;
     use crate::objects::ActionState;
     use crate::objects::WorkRate;
     use crate::objects::actions::ActionList;
@@ -358,7 +357,7 @@ mod tests {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         };

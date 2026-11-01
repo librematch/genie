@@ -496,10 +496,9 @@ pub(super) fn build_entries(inventory: &[[u8; 6]]) -> Vec<(i16, i16, bool)> {
         .collect()
 }
 
-/// What movement reads of a saved object's master: radii, class and obstruction kind, from the
-/// object's own master or its player's.
-/// How fast an object may move, for the slice's bound on a frozen object's place: its own or its
-/// player's master's speed, 0 for an object that does not move.
+/// How fast an object may move: its own or its player's master's speed, 0 for an object that
+/// does not move (whether it moves, [`genie_core::map::spatial::Placed::moves`], and whether a
+/// combat unit links its tiles); a master the save does not hold, the largest.
 pub(super) fn moving_speed(
     o: &genie_save::Object,
     s: &RgeStaticObject,

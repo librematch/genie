@@ -30,7 +30,6 @@ use crate::map::Rect;
 use crate::map::TileRect;
 use crate::map::spatial::{RecordId, Spatial};
 use crate::math::fmath::sqrt;
-use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
@@ -339,13 +338,14 @@ impl Waypoints {
     }
 }
 
-/// What the pather knows of its target object: its place, radii and speed (its id is the
-/// search's, -1 for the goal query's target).
+/// What the pather knows of its target object: its place, radii and whether it moves (its top
+/// speed, slot 0x208, is not 0: [`crate::map::spatial::Placed::moves`]; its id is the search's,
+/// -1 for the goal query's target).
 #[derive(Clone, Copy, Debug)]
 struct Target {
     at: Point,
     radius: Footprint,
-    speed: Speed,
+    moves: bool,
 }
 
 /// One search's query: the start and the goal, the target on the goal (its id -1 for none and for

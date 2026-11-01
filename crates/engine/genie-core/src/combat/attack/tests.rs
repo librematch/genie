@@ -1049,7 +1049,7 @@ fn world_with(id: i32, player: PlayerId, class: ClassId, at: Position) -> Spatia
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },

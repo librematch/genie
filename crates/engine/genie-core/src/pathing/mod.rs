@@ -424,7 +424,6 @@ impl Pathing {
 mod tests {
     use super::*;
     use crate::map::RestrictionId;
-    use crate::movement::Speed;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::class;
@@ -654,7 +653,7 @@ mod tests {
             obstruction_type: ObstructionType::CIRCLE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::new(0.8),
+            moves: true,
             unknown: None,
             obstruction: Some(Obstruction {
                 kind: ObstructionType::CIRCLE,

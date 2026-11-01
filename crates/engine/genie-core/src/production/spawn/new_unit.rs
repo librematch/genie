@@ -329,7 +329,7 @@ impl World {
             obstruction_type: made.obstruction_type,
             buildable_on: made.buildable_on,
             tall: made.tall,
-            speed: moving.speed,
+            moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
                 Obstruction {

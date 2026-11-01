@@ -9,7 +9,6 @@ use crate::map::spatial::{Obstruction, Placed};
 use crate::math::Angle;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
-use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -264,7 +263,7 @@ impl World {
             obstruction_type: made.obstruction_type,
             buildable_on: made.buildable_on,
             tall: made.tall,
-            speed: moving.as_ref().map_or(Speed::ZERO, |m| m.speed),
+            moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
                 Obstruction {

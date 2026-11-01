@@ -584,7 +584,7 @@ fn target_at(y: f32) -> Placed {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: false,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     }

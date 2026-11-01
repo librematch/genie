@@ -1434,7 +1434,7 @@ fn a_player_s_new_tiles_give_their_resources_to_its_lists() {
                 obstruction_type: ObstructionType::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: false,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             },
@@ -2382,7 +2382,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             },
@@ -2647,7 +2647,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -3059,7 +3059,7 @@ pub(crate) fn forage_world() -> World {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -3658,7 +3658,7 @@ fn the_empire_wars_start_puts_a_villager_on_its_farm_to_work() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -4047,7 +4047,7 @@ fn a_unit_sent_off_a_foundation_finds_the_spot_beside_it() {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -4218,7 +4218,7 @@ fn cart_world() -> World {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -4263,7 +4263,7 @@ fn footprint_world() -> World {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -4532,7 +4532,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             },
@@ -4615,7 +4615,7 @@ pub(crate) fn hunt_world() -> World {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -5366,7 +5366,7 @@ fn shepherd_world(x: f32) -> World {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -5526,7 +5526,7 @@ fn lumber_world(near: f32) -> World {
                 obstruction_type: ObstructionType::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: true,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             },
@@ -6140,7 +6140,7 @@ fn the_unit_ai_s_repair_command_is_the_unit_s_within_its_run() {
         obstruction_type: ObstructionType::TYPE_2,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -6233,7 +6233,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -6249,7 +6249,7 @@ fn enter_world(orders: Vec<crate::unit_ai::QueuedOrder>, room: u8) -> World {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::new(0.8),
+            moves: true,
             unknown: None,
             obstruction: None,
         },
@@ -7267,7 +7267,7 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -7774,7 +7774,7 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -8191,7 +8191,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: Some(record),
         },
@@ -8263,7 +8263,7 @@ fn a_gate_counts_the_moving_units_between_its_posts() {
         obstruction_type: kind,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed,
+        moves: Speed::ZERO < speed,
         unknown: None,
         obstruction: Some(crate::map::spatial::Obstruction {
             kind,
@@ -8457,7 +8457,7 @@ fn gate_world() -> World {
         obstruction_type: kind,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed,
+        moves: Speed::ZERO < speed,
         unknown: None,
         obstruction: Some(crate::map::spatial::Obstruction {
             kind,
@@ -9719,7 +9719,7 @@ fn hands_world(id: i32, p: PlayerId, class: ClassId, master: MasterId, los: Dist
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -9936,7 +9936,7 @@ fn owner_search_unit(s: &mut Spatial, id: i32, p: PlayerId, x: f32) {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -10251,7 +10251,7 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
                 obstruction_type: ObstructionType::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: false,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             },
@@ -11021,7 +11021,7 @@ fn a_move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() 
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -11129,7 +11129,7 @@ fn a_move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -11304,7 +11304,7 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -11400,7 +11400,7 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -11719,7 +11719,7 @@ fn an_artifact_s_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             },
@@ -11893,7 +11893,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -12046,7 +12046,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -12183,7 +12183,7 @@ fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -12448,7 +12448,7 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -13497,7 +13497,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -14715,7 +14715,7 @@ fn scout_attack_on(
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -14845,7 +14845,7 @@ fn attack_by(
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -15015,7 +15015,7 @@ fn help_view<R>(
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -15770,7 +15770,7 @@ fn a_reseed_s_placement_passes_over_the_old_farm() {
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: None,
             };
@@ -16364,7 +16364,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: Some(crate::map::spatial::Obstruction {
                 kind: ObstructionType::TYPE_2,
@@ -18628,7 +18628,7 @@ pub(crate) fn repairing(at: Position) -> World {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     };
@@ -20571,4 +20571,30 @@ fn only_a_computer_players_explorer_notify_reaches_the_ai() {
 /// Object `value` as a container.
 fn container_id(value: i32) -> ContainerId {
     ContainerId::new(object_id(value))
+}
+
+/// A frozen unit's place grows by its master's speed as the master stands at each tick
+/// ([`World::grow_unknown`]): 2 s at 0.8 tiles a second, 1.6 tiles; a master the world does not
+/// hold may be anywhere.
+#[test]
+fn a_frozen_unit_may_have_moved_its_master_s_speed() {
+    let mut t = forage_world();
+    let id = t.players[1].objects[ListIndex::new(0)].id;
+    let master = t.players[1].objects[ListIndex::new(0)].life.master_id;
+    t.masters[1]
+        .get_mut(master)
+        .unwrap()
+        .moving
+        .as_mut()
+        .unwrap()
+        .base = Speed::new(0.8);
+    let mut placed = *t.spatial.get(id).unwrap();
+    placed.moves = true;
+    t.spatial.insert(id, placed);
+    t.spatial.freeze(id);
+    t.grow_unknown(Seconds::new(2.0));
+    assert_eq!(t.spatial.get(id).unwrap().unknown, Some(1.6));
+    t.masters[1] = Masters::new([]);
+    t.grow_unknown(Seconds::new(0.05));
+    assert_eq!(t.spatial.get(id).unwrap().unknown, Some(f32::INFINITY));
 }

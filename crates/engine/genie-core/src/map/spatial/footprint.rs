@@ -8,7 +8,6 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::{Tile, TileRect};
 use crate::math::fmath::BVector;
-use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::world::slots::CheckedIndex;
@@ -116,7 +115,7 @@ impl Spatial {
     /// as occupying it (`FUN_14123bb20`): objects other than the site below state 3, or of a
     /// type other than a building's below state 7 (their state and type `looks`'); for a site
     /// whose master does not obstruct (`FUN_1411205c0`: obstruction type 0 or 12, `obstructs`
-    /// false) only those that do not move (speed 0, slot 0xe8); a desolid building foundation
+    /// false) only those that do not move ([`Placed::moves`], the master's slot 0xe8); a desolid building foundation
     /// (`+0xc60`) only of a player that and the site's count each other allied
     /// (`FUN_141663d90` with the ally flag, both ways); not those the site may be built over
     /// (`can_be_built_on` 1); with all three radii. An object `looks` does not hold (the owner's
@@ -149,7 +148,7 @@ impl Spatial {
             .iter()
             .filter(|&(id, o)| {
                 id != site_id.id()
-                    && (obstructs || o.speed <= Speed::ZERO)
+                    && (obstructs || !o.moves)
                     && !o.buildable_on.passed()
                     && o.tall
                     && o.radius.sized()

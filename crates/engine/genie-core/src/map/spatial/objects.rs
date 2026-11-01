@@ -248,11 +248,18 @@ impl Spatial {
         let _ = self.frozen_for.remove(id);
     }
 
-    /// A tick of `dt` seconds passed: every frozen object may have moved its speed times dt.
-    pub fn grow_unknown(&mut self, dt: Seconds) {
+    /// A tick of `dt` seconds passed: every frozen object that moves may have moved its master's
+    /// speed (`speed` of its player and master) times dt.
+    pub fn grow_unknown(
+        &mut self,
+        dt: Seconds,
+        speed: impl Fn(PlayerId, crate::objects::masters::MasterId) -> Speed,
+    ) {
         for p in self.objects.values_mut() {
-            if let Some(u) = p.unknown.as_mut() {
-                *u += (p.speed * dt).get();
+            if let Some(u) = p.unknown.as_mut()
+                && p.moves
+            {
+                *u += (speed(p.player, p.master) * dt).get();
             }
         }
         for t in self.frozen_for.values_mut() {
@@ -332,7 +339,7 @@ impl Spatial {
                 // Gaia's units (animals) do not work on objects
                 return false;
             }
-            let moved = if Speed::ZERO < q.speed {
+            let moved = if q.moves {
                 u
             } else {
                 self.fastest * self.frozen_for.get(other).copied().unwrap_or(Seconds::ZERO)

@@ -4,7 +4,6 @@
 use genie_core::map::Distance;
 use genie_core::map::terrain::TileTerrain;
 use genie_core::map::{GridSize, TileOffset};
-use genie_core::movement::Speed;
 use genie_core::vision::TileCount;
 
 use crate::masters::{MasterTable, TerrainTable};
@@ -271,7 +270,7 @@ pub(super) fn spatial(
                     obstruction_type: m.obstruction_type,
                     buildable_on: m.buildable_on,
                     tall: 0.0 < m.radius.z(),
-                    speed: Speed::new(moving_speed(o, s, section.objects())),
+                    moves: 0.0 < moving_speed(o, s, section.objects()),
                     unknown: None,
                     obstruction,
                 },

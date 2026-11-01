@@ -80,7 +80,7 @@ fn on_map(
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::of_data(buildable),
         tall: false,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     }
@@ -526,7 +526,7 @@ fn house() -> crate::map::spatial::Placed {
         obstruction_type: ObstructionType::TYPE_2,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     }

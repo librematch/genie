@@ -407,7 +407,6 @@ mod tests {
     use crate::map::RestrictionId;
     use crate::map::TerrainFlags;
     use crate::map::terrain::TileTerrain;
-    use crate::movement::Speed;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
@@ -501,7 +500,7 @@ mod tests {
                     obstruction_type: ObstructionType::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: true,
-                    speed: Speed::ZERO,
+                    moves: false,
                     unknown: None,
                     obstruction: Some(Obstruction {
                         kind: ObstructionType::CIRCLE,

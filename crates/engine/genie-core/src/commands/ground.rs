@@ -348,7 +348,7 @@ impl World {
             obstruction_type: made.obstruction_type,
             buildable_on: made.buildable_on,
             tall: made.tall,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: (!desolid
                 && !crate::math::fmath::at_most_or_unordered(made.height.get(), 0.0)

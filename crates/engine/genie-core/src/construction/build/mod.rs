@@ -660,7 +660,7 @@ mod stack_tests {
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
-                speed: Speed::ZERO,
+                moves: false,
                 unknown: None,
                 obstruction: Some(Obstruction {
                     kind: ObstructionType::TYPE_2,

@@ -188,7 +188,7 @@ fn post(x: f32, y: f32) -> Placed {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,

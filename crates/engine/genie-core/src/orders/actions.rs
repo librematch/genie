@@ -3,7 +3,6 @@
 
 use crate::GenieError;
 use crate::math::rng::Stream;
-use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -424,7 +423,7 @@ pub(crate) fn switch_master(
             placed.obstruction_type = next.obstruction_type;
             placed.buildable_on = next.buildable_on;
             placed.tall = next.tall;
-            placed.speed = next.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
+            placed.moves = next.moves();
             if unit.life.inside.is_some() {
                 // inside another (`+0x2f0`) the unit has no tile (`+0x2e8` 0: no sight slots) and
                 // is in no list nor the obstruction manager: its record takes the new master's

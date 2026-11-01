@@ -719,7 +719,7 @@ fn register(t: &mut World) {
                     obstruction_type: ObstructionType::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: false,
-                    speed: Speed::ZERO,
+                    moves: false,
                     unknown: None,
                     obstruction: None,
                 },

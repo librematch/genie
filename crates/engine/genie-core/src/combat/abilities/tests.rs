@@ -8,7 +8,6 @@ use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
-use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
@@ -698,7 +697,7 @@ fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Poin
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },

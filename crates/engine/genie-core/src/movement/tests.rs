@@ -286,7 +286,7 @@ fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> S
         obstruction_type: ObstructionType::CIRCLE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,
@@ -517,7 +517,7 @@ fn walled(radius: Distance) -> Spatial {
             obstruction_type: ObstructionType::CIRCLE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
                 kind: ObstructionType::CIRCLE,
@@ -836,7 +836,7 @@ fn a_big_unit_s_path_request_takes_the_old_pather_with_the_walk_s_kept_hits() {
         obstruction_type: ObstructionType::CIRCLE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,
@@ -930,7 +930,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::new(0.8),
+            moves: true,
             unknown: None,
             obstruction: Some(Obstruction {
                 kind: ObstructionType::CIRCLE,
@@ -1345,7 +1345,7 @@ fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
         obstruction_type: ObstructionType::TYPE_2,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::TYPE_2,
@@ -1609,7 +1609,7 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
                 kind: ObstructionType::TYPE_2,
@@ -1724,7 +1724,7 @@ pub(crate) fn world() -> Spatial {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,
@@ -1744,7 +1744,7 @@ pub(crate) fn world() -> Spatial {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         },
@@ -1845,7 +1845,7 @@ fn a_long_path_ends_before_its_first_walled_stretch() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed,
+        moves: Speed::ZERO < speed,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,
@@ -2419,7 +2419,7 @@ fn a_top_level_short_of_its_moved_target_arrives() {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
-            speed: Speed::new(1.0),
+            moves: true,
             unknown: None,
             obstruction: None,
         };
@@ -2512,7 +2512,7 @@ fn a_next_waypoint_an_object_stands_on_goes() {
             obstruction_type: ObstructionType::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
                 kind: ObstructionType::TYPE_2,

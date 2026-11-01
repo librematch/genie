@@ -22,6 +22,13 @@ pub(super) fn sprite_speed(
 }
 
 impl Master {
+    /// Whether its objects move: a moving master (types 30 and up) whose speed (`+0x740`, the
+    /// master's slot 0xe8, [`MoveStats::base`]) is above 0 (`FUN_14123bb20`'s test).
+    #[must_use]
+    pub fn moves(&self) -> bool {
+        self.moving.is_some_and(|m| Speed::ZERO < m.base)
+    }
+
     /// The facets the facing routines read of a unit of this master ([`MoveStats::facets`]):
     /// those of its standing sprites, its moving ones (types 30 and up), its attack sprite (50
     /// and up) and its tasks' sprites, when every one the graphics hold has the same count and

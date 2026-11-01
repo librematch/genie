@@ -651,7 +651,7 @@ mod tests {
             obstruction_type: ObstructionType::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
-            speed: Speed::ZERO,
+            moves: false,
             unknown: None,
             obstruction: None,
         }

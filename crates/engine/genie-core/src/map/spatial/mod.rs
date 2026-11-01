@@ -19,7 +19,6 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
 use crate::map::Tile;
-use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::BuildableOn;
@@ -223,11 +222,15 @@ pub struct Placed {
     pub buildable_on: BuildableOn,
     /// The master's height radius (`+0x5e0`) is above 0: the tile counts it as tall.
     pub tall: bool,
-    /// The top speed, tiles per second; 0 for an object that does not move.
-    pub speed: Speed,
+    /// Its master moves ([`crate::objects::masters::Master::moves`]: a moving master whose speed,
+    /// `+0x740`, is above 0): the footprint's occupants read it (`FUN_14123bb20`, the master's
+    /// slot 0xe8), and the pather's target (`FUN_140f85580`, the object's top speed, slot
+    /// 0x208, not 0 just when its master's speed is not). Its placement and a change of its
+    /// master write it.
+    pub moves: bool,
     /// How far from `position` the object may be, when its player's update is not modelled: it
-    /// grows by its speed every tick ([`Spatial::grow_unknown`]). None for an object the slice
-    /// updates.
+    /// grows by its master's speed every tick ([`Spatial::grow_unknown`]). None for an object
+    /// the slice updates.
     pub unknown: Option<f32>,
     /// The obstruction record, if the object has one: a foundation gets its record only when
     /// construction starts.

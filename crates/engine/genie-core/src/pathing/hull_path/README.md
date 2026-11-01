@@ -38,5 +38,5 @@ lists them.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

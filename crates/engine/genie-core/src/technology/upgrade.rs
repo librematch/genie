@@ -694,7 +694,6 @@ mod tests {
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
-    use crate::movement::Speed;
     use crate::objects::ListIndex;
     use crate::objects::MasterHitPoints;
     use crate::objects::ObjectId;
@@ -1647,7 +1646,7 @@ mod tests {
                     obstruction_type: ObstructionType::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: true,
-                    speed: Speed::ZERO,
+                    moves: false,
                     unknown: None,
                     obstruction: None,
                 },

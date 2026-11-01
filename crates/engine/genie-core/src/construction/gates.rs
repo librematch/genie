@@ -4,7 +4,6 @@
 use crate::GenieError;
 use crate::map::Rect;
 use crate::map::spatial::{RecordId, Spatial, WalkQuery};
-use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::masters::ObstructionType;
@@ -14,15 +13,16 @@ use crate::objects::masters::player_master;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
-use crate::world::{GATE_COUNT_CAP, GATE_EPSILON, GATE_GROW, GATE_QUERY_RECORDS, World};
+use crate::world::{GATE_COUNT_CAP, GATE_GROW, GATE_QUERY_RECORDS, World};
 
 /// The units in gate `gate` (`FUN_1411d0570`): the obstruction manager's query from its first
 /// annex to its second (`+0xbc0`, `+0xbc8`) with flags 0x10, the gate and its annexes ignored
 /// (`FUN_1410562e0`), every record and the query grown by [`GATE_GROW`] (`FUN_1410562d0`), any
 /// kind and player ([`Spatial::walk_hits`]; its list holds 10 records, more are not modelled).
 /// Of the objects it lists, those not of the classes 27, 39 and 52, nor of class 3 standing
-/// still, and either moving (a top speed of at least [`GATE_EPSILON`]) or not Gaia's count, at
-/// most 25; the second answer is how many of them are of a player the gate's counts an ally
+/// still, and either moving or not Gaia's count, at most 25 (the game reads the object's top
+/// speed, slot 0x208: not 0 and at least [`crate::world::GATE_EPSILON`] just when its master moves,
+/// [`crate::map::spatial::Placed::moves`], for every speed the data gives); the second answer is how many of them are of a player the gate's counts an ally
 /// (`FUN_141663d90` with the ally flag).
 pub(crate) fn gate_units(
     spatial: &mut Spatial,
@@ -68,8 +68,8 @@ pub(crate) fn gate_units(
             continue;
         };
         let counts = !matches!(p.class, class::WALL | class::GATE | class::TOWER)
-            && (p.class != class::BUILDING || p.speed != Speed::ZERO)
-            && (GATE_EPSILON <= p.speed.get() || p.player != PlayerId::GAIA);
+            && (p.class != class::BUILDING || p.moves)
+            && (p.moves || p.player != PlayerId::GAIA);
         if counts {
             units.push(id);
             if spatial.allied_with(owner, p.player) {

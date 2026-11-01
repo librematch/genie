@@ -285,7 +285,7 @@ impl World {
                 run.start_work = std::mem::take(&mut self.start_work_due);
             }
             WorldStep::Draw => {
-                self.spatial.grow_unknown(run.dt.seconds());
+                self.grow_unknown(run.dt.seconds());
                 run.seed = self.streams.get(Stream::World).rand15();
             }
             // every player's ghosts (FUN_141166550 on +0x40), then every player's watched list

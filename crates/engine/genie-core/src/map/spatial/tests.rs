@@ -4,6 +4,7 @@ use crate::map::GridSize;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::{Rect, Segment};
+use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::BuildableOn;
@@ -45,7 +46,7 @@ fn the_record_cells_answer_as_the_full_scan_does() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: false,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: kind.map(|kind| Obstruction {
             kind,
@@ -260,7 +261,7 @@ fn villager(x: f32, y: f32) -> Placed {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,
@@ -1094,7 +1095,7 @@ fn a_static_record_marks_its_tiles_with_its_class_and_player() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::TYPE_2,
@@ -1111,7 +1112,7 @@ fn a_static_record_marks_its_tiles_with_its_class_and_player() {
         obstruction_type: ObstructionType::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
             kind: ObstructionType::TYPE_2,
@@ -1952,7 +1953,9 @@ fn a_tile_record_blocks_later_walks_until_the_records_are_cleared() {
 fn a_frozen_object_may_be_anywhere_its_speed_could_take_it() {
     let (mut s, house) = site();
     let mut deer = villager(34.0, 88.0);
-    deer.speed = Speed::new(1.0);
+    deer.moves = true;
+    // its master's speed, a tile a second
+    let deer_speed = |_, _| Speed::new(1.0);
     s.insert(object_id(9656), deer);
     s.freeze(object_id(9656));
     // frozen at once, the deer is where the save has it
@@ -1967,7 +1970,7 @@ fn a_frozen_object_may_be_anywhere_its_speed_could_take_it() {
     );
     assert!(s.get_known(object_id(9656)).is_ok());
     // its box reaches x 33.8; 3 s later it may stand on the footprint, which ends at 31
-    s.grow_unknown(Seconds::new(2.5));
+    s.grow_unknown(Seconds::new(2.5), deer_speed);
     assert!(
         s.footprint_occupants(
             FoundationId::new(object_id(10028)),
@@ -1977,7 +1980,7 @@ fn a_frozen_object_may_be_anywhere_its_speed_could_take_it() {
         )
         .is_ok()
     );
-    s.grow_unknown(Seconds::new(0.5));
+    s.grow_unknown(Seconds::new(0.5), deer_speed);
     let e = s
         .footprint_occupants(
             FoundationId::new(object_id(10028)),
@@ -1998,7 +2001,7 @@ fn a_frozen_object_that_does_not_move_is_known_unless_a_stopped_unit_may_reach_i
     let mut s = Spatial::new(GridSize::new(64, 64));
     let tree = Placed {
         player: PlayerId::new(0),
-        speed: Speed::ZERO,
+        moves: false,
         ..villager(24.5, 97.5 - 60.0)
     };
     s.insert(object_id(9365), tree);
@@ -2006,15 +2009,17 @@ fn a_frozen_object_that_does_not_move_is_known_unless_a_stopped_unit_may_reach_i
     s.reach = Distance::new(1.0);
     let near = Rect::new(24.0, 37.0, 24.6, 38.0);
     assert!(s.check_known(near).is_ok());
-    // a stopped villager 10 tiles off, 0.8 tiles a second
+    // a stopped villager 10 tiles off, 0.8 tiles a second (every master's speed here: the tree
+    // does not move, so its place stays known)
+    let villager_speed = |_, _| Speed::new(0.8);
     let mut walker = villager(34.5, 37.5);
     walker.player = PlayerId::new(1);
-    walker.speed = Speed::new(0.8);
+    walker.moves = true;
     s.insert(object_id(9200), walker);
     s.freeze(object_id(9200));
-    s.grow_unknown(Seconds::new(10.0));
+    s.grow_unknown(Seconds::new(10.0), villager_speed);
     assert!(s.check_known(near).is_ok());
-    s.grow_unknown(Seconds::new(2.0));
+    s.grow_unknown(Seconds::new(2.0), villager_speed);
     assert!(s.check_known(near).is_err());
 }
 

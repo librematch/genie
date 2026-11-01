@@ -65,6 +65,20 @@ impl World {
         }
     }
 
+    /// A tick of `dt` seconds passed: every frozen object that moves may have moved its master's
+    /// speed times `dt` ([`Spatial::grow_unknown`]), as its master stands now; one of a master
+    /// the world does not hold may be anywhere.
+    ///
+    /// [`Spatial::grow_unknown`]: crate::map::spatial::Spatial::grow_unknown
+    pub(crate) fn grow_unknown(&mut self, dt: crate::world::Seconds) {
+        let masters = &self.masters;
+        self.spatial.grow_unknown(dt, |player, master| {
+            crate::objects::masters::player_master(masters, player, master)
+                .and_then(|m| m.moving)
+                .map_or(crate::movement::Speed::new(f32::INFINITY), |m| m.base)
+        });
+    }
+
     /// Tell the world which objects move now and how the players stand to each other, for the
     /// walk's query ([`Spatial::walk_hits`]), as each update does first: for a look at the
     /// world between updates.

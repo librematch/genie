@@ -62,7 +62,7 @@ impl HullPather<'_> {
             [p] => Ok(Some(Target {
                 at: p.position.ground(),
                 radius: p.radius,
-                speed: p.speed,
+                moves: p.moves,
             })),
             _ => Err(GenieError::unsupported(
                 "the old short pather's goal held by two objects or more (the grid's order)",

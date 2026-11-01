@@ -287,7 +287,8 @@ impl Mover {
     /// footprint and a height, `FUN_141194060` with 1): each stretch's obstruction query
     /// (`FUN_14114cc60` as the walk's, grown by the radius times `LONG_PATH_GROW`; the unit and
     /// the target ignored with their annexes, `FUN_14114e8a0`) that meets a wall, a gate, a tower
-    /// or a building that does not move (classes 27, 39, 52, and 3 at speed 0, slot 0x208) ends
+    /// or a building that does not move (classes 27, 39, 52, and 3 at top speed 0, slot 0x208:
+    /// [`crate::map::spatial::Placed::moves`]) ends
     /// the path before that stretch (`FUN_140f98dd0`), or, on the first one, empties it (its
     /// length kept) and false; a villager's path is never cut.
     pub(super) fn walled_off(
@@ -320,7 +321,7 @@ impl Mover {
             let walled = hits.iter().any(|&h| {
                 world.get(h).is_some_and(|p| {
                     matches!(p.class, class::WALL | class::GATE | class::TOWER)
-                        || (p.class == class::BUILDING && p.speed <= Speed::ZERO)
+                        || (p.class == class::BUILDING && !p.moves)
                 })
             });
             if walled {

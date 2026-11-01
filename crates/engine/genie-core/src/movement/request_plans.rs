@@ -4,7 +4,6 @@
 use crate::map::Distance;
 use crate::movement::LevelFlags;
 use crate::movement::PathState;
-use crate::movement::Speed;
 use crate::movement::WaypointIndex;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -176,7 +175,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
     ) -> Result<(), GenieError> {
-        let target_moves = w.goal.target.is_some_and(|(_, t)| Speed::ZERO < t.speed);
+        let target_moves = w.goal.target.is_some_and(|(_, t)| t.moves);
         let target_radius = w
             .goal
             .target
@@ -408,7 +407,7 @@ impl Mover {
         let target_radius = w
             .goal
             .target
-            .filter(|(_, t)| t.speed <= Speed::ZERO)
+            .filter(|(_, t)| !t.moves)
             .map_or(0.0, |(_, t)| t.radius.x());
         let mut other = Path::default();
         let ask = TileAsk {

@@ -447,7 +447,7 @@ impl Unit {
             obstruction_type: made.obstruction_type,
             buildable_on: made.buildable_on,
             tall: made.tall,
-            speed: mover.stats.speed,
+            moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
                 crate::map::spatial::Obstruction {

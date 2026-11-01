@@ -1544,3 +1544,34 @@ fn the_world_s_masters_are_looked_up_by_player() {
     );
     assert!(every.of_mut(PlayerId::new(2)).is_none());
 }
+
+/// A master's objects move ([`Master::moves`], `FUN_14123bb20`'s test of the master's slot
+/// 0xe8, its speed `+0x740`): a moving master whose speed is above 0; one of speed 0 and a
+/// master without a moving part do not.
+#[test]
+fn a_master_moves_with_a_moving_part_whose_speed_is_above_0() {
+    let moving = |base: f32| MoveStats {
+        fly_mode: FlyMode::GROUND,
+        speed: Speed::new(base * 1.5),
+        base: Speed::new(base),
+        turn_rate: TurnRate::new(1.0),
+        turn_radius: Distance::ZERO,
+        turn_radius_speed: Speed::MAX,
+        radius: Radii::new(0.2, 0.2, 2.0),
+        restriction: RestrictionId::named(7),
+        restriction_mask: TerrainMask::of_bits(1),
+        turn_time: Seconds::ZERO,
+        move_algorithm: MoveAlgorithm::NONE,
+        min_collision: 0.0,
+        fast_turn: false,
+        facets: None,
+        weapon_range: Distance::ZERO,
+    };
+    let mut m = of_type(master_type::COMBAT);
+    m.moving = None;
+    assert!(!m.moves());
+    m.moving = Some(moving(0.9));
+    assert!(m.moves());
+    m.moving = Some(moving(0.0));
+    assert!(!m.moves());
+}

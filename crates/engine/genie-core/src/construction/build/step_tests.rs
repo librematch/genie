@@ -103,7 +103,7 @@ const fn placed(at: Position, r: f32, class: ClassId, master: MasterId) -> Place
         obstruction_type: ObstructionType::TYPE_2,
         buildable_on: BuildableOn::NO,
         tall: true,
-        speed: Speed::ZERO,
+        moves: false,
         unknown: None,
         obstruction: None,
     }
@@ -1020,7 +1020,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
             object_id(6),
             Placed {
                 position: Position::new(10.6, 10.6, 0.0),
-                speed: Speed::new(0.8),
+                moves: true,
                 ..me
             },
         );
@@ -1629,7 +1629,7 @@ fn villager(t: &mut World, at: Position) {
         object_id(6),
         Placed {
             position: at,
-            speed: Speed::new(0.8),
+            moves: true,
             ..me
         },
     );
