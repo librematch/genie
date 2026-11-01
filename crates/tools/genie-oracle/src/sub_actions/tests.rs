@@ -239,9 +239,12 @@ fn the_default_task_starts_what_the_table_names() {
     ));
     assert!(start(&table(DefaultAction::Type(genie_core::garrison::ENTER))).is_err());
     assert!(start(&table(DefaultAction::NoSuchTask)).is_err());
-    // a bird's Fly needs its task, which neither the save nor this table has
+    // a bird's Fly reads its master's default task as it starts, not at the load
     let fly = genie_core::movement::fly::FLY;
-    assert!(start(&table(DefaultAction::Type(fly))).is_err());
+    assert!(matches!(
+        start(&table(DefaultAction::Type(fly))),
+        Ok(Some(DefaultStart::Fly))
+    ));
     // a master the table does not have
     assert!(start(&MasterTable::default()).is_err());
 }

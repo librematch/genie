@@ -394,7 +394,6 @@ impl World {
                 amount: Amount::ZERO,
                 dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
-                remains: made.death_spawns[1],
                 death_facets: None,
                 inside: None,
                 goto_sleep: false,

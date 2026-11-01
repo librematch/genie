@@ -67,19 +67,19 @@ pub(super) fn lifecycle(
             pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several()
         })
         .map(|g| g.facets);
-    let (dying_sprite, [death_spawn, remains], master) = s.own_master().map_or_else(
+    let (dying_sprite, death_spawn, master) = s.own_master().map_or_else(
         || {
             let player = objects.master(s.master_obj).and_then(|m| m.static_part());
             (
                 player.and_then(|m| SpriteId::of_data(m.death_sprite_id)),
-                player.map_or([-1, -1], |m| [m.death_spawn_obj_id, m.death_spawn_obj_id2]),
+                player.map_or(-1, |m| m.death_spawn_obj_id),
                 masters.and_then(|t| t.get(civ, dat_id(objects, s.master_obj)?)),
             )
         },
         |own| {
             (
                 SpriteId::of_data(own.death_sprite_num),
-                [own.death_spawn_obj_id, own.death_spawn_obj_id2],
+                own.death_spawn_obj_id,
                 Some(MasterData {
                     decay: AmountRate::new(own.attribute_rot),
                     undead: own.undead_flag != 0,
@@ -99,7 +99,6 @@ pub(super) fn lifecycle(
         amount: Amount::new(s.attribute_amount_held),
         dying_sprite,
         death_spawn: death_spawn >= 0,
-        remains: MasterId::of_data(remains),
         death_facets,
         inside: ContainerId::of_field(s.inside_obj),
         goto_sleep: s.goto_sleep_flag != 0,

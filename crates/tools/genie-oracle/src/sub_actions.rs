@@ -407,9 +407,9 @@ pub(super) fn gather_point(
 /// A default task's action the slice models.
 pub(super) enum DefaultStart {
     /// The Artifact action (type 107, livestock's).
-    Artifact(genie_core::ownership::artifact::Artifact),
-    /// A bird's Fly (type 10) with its task.
-    Fly(genie_core::objects::masters::Task),
+    Artifact(Box<genie_core::ownership::artifact::Artifact>),
+    /// A bird's Fly (type 10), with its master's default task as it starts.
+    Fly,
     /// A farm's or fish trap's Make (type 21).
     Make,
 }
@@ -453,13 +453,11 @@ pub(super) fn default_task(
                 .and_then(|t| t.work(civ, dat_id(objects, s.master_obj)?))
                 .and_then(genie_core::objects::masters::Master::default_task)
                 .and_then(|t| t.sprites.moving);
-            Ok(Some(DefaultStart::Artifact(
+            Ok(Some(DefaultStart::Artifact(Box::new(
                 genie_core::ownership::artifact::Artifact::new(s.owner == 0, moving),
-            )))
+            ))))
         }
-        DefaultAction::Type(genie_core::movement::fly::FLY) => {
-            fly_task(objects, civ, masters, s.master_obj).map(|t| Some(DefaultStart::Fly(t)))
-        }
+        DefaultAction::Type(genie_core::movement::fly::FLY) => Ok(Some(DefaultStart::Fly)),
         DefaultAction::Type(genie_core::gathering::make::MAKE) => Ok(Some(DefaultStart::Make)),
         // the action list's factory (`FUN_140aca4b0`, then the RGE one `FUN_140a97e00`) makes
         // no action of the other types: the default task starts nothing (wild animals' Explore,

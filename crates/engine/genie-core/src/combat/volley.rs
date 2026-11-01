@@ -519,7 +519,6 @@ impl Unit {
         if let Some(a) = action.launch(position, point, &stats)? {
             mover.angle = a;
         }
-        let remains = made.death_spawns[1];
         let missile = Self {
             id,
             life: Lifecycle {
@@ -530,7 +529,6 @@ impl Unit {
                 amount: held.amount,
                 dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
-                remains,
                 death_facets: None,
                 inside: None,
                 goto_sleep: false,

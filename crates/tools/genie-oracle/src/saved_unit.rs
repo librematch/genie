@@ -285,8 +285,8 @@ pub(super) fn unit(
         // an object without actions in a save: its default task's action (an Artifact exists
         // from the load on; a Fly starts in its first update)
         default_task(object, s, objects, civ, masters).map(|d| match d {
-            Some(DefaultStart::Artifact(a)) => unit.actions.set_artifact(Some(a)),
-            Some(DefaultStart::Fly(task)) => unit.default_fly = Some(task),
+            Some(DefaultStart::Artifact(a)) => unit.actions.set_artifact(Some(*a)),
+            Some(DefaultStart::Fly) => unit.default_fly = true,
             Some(DefaultStart::Make) => unit.default_make = true,
             None => {}
         })
@@ -294,7 +294,7 @@ pub(super) fn unit(
     // what the default task starts once the action list empties: nothing, a Fly, the Artifact
     // again or something not modelled
     unit.default_task = match default_task(object, s, objects, civ, masters) {
-        Ok(None | Some(DefaultStart::Fly(_) | DefaultStart::Make)) => None,
+        Ok(None | Some(DefaultStart::Fly | DefaultStart::Make)) => None,
         Ok(Some(DefaultStart::Artifact(_))) => {
             unit.default_artifact = true;
             None
@@ -303,7 +303,7 @@ pub(super) fn unit(
     };
     if saved {
         // a saved object's Fly is its saved action's: none starts again (it never ends)
-        unit.default_fly = None;
+        unit.default_fly = false;
     }
     // a missile without its action (one that met its target, dying): the object's own fields, and
     // the flying flag the load constructor sets (`+0x994` 1, not saved)

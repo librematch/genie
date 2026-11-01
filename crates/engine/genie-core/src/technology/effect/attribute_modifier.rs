@@ -482,7 +482,6 @@ impl World {
                     u.life.dying_sprite = master.death_sprite;
                 }
                 a::DEAD_UNIT_ID => u.life.death_spawn = master.death_spawns[0].is_some(),
-                a::BLOOD_UNIT => u.life.remains = master.death_spawns[1],
                 _ => {}
             }
             if let Some(c) = u.construction.as_mut() {

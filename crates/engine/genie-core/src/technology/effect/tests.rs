@@ -1007,17 +1007,17 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         t.master_followers(PlayerId::new(0), master_id(99), attribute)
             .unwrap();
     }
-    let follows = |u: &Unit| (u.life.dying_sprite, u.life.death_spawn, u.life.remains);
+    let follows = |u: &Unit| (u.life.dying_sprite, u.life.death_spawn);
     let p = &t.players[0];
     assert_eq!(
         follows(&p.objects[ListIndex::new(0)]),
-        (Some(SpriteId::named(7)), true, Some(master_id(9)))
+        (Some(SpriteId::named(7)), true)
     );
     assert_eq!(
         follows(&p.sleeping[ListIndex::new(0)]),
-        (Some(SpriteId::named(7)), true, Some(master_id(9)))
+        (Some(SpriteId::named(7)), true)
     );
-    assert_eq!(follows(&p.objects[ListIndex::new(1)]), (None, false, None));
+    assert_eq!(follows(&p.objects[ListIndex::new(1)]), (None, false));
     let c = p.objects[ListIndex::new(0)].construction.unwrap();
     assert_eq!(c.build_time, WholeSeconds::of_data(33));
     assert_eq!(

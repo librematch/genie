@@ -222,11 +222,11 @@ pub struct Unit {
     /// slice does not model it (None: nothing, as a wild animal's Explore).
     #[diff(unsaved, eq)]
     pub default_task: Option<GenieError>,
-    /// The Fly task its master's default task starts once its action list is empty (a bird at
-    /// a game's start, before its first update). Not saved: genie's copy of the master's task,
-    /// which a load from the header holds on and a load of a later save clears.
+    /// Its master's default task is a Fly, which starts once its action list is empty (a bird at
+    /// a game's start, before its first update) with the task its master holds then. Not
+    /// saved: a load from the header sets it, a load of a later save (the Fly saved) does not.
     #[diff(unsaved)]
-    pub default_fly: Option<crate::objects::masters::Task>,
+    pub default_fly: bool,
     /// Its master's default task is a Make, which starts once its action list is empty in
     /// state 2 (a farm or fish trap before its first update as a built building), with the task
     /// its master holds then.

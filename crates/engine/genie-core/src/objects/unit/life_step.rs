@@ -162,13 +162,14 @@ impl Unit {
     }
 
     /// The dying sprite ended (`RGE_Animated_Object::update`): the animation stops and an object
-    /// below type 80 leaves its remains (`FUN_1411a4e90`) with its facet (`+0xe`) as its angle
+    /// below type 80 leaves its remains (`FUN_1411a4e90`: its master's `death_spawn_obj_id2`,
+    /// `+0x5e6`, the `.dat`'s `blood_unit_id`, −1 for none) with its facet (`+0xe`) as its angle
     /// left it ([`crate::objects::facing::facet_of_angle`]).
     pub(crate) fn dying_sprite_ended(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         self.body.set_anim_speed(Speed::ZERO);
-        let kind = self.master(&c.w.masters, c.player)?.kind;
-        if kind < BUILDING
-            && let Some(remains) = self.life.remains
+        let master = self.master(&c.w.masters, c.player)?;
+        if master.kind < BUILDING
+            && let Some(remains) = master.death_spawns[1]
         {
             let facet = self
                 .body

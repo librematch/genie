@@ -99,7 +99,7 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         PLAYERS,
     );
     assert!(u.unmodelled_action.is_some());
-    assert!(u.default_fly.is_none());
+    assert!(!u.default_fly);
 }
 
 /// A missile without its action (it met its target) flies on with its own fields.

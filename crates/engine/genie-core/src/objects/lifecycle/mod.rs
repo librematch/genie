@@ -103,10 +103,6 @@ pub struct Lifecycle {
     pub dying_sprite: Option<SpriteId>,
     /// The master spawns an object when this one is gone (its death spawn `+0x5e4`, state 7).
     pub death_spawn: bool,
-    /// The master's `death_spawn_obj_id2` (`+0x5e6`, the `.dat`'s `blood_unit_id`, −1 for none):
-    /// what an object below type 80 leaves when its dying sprite ends (`FUN_1411a4e90`, the
-    /// caller's).
-    pub remains: Option<MasterId>,
     /// A static object's sprite after its death (the master's dying sprite, else its current
     /// one) starts on a random facet (sequence flag 4) of this many (more than one): its death
     /// draws the facet from the Object stream.
@@ -132,7 +128,6 @@ impl Default for Lifecycle {
             amount: Amount::ZERO,
             dying_sprite: None,
             death_spawn: false,
-            remains: None,
             death_facets: None,
             inside: None,
             goto_sleep: false,

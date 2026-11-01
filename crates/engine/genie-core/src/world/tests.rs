@@ -7697,9 +7697,9 @@ fn a_dying_object_gives_back_its_storage_of_kinds_2_and_16() {
 fn a_dead_object_leaves_its_remains_and_its_death_spawn() {
     let ended = |kind: MasterKind, remains: Option<MasterId>| {
         life_part(
-            |m, v| {
+            |m, _| {
                 m.kind = kind;
-                v.life.remains = remains;
+                m.death_spawns[1] = remains;
             },
             Unit::dying_sprite_ended,
         )

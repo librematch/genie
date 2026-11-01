@@ -21,7 +21,12 @@ impl Unit {
         {
             return Ok(false);
         }
-        if let Some(task) = self.default_fly {
+        if self.default_fly {
+            let task = Master::default_task(self.master(&c.w.masters, c.player)?)
+                .copied()
+                .ok_or(GenieError::missing_data(
+                    "a bird's default Fly whose master has no default task",
+                ))?;
             self.start_fly(c, task)?;
             return Ok(true);
         }

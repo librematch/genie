@@ -306,7 +306,6 @@ impl World {
                 amount: held.amount,
                 dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
-                remains: made.death_spawns[1],
                 death_facets,
                 inside: None,
                 goto_sleep: false,

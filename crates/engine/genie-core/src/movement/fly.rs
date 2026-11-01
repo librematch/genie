@@ -748,6 +748,47 @@ mod tests {
         assert_eq!(flown(&mut t), Err(NO_MOVER));
     }
 
+    /// A bird that starts its master's default Fly (a load from the header) takes the master's
+    /// default task as it starts (slot 0x7f0): the Fly runs with that task; a master without a
+    /// default task lacks it.
+    #[test]
+    fn a_bird_s_default_fly_takes_its_master_s_default_task() {
+        let task = Task {
+            action_type: FLY,
+            wait_time: Seconds::new(3.0),
+            ..Task::default()
+        };
+        let start = |default: Option<crate::objects::masters::TaskIndex>| {
+            let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
+            let bird = &mut t.players[0].objects[ListIndex::new(0)];
+            bird.actions.set_fly(None);
+            bird.default_fly = true;
+            let master = t.masters[0].get_mut(master_id(96)).unwrap();
+            master.tasks = vec![task];
+            master.default_task = default;
+            let r = crate::world::tests::in_update(
+                &mut t,
+                (PlayerId::new(0), ListIndex::new(0)),
+                21,
+                Unit::start_default_task,
+            );
+            let fly = t.players[0].objects[ListIndex::new(0)]
+                .actions
+                .fly()
+                .copied();
+            (r, fly)
+        };
+        let (r, fly) = start(crate::objects::masters::TaskIndex::of_data(0));
+        assert_eq!(r, Ok(true));
+        assert_eq!(fly.map(|f| f.task), Some(task));
+        let (r, fly) = start(None);
+        assert_eq!(
+            r.unwrap_err().reason(),
+            "a bird's default Fly whose master has no default task"
+        );
+        assert_eq!(fly, None);
+    }
+
     #[test]
     fn a_leash_keeps_the_point_near_home() {
         let fly = Fly {
