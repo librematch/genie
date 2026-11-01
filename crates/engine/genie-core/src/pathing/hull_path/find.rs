@@ -15,6 +15,7 @@ use crate::pathing::hull_path::rounds::Rounds;
 use crate::pathing::hull_path::{
     HALF, HullPather, HullQuery, NEAR_TARGET, Point, Target, Waypoints,
 };
+use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 impl HullPather<'_> {
@@ -147,7 +148,7 @@ impl HullPather<'_> {
             (ax1 + 6) as f32,
             (ay1 + 6) as f32,
         ))?;
-        self.empty(0)?;
+        self.empty(NodeList::SEARCH)?;
         let mut rounds = Rounds::new(sqrt(
             (from.y() - to.y()) * (from.y() - to.y()) + (from.x() - to.x()) * (from.x() - to.x()),
         ));
@@ -315,7 +316,7 @@ impl HullPather<'_> {
     /// Whether the node `end` lies nearer the goal than the walk's end, the path's last point (a
     /// path without one is NaN). `COMISS`/`JNC` to the partway end at 0x140f86cb6: an unordered
     /// distance takes the node.
-    fn node_nearer(&self, end: usize, path: &Waypoints, to: Point) -> Result<bool, GenieError> {
+    fn node_nearer(&self, end: NodeIndex, path: &Waypoints, to: Point) -> Result<bool, GenieError> {
         let last = *path
             .points
             .last()

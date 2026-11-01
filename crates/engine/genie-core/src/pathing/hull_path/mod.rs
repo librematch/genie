@@ -32,6 +32,8 @@ use crate::map::spatial::{RecordId, Spatial};
 use crate::math::fmath::sqrt;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::world::slots::CheckedIndex;
+use genie_error::GenieError;
 use std::collections::BTreeSet;
 
 mod area;
@@ -163,13 +165,93 @@ impl HullIndex {
     }
 }
 
+/// A node's place in the pather's nodes (`PathingNode`s in the order made; the two lists'
+/// heads first).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct NodeIndex(usize);
+
+/// One of the pather's two node lists, each an open list headed by its own node and a closed
+/// list: the search's (0, `+0x20` and `+0x90`) and the walks' in and out of a hull (1, `+0x58`
+/// and `+0xa0`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct NodeList(usize);
+
+impl NodeList {
+    /// The search's list.
+    const SEARCH: Self = Self(0);
+    /// The walks' list.
+    const WALKS: Self = Self(1);
+
+    /// The node heading its open list.
+    const fn head(self) -> NodeIndex {
+        NodeIndex(self.0)
+    }
+}
+
+/// The pather's nodes, read and changed by [`NodeIndex`]: the two lists' heads, then the
+/// nodes in the order made.
+#[derive(Clone, Debug)]
+struct Nodes(Vec<Node>);
+
+impl Nodes {
+    /// The two heads alone.
+    fn heads() -> Self {
+        Self(vec![Node::head(), Node::head()])
+    }
+
+    /// Node `i`.
+    fn checked(&self, i: NodeIndex) -> Result<&Node, GenieError> {
+        self.0.checked(i.0)
+    }
+
+    /// Node `i`, if there is one.
+    fn get(&self, i: NodeIndex) -> Option<&Node> {
+        self.0.get(i.0)
+    }
+
+    /// Node `i`, to change.
+    fn checked_mut(&mut self, i: NodeIndex) -> Result<&mut Node, GenieError> {
+        self.0.checked_mut(i.0)
+    }
+
+    /// Append `node`; its place.
+    fn push(&mut self, node: Node) -> NodeIndex {
+        self.0.push(node);
+        NodeIndex(self.0.len() - 1)
+    }
+}
+
+impl std::ops::Index<NodeIndex> for Nodes {
+    type Output = Node;
+
+    fn index(&self, i: NodeIndex) -> &Node {
+        &self.0[i.0]
+    }
+}
+
+/// The two lists' closed nodes, in the order closed.
+#[derive(Clone, Debug, Default)]
+struct ClosedLists([Vec<NodeIndex>; 2]);
+
+impl ClosedLists {
+    /// List `l`'s closed nodes.
+    const fn of(&self, l: NodeList) -> &Vec<NodeIndex> {
+        &self.0[l.0]
+    }
+
+    /// List `l`'s closed nodes, to change.
+    const fn of_mut(&mut self, l: NodeList) -> &mut Vec<NodeIndex> {
+        &mut self.0[l.0]
+    }
+}
+
 /// A search node (`PathingNode`, 0x38 bytes).
 #[derive(Clone, Copy, Debug)]
 struct Node {
     at: Point,
-    parent: Option<usize>,
-    next: Option<usize>,
-    prev: Option<usize>,
+    parent: Option<NodeIndex>,
+    next: Option<NodeIndex>,
+    prev: Option<NodeIndex>,
     /// The straight distance to the goal (`+0x20`).
     to_goal: f32,
     /// The walk from the start (`+0x24`).
@@ -315,9 +397,9 @@ pub struct HullPather<'w> {
     ignore: Vec<RecordId>,
     hulls: Vec<Hull>,
     /// The nodes; 0 and 1 head the open lists (`+0x20`, `+0x58`).
-    nodes: Vec<Node>,
+    nodes: Nodes,
     /// The closed lists (`+0x90`, `+0xa0`).
-    closed: [Vec<usize>; 2],
+    closed: ClosedLists,
     /// The area in tiles (`+0xe8`).
     area: TileRect,
     start: Point,

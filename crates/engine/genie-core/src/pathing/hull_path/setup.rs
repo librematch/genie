@@ -11,7 +11,9 @@ use std::collections::BTreeSet;
 use crate::GenieError;
 use crate::map::spatial::{RecordId, Spatial, tile_record_id};
 use crate::math::conversions::cvttss2si;
-use crate::pathing::hull_path::{HALF, HullPather, KeptHulls, Node, ONE, PATHS, Point, Waypoints};
+use crate::pathing::hull_path::{
+    ClosedLists, HALF, HullPather, KeptHulls, Nodes, ONE, PATHS, Point, Waypoints,
+};
 
 /// A quick path without the map's terrain.
 pub(crate) const NO_TERRAIN: GenieError =
@@ -146,8 +148,8 @@ impl<'w> HullPather<'w> {
             buffer: None,
             ignore,
             hulls: Vec::new(),
-            nodes: vec![Node::head(), Node::head()],
-            closed: [Vec::new(), Vec::new()],
+            nodes: Nodes::heads(),
+            closed: ClosedLists::default(),
             area: NO_AREA,
             start: Point::new(0.0, 0.0),
             goal: Point::new(0.0, 0.0),

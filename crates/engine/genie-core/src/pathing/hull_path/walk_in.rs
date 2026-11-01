@@ -7,6 +7,7 @@ use crate::pathing::hull_path::{
     ENTRANCE_STEP, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, PATHS, Point, SIDES, Target,
     Waypoints, Within,
 };
+use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 /// The ways in a walk into a hull keeps: its paths, the hull side each leaves by, how many it
@@ -59,7 +60,7 @@ impl HullPather<'_> {
         } = walk;
         *count = 0;
         let mut left_boxes = false;
-        self.empty(1)?;
+        self.empty(NodeList::WALKS)?;
         let (inside, stuck) = self.begin_walk_in(hull, (from, to), target)?;
         if stuck {
             return Ok(Within {
@@ -79,11 +80,11 @@ impl HullPather<'_> {
                 if HULL_ITERATIONS <= iterations || ways.most <= *ways.count {
                     break 'search;
                 }
-                let Some(n) = self.nodes.checked(1)?.next else {
+                let Some(n) = self.nodes.checked(NodeList::WALKS.head())?.next else {
                     break 'search;
                 };
                 iterations += 1;
-                self.close(1, n)?;
+                self.close(NodeList::WALKS, n)?;
                 if self.on_map(self.nodes.checked(n)?.at) {
                     break n;
                 }
@@ -114,7 +115,7 @@ impl HullPather<'_> {
         target: Option<Target>,
     ) -> Result<(Option<usize>, bool), GenieError> {
         let root = self.add_unrefused(UnrefusedNode {
-            list: 1,
+            list: NodeList::WALKS,
             open: true,
             parent: None,
             position: from,
@@ -126,7 +127,7 @@ impl HullPather<'_> {
         if inside.is_none() && target.is_none() {
             return Ok((inside, false));
         }
-        self.close(1, root)?;
+        self.close(NodeList::WALKS, root)?;
         let mut made = self.first_steps(hull, root, from, Some(to))?;
         let bounds = match target {
             None => {
@@ -157,7 +158,7 @@ impl HullPather<'_> {
     fn cast_into(
         &mut self,
         hull: HullIndex,
-        node: usize,
+        node: NodeIndex,
         to: Point,
         ways: &mut Ways<'_>,
     ) -> Result<bool, GenieError> {
@@ -175,7 +176,7 @@ impl HullPather<'_> {
                     .ray_to_box(at, side, n.hull)
                 {
                     let _ = self.add_node(NewNode {
-                        list: 1,
+                        list: NodeList::WALKS,
                         open: true,
                         parent: Some(node),
                         position: q,
@@ -198,7 +199,7 @@ impl HullPather<'_> {
                 let s = *SIDES.checked(side as usize)?;
                 q = Point::new(q.x() - s.x() * NUDGE, q.y() - s.y() * NUDGE);
                 if let Some(end) = self.add_node(NewNode {
-                    list: 1,
+                    list: NodeList::WALKS,
                     open: false,
                     parent: Some(node),
                     position: q,

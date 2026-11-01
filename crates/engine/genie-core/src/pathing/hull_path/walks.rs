@@ -12,6 +12,7 @@ use crate::pathing::hull_path::{
     DIRECTIONS, EXIT_STEP, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, ONE, Point,
     SAME_END, SIDES, SQRT_2, Target, Waypoints, Within,
 };
+use crate::pathing::hull_path::{NodeIndex, NodeList};
 use crate::world::slots::CheckedIndex;
 
 /// A walk out of a hull ([`HullPather::walk_out`]'s arguments, `FUN_140f8cf00`'s order).
@@ -146,7 +147,7 @@ impl HullPather<'_> {
     pub(super) fn side_points(
         &mut self,
         hull: HullIndex,
-        root: usize,
+        root: NodeIndex,
         b: Rect,
         p: Point,
         step: f32,
@@ -216,7 +217,7 @@ impl HullPather<'_> {
         let mut add = |me: &mut Self, q: Point| -> Result<(), GenieError> {
             if near(q) && me.hulls.checked(hull.index())?.box_holding(q).is_none() {
                 let _ = me.add_node(NewNode {
-                    list: 1,
+                    list: NodeList::WALKS,
                     open: true,
                     parent: Some(root),
                     position: q,
@@ -271,7 +272,7 @@ impl HullPather<'_> {
     pub(super) fn first_steps(
         &mut self,
         hull: HullIndex,
-        root: usize,
+        root: NodeIndex,
         p: Point,
         goal: Option<Point>,
     ) -> Result<bool, GenieError> {
@@ -284,7 +285,7 @@ impl HullPather<'_> {
             }
             if self.hulls.checked(hull.index())?.box_holding(q).is_none() {
                 let _ = self.add_node(NewNode {
-                    list: 1,
+                    list: NodeList::WALKS,
                     open: true,
                     parent: Some(root),
                     position: q,
@@ -318,7 +319,7 @@ impl HullPather<'_> {
         &mut self,
         paths: &mut [Waypoints],
         count: &mut usize,
-        end: usize,
+        end: NodeIndex,
     ) -> Result<Option<usize>, GenieError> {
         let at = self.nodes.checked(end)?.at;
         let cost = self.nodes.checked(end)?.cost;
@@ -371,8 +372,8 @@ impl HullPather<'_> {
         } = walk;
         *count = 0;
         let mut left_boxes = false;
-        self.empty(1)?;
-        let mut nearest: Option<usize> = None;
+        self.empty(NodeList::WALKS)?;
+        let mut nearest: Option<NodeIndex> = None;
         let mut best = goal.map_or(0.0, |g| {
             sqrt((from.y() - g.y()) * (from.y() - g.y()) + (from.x() - g.x()) * (from.x() - g.x()))
         });
@@ -384,18 +385,18 @@ impl HullPather<'_> {
             });
         }
         let mut iterations = 0;
-        let mut found: Option<usize> = None;
-        let mut ended_at: Option<usize> = None;
+        let mut found: Option<NodeIndex> = None;
+        let mut ended_at: Option<NodeIndex> = None;
         'search: loop {
             let node = loop {
                 if HULL_ITERATIONS <= iterations || most <= *count {
                     break 'search;
                 }
-                let Some(n) = self.nodes.checked(1)?.next else {
+                let Some(n) = self.nodes.checked(NodeList::WALKS.head())?.next else {
                     break 'search;
                 };
                 iterations += 1;
-                self.close(1, n)?;
+                self.close(NodeList::WALKS, n)?;
                 if self.on_map(self.nodes.checked(n)?.at) {
                     break n;
                 }
@@ -422,7 +423,7 @@ impl HullPather<'_> {
                 }
                 if !self.blocked(at, g)? {
                     let end = self.add_node(NewNode {
-                        list: 1,
+                        list: NodeList::WALKS,
                         open: false,
                         parent: Some(node),
                         position: g,
@@ -494,7 +495,7 @@ impl HullPather<'_> {
         goal: Option<Point>,
     ) -> Result<(Option<usize>, bool), GenieError> {
         let root = self.add_unrefused(UnrefusedNode {
-            list: 1,
+            list: NodeList::WALKS,
             open: true,
             parent: None,
             position: from,
@@ -506,7 +507,7 @@ impl HullPather<'_> {
         let Some(b) = inside else {
             return Ok((inside, false));
         };
-        self.close(1, root)?;
+        self.close(NodeList::WALKS, root)?;
         let mut made = self.first_steps(hull, root, from, goal)?;
         let bounds = self.hulls.checked(hull.index())?.objects.checked(b)?.bounds;
         let d = self.radius + self.radius;
@@ -519,8 +520,8 @@ impl HullPather<'_> {
     fn finish_walk_out(
         &mut self,
         paths: &mut [Waypoints],
-        end: Option<usize>,
-        nearest: Option<usize>,
+        end: Option<NodeIndex>,
+        nearest: Option<NodeIndex>,
         left_boxes: bool,
     ) -> Result<Within, GenieError> {
         let Some(n) = end.or(nearest) else {
@@ -544,7 +545,7 @@ impl HullPather<'_> {
     pub(super) fn cast_rays(
         &mut self,
         hull: HullIndex,
-        node: usize,
+        node: NodeIndex,
         goal: Option<Point>,
         nudge: bool,
         paths: &mut [Waypoints],
@@ -563,7 +564,7 @@ impl HullPather<'_> {
                 .ray_to_box(at, side, n.hull)
             {
                 let _ = self.add_node(NewNode {
-                    list: 1,
+                    list: NodeList::WALKS,
                     open: true,
                     parent: Some(node),
                     position: q,
@@ -582,7 +583,7 @@ impl HullPather<'_> {
             };
             if goal.is_some() {
                 let _ = self.add_node(NewNode {
-                    list: 1,
+                    list: NodeList::WALKS,
                     open: true,
                     parent: Some(node),
                     position: q,
@@ -600,7 +601,7 @@ impl HullPather<'_> {
                     q = Point::new(q.x() + s.x() * NUDGE, q.y() + s.y() * NUDGE);
                 }
                 if let Some(end) = self.add_node(NewNode {
-                    list: 1,
+                    list: NodeList::WALKS,
                     open: false,
                     parent: Some(node),
                     position: q,
