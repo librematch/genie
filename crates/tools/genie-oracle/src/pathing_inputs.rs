@@ -4,7 +4,7 @@
 use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::objects::ObjectId;
-use genie_core::pathing::FixedPoint;
+use genie_core::pathing::{FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
 
 use crate::masters::TerrainTable;
@@ -40,7 +40,7 @@ pub fn mesh_from_dump(text: &str) -> Option<genie_core::pathing::mesh::Mesh> {
                     .iter()
                     .map(|w| w.parse().ok())
                     .collect::<Option<_>>()?;
-                m.shapes.push([v[0], v[1], v[2], v[3]]);
+                m.shapes.push(FixedRect::new(v[0], v[1], v[2], v[3]));
                 m.sides.push(Default::default());
             }
             Some("side") => {

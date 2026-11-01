@@ -1,6 +1,6 @@
 use crate::pathing_inputs::{mesh_from_dump, mesh_owners_from_dump};
 use crate::test_ids::object_id;
-use genie_core::pathing::FixedPoint;
+use genie_core::pathing::{FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
 
 /// A mesh 2 tiles wide with one shape, its side 1's contact and the tile (1, 0) holding it.
@@ -16,7 +16,7 @@ owner 900 0
 fn a_mesh_dump_reads_its_shapes_contacts_and_tiles() {
     let mesh = mesh_from_dump(MESH).unwrap();
     assert_eq!((mesh.width, mesh.free), (2, Some(ShapeId::new(0x10))));
-    assert_eq!(mesh.shapes, [[1, 2, 3, 4]]);
+    assert_eq!(mesh.shapes, [FixedRect::new(1, 2, 3, 4)]);
     let contact = &mesh.sides[0][1][0];
     assert_eq!(
         (contact.other, contact.side),

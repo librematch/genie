@@ -3,7 +3,8 @@
 
 use crate::GenieError;
 use crate::map::Tile;
-use crate::pathing::mesh::{ONE, Rect};
+use crate::pathing::FixedRect;
+use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
     Callback, Ctx, FixedPoint, Hit, Sweep, T_START, Token, inside, ray_rect, strictly_inside,
@@ -106,7 +107,7 @@ impl Ctx<'_> {
                 continue;
             }
             let r = *self.mesh.shapes.checked(id.index())?;
-            let shrunk = [r[0] + d, r[1] + d, r[2] - d, r[3] - d];
+            let shrunk = FixedRect::new(r.x0() + d, r.y0() + d, r.x1() - d, r.y1() - d);
             match cb {
                 Callback::Corner(token) => {
                     let mut tt = *t;
@@ -128,10 +129,26 @@ impl Ctx<'_> {
                 }
                 Callback::Box | Callback::Sight => {
                     let clip = [
-                        if bx[0] < shrunk[0] { shrunk[0] } else { bx[0] },
-                        if bx[1] < shrunk[1] { shrunk[1] } else { bx[1] },
-                        if shrunk[2] < bx[2] { shrunk[2] } else { bx[2] },
-                        if shrunk[3] < bx[3] { shrunk[3] } else { bx[3] },
+                        if bx[0] < shrunk.x0() {
+                            shrunk.x0()
+                        } else {
+                            bx[0]
+                        },
+                        if bx[1] < shrunk.y0() {
+                            shrunk.y0()
+                        } else {
+                            bx[1]
+                        },
+                        if shrunk.x1() < bx[2] {
+                            shrunk.x1()
+                        } else {
+                            bx[2]
+                        },
+                        if shrunk.y1() < bx[3] {
+                            shrunk.y1()
+                        } else {
+                            bx[3]
+                        },
                     ];
                     if !(clip[0] < clip[2] && clip[1] < clip[3]) {
                         continue;
@@ -240,30 +257,30 @@ impl Ctx<'_> {
     pub(super) fn axis_hit(
         from: FixedPoint,
         end: FixedPoint,
-        r: Rect,
+        r: FixedRect,
         d: i32,
         dir: AxisDir,
     ) -> Option<(FixedPoint, ShapeSide)> {
         let [x, y] = from.get();
         let met = match dir {
             AxisDir::PlusX => {
-                let h = d + r[0];
-                (r[1] + d < y && y < r[3] - d && h < end.x() && x <= h)
+                let h = d + r.x0();
+                (r.y0() + d < y && y < r.y1() - d && h < end.x() && x <= h)
                     .then_some(FixedPoint::new(h, y))
             }
             AxisDir::PlusY => {
-                let h = d + r[1];
-                (r[0] + d < x && x < r[2] - d && h < end.y() && y <= h)
+                let h = d + r.y0();
+                (r.x0() + d < x && x < r.x1() - d && h < end.y() && y <= h)
                     .then_some(FixedPoint::new(x, h))
             }
             AxisDir::MinusX => {
-                let h = r[2] - d;
-                (r[1] + d < y && y < r[3] - d && end.x() < h && h <= x)
+                let h = r.x1() - d;
+                (r.y0() + d < y && y < r.y1() - d && end.x() < h && h <= x)
                     .then_some(FixedPoint::new(h, y))
             }
             AxisDir::MinusY => {
-                let h = r[3] - d;
-                (r[0] + d < x && x < r[2] - d && end.y() < h && h <= y)
+                let h = r.y1() - d;
+                (r.x0() + d < x && x < r.x1() - d && end.y() < h && h <= y)
                     .then_some(FixedPoint::new(x, h))
             }
         };

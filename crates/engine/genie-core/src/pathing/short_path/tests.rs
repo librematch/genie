@@ -154,7 +154,7 @@ fn a_contact_point_moves_off_its_side() {
 /// coordinate set, the other held between the shrunk corners).
 #[test]
 fn a_point_snaps_onto_a_side_within_its_corners() {
-    let r = [0, 0, 100, 50];
+    let r = FixedRect::new(0, 0, 100, 50);
     let snap = |p: FixedPoint, side: usize| {
         let mut q = p;
         snap_to_side(&mut q, r, ShapeSide::ALL[side], 5);
@@ -183,7 +183,7 @@ fn the_integer_square_root_is_exact_below_and_truncates_between_squares() {
 #[test]
 fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
     // a ray from (0, 1) to (4, 1) against the box (2, 0)-(3, 2): its left side at x = 2
-    let r = [2 * ONE, 0, 3 * ONE, 2 * ONE];
+    let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let mut t = T_START;
     let hit = ray_rect(
         FixedPoint::new(0, ONE),
@@ -219,7 +219,7 @@ fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
 /// a slanted ray meets them as `FUN_140fa9f10` does.
 #[test]
 fn a_ray_along_y_crosses_the_bottom_or_the_top() {
-    let r = [2 * ONE, 0, 3 * ONE, 2 * ONE];
+    let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let x = 2 * ONE + ONE / 2;
     let cast = |a: FixedPoint, b: FixedPoint, t: i32| {
         let mut t = t;
@@ -417,7 +417,14 @@ fn around(walls: &[[f32; 4]], from: Point, to: Point, ignored: bool) -> (u8, Vec
     let mut mesh = Mesh::new(32);
     let ids: Vec<ShapeId> = walls
         .iter()
-        .map(|w| mesh.add([fixed(w[0]), fixed(w[1]), fixed(w[2]), fixed(w[3])]))
+        .map(|w| {
+            mesh.add(FixedRect::new(
+                fixed(w[0]),
+                fixed(w[1]),
+                fixed(w[2]),
+                fixed(w[3]),
+            ))
+        })
         .collect();
     let q = Query {
         from: FixedPoint::new(fixed(from.x()), fixed(from.y())),
@@ -596,8 +603,8 @@ fn square(run: bool) -> Poly {
 fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
     let mut mesh = Mesh::new(64);
     mesh.shapes = vec![
-        [0, 0, 4 * ONE, 4 * ONE],
-        [3 * ONE, 3 * ONE, 6 * ONE, 6 * ONE],
+        FixedRect::new(0, 0, 4 * ONE, 4 * ONE),
+        FixedRect::new(3 * ONE, 3 * ONE, 6 * ONE, 6 * ONE),
     ];
     let edge = |poly: &Poly, p: FixedPoint, side: usize| {
         Search::edge_holding(
@@ -650,9 +657,9 @@ fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
 fn a_vertex_holds_a_point_in_its_shape_s_overlap_with_the_other() {
     let mut mesh = Mesh::new(64);
     mesh.shapes = vec![
-        [0, 0, 4 * ONE, 4 * ONE],
-        [2 * ONE, 2 * ONE, 6 * ONE, 6 * ONE],
-        [5 * ONE, 5 * ONE, 8 * ONE, 8 * ONE],
+        FixedRect::new(0, 0, 4 * ONE, 4 * ONE),
+        FixedRect::new(2 * ONE, 2 * ONE, 6 * ONE, 6 * ONE),
+        FixedRect::new(5 * ONE, 5 * ONE, 8 * ONE, 8 * ONE),
     ];
     let p = FixedPoint::new(3 * ONE, 3 * ONE);
     let held = |vc: FixedPoint, vs: Option<u32>, d| {
@@ -872,7 +879,7 @@ fn opened(s: &Search<'_>) -> Vec<(FixedPoint, i32, Kind)> {
 /// tile, `rr2` four) toward (12, 12).
 fn shape_at_2_2() -> Mesh {
     let mut mesh = Mesh::new(16);
-    let _ = mesh.add([2 * ONE, 2 * ONE, 6 * ONE, 6 * ONE]);
+    let _ = mesh.add(FixedRect::new(2 * ONE, 2 * ONE, 6 * ONE, 6 * ONE));
     mesh
 }
 
@@ -1011,7 +1018,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
     );
     // shape 1 holds the crossing right of the foot; its contact at (5, 2) is a candidate
     let mut mesh = shape_at_2_2();
-    let _ = mesh.add([5 * ONE, 0, 9 * ONE, 3 * ONE]);
+    let _ = mesh.add(FixedRect::new(5 * ONE, 0, 9 * ONE, 3 * ONE));
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(4 * ONE, 3 * ONE),
@@ -1082,7 +1089,7 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
     s.escape_foot(p, 0, (ShapeId::new(0), ShapeSide::ALL[0]), corners(0))
         .unwrap();
     let mut held = shape_at_2_2();
-    let _ = held.add([0, 0, 4 * ONE, 4 * ONE]);
+    let _ = held.add(FixedRect::new(0, 0, 4 * ONE, 4 * ONE));
     let mut t = search_toward(&held, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     t.escape_foot(p, 0, (ShapeId::new(0), ShapeSide::ALL[0]), corners(0))
         .unwrap();
@@ -1096,8 +1103,8 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
 fn a_side_s_contacts_become_candidates_when_wide_free_and_near() {
     use crate::pathing::mesh::Contact;
     let mut mesh = shape_at_2_2();
-    let _ = mesh.add([5 * ONE, 0, 9 * ONE, 3 * ONE]);
-    let _ = mesh.add([4 * ONE, 2 * ONE, 7 * ONE, 4 * ONE]);
+    let _ = mesh.add(FixedRect::new(5 * ONE, 0, 9 * ONE, 3 * ONE));
+    let _ = mesh.add(FixedRect::new(4 * ONE, 2 * ONE, 7 * ONE, 4 * ONE));
     let contact = |other, side: usize, at: FixedPoint, half| Contact {
         other: ShapeId::new(other),
         side: ShapeSide::ALL[side],

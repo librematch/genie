@@ -37,6 +37,7 @@ members' steering (`groups/steer/`) ask the same planners.
 | File | What it holds |
 | --- | --- |
 | [`fixed_point.rs`](fixed_point.rs) | A point in the pathing's fixed point (`FixedPoint`). |
+| [`fixed_rect.rs`](fixed_rect.rs) | A rectangle in the pathing's fixed point (`FixedRect`). |
 | [`long_path.rs`](long_path.rs) | The long pather (`FUN_140f9eb70`, run on the global at `0x1439e6910`): a best-first search over the map's tiles from a unit's tile to a goal tile, which the reachability test of a point (`FUN_140fa0370`, `crate::movement::Mover::reaches`) runs for a goal more than a tile from the unit. |
 | [`mesh.rs`](mesh.rs) | The obstruction manager's shape mesh (`*(*(DAT_143f0a088 + 8))`): the rectangles the short pather searches around, in fixed point (2^22 units per tile). |
 | [`mod.rs`](mod.rs) | Finding a way: the planners of the paths that units walk, from the tile pathfinder over the whole map to the short pathers around the obstructions near a unit. |

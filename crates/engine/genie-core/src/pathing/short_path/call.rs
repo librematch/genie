@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
+use crate::pathing::FixedRect;
 use crate::pathing::ShapeId;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::short_path::{
@@ -237,12 +238,12 @@ impl Pather {
             while tx <= tile_of(b[2]) as u32 {
                 if words(tx, ty) & blocked == 0 {
                     if let Some(a) = run.take() {
-                        let r = [
+                        let r = FixedRect::new(
                             (a as i32).wrapping_mul(ONE) - 0x20_0000,
                             (ty as i32).wrapping_mul(ONE) - 0x20_0000,
                             (tx as i32).wrapping_mul(ONE) + 0x20_0000,
                             y1,
-                        ];
+                        );
                         self.temp.push(mesh.add(r));
                     }
                 } else if run.is_none() {
@@ -251,12 +252,12 @@ impl Pather {
                 tx += 1;
             }
             if let Some(a) = run {
-                let r = [
+                let r = FixedRect::new(
                     (a as i32).wrapping_mul(ONE) - 0x20_0000,
                     (ty as i32).wrapping_mul(ONE) - 0x20_0000,
                     (tx as i32).wrapping_mul(ONE) + 0x20_0000,
                     y1,
-                ];
+                );
                 self.temp.push(mesh.add(r));
             }
             ty += 1;

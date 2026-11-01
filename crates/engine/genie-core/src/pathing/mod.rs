@@ -19,7 +19,7 @@ use crate::map::Tile;
 use crate::map::spatial::{BLOCKED, Obstruction, Placed, Tiles};
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionType;
-use crate::pathing::mesh::{Mesh, ONE, Rect};
+use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::short_path::Pather;
 use crate::pathing::tile_path::PlanRect;
 use crate::pathing::tile_path::Planner;
@@ -27,10 +27,12 @@ use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
 pub use self::fixed_point::FixedPoint;
+pub use self::fixed_rect::FixedRect;
 pub use self::shape_id::ShapeId;
 pub use self::shape_side::ShapeSide;
 
 mod fixed_point;
+mod fixed_rect;
 pub mod hull_path;
 pub mod long_path;
 pub mod mesh;
@@ -130,32 +132,32 @@ impl Pathing {
 /// A shape's rectangle for an object (`FUN_141056460`): its box grown by half a tile, in fixed
 /// point by truncation.
 #[must_use]
-pub fn shape_rect(p: &Placed) -> Rect {
+pub fn shape_rect(p: &Placed) -> FixedRect {
     let (x, y) = (p.position.x(), p.position.y());
     let (rx, ry) = (p.radius.x(), p.radius.y());
     let fixed = |v: f32| (v * ONE as f32) as i64 as i32;
-    [
+    FixedRect::new(
         fixed((x - rx) - 0.5),
         fixed((y - ry) - 0.5),
         fixed((x + rx) + 0.5),
         fixed((y + ry) + 0.5),
-    ]
+    )
 }
 
 /// A shape's rectangle at the end of an action object's update (`FUN_141054fe0`): the place and
 /// the radii each in fixed point by truncation, the box grown by half a tile (`0x200000`).
 #[must_use]
-pub fn refreshed_rect(position: Position, radius: Footprint) -> Rect {
+pub fn refreshed_rect(position: Position, radius: Footprint) -> FixedRect {
     let fixed = |v: f32| (v * ONE as f32) as i64 as i32;
     let (x, y) = (position.x(), position.y());
     let (rx, ry) = (fixed(radius.x()), fixed(radius.y()));
     let half = ONE / 2;
-    [
+    FixedRect::new(
         (fixed(x) - rx) - half,
         (fixed(y) - ry) - half,
         fixed(x) + half + rx,
         fixed(y) + half + ry,
-    ]
+    )
 }
 
 impl Pathing {
@@ -587,12 +589,12 @@ mod tests {
         let r = shape_rect(&villager(30.0, 89.0));
         assert_eq!(
             r,
-            [
+            FixedRect::new(
                 (29.3f32 * 4_194_304.0) as i32,
                 (88.3f32 * 4_194_304.0) as i32,
                 (30.7f32 * 4_194_304.0) as i32,
                 (89.7f32 * 4_194_304.0) as i32
-            ]
+            )
         );
     }
 
@@ -607,12 +609,17 @@ mod tests {
         let s = p.shape(object_id(10029)).unwrap();
         let r = refreshed_rect(hunter.position, hunter.radius);
         assert_eq!(
-            r[0],
+            r.x0(),
             (106.53662f32 * 4_194_304.0) as i32 - 838_860 - 0x20_0000
         );
         assert_eq!(
             p.mesh().unwrap().shapes[s.index()],
-            [r[0] & !1, r[1] & !1, (r[2] + 1) & !1, (r[3] + 1) & !1]
+            FixedRect::new(
+                r.x0() & !1,
+                r.y0() & !1,
+                (r.x1() + 1) & !1,
+                (r.y1() + 1) & !1
+            )
         );
         // moving, it has none; without a record, none either
         p.refresh(object_id(10029), &hunter, true, Footprint::ZERO);
@@ -631,7 +638,12 @@ mod tests {
         let s = p.shape(object_id(9175)).unwrap();
         assert_eq!(p.mesh().unwrap().shapes[s.index()], {
             let r = shape_rect(&villager(30.0, 89.0));
-            [r[0] & !1, r[1] & !1, (r[2] + 1) & !1, (r[3] + 1) & !1]
+            FixedRect::new(
+                r.x0() & !1,
+                r.y0() & !1,
+                (r.x1() + 1) & !1,
+                (r.y1() + 1) & !1,
+            )
         });
         p.moved(object_id(9175), &villager(30.1, 89.0), true);
         assert_eq!(p.shape(object_id(9175)), None);

@@ -7,7 +7,8 @@
 
 use crate::GenieError;
 use crate::math::fmath;
-use crate::pathing::mesh::{Mesh, ONE, Rect};
+use crate::pathing::FixedRect;
+use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
 
 mod axis_dir;
@@ -79,15 +80,15 @@ fn float_distance(a: FixedPoint, b: FixedPoint) -> i32 {
 }
 
 /// `FUN_14087c610`: `p` strictly inside `r` shrunk by `k`.
-const fn strictly_inside(r: Rect, p: FixedPoint, k: i32) -> bool {
+const fn strictly_inside(r: FixedRect, p: FixedPoint, k: i32) -> bool {
     let [x, y] = p.get();
-    r[0] + k < x && r[1] + k < y && x < r[2] - k && y < r[3] - k
+    r.x0() + k < x && r.y0() + k < y && x < r.x1() - k && y < r.y1() - k
 }
 
 /// `FUN_14087c650`: `p` inside `r` shrunk by `k`, edges included.
-const fn inside(r: Rect, p: FixedPoint, k: i32) -> bool {
+const fn inside(r: FixedRect, p: FixedPoint, k: i32) -> bool {
     let [x, y] = p.get();
-    r[0] + k <= x && r[1] + k <= y && x <= r[2] - k && y <= r[3] - k
+    r.x0() + k <= x && r.y0() + k <= y && x <= r.x1() - k && y <= r.y1() - k
 }
 
 /// A hit of the raycast or a sweep: the shape and its side.

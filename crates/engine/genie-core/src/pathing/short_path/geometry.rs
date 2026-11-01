@@ -2,17 +2,17 @@
 //! segment and ray hits.
 
 use crate::pathing::FixedPoint;
+use crate::pathing::FixedRect;
 use crate::pathing::ShapeSide;
-use crate::pathing::mesh::Rect;
 
 /// `FUN_140fa8460`: corner `k` of `r` shrunk by `d`.
-pub(super) const fn shrunk_corner(r: Rect, k: u32, d: i32) -> FixedPoint {
+pub(super) const fn shrunk_corner(r: FixedRect, k: u32, d: i32) -> FixedPoint {
     match k {
-        0 => FixedPoint::new(r[0] + d, r[1] + d),
-        1 => FixedPoint::new(r[2] - d, r[1] + d),
-        2 => FixedPoint::new(r[2] - d, r[3] - d),
-        3 => FixedPoint::new(r[0] + d, r[3] - d),
-        _ => FixedPoint::new(r[0], r[1]),
+        0 => FixedPoint::new(r.x0() + d, r.y0() + d),
+        1 => FixedPoint::new(r.x1() - d, r.y0() + d),
+        2 => FixedPoint::new(r.x1() - d, r.y1() - d),
+        3 => FixedPoint::new(r.x0() + d, r.y1() - d),
+        _ => FixedPoint::new(r.x0(), r.y0()),
     }
 }
 
@@ -53,7 +53,7 @@ pub(super) const fn contact_point(p: FixedPoint, side: ShapeSide, d: i32, flag: 
 }
 
 /// `FUN_140fa39f0`: `p` moved onto side `side` of `r` shrunk by `d`, held within the side.
-pub(super) fn snap_to_side(p: &mut FixedPoint, r: Rect, side: ShapeSide, d: i32) {
+pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d: i32) {
     let hold = |v: i32, lo: i32, hi: i32| {
         if v < lo {
             lo
@@ -65,16 +65,16 @@ pub(super) fn snap_to_side(p: &mut FixedPoint, r: Rect, side: ShapeSide, d: i32)
     };
     match side {
         ShapeSide::LowY => {
-            *p = FixedPoint::new(hold(p.x(), r[0] + d, r[2] - d), r[1] + d);
+            *p = FixedPoint::new(hold(p.x(), r.x0() + d, r.x1() - d), r.y0() + d);
         }
         ShapeSide::HighX => {
-            *p = FixedPoint::new(r[2] - d, hold(p.y(), r[1] + d, r[3] - d));
+            *p = FixedPoint::new(r.x1() - d, hold(p.y(), r.y0() + d, r.y1() - d));
         }
         ShapeSide::HighY => {
-            *p = FixedPoint::new(hold(p.x(), r[0] + d, r[2] - d), r[3] - d);
+            *p = FixedPoint::new(hold(p.x(), r.x0() + d, r.x1() - d), r.y1() - d);
         }
         ShapeSide::LowX => {
-            *p = FixedPoint::new(r[0] + d, hold(p.y(), r[1] + d, r[3] - d));
+            *p = FixedPoint::new(r.x0() + d, hold(p.y(), r.y0() + d, r.y1() - d));
         }
     }
 }
@@ -142,7 +142,7 @@ pub(super) fn segment_hit(
 pub(super) fn ray_rect(
     a: FixedPoint,
     b: FixedPoint,
-    r: Rect,
+    r: FixedRect,
     t: &mut i32,
 ) -> Option<(i32, ShapeSide)> {
     let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
@@ -177,12 +177,8 @@ pub(super) fn ray_ratio(num: i32, den: i32) -> i32 {
 /// [`ray_rect`]'s right side (x1) for the ray `a`–`b` going left: a ray along x (no y step)
 /// crosses it within its open span from at or right of it to left of it, nearer than `t` (1, its
 /// ratio into `t`); any other ray as [`segment_hit`]; 0 for none.
-pub(super) fn ray_right_side(
-    a: FixedPoint,
-    b: FixedPoint,
-    [_, ry0, rx1, ry1]: Rect,
-    t: &mut i32,
-) -> i32 {
+pub(super) fn ray_right_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+    let [_, ry0, rx1, ry1] = r.get();
     if b.y() - a.y() != 0 {
         return segment_hit(
             a,
@@ -208,12 +204,8 @@ pub(super) fn ray_right_side(
 
 /// [`ray_rect`]'s left side (x0) for the ray `a`–`b` going right, as [`ray_right_side`]: a ray
 /// along x crosses it from at or left of it to right of it.
-pub(super) fn ray_left_side(
-    a: FixedPoint,
-    b: FixedPoint,
-    [rx0, ry0, _, ry1]: Rect,
-    t: &mut i32,
-) -> i32 {
+pub(super) fn ray_left_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+    let [rx0, ry0, _, ry1] = r.get();
     if b.y() - a.y() != 0 {
         return segment_hit(
             a,
@@ -240,12 +232,8 @@ pub(super) fn ray_left_side(
 /// [`ray_rect`]'s bottom side (y0) for the ray `a`–`b` going up in y: a ray along y (no x step)
 /// crosses it within its open span from at or below it to above it, nearer than `t` (1, its
 /// ratio into `t`); any other ray as [`segment_hit`]; 0 for none.
-pub(super) fn ray_bottom_side(
-    a: FixedPoint,
-    b: FixedPoint,
-    [rx0, ry0, rx1, _]: Rect,
-    t: &mut i32,
-) -> i32 {
+pub(super) fn ray_bottom_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+    let [rx0, ry0, rx1, _] = r.get();
     if b.x() - a.x() != 0 {
         return segment_hit(
             a,
@@ -271,12 +259,8 @@ pub(super) fn ray_bottom_side(
 
 /// [`ray_rect`]'s top side (y1) for the ray `a`–`b` going down in y, as [`ray_bottom_side`]: a
 /// ray along y crosses it from at or above it to below it.
-pub(super) fn ray_top_side(
-    a: FixedPoint,
-    b: FixedPoint,
-    [rx0, _, rx1, ry1]: Rect,
-    t: &mut i32,
-) -> i32 {
+pub(super) fn ray_top_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+    let [rx0, _, rx1, ry1] = r.get();
     if b.x() - a.x() != 0 {
         return segment_hit(
             a,

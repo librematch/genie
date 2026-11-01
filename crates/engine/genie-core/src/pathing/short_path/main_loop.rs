@@ -479,14 +479,14 @@ impl Search<'_> {
         }
         let r = *self.ctx.mesh.shapes.checked(hit.shape.index())?;
         let centre = FixedPoint::new(
-            r[0].wrapping_add(
-                (((i64::from(r[2] - r[0]) * 0x40_0000)
-                    + ((i64::from(r[2] - r[0]) >> 63) & 0x7f_ffff))
+            r.x0().wrapping_add(
+                (((i64::from(r.x1() - r.x0()) * 0x40_0000)
+                    + ((i64::from(r.x1() - r.x0()) >> 63) & 0x7f_ffff))
                     >> 23) as i32,
             ),
-            r[1].wrapping_add(
-                (((i64::from(r[3] - r[1]) * 0x40_0000)
-                    + ((i64::from(r[3] - r[1]) >> 63) & 0x7f_ffff))
+            r.y0().wrapping_add(
+                (((i64::from(r.y1() - r.y0()) * 0x40_0000)
+                    + ((i64::from(r.y1() - r.y0()) >> 63) & 0x7f_ffff))
                     >> 23) as i32,
             ),
         );

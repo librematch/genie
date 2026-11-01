@@ -2,6 +2,7 @@
 //! walk of a new polygon.
 
 use crate::GenieError;
+use crate::pathing::FixedRect;
 use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
@@ -360,20 +361,28 @@ impl Search<'_> {
         else {
             return false;
         };
-        let y1 = if sr[3] - d < vr[3] - d {
-            sr[3] - d
+        let y1 = if sr.y1() - d < vr.y1() - d {
+            sr.y1() - d
         } else {
-            vr[3] - d
+            vr.y1() - d
         };
-        let x1 = if sr[2] - d < vr[2] - d {
-            sr[2] - d
+        let x1 = if sr.x1() - d < vr.x1() - d {
+            sr.x1() - d
         } else {
-            vr[2] - d
+            vr.x1() - d
         };
-        let y0 = if vr[1] + d < sr[1] + d { sr[1] } else { vr[1] };
-        let x0 = if vr[0] + d < sr[0] + d { sr[0] } else { vr[0] };
-        let o = [x0 + d, y0 + d, x1, y1];
-        o[0] < o[2] && o[1] < o[3] && inside(o, p, 0)
+        let y0 = if vr.y0() + d < sr.y0() + d {
+            sr.y0()
+        } else {
+            vr.y0()
+        };
+        let x0 = if vr.x0() + d < sr.x0() + d {
+            sr.x0()
+        } else {
+            vr.x0()
+        };
+        let o = FixedRect::new(x0 + d, y0 + d, x1, y1);
+        o.x0() < o.x1() && o.y0() < o.y1() && inside(o, p, 0)
     }
 
     /// `FUN_140fa77b0`'s edge test: `p` lies on the edge of side `s_cur` from `vc` to `vn`; the
