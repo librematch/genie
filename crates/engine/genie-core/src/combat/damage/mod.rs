@@ -57,6 +57,8 @@ use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
+use crate::objects::masters::BlastDefense;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterId;
@@ -174,7 +176,7 @@ pub struct Victim {
     /// works).
     pub workers: i32,
     /// Its master's `area_effect_object_level` (`+0x62b`): the blast levels that reach it.
-    pub blast_defense: u8,
+    pub blast_defense: BlastDefense,
     /// Flagged to sleep (`+0x641`, `+0x643`): a killing hit wakes it (`FUN_14119deb0` with 0).
     pub goto_sleep: bool,
     /// Its master's decay (`+0x620`), which a hunt's decay stop negates (`FUN_140ac44b0`; the
@@ -356,14 +358,13 @@ pub struct Attacker {
     /// Its master's missile, −1 for none.
     pub missile: Option<MasterId>,
     /// Its master's weapon range (`+0x828`), `area_effect_range` (`+0x82c`: the blast's radius),
-    /// `area_effect_level` (`+0x830`: the levels it reaches, bit 2 its friends too, bit 5 a wide
-    /// cone, bit 6 a falloff, bit 7 a cone) and `area_damage` (`+0x834`: the share of the damage
-    /// the objects besides its target take, a fixed damage below 0).
+    /// `area_effect_level` (`+0x830`, [`BlastLevel`]) and `area_damage` (`+0x834`: the share of the
+    /// damage the objects besides its target take, a fixed damage below 0).
     pub weapon_range: Distance,
     /// Its master's `area_effect_range` (`+0x82c`): the blast's radius.
     pub area_effect: Distance,
     /// Its master's `area_effect_level` (`+0x830`).
-    pub blast_level: u8,
+    pub blast_level: BlastLevel,
     /// Its master's `area_damage` (`+0x834`).
     pub area_damage: f32,
     /// Its master's `charge_type`, `max_charge`, `charge_target` and `special_attack_flag`; its

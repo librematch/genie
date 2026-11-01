@@ -168,8 +168,9 @@ pub(super) fn pass(
     steer(motion, group, lead, world, target.as_ref())
 }
 
-/// The reached waypoint (the walked level's bit 0, `0x14104a4bf`): with bit 1 the group takes
-/// the waypoint's place; both bits clear and the level moves on. On a path that does not loop,
+/// The reached waypoint (the walked level's [`crate::movement::LevelFlags::REACHED`],
+/// `0x14104a4bf`): with [`crate::movement::LevelFlags::AT_WAYPOINT`] the group takes the
+/// waypoint's place; both clear and the level moves on. On a path that does not loop,
 /// past its last waypoint, a group not yet within the range plus 0.1 of where it was going (its
 /// target's footprint, else the waypoint it left) steps back to that waypoint and asks again
 /// (state 2), else the level arrived (state 4); with waypoints left a level above 0 asks for the

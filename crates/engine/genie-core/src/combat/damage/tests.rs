@@ -805,7 +805,7 @@ fn reflected_damage_comes_back_at_least_one() {
 fn a_blast_s_nan_paths_are_the_game_s() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
-    elephant.source.blast_level = 0x42;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(0x42);
     elephant.source.area_damage = 0.5;
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let center = elephant.position;
@@ -813,7 +813,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
         id: object_id(2),
         player: PlayerId::new(2),
         position: Position::new(x, y, 0.0),
-        blast_defense: 2,
+        blast_defense: BlastDefense::new(2),
         ..sheep()
     };
     // a NaN radius on x: the gap on x is 0, the falloff takes the gap on y alone
@@ -828,7 +828,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
     let f = (1.0 - fmath::sqrt(0.5 * 0.5)) / 1.0 * 0.5;
     assert_eq!(t.hp, HitPoints::new(14.0 - 10.0 * f));
     // a narrow cone keeps a NaN offset
-    elephant.source.blast_level = 0x82;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(0x82);
     elephant.armored.as_mut().unwrap().facing = Some(Facing {
         angle: Angle::new(f32::NAN),
         facets: 8,
@@ -851,7 +851,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
     );
     assert_eq!(t.hp, HitPoints::new(9.0));
     // a NaN area damage share leaves the factor at 1
-    elephant.source.blast_level = 2;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(2);
     elephant.source.area_damage = f32::NAN;
     let mut t = enemy(10.8, 11.0);
     assert_eq!(
@@ -887,7 +887,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
 fn a_blast_reaches_the_objects_about_its_attacker() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
-    elephant.source.blast_level = 2;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(2);
     elephant.source.area_damage = 0.5;
     elephant.source.player = PlayerId::new(1);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
@@ -895,7 +895,7 @@ fn a_blast_reaches_the_objects_about_its_attacker() {
         id: object_id(id),
         player: PlayerId::new(2),
         position: Position::new(x, 11.0, 0.0),
-        blast_defense: 2,
+        blast_defense: BlastDefense::new(2),
         ..sheep()
     };
     let mut target = enemy(1, 10.6);
@@ -928,7 +928,7 @@ fn a_blast_reaches_the_objects_about_its_attacker() {
         )
     );
     // the falloff: 0.3 of radius 1 away keeps 0.7
-    elephant.source.blast_level = 0x42;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(0x42);
     let mut near = enemy(2, 10.8);
     let mut all = [&mut near];
     assert_eq!(
@@ -1394,7 +1394,7 @@ fn a_building_s_attacker_effects_and_kill_bonus_are_the_game_s() {
 fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
     let mut mangonel = hunter();
     mangonel.source.area_effect = Distance::new(2.0);
-    mangonel.source.blast_level = 2;
+    mangonel.source.blast_level = BlastLevel::from_bits_retain(2);
     mangonel.source.area_damage = 0.5;
     mangonel.weapons = vec![ClassAmount::new(4, 10)];
     mangonel.position = Position::new(10.5, 10.5, 0.0);
@@ -1404,7 +1404,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
         hp: HitPoints::new(100.0),
         position: Position::new(11.5, 10.5, 0.0),
         radius: Footprint::new(1.0, 1.0),
-        blast_defense: 2,
+        blast_defense: BlastDefense::new(2),
         building: Some(Building {
             annexes: vec![object_id(21)],
             blast_taken: HitPoints::new(7.0),
@@ -1418,7 +1418,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
         hp: HitPoints::new(100.0),
         position: Position::new(10.5, 10.5, 0.0),
         radius: Footprint::new(0.5, 0.5),
-        blast_defense: 0,
+        blast_defense: BlastDefense::new(0),
         building: Some(Building {
             main: Some(object_id(20)),
             ..Building::default()
@@ -1452,7 +1452,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
 fn a_blast_walks_a_tile_s_objects_in_its_list_order() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
-    elephant.source.blast_level = 2;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(2);
     elephant.source.area_damage = 0.5;
     elephant.source.player = PlayerId::new(1);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
@@ -1461,7 +1461,7 @@ fn a_blast_walks_a_tile_s_objects_in_its_list_order() {
         tile_place,
         player: PlayerId::new(2),
         position: Position::new(x, y, 0.0),
-        blast_defense: 2,
+        blast_defense: BlastDefense::new(2),
         ..sheep()
     };
     let (mut a, mut b, mut c) = (
@@ -1547,7 +1547,7 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
     use crate::combat::damage::blasts::{blast_ledger, ledger_values};
     let mut main = house();
     main.source.area_damage = 0.25;
-    main.blast_defense = 3;
+    main.blast_defense = BlastDefense::new(3);
     main.building.as_mut().unwrap().blast_taken = HitPoints::new(7.0);
     let mut annex = Victim {
         id: object_id(501),
@@ -1569,13 +1569,16 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
     };
     assert_eq!(
         ledger_values(&all, 1, Some(0), &a),
-        (0.25, 3, HitPoints::new(7.0))
+        (0.25, BlastDefense::new(3), HitPoints::new(7.0))
     );
     assert_eq!(
         ledger_values(&all, 0, Some(0), &a),
-        (0.5, 3, HitPoints::new(7.0))
+        (0.5, BlastDefense::new(3), HitPoints::new(7.0))
     );
-    assert_eq!(ledger_values(&all, 2, None, &a), (0.5, 0, HitPoints::ZERO));
+    assert_eq!(
+        ledger_values(&all, 2, None, &a),
+        (0.5, BlastDefense::new(0), HitPoints::ZERO)
+    );
     let mut orphan = Victim {
         building: Some(Building {
             main: Some(object_id(999)),
@@ -1616,14 +1619,14 @@ fn a_blast_measures_to_an_object_s_box_within_its_radius() {
 }
 
 /// The blast's factor: an ally's `friendly_fire_damage` scales it; a melee blast falls off
-/// with the level's bit 6 only and not on `main`; a missile's falls off everywhere, but at
+/// with `FALLS_OFF` only and not on `main`; a missile's falls off everywhere, but at
 /// distance 0 on a `main` building.
 #[test]
 fn a_blast_s_factor_takes_the_friendly_fire_and_the_falloff() {
     use crate::combat::damage::blasts::blast_falloff;
     let attacker = hunter();
     let melee = Attacker {
-        blast_level: 2,
+        blast_level: BlastLevel::from_bits_retain(2),
         ..attacker.source
     };
     let mut enemy = Victim {
@@ -1636,7 +1639,7 @@ fn a_blast_s_factor_takes_the_friendly_fire_and_the_falloff() {
         1.0
     );
     let falling = Attacker {
-        blast_level: 0x42,
+        blast_level: BlastLevel::from_bits_retain(0x42),
         ..melee
     };
     assert_eq!(
@@ -1676,8 +1679,8 @@ fn a_blast_s_factor_takes_the_friendly_fire_and_the_falloff() {
     );
 }
 
-/// A cone blast (bit 7) leaves out what lies past half a facet of the attacker's facing; a
-/// wide one (bit 5) what lies past its radius or 1.67 facets; a blast of no cone leaves out
+/// A cone blast (`CONE`) leaves out what lies past half a facet of the attacker's facing; a
+/// wide one (`WIDE_CONE`) what lies past its radius or 1.67 facets; a blast of no cone leaves out
 /// nothing; a cone blast of an attacker without a facing fails.
 #[test]
 fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
@@ -1694,15 +1697,28 @@ fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
         ..attacker.source
     };
     assert_eq!(
-        outside_cone(&attacker, &level(2), &behind, (1.0, 0.0)),
+        outside_cone(
+            &attacker,
+            &level(BlastLevel::from_bits_retain(2)),
+            &behind,
+            (1.0, 0.0)
+        ),
         Ok(false)
     );
-    assert!(outside_cone(&attacker, &level(0x82), &front, (1.0, 0.0)).is_err());
+    assert!(
+        outside_cone(
+            &attacker,
+            &level(BlastLevel::from_bits_retain(0x82)),
+            &front,
+            (1.0, 0.0)
+        )
+        .is_err()
+    );
     attacker.armored.as_mut().unwrap().facing = Some(Facing {
         angle: Angle::ZERO,
         facets: 8,
     });
-    let narrow = level(0x82);
+    let narrow = level(BlastLevel::from_bits_retain(0x82));
     assert_eq!(
         outside_cone(&attacker, &narrow, &front, (1.0, 0.0)),
         Ok(false)
@@ -1715,7 +1731,7 @@ fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
         outside_cone(&attacker, &narrow, &behind, (1.0, 0.0)),
         Ok(true)
     );
-    let wide = level(0xa2);
+    let wide = level(BlastLevel::from_bits_retain(0xa2));
     assert_eq!(outside_cone(&attacker, &wide, &side, (1.0, 2.0)), Ok(false));
     assert_eq!(outside_cone(&attacker, &wide, &side, (1.0, 0.5)), Ok(true));
     assert_eq!(
@@ -1831,7 +1847,7 @@ fn a_blast_passes_over_what_it_spares_and_hits_the_rest() {
     use crate::combat::damage::blasts::{Blast, blast_one, blast_tiles};
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
-    elephant.source.blast_level = 2;
+    elephant.source.blast_level = BlastLevel::from_bits_retain(2);
     elephant.source.area_damage = 0.5;
     let center = elephant.position;
     let blast = |a: Attacker| Blast {
@@ -1850,7 +1866,7 @@ fn a_blast_passes_over_what_it_spares_and_hits_the_rest() {
         id: object_id(2),
         player: PlayerId::new(2),
         position: Position::new(10.8, 11.0, 0.0),
-        blast_defense: 2,
+        blast_defense: BlastDefense::new(2),
         ..sheep()
     };
     let b = blast(elephant.source);
@@ -1882,7 +1898,7 @@ fn a_blast_passes_over_what_it_spares_and_hits_the_rest() {
             ..enemy.clone()
         },
         Victim {
-            blast_defense: 1,
+            blast_defense: BlastDefense::new(1),
             ..enemy.clone()
         },
     ] {

@@ -12,6 +12,8 @@ use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::BlastDefense;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
@@ -103,32 +105,32 @@ pub(super) fn blast_tiles(center: Position, r: Distance) -> (Tile, Tile) {
     )
 }
 
-/// Slot 0x848 (`FUN_14107f690`), the blast of `attacker` about `center` with factor `factor`,
-/// over the objects the tiles of [`blast_tiles`] hold, row by row and a tile's objects in its
-/// list's order ([`Victim::tile_place`]): the attacker's hit is first marked as no
-/// charge's (`+0x8a8`). An object is passed when the blast spares its friends (a weapon range of
-/// at most 1 or the level's bit 2: `FUN_1410bfcb0`) and its player is the attacker's or allied,
-/// when it is `exclude`, the attacker or an artifact, when its `area_effect_object_level` is
-/// at most 1 and below the blast's level, when a ram's blast meets neither a building nor `main`,
-/// when it lies beyond the radius (the gap past its radii) or its shield blocks the blast. Its
-/// damage factor is the attacker's elevation factor, times its `friendly_fire_damage` when it is
-/// of type 70 and up and its player counts the source's as its own or allied; times the falloff
-/// `(r - d) / r` (a melee attacker's only with the level's bit 6, and not on `main`; a missile's
+/// Slot 0x848 (`FUN_14107f690`), the blast of `attacker` about `center` with factor `factor`, over
+/// the objects the tiles of [`blast_tiles`] hold, row by row and a tile's objects in its list's
+/// order ([`Victim::tile_place`]): the attacker's hit is first marked as no charge's (`+0x8a8`). An
+/// object is passed when the blast spares its friends (a weapon range of at most 1 or
+/// [`BlastLevel::SPARES_FRIENDS`]: `FUN_1410bfcb0`) and its player is the attacker's or allied,
+/// when it is `exclude`, the attacker or an artifact, when its `area_effect_object_level` is at
+/// most 1 and below the blast's level, when a ram's blast meets neither a building nor `main`, when
+/// it lies beyond the radius (the gap past its radii) or its shield blocks the blast. Its damage
+/// factor is the attacker's elevation factor, times its `friendly_fire_damage` when it is of type
+/// 70 and up and its player counts the source's as its own or allied; times the falloff `(r - d) /
+/// r` (a melee attacker's only with [`BlastLevel::FALLS_OFF`], and not on `main`; a missile's
 /// everywhere, at distance 0 on a `main` building). An object other than `main` lies within the
-/// cone of a cone blast (bit 7: within half a facet, or 1.67 for a wide one, bit 5) and takes the
-/// attacker's `area_damage` share; a fixed damage (`area_damage` below 0) takes its hit points
-/// alone (slot 0xb0; below 1 it has 0 and holds nothing, `FUN_14119d320`; a combat unit of a
-/// player that had 1 is counted killed, `FUN_1412005b0`). Then the object's slot 0xe8 with the
-/// attacker's weapons ([`take`]), and the attacker's hit is its charge's if any hit was
-/// (slot 0x2f0). Every building on the tiles starts the blast with nothing taken (`+0xb90`, a
-/// first pass over the tiles); a building's hit leaves out what the blast has done to it so far,
-/// its main building's for an annex (`+0xbb8`, which also gives the annex its `area_damage`
-/// share and its blast level, the main building's master's), and adds its loss to it; the
-/// main building of an annex it reaches is among `targets`. The compares are the assembly's: a NaN gap past a radius is 0
-/// (`COMISS`/`JBE`), a NaN square distance is beyond the radius (`JBE`), a NaN facet offset
-/// stays in a cone (`JA` past, both the narrow and the wide one), a NaN `area_damage` leaves the
-/// factor as it is. Answers whether the radius is above 0 (or NaN: `COMISS 0, r`/`JC`), which
-/// neither caller reads.
+/// cone of a cone blast ([`BlastLevel::CONE`]: within half a facet, or 1.67 for a wide one,
+/// [`BlastLevel::WIDE_CONE`]) and takes the attacker's `area_damage` share; a fixed damage
+/// (`area_damage` below 0) takes its hit points alone (slot 0xb0; below 1 it has 0 and holds
+/// nothing, `FUN_14119d320`; a combat unit of a player that had 1 is counted killed,
+/// `FUN_1412005b0`). Then the object's slot 0xe8 with the attacker's weapons ([`take`]), and the
+/// attacker's hit is its charge's if any hit was (slot 0x2f0). Every building on the tiles starts
+/// the blast with nothing taken (`+0xb90`, a first pass over the tiles); a building's hit leaves
+/// out what the blast has done to it so far, its main building's for an annex (`+0xbb8`, which also
+/// gives the annex its `area_damage` share and its blast level, the main building's master's), and
+/// adds its loss to it; the main building of an annex it reaches is among `targets`. The compares
+/// are the assembly's: a NaN gap past a radius is 0 (`COMISS`/`JBE`), a NaN square distance is
+/// beyond the radius (`JBE`), a NaN facet offset stays in a cone (`JA` past, both the narrow and
+/// the wide one), a NaN `area_damage` leaves the factor as it is. Answers whether the radius is
+/// above 0 (or NaN: `COMISS 0, r`/`JC`), which neither caller reads.
 pub fn blast(
     attacker: &mut Victim,
     center: Position,
@@ -142,7 +144,7 @@ pub fn blast(
     if !fmath::below_or_unordered(0.0, r.get()) {
         return Ok(false);
     }
-    let wide = if a.blast_level & 0x80 != 0 {
+    let wide = if a.blast_level.contains(BlastLevel::CONE) {
         r
     } else {
         Distance::ZERO
@@ -153,7 +155,7 @@ pub fn blast(
         r,
         wide,
         tiles: blast_tiles(center, r),
-        spares_friends: !(Distance::new(1.0) < a.weapon_range && a.blast_level & 4 == 0),
+        spares_friends: a.blast_level.spares_friends(a.weapon_range),
         exclude,
         main,
         factor,
@@ -235,7 +237,7 @@ pub(super) fn blast_one(
     let is_main = Some(t.id) == b.main;
     let ledger = blast_ledger(targets, i)?;
     let (share, defense, blast_taken) = ledger_values(targets, i, ledger, a);
-    if !(1 < defense || a.blast_level <= defense) {
+    if !(BlastDefense::ALWAYS_REACHED <= defense || a.blast_level.reaches(defense)) {
         return Ok(());
     }
     let t = &mut *targets[i];
@@ -298,7 +300,7 @@ pub(super) fn ledger_values(
     i: usize,
     ledger: Option<usize>,
     a: &Attacker,
-) -> (f32, u8, HitPoints) {
+) -> (f32, BlastDefense, HitPoints) {
     let taken = |v: &Victim| {
         v.building
             .as_ref()
@@ -342,9 +344,9 @@ pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f3
 }
 
 /// The blast's damage factor on `t` at square distance `d2` within radius `r`: the attacker's
-/// elevation factor, times `t`'s `friendly_fire_damage` when it is of type 70 and up and its
-/// player is the attacker's or allied, times the falloff `(r - d) / r` (a melee attacker's only
-/// with the level's bit 6 and not on `main`; a missile's everywhere, at distance 0 on a `main`
+/// elevation factor, times `t`'s `friendly_fire_damage` when it is of type 70 and up and its player
+/// is the attacker's or allied, times the falloff `(r - d) / r` (a melee attacker's only with
+/// [`BlastLevel::FALLS_OFF`] and not on `main`; a missile's everywhere, at distance 0 on a `main`
 /// building).
 pub(super) fn blast_falloff(
     attacker: &Victim,
@@ -358,7 +360,7 @@ pub(super) fn blast_falloff(
         f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire);
     }
     if a.missile.is_none() {
-        if a.blast_level & 0x40 != 0 && !is_main {
+        if a.blast_level.contains(BlastLevel::FALLS_OFF) && !is_main {
             f *= (r - fmath::sqrt(d2)) / r;
         }
     } else {
@@ -372,16 +374,16 @@ pub(super) fn blast_falloff(
     f
 }
 
-/// Whether `t` lies outside the cone of a cone blast (the level's bit 7): beyond half a facet
-/// of the attacker's facing, or for a wide one (bit 5) beyond the wide radius or 1.67 facets; a
-/// NaN facet offset stays in either. A blast of no cone has none to leave.
+/// Whether `t` lies outside the cone of a cone blast ([`BlastLevel::CONE`]): beyond half a facet of
+/// the attacker's facing, or for a wide one ([`BlastLevel::WIDE_CONE`]) beyond the wide radius or
+/// 1.67 facets; a NaN facet offset stays in either. A blast of no cone has none to leave.
 pub(super) fn outside_cone(
     attacker: &Victim,
     a: &Attacker,
     t: &Victim,
     (d2, wide): (f32, f32),
 ) -> Result<bool, GenieError> {
-    if a.blast_level & 0x80 == 0 {
+    if !a.blast_level.contains(BlastLevel::CONE) {
         return Ok(false);
     }
     let facing =
@@ -392,7 +394,7 @@ pub(super) fn outside_cone(
             .ok_or(GenieError::unsupported(
                 "the facing of an attacker with a cone blast (+0x7e8)",
             ))?;
-    if a.blast_level & 0x20 == 0 {
+    if !a.blast_level.contains(BlastLevel::WIDE_CONE) {
         let off = facing_offset(attacker.position, facing, t.position);
         return Ok(CONE < off || off < MINUS_CONE);
     }

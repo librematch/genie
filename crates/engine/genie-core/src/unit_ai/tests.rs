@@ -11,6 +11,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
@@ -6689,7 +6690,7 @@ const TC: Attacker = Attacker {
     min_range: Distance::ZERO,
     charge_type: 0,
     area_effect: Distance::ZERO,
-    blast_level: 0,
+    blast_level: BlastLevel::NONE,
     los: Distance::new(8.0),
     position: Position::new(29.0, 94.0, 0.0),
     radius: Footprint::new(2.0, 2.0),
@@ -10362,10 +10363,10 @@ const MANGONEL: Attacker = Attacker {
     ..TC
 };
 
-/// `FUN_14120e4e0` for a type-70 attacker: priority 3 spares every class but its six; a
-/// ranged attacker with a blast whose level has neither bit 2 nor bit 3 would scan the blast
-/// for friends (not modelled); a melee attacker, one without a blast, or a blast level with
-/// either bit spares nobody.
+/// `FUN_14120e4e0` for a type-70 attacker: priority 3 spares every class but its six; a ranged
+/// attacker with a blast whose level has neither `SPARES_FRIENDS` nor `SKIPS_FRIEND_CHECK` would
+/// scan the blast for friends (not modelled); a melee attacker, one without a blast, or a blast
+/// level with either bit spares nobody.
 #[test]
 fn an_attacker_spares_by_its_priority_and_its_blast() {
     let villager = Target {
@@ -10389,7 +10390,7 @@ fn an_attacker_spares_by_its_priority_and_its_blast() {
     assert!(spares_friends(&blast, &villager).is_err());
     for level in [4, 8] {
         let a = Attacker {
-            blast_level: level,
+            blast_level: BlastLevel::from_bits_retain(level),
             ..blast
         };
         assert_eq!(spares_friends(&a, &villager), Ok(true));

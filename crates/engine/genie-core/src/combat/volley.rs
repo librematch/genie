@@ -236,9 +236,7 @@ impl Unit {
                 [600, ObjectId::field(aimed.target), 0],
             )?;
         }
-        // FUN_1410bfcb0: a blast of a unit of range above 1 without the level's bit 2 does not
-        // spare friends
-        let spares_friends = !(Distance::new(1.0) < weapon_range && blast_level & 4 == 0);
+        let spares_friends = blast_level.spares_friends(weapon_range);
         if !spares_friends
             && c.w
                 .players

@@ -215,12 +215,12 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         (a::SIZE_Z, |m| m.height, [3.0, 5.0, 10.0]),
         (
             a::CAN_BE_BUILT_ON,
-            |m| f32::from(m.blast_defense),
+            |m| f32::from(m.blast_defense.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             a::BLAST_DEFENSE_LEVEL,
-            |m| f32::from(m.blast_defense),
+            |m| f32::from(m.blast_defense.get()),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -431,7 +431,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::BLAST_ATTACK_LEVEL,
-            |m| f32::from(m.blast_level),
+            |m| f32::from(m.blast_level.bits()),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -694,7 +694,7 @@ fn the_static_setters_truncate_as_the_game_does() {
     // "Can Be Built On" writes the blast defense level; its multiply does not round
     m.set_attribute(attribute::CAN_BE_BUILT_ON, 3.0, &world(false));
     m.multiply_attribute(attribute::BLAST_DEFENSE_LEVEL, 1.9, &world(false));
-    assert_eq!(m.blast_defense, 5);
+    assert_eq!(m.blast_defense, BlastDefense::new(5));
     // the available flag holds the byte's test against 0
     m.set_attribute(attribute::AVAILABLE_UNIT_FLAG, 256.0, &world(false));
     assert!(!m.available);

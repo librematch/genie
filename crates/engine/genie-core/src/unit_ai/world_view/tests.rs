@@ -7,6 +7,7 @@ use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
@@ -96,7 +97,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
         min_range: Distance::ZERO,
         charge_type: 0,
         area_effect: Distance::ZERO,
-        blast_level: 0,
+        blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
@@ -207,7 +208,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         min_range: Distance::ZERO,
         charge_type: 0,
         area_effect: Distance::ZERO,
-        blast_level: 0,
+        blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(0.3, 0.3),
@@ -361,7 +362,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         min_range: Distance::ZERO,
         charge_type: 0,
         area_effect: Distance::ZERO,
-        blast_level: 0,
+        blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(0.3, 0.3),

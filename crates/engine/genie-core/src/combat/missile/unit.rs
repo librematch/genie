@@ -16,6 +16,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::forget_resource;
+use crate::objects::masters::BlastDefense;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::player_master;
 use crate::objects::unit::{Unit, missed_passes};
@@ -226,7 +227,7 @@ impl Unit {
                     action.result = result;
                     // the master's dying sprite plays there (a sprite of its own, not held)
                     if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH) || result == 2)
-                        && blast_level <= level
+                        && blast_level.reaches(level)
                     {
                         continue;
                     }
@@ -255,7 +256,7 @@ impl Unit {
         stats: &crate::combat::missile::MissileStats,
         old: Position,
         c: &mut Step<'_>,
-    ) -> Result<Vec<(ObjectId, PlayerId, MasterKind, u8)>, GenieError> {
+    ) -> Result<Vec<(ObjectId, PlayerId, MasterKind, BlastDefense)>, GenieError> {
         let (w, h) = (c.w.spatial.map.width(), c.w.spatial.map.height());
         let hold = |v: f32, size: i32| {
             if v < 0.0 {

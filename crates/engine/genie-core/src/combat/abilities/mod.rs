@@ -41,6 +41,8 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::BlastDefense;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -87,8 +89,8 @@ const WORKING: u8 = 7;
 /// The building classes a movement damage hits (`0x141207ae8`, decoded 0x33 and 0x36); it hits
 /// any object of another type.
 const STRUCK_BUILDING_CLASSES: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
-/// The blast level from which an object is reached whatever the hitter's level (`+0x62b`).
-const ALWAYS_REACHED: u8 = 2;
+/// The blast defence from which an object is reached whatever the hitter's level (`+0x62b`).
+const ALWAYS_REACHED: BlastDefense = BlastDefense::ALWAYS_REACHED;
 
 /// Hit points below which an object counts dead, and the store's give threshold
 /// (`DAT_14330eb8c`).
@@ -175,7 +177,7 @@ struct Own {
     /// Its type (`+0x8`).
     kind: MasterKind,
     /// Its `area_effect_level` (`+0x830`).
-    blast_level: u8,
+    blast_level: BlastLevel,
     /// Its radii (`+0x5d8`, `+0x5dc`).
     radius: Footprint,
 }

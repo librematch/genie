@@ -9,6 +9,8 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::WorkRate;
+use crate::objects::masters::BlastDefense;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
@@ -418,9 +420,9 @@ pub(crate) const TAKEN_OUT: ObjectId = ObjectId::TAKEN_OUT;
 /// 15 or one of a blast defence below the missile's (`blast_level`).
 pub(crate) fn missed_passes(
     c: &Step<'_>,
-    (id, player, kind, level): (ObjectId, PlayerId, MasterKind, u8),
+    (id, player, kind, level): (ObjectId, PlayerId, MasterKind, BlastDefense),
     target: Option<ObjectId>,
-    blast_level: u8,
+    blast_level: BlastLevel,
 ) -> bool {
     if player == c.player || kind == MISSILE {
         return true;
@@ -428,7 +430,7 @@ pub(crate) fn missed_passes(
     let other = Some(id) != target;
     c.w.spatial.allied_with(c.player, player)
         || (other && player == PlayerId::new(0) && TREE < kind)
-        || (other && level < blast_level)
+        || (other && !blast_level.reaches(level))
 }
 
 /// What an object's update leaves of it.

@@ -31,6 +31,7 @@ file for what the save does not hold.
 | [`action_type.rs`](action_type.rs) | The action types (`TRIBE_Action_*`'s `+0x8`, a task's `action_type`): the action a task makes a unit do, and the type of an action a unit runs. |
 | [`attack_priority.rs`](attack_priority.rs) | A master's attack priority: which targets its unit AI's checks let it choose. |
 | [`attribute.rs`](attribute.rs) | The attributes an effect changes on a master and on its objects (the game's attribute list: string 12200 plus the number names each). |
+| [`blast_level.rs`](blast_level.rs) | A master's blast level and blast defence (`BlastLevel`, `BlastDefense`). |
 | [`class.rs`](class.rs) | The master classes (`+0x18`, an `i16`): the one definition of the class values. |
 | [`class_id.rs`](class_id.rs) | A master's class as one type: the group of masters the game treats alike (villagers, siege weapons, gates, farms), the value the `.dat` names `unit_class`. |
 | [`class_mask.rs`](class_mask.rs) | A set of classes as the game tests one: a bit mask over the classes below a bound. |

@@ -320,7 +320,7 @@ fn the_reach_is_the_truncated_range_about_the_truncated_place_within_the_map() {
 fn hitter() -> Hitter {
     Hitter {
         id: object_id(1),
-        blast_level: 1,
+        blast_level: BlastLevel::from_bits_retain(1),
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(0.4, 0.4),
     }
@@ -334,7 +334,7 @@ fn bystander() -> Bystander {
         kind: COMBAT,
         class: class::CLASS_6,
         state: ObjectState::Alive,
-        blast_defense: 1,
+        blast_defense: BlastDefense::new(1),
         position: Position::new(11.5, 10.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
     }
@@ -402,7 +402,7 @@ fn a_movement_damage_strikes_enemies_in_reach() {
     ));
     // the blast levels
     let high = Hitter {
-        blast_level: 3,
+        blast_level: BlastLevel::from_bits_retain(3),
         ..h
     };
     assert!(!struck(&high, Distance::new(1.0), &b));
@@ -410,18 +410,18 @@ fn a_movement_damage_strikes_enemies_in_reach() {
         &high,
         Distance::new(1.0),
         &Bystander {
-            blast_defense: 2,
+            blast_defense: BlastDefense::new(2),
             ..b
         }
     ));
     assert!(struck(
         &Hitter {
-            blast_level: 1,
+            blast_level: BlastLevel::from_bits_retain(1),
             ..h
         },
         Distance::new(1.0),
         &Bystander {
-            blast_defense: 1,
+            blast_defense: BlastDefense::new(1),
             ..b
         }
     ));

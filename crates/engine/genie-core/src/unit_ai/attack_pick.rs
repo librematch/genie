@@ -11,6 +11,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -187,7 +188,7 @@ pub struct Attacker {
     /// Its master's `area_effect_range` (`+0x82c`).
     pub area_effect: Distance,
     /// Its master's `area_effect_level` (`+0x830`).
-    pub blast_level: u8,
+    pub blast_level: BlastLevel,
     /// Its master's line of sight (`+0x5d0`).
     pub los: Distance,
     /// Its place.
@@ -537,7 +538,8 @@ pub(super) fn stance_reaches(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
 
 /// `FUN_14120e4e0` for an attacker of type 70: one of attack priority 3 attacks only
 /// [`PRIORITY_3_CLASSES`]; a ranged one (range above 1) with a blast (`+0x82c` above 0) whose
-/// `area_effect_level` has neither bit 2 nor 3 (`FUN_1410bf160`, `FUN_1410bfcb0`) scans the tiles
+/// `area_effect_level` has neither [`BlastLevel::SPARES_FRIENDS`] nor
+/// [`BlastLevel::SKIPS_FRIEND_CHECK`] (`FUN_1410bf160`, `FUN_1410bfcb0`) scans the tiles
 /// of the blast around the target for its own or allied objects (not modelled).
 pub(crate) fn spares_friends(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
     if me.attack_priority == AttackPriority::PRIORITY_3 && !PRIORITY_3_CLASSES.contains(&t.class) {
@@ -545,9 +547,9 @@ pub(crate) fn spares_friends(me: &Attacker, t: &Target) -> Result<bool, GenieErr
     }
     let ranged = Distance::new(1.0) < me.range;
     if ranged
-        && me.blast_level & 8 == 0
+        && !me.blast_level.contains(BlastLevel::SKIPS_FRIEND_CHECK)
         && Distance::ZERO < me.area_effect
-        && me.blast_level & 4 == 0
+        && !me.blast_level.contains(BlastLevel::SPARES_FRIENDS)
     {
         return Err(GenieError::unsupported(
             "a blast attacker's scan for friends near its target (FUN_14120e4e0)",

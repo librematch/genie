@@ -12,6 +12,7 @@ use crate::movement::Me;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
@@ -123,7 +124,7 @@ impl Unit {
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
             charge_type: master.map_or(0, |m| m.charge_type),
             area_effect: master.map_or(Distance::ZERO, |m| m.area_effect),
-            blast_level: master.map_or(0, |m| m.blast_level),
+            blast_level: master.map_or(BlastLevel::NONE, |m| m.blast_level),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
             position: self.position(),
             radius: master.map_or(Footprint::ZERO, |m| m.radius),

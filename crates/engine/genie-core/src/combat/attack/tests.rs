@@ -21,6 +21,8 @@ use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::SpriteFlags;
 use crate::objects::layers::Animated;
+use crate::objects::masters::BlastDefense;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionType;
@@ -747,7 +749,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
         player: PlayerId::new(2),
         position: at,
         radius: Footprint::new(0.5, 0.5),
-        blast_defense: 2,
+        blast_defense: BlastDefense::new(2),
         master_hp: 100,
         armored: Some(damage::Armored {
             armors: vec![ClassAmount::new(4, 0)],
@@ -904,7 +906,7 @@ fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
                 missile: None,
                 player: PlayerId::new(1),
                 area_effect: Distance::new(1.0),
-                blast_level: 2,
+                blast_level: BlastLevel::from_bits_retain(2),
                 area_damage: 0.5,
                 ..damage::Attacker::default()
             },

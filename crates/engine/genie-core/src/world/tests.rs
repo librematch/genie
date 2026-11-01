@@ -61,6 +61,7 @@ use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
@@ -14072,7 +14073,7 @@ fn on_side<R>(
                     min_range: Distance::ZERO,
                     charge_type: 0,
                     area_effect: Distance::ZERO,
-                    blast_level: 0,
+                    blast_level: BlastLevel::NONE,
                     los: Distance::new(4.0),
                     position: Position::new(10.0, 10.0, 0.0),
                     radius: Footprint::new(0.2, 0.2),

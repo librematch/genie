@@ -12,6 +12,8 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::BlastDefense;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
@@ -81,7 +83,7 @@ pub struct Bystander {
     /// Its state (`+0x640`).
     pub state: ObjectState,
     /// Its master's `area_effect_object_level` (`+0x62b`).
-    pub blast_defense: u8,
+    pub blast_defense: BlastDefense,
     /// Its place (`+0x3c8`, `+0x4c8`).
     pub position: Position,
     /// Its master's radii (`+0x5d8`, `+0x5dc`).
@@ -95,7 +97,7 @@ pub struct Hitter {
     /// The object.
     pub id: ObjectId,
     /// Its master's `area_effect_level` (`+0x830`).
-    pub blast_level: u8,
+    pub blast_level: BlastLevel,
     /// Its place.
     pub position: Position,
     /// Its master's radii.
@@ -118,7 +120,7 @@ pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander) -> bool {
     if ObjectState::Alive < b.state {
         return false;
     }
-    if !(ALWAYS_REACHED <= b.blast_defense || hitter.blast_level <= b.blast_defense) {
+    if !(ALWAYS_REACHED <= b.blast_defense || hitter.blast_level.reaches(b.blast_defense)) {
         return false;
     }
     let d2 = crate::movement::footprint_gap_squared(

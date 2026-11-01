@@ -2,6 +2,7 @@
 
 use crate::combat::missile::{SmartMode, VanishMode};
 use crate::map::Distance;
+use crate::objects::masters::BlastLevel;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
@@ -43,7 +44,7 @@ impl Master {
             a::BLAST_WIDTH => self.area_effect = Distance::new(v),
             a::BONUS_DAMAGE_RESISTANCE => self.resistance = v,
             a::FRAME_DELAY => self.fire_frame = low16(v),
-            a::BLAST_ATTACK_LEVEL => self.blast_level = low8(v),
+            a::BLAST_ATTACK_LEVEL => self.blast_level = BlastLevel::from_bits_retain(low8(v)),
             a::SHOWN_ATTACK => self.shown.attack = low16(v),
             a::SHOWN_RANGE => self.shown.range = Distance::new(v),
             a::SHOWN_MELEE_ARMOR => self.shown.melee_armor = low16(v),
@@ -118,7 +119,10 @@ impl Master {
             a::BLAST_WIDTH => self.area_effect += Distance::new(v),
             a::BONUS_DAMAGE_RESISTANCE => self.resistance += v,
             a::FRAME_DELAY => self.fire_frame = self.fire_frame.wrapping_add(low16(v)),
-            a::BLAST_ATTACK_LEVEL => self.blast_level = self.blast_level.wrapping_add(low8(v)),
+            a::BLAST_ATTACK_LEVEL => {
+                self.blast_level =
+                    BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_add(low8(v)));
+            }
             a::SHOWN_ATTACK => self.shown.attack = self.shown.attack.wrapping_add(low16(v)),
             a::SHOWN_RANGE => self.shown.range += Distance::new(v),
             a::SHOWN_MELEE_ARMOR => {
@@ -207,7 +211,10 @@ impl Master {
             a::BONUS_DAMAGE_RESISTANCE => self.resistance *= v,
             // integer products (`IMUL`) of the truncated amount
             a::FRAME_DELAY => self.fire_frame = self.fire_frame.wrapping_mul(low16(v)),
-            a::BLAST_ATTACK_LEVEL => self.blast_level = self.blast_level.wrapping_mul(low8(v)),
+            a::BLAST_ATTACK_LEVEL => {
+                self.blast_level =
+                    BlastLevel::from_bits_retain(self.blast_level.bits().wrapping_mul(low8(v)));
+            }
             a::SHOWN_ATTACK => self.shown.attack = self.shown.attack.wrapping_mul(low16(v)),
             a::SHOWN_RANGE => self.shown.range *= v,
             a::SHOWN_MELEE_ARMOR => {

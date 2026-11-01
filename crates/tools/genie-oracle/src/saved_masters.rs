@@ -29,6 +29,7 @@ use genie_core::objects::masters::VolleySpread;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
+use genie_core::objects::masters::{BlastDefense, BlastLevel};
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
@@ -205,7 +206,7 @@ pub(super) fn work_masters(
         work.disabled = s.disabled != 0;
         work.line_of_sight = Distance::new(s.los);
         work.capacity = s.attribute_max_amount;
-        work.blast_defense = s.area_effect_object_level;
+        work.blast_defense = BlastDefense::new(s.area_effect_object_level);
         if let Some(a) = action_part(m) {
             work.work_rate = WorkRate::new(a.work_rate);
             work.search_radius = Distance::new(a.search_radius);
@@ -279,7 +280,7 @@ pub(super) fn work_masters(
             work.reflection = rc.damage_reflection;
             work.friendly_fire = rc.friendly_fire_damage;
             work.area_effect = Distance::new(rc.area_effect_range);
-            work.blast_level = rc.area_effect_level;
+            work.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
             work.area_damage = rc.area_damage;
             work.garrison_firepower = rc.garrison_firepower;
         }

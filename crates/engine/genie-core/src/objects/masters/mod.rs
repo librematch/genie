@@ -362,11 +362,11 @@ pub struct Master {
     /// leading livestock shows it.
     pub special_sprite: Option<SpriteId>,
     /// `area_effect_object_level` (`+0x62b`): the blasts that reach it.
-    pub blast_defense: u8,
+    pub blast_defense: BlastDefense,
     /// `area_effect_range` (`+0x82c`): its blast's radius.
     pub area_effect: Distance,
     /// `area_effect_level` (`+0x830`).
-    pub blast_level: u8,
+    pub blast_level: BlastLevel,
     /// `area_damage` (`+0x834`).
     pub area_damage: f32,
     /// `max_charge` (`+0x918`).
@@ -594,6 +594,7 @@ pub struct Masters {
 pub mod action_type;
 mod attack_priority;
 pub mod attribute;
+mod blast_level;
 pub mod class;
 mod class_id;
 mod class_mask;
@@ -618,6 +619,7 @@ mod volley_spread;
 pub use self::action_type::ActionType;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
+pub use self::blast_level::{BlastDefense, BlastLevel};
 pub use self::class_id::ClassId;
 pub use self::class_mask::ClassMask;
 pub use self::combat_ability::CombatAbility;
