@@ -11,6 +11,8 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
+use crate::technology::ChangeMode;
+use crate::technology::DisabledTech;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER, MODE_WITHOUT_0X26D};
@@ -97,11 +99,10 @@ impl World {
         let t = t.index();
         let def = self.techs.checked(t)?;
         let state = &self.players.player(p)?.techs.checked(t)?;
-        let shared = |tech: i32| {
+        let shared = |tech: DisabledTech| {
             // FUN_1413d1020 tests the whole id
-            usize::try_from(tech)
-                .ok()
-                .and_then(|d| self.techs.get(d))
+            tech.whole()
+                .and_then(|d| self.techs.get(d.index()))
                 .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
         };
         // the player's own enable for one building and upgrade of the object (kinds 2 and 3),
@@ -332,13 +333,13 @@ impl World {
     pub(super) fn tech_cost(
         &mut self,
         p: PlayerId,
-        tech: i16,
+        tech: TechId,
         resource: Option<AttributeId>,
         amount: f32,
-        mode: u8,
+        mode: ChangeMode,
     ) -> Result<(), GenieError> {
         let tree = self.players.player(p)?.techs.len().min(self.techs.len());
-        let Some(t) = usize::try_from(tech).ok().filter(|&t| t < tree) else {
+        let Some(t) = Some(tech.index()).filter(|&t| t < tree) else {
             return Ok(());
         };
         let costs = self.techs.checked(t)?.costs;
@@ -348,13 +349,15 @@ impl World {
                 continue;
             }
             *adj = match mode {
-                2 => {
+                ChangeMode::SCALE => {
                     let half = if amount < 1.0 { -0.5 } else { 0.5 };
                     let delta = (amount - 1.0) * f32::from(cost.amount) + half;
                     adj.wrapping_add(crate::math::conversions::cvttss2si(delta) as i16)
                 }
                 // CVTTSS2SI's 32 bits, the low word added (0x1413d11a6, 0x1413d11be)
-                0 => (crate::math::conversions::cvttss2si(amount) as i16).wrapping_sub(cost.amount),
+                ChangeMode::SET => {
+                    (crate::math::conversions::cvttss2si(amount) as i16).wrapping_sub(cost.amount)
+                }
                 _ => adj.wrapping_add(crate::math::conversions::cvttss2si(amount) as i16),
             };
             if resource.is_some() {
@@ -373,11 +376,11 @@ impl World {
     pub(super) fn disable_tech(
         &mut self,
         p: PlayerId,
-        tech: i32,
+        tech: DisabledTech,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let count = self.players.player(p)?.techs.len().min(self.techs.len());
-        let held = usize::try_from(tech).ok().filter(|&t| t < count);
+        let held = tech.whole().map(TechId::index).filter(|&t| t < count);
         if held.is_some_and(|t| {
             self.techs
                 .get(t)
@@ -408,7 +411,7 @@ impl World {
             }
         };
         // FUN_1413cdb00 takes the id's low 16 bits (MOVZX EDX, BX in FUN_14163a500)
-        let short = tech as i16;
+        let short = tech.short();
         let states = &mut self.players.player_mut(p)?.techs;
         match usize::try_from(short).ok().filter(|&t| t < count) {
             Some(t) => disable(&self.techs, states, t),

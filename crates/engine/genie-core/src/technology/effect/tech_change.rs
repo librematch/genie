@@ -7,6 +7,9 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
+use crate::technology::ChangeMode;
+use crate::technology::ModifyLocation;
+use crate::technology::ModifyMode;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ONE, ROUND};
@@ -14,30 +17,27 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
-/// A tech effect's location above 0 that is no index.
-const BAD_LOCATION: GenieError =
-    GenieError::unreachable("a tech location above 0 that is not an index");
-
 /// The modes of `FUN_1415c3f20`'s technology change (kind 8) that change a cost, with the
 /// resource and the cost modifier's mode (`DAT_142ed71b0`'s map: 0 to 3 set food, wood, stone,
 /// gold; 0x4000 to 0x4003 add to them; 0xd to 0x10 multiply them, 0x11 every one).
-pub(super) const fn tech_cost_mode(mode: i16) -> Option<(Option<AttributeId>, u8)> {
+pub(super) const fn tech_cost_mode(mode: ModifyMode) -> Option<(Option<AttributeId>, ChangeMode)> {
+    let mode = mode.get();
     match mode {
-        0..=3 => Some((Some(AttributeId::numbered(mode)), 0)),
-        0x4000..=0x4003 => Some((Some(AttributeId::numbered(mode - 0x4000)), 1)),
-        0xd..=0x10 => Some((Some(AttributeId::numbered(mode - 0xd)), 2)),
-        0x11 => Some((None, 2)),
+        0..=3 => Some((Some(AttributeId::numbered(mode)), ChangeMode::SET)),
+        0x4000..=0x4003 => Some((Some(AttributeId::numbered(mode - 0x4000)), ChangeMode::ADD)),
+        0xd..=0x10 => Some((Some(AttributeId::numbered(mode - 0xd)), ChangeMode::SCALE)),
+        0x11 => Some((None, ChangeMode::SCALE)),
         _ => None,
     }
 }
 
 /// The modes that change a research time (`DAT_142f8f340`'s map: −1 sets, −2 adds, −3
 /// multiplies).
-pub(super) const fn tech_time_mode(mode: i16) -> Option<u8> {
-    match mode {
-        -1 => Some(0),
-        -2 => Some(1),
-        -3 => Some(2),
+pub(super) const fn tech_time_mode(mode: ModifyMode) -> Option<ChangeMode> {
+    match mode.get() {
+        -1 => Some(ChangeMode::SET),
+        -2 => Some(ChangeMode::ADD),
+        -3 => Some(ChangeMode::SCALE),
         _ => None,
     }
 }
@@ -67,13 +67,13 @@ impl World {
     pub(super) fn modify_tech(
         &mut self,
         p: PlayerId,
-        tech: i16,
-        mode: i16,
+        tech: TechId,
+        mode: ModifyMode,
         v: f32,
-        location: i16,
+        location: ModifyLocation,
     ) -> Result<(), GenieError> {
         let tree = self.players.player(p)?.techs.len();
-        let Some(tech_id) = TechId::of_data(tech).filter(|t| t.index() < tree) else {
+        let Some(tech_id) = Some(tech).filter(|t| t.index() < tree) else {
             return Ok(());
         };
         let Some((at, building)) = self.tech_location(p, tech_id, location)? else {
@@ -97,14 +97,12 @@ impl World {
         &mut self,
         p: PlayerId,
         t: TechId,
-        location: i16,
+        location: ModifyLocation,
     ) -> Result<Option<LocationAt>, GenieError> {
         let t = t.index();
         let (mut at, mut building) = (None, None);
-        if 0 < location {
+        if let Some(i) = location.entry() {
             let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
-            let i =
-                usize::try_from(location).map_err(|_| BAD_LOCATION.with("location", location))?;
             if i < state.locations.len() {
                 building = state.locations.checked(i)?.building;
                 at = Some(i);
@@ -131,14 +129,14 @@ impl World {
         &mut self,
         p: PlayerId,
         t: TechId,
-        (mode, v): (i16, f32),
+        (mode, v): (ModifyMode, f32),
         at: Option<usize>,
     ) -> Result<(), GenieError> {
         let (tech, t) = (t, t.index());
         let short = crate::math::conversions::cvttss2si(v) as i16;
         match mode {
-            4 => self.set_tech_building(p, tech, v, at)?,
-            5 => {
+            ModifyMode::BUILDING => self.set_tech_building(p, tech, v, at)?,
+            ModifyMode::BUTTON => {
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
                 for (i, l) in state.locations.iter_mut().enumerate() {
                     if at.is_none_or(|a| a == i) {
@@ -146,16 +144,18 @@ impl World {
                     }
                 }
             }
-            9 => self.players.player_mut(p)?.techs.checked_mut(t)?.stack = v != 0.0,
-            10 => {
+            ModifyMode::STACKING => {
+                self.players.player_mut(p)?.techs.checked_mut(t)?.stack = v != 0.0;
+            }
+            ModifyMode::RESEARCH_CAP => {
                 self.players
                     .player_mut(p)?
                     .techs
                     .checked_mut(t)?
                     .research_cap = short;
             }
-            12 => self.set_tech_state(p, tech, v)?,
-            18 => {
+            ModifyMode::STATE => self.set_tech_state(p, tech, v)?,
+            ModifyMode::EFFECT_OVERRIDE => {
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
                 state.effect_override = short;
                 if state.state == ResearchState::Researched {
@@ -250,13 +250,13 @@ impl World {
     pub(super) fn research_time(
         &mut self,
         p: PlayerId,
-        tech: i16,
+        tech: TechId,
         v: f32,
-        mode: u8,
+        mode: ChangeMode,
         location: Option<MasterId>,
     ) -> Result<(), GenieError> {
         let tree = self.players.player(p)?.techs.len();
-        let Some(tech_id) = TechId::of_data(tech).filter(|t| t.index() < tree) else {
+        let Some(tech_id) = Some(tech).filter(|t| t.index() < tree) else {
             return Ok(());
         };
         let t = tech_id.index();
@@ -295,7 +295,7 @@ impl World {
             };
             let short = |x: f32| f32::from(crate::math::conversions::cvttss2si(x) as i16);
             let adjustment = match mode {
-                2 => {
+                ChangeMode::SCALE => {
                     let half = if crate::math::fmath::below_or_unordered(v, ONE) {
                         -ROUND
                     } else {
@@ -303,7 +303,7 @@ impl World {
                     };
                     Seconds::new(short((v - ONE) * time + half)) + entry.adjustment
                 }
-                0 => {
+                ChangeMode::SET => {
                     let s = if v == NO_TIME {
                         0
                     } else {
@@ -316,7 +316,7 @@ impl World {
             entry.adjustment = adjustment;
             let done = state.state == ResearchState::Available
                 && adjustment + Seconds::new(time) <= state.research_done
-                && (mode != 0 || v != NO_TIME);
+                && (mode != ChangeMode::SET || v != NO_TIME);
             if done {
                 let _ = self.complete_research(p, tech_id, None)?;
             }

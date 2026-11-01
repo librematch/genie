@@ -7,6 +7,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::FARM_FOOD_AMOUNT;
+use crate::technology::DisabledTech;
 use crate::technology::{EffectCommand, Party};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -54,19 +55,21 @@ impl World {
         for c in effect {
             match *c {
                 EffectCommand::TechCost {
-                    tech,
+                    tech: Some(tech),
                     resource,
                     amount,
                     mode,
                 } => self.tech_cost(p, tech, resource, amount, mode)?,
                 EffectCommand::TechDisable { tech } => {
-                    if tech != -1 {
+                    if tech != DisabledTech::NONE {
                         self.disable_tech(p, tech, object)?;
                     }
                 }
-                EffectCommand::TechTime { tech, amount, mode } => {
-                    self.research_time(p, tech, amount, mode, None)?;
-                }
+                EffectCommand::TechTime {
+                    tech: Some(tech),
+                    amount,
+                    mode,
+                } => self.research_time(p, tech, amount, mode, None)?,
                 _ => {}
             }
         }
@@ -243,6 +246,9 @@ impl World {
                 amount,
                 location,
             } => {
+                let Some(tech) = tech else {
+                    return Ok(());
+                };
                 for q in self.party(p, party) {
                     self.modify_tech(q, tech, mode, amount, location)?;
                 }

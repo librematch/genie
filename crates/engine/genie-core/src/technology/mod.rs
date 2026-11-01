@@ -15,6 +15,7 @@ use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
+mod command_args;
 pub mod effect;
 mod effect_command;
 mod research_state;
@@ -22,6 +23,7 @@ mod tech_id;
 mod tech_type;
 pub mod upgrade;
 
+pub use self::command_args::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode};
 pub use self::effect_command::{
     CostEdit, CostUnits, EffectCommand, ObjectsKind, Party, ResourceChange,
 };

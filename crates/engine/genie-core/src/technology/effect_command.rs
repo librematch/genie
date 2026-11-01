@@ -9,6 +9,7 @@ use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::players::attribute::AttributeId;
 use crate::technology::effect::Change;
+use crate::technology::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode, TechId};
 
 /// The `TRIBE_Effects` command kinds that change technologies (`'e'`, `'f'`, `'g'`): a cost, the
 /// disabling and a research time.
@@ -232,44 +233,44 @@ pub enum EffectCommand {
     Tech {
         /// The block's players.
         party: Party,
-        /// The first argument.
-        tech: i16,
+        /// The first argument (a negative one is none).
+        tech: Option<TechId>,
         /// The second.
-        mode: i16,
+        mode: ModifyMode,
         /// The fourth.
         amount: f32,
         /// The third.
-        location: i16,
+        location: ModifyLocation,
     },
     /// The objects' kinds (200 to 206).
     Objects(ObjectsKind),
     /// `'e'`: technology `tech`'s cost of `resource` (any for none) by `amount` in `mode` (the
     /// third argument's low byte).
     TechCost {
-        /// The first argument.
-        tech: i16,
+        /// The first argument (a negative one is none).
+        tech: Option<TechId>,
         /// The second (−1 for any).
         resource: Option<AttributeId>,
         /// The fourth.
         amount: f32,
         /// The third argument's low byte.
-        mode: u8,
+        mode: ChangeMode,
     },
     /// `'f'`: the technology the amount names (CVTTSS2SI) disabled; −1 disables none. The
     /// shared kind's test reads the whole number, the disabling its low 16 bits.
     TechDisable {
         /// The fourth argument as CVTTSS2SI gives it.
-        tech: i32,
+        tech: DisabledTech,
     },
     /// `'g'`: technology `tech`'s research time by `amount` in `mode` (the third argument's low
     /// byte).
     TechTime {
-        /// The first argument.
-        tech: i16,
+        /// The first argument (a negative one is none).
+        tech: Option<TechId>,
         /// The fourth.
         amount: f32,
         /// The third argument's low byte.
-        mode: u8,
+        mode: ChangeMode,
     },
     /// A kind neither switch knows (9, 19, 29, 39, 49 and up but the ones above): nothing.
     Inert(u8),
@@ -288,16 +289,18 @@ impl EffectCommand {
         let low = |v: i16| v.to_le_bytes()[0];
         Ok(match kind {
             TECH_COST => Self::TechCost {
-                tech: a,
+                tech: TechId::of_data(a),
                 resource: AttributeId::of_field(b)?,
                 amount: d,
-                mode: low(c),
+                mode: ChangeMode::of_data(low(c)),
             },
-            TECH_DISABLE => Self::TechDisable { tech: cvttss2si(d) },
+            TECH_DISABLE => Self::TechDisable {
+                tech: DisabledTech::of_data(cvttss2si(d)),
+            },
             TECH_TIME => Self::TechTime {
-                tech: a,
+                tech: TechId::of_data(a),
                 amount: d,
-                mode: low(c),
+                mode: ChangeMode::of_data(low(c)),
             },
             kind::OBJECTS_SET..kind::OBJECT_SET => {
                 Self::Objects(ObjectsKind::OwnMasters(change_of(kind - kind::OBJECTS_SET)))
@@ -380,10 +383,10 @@ impl EffectCommand {
             },
             kind::TECH => Self::Tech {
                 party,
-                tech: a,
-                mode: b,
+                tech: TechId::of_data(a),
+                mode: ModifyMode::of_data(b),
                 amount: d,
-                location: c,
+                location: ModifyLocation::of_data(c),
             },
             _ => Self::Inert(kind),
         })
@@ -403,6 +406,9 @@ const fn change_of(offset: u8) -> Change {
 mod tests {
     use crate::objects::masters::{ClassId, MasterAttribute};
     use crate::players::attribute::AttributeId;
+    use crate::technology::ChangeMode;
+    use crate::technology::DisabledTech;
+    use crate::technology::TechId;
     use crate::technology::effect::Change;
     use crate::technology::{
         CostEdit, CostUnits, EffectCommand, ObjectsKind, Party, ResourceChange,
@@ -528,15 +534,17 @@ mod tests {
         assert_eq!(
             parse(b'e', 7, -1, 0x0102, 3.0),
             EffectCommand::TechCost {
-                tech: 7,
+                tech: TechId::of_data(7),
                 resource: None,
                 amount: 3.0,
-                mode: 2,
+                mode: ChangeMode::SCALE,
             }
         );
         assert_eq!(
             parse(b'f', -1, -1, -1, 65538.0),
-            EffectCommand::TechDisable { tech: 65538 }
+            EffectCommand::TechDisable {
+                tech: DisabledTech::of_data(65538)
+            }
         );
         assert_eq!(
             [200, 202, 203, 205, 206].map(|k| parse(k, -1, -1, 0, 1.0)),

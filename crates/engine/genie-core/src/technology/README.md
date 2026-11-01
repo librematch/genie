@@ -18,6 +18,7 @@ the player's masters, resources or other technologies.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`command_args.rs`](command_args.rs) | The arguments of the technology commands: how a cost or a research time changes (`ChangeMode`), what kind 8 changes (`ModifyMode`) and at which location (`ModifyLocation`), and the technology a disable names (`DisabledTech`). |
 | [`effect_command.rs`](effect_command.rs) | An effect's commands by kind: the `.dat`'s 12 bytes each (a kind and four arguments) as `TRIBE_Effects::do_effect` (`FUN_141462440`) and its base (`FUN_140ec2ac0`) read them, parsed once where the `.dat` is read. |
 | [`mod.rs`](mod.rs) | Technologies and upgrades: the players' technologies, a research's effects and an object's upgrade to another master. |
 | [`research_state.rs`](research_state.rs) | A player's technology's state: whether it may be researched, is being researched or is researched. |
