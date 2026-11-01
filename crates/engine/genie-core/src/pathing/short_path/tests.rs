@@ -49,8 +49,8 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
 const RUN_0: Run = Run {
     poly: PolyIndex::of(0),
     dir: WalkDir::Forward,
-    lo: 0,
-    hi: 0,
+    lo: VertexIndex::FIRST,
+    hi: VertexIndex::FIRST,
 };
 
 /// A node's index is its place in the arena, the start's 0; a goal node beats only a cheaper
@@ -80,6 +80,32 @@ fn a_node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
     // a goal node the arena does not hold fails
     s.goal_node = Some(NodeIndex::new(7));
     assert!(s.beats_goal(FixedDistance::ZERO).is_err());
+}
+
+/// A vertex index steps round its polygon (`next_in`, `prev_in`) or along its list (`succ`,
+/// `pred`), and reads the polygon's columns.
+#[test]
+fn a_vertex_index_steps_round_its_polygon_and_reads_its_columns() {
+    let (first, last) = (VertexIndex::FIRST, VertexIndex::new(3));
+    assert_eq!((last.next_in(4), first.prev_in(4)), (first, last));
+    assert_eq!(
+        (first.next_in(4), last.prev_in(4)),
+        (VertexIndex::new(1), VertexIndex::new(2))
+    );
+    assert_eq!(
+        (last.succ(), last.pred()),
+        (VertexIndex::new(4), VertexIndex::new(2))
+    );
+    assert!(first < last && last.get() == 3);
+    let mut poly = square(false);
+    assert_eq!(poly.count(), 4);
+    assert_eq!(poly.vertex(VertexIndex::new(2)).unwrap(), poly.vertices[2]);
+    assert_eq!(poly.side(VertexIndex::new(1)).unwrap(), poly.sides[1]);
+    assert_eq!(poly.shape(last).unwrap(), poly.shapes[3]);
+    assert_eq!(poly.cost(first).unwrap(), poly.costs[0]);
+    *poly.cost_mut(first).unwrap() = FixedDistance::TILE;
+    assert_eq!(poly.costs[0], FixedDistance::TILE);
+    assert!(poly.vertex(last.succ()).is_err());
 }
 
 /// A polygon's index is its place in the search's list.
@@ -667,15 +693,33 @@ fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
         )
     };
     let poly = square(false);
-    assert_eq!(edge(&poly, FixedPoint::new(2 * ONE, 0), 0), Some(0));
-    assert_eq!(edge(&poly, FixedPoint::new(4 * ONE, 2 * ONE), 1), Some(1));
-    assert_eq!(edge(&poly, FixedPoint::new(2 * ONE, 4 * ONE), 2), Some(2));
-    assert_eq!(edge(&poly, FixedPoint::new(0, 2 * ONE), 3), Some(3));
+    assert_eq!(
+        edge(&poly, FixedPoint::new(2 * ONE, 0), 0),
+        Some(VertexIndex::new(0))
+    );
+    assert_eq!(
+        edge(&poly, FixedPoint::new(4 * ONE, 2 * ONE), 1),
+        Some(VertexIndex::new(1))
+    );
+    assert_eq!(
+        edge(&poly, FixedPoint::new(2 * ONE, 4 * ONE), 2),
+        Some(VertexIndex::new(2))
+    );
+    assert_eq!(
+        edge(&poly, FixedPoint::new(0, 2 * ONE), 3),
+        Some(VertexIndex::new(3))
+    );
     assert_eq!(edge(&poly, FixedPoint::new(2 * ONE, 0), 1), None);
     assert_eq!(edge(&poly, FixedPoint::new(2 * ONE, 2 * ONE), 0), None);
     let run = square(true);
-    assert_eq!(edge(&run, FixedPoint::new(3 * ONE, 0), 0), Some(0));
-    assert_eq!(edge(&run, FixedPoint::new(4 * ONE, 2 * ONE), 1), Some(2));
+    assert_eq!(
+        edge(&run, FixedPoint::new(3 * ONE, 0), 0),
+        Some(VertexIndex::new(0))
+    );
+    assert_eq!(
+        edge(&run, FixedPoint::new(4 * ONE, 2 * ONE), 1),
+        Some(VertexIndex::new(2))
+    );
     assert_eq!(
         Search::edge_holding(
             &poly,
@@ -697,7 +741,10 @@ fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
     assert_eq!(edge(&empty, FixedPoint::new(2 * ONE, 0), 0), None);
     let mut corner = square(false);
     corner.shapes[2] = Some(ShapeId::new(1));
-    assert_eq!(edge(&corner, FixedPoint::new(4 * ONE, 4 * ONE), 0), Some(2));
+    assert_eq!(
+        edge(&corner, FixedPoint::new(4 * ONE, 4 * ONE), 0),
+        Some(VertexIndex::new(2))
+    );
 }
 
 /// `FUN_140fa77b0`'s vertex test: the vertex at the point, of a shape whose overlap with the

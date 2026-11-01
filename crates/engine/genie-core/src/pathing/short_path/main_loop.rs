@@ -4,8 +4,8 @@ use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
     Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, NUDGES, Node, NodeIndex,
     OPEN_CORNER_WITHOUT_EMIT, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, ShortPath, T_START,
-    TO_FIXED, TO_FLOAT, UNSET, WalkDir, cheb, corner_emits, float_distance, in_box, isqrt,
-    through_float,
+    TO_FIXED, TO_FLOAT, UNSET, VertexIndex, WalkDir, cheb, corner_emits, float_distance, in_box,
+    isqrt, through_float,
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -82,18 +82,23 @@ impl Search<'_> {
     /// The re-walk of a polygon from edge `e` (0x140fa63d4..0x140fa6639): backward from `v[e]`,
     /// forward from `v[e + 1]`, the forward side on equal costs, each while its cost stays below
     /// the vertex's; vertices no corner node reached are passed over.
-    pub(super) fn rewalk(&mut self, n: Node, pi: PolyIndex, e: u32) -> Result<(), GenieError> {
+    pub(super) fn rewalk(
+        &mut self,
+        n: Node,
+        pi: PolyIndex,
+        e: VertexIndex,
+    ) -> Result<(), GenieError> {
         let p = n.at;
         let poly = self.poly(pi)?;
-        let m = poly.vertices.len() as u32;
-        let next0 = (e + 1) % m;
+        let m = poly.count();
+        let next0 = e.next_in(m);
         let mut bv = e;
         let mut fv = next0;
-        let mut gb = cheb(*poly.vertices.checked(e as usize)?, p).wrapping_add(n.g);
-        let mut gf = cheb(*poly.vertices.checked(next0 as usize)?, p).wrapping_add(n.g);
+        let mut gb = cheb(poly.vertex(e)?, p).wrapping_add(n.g);
+        let mut gf = cheb(poly.vertex(next0)?, p).wrapping_add(n.g);
         let alive = |cost: FixedDistance, g: FixedDistance| g < cost || cost == UNSET;
-        let mut alive_b = alive(*poly.costs.checked(e as usize)?, gb);
-        let mut alive_f = alive(*poly.costs.checked(next0 as usize)?, gf);
+        let mut alive_b = alive(poly.cost(e)?, gb);
+        let mut alive_f = alive(poly.cost(next0)?, gf);
         let walk = Rewalk {
             parent: n.idx,
             poly: pi,
@@ -122,21 +127,21 @@ impl Search<'_> {
         &mut self,
         walk: &Rewalk,
         poly: &Poly,
-        (at, g): (u32, FixedDistance),
-        (dir, lo, hi): (WalkDir, u32, u32),
+        (at, g): (VertexIndex, FixedDistance),
+        (dir, lo, hi): (WalkDir, VertexIndex, VertexIndex),
     ) -> Result<(), GenieError> {
         let m = walk.count;
-        let v = *poly.vertices.checked(at as usize)?;
-        let sp = *poly.sides.checked(((at + m - 1) % m) as usize)?;
-        let sn = *poly.sides.checked(at as usize)?;
-        let sh = *poly.shapes.checked(at as usize)?;
+        let v = poly.vertex(at)?;
+        let sp = poly.side(at.prev_in(m))?;
+        let sn = poly.side(at)?;
+        let sh = poly.shape(at)?;
         let run = Run {
             poly: walk.poly,
             dir,
             lo,
             hi,
         };
-        if *poly.costs.checked(at as usize)? != UNSET
+        if poly.cost(at)? != UNSET
             && !self.goal_test(Corner {
                 cost: g,
                 parent: walk.parent,
@@ -157,7 +162,7 @@ impl Search<'_> {
             };
             let node = self.add(g, walk.parent, v, kind);
             self.push(node);
-            *self.poly_mut(walk.poly)?.costs.checked_mut(at as usize)? = g;
+            *self.poly_mut(walk.poly)?.cost_mut(at)? = g;
         }
         Ok(())
     }
@@ -169,22 +174,23 @@ impl Search<'_> {
         &self,
         walk: &Rewalk,
         poly: &Poly,
-        (from, g): (u32, FixedDistance),
+        (from, g): (VertexIndex, FixedDistance),
         forward: bool,
-    ) -> Result<(u32, FixedDistance, bool), GenieError> {
+    ) -> Result<(VertexIndex, FixedDistance, bool), GenieError> {
         let m = walk.count;
-        let costs = &self.poly(walk.poly)?.costs;
+        // the costs as the search holds them, the vertices from the walk's copy
+        let costs = self.poly(walk.poly)?;
         let (mut vi, mut g) = (from, g);
-        let mut at = *poly.vertices.checked(from as usize)?;
+        let mut at = poly.vertex(from)?;
         loop {
             vi = if forward {
-                (vi + 1) % m
+                vi.next_in(m)
             } else {
-                (m - 1 + vi) % m
+                vi.prev_in(m)
             };
-            let w = *poly.vertices.checked(vi as usize)?;
+            let w = poly.vertex(vi)?;
             g = g.wrapping_add(cheb(at, w));
-            let cost = *costs.checked(vi as usize)?;
+            let cost = costs.cost(vi)?;
             at = w;
             if cost != UNSET {
                 return Ok((vi, g, g < cost));
@@ -341,19 +347,19 @@ impl Search<'_> {
                     ..
                 } => {
                     pts.push(node.at);
-                    let v = &self.poly(poly)?.vertices;
-                    let n = v.len() as u32;
+                    let v = self.poly(poly)?;
+                    let n = v.count();
                     if dir == WalkDir::Backward {
                         let mut k = lo;
                         while k != hi {
-                            pts.push(*v.checked(k as usize)?);
-                            k = (k + 1) % n;
+                            pts.push(v.vertex(k)?);
+                            k = k.next_in(n);
                         }
                     } else {
                         let mut k = hi;
                         while k != lo {
-                            k = (k + n - 1) % n;
-                            pts.push(*v.checked(k as usize)?);
+                            k = k.prev_in(n);
+                            pts.push(v.vertex(k)?);
                         }
                     }
                 }

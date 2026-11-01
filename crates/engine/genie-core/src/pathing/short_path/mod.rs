@@ -11,6 +11,7 @@ use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
+use crate::world::slots::CheckedIndex;
 
 mod axis_dir;
 mod call;
@@ -257,8 +258,48 @@ impl PolyIndex {
 struct Run {
     poly: PolyIndex,
     dir: WalkDir,
-    lo: u32,
-    hi: u32,
+    lo: VertexIndex,
+    hi: VertexIndex,
+}
+
+/// A vertex's place in its polygon's columns (the vertices, their sides, shapes and costs):
+/// a run's ends, a held edge's start, a walk's corner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct VertexIndex(u32);
+
+impl VertexIndex {
+    /// The polygon's first vertex.
+    const FIRST: Self = Self(0);
+
+    /// Vertex `i`.
+    const fn new(i: u32) -> Self {
+        Self(i)
+    }
+
+    /// The place as a slice index.
+    const fn get(self) -> usize {
+        self.0 as usize
+    }
+
+    /// The vertex after it round a polygon of `count` vertices: `(i + 1) % count`.
+    const fn next_in(self, count: u32) -> Self {
+        Self((self.0 + 1) % count)
+    }
+
+    /// The vertex before it round a polygon of `count` vertices: `(i + count - 1) % count`.
+    const fn prev_in(self, count: u32) -> Self {
+        Self((self.0 + count - 1) % count)
+    }
+
+    /// The next place along the polygon's list, past its end too (a walk's forward end).
+    const fn succ(self) -> Self {
+        Self(self.0 + 1)
+    }
+
+    /// The place before it along the polygon's list (a walk's backward end, never the first).
+    const fn pred(self) -> Self {
+        Self(self.0 - 1)
+    }
 }
 
 /// The direction of a walk round a polygon's vertices (a corner node's, a goal candidate's):
@@ -325,6 +366,38 @@ struct Poly {
     shapes: Vec<Option<ShapeId>>,
     costs: Vec<FixedDistance>,
     flag: bool,
+}
+
+impl Poly {
+    /// The vertex count, as the game's 32 bits.
+    const fn count(&self) -> u32 {
+        self.vertices.len() as u32
+    }
+
+    /// Vertex `i`'s point.
+    fn vertex(&self, i: VertexIndex) -> Result<FixedPoint, GenieError> {
+        self.vertices.checked(i.get()).copied()
+    }
+
+    /// The side from vertex `i` to the next.
+    fn side(&self, i: VertexIndex) -> Result<ShapeSide, GenieError> {
+        self.sides.checked(i.get()).copied()
+    }
+
+    /// Vertex `i`'s shape, none on the bounds' border.
+    fn shape(&self, i: VertexIndex) -> Result<Option<ShapeId>, GenieError> {
+        self.shapes.checked(i.get()).copied()
+    }
+
+    /// The best cost a corner node reached vertex `i` with, [`UNSET`] for none yet.
+    fn cost(&self, i: VertexIndex) -> Result<FixedDistance, GenieError> {
+        self.costs.checked(i.get()).copied()
+    }
+
+    /// The best cost at vertex `i`, to change.
+    fn cost_mut(&mut self, i: VertexIndex) -> Result<&mut FixedDistance, GenieError> {
+        self.costs.checked_mut(i.get())
+    }
 }
 
 /// One search's state (the pather's arrays at `+0x08`..`+0x80`).

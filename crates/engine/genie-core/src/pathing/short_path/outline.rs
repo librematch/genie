@@ -8,7 +8,8 @@ use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
     Corner, Emit, FixedPoint, Foot, Kind, NodeIndex, Poly, PolyIndex, Run, Search, TRACE_STEPS,
-    UNSET, WalkDir, cheb, clamp_to_box, contact_point, corner_emits, in_box, inside, shrunk_corner,
+    UNSET, VertexIndex, WalkDir, cheb, clamp_to_box, contact_point, corner_emits, in_box, inside,
+    shrunk_corner,
 };
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -301,7 +302,7 @@ impl Search<'_> {
         mesh: &Mesh,
         shape: Option<ShapeId>,
         d: FixedDistance,
-    ) -> Option<u32> {
+    ) -> Option<VertexIndex> {
         let shape = shape?;
         let n = poly.vertices.len() as u32;
         if n == 0 {
@@ -335,7 +336,7 @@ impl Search<'_> {
                 || (side == s_cur
                     && Self::on_edge(s_cur, (vc, *v.get(nxt as usize)?), p, (prev, s_i)))
             {
-                return Some(cur);
+                return Some(VertexIndex::new(cur));
             }
             i = nxt + 1;
             prev = s_cur;
@@ -471,21 +472,25 @@ impl Search<'_> {
         parent: NodeIndex,
     ) -> Result<(), GenieError> {
         let poly = self.poly(pi)?.clone();
-        let v = &poly.vertices;
-        let n = v.len() as u32;
-        let last = n - 1;
+        let n = poly.count();
         let walk = NewWalk { poly: pi, parent };
         let (mut cb, mut cf) = self.walk_new_start(&walk, &poly, p, g0)?;
-        let mut bi = last;
-        let mut fi: u32 = 0;
-        if bi == 0 {
+        let mut bi = VertexIndex::new(n - 1);
+        let mut fi = VertexIndex::FIRST;
+        if bi == VertexIndex::FIRST {
             return Ok(());
         }
         loop {
             if cb < cf {
-                let vv = *v.checked(bi as usize)?;
-                self.walk_new_corner(&walk, &poly, (bi, bi - 1), cb, (WalkDir::Backward, bi, 0))?;
-                let w = *v.checked((bi - 1) as usize)?;
+                let vv = poly.vertex(bi)?;
+                self.walk_new_corner(
+                    &walk,
+                    &poly,
+                    (bi, bi.pred()),
+                    cb,
+                    (WalkDir::Backward, bi, VertexIndex::FIRST),
+                )?;
+                let w = poly.vertex(bi.pred())?;
                 let dx = vv.x() - w.x();
                 self.foot_test(Foot {
                     start: vv,
@@ -494,25 +499,25 @@ impl Search<'_> {
                     run: Run {
                         poly: pi,
                         dir: WalkDir::Backward,
-                        lo: bi - 1,
-                        hi: 0,
+                        lo: bi.pred(),
+                        hi: VertexIndex::FIRST,
                     },
                     start_cost: cb,
                     parent,
                 })?;
                 cb = cb.wrapping_add(cheb(vv, w));
-                bi -= 1;
+                bi = bi.pred();
             } else {
-                let vv = *v.checked(fi as usize)?;
+                let vv = poly.vertex(fi)?;
                 self.walk_new_corner(
                     &walk,
                     &poly,
-                    (fi, (n - 1 + fi) % n),
+                    (fi, fi.prev_in(n)),
                     cf,
-                    (WalkDir::Forward, 0, fi),
+                    (WalkDir::Forward, VertexIndex::FIRST, fi),
                 )?;
-                fi += 1;
-                let w = *v.checked(fi as usize)?;
+                fi = fi.succ();
+                let w = poly.vertex(fi)?;
                 let dx = vv.x() - w.x();
                 self.foot_test(Foot {
                     start: vv,
@@ -521,7 +526,7 @@ impl Search<'_> {
                     run: Run {
                         poly: pi,
                         dir: WalkDir::Forward,
-                        lo: 0,
+                        lo: VertexIndex::FIRST,
                         hi: fi,
                     },
                     start_cost: cf,
@@ -545,9 +550,8 @@ impl Search<'_> {
         p: FixedPoint,
         g0: FixedDistance,
     ) -> Result<(FixedDistance, FixedDistance), GenieError> {
-        let v = &poly.vertices;
-        let last = v.len() - 1;
-        let (vb, vf) = (*v.checked(last)?, *v.checked(0)?);
+        let last = VertexIndex::new(poly.count() - 1);
+        let (vb, vf) = (poly.vertex(last)?, poly.vertex(VertexIndex::FIRST)?);
         let (dxb, dyb) = (vb.x() - p.x(), vb.y() - p.y());
         let (dxf, dyf) = (vf.x() - p.x(), vf.y() - p.y());
         self.foot_test(Foot {
@@ -557,8 +561,8 @@ impl Search<'_> {
             run: Run {
                 poly: walk.poly,
                 dir: WalkDir::Backward,
-                lo: last as u32,
-                hi: 0,
+                lo: last,
+                hi: VertexIndex::FIRST,
             },
             start_cost: g0,
             parent: walk.parent,
@@ -570,8 +574,8 @@ impl Search<'_> {
             run: Run {
                 poly: walk.poly,
                 dir: WalkDir::Forward,
-                lo: 0,
-                hi: 0,
+                lo: VertexIndex::FIRST,
+                hi: VertexIndex::FIRST,
             },
             start_cost: g0,
             parent: walk.parent,
@@ -595,14 +599,14 @@ impl Search<'_> {
         &mut self,
         walk: &NewWalk,
         poly: &Poly,
-        (at, before): (u32, u32),
+        (at, before): (VertexIndex, VertexIndex),
         g: FixedDistance,
-        (dir, lo, hi): (WalkDir, u32, u32),
+        (dir, lo, hi): (WalkDir, VertexIndex, VertexIndex),
     ) -> Result<(), GenieError> {
-        let vv = *poly.vertices.checked(at as usize)?;
-        let sp = *poly.sides.checked(before as usize)?;
-        let sn = *poly.sides.checked(at as usize)?;
-        let sh = *poly.shapes.checked(at as usize)?;
+        let vv = poly.vertex(at)?;
+        let sp = poly.side(before)?;
+        let sn = poly.side(at)?;
+        let sh = poly.shape(at)?;
         let run = Run {
             poly: walk.poly,
             dir,
@@ -630,7 +634,7 @@ impl Search<'_> {
             self.push(node);
             let pm = self.poly_mut(walk.poly)?;
             pm.flag = true;
-            *pm.costs.checked_mut(at as usize)? = g;
+            *pm.cost_mut(at)? = g;
         }
         Ok(())
     }
