@@ -380,7 +380,7 @@ fn the_top_action_s_object_is_its_target_unless_it_has_none() {
     use crate::construction::build::BuildTask;
     let task = BuildTask {
         range: Distance::new(0.1),
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
@@ -447,7 +447,7 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
         Distance::ZERO,
         crate::construction::build::BuildTask {
             range: Distance::new(0.1),
-            work_value: 1.0,
+            work_value: crate::objects::masters::WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),

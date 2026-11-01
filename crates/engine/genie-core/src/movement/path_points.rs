@@ -239,8 +239,6 @@ pub struct Planning<'a> {
     pub computer: bool,
     /// The Object stream (`DAT_143f07160`), which a long new path's repath time draws from.
     pub object: &'a mut Well512,
-    /// The owner's construction rate (attribute 195), which a builder's work reads.
-    pub construction_rate: f32,
     /// The world's unit groups as they are now, which the long pather reads for a unit in a
     /// group (its group's differentiator units, `FUN_140f9eb70`).
     pub groups: &'a crate::groups::UnitGroups,
@@ -254,7 +252,6 @@ impl Planning<'_> {
             now: self.now,
             computer: self.computer,
             object: &mut *self.object,
-            construction_rate: self.construction_rate,
             groups: self.groups,
         }
     }

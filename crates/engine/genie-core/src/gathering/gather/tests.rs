@@ -35,7 +35,7 @@ fn reads() -> GatherReads {
     GatherReads {
         work_rate: WorkRate::new(0.31),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
         sprites: HuntSprites::default(),
         class: class::VILLAGER,
         defaults: MoveDefaults::default(),
@@ -43,7 +43,7 @@ fn reads() -> GatherReads {
         stance: UnitStance::AGGRESSIVE,
         farm_stops: false,
         computer: false,
-        stop_productivity: 1.0,
+        stop_productivity: Amount::new(1.0),
         food_sold: 0.0,
     }
 }
@@ -193,7 +193,7 @@ fn task() -> HuntTask {
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         productivity: None,
         kind4: None,
     }
@@ -221,7 +221,7 @@ const fn rate() -> StopRate {
     StopRate {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
     }
 }
 
@@ -286,7 +286,7 @@ fn under_the_farm_setting_a_farm_s_gather_goes_in_four_timed_stops() {
     let rate = StopRate {
         work_rate: WorkRate::new(0.33),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
     };
     let g = GatherAction::new(task(), &farm(), true, rate).unwrap();
     assert_eq!(

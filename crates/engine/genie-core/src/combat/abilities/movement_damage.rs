@@ -209,8 +209,8 @@ impl World {
                         continue;
                     }
                     self.players[p].objects[i].abilities.movement_damage_timer =
-                        Seconds::new(task.work_val2);
-                    self.movement_hit(b, owner, HitPoints::new(task.work_val1))?;
+                        Seconds::new(task.work_val2.get());
+                    self.movement_hit(b, owner, HitPoints::new(task.work_val1.get()))?;
                 }
             }
         }

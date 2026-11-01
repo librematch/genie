@@ -83,7 +83,7 @@ pub fn generates(
 /// in that order (`MULSS`, `MULSS`).
 #[must_use]
 pub fn generated(dt: Seconds, task: &Task, multiplier: Amount) -> Amount {
-    Amount::new(dt.get() * task.work_val1 * multiplier.get())
+    Amount::new(dt.get() * task.work_val1.get() * multiplier.get())
 }
 
 /// The player's store of what its generation tasks made (`player+0x658`): `amount` above 0 (not

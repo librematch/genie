@@ -385,7 +385,6 @@ impl Fixture {
             now: WorldTime::from_millis(100),
             computer: false,
             object: &mut self.object,
-            construction_rate: 0.0,
             groups: &self.groups,
         };
         let mut world = StepWorld {
@@ -513,7 +512,6 @@ impl Fixture {
             now: WorldTime::from_millis(100),
             computer: false,
             object: &mut self.object,
-            construction_rate: 0.0,
             groups: &self.groups,
         };
         let mut world = StepWorld {
@@ -970,7 +968,6 @@ impl Fixture {
             now: WorldTime::from_millis(100),
             computer: false,
             object: &mut self.object,
-            construction_rate: 0.0,
             groups: &self.groups,
         };
         let mut world = StepWorld {
@@ -1168,7 +1165,6 @@ fn the_members_centre_pulls_a_group_whose_members_all_act() {
             now: WorldTime::from_millis(100),
             computer: false,
             object: &mut fx.object,
-            construction_rate: 0.0,
             groups: &fx.groups,
         };
         let mut world = StepWorld {

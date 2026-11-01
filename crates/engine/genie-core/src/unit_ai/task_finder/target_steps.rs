@@ -218,7 +218,7 @@ pub(super) fn repair_finding<'m>(
         }
         match by_class {
             None if any.is_some() => return Finding::Answer(any),
-            Some(task) if 0.0 < task.work_val1 => return Finding::Answer(Some(task)),
+            Some(task) if task.work_val1.positive() => return Finding::Answer(Some(task)),
             _ => {}
         }
         if filter == Some(crate::construction::repair::REPAIR) {
@@ -244,7 +244,7 @@ fn build_task<'m>(
         .filter(|t| t.action_type == action_type::BUILD && wanted(filter, t))
     {
         if task.object_id == Some(t.master.id) {
-            return (0.0 < task.work_val1).then_some(task);
+            return (task.work_val1.positive()).then_some(task);
         }
         if task.for_class(t.master.class) {
             by_class = Some(task);
@@ -253,5 +253,5 @@ fn build_task<'m>(
             generic = Some(task);
         }
     }
-    by_class.map_or(generic, |task| (0.0 < task.work_val1).then_some(task))
+    by_class.map_or(generic, |task| (task.work_val1.positive()).then_some(task))
 }

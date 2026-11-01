@@ -213,7 +213,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         productivity: None,
         kind4: None,
     };
@@ -232,7 +232,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     let rate = crate::gathering::gather::StopRate {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
     };
     let gather = add(Unit {
         id: object_id(30),
@@ -243,7 +243,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     });
     let build_task = crate::construction::build::BuildTask {
         range: Distance::ZERO,
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
@@ -263,7 +263,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     });
     let repair_task = crate::construction::repair::RepairTask {
         id: TaskId::test(0),
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         moving: None,
         proceeding: None,
     };
@@ -387,7 +387,7 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
                 range: Distance::ZERO,
                 resource: None,
                 sprites: TaskSprites::NONE,
-                work_value: 0.0,
+                work_value: crate::objects::masters::WorkValue::new(0.0),
                 productivity: None,
                 kind4: None,
             },

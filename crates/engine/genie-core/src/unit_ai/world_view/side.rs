@@ -217,7 +217,6 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             now: self.c.w.world_time,
             computer: self.computer,
             object: self.c.w.streams.get(Stream::Object),
-            construction_rate: self.construction_rate,
             groups: &self.c.w.groups,
         };
         let unit = &*self.unit;
@@ -275,7 +274,6 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             now: self.c.w.world_time,
             computer: self.computer,
             object: self.c.w.streams.get(Stream::Object),
-            construction_rate: self.construction_rate,
             groups: &self.c.w.groups,
         };
         let unit = &*self.unit;

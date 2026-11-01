@@ -46,7 +46,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
         attack: crate::combat::attack::tests::reads(),
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
         stops_decay: false,
         has_ai: true,
         ai_class: None,
@@ -328,7 +328,7 @@ const CHOP: HuntTask = HuntTask {
     range: Distance::ZERO,
     resource: Some(attribute::MEAT),
     sprites: TaskSprites::of_data([-1, 1239, 1961, 1960]),
-    work_value: 1.0,
+    work_value: crate::objects::masters::WorkValue::new(1.0),
     productivity: None,
     kind4: None,
 };
@@ -560,7 +560,7 @@ fn a_villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full
         point: Position::new(24.5, 94.5, 0.0),
         target_class: Some(class::TREE),
         task: HuntTask {
-            work_value: 0.39,
+            work_value: crate::objects::masters::WorkValue::new(0.39),
             resource: Some(attribute::WOOD),
             ..CHOP
         },

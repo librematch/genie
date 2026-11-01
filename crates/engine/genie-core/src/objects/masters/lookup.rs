@@ -138,7 +138,9 @@ impl Masters {
                 }) else {
                     return Ok(Some((candidate.id, task)));
                 };
-                if by_class.is_none() && task.for_class(target.master.class) && 0.0 < task.work_val1
+                if by_class.is_none()
+                    && task.for_class(target.master.class)
+                    && task.work_val1.positive()
                 {
                     by_class = Some((candidate.id, task));
                 } else if generic.is_none()

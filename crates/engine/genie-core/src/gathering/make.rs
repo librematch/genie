@@ -131,7 +131,7 @@ impl MakeAction {
             MakeState::Done => return Ok(HeadCode::Deletes),
             MakeState::Making if Amount::ZERO < self.remaining || self.total <= Amount::ZERO => {
                 let rate = (master.work_rate + farm.work_rate_powerup)
-                    * self.task.work_val1
+                    * self.task.work_val1.get()
                     * c.dt.seconds();
                 let before = farm.life.amount;
                 if self.task.work_flag == 0 {
@@ -203,7 +203,7 @@ mod tests {
             action_type: MAKE,
             attribute_type: Some(attribute::FARM_FOOD),
             attribute_type2: Some(attribute::FOOD),
-            work_val1: 1.0,
+            work_val1: crate::objects::masters::WorkValue::new(1.0),
             ..Task::default()
         }
     }

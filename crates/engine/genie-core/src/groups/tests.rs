@@ -417,7 +417,7 @@ fn plain_task(action_type: ActionType, range: Distance) -> crate::objects::maste
     crate::objects::masters::Task {
         action_type,
         work_range: range,
-        work_val1: 1.0,
+        work_val1: crate::objects::masters::WorkValue::new(1.0),
         ..crate::objects::masters::Task::default()
     }
 }

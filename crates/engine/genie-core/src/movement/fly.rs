@@ -206,10 +206,10 @@ impl Fly {
         let radius = mover.stats.radius.ground();
         let leash = f32::from(t.holding_attr) * f32::from(t.holding_attr);
         let mut angle = action.below_checked(360) as i32;
-        let factor = if t.work_val1 < EPSILON {
+        let factor = if t.work_val1.get() < EPSILON {
             1.0
         } else {
-            t.work_val1
+            t.work_val1.get()
         };
         let distance = (speed * self.timer * factor).get();
         let (x, y, z) = (position.x(), position.y(), position.z());
@@ -242,12 +242,12 @@ impl Fly {
                 "a flight to a terrain of its task's",
             ));
         }
-        if t.work_val2 as i32 as i16 != -1 && Distance::ZERO < t.work_range {
+        if t.work_val2.get() as i32 as i16 != -1 && Distance::ZERO < t.work_range {
             return Err(GenieError::unsupported(
                 "a flight keeping away from a class",
             ));
         }
-        if EPSILON < t.work_val1 {
+        if EPSILON < t.work_val1.get() {
             return Err(GenieError::unsupported(
                 "a flight's animation speed (+0x7b8)",
             ));
@@ -421,7 +421,7 @@ mod tests {
             task: Task {
                 action_type: FLY,
                 object_group: None,
-                work_val2: 0.0,
+                work_val2: crate::objects::masters::WorkValue::new(0.0),
                 sprites: TaskSprites::of_data([846, 1595, 846, -1]),
                 ..Task::default()
             },
@@ -589,12 +589,12 @@ mod tests {
                 ..unsprited
             },
             Task {
-                work_val2: 4.0,
+                work_val2: crate::objects::masters::WorkValue::new(4.0),
                 work_range: Distance::new(3.0),
                 ..unsprited
             },
             Task {
-                work_val1: 2.0,
+                work_val1: crate::objects::masters::WorkValue::new(2.0),
                 ..unsprited
             },
             Task {

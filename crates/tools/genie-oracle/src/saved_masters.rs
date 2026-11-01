@@ -43,6 +43,7 @@ use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::VolleySpread;
+use genie_core::objects::masters::WorkValue;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
@@ -184,8 +185,8 @@ pub(super) fn core_task(
         attribute_type3,
         attribute_type4,
         wait_time: Seconds::new(t.search_wait_time),
-        work_val1: t.work_val1,
-        work_val2: t.work_val2,
+        work_val1: WorkValue::new(t.work_val1),
+        work_val2: WorkValue::new(t.work_val2),
         work_range: Distance::new(t.work_range),
         work_flag: t.work_flag,
         enablement,

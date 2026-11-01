@@ -110,7 +110,7 @@ impl Unit {
             ),
             work_rate: self.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
-            productivity: productivity.get(),
+            productivity,
             stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),
             has_ai: self.ai.is_some(),
             ai_class: self.ai.as_ref().and_then(|ai| ai.target_class),

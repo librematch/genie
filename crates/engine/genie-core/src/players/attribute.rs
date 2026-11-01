@@ -239,8 +239,8 @@ pub const CASTLES: AttributeId = AttributeId::named(134);
 pub const CASTLES_BUILT: AttributeId = AttributeId::named(173);
 /// The wonders the player built (174).
 pub const WONDERS_BUILT: AttributeId = AttributeId::named(174);
-/// The construction rate modifier (195), which a builder's work and the pathing's planner read
-/// (the work reads it at the player's attributes `+0x618`).
+/// The construction rate modifier (195), which a builder's work reads (at the player's attributes
+/// `+0x618`).
 pub const CONSTRUCTION_RATE: AttributeId = AttributeId::named(195);
 /// Where a castle's or a wonder's paid cost goes rather than to 98 and 165 (184,
 /// `FUN_1411dbb70`).

@@ -97,9 +97,9 @@ pub struct Task {
     /// `+0x1c`, `search_wait_time`: a Fly task's rest between flights.
     pub wait_time: Seconds,
     /// `+0x28`, the save's `work_val1`; `+0x2c`, `work_val2`.
-    pub work_val1: f32,
+    pub work_val1: WorkValue,
     /// `+0x2c`, the save's `work_val2`.
-    pub work_val2: f32,
+    pub work_val2: WorkValue,
     /// `+0x30`: how near the target the work is done.
     pub work_range: Distance,
     /// `+0x34`, `work_flag` (the `.dat`'s `gather_type`): a Make adds to its player's attribute,
@@ -142,8 +142,8 @@ impl Default for Task {
             attribute_type3: None,
             attribute_type4: None,
             wait_time: Seconds::ZERO,
-            work_val1: 0.0,
-            work_val2: 0.0,
+            work_val1: WorkValue::ZERO,
+            work_val2: WorkValue::ZERO,
             work_range: Distance::ZERO,
             work_flag: 0,
             enablement: None,
@@ -648,6 +648,7 @@ mod task_flags;
 mod task_group;
 mod task_sprites;
 mod volley_spread;
+mod work_value;
 
 pub use self::action_type::ActionType;
 pub use self::adjacent_mode::AdjacentMode;
@@ -694,6 +695,7 @@ pub use self::task_flags::TaskFlags;
 pub use self::task_group::TaskGroup;
 pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;
+pub use self::work_value::WorkValue;
 
 #[cfg(test)]
 mod tests;

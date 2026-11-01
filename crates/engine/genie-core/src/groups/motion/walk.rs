@@ -306,7 +306,6 @@ impl World {
                 now: self.world_time,
                 computer: lead.computer,
                 object: self.streams.get(crate::math::rng::Stream::Object),
-                construction_rate: 0.0,
                 groups: &self.groups,
             };
             let mut world = StepWorld {

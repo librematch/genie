@@ -118,7 +118,7 @@ pub struct BuildTask {
     /// The task's work range.
     pub range: Distance,
     /// The task's work value.
-    pub work_value: f32,
+    pub work_value: crate::objects::masters::WorkValue,
     /// The builder's work rate: its master's `work_rate` (`+0x798`) plus its `mWorkRatePowerup`
     /// (`+0xa30`).
     pub work_rate: WorkRate,

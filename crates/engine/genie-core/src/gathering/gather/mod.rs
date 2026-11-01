@@ -108,7 +108,7 @@ const FARM_STOPS: u8 = 4;
 /// A stop's point lies this far into its tile (`DAT_142e7f384`).
 const STOP_CENTRE: f32 = crate::math::image::gather::STOP_CENTRE;
 /// The productivity of a task without a productivity attribute (`DAT_14330eb8c`).
-const DEFAULT_PRODUCTIVITY: f32 = crate::math::image::gather::DEFAULT_PRODUCTIVITY;
+const DEFAULT_PRODUCTIVITY: Amount = Amount::new(crate::math::image::gather::DEFAULT_PRODUCTIVITY);
 /// The draws a stop's point takes at most (`set_state(4)`'s loop).
 const STOP_DRAWS: u32 = 10;
 /// The player's attribute that sells a farm's food at once (`player+0x100` at `+0x300`).
@@ -204,7 +204,7 @@ pub(crate) struct GatherReads {
     /// The master's `attribute_max_amount` (`+0x61c`): what the unit carries at most.
     pub(crate) capacity: Amount,
     /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
-    pub(crate) productivity: f32,
+    pub(crate) productivity: Amount,
     /// The sprites the gather shows.
     pub(crate) sprites: HuntSprites,
     /// The unit's master's class: a villager's `MoveTo` waits once when the motion step gives up.
@@ -225,7 +225,7 @@ pub(crate) struct GatherReads {
     pub(crate) computer: bool,
     /// The player's attribute the task's `attribute_type2` names (none: 1.0), as the time per
     /// stop reads it.
-    pub(crate) stop_productivity: f32,
+    pub(crate) stop_productivity: Amount,
     /// The player's attribute 96: a farm's food is sold at once.
     pub(crate) food_sold: f32,
 }

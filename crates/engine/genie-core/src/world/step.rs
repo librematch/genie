@@ -51,14 +51,13 @@ pub(crate) struct Step<'a> {
     pub(crate) side_notifies: Option<Vec<(crate::unit_ai::Notify, crate::objects::ObjectState)>>,
 }
 
-/// What a walk takes of the update beside the world: the dt in seconds, the world's time, and
-/// the owner's computer flag and construction rate.
+/// What a walk takes of the update beside the world: the dt in seconds, the world's time and
+/// the owner's computer flag.
 #[derive(Clone, Copy)]
 pub(crate) struct Pace {
     pub(crate) dt: Seconds,
     pub(crate) now: WorldTime,
     pub(crate) computer: bool,
-    pub(crate) construction_rate: f32,
 }
 
 /// The world's parts beside a walk ([`World::walk_beside`]), which an update reads and changes
@@ -95,7 +94,6 @@ impl World {
                 now: pace.now,
                 computer: pace.computer,
                 object,
-                construction_rate: pace.construction_rate,
                 groups,
             }),
         };
@@ -225,7 +223,6 @@ impl Step<'_> {
             dt: self.dt.seconds(),
             now: self.w.world_time,
             computer: self.w.players[self.player.index()].computer,
-            construction_rate: self.w.players[self.player.index()].construction_rate(),
         }
     }
 }
@@ -249,7 +246,6 @@ impl Step<'_> {
                     now: self.w.world_time,
                     computer: self.w.players[self.player.index()].computer,
                     object,
-                    construction_rate: self.w.players[self.player.index()].construction_rate(),
                     groups: &self.w.groups,
                 }),
             },

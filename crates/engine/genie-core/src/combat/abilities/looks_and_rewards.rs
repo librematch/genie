@@ -72,7 +72,7 @@ pub fn look(
 #[must_use]
 pub fn reward(task: &Task, player: PlayerId, multiplier: Option<f32>, cost: &[CostSlot]) -> Reward {
     let out = task.attribute_type3;
-    let mut rate = task.work_val1;
+    let mut rate = task.work_val1.get();
     if task.attribute_type2.is_some()
         && let Some(m) = multiplier
     {
@@ -130,7 +130,7 @@ impl World {
         let look = look(task, mask, flags, exists);
         let unit = &mut self.players[p].objects[i];
         let (factor, rate) = if look.is_some() {
-            (task.work_val1, task.work_val2)
+            (task.work_val1.get(), task.work_val2.get())
         } else {
             (ONE, ONE)
         };

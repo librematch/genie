@@ -395,7 +395,6 @@ impl World {
             now: self.world_time,
             computer: self.players.player(tp)?.computer,
             object: self.streams.get(crate::math::rng::Stream::Object),
-            construction_rate: self.players.player(tp)?.construction_rate(),
             groups: &self.groups,
         };
         if !ship_reaches(ship, &mut self.spatial, &mut plan, to)? {

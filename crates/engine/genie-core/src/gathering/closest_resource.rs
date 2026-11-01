@@ -214,7 +214,6 @@ impl UnitView<'_, '_> {
                 now: self.c.w.world_time,
                 computer: self.computer,
                 object: self.c.w.streams.get(Stream::Object),
-                construction_rate: self.construction_rate,
                 groups: &self.c.w.groups,
             },
         };
@@ -288,7 +287,6 @@ impl Unit {
                 now: c.w.world_time,
                 computer: c.w.players.player(c.player)?.computer,
                 object: c.w.streams.get(Stream::Object),
-                construction_rate: c.w.players.player(c.player)?.construction_rate(),
                 groups: &c.w.groups,
             },
         };

@@ -1100,7 +1100,7 @@ mod tests {
             action_type,
             object_group,
             work_range,
-            work_val1: (work_range * 2.0).get(),
+            work_val1: crate::objects::masters::WorkValue::new((work_range * 2.0).get()),
             attribute_type: Some(AttributeId::numbered(17)),
             ..Task::default()
         };
@@ -1162,7 +1162,7 @@ mod tests {
         let u = &mut t.players[1].objects[ListIndex::new(0)];
         let build = BuildTask {
             range: Distance::new(0.25),
-            work_value: 0.5,
+            work_value: crate::objects::masters::WorkValue::new(0.5),
             work_rate: WorkRate::new(1.0),
             resource: Some(AttributeId::numbered(17)),
             id: TaskId::test(3),
@@ -1198,7 +1198,7 @@ mod tests {
             u.actions.build().copied().unwrap().task,
             BuildTask {
                 range: Distance::new(1.5),
-                work_value: 3.0,
+                work_value: crate::objects::masters::WorkValue::new(3.0),
                 work_rate: WorkRate::new(1.0),
                 resource: Some(AttributeId::numbered(17)),
                 id: TaskId::test(7),

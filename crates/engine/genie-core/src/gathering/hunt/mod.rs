@@ -181,7 +181,7 @@ pub struct HuntTask {
     /// Its moving, proceeding, working and carrying sprites (`+0x40`..`+0x58`).
     pub sprites: TaskSprites,
     /// `+0x28`, `work_val1`: what one work gathers per second and work rate.
-    pub work_value: f32,
+    pub work_value: crate::objects::masters::WorkValue,
     /// `+0x22`, `attribute_type2`: the player's attribute that scales the gathering, -1 none.
     pub productivity: Option<AttributeId>,
     /// `+0x26`, `attribute_type4`.
@@ -202,7 +202,7 @@ pub(crate) struct HuntReads {
     /// The master's `attribute_max_amount` (`+0x61c`): what the unit carries at most.
     pub(crate) capacity: Amount,
     /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
-    pub(crate) productivity: f32,
+    pub(crate) productivity: Amount,
     /// The player's attribute 292 is 1: a task whose `attribute_type4` is 0x124 stops the
     /// target's decay (`FUN_140ac44b0`).
     pub(crate) stops_decay: bool,

@@ -283,7 +283,6 @@ impl World {
             now: self.world_time,
             computer: owner.computer,
             object: self.streams.get(Stream::Object),
-            construction_rate: owner.construction_rate(),
             groups: &self.groups,
         };
         let blocked = mask.blocked() | crate::map::spatial::BLOCKED;

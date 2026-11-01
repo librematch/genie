@@ -148,7 +148,8 @@ pub(crate) fn victim_of(
             armor_removed: u.armor_removed,
             hp_powerup: u.hp_powerup,
             kill_tasks: master.tasks.iter().any(|t| {
-                t.action_type == crate::combat::abilities::REMOVAL_REWARD && 1e-7 < t.work_val1
+                t.action_type == crate::combat::abilities::REMOVAL_REWARD
+                    && 1e-7 < t.work_val1.get()
             }),
             busy: u.top_action_kind().is_some() || u.unmodelled_action.is_some(),
             unit_ai: u.ai.is_some(),

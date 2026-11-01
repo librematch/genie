@@ -618,7 +618,7 @@ mod tests {
             action_type,
             object_group: crate::test_ids::class_of(object_group),
             object_id: crate::test_ids::opt_master(object_id),
-            work_val1,
+            work_val1: crate::objects::masters::WorkValue::new(work_val1),
             ..Task::default()
         }
     }

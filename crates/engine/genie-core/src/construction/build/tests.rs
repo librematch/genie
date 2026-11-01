@@ -431,7 +431,7 @@ fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
 /// A villager's Build task: range 0.1, work value 1, work rate 1.
 pub(super) const TASK: BuildTask = BuildTask {
     range: Distance::new(0.1),
-    work_value: 1.0,
+    work_value: crate::objects::masters::WorkValue::new(1.0),
     work_rate: WorkRate::new(1.0),
     resource: None,
     id: TaskId::of_task(-1),

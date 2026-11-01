@@ -364,7 +364,6 @@ impl World {
             now: self.world_time,
             computer,
             object: self.streams.get(crate::math::rng::Stream::Object),
-            construction_rate: 0.0,
             groups: &self.groups,
         };
         let r = crate::movement::short_path_for(

@@ -97,12 +97,12 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim) -> f32 {
         };
         // the task's `+0x26` read as a flag: other than 0 (none, −1, is other too)
         let share = whose.hp_share(AttributeId::field(t.attribute_type4) != 0);
-        if fmath::at_most_or_unordered(t.work_val2, 0.0)
+        if fmath::at_most_or_unordered(t.work_val2.get(), 0.0)
             || fmath::at_most_or_unordered(target.shown_hp().get(), 0.0)
         {
             continue;
         }
-        sum += libm::floorf(share / t.work_val2 + EPSILON) * t.work_val1;
+        sum += libm::floorf(share / t.work_val2.get() + EPSILON) * t.work_val1.get();
     }
     fmath::maxss(sum, 0.0)
 }

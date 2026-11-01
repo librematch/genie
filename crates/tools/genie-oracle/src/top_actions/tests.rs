@@ -24,6 +24,7 @@ use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::TaskTerrain;
+use genie_core::objects::masters::WorkValue;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
@@ -55,8 +56,8 @@ fn task(id: i16, range: f32) -> Task {
         attribute_type3: Some(attribute::GOLD),
         attribute_type4: Some(attribute::HEADROOM),
         wait_time: Seconds::ZERO,
-        work_val1: 0.5,
-        work_val2: 0.0,
+        work_val1: WorkValue::new(0.5),
+        work_val2: WorkValue::ZERO,
         work_range: Distance::new(range),
         work_flag: 0,
         enablement: Some(attribute::FOOD),
@@ -152,7 +153,7 @@ fn import_drawn(
         |_| {
             Ok(BuildTask {
                 range: Distance::new(1.0),
-                work_value: 0.5,
+                work_value: WorkValue::new(0.5),
                 work_rate: WorkRate::new(2.0),
                 resource: None,
                 id: TaskId::of_task(7),

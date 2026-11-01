@@ -91,6 +91,7 @@ file for what the save does not hold.
 | [`tribe_setters.rs`](tribe_setters.rs) | The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the train locations. |
 | [`values.rs`](values.rs) | What the attribute setters share: the caps, the truncations, the sprite and class amounts, the damage sprites' and train locations' entries. |
 | [`volley_spread.rs`](volley_spread.rs) | How far a volley's missiles scatter (`VolleySpread`). |
+| [`work_value.rs`](work_value.rs) | A task's work values. |
 <!-- /files -->
 
 ## How it connects

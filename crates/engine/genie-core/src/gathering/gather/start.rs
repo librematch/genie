@@ -75,16 +75,20 @@ pub struct StopRate {
     /// The capacity.
     pub capacity: Amount,
     /// The productivity.
-    pub productivity: f32,
+    pub productivity: Amount,
 }
 
 impl StopRate {
     /// The time per stop (`+0x70`): the capacity times the productivity over the work a second,
     /// shared out over the stops.
     #[must_use]
-    pub fn time_per_stop(self, work_value: f32, stops: u8) -> Seconds {
+    pub fn time_per_stop(
+        self,
+        work_value: crate::objects::masters::WorkValue,
+        stops: u8,
+    ) -> Seconds {
         Seconds::new(
-            ((self.capacity.get() * self.productivity) / (self.work_rate * work_value).get())
+            ((self.capacity.get() * self.productivity.get()) / (self.work_rate * work_value).get())
                 / f32::from(stops),
         )
     }
@@ -109,15 +113,14 @@ pub struct MoveTarget {
 /// The productivity the time per stop reads (the constructor's and the update's): the player's
 /// attribute the task's `attribute_type2` names, as it is, or 1.0 for none (`DAT_14330eb8c`).
 #[must_use]
-pub fn productivity_of(attribute_type2: Option<AttributeId>, attributes: &[Amount]) -> f32 {
+pub fn productivity_of(attribute_type2: Option<AttributeId>, attributes: &[Amount]) -> Amount {
     let Some(attribute) = attribute_type2 else {
         return DEFAULT_PRODUCTIVITY;
     };
-    (attributes
+    attributes
         .get(attribute.index())
         .copied()
-        .unwrap_or(Amount::ZERO))
-    .get()
+        .unwrap_or(Amount::ZERO)
 }
 
 /// `set_state(4)`'s point of a farm's next stop (`0x140a8cd40` case 4): a tile of the farm's

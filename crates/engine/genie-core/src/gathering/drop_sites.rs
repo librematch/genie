@@ -327,7 +327,7 @@ mod tests {
     fn villager(target: Option<i32>) -> Unit {
         let task = BuildTask {
             range: Distance::new(0.1),
-            work_value: 1.0,
+            work_value: crate::objects::masters::WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
@@ -395,7 +395,6 @@ mod tests {
             now: WorldTime::ZERO,
             computer: false,
             object: &mut object,
-            construction_rate: 1.0,
             groups: &groups,
         };
         let seeker = Seeker {

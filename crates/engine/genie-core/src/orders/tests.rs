@@ -313,7 +313,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
                 Distance::ZERO,
                 crate::construction::build::BuildTask {
                     range: Distance::new(0.1),
-                    work_value: 1.0,
+                    work_value: crate::objects::masters::WorkValue::new(1.0),
                     work_rate: WorkRate::new(1.0),
                     resource: None,
                     id: TaskId::of_task(-1),
@@ -2912,7 +2912,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
             point: Position::new(-1.0, -1.0, -1.0),
             task: crate::construction::build::BuildTask {
                 range: Distance::new(0.1),
-                work_value: 1.0,
+                work_value: crate::objects::masters::WorkValue::new(1.0),
                 work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
@@ -3028,7 +3028,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_a_task() {
         action_type,
         object_group: None,
         object_id,
-        work_val1: 1.0,
+        work_val1: crate::objects::masters::WorkValue::new(1.0),
         ..crate::objects::masters::Task::default()
     };
     let villager = |id, tasks| Master {
@@ -4495,7 +4495,7 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
     );
     let task = crate::construction::build::BuildTask {
         range: Distance::new(0.1),
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: Some(attribute::WOOD),
         id: TaskId::of_task(-1),
@@ -4886,7 +4886,7 @@ fn a_work_command_s_task_is_retaken_by_the_action_on_top() {
     let mut t = crate::world::tests::forage_world();
     let build = crate::construction::build::BuildTask {
         range: Distance::new(0.1),
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::test(3),

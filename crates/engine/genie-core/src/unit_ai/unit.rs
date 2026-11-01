@@ -240,7 +240,6 @@ impl Unit {
             attacker,
             player,
             computer,
-            construction_rate: view.construction_rate,
             new_owner: view.new_owner,
             civ: view.civ,
             ai_settings: view.ai_settings,

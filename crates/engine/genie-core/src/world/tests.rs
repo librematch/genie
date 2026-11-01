@@ -2358,7 +2358,7 @@ fn repair_world() -> World {
         builder.weapon_range = Distance::new(0.5);
         builder.tasks.push(crate::objects::masters::Task {
             id: TaskId::test(4),
-            work_val1: 0.5,
+            work_val1: crate::objects::masters::WorkValue::new(0.5),
             ..task(crate::construction::repair::REPAIR)
         });
     }
@@ -2395,7 +2395,7 @@ fn a_work_command_on_a_damaged_building_starts_a_repair() {
             RepairState::Move,
             Distance::new(0.5),
             TaskId::test(4),
-            0.5
+            crate::objects::masters::WorkValue::new(0.5)
         )
     );
     let ai = v.ai.as_ref().unwrap();
@@ -2538,7 +2538,7 @@ fn a_work_command_on_a_foundation_starts_a_build_as_its_builder() {
         b.task,
         BuildTask {
             range: Distance::ZERO,
-            work_value: 0.0,
+            work_value: crate::objects::masters::WorkValue::new(0.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::test(0),
@@ -2920,7 +2920,7 @@ pub(crate) fn forage_world() -> World {
                 object_group: Some(class_id(7)),
                 attribute_type: Some(AttributeId::numbered(17)),
                 work_range: Distance::new(0.25),
-                work_val1: 0.31,
+                work_val1: crate::objects::masters::WorkValue::new(0.31),
                 ..crate::objects::masters::Task::default()
             }],
             ..masters.get(VILLAGER_MALE).unwrap().clone()
@@ -5052,7 +5052,10 @@ fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
     let gathering = |held: f32| {
         let mut t = hunter_in(|h| {
             (h.state, h.attack, h.move_to) = (HuntState::Gather, None, None);
-            (h.task.work_value, h.task.resource) = (1.0, Some(attribute::MEAT));
+            (h.task.work_value, h.task.resource) = (
+                crate::objects::masters::WorkValue::new(1.0),
+                Some(attribute::MEAT),
+            );
         });
         for masters in &mut t.masters {
             let hunter = masters.get_mut(master_id(122)).unwrap();
@@ -5113,7 +5116,10 @@ fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
 fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
     let mut t = hunter_in(|h| {
         (h.state, h.attack, h.move_to) = (HuntState::Gather, None, None);
-        (h.task.work_value, h.task.resource) = (1.0, Some(attribute::MEAT));
+        (h.task.work_value, h.task.resource) = (
+            crate::objects::masters::WorkValue::new(1.0),
+            Some(attribute::MEAT),
+        );
     });
     for masters in &mut t.masters {
         let hunter = masters.get_mut(master_id(122)).unwrap();
@@ -5909,7 +5915,7 @@ fn repairer_world(orders: Vec<crate::unit_ai::QueuedOrder>, repairer: bool) -> W
             m.weapon_range = Distance::new(0.5);
             m.tasks.push(crate::objects::masters::Task {
                 id: TaskId::test(4),
-                work_val1: 0.5,
+                work_val1: crate::objects::masters::WorkValue::new(0.5),
                 ..task(crate::construction::repair::REPAIR)
             });
             *masters = Masters::new(masters.iter().cloned().chain([m]));
@@ -7365,7 +7371,7 @@ fn farm_master() -> Master {
             action_type: crate::gathering::make::MAKE,
             attribute_type: Some(attribute::FARM_FOOD),
             attribute_type2: Some(attribute::FOOD),
-            work_val1: 1.0,
+            work_val1: crate::objects::masters::WorkValue::new(1.0),
             ..crate::objects::masters::Task::default()
         }],
         ..Master::default()
@@ -10473,7 +10479,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
             point: Position::new(-1.0, -1.0, -1.0),
             task: BuildTask {
                 range: Distance::ZERO,
-                work_value: 0.0,
+                work_value: crate::objects::masters::WorkValue::new(0.0),
                 work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
@@ -10579,7 +10585,7 @@ fn deaths_world() -> World {
     let rate = crate::gathering::gather::StopRate {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
     };
     let gather = crate::gathering::gather::GatherAction::new(chop, &tree, false, rate).unwrap();
     let mut villagers = vec![
@@ -10603,7 +10609,7 @@ fn deaths_world() -> World {
         point: Position::new(-1.0, -1.0, -1.0),
         task: BuildTask {
             range: Distance::ZERO,
-            work_value: 1.0,
+            work_value: crate::objects::masters::WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
@@ -11122,7 +11128,6 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
             object: t.streams.get(Stream::Object),
             world_time: WorldTime::ZERO,
             computer: false,
-            construction_rate: 1.0,
             groups: &t.groups,
         };
         hunter.drop_off_in(
@@ -14100,7 +14105,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         productivity: None,
         kind4: None,
     };
@@ -14119,7 +14124,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
     let rate = crate::gathering::gather::StopRate {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
     };
     let mut gather = crate::gathering::gather::GatherAction::new(task, &bush, false, rate).unwrap();
     gather.state = GatherState::Idle;
@@ -14424,7 +14429,6 @@ fn on_side<R>(
                 },
                 player: PlayerId::new(1),
                 computer: false,
-                construction_rate: 1.0,
                 new_owner: None,
                 civ: CivId::new(0),
                 ai_settings: AiSettings::default(),
@@ -15279,7 +15283,7 @@ fn reseed_world() -> World {
         range: Distance::new(0.25),
         resource: Some(attribute::MEAT),
         sprites: TaskSprites::NONE,
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         productivity: None,
         kind4: None,
     };
@@ -15298,7 +15302,7 @@ fn reseed_world() -> World {
     let rate = crate::gathering::gather::StopRate {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
-        productivity: 1.0,
+        productivity: Amount::new(1.0),
     };
     let gather = crate::gathering::gather::GatherAction {
         state: GatherState::ReseedWalk,
@@ -17209,7 +17213,6 @@ fn drop_site_sought(
         object: t.streams.get(Stream::Object),
         world_time: WorldTime::ZERO,
         computer: false,
-        construction_rate: 1.0,
         groups: &t.groups,
     };
     let objects = OthersRef::of(&t.players, PlayerId::new(1)).unwrap();
@@ -17962,7 +17965,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
         (ObjectId::of_field(site), BuildState::Place, true, None);
     b.task = BuildTask {
         range: Distance::new(0.1),
-        work_value: 1.0,
+        work_value: crate::objects::masters::WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
@@ -18897,7 +18900,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
         count: crate::objects::FacetCount::of_data(8),
         turns: false,
     });
-    v.actions.build_mut().unwrap().task.work_value = 1.0;
+    v.actions.build_mut().unwrap().task.work_value = crate::objects::masters::WorkValue::new(1.0);
     let mut seen = Vec::new();
     for n in 0..520 {
         let _ = in_update(
@@ -19490,7 +19493,7 @@ fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
         count: crate::objects::FacetCount::of_data(8),
         turns: false,
     });
-    v.actions.build_mut().unwrap().task.work_value = 1.0;
+    v.actions.build_mut().unwrap().task.work_value = crate::objects::masters::WorkValue::new(1.0);
     let mut seen = Vec::new();
     for n in 0..520 {
         t.tick(Millis::new(50));

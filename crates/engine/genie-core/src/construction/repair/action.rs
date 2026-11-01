@@ -35,7 +35,7 @@ use crate::world::step::Step;
 #[must_use]
 pub fn work_amount(
     rate: WorkRate,
-    work_value: f32,
+    work_value: crate::objects::masters::WorkValue,
     dt: Seconds,
     repairers: Option<u8>,
 ) -> HitPoints {

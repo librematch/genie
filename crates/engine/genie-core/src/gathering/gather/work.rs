@@ -120,7 +120,7 @@ impl GatherAction {
             target.amount
         };
         let capacity = r.capacity;
-        let mut gain = r.productivity * take;
+        let mut gain = r.productivity.get() * take;
         if capacity < gain + *held {
             return Ok(Next::Drop);
         }

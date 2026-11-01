@@ -214,7 +214,7 @@ impl HuntAction {
         } else {
             victim.amount
         };
-        let mut gain = r.productivity * take;
+        let mut gain = r.productivity.get() * take;
         let capacity = r.capacity;
         // `<=` in the game: a NaN goes to the drop-off too
         let room = capacity - *held;

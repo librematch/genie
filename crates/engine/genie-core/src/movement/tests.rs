@@ -227,7 +227,6 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
         now: WorldTime::from_millis(16360),
         computer: false,
         object: &mut object,
-        construction_rate: 1.0,
         groups: &groups,
     };
     let me = Me {
@@ -397,7 +396,6 @@ fn a_drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
         now: WorldTime::from_millis(100),
         computer: false,
         object: &mut object,
-        construction_rate: 1.0,
         groups: &groups,
     };
     let me = |action_state| Me {
@@ -467,7 +465,6 @@ fn the_drop_off_walker_s_start_is_blocked_in_terrain_its_mask_lacks() {
             now: WorldTime::ZERO,
             computer: false,
             object: &mut object,
-            construction_rate: 1.0,
             groups: &groups,
         };
         let mut target = world_target();
@@ -554,7 +551,6 @@ fn a_big_unit_s_short_path_takes_the_old_pather() {
         now: WorldTime::from_millis(100),
         computer: false,
         object: &mut object,
-        construction_rate: 1.0,
         groups: &groups,
     };
     let walker = Walker {
@@ -864,7 +860,6 @@ fn a_big_unit_s_path_request_takes_the_old_pather_with_the_walk_s_kept_hits() {
         now: WorldTime::from_millis(100),
         computer: false,
         object: &mut object,
-        construction_rate: 1.0,
         groups: &groups,
     };
     let goal = Goal {
@@ -946,7 +941,6 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
         now: WorldTime::ZERO,
         computer: false,
         object: &mut object,
-        construction_rate: 1.0,
         groups: &groups,
     };
     let me = Me {
@@ -1862,7 +1856,6 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
             now: WorldTime::ZERO,
             computer: false,
             object: &mut object,
-            construction_rate: 1.0,
             groups: &groups,
         };
         let me = Me {
@@ -2011,7 +2004,6 @@ impl WalkRig {
                 now: WorldTime::ZERO,
                 computer: false,
                 object: &mut self.object,
-                construction_rate: 1.0,
                 groups: &self.groups,
             }),
         }

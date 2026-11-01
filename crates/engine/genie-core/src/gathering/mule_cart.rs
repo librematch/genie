@@ -148,7 +148,6 @@ impl World {
                     now: self.world_time,
                     computer: player.computer,
                     object: self.streams.get(Stream::Object),
-                    construction_rate: player.construction_rate(),
                     groups: &self.groups,
                 },
             };

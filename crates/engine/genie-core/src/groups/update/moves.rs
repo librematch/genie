@@ -426,7 +426,6 @@ impl World {
             .unwrap_or_default();
         self.refresh_gaits(members);
         let computer = self.players.player(p)?.computer;
-        let construction_rate = self.players.player(p)?.construction_rate();
         let unit = self.players.live_mut(p, idx)?;
         let me = Me {
             id,
@@ -441,7 +440,6 @@ impl World {
             now: self.world_time,
             computer,
             object: self.streams.get(crate::math::rng::Stream::Object),
-            construction_rate,
             groups: &self.groups,
         };
         let motion = mover.motion(&me, self.dt_seconds, &mut self.spatial, Some(&mut plan))?;

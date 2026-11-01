@@ -33,7 +33,7 @@ use crate::world::step::Step;
 /// What a tick's update of one object needs from the world.
 /// What a hunt's drop-off ([`Unit::drop_off_in`]) reads besides its unit: the owner's masters,
 /// the world with its zone maps and planners, the world's time, the Object stream (the drop-site
-/// search's plans), the owner's type and construction rate.
+/// search's plans) and the owner's type.
 pub(crate) struct DropWorld<'a> {
     pub masters: Option<&'a Masters>,
     pub spatial: &'a mut Spatial,
@@ -42,7 +42,6 @@ pub(crate) struct DropWorld<'a> {
     pub object: &'a mut Well512,
     pub world_time: WorldTime,
     pub computer: bool,
-    pub construction_rate: f32,
     pub groups: &'a crate::groups::UnitGroups,
 }
 
@@ -110,8 +109,8 @@ impl<'a> Foreign<'a> {
     }
 }
 
-/// What a unit's AI part reads of its owner's side ([`Unit::ai_part`]): the owner, its civ,
-/// construction rate and AI settings, and the player that took the unit over in its update
+/// What a unit's AI part reads of its owner's side ([`Unit::ai_part`]): the owner, its civ and
+/// AI settings, and the player that took the unit over in its update
 /// (`new_owner`), whose side it reads (`RGE_Combat_Object::update` reads the owner after the
 /// change; [`owner_view`] gives its objects). Its masters, diplomacy and attributes are the
 /// world's (the side's diplomacy: [`OwnerView::relations`]).
@@ -120,7 +119,6 @@ pub(crate) struct OwnerView {
     pub(crate) player: PlayerId,
     pub(crate) new_owner: Option<PlayerId>,
     pub(crate) civ: crate::players::CivId,
-    pub(crate) construction_rate: f32,
     pub(crate) ai_settings: crate::world::player::AiSettings,
 }
 
@@ -139,7 +137,6 @@ impl OwnerView {
                 player: c.player,
                 new_owner: None,
                 civ: owner.civ,
-                construction_rate: owner.construction_rate(),
                 ai_settings: owner.ai_settings,
             });
         };
@@ -147,7 +144,6 @@ impl OwnerView {
             player: new,
             new_owner: Some(new),
             civ: q.civ,
-            construction_rate: q.construction_rate(),
             ai_settings: q.ai_settings,
         })
     }
@@ -197,8 +193,6 @@ pub(crate) struct UnitView<'u, 's> {
     pub(crate) player: PlayerId,
     /// The owner is a computer player.
     pub(crate) computer: bool,
-    /// The owner's construction rate.
-    pub(crate) construction_rate: f32,
     /// The player that took the unit over in its update ([`changed_view`]).
     pub(crate) new_owner: Option<PlayerId>,
     /// The owner's civ.

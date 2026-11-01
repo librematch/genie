@@ -378,8 +378,8 @@ fn bonus_damage_counts_whole_steps_of_a_hit_point_share() {
             object_id,
             work_range: range,
             attribute_type4: AttributeId::of_data(lacking),
-            work_val1: 2.0,
-            work_val2: 0.25,
+            work_val1: crate::objects::masters::WorkValue::new(2.0),
+            work_val2: crate::objects::masters::WorkValue::new(0.25),
             ..crate::objects::masters::Task::default()
         }
     };
@@ -413,7 +413,7 @@ fn bonus_damage_counts_whole_steps_of_a_hit_point_share() {
     assert_eq!(bonus_damage(&hunter, &tc), 8.0);
     // no step, no target hit points, or a negative sum: 0
     hunter.bonus_tasks = vec![crate::objects::masters::Task {
-        work_val2: 0.0,
+        work_val2: crate::objects::masters::WorkValue::new(0.0),
         ..task(-1, None, Distance::ZERO, 0)
     }];
     assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
@@ -422,7 +422,7 @@ fn bonus_damage_counts_whole_steps_of_a_hit_point_share() {
     assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
     sheep.hp = HitPoints::new(7.0);
     hunter.bonus_tasks = vec![crate::objects::masters::Task {
-        work_val1: -3.0,
+        work_val1: crate::objects::masters::WorkValue::new(-3.0),
         ..task(-1, None, Distance::ZERO, 0)
     }];
     assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
@@ -465,8 +465,8 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
     v.bonus_tasks = vec![crate::objects::masters::Task {
         action_type: BONUS_DAMAGE,
         attribute_type4: Some(attribute::FOOD),
-        work_val1: 1.5,
-        work_val2: 0.5,
+        work_val1: crate::objects::masters::WorkValue::new(1.5),
+        work_val2: crate::objects::masters::WorkValue::new(0.5),
         ..crate::objects::masters::Task::default()
     }];
     let at_sheep = Shown {

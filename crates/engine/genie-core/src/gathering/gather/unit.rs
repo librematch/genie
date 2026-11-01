@@ -153,8 +153,7 @@ impl Unit {
                 .and_then(|i| attributes.get(i.index()))
                 .copied()
                 .filter(|&v| Amount::ZERO < v)
-                .unwrap_or(Amount::new(1.0))
-                .get(),
+                .unwrap_or(Amount::new(1.0)),
             sprites: HuntSprites {
                 moving: g(task.sprites.moving),
                 working: g(task.sprites.working),
@@ -387,7 +386,6 @@ impl Unit {
                 object: c.w.streams.get(Stream::Object),
                 world_time: c.w.world_time,
                 computer: c.w.players.player(c.player)?.computer,
-                construction_rate: c.w.players.player(c.player)?.construction_rate(),
                 groups: &c.w.groups,
             };
             // the notify's record holds the drop site's id, 0 for none

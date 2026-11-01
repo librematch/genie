@@ -87,7 +87,7 @@ pub struct RepairTask {
     /// The task's id.
     pub id: TaskId,
     /// Its work value.
-    pub work_value: f32,
+    pub work_value: crate::objects::masters::WorkValue,
     /// Its moving sprite (`+0x40`), which its `MoveTo`s take and its turn toward the target
     /// (state 6) shows; None for none.
     pub moving: Option<SpriteId>,

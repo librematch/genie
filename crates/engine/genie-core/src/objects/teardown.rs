@@ -242,7 +242,7 @@ mod tests {
     fn build() -> BuildAction {
         let task = BuildTask {
             range: Distance::ZERO,
-            work_value: 1.0,
+            work_value: crate::objects::masters::WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),

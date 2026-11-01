@@ -250,9 +250,9 @@ impl Player {
     /// Attribute 195, the construction rate modifier ([`attribute::CONSTRUCTION_RATE`]), 0 past
     /// the count.
     #[must_use]
-    pub fn construction_rate(&self) -> f32 {
+    pub fn construction_rate(&self) -> Amount {
         self.attribute(attribute::CONSTRUCTION_RATE)
-            .map_or(0.0, Amount::get)
+            .unwrap_or(Amount::ZERO)
     }
 
     /// `FUN_141616820` for the attributes an object's storage holds: the attribute's value grows

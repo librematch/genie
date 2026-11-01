@@ -47,7 +47,7 @@ fn feitoria_food() -> Task {
         object_group: None,
         attribute_type2: Some(AttributeId::numbered(205)),
         attribute_type3: Some(attribute::FOOD),
-        work_val1: 1.6,
+        work_val1: crate::objects::masters::WorkValue::new(1.6),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
     }
@@ -59,7 +59,7 @@ fn keshik_gold() -> Task {
         object_group: Some(class_id(0)),
         attribute_type2: Some(AttributeId::numbered(213)),
         attribute_type3: Some(attribute::GOLD),
-        work_val1: 0.01,
+        work_val1: crate::objects::masters::WorkValue::new(0.01),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
     }
@@ -498,8 +498,8 @@ fn the_terrain_mask_is_a_bitset_of_8() {
 fn longboat_look() -> Task {
     Task {
         terrain: TaskTerrain::of_data(-32),
-        work_val1: 0.35,
-        work_val2: 1.0,
+        work_val1: crate::objects::masters::WorkValue::new(0.35),
+        work_val2: crate::objects::masters::WorkValue::new(1.0),
         sprites: TaskSprites::of_data([19601, -1, 19599, 19599]),
         sound_events: SoundEvents::new(19598, 19600),
         ..task(TERRAIN_LOOK)
@@ -548,7 +548,7 @@ fn bounty() -> Task {
     Task {
         attribute_type2: Some(attribute::RELICS_HELD),
         attribute_type3: Some(attribute::GOLD),
-        work_val1: 10.0,
+        work_val1: crate::objects::masters::WorkValue::new(10.0),
         ..task(REMOVAL_REWARD)
     }
 }
@@ -863,8 +863,8 @@ fn a_keshik_makes_gold_while_it_fights_a_target_of_its_task_s_class() {
 fn trampler(t: &mut World) {
     let trample = Task {
         work_range: Distance::new(2.0),
-        work_val1: 5.0,
-        work_val2: 3.0,
+        work_val1: crate::objects::masters::WorkValue::new(5.0),
+        work_val2: crate::objects::masters::WorkValue::new(3.0),
         ..task(MOVEMENT_DAMAGE)
     };
     give_master(t, master_id(9), COMBAT, class::CLASS_12, vec![trample]);
@@ -1146,10 +1146,10 @@ fn a_player_s_attribute_reads_its_place_and_none_past_the_count() {
         p.resources(),
         crate::test_ids::amounts([1.0, 2.0, 3.0, 4.0])
     );
-    assert_eq!(p.construction_rate(), 0.0);
+    assert_eq!(p.construction_rate(), Amount::ZERO);
     p.attributes.resize(196, Amount::ZERO);
     p.attributes[attribute::CONSTRUCTION_RATE.index()] = Amount::new(1.5);
-    assert_eq!(p.construction_rate(), 1.5);
+    assert_eq!(p.construction_rate(), Amount::new(1.5));
     assert_eq!(
         Player::default().resources(),
         crate::test_ids::amounts([0.0; 4])

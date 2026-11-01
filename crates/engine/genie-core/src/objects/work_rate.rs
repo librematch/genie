@@ -76,6 +76,15 @@ impl std::fmt::Display for WorkRate {
     }
 }
 
+impl std::ops::Mul<crate::objects::masters::WorkValue> for WorkRate {
+    type Output = Self;
+
+    /// The rate a task's work value scales (one `f32` product, the rate first).
+    fn mul(self, value: crate::objects::masters::WorkValue) -> Self {
+        Self(self.0 * value.get())
+    }
+}
+
 impl genie_diff::Diff for WorkRate {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
@@ -85,6 +94,7 @@ impl genie_diff::Diff for WorkRate {
 #[cfg(test)]
 mod tests {
     use crate::objects::WorkRate;
+    use crate::objects::masters::WorkValue;
     use crate::world::Seconds;
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
@@ -102,6 +112,10 @@ mod tests {
         assert_eq!(
             ((a * 3.0) * Seconds::new(0.7)).to_bits(),
             ((0.1_f32 * 3.0) * 0.7).to_bits()
+        );
+        assert_eq!(
+            (a * WorkValue::new(0.7)).get().to_bits(),
+            (0.1_f32 * 0.7).to_bits()
         );
         assert!(WorkRate::ZERO < a && a <= a);
         assert_eq!(WorkRate::new(f32::NAN).partial_cmp(&a), None);
