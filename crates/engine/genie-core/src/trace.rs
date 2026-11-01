@@ -223,18 +223,19 @@ impl Watch {
             );
         }
         if now.order != self.order {
-            let part = |o: Option<[i32; 3]>, i: usize| o.map_or(-1, |o| o[i]);
+            let [from_order, from_ai_action, from_target] = self.order.unwrap_or([-1; 3]);
+            let [to_order, to_ai_action, to_target] = now.order.unwrap_or([-1; 3]);
             tracing::debug!(
                 target: STATE,
                 tick = tick.get(),
                 player = player.index(),
                 object,
-                from_order = part(self.order, 0),
-                to_order = part(now.order, 0),
-                from_ai_action = part(self.order, 1),
-                to_ai_action = part(now.order, 1),
-                from_target = part(self.order, 2),
-                to_target = part(now.order, 2),
+                from_order,
+                to_order,
+                from_ai_action,
+                to_ai_action,
+                from_target,
+                to_target,
                 "unit_ai"
             );
         }

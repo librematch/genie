@@ -424,7 +424,7 @@ impl World {
                 common
             } else {
                 let owner = split.owner;
-                let id = self.groups.create(owner).id;
+                let id = self.groups.create(owner);
                 for &unit in units {
                     let _ = self.add_to_group(id, unit)?;
                 }

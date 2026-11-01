@@ -119,15 +119,14 @@ impl UnitGroups {
     /// A new group at the world list's end with the next id (`FUN_14152efc0` with 1: the
     /// constructor, `FUN_141039640`'s id, then the count and the counter up by one); its state
     /// is the constructor's ([`UnitGroup::new`]) and `owner`'s, which the order's handler sets
-    /// (`+0xdc`).
-    pub fn create(&mut self, owner: Option<PlayerId>) -> &mut UnitGroup {
+    /// (`+0xdc`). Answers its id.
+    pub fn create(&mut self, owner: Option<PlayerId>) -> GroupId {
         let id = self.counter;
         self.counter = id.successor();
-        let at = self.groups.len();
         let mut g = UnitGroup::new(id);
         g.owner = owner;
         self.groups.push(g);
-        &mut self.groups[at]
+        id
     }
 }
 

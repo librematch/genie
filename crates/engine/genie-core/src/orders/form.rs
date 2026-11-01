@@ -103,7 +103,7 @@ impl World {
         number: usize,
     ) -> Result<GroupId, GenieError> {
         let owner = split.owner;
-        let id = self.groups.create(owner).id;
+        let id = self.groups.create(owner);
         for &unit in units {
             let _ = self.add_to_group(id, unit)?;
             if let Some(&at) = units.get(number) {

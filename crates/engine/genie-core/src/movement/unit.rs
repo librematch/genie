@@ -198,7 +198,7 @@ impl Unit {
                 let look = self.abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
-                let (walk, rng) = c.walk_and_sprites(&mut self.body, me);
+                let (walk, rng) = c.walk_and_sprites(&mut self.body, me)?;
                 let shows = Shows {
                     sprite: &mut self.sprite,
                     rng,

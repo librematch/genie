@@ -217,24 +217,33 @@ impl Step<'_> {
     }
 
     /// What a walk takes of the update beside the world ([`World::walk_beside`]).
-    pub(crate) fn pace(&self) -> Pace {
-        Pace {
+    ///
+    /// # Errors
+    ///
+    /// An updating player the world has not got.
+    pub(crate) fn pace(&self) -> Result<Pace, GenieError> {
+        Ok(Pace {
             dt: self.dt.seconds(),
             now: self.w.world_time,
-            computer: self.w.players[self.player.index()].computer,
-        }
+            computer: self.w.players.player(self.player)?.computer,
+        })
     }
 }
 
 impl Step<'_> {
     /// A walk and the Sprite stream, for an attacker's update.
+    ///
+    /// # Errors
+    ///
+    /// An updating player the world has not got.
     pub(crate) fn walk_and_sprites<'b>(
         &'b mut self,
         body: &'b mut crate::objects::layers::Body,
         me: Me,
-    ) -> (Walk<'b>, &'b mut Well512) {
+    ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
+        let computer = self.w.players.player(self.player)?.computer;
         let (object, sprite) = self.w.streams.two(Stream::Object, Stream::Sprite);
-        (
+        Ok((
             Walk {
                 body,
                 me,
@@ -243,12 +252,12 @@ impl Step<'_> {
                 plan: Some(Planning {
                     pathing: &mut self.w.pathing,
                     now: self.w.world_time,
-                    computer: self.w.players[self.player.index()].computer,
+                    computer,
                     object,
                     groups: &self.w.groups,
                 }),
             },
             sprite,
-        )
+        ))
     }
 }

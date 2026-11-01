@@ -337,8 +337,8 @@ fn a_new_group_takes_the_next_id_at_the_list_s_end() {
         counter: group_id(4),
         ..UnitGroups::default()
     };
-    assert_eq!(groups.create(Some(PlayerId::new(2))).id, group_id(4));
-    assert_eq!(groups.create(Some(PlayerId::new(1))).id, group_id(5));
+    assert_eq!(groups.create(Some(PlayerId::new(2))), group_id(4));
+    assert_eq!(groups.create(Some(PlayerId::new(1))), group_id(5));
     assert_eq!(groups.counter, group_id(6));
     assert_eq!(
         groups
