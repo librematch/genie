@@ -8,8 +8,8 @@ use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::walk_in::WalkIn;
 use crate::pathing::hull_path::walks::WalkOut;
 use crate::pathing::hull_path::{
-    GROWTHS, HullIndex, HullPather, HullQuery, ITERATION_CAP, MOST, NUDGE, NodeIndex, NodeList,
-    PATHS, Point, WalkResult, Waypoints,
+    EntranceIndex, GROWTHS, HullIndex, HullPather, HullQuery, ITERATION_CAP, MOST, NUDGE,
+    NodeIndex, NodeList, PATHS, Point, WalkResult, Waypoints,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -19,8 +19,8 @@ pub(super) struct Rounds {
     nearest_d: Distance,
     /// Whether the search reached the goal or the target.
     pub(super) found: bool,
-    /// The goal hull's entrance the found node takes, or -1.
-    pub(super) entrance: i32,
+    /// The goal hull's entrance the found node takes (the game's -1 for none).
+    pub(super) entrance: Option<EntranceIndex>,
     /// The nodes expanded, across the rounds.
     iterations: i32,
     /// How often the area grew.
@@ -44,7 +44,7 @@ impl Rounds {
         Self {
             nearest_d: straight,
             found: false,
-            entrance: -1,
+            entrance: None,
             iterations: 0,
             growths: 0,
             within: false,
@@ -268,7 +268,7 @@ impl HullPather<'_> {
             e.points.clear();
         }
         let n = self.hulls.checked(hull.index())?.points.len();
-        self.hulls.checked_mut(hull.index())?.entrances = vec![-1; n];
+        self.hulls.checked_mut(hull.index())?.entrances = vec![None; n];
         let mut count = 0;
         let mut sides = [0usize; PATHS];
         let walk = self.walk_in(WalkIn {
@@ -424,13 +424,12 @@ impl HullPather<'_> {
             && 0 <= vertex
         {
             let hull = self.hulls.checked(goal.index())?;
-            if let Some(&e) = hull.entrances.get(vertex as usize)
+            if let Some(&Some(e)) = hull.entrances.get(vertex as usize)
                 && (vertex as usize) < hull.points.len()
-                && 0 <= e
             {
                 rounds.found = true;
                 rounds.best_node = Some(best);
-                rounds.entrance = e;
+                rounds.entrance = Some(e);
                 return Ok(Expanded::End);
             }
         }

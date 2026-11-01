@@ -68,7 +68,7 @@ impl HullPather<'_> {
                     min,
                     Point::new(min.x(), max.y()),
                 ],
-                entrances: vec![-1; 4],
+                entrances: vec![None; 4],
                 min,
                 max,
                 objects: Vec::new(),

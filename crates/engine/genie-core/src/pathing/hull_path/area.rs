@@ -11,7 +11,7 @@ use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::{
-    EPSILON, HullIndex, HullPather, MOST_AREA, PATHS, Point, Target, Waypoints,
+    EPSILON, EntranceIndex, HullIndex, HullPather, MOST_AREA, PATHS, Point, Target, Waypoints,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -26,18 +26,15 @@ impl HullPather<'_> {
     /// the records joined it, which the slice does not hold: the answer is exact for one object
     /// holding the goal or none.
     pub(super) fn goal_record(&self, to: Point) -> Result<Option<Target>, GenieError> {
-        let grow = self.buffer.unwrap_or(0.0);
-        if !self
-            .world
-            .point_hit(to, Distance::new(grow), &self.ignore, false)?
-        {
+        let grow = self.buffer.unwrap_or(Distance::ZERO);
+        if !self.world.point_hit(to, grow, &self.ignore, false)? {
             return Ok(None);
         }
         let near: Vec<ObjectId> = self
             .world
             .records()
             .filter(|&(id, _, b)| {
-                !self.ignore.contains(&RecordId::from(id)) && b.grown(Distance::new(grow)).holds(to)
+                !self.ignore.contains(&RecordId::from(id)) && b.grown(grow).holds(to)
             })
             .map(|(id, _, _)| id)
             .collect();
@@ -50,10 +47,7 @@ impl HullPather<'_> {
                     .filter(|&&o| o != id)
                     .map(|&o| RecordId::from(o)),
             );
-            if !self
-                .world
-                .point_hit(to, Distance::new(grow), &others, false)?
-            {
+            if !self.world.point_hit(to, grow, &others, false)? {
                 continue;
             }
             let Some(p) = self.world.get(id) else {
@@ -227,7 +221,7 @@ impl HullPather<'_> {
                 hull.points.len()
             };
             hull.points.insert(at, last);
-            hull.entrances.insert(at, e as i32);
+            hull.entrances.insert(at, Some(EntranceIndex(e)));
             if *by.checked(k)? != 0 {
                 joined += 1;
             }

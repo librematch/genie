@@ -316,12 +316,10 @@ impl HullPather<'_> {
         if movers.is_empty() {
             return Ok(met);
         }
-        let grow = self.buffer.unwrap_or(0.0);
+        let grow = self.buffer.unwrap_or(Distance::ZERO);
         let mut skip = self.ignore.clone();
         loop {
-            let hits = self
-                .world
-                .line_hits(a, b, Distance::new(grow), false, &skip)?;
+            let hits = self.world.line_hits(a, b, grow, false, &skip)?;
             let full = LINE_HITS <= hits.len();
             for id in hits {
                 if let Some(o) = id.object()

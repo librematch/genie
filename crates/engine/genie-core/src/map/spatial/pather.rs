@@ -48,7 +48,7 @@ impl Spatial {
         &mut self,
         a: Point,
         b: Point,
-        buffer: Option<f32>,
+        buffer: Option<Distance>,
         mask: crate::map::TerrainMask,
         ignore: &[RecordId],
         first: bool,
@@ -58,10 +58,10 @@ impl Spatial {
         let hi_x = if a.x() <= b.x() { b.x() } else { a.x() };
         let lo_y = if b.y() <= a.y() { b.y() } else { a.y() };
         let hi_y = if a.y() <= b.y() { b.y() } else { a.y() };
-        let g = buffer.unwrap_or(0.0);
-        self.put_tile_records(a, b, Distance::new(g), mask);
+        let g = buffer.unwrap_or(Distance::ZERO);
+        self.put_tile_records(a, b, g, mask);
         let walk_box = Rect::new(lo_x, lo_y, hi_x, hi_y);
-        let grown = walk_box.grown(Distance::new(g));
+        let grown = walk_box.grown(g);
         let mut hits = Vec::new();
         if grown.leaves_map(self.map) {
             hits = self.edge_records(grown, QUERY_HITS);
@@ -72,8 +72,7 @@ impl Spatial {
         self.check_known_records(grown)?;
         let walk = Segment { from: a, to: b };
         let meets = |kind: ObstructionType, bx: Rect| {
-            walk_box.overlaps(bx.grown(Distance::new(g)))
-                && record_meets_segment(kind, bx, Distance::new(g), walk)
+            walk_box.overlaps(bx.grown(g)) && record_meets_segment(kind, bx, g, walk)
         };
         let level = self.grid.level(0);
         let shift = self.grid.shift(level);
@@ -134,7 +133,7 @@ impl Spatial {
         &mut self,
         a: Point,
         b: Point,
-        buffer: Option<f32>,
+        buffer: Option<Distance>,
         mask: crate::map::TerrainMask,
         ignore: &[RecordId],
     ) -> Result<bool, GenieError> {
@@ -149,7 +148,7 @@ impl Spatial {
         &mut self,
         a: Point,
         b: Point,
-        buffer: Option<f32>,
+        buffer: Option<Distance>,
         mask: crate::map::TerrainMask,
         ignore: &[RecordId],
     ) -> Result<Vec<Hit>, GenieError> {
@@ -270,7 +269,7 @@ impl<E> crate::pathing::tile_path::SegmentTest<E> for SmoothingWalls<'_> {
     fn blocked(&mut self, a: Point, b: Point) -> Result<bool, E> {
         self.ran = true;
         // the pass's buffer, the unit's radius (FUN_1410562d0 with 1)
-        self.world.set_manager_buffer(Some(self.radius.get()));
+        self.world.set_manager_buffer(Some(self.radius));
         self.world.put_tile_records(a, b, self.radius, self.mask);
         Ok(self.world.segment_meets(a, b, self.radius, self.ignore))
     }

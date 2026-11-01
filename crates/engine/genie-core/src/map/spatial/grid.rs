@@ -328,14 +328,14 @@ impl Spatial {
 
     /// `FUN_1410562d0` on the obstruction manager: its buffer becomes `buffer` (None: not set),
     /// until the next call.
-    pub const fn set_manager_buffer(&mut self, buffer: Option<f32>) {
+    pub const fn set_manager_buffer(&mut self, buffer: Option<Distance>) {
         self.manager_buffer = buffer;
     }
 
     /// The obstruction manager's buffer as the last `FUN_1410562d0` left it
     /// ([`Spatial::set_manager_buffer`]).
     #[must_use]
-    pub const fn manager_buffer(&self) -> Option<f32> {
+    pub const fn manager_buffer(&self) -> Option<Distance> {
         self.manager_buffer
     }
 
@@ -345,7 +345,7 @@ impl Spatial {
     /// spot `FUN_141007630`).
     #[must_use]
     pub fn manager_grow(&self) -> Distance {
-        Distance::new(self.manager_buffer.unwrap_or(0.0))
+        self.manager_buffer.unwrap_or(Distance::ZERO)
     }
 
     /// The walk's obstruction query (`FUN_14114cc60` -> `FUN_141051900` with flags `0x90`, each

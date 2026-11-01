@@ -569,7 +569,7 @@ pub struct Spatial {
     /// records by) as the last `FUN_1410562d0` left it, None when not set: the routines that
     /// set it reset it at their end but `FindShortPath`'s quick-only exit, and the queries that
     /// set none read what is left ([`Spatial::manager_grow`]).
-    manager_buffer: Option<f32>,
+    manager_buffer: Option<Distance>,
     objects: BTreeMap<ObjectId, Placed>,
     /// The cell of each object's record ([`RecordCells`]), kept with `objects`
     /// ([`Spatial::refile`]).

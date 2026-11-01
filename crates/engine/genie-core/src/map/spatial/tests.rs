@@ -598,7 +598,7 @@ fn a_line_meets_the_records_and_the_tiles_its_mask_lacks() {
         Tiles::new(crate::map::GridSize::new(10, 10), classes),
     );
     s.insert(object_id(7), villager(4.0, 5.5));
-    s.set_manager_buffer(Some(0.2));
+    s.set_manager_buffer(Some(Distance::new(0.2)));
     let hits = s
         .line_query(
             Point::new(2.0, 5.5),
@@ -708,7 +708,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
         (s.manager_buffer(), s.manager_grow()),
         (None, Distance::ZERO)
     );
-    s.set_manager_buffer(Some(0.1));
+    s.set_manager_buffer(Some(Distance::new(0.1)));
     assert_eq!(s.manager_grow(), Distance::new(0.1));
     assert!(
         s.point_clear(
@@ -720,7 +720,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
         .unwrap()
     );
     assert_eq!(s.manager_buffer(), None);
-    s.set_manager_buffer(Some(0.1));
+    s.set_manager_buffer(Some(Distance::new(0.1)));
     let _ = s
         .walk_hits(WalkQuery {
             start: Point::new(2.0, 2.0),
@@ -1712,7 +1712,7 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
     );
     let (a, b) = (Point::new(6.5, 6.5), Point::new(7.5, 7.5));
     assert!(
-        !s.pather_blocked(a, b, Some(0.5), TerrainMask::of_bits(1), &[])
+        !s.pather_blocked(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
             .unwrap()
     );
     s.clear_tile_records();
@@ -1720,7 +1720,7 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
         s.pather_blocked(
             Point::new(5.5, 4.0),
             Point::new(5.5, 7.0),
-            Some(0.5),
+            Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
             &[]
         )
@@ -1728,7 +1728,7 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
     );
     assert_eq!(s.tile_records(), vec![Tile::new(5, 5)]);
     let hits = s
-        .pather_hits(a, b, Some(0.5), TerrainMask::of_bits(1), &[])
+        .pather_hits(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
         .unwrap();
     assert_eq!(
         hits,
@@ -1742,7 +1742,7 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
         !s.pather_blocked(
             a,
             b,
-            Some(0.5),
+            Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
             &[tile_record_id(Tile::new(5, 5))]
         )
@@ -1750,7 +1750,7 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
     );
     s.clear_tile_records();
     assert!(
-        !s.pather_blocked(a, b, Some(0.5), TerrainMask::of_bits(1), &[])
+        !s.pather_blocked(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
             .unwrap()
     );
 }
@@ -1782,12 +1782,12 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
     let edge = s.edge_records(Rect::new(-0.3, 7.5, 6.5, 8.5), QUERY_HITS);
     assert_ne!(edge.len(), 0);
     assert!(
-        s.pather_blocked(a, b, Some(0.5), TerrainMask::of_bits(1), &[])
+        s.pather_blocked(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
             .unwrap()
     );
     s.clear_tile_records();
     let hits = s
-        .pather_hits(a, b, Some(0.5), TerrainMask::of_bits(1), &[])
+        .pather_hits(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
         .unwrap();
     assert_eq!(hits.len(), edge.len() + 1);
     assert_eq!(hits[..edge.len()], edge[..]);
@@ -1798,7 +1798,7 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
         .pather_hits(
             Point::new(1.0, 8.0),
             Point::new(6.0, 8.0),
-            Some(0.5),
+            Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
             &[],
         )
@@ -1818,7 +1818,7 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
         s.pather_hits(
             Point::new(1.0, 8.0),
             Point::new(6.0, 8.0),
-            Some(0.5),
+            Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
             &[]
         )
@@ -1835,7 +1835,7 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
         s.pather_hits(
             Point::new(1.0, 8.0),
             Point::new(6.0, 8.0),
-            Some(0.5),
+            Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
             &[]
         )

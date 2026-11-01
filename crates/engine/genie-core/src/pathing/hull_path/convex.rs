@@ -138,7 +138,7 @@ impl Hull {
             }
         }
         if scratch.len() > self.entrances.len() {
-            self.entrances.resize(scratch.len(), -1);
+            self.entrances.resize(scratch.len(), None);
         }
         let mut k = 0;
         let mut first = *scratch.checked(0)?;

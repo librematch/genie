@@ -108,7 +108,6 @@ impl HullPather<'_> {
         keep: bool,
         quick_only: bool,
     ) -> Result<(ShortFound, Waypoints, bool), GenieError> {
-        let r = self.radius.get();
         let mut path = Waypoints::default();
         if !keep {
             self.area = NO_AREA;
@@ -122,7 +121,7 @@ impl HullPather<'_> {
         if self.already_there(&q) {
             return Ok((ShortFound::InRange, path, false));
         }
-        self.buffer = (0.0 < r).then_some(r * HALF);
+        self.buffer = (Distance::ZERO < self.radius).then_some(self.radius * HALF);
         // the pather's buffer becomes the manager's (FUN_1410562d0), its temporary tile records
         // go (FUN_1410561f0), and the pather's ignore list becomes the manager's
         // (FUN_1410562e0 with +0xc0..+0xd0)
@@ -332,10 +331,10 @@ impl HullPather<'_> {
         rounds: &Rounds,
         path: &mut Waypoints,
     ) -> Result<bool, GenieError> {
-        if rounds.entrance < 0 {
+        let Some(entrance) = rounds.entrance else {
             return Ok(true);
-        }
-        let e = &self.entrances.checked(rounds.entrance as usize)?.points;
+        };
+        let e = &self.entrances.checked(entrance.0)?.points;
         for j in (0..e.len().saturating_sub(1)).rev() {
             path.push(*e.checked(j)?);
         }

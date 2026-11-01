@@ -137,7 +137,7 @@ impl Shape {
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Hull {
     points: Vec<Point>,
-    entrances: Vec<i32>,
+    entrances: Vec<Option<EntranceIndex>>,
     min: Point,
     max: Point,
     objects: Vec<Shape>,
@@ -165,6 +165,11 @@ impl HullIndex {
         i32::try_from(self.0).unwrap_or(i32::MAX)
     }
 }
+
+/// An entrance path's place in the pather's entrance paths (`+0x110`, at most [`PATHS`]): a
+/// point of the goal's hull holds the one ending at it (the game's −1 for none).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct EntranceIndex(usize);
 
 /// A node's place in the pather's nodes (`PathingNode`s in the order made; the two lists'
 /// heads first).
@@ -418,7 +423,7 @@ pub struct HullPather<'w> {
     /// ignored or moving.
     include: Vec<ObjectId>,
     /// The manager's buffer for the line tests (`+0x57`, `+0x58`): half the radius.
-    buffer: Option<f32>,
+    buffer: Option<Distance>,
     /// The ignore list (`+0xc0` on, `+0xc4` count, `+0xd0` ids), which the manager's tests read.
     ignore: Vec<RecordId>,
     hulls: Vec<Hull>,

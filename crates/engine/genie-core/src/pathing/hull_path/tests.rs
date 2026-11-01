@@ -28,7 +28,7 @@ fn square() -> Hull {
             Point::new(0.0, 0.0),
             Point::new(0.0, 1.0),
         ],
-        entrances: vec![-1; 4],
+        entrances: vec![None; 4],
         min: Point::new(0.0, 0.0),
         max: Point::new(1.0, 1.0),
         objects: Vec::new(),
@@ -276,7 +276,7 @@ fn a_hull_crossing_only_the_other_s_last_tested_side_merges() {
             Point::new(2.0, -1.0),
             Point::new(-1.0, 2.0),
         ],
-        entrances: vec![-1; 4],
+        entrances: vec![None; 4],
         min: Point::new(-1.0, -1.0),
         max: Point::new(2.1, 2.1),
         objects: Vec::new(),
@@ -290,7 +290,7 @@ fn a_hull_crossing_only_the_other_s_last_tested_side_merges() {
             Point::new(0.0, 0.0),
             Point::new(0.0, 10.0),
         ],
-        entrances: vec![-1; 4],
+        entrances: vec![None; 4],
         min: Point::new(0.0, 0.0),
         max: Point::new(10.0, 10.0),
         objects: Vec::new(),
@@ -1036,7 +1036,7 @@ fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
             Point::new(0.0, 0.0),
             Point::new(0.0, 1.0),
         ],
-        entrances: vec![-1; 4],
+        entrances: vec![None; 4],
         min: Point::new(0.0, 0.0),
         max: Point::new(1.0, 1.0),
         objects: Vec::new(),
@@ -1817,7 +1817,11 @@ fn the_hull_search_goes_around_a_wall_to_the_target() {
     // the target's hull took the four entrance ends on its left side, by their distance from
     // the side's first point (11.8, 4.8)
     let x = 11.8 - NUDGE;
-    assert_eq!(p.hulls[1].entrances, [-1, -1, -1, 2, 0, 1, 3, -1]);
+    let e = |i: usize| Some(EntranceIndex(i));
+    assert_eq!(
+        p.hulls[1].entrances,
+        [None, None, None, e(2), e(0), e(1), e(3), None]
+    );
     assert_eq!(p.hulls[1].points[3].x(), x);
     assert_eq!(result, ShortFound::Reached);
     assert_eq!(
@@ -2598,7 +2602,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         Distance::new(0.6),
         Some(PlayerId::from(1)),
     );
-    p.buffer = Some(0.3);
+    p.buffer = Some(Distance::new(0.3));
     assert!(
         !p.blocked(Point::new(2.0, 5.5), Point::new(10.0, 5.5))
             .unwrap()
@@ -2626,7 +2630,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         Some(PlayerId::from(1)),
     )
     .including(&[object_id(50)]);
-    p.buffer = Some(0.3);
+    p.buffer = Some(Distance::new(0.3));
     assert!(
         p.blocked(Point::new(2.0, 5.5), Point::new(10.0, 5.5))
             .unwrap()
@@ -2666,7 +2670,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
         Some(PlayerId::from(1)),
     )
     .including(&[object_id(50)]);
-    q.buffer = Some(0.3);
+    q.buffer = Some(Distance::new(0.3));
     assert!(
         !q.blocked(Point::new(2.0, 5.5), Point::new(10.0, 5.5))
             .unwrap()
@@ -2819,7 +2823,7 @@ fn around_triangle(at: Point, taken: &[i32]) -> (Vec<(Point, Option<usize>, i32)
             Point::new(5.0, 4.0),
             Point::new(4.0, 5.0),
         ],
-        entrances: vec![-1; 3],
+        entrances: vec![None; 3],
         min: Point::new(4.0, 4.0),
         max: Point::new(5.0, 6.0),
         objects: Vec::new(),
@@ -2943,7 +2947,7 @@ fn a_found_path_follows_its_entrance_and_keeps_a_last_leg_on_the_target() {
     let mut path = walk();
     assert_eq!(p.found_end(&q, &rounds, &mut path), Ok(true));
     assert_eq!(path, walk());
-    rounds.entrance = 0;
+    rounds.entrance = Some(EntranceIndex(0));
     let through = [
         Point::new(2.0, 5.5),
         Point::new(11.7, 5.5),
