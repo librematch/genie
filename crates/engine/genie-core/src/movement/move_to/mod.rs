@@ -23,6 +23,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use genie_diff::Diff;
 
 mod action;
@@ -178,6 +179,8 @@ pub struct Walk<'a> {
     pub world: &'a mut Spatial,
     /// The planners and the world's time for a path request, None where the caller has none.
     pub plan: Option<Planning<'a>>,
+    /// The objects by id: what the walk reads of the units it meets ([`ObjectsRef::gait`]).
+    pub by_id: ObjectsRef<'a>,
 }
 
 impl Walk<'_> {
@@ -202,6 +205,7 @@ impl Walk<'_> {
             dt: self.dt,
             world: &mut *self.world,
             plan: self.plan.as_mut().map(|p| p.reborrow()),
+            by_id: self.by_id,
         }
     }
 }
@@ -404,12 +408,13 @@ pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
         dt,
         world,
         mut plan,
+        by_id,
     } = walk;
     let mover = body.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
     if mover.paths.is_empty() {
         return Err(GenieError::unsupported("the path request (FUN_14114e410)"));
     }
-    Ok(match mover.motion(&me, dt, world, plan.as_mut())? {
+    Ok(match mover.motion(&me, dt, world, plan.as_mut(), by_id)? {
         Motion::Moving => Some(MoveTo::Moving),
         Motion::Arrived => Some(MoveTo::Arrived),
         Motion::Done => None,
@@ -957,8 +962,10 @@ mod tests {
             let mover = crate::movement::tests::builder_9177();
             let mut mover = Body::new(Position::new(28.0, 89.0, 0.0), None, Some(mover));
             let mut walk = Walk {
+                by_id: ObjectsRef::empty(),
                 body: &mut mover,
                 me: Me {
+                    human_order: WorldTime::ZERO,
                     id: object_id(9177),
                     group: None,
                     action_state: ActionState::new(4),

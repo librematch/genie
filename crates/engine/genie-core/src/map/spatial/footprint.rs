@@ -35,6 +35,7 @@ impl Spatial {
         mask: crate::map::TerrainMask,
         (at, radius): (Position, Footprint),
         farthest: bool,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
         /// The footprint's last tile stops short of its edge by this (`DAT_142eb1e9c`).
         const EDGE: f32 = crate::math::image::spatial::FOOTPRINT_EDGE;
@@ -65,7 +66,7 @@ impl Spatial {
                 for n in t.beside() {
                     let at = ((ox + n.x()) * size + n.y() + oy) as usize;
                     if !*visited.checked(at)?
-                        && self.passable(n, mask, me, Distance::new(radius_x))?
+                        && self.passable(n, mask, me, Distance::new(radius_x), by_id)?
                     {
                         *visited.checked_mut(at)? = true;
                         list.push(n);
@@ -197,6 +198,7 @@ impl Spatial {
         point: Point,
         grow: Distance,
         mask: crate::map::TerrainMask,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (x, y) = (point.x(), point.y());
         let (tx, ty) = (x as i32, y as i32);
@@ -211,7 +213,7 @@ impl Spatial {
         let own = [RecordId::from(me)];
         self.set_manager_ignore(&own);
         self.set_manager_buffer(None);
-        Ok(!self.point_hit(point, grow, &own, false)?)
+        Ok(!self.point_hit(point, grow, &own, false, by_id)?)
     }
 
     /// Slot 0x270 of unit `me` (`FUN_141158940`): whether it could stand at `point` among the
@@ -231,6 +233,7 @@ impl Spatial {
         grow: Distance,
         mask: crate::map::TerrainMask,
         ignore: &[ObjectId],
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         // CVTTSS2SI: a NaN or huge coordinate is i32::MIN, off the map
         let Some(word) = self.tiles.word(point.tile()) else {
@@ -248,7 +251,7 @@ impl Spatial {
         self.set_manager_ignore(&ignore);
         // the buffer it set for the query it resets after (FUN_1410562d0 with 0)
         self.set_manager_buffer(None);
-        Ok(!self.point_hit(point, grow, &ignore, false)?)
+        Ok(!self.point_hit(point, grow, &ignore, false, by_id)?)
     }
 
     /// The obstruction manager's point query (`FUN_141051900` with flags 0x20, any player, the
@@ -271,6 +274,7 @@ impl Spatial {
         grow: Distance,
         ignore: &[RecordId],
         still: bool,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::between(point, point).grown(grow);
         if rect.leaves_map(self.map) && !self.edge_records(rect, QUERY_HITS).is_empty() {
@@ -287,7 +291,7 @@ impl Spatial {
         if tile {
             return Ok(true);
         }
-        self.object_holds(point, grow, ignore, still)
+        self.object_holds(point, grow, ignore, still, by_id)
     }
 
     /// The objects' records of [`Spatial::point_hit`]'s query (`FUN_141051900` with flags 0x20,
@@ -304,6 +308,7 @@ impl Spatial {
         grow: Distance,
         ignore: &[RecordId],
         still: bool,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::between(point, point).grown(grow);
         self.check_known_records(rect)?;
@@ -314,7 +319,7 @@ impl Spatial {
             else {
                 return false;
             };
-            if still && self.gaits.get(id).is_some_and(|g| g.moving) {
+            if still && by_id.moving(id) {
                 return false;
             }
             if !self.visits(p, o.kind, rect) {

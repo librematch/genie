@@ -319,6 +319,7 @@ impl Unit {
     /// `MoveTo` walks there ([`crate::gathering::gather::GatherAction::set_drop`]). Without one the unit AI's
     /// part (notify 0x203) is not modelled.
     pub(crate) fn gather_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let w = DropWorld {
             masters: c.w.masters.of(c.player),
             spatial: &mut c.w.spatial,
@@ -330,7 +331,7 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.gather_drop_off_in(w, others, &c.w.graphics)? {
+        if let Some(site) = self.gather_drop_off_in(w, others, &c.w.graphics, by_id)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;
         }
@@ -345,6 +346,7 @@ impl Unit {
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
         graphics: &crate::objects::Graphics,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
@@ -357,8 +359,13 @@ impl Unit {
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
-        let (site, gap) =
-            self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;
+        let (site, gap) = self.drop_site(
+            &mut c,
+            others,
+            carry_to,
+            ActionState::new(state.get()),
+            by_id,
+        )?;
         let at = c
             .spatial
             .get_known(site)?
@@ -387,6 +394,7 @@ impl Unit {
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
         graphics: &crate::objects::Graphics,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
@@ -399,8 +407,13 @@ impl Unit {
             .hunt()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
-        let (site, gap) =
-            self.drop_site(&mut c, others, carry_to, ActionState::new(state.get()))?;
+        let (site, gap) = self.drop_site(
+            &mut c,
+            others,
+            carry_to,
+            ActionState::new(state.get()),
+            by_id,
+        )?;
         if site.is_none() {
             return Err(GenieError::unsupported(
                 "a hunt without a drop site (notify 0x203, set_state 2)",
@@ -437,6 +450,7 @@ impl Unit {
         others: OthersRef<'_>,
         carry_to: Option<DropSiteId>,
         state: ActionState,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
         let master = self.master_in(c.masters)?;
         let mover = self
@@ -449,7 +463,7 @@ impl Unit {
                 "a drop-off of a player without masters",
             ))?;
             let sites = &master.drop_sites;
-            site = match self.drop_site_from(c, others, state, true)? {
+            site = match self.drop_site_from(c, others, state, true, by_id)? {
                 Some(s) => Some(s),
                 None => drop_site_search(
                     others.own_iter(),
@@ -458,6 +472,7 @@ impl Unit {
                     self.position(),
                     None,
                     (true, Some(action_type::UNPACK)),
+                    by_id,
                 )?,
             };
         }
@@ -485,6 +500,7 @@ impl Unit {
         others: OthersRef<'_>,
         state: ActionState,
         outside: bool,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let by_path = !c.computer;
         self.drop_site_with(
@@ -492,6 +508,7 @@ impl Unit {
             others,
             state,
             (outside, by_path, Some(action_type::UNPACK)),
+            by_id,
         )
     }
 
@@ -503,6 +520,7 @@ impl Unit {
         others: OthersRef<'_>,
         state: ActionState,
         (outside, by_path, at_work): (bool, bool, Option<ActionType>),
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let masters = c.masters.ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
@@ -520,9 +538,8 @@ impl Unit {
             .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
         let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
         let me = Me {
-            id: self.id,
-            group: self.group.id,
             action_state: state,
+            ..self.me()
         };
         let mut plan = Planning {
             pathing: &mut *c.pathing,
@@ -548,6 +565,7 @@ impl Unit {
             self.position(),
             Some(seeker),
             (outside, at_work),
+            by_id,
         )
     }
 }

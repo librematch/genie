@@ -56,6 +56,7 @@ impl Unit {
     /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
     /// of at most 0).
     pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let master = self.master(&c.w.masters, c.player)?;
         let transforms = master
@@ -77,7 +78,7 @@ impl Unit {
             return Ok(());
         }
         let locked = gate.locked;
-        let (total, allied) = self.gate_count(&mut c.w.spatial, others)?;
+        let (total, allied) = self.gate_count(&mut c.w.spatial, others, by_id)?;
         let gate = self.building.gate.as_mut().ok_or(GenieError::unreachable(
             "a gate whose state went during its update",
         ))?;
@@ -124,9 +125,14 @@ impl Unit {
         &self,
         spatial: &mut Spatial,
         others: OthersRef<'_>,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(usize, usize), GenieError> {
-        let (units, allied) =
-            gate_units(spatial, self.id, &annexes_of(self.id, others.own_iter()))?;
+        let (units, allied) = gate_units(
+            spatial,
+            self.id,
+            &annexes_of(self.id, others.own_iter()),
+            by_id,
+        )?;
         Ok((units.len(), allied))
     }
 
@@ -425,10 +431,9 @@ impl Unit {
     /// counts down by the world's dt (`+0x7c`, in ms), not below 0. The walk reads the field
     /// live, so the world's view follows at once: the unit's own walk later in this update ranks
     /// the units it meets by the counted-down time.
-    pub(crate) fn count_down_human_order(&mut self, dt: Millis, spatial: &mut Spatial) {
+    pub(crate) fn count_down_human_order(&mut self, dt: Millis) {
         if self.last_human_order <= crate::unit_ai::HUMAN_ORDER_CAP {
             self.last_human_order = self.last_human_order.saturating_before(dt);
-            spatial.set_human_order(self.id, self.last_human_order);
         }
     }
 }

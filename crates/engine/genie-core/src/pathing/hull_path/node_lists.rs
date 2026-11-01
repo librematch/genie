@@ -268,7 +268,7 @@ impl HullPather<'_> {
     pub(super) fn blocked(&mut self, a: Point, b: Point) -> Result<bool, GenieError> {
         if self
             .world
-            .pather_blocked(a, b, self.buffer, self.mask, &self.ignore)?
+            .pather_blocked(a, b, self.buffer, self.mask, &self.ignore, self.by_id)?
         {
             return Ok(true);
         }
@@ -280,9 +280,9 @@ impl HullPather<'_> {
     /// Spatial's pather query and the included objects that move
     /// ([`HullPather::included_movers`]). The callers read how many and which, not their order.
     pub(super) fn hits(&mut self, a: Point, b: Point) -> Result<Vec<Hit>, GenieError> {
-        let mut hits = self
-            .world
-            .pather_hits(a, b, self.buffer, self.mask, &self.ignore)?;
+        let mut hits =
+            self.world
+                .pather_hits(a, b, self.buffer, self.mask, &self.ignore, self.by_id)?;
         for id in self.included_movers(a, b)? {
             if let Some(p) = self.world.get(id) {
                 hits.push(Hit {
@@ -307,10 +307,7 @@ impl HullPather<'_> {
             .include
             .iter()
             .copied()
-            .filter(|id| {
-                !self.ignore.contains(&RecordId::from(*id))
-                    && self.world.gait(*id).is_some_and(|g| g.moving)
-            })
+            .filter(|id| !self.ignore.contains(&RecordId::from(*id)) && self.by_id.moving(*id))
             .collect();
         let mut met = Vec::new();
         if movers.is_empty() {

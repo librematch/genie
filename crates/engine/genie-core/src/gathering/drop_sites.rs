@@ -67,6 +67,7 @@ impl Seeker<'_, '_> {
         by_path: bool,
         squared: f32,
         last: &mut f32,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<f32>, GenieError> {
         let radii = Distance::new(self.mover.stats.radius.x() + master.radius.x());
         let to = o.position().ground();
@@ -88,6 +89,7 @@ impl Seeker<'_, '_> {
                         self.spatial,
                         o.id,
                         Distance::new(DROP_REACH),
+                        by_id,
                     )?
                     && short < length
                 {
@@ -164,6 +166,7 @@ pub(crate) fn drop_site_search<'u>(
     at: Position,
     mut seeker: Option<Seeker<'_, '_>>,
     (outside, at_work): (bool, Option<ActionType>),
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<Option<DropSiteId>, GenieError> {
     let (mut x, mut y) = (at.x(), at.y());
     let pointless = x <= NO_POINT || y <= NO_POINT;
@@ -214,7 +217,7 @@ pub(crate) fn drop_site_search<'u>(
         let (dx, dy) = (x - o.position().x(), y - o.position().y());
         let squared = dy * dy + dx * dx;
         let d = match seeker.as_mut() {
-            Some(s) => match s.measure(o, master, by_path, squared, &mut last)? {
+            Some(s) => match s.measure(o, master, by_path, squared, &mut last, by_id)? {
                 Some(d) => d,
                 None => continue,
             },
@@ -403,6 +406,7 @@ mod tests {
         let seeker = Seeker {
             unit,
             me: Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 action_state: ActionState::NO_ACTION,
                 group: None,
@@ -414,7 +418,15 @@ mod tests {
             class,
             by_path: true,
         };
-        drop_site_search(units, &masters(), &SITES, at, Some(seeker), (false, None))
+        drop_site_search(
+            units,
+            &masters(),
+            &SITES,
+            at,
+            Some(seeker),
+            (false, None),
+            crate::world::index::ObjectsRef::empty(),
+        )
     }
 
     /// `FUN_1411671e0`'s farm (slot 0x190 of a class-4 seeker on a class-49 object): a villager

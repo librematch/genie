@@ -180,6 +180,7 @@ impl EnterAction {
         start: WalkStart,
         meeting: Meeting<'_>,
         reads: &MoveToReads<'_>,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Walking, GenieError> {
         self.move_to = None;
         self.state = EnterState::Walk;
@@ -189,7 +190,7 @@ impl EnterAction {
         let code = if t.building {
             0
         } else {
-            let (meet_at, code) = meeting.point()?;
+            let (meet_at, code) = meeting.point(by_id)?;
             self.point = self.point.with_x(meet_at.x()).with_y(meet_at.y());
             code
         };
@@ -282,12 +283,13 @@ impl EnterAction {
         gap_squared: DistanceSquared,
         target_speed: Speed,
         walls: &mut crate::garrison::Walls<'_>,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         if range.squared() < gap_squared {
             return Ok(false);
         }
         if range <= ENTER_NEAR && Speed::ZERO < target_speed {
-            return Ok(!walls.walled_off()?);
+            return Ok(!walls.walled_off(by_id)?);
         }
         Ok(true)
     }
@@ -467,7 +469,13 @@ impl EnterAction {
                 graphics: &w.graphics,
             };
             let moves = MoveToReads::with_sprites(sprites, meeting.unit);
-            self.walk_again(t, reads.start, meeting, &moves)?
+            self.walk_again(
+                t,
+                reads.start,
+                meeting,
+                &moves,
+                crate::world::index::ObjectsRef::new(&w.players, &w.index),
+            )?
         };
         match walking {
             Walking::Enter => {

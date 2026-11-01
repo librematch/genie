@@ -189,8 +189,9 @@ impl World {
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
     fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> Result<bool, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         self.spatial
-            .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators)
+            .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
     }
 
     /// The way round's first try ([`World::way_round`]'s 1): to the slot `to` when the member
@@ -359,6 +360,7 @@ impl World {
         ignore: &[ObjectId],
         record: &mut Path,
     ) -> Result<ShortFound, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -369,7 +371,7 @@ impl World {
         let r = crate::movement::short_path_for(
             walker,
             from,
-            &mut self.spatial,
+            (&mut self.spatial, by_id),
             &mut plan,
             (to, Distance::ZERO, None),
             ignore,
@@ -401,7 +403,15 @@ impl World {
             ignore_units: &mover.ignore_units,
             group_units: self.groups.group_units(u.group.id),
         };
-        crate::movement::long_path_for(&walker, from, &self.spatial, computer, (to, 0.0), None)
+        crate::movement::long_path_for(
+            &walker,
+            from,
+            &self.spatial,
+            computer,
+            (to, 0.0),
+            None,
+            crate::world::index::ObjectsRef::new(&self.players, &self.index),
+        )
     }
 
     /// The way round's tile planner (`FUN_140f7cb30` -> `FUN_140f7c530`): the planner of

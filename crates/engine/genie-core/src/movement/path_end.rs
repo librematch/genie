@@ -70,6 +70,7 @@ impl Mover {
         world: &mut Spatial,
         plan: &mut Planning<'_>,
         ask: ReachAsk,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let ReachAsk {
             goal: to,
@@ -120,7 +121,7 @@ impl Mover {
             // height, the unit's (`+0x824`) and the target's (slot 0x520), not x and y
             let height = placed.map_or(0.0, |t| t.position.z());
             let line = (Point::new(x, height_at), Point::new(to.x(), height));
-            let ignore = self.ignore_list(me, world, plan, target.zip(placed), line)?;
+            let ignore = self.ignore_list(me, world, plan, target.zip(placed), line, by_id)?;
             let ask = ShortAsk {
                 goal,
                 range,
@@ -128,7 +129,10 @@ impl Mover {
                 ignore: &ignore,
                 include: &[],
             };
-            if self.short_path(me, world, plan, ask, &mut path)?.reaches() {
+            if self
+                .short_path(me, world, plan, ask, &mut path, by_id)?
+                .reaches()
+            {
                 return Ok(true);
             }
         }
@@ -165,7 +169,7 @@ impl Mover {
             ignore_units: &self.ignore_units,
             group_units: plan.groups.group_units(me.group),
         };
-        let lowered = lowered_units(&walker, world, target)
+        let lowered = lowered_units(&walker, world, target, by_id)
             .into_iter()
             .filter_map(|id| world.get(id))
             .filter(|p| p.tall)
@@ -445,8 +449,8 @@ impl Mover {
         player: PlayerId,
         (id, other): (ObjectId, &Placed),
         projected: BVector,
-        world: &Spatial,
         now: WorldTime,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let level = self.paths.walked()?;
         let top = self.paths.last().filter(|l| !l.points.is_empty());
@@ -454,7 +458,7 @@ impl Mover {
         let o = other.position.vector();
         let now_overlap = overlap(self.position().vector(), ground, o, other.radius);
         let next_overlap = overlap(projected, ground, o, other.radius);
-        let last_move = world.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
+        let last_move = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
         let mut pushed = false;
         if let Some(top) = top.filter(|_| now_overlap <= next_overlap) {
             if top.created == now
@@ -497,7 +501,11 @@ impl Mover {
     pub(super) fn avoid(
         &self,
         me: &Me,
-        (world, groups): (&Spatial, Option<&crate::groups::UnitGroups>),
+        (world, groups, by_id): (
+            &Spatial,
+            Option<&crate::groups::UnitGroups>,
+            crate::world::index::ObjectsRef<'_>,
+        ),
         hits: &[RecordId],
         projected: BVector,
         dt: Seconds,
@@ -536,7 +544,7 @@ impl Mover {
             if own_move && !KEPT_BY_MEMBERS.contains(&other.class) {
                 continue;
             }
-            if self.keeps_hit(me, player, (id, other), projected, world, now)? {
+            if self.keeps_hit(me, player, (id, other), projected, now, by_id)? {
                 kept.push(id);
             }
         }
@@ -570,12 +578,12 @@ impl Mover {
                     continue;
                 }
                 if (player == PlayerId::GAIA || other.player != PlayerId::GAIA)
-                    && pause_rank(me, (player, computer), (id, other), world, groups) != Some(true)
+                    && pause_rank(me, (player, computer), (id, other), groups, by_id) != Some(true)
                 {
                     continue;
                 }
                 // slot 0x528's walked level, paused for dt more when its pause is shorter
-                if let Some(p) = self.pause_of(world, id).filter(|&p| p < dt) {
+                if let Some(p) = self.pause_of(id, by_id).filter(|&p| p < dt) {
                     pauses.push((id, p + dt));
                 }
             }
@@ -589,14 +597,18 @@ impl Mover {
 
     /// The pause of unit `id`'s walked level as slot 0x5f0 leaves it: the last this walk gave it
     /// (the game's call writes it at once, a later pass of the same step reads it), else the
-    /// world's ([`crate::map::spatial::Gait::pause`]).
-    pub(super) fn pause_of(&self, world: &Spatial, id: ObjectId) -> Option<Seconds> {
+    /// unit's own (`by_id`, [`crate::map::spatial::Gait::pause`]).
+    pub(super) fn pause_of(
+        &self,
+        id: ObjectId,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Option<Seconds> {
         self.pauses
             .iter()
             .rev()
             .find(|&&(i, _)| i == id)
             .map(|&(_, p)| p)
-            .or_else(|| world.gait(id).and_then(|g| g.pause))
+            .or_else(|| by_id.gait(id).and_then(|g| g.pause))
     }
 }
 

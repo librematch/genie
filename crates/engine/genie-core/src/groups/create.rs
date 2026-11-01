@@ -220,9 +220,6 @@ impl World {
                     m.stand()?;
                 }
                 u.group.id = None;
-                // the walks that meet it read its group
-                let gait = u.gait();
-                self.spatial.set_gait(id, gait);
             }
         }
         let g = self.groups.held_mut(group)?;
@@ -397,9 +394,6 @@ impl World {
             }
             ai.orders.clear();
         }
-        // the walks that meet it read its group
-        let gait = u.gait();
-        self.spatial.set_gait(id, gait);
         let masters: Vec<(ObjectId, MasterId)> = self
             .players
             .iter()

@@ -126,6 +126,7 @@ impl Unit {
     /// the closest (`FUN_1411671e0` as `set_state(8)` searches, [`Unit::drop_site`]), with none
     /// found 0, and the hunt's class goes (−1).
     pub(crate) fn hunt_search_notify(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let hunt = self
             .actions
@@ -154,6 +155,7 @@ impl Unit {
                 others,
                 None,
                 ActionState::new(HuntState::Search.get()),
+                by_id,
             )?;
             match site {
                 None => {
@@ -404,8 +406,6 @@ impl Unit {
             memory: crate::unit_ai::Memory::default(),
         };
         let me = Me {
-            id: self.id,
-            group: self.group.id,
             action_state: ActionState::new(
                 self.actions
                     .list
@@ -414,6 +414,7 @@ impl Unit {
                     .state
                     .get(),
             ),
+            ..self.me()
         };
         let mut plan = Planning {
             pathing: &mut c.w.pathing,
@@ -423,8 +424,9 @@ impl Unit {
             groups: &c.w.groups,
         };
         let master_id = self.life.master_id;
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
-            mover.reaches_object(&me, spatial, &mut plan, id, range, master_id)
+            mover.reaches_object(&me, (spatial, by_id), &mut plan, id, range, master_id)
         };
         let mut no_attack = crate::unit_ai::NoAttack;
         let moving = |id: ObjectId| herded(others, id);
@@ -624,6 +626,7 @@ impl Unit {
     /// [`HuntAction::set_drop`]: crate::gathering::hunt::HuntAction::set_drop
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
     pub(crate) fn hunt_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let w = DropWorld {
             masters: c.w.masters.of(c.player),
             spatial: &mut c.w.spatial,
@@ -635,7 +638,7 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.drop_off_in(w, others, &c.w.graphics)? {
+        if let Some(site) = self.drop_off_in(w, others, &c.w.graphics, by_id)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;
         }

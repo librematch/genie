@@ -16,6 +16,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::PlayerSlots;
 
 pub(crate) struct Step<'a> {
@@ -69,7 +70,7 @@ pub(crate) struct Beside<'b> {
 impl World {
     /// A walk at `pace` ([`Step::walk`]) and the world's parts beside it, each its own
     /// borrow.
-    pub(crate) const fn walk_beside<'b>(
+    pub(crate) fn walk_beside<'b>(
         &'b mut self,
         pace: Pace,
         body: &'b mut crate::objects::layers::Body,
@@ -80,6 +81,8 @@ impl World {
             pathing,
             groups,
             streams,
+            players,
+            index,
             ..
         } = self;
         let (object, sprite_rng) = streams.object_and_sprite();
@@ -95,6 +98,7 @@ impl World {
                 object,
                 groups,
             }),
+            by_id: ObjectsRef::new(players, index),
         };
         let beside = Beside { sprite_rng };
         (walk, beside)
@@ -250,6 +254,7 @@ impl Step<'_> {
                     object,
                     groups: &self.w.groups,
                 }),
+                by_id: ObjectsRef::new(&self.w.players, &self.w.index),
             },
             sprite,
         ))

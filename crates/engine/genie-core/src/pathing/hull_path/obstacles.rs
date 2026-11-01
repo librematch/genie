@@ -149,8 +149,7 @@ impl HullPather<'_> {
                 continue;
             }
             // slot 0x5c8 is asked only of an object not ignored
-            let left_out = self.ignore.contains(&RecordId::from(id))
-                || world.gait(id).is_some_and(|g| g.moving);
+            let left_out = self.ignore.contains(&RecordId::from(id)) || self.by_id.moving(id);
             if left_out && !self.include.contains(&id) {
                 continue;
             }

@@ -551,6 +551,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
         ..TransportAction::new(Position::new(28.0, 89.0, 0.0))
     };
     let me = crate::movement::Me {
+        human_order: crate::world::WorldTime::ZERO,
         id: object_id(9177),
         group: None,
         action_state: ActionState::new(TransportState::Sail.get()),

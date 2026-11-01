@@ -36,6 +36,7 @@ pub(super) fn steer(
     world: &mut StepWorld<'_, '_>,
     target: Option<&Placed>,
 ) -> Result<Pass, GenieError> {
+    let by_id = world.by_id;
     let dt = world.dt;
     let level = motion.paths.checked(0)?;
     let waypoint = point(level, level.waypoint);
@@ -62,7 +63,7 @@ pub(super) fn steer(
         }
         Passing::Short => {}
     }
-    if let Some(pass) = way_blocked(motion, lead, world.spatial, at, next)? {
+    if let Some(pass) = way_blocked(motion, lead, world.spatial, at, next, by_id)? {
         return Ok(pass);
     }
     if let Some(pass) = walk_ends(motion, at, target)? {
@@ -88,6 +89,7 @@ fn way_blocked(
     spatial: &mut Spatial,
     at: BVector,
     next: BVector,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<Option<Pass>, GenieError> {
     let ignore: Vec<RecordId> = match lead.group.as_ref() {
         Some(g) if !g.differentiator_units.is_empty() => g.differentiator_units.clone(),
@@ -106,7 +108,7 @@ fn way_blocked(
     if hits.is_empty() {
         return Ok(None);
     }
-    let (on_target, newer) = weigh_hits(motion, spatial, &hits)?;
+    let (on_target, newer) = weigh_hits(motion, spatial, &hits, by_id)?;
     if hits.len() == 1 && on_target {
         set_flag(&mut motion.paths, LevelFlags::REACHED, true);
         set_flag(&mut motion.paths, LevelFlags::MET_TARGET, true);
@@ -125,6 +127,7 @@ fn weigh_hits(
     motion: &Motion,
     spatial: &Spatial,
     hits: &[RecordId],
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(bool, u32), GenieError> {
     let level = motion.paths.checked(0)?;
     let top_ignore = motion
@@ -144,7 +147,7 @@ fn weigh_hits(
         if level.targets(id) {
             on_target = true;
         }
-        let last_move = spatial.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
+        let last_move = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
         if level.created < last_move {
             newer += 1;
         }
@@ -315,6 +318,7 @@ impl World {
                 spatial: &mut self.spatial,
                 plan: &mut plan,
                 dt: self.dt_seconds,
+                by_id: crate::world::index::ObjectsRef::new(&self.players, &self.index),
             };
             path_step(&mut motion, &view, &lead, &mut world, budget)
         };

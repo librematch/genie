@@ -28,6 +28,7 @@ pub(crate) fn gate_units(
     spatial: &mut Spatial,
     gate: ObjectId,
     annexes: &[ObjectId],
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(Vec<ObjectId>, usize), GenieError> {
     let [a, b] = annexes[..] else {
         return Err(GenieError::unsupported("a gate without its two annexes"));
@@ -53,6 +54,7 @@ pub(crate) fn gate_units(
         ally_factor: 1.0,
         player: Some(owner),
         ignore: &[RecordId::from(gate), RecordId::from(a), RecordId::from(b)],
+        objects: by_id,
     })?;
     if GATE_QUERY_RECORDS < hits.len() {
         return Err(GenieError::unsupported(

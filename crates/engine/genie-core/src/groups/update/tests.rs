@@ -1261,16 +1261,11 @@ fn a_member_s_own_move_walks_its_path() {
         (BVector::new(1.0, 0.0, 1.0), BVector::new(1.0, 0.0, 1.0))
     );
     assert_eq!(own.distance, Distance::new(2.0));
-    // the walks that meet the unit later in the update read its walked level as the step left it
-    assert_eq!(
-        t.spatial.gait(object_id(10)),
-        t.object(object_id(10)).unwrap().1.gait()
-    );
 }
 
-/// The walks read a unit's gait from the spatial index: a group update that changes its
-/// members' movers leaves their gaits current. Here the group goes (its members have no unit
-/// AI) and its free members stand, no longer moving.
+/// The walks read a unit's gait from the unit itself ([`crate::world::World::objects`]): after a
+/// group update that changes its members' movers, they read the movers as it left them. Here the
+/// group goes (its members have no unit AI) and its free members stand, no longer moving.
 #[test]
 fn a_group_update_leaves_its_members_gaits_current() {
     let mut t = world();
@@ -1279,14 +1274,11 @@ fn a_group_update_leaves_its_members_gaits_current() {
         u.body.put_mover(Some(walker.clone()));
         u.body.mover_mut().unwrap().moved_at = u.position();
         u.combat.ai = None;
-        t.spatial.set_gait(u.id, u.gait());
     }
-    assert!(t.spatial.gait(object_id(10)).unwrap().moving);
+    assert!(t.objects().gait(object_id(10)).unwrap().moving);
     t.update_groups(PlayerId::new(1)).unwrap();
     for id in 10..=12 {
-        let gait = t.object(object_id(id)).unwrap().1.gait();
-        assert!(!gait.unwrap().moving, "{id}");
-        assert_eq!(t.spatial.gait(object_id(id)), gait, "{id}");
+        assert!(!t.objects().gait(object_id(id)).unwrap().moving, "{id}");
     }
 }
 

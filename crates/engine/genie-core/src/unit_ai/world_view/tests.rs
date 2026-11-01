@@ -117,6 +117,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
         left: None,
     };
     let picker = WorldPicker {
+        by_id: crate::world::index::ObjectsRef::empty(),
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
@@ -235,6 +236,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         left: None,
     };
     let picker = WorldPicker {
+        by_id: crate::world::index::ObjectsRef::empty(),
         attacker: &attacker,
         seeker: None,
         me: object_id(123),
@@ -393,6 +395,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         left: None,
     };
     let mut picker = WorldPicker {
+        by_id: crate::world::index::ObjectsRef::empty(),
         attacker: &attacker,
         seeker: None,
         me: object_id(123),

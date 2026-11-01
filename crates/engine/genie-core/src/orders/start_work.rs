@@ -23,7 +23,6 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Planning};
-use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -211,13 +210,7 @@ impl World {
             my_pasture: unit.my_pasture,
             min_state: ObjectState::Alive,
         };
-        let me_walk = Me {
-            id: unit.id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
+        let me_walk = unit.me();
         Ok((seeker, me_walk))
     }
 
@@ -238,6 +231,7 @@ impl World {
         let (seeker, me_walk) = self.search_seeker(p, unit)?;
         let (mask, master_id) = (mover.stats.restriction_mask, unit.life.master_id);
         let (players, masters, index) = (&self.players, &self.masters, &self.index);
+        let by_id = crate::world::index::ObjectsRef::new(players, index);
         let candidate = |spatial: &crate::map::spatial::Spatial,
                          id: ObjectId|
          -> Result<Candidate, GenieError> {
@@ -294,7 +288,7 @@ impl World {
                 reach: &mut |spatial, id| {
                     mover.reaches_object(
                         &me_walk,
-                        spatial,
+                        (spatial, by_id),
                         &mut plan,
                         id,
                         Distance::ZERO,

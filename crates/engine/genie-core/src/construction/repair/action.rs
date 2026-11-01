@@ -299,6 +299,7 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
     ) -> Result<bool, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let spatial = &mut c.w.spatial;
         let terrain = spatial
             .terrain
@@ -309,7 +310,7 @@ impl RepairAction {
             .ok_or(crate::pathing::hull_path::NO_RESTRICTION)?;
         let mask = terrain.restriction_mask(r);
         crate::pathing::hull_path::quick_reach(
-            spatial,
+            (spatial, by_id),
             repairer.id,
             self.target,
             mask,

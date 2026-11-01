@@ -320,10 +320,6 @@ impl crate::world::World {
             crate::orders::lock_gate(nu, locked, now)?;
         }
         nu.life.hp -= stack.hp_lost;
-        // the walks of this update read the last move time the lock set
-        if let Some(t) = nu.body.mover().map(|m| m.last_move) {
-            self.spatial.set_last_move(new, t);
-        }
         Ok(())
     }
 

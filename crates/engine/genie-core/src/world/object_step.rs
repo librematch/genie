@@ -60,7 +60,6 @@ impl World {
         {
             result = Err(e);
         }
-        self.spatial.set_gait(me, unit.gait());
         // back to its stand-in's slot, which a removal in the step may have moved
         if let Err(e) = self.put_back_own(p, unit) {
             result = Err(e);

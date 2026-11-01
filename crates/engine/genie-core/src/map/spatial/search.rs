@@ -49,6 +49,7 @@ impl Spatial {
         to: Point,
         grow: Distance,
         ignore: &[RecordId],
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::new(
             if to.x() <= from.x() { to.x() } else { from.x() },
@@ -85,7 +86,7 @@ impl Spatial {
             let kind = o.kind.filed();
             kind.tested()
                 && !ignore.contains(&RecordId::from(id))
-                && !self.gaits.get(id).is_some_and(|g| g.moving)
+                && !by_id.moving(id)
                 && self.visits(p, kind, query)
                 && meets(kind, p.bounds())
         }))

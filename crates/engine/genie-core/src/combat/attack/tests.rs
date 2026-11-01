@@ -763,6 +763,7 @@ impl Rig {
 /// The soldier's [`Me`] in action state `state`.
 const fn me(id: i32, state: AttackState) -> Me {
     Me {
+        human_order: WorldTime::ZERO,
         id: object_id(id),
         group: None,
         action_state: ActionState::new(state.get()),
@@ -2343,6 +2344,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
         flags: SpriteFlags::ANIMATED,
     };
     let me = |id| Me {
+        human_order: WorldTime::ZERO,
         id,
         group: None,
         action_state: ActionState::NO_ACTION,

@@ -224,7 +224,6 @@ impl Construction {
         }
         if let Some(m) = mover {
             m.last_move = now.after(Millis::new(1));
-            world.set_last_move(id, m.last_move);
         }
         Ok(true)
     }

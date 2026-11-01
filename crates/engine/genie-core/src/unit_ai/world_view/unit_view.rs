@@ -41,6 +41,7 @@ impl UnitView<'_, '_> {
             )?
             .players(),
             every: &self.c.w.masters,
+            by_id: crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index),
             restriction: None,
             unit: &*self.unit,
             attributes: &self.c.w.players.player(self.player)?.attributes,

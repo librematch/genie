@@ -37,6 +37,7 @@ impl Mover {
         world: &Spatial,
         hits: &[RecordId],
         computer: bool,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let level = self.paths.walked()?;
         let player = world
@@ -58,8 +59,8 @@ impl Mover {
                 continue;
             };
             let outranks = if player == PlayerId::GAIA || other.player != PlayerId::GAIA {
-                let mine = world.gait(me.id).map_or(WorldTime::ZERO, |g| g.human_order);
-                let theirs = world.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
+                let mine = me.human_order;
+                let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
                 if !computer && (other.player != player || theirs != mine) {
                     theirs < mine
                 } else {
@@ -71,7 +72,7 @@ impl Mover {
             // slot 0x5f0 with the walker's player's view of the hit's (FUN_141663d90 with the
             // ally flag): an ally pauses 0.1, anyone else 0.5 (Gaia counts for no one)
             let allied = world.allied_with(player, other.player);
-            if outranks && world.gait(id).is_some_and(|g| g.pause.is_some()) {
+            if outranks && by_id.gait(id).is_some_and(|g| g.pause.is_some()) {
                 let pause = if allied { ALLY_PAUSE } else { OTHER_PAUSE };
                 self.pauses.push((id, pause));
             }

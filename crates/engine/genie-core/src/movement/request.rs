@@ -54,7 +54,7 @@ impl Mover {
     pub(super) fn request(
         &mut self,
         me: &Me,
-        world: &mut Spatial,
+        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         goal: Goal<'_>,
         plans: &mut StepPlans,
@@ -98,7 +98,7 @@ impl Mover {
                 target_id: level.target,
                 trade_cart,
             };
-            if let Some(step) = self.plan_solid(me, world, plan, &w, &mut np)? {
+            if let Some(step) = self.plan_solid(me, world, plan, &w, &mut np, by_id)? {
                 return Ok(step);
             }
         } else {
@@ -245,6 +245,7 @@ impl Mover {
         plan: &Planning<'_>,
         ask: LongAsk<'_>,
         path: &mut Path,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
         let LongAsk {
             waypoint,
@@ -271,6 +272,7 @@ impl Mover {
             plan.computer,
             (waypoint, range.get()),
             target,
+            by_id,
         )?;
         *path = long;
         path.measure();
@@ -287,7 +289,7 @@ impl Mover {
             path.length = Distance::ZERO;
             return Ok(Some((found, Some(end))));
         }
-        if !self.walled_off(me, world, target_id, path)? {
+        if !self.walled_off(me, world, target_id, path, by_id)? {
             found = false;
         }
         Ok(Some((found, None)))
@@ -307,6 +309,7 @@ impl Mover {
         world: &mut Spatial,
         target_id: Option<ObjectId>,
         path: &mut Path,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let me_at = world.get(me.id);
         if me_at.is_some_and(|p| p.class == class::VILLAGER) {
@@ -328,6 +331,7 @@ impl Mover {
                 ally_factor: self.stats.min_collision,
                 player,
                 ignore: &ignore,
+                objects: by_id,
             })?;
             let walled = hits.iter().any(|&h| {
                 world.get(h).is_some_and(|p| {

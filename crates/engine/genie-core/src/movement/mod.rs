@@ -315,6 +315,9 @@ pub struct Me {
     /// Its group (`mGroupID`, `+0x6d0`; -1 for none), whose differentiator units the long pather
     /// lowers (`FUN_140f9eb70`).
     pub group: Option<crate::groups::GroupId>,
+    /// `+0x650`, `mLastHumanOrderTime`: its rank against a unit it meets (the walk's pause and
+    /// the path end's keep), as the walk starts.
+    pub human_order: WorldTime,
 }
 
 /// What the motion step returns to the `MoveTo` action.
@@ -582,15 +585,15 @@ fn pause_rank(
     me: &Me,
     (player, computer): (PlayerId, bool),
     (id, other): (ObjectId, &Placed),
-    world: &Spatial,
     groups: Option<&crate::groups::UnitGroups>,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Option<bool> {
-    let mine = world.gait(me.id).map_or(WorldTime::ZERO, |g| g.human_order);
-    let theirs = world.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
+    let mine = me.human_order;
+    let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
     Some(if !computer && (other.player != player || theirs != mine) {
         theirs < mine
     } else if let Some(group) = me.group
-        && world.gait(id).and_then(|g| g.group) == Some(group)
+        && by_id.gait(id).and_then(|g| g.group) == Some(group)
     {
         let g = groups.and_then(|gs| gs.get(group))?;
         g.index_of(me.id) < g.index_of(id)

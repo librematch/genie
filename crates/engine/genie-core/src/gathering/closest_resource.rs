@@ -8,8 +8,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
-use crate::movement::{Me, Planning};
-use crate::objects::ActionState;
+use crate::movement::Planning;
 use crate::objects::ObjectId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
@@ -64,6 +63,7 @@ pub(crate) fn closest_resource_of(
         Option<crate::gathering::DropSiteId>,
     ),
     (current, min_state, point): (Option<ObjectId>, crate::objects::ObjectState, Point),
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
     /// The site masters whose search starts from their footprint in any zone.
@@ -160,13 +160,7 @@ pub(crate) fn closest_resource_of(
         my_pasture: unit.my_pasture,
         min_state,
     };
-    let me_walk = Me {
-        id: unit.id,
-        group: unit.group.id,
-        action_state: unit
-            .top_action()
-            .map_or(ActionState::NO_ACTION, |a| a.state),
-    };
+    let me_walk = unit.me();
     let master_id = unit.life.master_id;
     let plan = &mut c.plan;
     let blocked = mask.blocked() | crate::map::spatial::BLOCKED;
@@ -182,7 +176,14 @@ pub(crate) fn closest_resource_of(
             passable: &|spatial, tile| spatial.tiles().word(tile).is_some_and(|w| w & blocked == 0),
             objects: &objects,
             reach: &mut |spatial, id| {
-                mover.reaches_object(&me_walk, spatial, plan, id, Distance::ZERO, master_id)
+                mover.reaches_object(
+                    &me_walk,
+                    (spatial, by_id),
+                    plan,
+                    id,
+                    Distance::ZERO,
+                    master_id,
+                )
             },
         },
     )
@@ -207,6 +208,7 @@ impl UnitView<'_, '_> {
         &mut self,
         search: crate::unit_ai::ResourceSearch,
     ) -> Result<Option<crate::unit_ai::Gatherable>, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
         let mut w = ResourceWorld {
             player: self.player,
             spatial: &mut self.c.w.spatial,
@@ -239,6 +241,7 @@ impl UnitView<'_, '_> {
             )?,
             (search.kind, search.cap, search.site),
             (search.current, search.min_state, search.point),
+            by_id,
         )?;
         let Some(id) = id else {
             return Ok(None);
@@ -288,6 +291,7 @@ impl Unit {
         cap: crate::objects::WorkerCount,
         site: Option<crate::gathering::DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current = self
             .combat
@@ -317,6 +321,7 @@ impl Unit {
             crate::objects::ObjectState::Alive,
             crate::unit_ai::NO_POINT,
         );
-        closest_resource_of(self, &mut w, others, (kind, cap, site), search).map(|(id, _)| id)
+        closest_resource_of(self, &mut w, others, (kind, cap, site), search, by_id)
+            .map(|(id, _)| id)
     }
 }

@@ -359,6 +359,7 @@ impl BuildAction {
     ///
     /// [`MoveToReads::to_point`]: crate::movement::move_to::MoveToReads::to_point
     pub(super) fn clear(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let mover = builder.body.mover().ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
@@ -370,6 +371,7 @@ impl BuildAction {
                     (builder.id, mover.stats.radius.x()),
                     mover.stats.restriction_mask,
                     site,
+                    by_id,
                 )?
                 .ok_or(GenieError::unsupported(
                     "no free tile beside the footprint (set_state 2)",

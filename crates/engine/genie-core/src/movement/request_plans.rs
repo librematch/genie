@@ -82,6 +82,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
         // FUN_141158210 is 1 only on an `E` tile in game type 12
         if plan.pathing.game_type == 12 {
@@ -90,13 +91,13 @@ impl Mover {
             ));
         }
         if w.level == WaypointLevel::TOP && TILE_PATHER {
-            self.first_plan(me, world, plan, w, np)?;
+            self.first_plan(me, world, plan, w, np, by_id)?;
         }
-        let tail = match self.short_tail(me, world, plan, w, np)? {
+        let tail = match self.short_tail(me, world, plan, w, np, by_id)? {
             ControlFlow::Break(step) => return Ok(Some(step)),
             ControlFlow::Continue(tail) => tail,
         };
-        if tail && let Some(step) = self.long_tail(me, world, plan, w, np)? {
+        if tail && let Some(step) = self.long_tail(me, world, plan, w, np, by_id)? {
             return Ok(Some(step));
         }
         if (!np.found || too_short(&np.path)) && w.level == WaypointLevel::TOP && TILE_PATHER {
@@ -119,9 +120,10 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         if self.planner_exists(world, plan) {
-            if !self.near_target_path(me, world, plan, w, np)? {
+            if !self.near_target_path(me, world, plan, w, np, by_id)? {
                 self.first_tile_plan(me, world, plan, w, np)?;
             }
         } else {
@@ -145,6 +147,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         if w.goal.target.is_none()
             || TARGET_SHORT_REACH < w.distance.get()
@@ -153,7 +156,7 @@ impl Mover {
             return Ok(false);
         }
         let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
-        let r = self.short_path_to(me, world, plan, w, near, np)?;
+        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
         if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
             np.failed = true;
             np.path.points.clear();
@@ -222,14 +225,14 @@ impl Mover {
     fn short_path_to(
         &self,
         me: &Me,
-        world: &mut Spatial,
+        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         near: bool,
         np: &mut NewPath,
     ) -> Result<ShortFound, GenieError> {
         let line = ground_line(self.moved_at, w.waypoint);
-        let ignore = self.ignore_list(me, world, plan, w.goal.target, line)?;
+        let ignore = self.ignore_list(me, world, plan, w.goal.target, line, by_id)?;
         let ask = ShortAsk {
             goal: w.waypoint,
             range: short_range(near, w.range),
@@ -237,7 +240,7 @@ impl Mover {
             ignore: &ignore,
             include: w.include,
         };
-        let r = self.short_path(me, world, plan, ask, &mut np.path)?;
+        let r = self.short_path(me, world, plan, ask, &mut np.path, by_id)?;
         np.path.measure();
         np.new.created = plan.now;
         self.give_ignored(&mut np.new, plan.now);
@@ -257,6 +260,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<ControlFlow<AfterRequest, bool>, GenieError> {
         let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
         if np.found && 3 <= np.path.points.len() {
@@ -265,7 +269,7 @@ impl Mover {
         if SHORT_PATHER
             && !np.failed
             && (w.distance <= Distance::new(SHORT_REACH) || near)
-            && let Some(step) = self.short_try(me, world, plan, w, near, np)?
+            && let Some(step) = self.short_try(me, (world, by_id), plan, w, near, np)?
         {
             return Ok(ControlFlow::Break(step));
         }
@@ -273,7 +277,7 @@ impl Mover {
             return Ok(ControlFlow::Continue(too_short(&np.path)));
         }
         if (w.distance < Distance::new(CLOSE) || w.goal.gap < Distance::new(CLOSE))
-            && self.close_in(me, w.waypoint, w.target_id, world)?
+            && self.close_in(me, w.waypoint, w.target_id, world, by_id)?
         {
             np.path.points.clear();
             let _ = np.path.push(w.position);
@@ -292,7 +296,7 @@ impl Mover {
     fn short_try(
         &mut self,
         me: &Me,
-        world: &mut Spatial,
+        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         near: bool,
@@ -300,7 +304,7 @@ impl Mover {
     ) -> Result<Option<AfterRequest>, GenieError> {
         np.planned = false;
         np.path.points.clear();
-        let r = self.short_path_to(me, world, plan, w, near, np)?;
+        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
         let length = np.path.length.get();
         let blocked = r.fails()
             || length <= EPSILON
@@ -361,6 +365,7 @@ impl Mover {
         plan: &Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
         if !(LONG_PATHER && (w.trade_cart || SHORT_REACH < w.distance.get())) {
             return Ok(None);
@@ -384,7 +389,8 @@ impl Mover {
             range: w.range,
             target,
         };
-        let Some((reached, farther)) = self.long_plan(me, world, plan, ask, &mut np.path)? else {
+        let Some((reached, farther)) = self.long_plan(me, world, plan, ask, &mut np.path, by_id)?
+        else {
             return Ok(Some(AfterRequest::Paused));
         };
         np.new.created = plan.now;

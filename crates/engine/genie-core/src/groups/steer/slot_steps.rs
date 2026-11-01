@@ -108,7 +108,10 @@ impl World {
             let r = crate::movement::short_path_for(
                 walker,
                 at.ground(),
-                &mut self.spatial,
+                (
+                    &mut self.spatial,
+                    crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                ),
                 &mut plan,
                 (to, Distance::ZERO, None),
                 &members,
@@ -133,6 +136,7 @@ impl World {
                 computer,
                 (to, 0.0),
                 None,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
             )?
             .0
         };

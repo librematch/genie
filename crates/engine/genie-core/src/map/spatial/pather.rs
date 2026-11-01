@@ -50,7 +50,7 @@ impl Spatial {
         b: Point,
         buffer: Option<Distance>,
         mask: crate::map::TerrainMask,
-        ignore: &[RecordId],
+        (ignore, by_id): (&[RecordId], crate::world::index::ObjectsRef<'_>),
         first: bool,
     ) -> Result<Vec<Hit>, GenieError> {
         const MOST_HITS: usize = 25;
@@ -95,7 +95,7 @@ impl Spatial {
             };
             let kind = o.kind.filed();
             if !kind.tested()
-                || self.gaits.get(id).is_some_and(|g| g.moving)
+                || by_id.moving(id)
                 || ignore.contains(&RecordId::from(id))
                 || !self.visits(p, kind, grown)
             {
@@ -136,9 +136,10 @@ impl Spatial {
         buffer: Option<Distance>,
         mask: crate::map::TerrainMask,
         ignore: &[RecordId],
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         Ok(!self
-            .pather_query(a, b, buffer, mask, ignore, true)?
+            .pather_query(a, b, buffer, mask, (ignore, by_id), true)?
             .is_empty())
     }
 
@@ -151,8 +152,9 @@ impl Spatial {
         buffer: Option<Distance>,
         mask: crate::map::TerrainMask,
         ignore: &[RecordId],
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Vec<Hit>, GenieError> {
-        self.pather_query(a, b, buffer, mask, ignore, false)
+        self.pather_query(a, b, buffer, mask, (ignore, by_id), false)
     }
 }
 

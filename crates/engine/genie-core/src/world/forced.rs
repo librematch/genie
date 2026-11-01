@@ -254,7 +254,7 @@ impl World {
     /// Object `i` of player `p` becomes the game's `g`, with what the save does not hold kept
     /// (a hunted animal's origin, a boar's flag) and its inside list in the slice's order while
     /// it holds the same objects; the world places it where the game has it, follows its state
-    /// (a resource past state 6 is forgotten), unfreezes it and files its gait and mesh place.
+    /// (a resource past state 6 is forgotten), unfreezes it and files its mesh place.
     ///
     /// # Errors
     ///
@@ -291,7 +291,6 @@ impl World {
             }
         }
         self.spatial.unfreeze(id);
-        self.spatial.set_gait(id, forced.gait());
         self.spatial.set_annex(id, forced.building.annex_of);
         if let Some(placed) = self.spatial.get(id).copied() {
             let moving = forced.body.mover().is_some_and(Mover::is_moving);

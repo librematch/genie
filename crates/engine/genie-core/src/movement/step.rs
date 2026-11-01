@@ -309,8 +309,9 @@ impl Mover {
         dt: Seconds,
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Motion, GenieError> {
-        let result = self.motion_passes(me, dt, world, plan.as_deref_mut());
+        let result = self.motion_passes(me, dt, world, plan.as_deref_mut(), by_id);
         // every exit of the step removes the kept hits' temporary shapes (FUN_141055970)
         if let Some(p) = plan {
             p.pathing.drop_temporary_shapes();
@@ -377,7 +378,7 @@ impl Mover {
     pub(super) fn level_state(
         &mut self,
         me: &Me,
-        world: &mut Spatial,
+        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: Option<&mut Planning<'_>>,
         goal: Goal<'_>,
         plans: &mut StepPlans,
@@ -389,12 +390,14 @@ impl Mover {
                 let plan = plan.ok_or(GenieError::unsupported(
                     "a path request without the world's planners",
                 ))?;
-                Ok(match self.request(me, world, plan, goal, plans, include)? {
-                    AfterRequest::Again => Next::Again,
-                    AfterRequest::Walk => Next::Dispatch,
-                    AfterRequest::Paused => Next::Done(Motion::Moving),
-                    AfterRequest::GaveUp => Next::Done(Motion::Done),
-                })
+                Ok(
+                    match self.request(me, (world, by_id), plan, goal, plans, include)? {
+                        AfterRequest::Again => Next::Again,
+                        AfterRequest::Walk => Next::Dispatch,
+                        AfterRequest::Paused => Next::Done(Motion::Moving),
+                        AfterRequest::GaveUp => Next::Done(Motion::Done),
+                    },
+                )
             }
             PathState::Idle | PathState::Walking | PathState::GaveUp => Ok(Next::Dispatch),
         }
@@ -407,6 +410,7 @@ impl Mover {
         dt: Seconds,
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Motion, GenieError> {
         if self.stats.speed == Speed::ZERO {
             return Ok(Motion::Done);
@@ -443,14 +447,21 @@ impl Mover {
             if self.paths.walked()?.flags.contains(LevelFlags::REACHED) {
                 let now = plan.as_deref().map_or(WorldTime::ZERO, |p| p.now);
                 let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
-                match self.reached(me, world, pathing, goal, now)? {
+                match self.reached(me, world, pathing, goal, now, by_id)? {
                     Next::Again => continue,
                     Next::Dispatch => {}
                     Next::Done(m) => return Ok(m),
                     Next::LoopEnd => return self.loop_end(dt, walked, heading),
                 }
             }
-            match self.level_state(me, world, plan.as_deref_mut(), goal, &mut plans, &include)? {
+            match self.level_state(
+                me,
+                (world, by_id),
+                plan.as_deref_mut(),
+                goal,
+                &mut plans,
+                &include,
+            )? {
                 Next::Done(m) => return Ok(m),
                 Next::Again => continue,
                 // a link of another type: on past the request (state 4 or 5) to the walk
@@ -480,6 +491,7 @@ impl Mover {
                     walked: &mut walked,
                     heading: &mut heading,
                 },
+                by_id,
             )?;
             if let Next::Done(m) = step {
                 return Ok(m);
@@ -495,7 +507,12 @@ impl Mover {
     /// unit stops, the step returns 2). A walk that may meet an obstruction is not modelled.
     /// `walked` takes the waypoint once it is not left behind (`local_1860`). `groups` are the
     /// world's unit groups (none for a walk without the world's planners).
-    pub(super) fn walk(&mut self, me: &Me, step: WalkStep<'_>) -> Result<Next, GenieError> {
+    pub(super) fn walk(
+        &mut self,
+        me: &Me,
+        step: WalkStep<'_>,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Result<Next, GenieError> {
         let WalkStep {
             time_step: dt,
             world,
@@ -550,10 +567,17 @@ impl Mover {
                 ally_factor: self.stats.min_collision,
                 player,
                 ignore: &[RecordId::from(me.id)],
+                objects: by_id,
             })?;
             if !hits.is_empty() {
-                let avoided =
-                    self.avoid(me, (world, groups), &hits, projected, dt, (now, computer))?;
+                let avoided = self.avoid(
+                    me,
+                    (world, groups, by_id),
+                    &hits,
+                    projected,
+                    dt,
+                    (now, computer),
+                )?;
                 if !avoided.kept.is_empty() {
                     include_kept(world, pathing, &avoided.kept, include)?;
                 }
@@ -569,7 +593,7 @@ impl Mover {
                 }
                 self.pauses.extend(avoided.pauses);
                 if !avoided.kept.is_empty() {
-                    return self.go_round(me, world, &hits, computer);
+                    return self.go_round(me, world, &hits, computer, by_id);
                 }
             }
         }

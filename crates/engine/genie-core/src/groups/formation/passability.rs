@@ -374,10 +374,13 @@ impl World {
                 continue;
             }
             let p = t.transform_position;
-            if self
-                .spatial
-                .still_line_hit(position.ground(), p.ground(), grow, members)?
-            {
+            if self.spatial.still_line_hit(
+                position.ground(),
+                p.ground(),
+                grow,
+                members,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+            )? {
                 unreachable.push(j);
             } else {
                 reachable.push(j);
@@ -488,6 +491,7 @@ impl World {
                 Point::new((ddx + fx) as f32 + PASS_HALF, (fy + ddy) as f32 + PASS_HALF),
                 grow,
                 members,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
             )?
         {
             *grid.cells.checked_mut(cell)? = count_up(b);

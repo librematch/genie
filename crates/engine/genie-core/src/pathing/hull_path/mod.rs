@@ -410,6 +410,8 @@ impl Default for KeptHulls {
 #[derive(Debug)]
 pub struct HullPather<'w> {
     world: &'w mut Spatial,
+    /// The world's objects, whose gaits the hulls and the line tests read.
+    by_id: crate::world::index::ObjectsRef<'w>,
     mask: crate::map::TerrainMask,
     radius: Distance,
     /// `FindShortPath`'s player (its argument 12, the unit's player's number `+0x718`), whom slot

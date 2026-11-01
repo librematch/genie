@@ -388,9 +388,13 @@ impl crate::world::World {
                     == crate::production::spawn::Tested::Free
             };
             if free
-                && self
-                    .spatial
-                    .point_clear(id, spot, Distance::new(grow), mask)?
+                && self.spatial.point_clear(
+                    id,
+                    spot,
+                    Distance::new(grow),
+                    mask,
+                    crate::world::index::ObjectsRef::new(&self.players, &self.index),
+                )?
             {
                 found = Some(spot);
                 break;

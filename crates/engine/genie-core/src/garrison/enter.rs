@@ -308,6 +308,7 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let tm = t.master(&self.masters, tp)?.clone();
@@ -319,6 +320,7 @@ impl World {
             self.players.live(player, idx)?,
             (t, &tm, room),
             range,
+            by_id,
         )
     }
 
@@ -338,6 +340,7 @@ impl World {
         t: &EnterTarget,
         start: WalkStart,
     ) -> Result<Walking, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(&self.masters, tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
@@ -351,7 +354,7 @@ impl World {
             room: t.room,
             unit,
         };
-        action.walk_again(t, start, meeting, &reads)
+        action.walk_again(t, start, meeting, &reads, by_id)
     }
 
     /// `FUN_140a85f30` ([`meeting`], [`Meeting::point`]) for unit `idx` of `player` and its
@@ -368,6 +371,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let master = t.master(&self.masters, tp)?.clone();
@@ -381,7 +385,7 @@ impl World {
             room,
             unit: self.players.live(player, idx)?,
         }
-        .point()
+        .point(by_id)
     }
 
     /// The transport's part of the Enter's `set_state(4)` with code 1: its slot 0x3d8
@@ -394,6 +398,7 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let Some(crate::world::index::Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };
@@ -405,7 +410,7 @@ impl World {
             object: self.streams.get(crate::math::rng::Stream::Object),
             groups: &self.groups,
         };
-        if !ship_reaches(ship, &mut self.spatial, &mut plan, to)? {
+        if !ship_reaches(ship, &mut self.spatial, &mut plan, to, by_id)? {
             return Err(UNREACHED);
         }
         self.ship_move(transport, to)

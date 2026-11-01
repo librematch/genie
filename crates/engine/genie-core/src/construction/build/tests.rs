@@ -1126,13 +1126,6 @@ fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
             ..house()
         },
     );
-    world.set_gait(
-        object_id(33439),
-        Some(crate::map::spatial::Gait {
-            last_move: WorldTime::from_millis(7000),
-            ..crate::map::spatial::Gait::default()
-        }),
-    );
     let mut c = Construction {
         progress: Seconds::ZERO,
         desolid: true,
@@ -1157,10 +1150,6 @@ fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
     );
     assert_eq!(started, Ok(true));
     assert_eq!(mover.last_move, WorldTime::from_millis(8281));
-    assert_eq!(
-        world.gait(object_id(33439)).map(|g| g.last_move),
-        Some(WorldTime::from_millis(8281))
-    );
 }
 
 /// An annex (a gate's post) whose main building is in state 0 with a hit point gives it the

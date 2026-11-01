@@ -155,6 +155,7 @@ pub fn walled_off(
     spatial: &mut Spatial,
     masters: &[Masters],
     (id, stats): (ObjectId, &MoveStats),
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
     let map = spatial.map;
     let (mx, my) = (cvttss2si(me.x()), cvttss2si(me.y()));
@@ -176,6 +177,7 @@ pub fn walled_off(
                     tile.corner(),
                     Distance::new(stats.radius.x()),
                     stats.restriction_mask,
+                    by_id,
                 )?
             {
                 continue;
@@ -253,11 +255,12 @@ pub(crate) fn meeting_point(
     unit: (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
     zones: &mut crate::pathing::zones::Zones,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(Point, u8), GenieError> {
     match meet_at(t) {
         MeetAt::Place => Ok((t.position, 0)),
         MeetAt::ActionPoint => Ok((t.action_point.clone()?, 0)),
-        MeetAt::Shore => shore_or_beach(t, unit, spatial, zones),
+        MeetAt::Shore => shore_or_beach(t, unit, spatial, zones, by_id),
     }
 }
 
@@ -274,9 +277,10 @@ fn shore_or_beach(
     unit: (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
     zones: &mut crate::pathing::zones::Zones,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(Point, u8), GenieError> {
     let (ux, uy) = (unit.1.x(), unit.1.y());
-    if let Some(tile) = shore(t, unit, spatial, zones)? {
+    if let Some(tile) = shore(t, unit, spatial, zones, by_id)? {
         let (x, y) = (tile.x() as f32, tile.y() as f32);
         return Ok((Point::new(x + HALF_TILE, y + HALF_TILE), 1));
     }
@@ -304,6 +308,7 @@ fn shore(
     (id, at, stats): (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
     zones: &mut crate::pathing::zones::Zones,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<Option<Tile>, GenieError> {
     let (ux, uy) = (at.x(), at.y());
     let terrain = spatial
@@ -336,6 +341,7 @@ fn shore(
                 place,
                 Distance::new(stats.radius.x()),
                 stats.restriction_mask,
+                by_id,
             )?
         {
             return Ok(Some(tile));
@@ -367,13 +373,17 @@ impl Walls<'_> {
     /// # Errors
     ///
     /// [`walled_off`]'s.
-    pub fn walled_off(&mut self) -> Result<bool, GenieError> {
+    pub fn walled_off(
+        &mut self,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Result<bool, GenieError> {
         walled_off(
             self.me,
             self.them,
             self.spatial,
             self.masters,
             (self.id, self.stats),
+            by_id,
         )
     }
 }
@@ -389,6 +399,7 @@ pub(crate) fn enter_reach(
     (id, stats, moved_at): (ObjectId, &MoveStats, Position),
     (target, target_mover): (ObjectId, Option<&crate::movement::Mover>),
     range: Distance,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
     let me = spatial
         .get_known(id)?
@@ -407,7 +418,7 @@ pub(crate) fn enter_reach(
         id,
         stats,
     };
-    EnterAction::in_reach(range, gap, speed, &mut walls)
+    EnterAction::in_reach(range, gap, speed, &mut walls, by_id)
 }
 
 /// What an Enter's update reads of its target `t` (of master `tm`, with `room` for `unit`): the
@@ -424,6 +435,7 @@ pub(crate) fn enter_view(
     unit: &crate::objects::unit::Unit,
     (t, tm, room): (&crate::objects::unit::Unit, &Master, bool),
     range: Distance,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(EnterTarget, WalkStart), GenieError> {
     let building = tm.kind == BUILDING;
     let mover = unit.body.mover();
@@ -436,6 +448,7 @@ pub(crate) fn enter_view(
         (unit.id, &stats, moved_at),
         (t.id, target_mover),
         range,
+        by_id,
     )?;
     let placed = |id: ObjectId| {
         spatial.get(id).ok_or_else(|| {
@@ -483,7 +496,10 @@ impl Meeting<'_> {
     /// # Errors
     ///
     /// A unit without movement state ([`NO_SPEED`]), and what the meeting does not model.
-    pub(crate) fn point(self) -> Result<(Point, u8), GenieError> {
+    pub(crate) fn point(
+        self,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Result<(Point, u8), GenieError> {
         let at = self.target.position();
         if self.master.kind == BUILDING {
             return Ok((at.ground(), 0));
@@ -495,6 +511,7 @@ impl Meeting<'_> {
             (self.unit.id, self.unit.position(), &stats),
             self.spatial,
             self.zones,
+            by_id,
         )
     }
 }
@@ -507,17 +524,19 @@ pub(crate) fn ship_reaches(
     world: &mut Spatial,
     plan: &mut crate::movement::Planning<'_>,
     to: Position,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
     let Some(m) = ship.body.mover() else {
         return Ok(false);
     };
-    let me = crate::movement::Me {
-        id: ship.id,
-        action_state: ship
-            .top_action()
-            .map_or(ActionState::NO_ACTION, |a| a.state),
-        group: ship.group.id,
-    };
+    let me = ship.me();
     let goal = Point::new(cvttss2si(to.x()) as f32, cvttss2si(to.y()) as f32);
-    m.reaches(&me, world, plan, goal, ENTER_NEAR, ship.life.master_id)
+    m.reaches(
+        &me,
+        (world, by_id),
+        plan,
+        goal,
+        ENTER_NEAR,
+        ship.life.master_id,
+    )
 }

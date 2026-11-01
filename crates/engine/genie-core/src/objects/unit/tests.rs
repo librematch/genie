@@ -188,7 +188,9 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
         let level = bush.body.mover().unwrap().paths[0].pause_time;
         Ok((
             level,
-            c.w.spatial.gait(object_id(600)).and_then(|g| g.pause),
+            crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index)
+                .gait(object_id(600))
+                .and_then(|g| g.pause),
         ))
     })
     .unwrap();
@@ -608,5 +610,26 @@ fn a_unit_reads_its_own_master_before_its_player_s() {
     assert!(
         u.master(&every, PlayerId::new(2)).is_err(),
         "no table for player 2"
+    );
+}
+
+/// The walk's view of the unit itself ([`Unit::me`]): its id, its top action's state (none
+/// without one), its group and its last human order's time, which ranks it against a met unit.
+#[test]
+fn a_unit_s_own_view_for_its_walk() {
+    let mut u = Unit {
+        id: object_id(5),
+        last_human_order: crate::world::WorldTime::from_millis(2001),
+        ..Unit::default()
+    };
+    u.group.id = Some(crate::test_ids::group_id(4));
+    assert_eq!(
+        u.me(),
+        crate::movement::Me {
+            id: object_id(5),
+            action_state: ActionState::NO_ACTION,
+            group: Some(crate::test_ids::group_id(4)),
+            human_order: crate::world::WorldTime::from_millis(2001),
+        }
     );
 }

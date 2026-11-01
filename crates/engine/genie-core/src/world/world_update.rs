@@ -32,7 +32,6 @@ impl World {
         self.dt_seconds = dt.seconds();
         self.dt = dt;
         self.streams.seed_all(self.frame_seed.get());
-        self.sync_moving();
         for command in commands {
             tracing::debug!(target: crate::trace::UPDATE, ?command, "command");
             let stopped: Vec<bool> = self
@@ -49,19 +48,6 @@ impl World {
                     *why = why.clone().with("command", name);
                 }
             }
-        }
-        self.sync_moving();
-    }
-
-    /// The walks read units `ids`' gaits ([`Unit::gait`]) from the spatial index: after a change
-    /// to their movers outside their own update (a group update's), each takes its unit's again
-    /// (a unit the world does not hold, none).
-    ///
-    /// [`Unit::gait`]: crate::objects::unit::Unit::gait
-    pub(crate) fn refresh_gaits(&mut self, ids: impl IntoIterator<Item = ObjectId>) {
-        for id in ids {
-            let gait = self.object(id).and_then(|(_, u)| u.gait());
-            self.spatial.set_gait(id, gait);
         }
     }
 
@@ -83,10 +69,7 @@ impl World {
     /// made from its parts (a load, a test's world): the
     /// annexes' main buildings (their one writer after it: the routines that link and unlink an
     /// annex), how the players stand to each other (after it: the diplomacy change,
-    /// [`World::set_relation`]), each player's masters with a task of action type 0x99, and the
-    /// objects' gaits ([`World::sync_moving`]), for the walk's query ([`Spatial::walk_hits`]).
-    ///
-    /// [`Spatial::walk_hits`]: crate::map::spatial::Spatial::walk_hits
+    /// [`World::set_relation`]) and each player's masters with a task of action type 0x99.
     pub fn sync_world(&mut self) {
         self.reindex();
         for p in &self.players {
@@ -109,20 +92,6 @@ impl World {
                     .collect()
             })
             .collect();
-        self.sync_moving();
-    }
-
-    /// Tell the walk's query which objects move now ([`Spatial::walk_hits`]): every object's
-    /// gait, as each update does first and after its commands. A copy until the objects are in
-    /// tables by id (T4), which the walk then reads.
-    ///
-    /// [`Spatial::walk_hits`]: crate::map::spatial::Spatial::walk_hits
-    pub(super) fn sync_moving(&mut self) {
-        for p in &self.players {
-            for u in p.objects.iter().chain(&p.sleeping) {
-                self.spatial.set_gait(u.id, u.gait());
-            }
-        }
     }
 
     /// Some player's attribute 204 is not 0, which a building's completion reads: the players'

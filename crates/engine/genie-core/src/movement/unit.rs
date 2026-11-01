@@ -37,7 +37,7 @@ impl Unit {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
         if self.body.mover().is_some() {
-            self.count_down_human_order(c.dt, &mut c.w.spatial);
+            self.count_down_human_order(c.dt);
         }
         // the velocity step (FUN_140f9ba80) runs for a unit with velocity data (+0x868)
         let group = match self.body.mover().and_then(|m| m.velocity.as_ref()) {

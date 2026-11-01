@@ -171,7 +171,13 @@ impl World {
                 BVector::new(spiral.at.x(), centroid.height(), spiral.at.y()),
                 self.spatial.map,
             );
-            if !self.spatial.point_hit(at.ground(), grow, &members, true)? {
+            if !self.spatial.point_hit(
+                at.ground(),
+                grow,
+                &members,
+                true,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+            )? {
                 return Ok(at);
             }
             spiral.step()?;
@@ -250,6 +256,7 @@ impl World {
         group: GroupId,
         ahead: Distance,
     ) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
@@ -287,6 +294,7 @@ impl World {
                 Distance::new(FRONT_SHARE * master.radius.x()),
                 mask,
                 &members,
+                by_id,
             )? {
                 let g = self.groups.held_mut(group)?;
                 g.motion.new_position[0] = centre;

@@ -134,8 +134,8 @@ impl World {
         }
         let cart = self.take_out(p, idx)?;
         let result = (|| {
-            let (before, rest) = self.players.split_at_mut(p.index());
-            let (player, after) = rest.split_first_mut().ok_or(GenieError::unreachable(
+            let (before, rest) = self.players.split_at(p.index());
+            let (player, after) = rest.split_first().ok_or(GenieError::unreachable(
                 "a cart's player outside the players",
             ))?;
             let mut w = ResourceWorld {
@@ -143,8 +143,8 @@ impl World {
                 spatial: &mut self.spatial,
                 zones: &mut self.zones,
                 foreign: Foreign {
-                    before: &*before,
-                    after: &*after,
+                    before,
+                    after,
                     left: None,
                 },
                 every: &self.masters,
@@ -170,6 +170,7 @@ impl World {
                         Some(crate::gathering::DropSiteId::new(id)),
                     ),
                     (current, ObjectState::Foundation, crate::unit_ai::NO_POINT),
+                    crate::world::index::ObjectsRef::new(&self.players, &self.index),
                 )?;
                 if let Some(f) = f {
                     found.push(f);

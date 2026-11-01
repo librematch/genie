@@ -128,6 +128,7 @@ impl World {
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let site_at = self
             .spatial
             .get(foundation)
@@ -147,6 +148,7 @@ impl World {
             mover.stats.restriction_mask,
             (site_at, radius),
             true,
+            by_id,
         )?;
         let Some(spot) = spot else {
             return Ok(());

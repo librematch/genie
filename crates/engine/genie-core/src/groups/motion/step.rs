@@ -35,6 +35,8 @@ pub(crate) struct StepWorld<'w, 'p> {
     pub(crate) spatial: &'w mut Spatial,
     pub(crate) plan: &'w mut Planning<'p>,
     pub(crate) dt: Seconds,
+    /// The objects by id: what the walk reads of the units it meets.
+    pub(crate) by_id: crate::world::index::ObjectsRef<'w>,
 }
 
 /// `FUN_14104a270` (the path step of `BMotion`'s update) on `motion`, for a group whose lead is

@@ -383,6 +383,7 @@ impl Unit {
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
     /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
     pub(crate) fn gather_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&c.w.players, &c.w.index);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
@@ -401,7 +402,7 @@ impl Unit {
                 groups: &c.w.groups,
             };
             // the notify's record holds the drop site's id, 0 for none
-            self.drop_site_from(&mut w, others, ActionState::new(state.get()), false)?
+            self.drop_site_from(&mut w, others, ActionState::new(state.get()), false, by_id)?
                 .map_or(0, |s| s.id().get())
         } else {
             -1

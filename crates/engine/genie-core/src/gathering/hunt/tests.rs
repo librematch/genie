@@ -132,6 +132,7 @@ fn to_point(state: MoveTo, point: Position, range: Distance) -> MoveToAction {
 /// The hunter 9177 of [`Rig::on_the_path`] in action state `state`.
 const fn me(state: HuntState) -> Me {
     Me {
+        human_order: WorldTime::ZERO,
         id: object_id(9177),
         group: None,
         action_state: ActionState::new(state.get()),

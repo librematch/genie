@@ -2798,6 +2798,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
     let shown_after_update = |t: &mut World| {
         in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -5003,6 +5004,7 @@ fn notified(t: &World, kind: NotifyKind) -> Vec<[i32; 3]> {
 fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), dt, |unit, c| {
         let me = crate::movement::Me {
+            human_order: WorldTime::ZERO,
             id: unit.id,
             group: unit.group.id,
             action_state: unit
@@ -5440,6 +5442,7 @@ fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
         50,
         |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -5479,6 +5482,7 @@ fn a_gathering_hunt_whose_target_left_searches_without_reading_one() {
         |unit, c| {
             unit.hunt_targets(c)?;
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -5654,6 +5658,7 @@ fn a_hunter_s_sheep_walks_before_the_hunter_s_update_ends() {
         50,
         |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -6865,6 +6870,7 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
             50,
             |unit, c| {
                 let me = crate::movement::Me {
+                    human_order: WorldTime::ZERO,
                     id: unit.id,
                     group: unit.group.id,
                     action_state: unit
@@ -6923,6 +6929,7 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
         50,
         |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -8622,6 +8629,7 @@ fn a_gate_counts_the_moving_units_between_its_posts() {
         &mut s,
         object_id(27745),
         &[object_id(27746), object_id(27747)],
+        index::ObjectsRef::empty(),
     )
     .unwrap();
     assert_eq!((units, allied), (vec![object_id(1)], 1));
@@ -8659,10 +8667,19 @@ fn a_gate_counts_the_moving_units_between_its_posts() {
         &mut s,
         object_id(27745),
         &[object_id(27746), object_id(27747)],
+        index::ObjectsRef::empty(),
     )
     .unwrap();
     assert_eq!((units, allied), (vec![object_id(1), object_id(3)], 1));
-    assert!(gate_units(&mut s, object_id(27745), &[object_id(27746)]).is_err());
+    assert!(
+        gate_units(
+            &mut s,
+            object_id(27745),
+            &[object_id(27746)],
+            index::ObjectsRef::empty()
+        )
+        .is_err()
+    );
 }
 
 /// records/425906646's gate 27745 of player 1 (annexes 27746 and 27747, master 88: open, no
@@ -11732,6 +11749,7 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
             world,
             OthersRef::alone(PlayerId::new(1), &others),
             &t.graphics,
+            index::ObjectsRef::empty(),
         )
     };
     assert_eq!(drop_off(&mut hunter, &mut t), Ok(Some(object_id(9149))));
@@ -15958,7 +15976,7 @@ fn a_build_command_s_foundation_holds_its_movement_state() {
     );
     t.sync_world();
     let gait = t
-        .spatial
+        .objects()
         .gait(object_id(10028))
         .expect("the walk's view of the building");
     assert_eq!(
@@ -16671,9 +16689,8 @@ fn a_unit_s_human_order_count_down_is_the_walk_s_view_at_once() {
         let v = &mut t.players[1].objects[ListIndex::new(0)];
         v.last_human_order = WorldTime::from_millis(before);
         let id = v.id;
-        t.spatial.set_gait(id, v.gait());
-        v.count_down_human_order(Millis::new(33), &mut t.spatial);
-        let seen = t.spatial.gait(id).map(|g| g.human_order);
+        v.count_down_human_order(Millis::new(33));
+        let seen = t.objects().gait(id).map(|g| g.human_order);
         (
             t.players[1].objects[ListIndex::new(0)].last_human_order,
             seen,
@@ -17795,6 +17812,7 @@ fn a_forager_with_nothing_found_after_the_drop_idles_or_is_done() {
 fn gather_step(t: &mut World) -> Result<(), GenieError> {
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
         let me = crate::movement::Me {
+            human_order: WorldTime::ZERO,
             id: unit.id,
             group: unit.group.id,
             action_state: unit
@@ -18118,6 +18136,7 @@ fn drop_site_sought(
         objects,
         ActionState::NO_ACTION,
         args,
+        index::ObjectsRef::empty(),
     )
 }
 
@@ -18214,6 +18233,7 @@ type OwnMoved = (
 fn own_move(t: &mut World) -> OwnMoved {
     let r = in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
         let me = crate::movement::Me {
+            human_order: WorldTime::ZERO,
             id: unit.id,
             group: unit.group.id,
             action_state: unit
@@ -18340,6 +18360,7 @@ fn flown(move_to: MoveTo, setup: impl FnOnce(&mut Unit)) -> Flown {
         50,
         |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(4),
@@ -18403,6 +18424,7 @@ fn explored(set: impl FnOnce(&mut crate::movement::explore::ExploreAction)) -> E
         50,
         |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(crate::movement::explore::ExploreState::Walk.get()),
@@ -18449,6 +18471,7 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
         |unit, c| {
             unit.explore_to(Point::new(40.5, 89.5), c)?;
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(crate::movement::explore::ExploreState::Walk.get()),
@@ -18804,6 +18827,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
         50,
         |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -18900,6 +18924,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
         .builders = crate::construction::BuilderCount::of_data(1);
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), dt, |unit, c| {
         let me = crate::movement::Me {
+            human_order: WorldTime::ZERO,
             id: unit.id,
             group: unit.group.id,
             action_state: unit
@@ -19368,6 +19393,7 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
     for _ in 0..n {
         in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -19480,6 +19506,7 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
         |unit, c| {
             c.w.players[1].attributes[1] = Amount::ZERO;
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: unit
@@ -19760,6 +19787,7 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
         for &i in &repairers {
             in_update(t, (PlayerId::new(1), i), 50, |unit, c| {
                 let me = crate::movement::Me {
+                    human_order: WorldTime::ZERO,
                     id: unit.id,
                     group: unit.group.id,
                     action_state: unit

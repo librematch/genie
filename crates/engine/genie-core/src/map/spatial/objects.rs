@@ -45,7 +45,6 @@ impl Spatial {
             frozen_for: crate::objects::IdTable::new(),
             fastest: 0.0,
             reach: Distance::ZERO,
-            gaits: crate::objects::IdTable::new(),
             scout_maps: BTreeMap::new(),
             annexes: crate::objects::IdTable::new(),
             relations: crate::players::ByPlayer::default(),

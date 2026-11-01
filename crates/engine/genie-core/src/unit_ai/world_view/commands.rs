@@ -8,7 +8,6 @@ use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Mover, Planning};
-use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
@@ -256,15 +255,10 @@ impl UnitView<'_, '_> {
             .restriction(mover.stats.restriction)
             .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
         let zones = self.c.w.zones.of(map, &terrain.kinds, values)?;
-        let me = Me {
-            id: unit.id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
+        let me = unit.me();
         let area = ScoutArea {
             spatial: &mut self.c.w.spatial,
+            by_id: crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index),
             zones,
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
@@ -327,6 +321,8 @@ impl crate::players::ai_module::SearchArea for ScoutArea<'_> {
 /// What the auto scout's search asks of the world for one unit ([`crate::movement::explore::Area`]).
 pub(crate) struct ScoutArea<'a> {
     pub(crate) spatial: &'a mut Spatial,
+    /// The world's objects, whose gaits the stand and reach tests read.
+    pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
     pub(crate) zones: &'a crate::pathing::zones::ZoneMap,
     pub(crate) plan: Planning<'a>,
     pub(crate) mover: &'a Mover,
@@ -369,6 +365,7 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
             tile.corner(),
             Distance::new(self.radius.x()),
             mask,
+            self.by_id,
         )
     }
 
@@ -376,7 +373,7 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
         let to = tile.corner();
         self.mover.reaches(
             &self.me,
-            self.spatial,
+            (self.spatial, self.by_id),
             &mut self.plan,
             to,
             self.reach,

@@ -83,6 +83,7 @@ pub(crate) fn lowered_units(
     walker: &LongWalker<'_>,
     world: &Spatial,
     target: Option<ObjectId>,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Vec<ObjectId> {
     /// The list's room for the walker's ignore units (`0xfe < lVar26` breaks).
     const IGNORED: usize = 254;
@@ -97,7 +98,7 @@ pub(crate) fn lowered_units(
                         id != walker.id
                             && Some(id) != target
                             && world.get(id).is_some()
-                            && world.gait(id).is_some_and(|g| g.waits || g.moving)
+                            && by_id.gait(id).is_some_and(|g| g.waits || g.moving)
                     })
                     .take(IGNORED),
             )
@@ -128,13 +129,14 @@ pub(crate) fn long_path_for(
     computer: bool,
     (to, range): (BVector, f32),
     target: Option<(ObjectId, &Placed)>,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(bool, Path), GenieError> {
     let long_target = target.map(|(_, t)| {
         let gap2 = footprint_gap_squared(walker.position, walker.radius, t.position, t.radius);
         let gap = footprint_gap(walker.position, walker.radius, t.position, t.radius);
         crate::pathing::long_path::LongTarget::new(t.position, t.radius, gap, gap2)
     });
-    let listed = lowered_units(walker, world, target.map(|(id, _)| id));
+    let listed = lowered_units(walker, world, target.map(|(id, _)| id), by_id);
     let lowered = listed
         .into_iter()
         .filter_map(|id| world.get(id))
@@ -334,7 +336,7 @@ pub(super) fn old_pather_for(radius: Distance) -> bool {
 pub(crate) fn short_path_for(
     walker: Walker,
     from: Point,
-    world: &mut Spatial,
+    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
     plan: &mut Planning<'_>,
     goal: (BVector, Distance, Option<ObjectId>),
     ignore: &[ObjectId],
@@ -349,7 +351,7 @@ pub(crate) fn short_path_for(
         ignore,
         include: &[],
     };
-    short_path_including(walker, from, world, plan, ask, player, out)
+    short_path_including(walker, from, (world, by_id), plan, ask, player, out)
 }
 
 /// The owner's number (`+0x718` of the object's player, `+0x138`) the short pather takes for
@@ -376,7 +378,7 @@ pub(super) fn owner_number(world: &Spatial, id: ObjectId) -> Option<PlayerId> {
 pub(crate) fn short_path_including(
     walker: Walker,
     from: Point,
-    world: &mut Spatial,
+    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
     plan: &mut Planning<'_>,
     ask: ShortAsk<'_>,
     player: Option<PlayerId>,
@@ -436,8 +438,9 @@ pub(crate) fn short_path_including(
     };
     out.points.clear();
     if old_pather_for(walker.radius) {
-        let mut pather = HullPather::for_list(world, ignore, walker.mask, walker.radius, player)
-            .including(include);
+        let mut pather =
+            HullPather::for_list((world, by_id), ignore, walker.mask, walker.radius, player)
+                .including(include);
         let (result, path) = pather.find(from, to.ground(), target, range)?;
         for p in &path.points {
             let _ = out.push(BVector::new(p.x(), 0.0, p.y()));

@@ -3,7 +3,6 @@
 use crate::GenieError;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Mover};
-use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::actions::Action;
@@ -84,13 +83,7 @@ impl Unit {
         &mut self,
         c: &mut Step<'_>,
     ) -> Result<Option<crate::ownership::capture::Captured>, GenieError> {
-        let me = Me {
-            id: self.id,
-            group: self.group.id,
-            action_state: self
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
+        let me = self.me();
         let mut captured = None;
         let code = self.head_part(c, me, &mut captured)?;
         self.end_head_update(c, code)?;
@@ -246,9 +239,9 @@ impl Unit {
         Ok(())
     }
 
-    /// After the actions: the units its walk met take their pauses (slot 0x5f0: the walked
-    /// level's pause and their gait, in the world; the walk read them from its own list till
-    /// now, `Mover::pause_of`). A unit whose walk met others in its way is not modelled.
+    /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
+    /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
+    /// whose walk met others in its way is not modelled.
     pub(crate) fn after_actions(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         if let Some(m) = self.body.mover_mut() {
             for (id, pause) in std::mem::take(&mut m.pauses) {
@@ -259,8 +252,6 @@ impl Unit {
                     continue;
                 };
                 level.pause_time = pause;
-                let gait = u.gait();
-                c.w.spatial.set_gait(id, gait);
             }
             if !m.in_the_way.is_empty() {
                 return Err(crate::world::IN_THE_WAY);

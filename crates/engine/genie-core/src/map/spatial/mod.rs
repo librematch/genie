@@ -179,7 +179,8 @@ const TRAPPERS: [MasterId; 3] = [
 /// What the walk reads of a moving object it meets: whether it moves (its velocity, `+0x868`, is
 /// not 0: slot 0x5c8, `FUN_1411583d0`), its last move time (`+0x870`, slot 0x5e8) and its current
 /// path level's pause time (`+0x858`'s `+0x34`, slot 0x528), none without a level, and when that
-/// level's path was made.
+/// level's path was made. The walk reads it from the met unit itself, by id
+/// ([`crate::world::index::ObjectsRef::gait`], [`crate::objects::unit::Unit::gait`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Gait {
     /// It moves: its velocity (`+0x868`) is not 0 (slot 0x5c8).
@@ -596,8 +597,6 @@ pub struct Spatial {
     pub fastest: f32,
     /// The farthest any of the players' units acts beyond its footprint.
     pub reach: Distance,
-    /// What the walk reads of the moving objects it meets ([`Gait`]).
-    gaits: crate::objects::IdTable<Gait>,
     /// Each player's scout map (`player+0x1370`, `mIsScoutMapEnabled` `+0x1368`), once made.
     scout_maps: BTreeMap<PlayerId, crate::movement::explore::InfluenceMap>,
     /// Each annex's main building (`+0xbb8`), which the walk's avoidance takes for the annex.

@@ -27,7 +27,10 @@ impl HullPather<'_> {
     /// holding the goal or none.
     pub(super) fn goal_record(&self, to: Point) -> Result<Option<Target>, GenieError> {
         let grow = self.buffer.unwrap_or(Distance::ZERO);
-        if !self.world.point_hit(to, grow, &self.ignore, false)? {
+        if !self
+            .world
+            .point_hit(to, grow, &self.ignore, false, self.by_id)?
+        {
             return Ok(None);
         }
         let near: Vec<ObjectId> = self
@@ -47,7 +50,7 @@ impl HullPather<'_> {
                     .filter(|&&o| o != id)
                     .map(|&o| RecordId::from(o)),
             );
-            if !self.world.point_hit(to, grow, &others, false)? {
+            if !self.world.point_hit(to, grow, &others, false, self.by_id)? {
                 continue;
             }
             let Some(p) = self.world.get(id) else {

@@ -166,7 +166,6 @@ impl Unit {
             Effect::Stop => self.stop_action(c),
             Effect::CapHumanOrder(cap) => {
                 self.last_human_order = self.last_human_order.min(cap);
-                c.w.spatial.set_gait(self.id, self.gait());
                 Ok(())
             }
             Effect::Move(_) | Effect::RestorePatrol => {

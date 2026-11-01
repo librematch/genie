@@ -16,8 +16,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, SearchQuery, Spatial};
 use crate::math::rng::{Stream, Well512};
-use crate::movement::{Me, Planning, footprint_gap_squared};
-use crate::objects::ActionState;
+use crate::movement::{Planning, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -72,11 +71,13 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
             "a stand test of a unit without movement state",
         ))?;
+        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
         self.c.w.spatial.point_clear(
             unit.id,
             point,
             Distance::new(mover.stats.radius.x()),
             mover.stats.restriction_mask,
+            by_id,
         )
     }
 
@@ -235,19 +236,14 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             groups: &self.c.w.groups,
         };
         let unit = &*self.unit;
-        let walker = Me {
-            id: unit.id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
+        let walker = unit.me();
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
             "a reach test of a unit that does not move",
         ))?;
+        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
         mover.reaches_object(
             &walker,
-            &mut self.c.w.spatial,
+            (&mut self.c.w.spatial, by_id),
             &mut plan,
             target,
             range,
@@ -279,6 +275,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             )?
             .players(),
             every: &self.c.w.masters,
+            by_id: crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index),
             restriction: self
                 .unit
                 .master(&self.c.w.masters, self.player)?
@@ -308,19 +305,14 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             groups: &self.c.w.groups,
         };
         let unit = &*self.unit;
-        let walker = Me {
-            id: unit.id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
+        let walker = unit.me();
         let (mover, master_id) = (unit.body.mover(), unit.life.master_id);
+        let by_id = crate::world::index::ObjectsRef::new(&self.c.w.players, &self.c.w.index);
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             let m = mover.ok_or(GenieError::unsupported(
                 "a reach test of a unit that does not move",
             ))?;
-            m.reaches_object(&walker, spatial, &mut plan, id, range, master_id)
+            m.reaches_object(&walker, (spatial, by_id), &mut plan, id, range, master_id)
         };
         let moving = |id: ObjectId| herded(others, id);
         // a class-10 searcher passes master 440 and the masters with object flag 0x10

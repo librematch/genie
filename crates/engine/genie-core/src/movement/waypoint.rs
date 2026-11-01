@@ -46,6 +46,7 @@ impl Mover {
         pathing: Option<&mut Pathing>,
         goal: Goal<'_>,
         now: WorldTime,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let ground_radius = self.stats.radius.ground();
         if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
@@ -65,7 +66,7 @@ impl Mover {
                 Next::Dispatch
             });
         }
-        self.drop_held_waypoint(world)?;
+        self.drop_held_waypoint(world, by_id)?;
         let parent_is_level_1 = self
             .paths
             .get(1)
@@ -119,7 +120,7 @@ impl Mover {
                 return Ok(Next::Dispatch);
             }
             if level.level == WaypointLevel::TOP {
-                return self.level_2_short(me, world, goal);
+                return self.level_2_short(me, world, goal, by_id);
             }
         }
         level.state = PathState::Arrived;
@@ -156,7 +157,11 @@ impl Mover {
     /// # Errors
     ///
     /// A frozen object the query may meet.
-    pub(super) fn drop_held_waypoint(&mut self, world: &Spatial) -> Result<(), GenieError> {
+    pub(super) fn drop_held_waypoint(
+        &mut self,
+        world: &Spatial,
+        by_id: crate::world::index::ObjectsRef<'_>,
+    ) -> Result<(), GenieError> {
         let level = self.paths.walked()?;
         let next = level.waypoint.next();
         if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
@@ -170,7 +175,13 @@ impl Mover {
         if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() < TARGET_SHORT_REACH {
             let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
             let ignore = world.manager_ignore();
-            if world.object_holds(Point::new(x, y), world.manager_grow(), &ignore, false)? {
+            if world.object_holds(
+                Point::new(x, y),
+                world.manager_grow(),
+                &ignore,
+                false,
+                by_id,
+            )? {
                 let level = self.paths.walked_mut()?;
                 let removed = remove_point(&mut level.points, level.waypoint);
                 debug_assert!(removed, "the waypoint lies within the path");
@@ -194,13 +205,14 @@ impl Mover {
         me: &Me,
         world: &Spatial,
         goal: Goal<'_>,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let level = self.paths.walked()?;
         let created = level.created;
         let own = world.get(me.id).map(|p| p.player);
         let yields = self.stats.weapon_range == Distance::ZERO
             && goal.target.is_some_and(|(target, t)| {
-                let moved = world.gait(target).map_or(WorldTime::ZERO, |g| g.last_move);
+                let moved = by_id.gait(target).map_or(WorldTime::ZERO, |g| g.last_move);
                 moved > created
                     || (moved == created && (own.is_some_and(|o| o < t.player) || me.id < target))
             });
@@ -305,6 +317,7 @@ impl Mover {
         p: BVector,
         target: Option<ObjectId>,
         world: &mut Spatial,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (rx, ry, rz) = (
             self.stats.radius.x(),
@@ -335,6 +348,7 @@ impl Mover {
             ally_factor: self.stats.min_collision,
             player,
             ignore: &ignore,
+            objects: by_id,
         })?;
         Ok(hits.is_empty())
     }

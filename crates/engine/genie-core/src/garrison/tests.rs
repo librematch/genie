@@ -335,7 +335,13 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
     let (mut walled, stats) = walled_map(GridSize::new(100, 100), &blocked, &blocked, &[(10, 11)]);
     let (mut open, _) = walled_map(GridSize::new(100, 100), &[(10, 11)], &blocked, &[]);
     let mut reach = |range, gap, speed| {
-        EnterAction::in_reach(range, gap, speed, &mut walls(&mut walled, &masters, &stats))
+        EnterAction::in_reach(
+            range,
+            gap,
+            speed,
+            &mut walls(&mut walled, &masters, &stats),
+            crate::world::index::ObjectsRef::empty(),
+        )
     };
     assert_eq!(
         reach(Distance::new(1.0), DistanceSquared::new(1.0), Speed::ZERO),
@@ -390,7 +396,8 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
             Distance::new(1.0),
             DistanceSquared::new(0.5),
             Speed::new(0.8),
-            &mut walls(&mut open, &masters, &stats)
+            &mut walls(&mut open, &masters, &stats),
+            crate::world::index::ObjectsRef::empty()
         ),
         Ok(true)
     );
@@ -540,6 +547,7 @@ fn enter_update(t: &mut World, dt: u32) -> Result<HeadCode, GenieError> {
     let v = villager(t);
     crate::world::tests::in_update(t, (PlayerId::new(1), v), dt, |u, c| {
         let me = crate::movement::Me {
+            human_order: WorldTime::ZERO,
             id: u.id,
             group: u.group.id,
             action_state: u.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
@@ -989,7 +997,14 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
     // tile and the next when it spans more than one), the two tiles left out
     let masters = [Masters::default(), garrison_masters()];
     let walled = |spatial: &mut crate::map::spatial::Spatial, stats, me, them| {
-        walled_off(me, them, spatial, &masters, (object_id(1), stats))
+        walled_off(
+            me,
+            them,
+            spatial,
+            &masters,
+            (object_id(1), stats),
+            crate::world::index::ObjectsRef::empty(),
+        )
     };
     let blocked = [(10, 11), (11, 10)];
     let (mut spatial, stats) = walled_map(GridSize::new(100, 100), &blocked, &blocked, &[(10, 11)]);
@@ -1060,7 +1075,8 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
             Point::new(11.5, 11.5),
             &mut spatial,
             &masters,
-            (object_id(1), &stats)
+            (object_id(1), &stats),
+            crate::world::index::ObjectsRef::empty()
         )
         .is_err()
     );
@@ -3846,6 +3862,7 @@ fn a_transport_unloads_inside_its_own_update() {
     let i = t.players[1].objects.position_of(object_id(200)).unwrap();
     let seen = crate::world::tests::in_update(&mut t, (PlayerId::new(1), i), 100, |unit, c| {
         let me = crate::movement::Me {
+            human_order: WorldTime::ZERO,
             id: unit.id,
             group: unit.group.id,
             action_state: unit
@@ -4259,6 +4276,7 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
     let mut update = |list: &mut Option<MoveToAction>| {
         crate::world::tests::in_update(&mut t, (PlayerId::new(1), v), 0, |u, c| {
             let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
                 id: u.id,
                 group: u.group.id,
                 action_state: ActionState::NO_ACTION,

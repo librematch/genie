@@ -174,6 +174,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         target: Option<(ObjectId, &Placed)>,
         line: (Point, Point),
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Vec<ObjectId>, GenieError> {
         let now = plan.now;
         let mut list = vec![me.id];
@@ -205,7 +206,7 @@ impl Mover {
             let skip = [RecordId::from(me.id), RecordId::from(target_id)];
             for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
                 let Some(p) = world.get(id) else { continue };
-                let gait = world.gait(id);
+                let gait = by_id.gait(id);
                 if gait.is_some_and(|g| g.moving) {
                     continue;
                 }
@@ -302,16 +303,18 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: ShortAsk<'_>,
         out: &mut Path,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<ShortFound, GenieError> {
         let walker = self.walker(me.id);
+        let owner = owner_number(world, me.id);
         // from +0x824: the motion step's `local_18c8`, the reach test's start (FUN_14114fea0)
         short_path_including(
             walker,
             self.moved_at.ground(),
-            world,
+            (world, by_id),
             plan,
             ask,
-            owner_number(world, me.id),
+            owner,
             out,
         )
     }
@@ -364,7 +367,7 @@ impl Mover {
     pub fn reaches(
         &self,
         me: &Me,
-        world: &mut Spatial,
+        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         to: Point,
         range: Distance,
@@ -376,7 +379,7 @@ impl Mover {
             range,
             master,
         };
-        self.reach_test(me, world, plan, ask)
+        self.reach_test(me, world, plan, ask, by_id)
     }
 
     /// Slot 0x3d0 of the unit (`FUN_14114fea0` -> `FUN_140fa0370` with the target object): whether
@@ -385,7 +388,7 @@ impl Mover {
     pub fn reaches_object(
         &self,
         me: &Me,
-        world: &mut Spatial,
+        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         target: ObjectId,
         range: Distance,
@@ -401,7 +404,7 @@ impl Mover {
             range,
             master,
         };
-        self.reach_test(me, world, plan, ask)
+        self.reach_test(me, world, plan, ask, by_id)
     }
 
     /// Slot 0x3e8 of the unit (`FUN_14114f790`): the length of its short path to object `target`
@@ -416,6 +419,7 @@ impl Mover {
         world: &mut Spatial,
         target: ObjectId,
         range: Distance,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<Distance>, GenieError> {
         let Some(t) = world.get_known(target)? else {
             return Ok(None);
@@ -423,7 +427,7 @@ impl Mover {
         let to = t.position.ground();
         let mask = self.stats.restriction_mask;
         let mut pather = HullPather::new(
-            world,
+            (world, by_id),
             me.id,
             Some(target),
             mask,

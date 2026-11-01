@@ -523,6 +523,7 @@ impl Spatial {
         mask: crate::map::TerrainMask,
         me: ObjectId,
         radius_x: Distance,
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (Some(word), Some(tall)) = (self.tiles.word(tile), self.tiles.tall(tile)) else {
             return Ok(false);
@@ -531,7 +532,7 @@ impl Spatial {
             return Ok(false);
         }
         if 1 < tall {
-            return self.point_clear(me, tile.corner(), radius_x * 0.5, mask);
+            return self.point_clear(me, tile.corner(), radius_x * 0.5, mask, by_id);
         }
         Ok(true)
     }
@@ -548,7 +549,8 @@ impl Spatial {
         me: (ObjectId, f32),
         mask: crate::map::TerrainMask,
         site: (Position, Footprint),
+        by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
-        self.spot_off(from, me, mask, site, false)
+        self.spot_off(from, me, mask, site, false, by_id)
     }
 }

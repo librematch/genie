@@ -1073,6 +1073,7 @@ mod tests {
     /// [`Rig::on_the_path`]'s unit 9177 as the walker.
     const fn me() -> Me {
         Me {
+            human_order: crate::world::WorldTime::ZERO,
             id: object_id(9177),
             group: None,
             action_state: ActionState::NO_ACTION,

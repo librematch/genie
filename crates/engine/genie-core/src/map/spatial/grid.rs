@@ -1,4 +1,4 @@
-//! The obstruction grid's cells and visits, the scout map, gaits, annexes, alliances and the line
+//! The obstruction grid's cells and visits, the scout map, annexes, alliances and the line
 //! queries.
 
 use crate::GenieError;
@@ -7,13 +7,13 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::map::spatial::{
-    Gait, Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
+    Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::objects::masters::ObstructionType;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
-use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 
 /// A walk's obstruction query ([`Spatial::walk_hits`]'s arguments).
 #[derive(Clone, Copy, Debug)]
@@ -33,6 +33,8 @@ pub struct WalkQuery<'a> {
     pub player: Option<PlayerId>,
     /// The objects the query ignores.
     pub ignore: &'a [RecordId],
+    /// The world's objects, whose gaits the query reads ([`ObjectsRef::moving`]).
+    pub objects: ObjectsRef<'a>,
 }
 
 impl Spatial {
@@ -202,51 +204,6 @@ impl Spatial {
         }
     }
 
-    /// What the walk reads of a moving object now, None for one without movement state.
-    pub fn set_gait(&mut self, id: impl ObjectKey, gait: Option<Gait>) {
-        let Some(id) = id.key() else {
-            return;
-        };
-        match gait {
-            Some(g) => {
-                let _ = self.gaits.insert(id, g);
-            }
-            None => {
-                let _ = self.gaits.remove(id);
-            }
-        }
-    }
-
-    /// The walk's view of the moving object `id`'s last human order time (`+0x650`) as the field
-    /// changes; nothing for an object without one.
-    pub fn set_human_order(&mut self, id: impl ObjectKey, human_order: WorldTime) {
-        let Some(id) = id.key() else {
-            return;
-        };
-        if let Some(g) = self.gaits.get_mut(id) {
-            g.human_order = human_order;
-        }
-    }
-
-    /// The walk's view of the moving object `id`'s last move time (`+0x870`, slot 0x5e8) as
-    /// the field changes outside its own update (a construction's start, a gate that shuts or
-    /// locks): a later walker of the same update reads it at once; nothing for an object without
-    /// movement state.
-    pub fn set_last_move(&mut self, id: impl ObjectKey, last_move: WorldTime) {
-        let Some(id) = id.key() else {
-            return;
-        };
-        if let Some(g) = self.gaits.get_mut(id) {
-            g.last_move = last_move;
-        }
-    }
-
-    /// What the walk reads of the moving object `id`.
-    #[must_use]
-    pub fn gait(&self, id: impl ObjectKey) -> Option<Gait> {
-        self.gaits.get(id.key()?).copied()
-    }
-
     /// An annex's main building, or none.
     pub fn set_annex(&mut self, id: ObjectId, main: Option<MainBuildingId>) {
         match main {
@@ -370,6 +327,7 @@ impl Spatial {
             ally_factor,
             player,
             ignore,
+            objects: by_id,
         } = walk;
         self.set_manager_ignore(ignore);
         // its callers reset the buffer after the query (FUN_1410562d0 with 0)
@@ -405,7 +363,7 @@ impl Spatial {
             {
                 continue;
             }
-            let g = if self.gaits.get(id).is_some_and(|g| g.moving) {
+            let g = if by_id.moving(id) {
                 let player = player.ok_or(GenieError::unsupported("a walker without a place"))?;
                 if self.allied(p.player, player) {
                     ally_factor * grow

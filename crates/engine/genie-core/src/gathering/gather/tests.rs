@@ -139,6 +139,7 @@ impl Rig {
             dt,
             |u, c| {
                 let me = Me {
+                    human_order: WorldTime::ZERO,
                     id: u.id,
                     group: None,
                     action_state: ActionState::new(state.get()),

@@ -103,6 +103,20 @@ impl Unit {
         why
     }
 
+    /// The unit as its walk reads it ([`crate::movement::Me`]): its id, its top action's state
+    /// (0 without one), its group and its last human order's time.
+    #[must_use]
+    pub fn me(&self) -> crate::movement::Me {
+        crate::movement::Me {
+            id: self.id,
+            action_state: self
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
+            group: self.group.id,
+            human_order: self.last_human_order,
+        }
+    }
+
     /// What the walk reads of it when it meets it ([`crate::map::spatial::Gait`]).
     #[must_use]
     pub fn gait(&self) -> Option<crate::map::spatial::Gait> {

@@ -87,7 +87,10 @@ pub fn old_pather_paths(
             continue;
         };
         let mut pather = genie_core::pathing::hull_path::HullPather::new(
-            &mut turns.spatial,
+            (
+                &mut turns.spatial,
+                genie_core::world::index::ObjectsRef::new(&turns.players, &turns.index),
+            ),
             id,
             Some(target),
             mask,

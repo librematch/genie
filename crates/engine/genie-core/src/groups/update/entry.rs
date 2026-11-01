@@ -37,18 +37,11 @@ impl World {
             .map(|g| g.id)
             .collect();
         for id in ids {
-            let members: Vec<ObjectId> = self
-                .groups
-                .get(id)
-                .map(|g| g.members.iter().map(|m| m.id).collect())
-                .unwrap_or_default();
             if self.group_update(id)? {
                 self.group_update_end(id)?;
             } else {
                 self.delete_group(id)?;
             }
-            // the walks after it (other groups', the objects' own) read the members as it left them
-            self.refresh_gaits(members);
         }
         Ok(())
     }
@@ -93,9 +86,6 @@ impl World {
                 continue;
             }
             u.group.id = None;
-            // the walks that meet it read its group
-            let gait = u.gait();
-            self.spatial.set_gait(m.id, gait);
             if self.member_idle(m.id)? {
                 if let Some((_, u)) = self.object_mut(m.id)
                     && let Some(mover) = u.body.mover_mut()

@@ -55,6 +55,8 @@ pub(crate) struct WorldPicker<'a> {
     pub(crate) player: PlayerId,
     /// The owner's other objects.
     pub(crate) others: OthersRef<'a>,
+    /// The world's objects, whose gaits the quick path reads.
+    pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
     /// The other players' lists.
     pub(crate) foreign: Foreign<'a>,
     /// Every player's masters.
@@ -502,7 +504,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             .ok_or(crate::pathing::hull_path::NO_RESTRICTION)?;
         let mask = terrain.restriction_mask(restriction);
         crate::pathing::hull_path::quick_reach(
-            spatial,
+            (spatial, self.by_id),
             self.me,
             Some(id),
             mask,

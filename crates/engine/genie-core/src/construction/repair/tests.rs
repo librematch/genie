@@ -347,6 +347,7 @@ fn passable(t: &mut crate::world::World) {
 fn repaired(t: &mut crate::world::World) -> Result<HeadCode, GenieError> {
     crate::world::tests::in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
         let me = Me {
+            human_order: crate::world::WorldTime::ZERO,
             id: unit.id,
             group: unit.group.id,
             action_state: unit

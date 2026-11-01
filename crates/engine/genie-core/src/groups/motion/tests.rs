@@ -407,6 +407,8 @@ struct Fixture {
     pathing: Pathing,
     object: Well512,
     groups: UnitGroups,
+    /// The units the walk meets by id, built for their gaits.
+    objects: crate::world::index::TestObjects,
 }
 
 impl Fixture {
@@ -416,6 +418,7 @@ impl Fixture {
             pathing: Pathing::default(),
             object: Well512::default(),
             groups: UnitGroups::default(),
+            objects: crate::world::index::TestObjects::default(),
         }
     }
 
@@ -428,6 +431,7 @@ impl Fixture {
             groups: &self.groups,
         };
         let mut world = StepWorld {
+            by_id: self.objects.view(),
             spatial: &mut self.spatial,
             plan: &mut plan,
             dt: Seconds::new(0.1),
@@ -555,6 +559,7 @@ impl Fixture {
             groups: &self.groups,
         };
         let mut world = StepWorld {
+            by_id: self.objects.view(),
             spatial: &mut self.spatial,
             plan: &mut plan,
             dt: Seconds::new(0.1),
@@ -1022,6 +1027,7 @@ impl Fixture {
             groups: &self.groups,
         };
         let mut world = StepWorld {
+            by_id: self.objects.view(),
             spatial: &mut self.spatial,
             plan: &mut plan,
             dt: Seconds::new(0.1),
@@ -1152,7 +1158,7 @@ fn what_stands_in_the_way_stops_the_walk() {
         LevelFlags::REACHED | LevelFlags::MET_TARGET
     );
     // 8 in the way moved at 60
-    fx.spatial.set_gait(
+    fx.objects.set_gait(
         object_id(8),
         Some(Gait {
             last_move: WorldTime::from_millis(60),
@@ -1243,6 +1249,7 @@ fn the_members_centre_pulls_a_group_whose_members_all_act() {
             groups: &fx.groups,
         };
         let mut world = StepWorld {
+            by_id: crate::world::index::ObjectsRef::empty(),
             spatial: &mut fx.spatial,
             plan: &mut plan,
             dt: Seconds::new(0.1),

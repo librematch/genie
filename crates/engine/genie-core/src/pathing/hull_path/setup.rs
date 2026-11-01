@@ -31,7 +31,7 @@ pub(crate) const NO_RESTRICTION: GenieError =
 ///
 /// Where the pather meets what the slice does not model, or an object the world does not place.
 pub fn quick_reach(
-    world: &mut Spatial,
+    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
     me: ObjectId,
     target: Option<ObjectId>,
     mask: crate::map::TerrainMask,
@@ -44,7 +44,15 @@ pub fn quick_reach(
             "a quick path of an object without a place",
         ))?
         .position;
-    let reach = quick_reach_from(world, me, from.ground(), target, mask, radius, range)?;
+    let reach = quick_reach_from(
+        (world, by_id),
+        me,
+        from.ground(),
+        target,
+        mask,
+        radius,
+        range,
+    )?;
     Ok(reach.is_some())
 }
 
@@ -60,7 +68,7 @@ pub fn quick_reach(
 ///
 /// Where the pather meets what the slice does not model.
 pub fn quick_reach_from(
-    world: &mut Spatial,
+    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
     me: ObjectId,
     from: Point,
     target: Option<ObjectId>,
@@ -72,7 +80,7 @@ pub fn quick_reach_from(
         return Ok(None);
     };
     let to = t.position.ground();
-    let mut pather = HullPather::new(world, me, target, mask, radius);
+    let mut pather = HullPather::new((world, by_id), me, target, mask, radius);
     let (result, path) = pather.find_quick(from, to, target, range)?;
     // the slot removes the manager's temporary tile records after (FUN_1410561f0), which the
     // quick path's exit leaves
@@ -98,7 +106,7 @@ impl<'w> HullPather<'w> {
     /// across searches holds the same state.
     #[must_use]
     pub fn new(
-        world: &'w mut Spatial,
+        (world, by_id): (&'w mut Spatial, crate::world::index::ObjectsRef<'w>),
         unit: ObjectId,
         target: Option<ObjectId>,
         mask: crate::map::TerrainMask,
@@ -106,7 +114,7 @@ impl<'w> HullPather<'w> {
     ) -> Self {
         let player = world.get(unit).map(|p| p.player);
         let ids: Vec<ObjectId> = [Some(unit), target].into_iter().flatten().collect();
-        Self::for_list(world, &ids, mask, radius, player)
+        Self::for_list((world, by_id), &ids, mask, radius, player)
     }
 
     /// The pather for a unit of terrain `mask`, `radius` and player `player` (`FindShortPath`'s
@@ -119,7 +127,7 @@ impl<'w> HullPather<'w> {
     /// ([`HullPather::new`]).
     #[must_use]
     pub fn for_list(
-        world: &'w mut Spatial,
+        (world, by_id): (&'w mut Spatial, crate::world::index::ObjectsRef<'w>),
         ids: &[ObjectId],
         mask: crate::map::TerrainMask,
         radius: Distance,
@@ -141,6 +149,7 @@ impl<'w> HullPather<'w> {
         }
         Self {
             world,
+            by_id,
             mask,
             radius,
             player,

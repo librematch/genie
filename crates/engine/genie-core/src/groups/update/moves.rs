@@ -18,7 +18,6 @@ use crate::groups::{SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
 use crate::movement::PathFlags;
-use crate::objects::ActionState;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::pathing::DelayCount;
 use crate::world::Millis;
@@ -405,53 +404,58 @@ impl World {
     /// [`crate::movement::Mover::motion`] with its top action's state, the update's seconds and
     /// the world's planners); true when it is done (the step answers other than 0: arrived or
     /// given up). Its place follows the world's; the units its walk paused take their pauses
-    /// (slot 0x5f0). The walk reads the group's members' gaits as the update left them, and the
-    /// unit's own follows its step ([`World::refresh_gaits`]). Not held: its facet from its
-    /// angle (`FUN_14114d8b0`).
+    /// (slot 0x5f0). The walk reads the other objects' gaits as they are now (the group's
+    /// members as its update left them); the member itself is out of its slot meanwhile, as an
+    /// updating object is. Not held: its facet from its angle (`FUN_14114d8b0`).
     ///
     /// # Errors
     ///
     /// What the motion step does not model, and a walk's unit in the way (notify 0x215).
     pub(crate) fn member_step(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        use crate::movement::{Me, Motion, Planning};
+        use crate::movement::{Motion, Planning};
         let Some(place) = self.place(id) else {
             return Ok(true);
         };
         let crate::world::index::Place::Live(p, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
-        // the walk meets the group's members as its update left them so far
-        let members: Vec<ObjectId> = (self.players.live(p, idx)?.group.id)
-            .and_then(|id| self.groups.get(id))
-            .map(|g| g.members.iter().map(|m| m.id).collect())
-            .unwrap_or_default();
-        self.refresh_gaits(members);
         let computer = self.players.player(p)?.computer;
-        let unit = self.players.live_mut(p, idx)?;
-        let me = Me {
-            id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
+        // the member is out of its slot for its step, as the updating object is
+        let mut unit = self.take_out(p, idx)?;
+        let me = unit.me();
+        let stepped = match unit.body.mover_mut() {
+            Some(mover) => {
+                let mut plan = Planning {
+                    pathing: &mut self.pathing,
+                    now: self.world_time,
+                    computer,
+                    object: self.streams.get(crate::math::rng::Stream::Object),
+                    groups: &self.groups,
+                };
+                let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
+                mover
+                    .motion(
+                        &me,
+                        self.dt_seconds,
+                        &mut self.spatial,
+                        Some(&mut plan),
+                        by_id,
+                    )
+                    .map(|motion| {
+                        let pauses = std::mem::take(&mut mover.pauses);
+                        (motion, pauses, mover.in_the_way.is_empty())
+                    })
+            }
+            None => Err(crate::world::WALKER_UNMOVING),
         };
-        let mover = unit.body.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
-        let mut plan = Planning {
-            pathing: &mut self.pathing,
-            now: self.world_time,
-            computer,
-            object: self.streams.get(crate::math::rng::Stream::Object),
-            groups: &self.groups,
-        };
-        let motion = mover.motion(&me, self.dt_seconds, &mut self.spatial, Some(&mut plan))?;
-        let pauses = std::mem::take(&mut mover.pauses);
-        if !mover.in_the_way.is_empty() {
+        let _ = self.put_back_own(p, unit)?;
+        let (motion, pauses, clear) = stepped?;
+        if !clear {
             return Err(crate::world::IN_THE_WAY);
         }
         for (other, pause) in pauses {
             self.pause(other, pause);
         }
-        self.refresh_gaits([id]);
         Ok(motion != Motion::Moving)
     }
 

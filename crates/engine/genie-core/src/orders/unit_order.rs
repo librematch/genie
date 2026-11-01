@@ -370,9 +370,19 @@ impl World {
         };
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         let result = if by == DropOffBy::Hunt {
-            unit.drop_off_in(world, others, &self.graphics)
+            unit.drop_off_in(
+                world,
+                others,
+                &self.graphics,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+            )
         } else {
-            unit.gather_drop_off_in(world, others, &self.graphics)
+            unit.gather_drop_off_in(
+                world,
+                others,
+                &self.graphics,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+            )
         };
         let idx = self.put_back_own(p, unit)?;
         if let Some(site) = result? {

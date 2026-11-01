@@ -383,7 +383,8 @@ fn a_rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses
             object_id(1),
             Point::new(0.2, 50.0),
             Distance::new(0.3),
-            TerrainMask::ALL
+            TerrainMask::ALL,
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -392,7 +393,8 @@ fn a_rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses
             object_id(1),
             Point::new(0.4, 50.0),
             Distance::new(0.3),
-            TerrainMask::ALL
+            TerrainMask::ALL,
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -404,6 +406,7 @@ fn a_rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses
 /// the formation finds grows the records.
 #[test]
 fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
+    let mut objects = crate::world::index::TestObjects::default();
     let mut classes = vec![1u8; 100];
     classes[2 * 10 + 7] = 2;
     let mut s = Spatial::with_tiles(
@@ -411,25 +414,26 @@ fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
         Tiles::new(crate::map::GridSize::new(10, 10), classes),
     );
     s.insert(object_id(7), villager(4.0, 5.0));
-    let line = |s: &Spatial, ignore: &[RecordId]| {
+    let line = |s: &Spatial, ignore: &[RecordId], objects: &crate::world::index::TestObjects| {
         s.still_line_hit(
             Point::new(1.0, 5.0),
             Point::new(8.0, 5.0),
             Distance::ZERO,
             ignore,
+            objects.view(),
         )
         .unwrap()
     };
-    assert!(line(&s, &[]));
-    assert!(!line(&s, &[RecordId::from(object_id(7))]));
-    s.set_gait(
+    assert!(line(&s, &[], &objects));
+    assert!(!line(&s, &[RecordId::from(object_id(7))], &objects));
+    objects.set_gait(
         object_id(7),
         Some(Gait {
             moving: true,
             ..Gait::default()
         }),
     );
-    assert!(!line(&s, &[]));
+    assert!(!line(&s, &[], &objects));
     // the class-2 tile (7, 2) once its record is put, for a mask that lacks its class
     let across = |s: &Spatial| {
         s.still_line_hit(
@@ -437,6 +441,7 @@ fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
             Point::new(7.5, 4.0),
             Distance::ZERO,
             &[],
+            objects.view(),
         )
         .unwrap()
     };
@@ -462,7 +467,8 @@ fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
             Point::new(1.0, 5.0),
             Point::new(10.5, 5.0),
             Distance::ZERO,
-            &[]
+            &[],
+            objects.view()
         )
         .unwrap()
     );
@@ -477,7 +483,8 @@ fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
             Point::new(1.0, 5.3),
             Point::new(8.0, 5.3),
             Distance::ZERO,
-            &[]
+            &[],
+            objects.view()
         )
         .unwrap()
     );
@@ -486,7 +493,8 @@ fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
             Point::new(1.0, 5.3),
             Point::new(8.0, 5.3),
             Distance::new(0.2),
-            &[]
+            &[],
+            objects.view()
         )
         .unwrap()
     );
@@ -510,7 +518,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(4.0, 6.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -520,7 +529,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(4.0, 6.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[object_id(3), object_id(7)]
+            &[object_id(3), object_id(7)],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -530,7 +540,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(4.0, 6.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -540,7 +551,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(4.0, 6.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[object_id(3)]
+            &[object_id(3)],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -551,7 +563,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(4.5, 5.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -561,7 +574,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(4.5, 5.5),
             Distance::new(0.1),
             TerrainMask::of_bits(3),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -571,7 +585,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(-0.5, 5.5),
             Distance::new(0.1),
             TerrainMask::of_bits(3),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -582,7 +597,8 @@ fn a_point_is_clear_among_the_ignored_objects() {
             Point::new(f32::NAN, 5.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -675,28 +691,6 @@ fn a_line_meets_the_records_and_the_tiles_its_mask_lacks() {
     assert_eq!(edge[0].value() as u32 & 0xff00_0000, 0xff00_0000);
 }
 
-/// The walk reads a met object's last move time (slot 0x5e8, `+0x870`) live: a change from
-/// outside the object's own update reaches the mirror at once, and an object without
-/// movement state stays without one.
-#[test]
-fn a_last_move_set_outside_the_object_s_update_reaches_the_walk() {
-    let mut s = Spatial::default();
-    s.set_gait(
-        object_id(33439),
-        Some(Gait {
-            last_move: WorldTime::from_millis(7000),
-            ..Gait::default()
-        }),
-    );
-    s.set_last_move(object_id(33439), WorldTime::from_millis(8281));
-    assert_eq!(
-        s.gait(object_id(33439)).map(|g| g.last_move),
-        Some(WorldTime::from_millis(8281))
-    );
-    s.set_last_move(object_id(33440), WorldTime::from_millis(8281));
-    assert_eq!(s.gait(object_id(33440)), None);
-}
-
 /// `FUN_1410562d0`'s buffer stays with the obstruction manager until the next call: the
 /// stand tests and the walk's query set one and reset it after; a point query counts the
 /// temporary tile records still put (the group's clear spot leaves one, `FUN_141007630`).
@@ -719,7 +713,8 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             object_id(1),
             Point::new(6.5, 6.5),
             Distance::new(0.2),
-            TerrainMask::of_bits(1)
+            TerrainMask::of_bits(1),
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -727,6 +722,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
     s.set_manager_buffer(Some(Distance::new(0.1)));
     let _ = s
         .walk_hits(WalkQuery {
+            objects: crate::world::index::ObjectsRef::empty(),
             start: Point::new(2.0, 2.0),
             end: Point::new(3.0, 2.0),
             rect: Rect::new(2.0, 2.0, 3.0, 2.0),
@@ -739,8 +735,14 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
     assert_eq!(s.manager_buffer(), None);
     // a point query near tile (4, 5) meets its record once it is put, within the grow
     assert!(
-        !s.point_hit(Point::new(3.95, 5.5), Distance::new(0.1), &[], true)
-            .unwrap()
+        !s.point_hit(
+            Point::new(3.95, 5.5),
+            Distance::new(0.1),
+            &[],
+            true,
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
     s.put_tile_records(
         Point::new(4.5, 5.5),
@@ -749,19 +751,32 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
         TerrainMask::of_bits(1),
     );
     assert!(
-        s.point_hit(Point::new(3.95, 5.5), Distance::new(0.1), &[], true)
-            .unwrap()
+        s.point_hit(
+            Point::new(3.95, 5.5),
+            Distance::new(0.1),
+            &[],
+            true,
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
     assert!(
-        !s.point_hit(Point::new(3.85, 5.5), Distance::new(0.1), &[], true)
-            .unwrap()
+        !s.point_hit(
+            Point::new(3.85, 5.5),
+            Distance::new(0.1),
+            &[],
+            true,
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
     assert!(
         !s.point_hit(
             Point::new(3.95, 5.5),
             Distance::new(0.1),
             &[tile_record_id(Tile::new(4, 5))],
-            true
+            true,
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -772,7 +787,8 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             Point::new(3.95, 5.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -783,7 +799,8 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             Point::new(3.95, 5.5),
             Distance::new(0.1),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -799,6 +816,7 @@ fn a_walk_past_the_maps_edge_meets_its_record_first() {
     let rect = Rect::new(0.1, 5.5, 2.0, 5.5);
     let hits = s
         .walk_hits(WalkQuery {
+            objects: crate::world::index::ObjectsRef::empty(),
             start: from,
             end: to,
             rect,
@@ -993,6 +1011,7 @@ fn a_record_goes_by_its_master_s_obstruction_type() {
 
 #[test]
 fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
+    let mut objects = crate::world::index::TestObjects::default();
     let mut s = Spatial::new(GridSize::new(120, 120));
     s.relations = ByPlayer::new(vec![
         relation_row([1, 4, 4]),
@@ -1005,6 +1024,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
     // the box (29.8..30.2, 88.8..89.2) grown by 0.25 reaches 88.55, past the step's end
     assert_eq!(
         s.walk_hits(WalkQuery {
+            objects: objects.view(),
             start: from,
             end: to,
             rect,
@@ -1020,6 +1040,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
     let rect = Rect::new(29.5, 88.0, 29.5, 88.5);
     assert_eq!(
         s.walk_hits(WalkQuery {
+            objects: objects.view(),
             start: longer.0,
             end: longer.1,
             rect,
@@ -1032,6 +1053,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
     );
     assert_eq!(
         s.walk_hits(WalkQuery {
+            objects: objects.view(),
             start: longer.0,
             end: longer.1,
             rect,
@@ -1043,7 +1065,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
         Ok(vec![])
     );
     // moving, of the walker's player, it grows by 0.4 × 0.5 only
-    s.set_gait(
+    objects.set_gait(
         object_id(9175),
         Some(Gait {
             moving: true,
@@ -1052,6 +1074,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
     );
     assert_eq!(
         s.walk_hits(WalkQuery {
+            objects: objects.view(),
             start: longer.0,
             end: longer.1,
             rect,
@@ -1066,6 +1089,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
     set_relation(&mut s, (2, 1), Relation::ENEMY);
     assert_eq!(
         s.walk_hits(WalkQuery {
+            objects: objects.view(),
             start: longer.0,
             end: longer.1,
             rect,
@@ -1290,7 +1314,8 @@ fn a_tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
             Tile::new(29, 89),
             TerrainMask::of_bits(6),
             object_id(1),
-            Distance::new(0.2)
+            Distance::new(0.2),
+            crate::world::index::ObjectsRef::empty()
         ),
         Ok(true)
     );
@@ -1299,7 +1324,8 @@ fn a_tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
             Tile::new(29, 89),
             TerrainMask::of_bits(1),
             object_id(1),
-            Distance::new(0.2)
+            Distance::new(0.2),
+            crate::world::index::ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -1308,7 +1334,8 @@ fn a_tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
             Tile::new(-1, 89),
             TerrainMask::of_bits(6),
             object_id(1),
-            Distance::new(0.2)
+            Distance::new(0.2),
+            crate::world::index::ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -1324,7 +1351,8 @@ fn a_tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
             Tile::new(29, 90),
             TerrainMask::of_bits(6),
             object_id(1),
-            Distance::new(0.2)
+            Distance::new(0.2),
+            crate::world::index::ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -1505,7 +1533,8 @@ fn the_free_spot_beside_a_footprint_is_the_closest_empty_tile_around_it() {
             Position::new(30.0, 89.0, 0.0),
             (object_id(1), 0.2),
             TerrainMask::of_bits(6),
-            (house.position, house.radius)
+            (house.position, house.radius),
+            crate::world::index::ObjectsRef::empty()
         ),
         Ok(Some(Point::new(29.5, 89.5)))
     );
@@ -1744,8 +1773,15 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
     );
     let (a, b) = (Point::new(6.5, 6.5), Point::new(7.5, 7.5));
     assert!(
-        !s.pather_blocked(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
-            .unwrap()
+        !s.pather_blocked(
+            a,
+            b,
+            Some(Distance::new(0.5)),
+            TerrainMask::of_bits(1),
+            &[],
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
     s.clear_tile_records();
     assert!(
@@ -1754,13 +1790,21 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
             Point::new(5.5, 7.0),
             Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
     assert_eq!(s.tile_records(), vec![Tile::new(5, 5)]);
     let hits = s
-        .pather_hits(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
+        .pather_hits(
+            a,
+            b,
+            Some(Distance::new(0.5)),
+            TerrainMask::of_bits(1),
+            &[],
+            crate::world::index::ObjectsRef::empty(),
+        )
         .unwrap();
     assert_eq!(
         hits,
@@ -1776,14 +1820,22 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
             b,
             Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
-            &[tile_record_id(Tile::new(5, 5))]
+            &[tile_record_id(Tile::new(5, 5))],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
     s.clear_tile_records();
     assert!(
-        !s.pather_blocked(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
-            .unwrap()
+        !s.pather_blocked(
+            a,
+            b,
+            Some(Distance::new(0.5)),
+            TerrainMask::of_bits(1),
+            &[],
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
 }
 
@@ -1814,12 +1866,26 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
     let edge = s.edge_records(Rect::new(-0.3, 7.5, 6.5, 8.5), QUERY_HITS);
     assert_ne!(edge.len(), 0);
     assert!(
-        s.pather_blocked(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
-            .unwrap()
+        s.pather_blocked(
+            a,
+            b,
+            Some(Distance::new(0.5)),
+            TerrainMask::of_bits(1),
+            &[],
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
     s.clear_tile_records();
     let hits = s
-        .pather_hits(a, b, Some(Distance::new(0.5)), TerrainMask::of_bits(1), &[])
+        .pather_hits(
+            a,
+            b,
+            Some(Distance::new(0.5)),
+            TerrainMask::of_bits(1),
+            &[],
+            crate::world::index::ObjectsRef::empty(),
+        )
         .unwrap();
     assert_eq!(hits.len(), edge.len() + 1);
     assert_eq!(hits[..edge.len()], edge[..]);
@@ -1833,6 +1899,7 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
             Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
             &[],
+            crate::world::index::ObjectsRef::empty(),
         )
         .unwrap();
     assert_eq!(
@@ -1852,7 +1919,8 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
             Point::new(6.0, 8.0),
             Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .is_err()
     );
@@ -1869,7 +1937,8 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
             Point::new(6.0, 8.0),
             Some(Distance::new(0.5)),
             TerrainMask::of_bits(1),
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .is_err()
     );
@@ -2033,6 +2102,7 @@ fn the_manager_keeps_the_last_ignore_list_set() {
     let rect = Rect::new(2.0, 5.0, 3.0, 5.0);
     let _ = s
         .walk_hits(WalkQuery {
+            objects: crate::world::index::ObjectsRef::empty(),
             start: Point::new(2.0, 5.0),
             end: Point::new(3.0, 5.0),
             rect,
@@ -2051,7 +2121,8 @@ fn the_manager_keeps_the_last_ignore_list_set() {
             object_id(3),
             Point::new(4.5, 4.5),
             Distance::new(0.1),
-            TerrainMask::ALL
+            TerrainMask::ALL,
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -2062,7 +2133,8 @@ fn the_manager_keeps_the_last_ignore_list_set() {
             Point::new(4.5, 4.5),
             Distance::new(0.1),
             TerrainMask::ALL,
-            &[]
+            &[],
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -2073,7 +2145,8 @@ fn the_manager_keeps_the_last_ignore_list_set() {
             object_id(5),
             Point::new(-1.0, 4.5),
             Distance::new(0.1),
-            TerrainMask::ALL
+            TerrainMask::ALL,
+            crate::world::index::ObjectsRef::empty()
         )
         .unwrap()
     );
@@ -2081,12 +2154,24 @@ fn the_manager_keeps_the_last_ignore_list_set() {
     s.set_manager_ignore(&[]);
     assert_eq!(s.manager_ignore(), Vec::<RecordId>::new());
     assert!(
-        s.point_hit(Point::new(0.05, 4.5), Distance::new(0.1), &[], false)
-            .unwrap()
+        s.point_hit(
+            Point::new(0.05, 4.5),
+            Distance::new(0.1),
+            &[],
+            false,
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
     assert!(
-        !s.object_holds(Point::new(0.05, 4.5), Distance::new(0.1), &[], false)
-            .unwrap()
+        !s.object_holds(
+            Point::new(0.05, 4.5),
+            Distance::new(0.1),
+            &[],
+            false,
+            crate::world::index::ObjectsRef::empty()
+        )
+        .unwrap()
     );
 }
 

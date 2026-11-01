@@ -224,8 +224,12 @@ impl World {
             let id = self.players.live(player, idx)?.id;
             let annexes =
                 crate::objects::unit::annexes_of(id, &self.players.player(player)?.objects);
-            let (units, _) =
-                crate::construction::gates::gate_units(&mut self.spatial, id, &annexes)?;
+            let (units, _) = crate::construction::gates::gate_units(
+                &mut self.spatial,
+                id,
+                &annexes,
+                crate::world::index::ObjectsRef::new(&self.players, &self.index),
+            )?;
             for u in units {
                 self.shut_in_gate(u)?;
             }
@@ -237,7 +241,6 @@ impl World {
                     "a shut gate without its moving part",
                 ))?
                 .last_move = now.after(Millis::new(1));
-            self.spatial.set_last_move(id, now.after(Millis::new(1)));
         }
         Ok(())
     }

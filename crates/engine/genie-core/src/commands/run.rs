@@ -31,7 +31,6 @@ impl World {
                 .filter(|o| o.combat.ai.is_some());
             if let Some(u) = unit {
                 u.last_human_order = self.world_time;
-                self.spatial.set_gait(u.id, u.gait());
             }
         }
     }

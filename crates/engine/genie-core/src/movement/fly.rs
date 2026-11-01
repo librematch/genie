@@ -494,6 +494,7 @@ mod tests {
     /// The hawk's update of 21 ms through its step: its Fly after it.
     fn flown(t: &mut World) -> Result<Fly, GenieError> {
         let me = Me {
+            human_order: WorldTime::ZERO,
             id: object_id(9925),
             group: None,
             action_state: ActionState::NO_ACTION,

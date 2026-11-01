@@ -90,6 +90,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
+        let by_id = crate::world::index::ObjectsRef::new(&self.players, &self.index);
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(&self.masters, p)?;
         let seeks = master.kind < COMBAT
@@ -109,6 +110,7 @@ impl World {
                 unit.position(),
                 None,
                 (false, None),
+                by_id,
             );
         }
         let state = unit
@@ -128,7 +130,7 @@ impl World {
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         player
             .live(idx)?
-            .drop_site_with(&mut world, others, state, (false, false, None))
+            .drop_site_with(&mut world, others, state, (false, false, None), by_id)
     }
 
     /// `FUN_141658e20` for player `p` at `at`: of the buildings the drop-site table gives for the

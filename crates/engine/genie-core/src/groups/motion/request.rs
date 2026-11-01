@@ -69,6 +69,7 @@ pub(super) fn request(
     target: Option<&Placed>,
     target_gap2: DistanceSquared,
 ) -> Result<Option<Pass>, GenieError> {
+    let by_id = world.by_id;
     if let Some(pass) = take_turn(motion, lead, world, budget)? {
         return Ok(Some(pass));
     }
@@ -118,7 +119,7 @@ pub(super) fn request(
         }
     }
     if long || plan.path.points.len() < 2 || plan.path.length < SHORT_LENGTH {
-        long_plan(lead, world.spatial, &leg, target, &mut plan)?;
+        long_plan(lead, world.spatial, &leg, target, &mut plan, by_id)?;
     }
     let now = world.plan.now;
     link(motion, lead, plan.path, (plan.found, plan.planned), now)
@@ -231,6 +232,7 @@ fn short_plan(
     short_range: Distance,
     plan: &mut PathSoFar,
 ) -> Result<Option<Pass>, GenieError> {
+    let by_id = world.by_id;
     let spatial = &mut *world.spatial;
     plan.planned = false;
     plan.path.points.clear();
@@ -245,7 +247,7 @@ fn short_plan(
         r = short_path_for(
             lead.walker,
             leg.from,
-            spatial,
+            (spatial, by_id),
             &mut planning,
             (leg.waypoint, short_range, leg.target_id),
             &ignore,
@@ -346,6 +348,7 @@ fn long_plan(
     leg: &Leg,
     target: Option<&Placed>,
     plan: &mut PathSoFar,
+    by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(), GenieError> {
     let walker = LongWalker {
         id: lead.walker.id,
@@ -363,6 +366,7 @@ fn long_plan(
         lead.computer,
         (leg.waypoint, leg.range.get()),
         leg.target_id.zip(target),
+        by_id,
     )?;
     plan.path = long;
     plan.path.measure();

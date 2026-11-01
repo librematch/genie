@@ -254,6 +254,7 @@ type Top = (Option<ActionType>, Option<ObjectId>);
 fn update(t: &mut World, dt: u32) -> Result<(HeadCode, Top), GenieError> {
     in_update(t, (PlayerId::new(1), ListIndex::new(0)), dt, |u, c| {
         let me = Me {
+            human_order: WorldTime::ZERO,
             id: u.id,
             group: u.group.id,
             action_state: u.top_action().map_or(ActionState::NO_ACTION, |a| a.state),

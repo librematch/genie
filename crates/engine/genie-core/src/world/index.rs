@@ -251,6 +251,85 @@ impl ObjectIndex {
     }
 }
 
+/// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
+/// spatial index and the planners): the players' lists and the table by id. An object out for
+/// its update is none.
+#[derive(Clone, Copy, Debug)]
+pub struct ObjectsRef<'a> {
+    players: &'a [Player],
+    index: &'a ObjectIndex,
+}
+
+impl<'a> ObjectsRef<'a> {
+    /// The objects of `players`, which the world's table `index` finds.
+    #[must_use]
+    pub const fn new(players: &'a [Player], index: &'a ObjectIndex) -> Self {
+        Self { players, index }
+    }
+
+    /// No objects: a test's walk that meets none by id.
+    #[cfg(test)]
+    pub(crate) fn empty() -> ObjectsRef<'static> {
+        ObjectsRef::new(&[], ObjectIndex::scanning())
+    }
+
+    /// Object `id`, live or sleeping.
+    #[must_use]
+    pub fn get(&self, id: impl ObjectKey) -> Option<&'a Unit> {
+        self.index.locate(self.players, id).map(|(_, u, _)| u)
+    }
+
+    /// What a walk reads of the moving object `id` ([`Unit::gait`]); none for an object without
+    /// movement state, one the world does not hold or one out for its update.
+    #[must_use]
+    pub fn gait(&self, id: impl ObjectKey) -> Option<crate::map::spatial::Gait> {
+        self.get(id)?.gait()
+    }
+
+    /// Whether object `id` moves now ([`crate::map::spatial::Gait::moving`]).
+    #[must_use]
+    pub fn moving(&self, id: impl ObjectKey) -> bool {
+        self.gait(id).is_some_and(|g| g.moving)
+    }
+}
+
+/// A test's objects by id without a world ([`ObjectsRef`]): one player's live list of units, each
+/// built for the gait a walk reads of it.
+#[cfg(test)]
+#[derive(Clone, Debug, Default)]
+pub(crate) struct TestObjects {
+    players: Vec<Player>,
+    index: ObjectIndex,
+}
+
+#[cfg(test)]
+impl TestObjects {
+    /// Unit `id` gives `gait` ([`crate::movement::tests::unit_with_gait`]); none leaves no unit of
+    /// the id.
+    pub(crate) fn set_gait(&mut self, id: ObjectId, gait: Option<crate::map::spatial::Gait>) {
+        if self.players.is_empty() {
+            self.players.push(Player::default());
+        }
+        let Some(player) = self.players.first_mut() else {
+            return;
+        };
+        let made = gait.map(|g| crate::movement::tests::unit_with_gait(id, g));
+        player.objects = player
+            .objects
+            .iter()
+            .filter(|u| u.id != id)
+            .cloned()
+            .chain(made)
+            .collect();
+        self.index = ObjectIndex::of(&self.players);
+    }
+
+    /// The units by id.
+    pub(crate) fn view(&self) -> ObjectsRef<'_> {
+        ObjectsRef::new(&self.players, &self.index)
+    }
+}
+
 /// [`ObjectIndex::place`] by the lists themselves, the first slot of the first player first.
 fn scan(players: &[Player], id: ObjectId) -> Option<Place> {
     PlayerId::each(players.len())
@@ -274,6 +353,12 @@ const fn list(player: &Player, sleeping: bool) -> &ObjectList {
 }
 
 impl World {
+    /// The objects by id, to read ([`ObjectsRef`]).
+    #[must_use]
+    pub fn objects(&self) -> ObjectsRef<'_> {
+        ObjectsRef::new(&self.players, &self.index)
+    }
+
     /// The table by id again from the players' lists (after a list changed in place).
     pub fn reindex(&mut self) {
         self.index = ObjectIndex::of(&self.players);
@@ -441,6 +526,36 @@ mod tests {
 
     fn asleep(p: u8, i: usize) -> Place {
         Place::Sleeping(PlayerId::new(p), ListIndex::new(i))
+    }
+
+    /// The walk's view by id: each unit's gait as the unit gives it ([`Unit::gait`]); none for
+    /// an id the world does not hold, a unit without movement state, and a unit out for its
+    /// update.
+    #[test]
+    fn the_objects_view_reads_each_unit_s_gait_by_id() {
+        use crate::map::spatial::Gait;
+        let mut t = world(&[&[1, 2]]);
+        let walking = Gait {
+            moving: true,
+            last_move: WorldTime::from_millis(70),
+            ..Gait::default()
+        };
+        let p = PlayerId::new(0);
+        let _ = t
+            .push_live(
+                p,
+                crate::movement::tests::unit_with_gait(object_id(3), walking),
+            )
+            .unwrap();
+        assert_eq!(t.objects().gait(object_id(3)), Some(walking));
+        assert!(t.objects().moving(object_id(3)));
+        assert_eq!(t.objects().gait(object_id(1)), None, "no movement state");
+        assert!(!t.objects().moving(object_id(9)), "not held");
+        let i = t.live_index(p, object_id(3)).unwrap();
+        let out = t.take_out(p, i).unwrap();
+        assert_eq!(t.objects().gait(object_id(3)), None, "out for its update");
+        let _ = t.put_back(p, out).unwrap();
+        assert!(t.objects().moving(object_id(3)));
     }
 
     #[test]
