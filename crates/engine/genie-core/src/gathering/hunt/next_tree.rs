@@ -43,8 +43,12 @@ impl Unit {
             return Ok(false);
         }
         let site = hunt.carry_to;
-        let Some(found) =
-            self.resource_search_from(c, crate::objects::masters::GatherGroup::WOOD, 2, site)?
+        let Some(found) = self.resource_search_from(
+            c,
+            crate::objects::masters::GatherGroup::WOOD,
+            crate::objects::WorkerCount::of_data(2),
+            site,
+        )?
         else {
             return Ok(false);
         };

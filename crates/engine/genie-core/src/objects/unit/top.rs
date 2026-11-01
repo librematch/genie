@@ -59,8 +59,8 @@ impl Unit {
         if listed {
             self.attacking_units.push(by);
         }
-        if self.workers < 550 {
-            self.workers += 1;
+        if self.workers < crate::objects::WorkerCount::MOST {
+            self.workers = self.workers.plus(1);
         }
         self.life.goto_sleep = false;
     }

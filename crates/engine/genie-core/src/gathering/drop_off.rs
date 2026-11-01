@@ -100,7 +100,7 @@ impl Unit {
         let Some(kind) = class.and_then(crate::unit_ai::civilian_kind) else {
             return Ok(None);
         };
-        self.resource_search(c, kind, -1)
+        self.resource_search(c, kind, crate::objects::WorkerCount::NO_CAP)
     }
 
     /// Nothing found after the drop: a Gather with its point walks there to search again

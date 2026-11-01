@@ -2046,7 +2046,7 @@ const fn any_filter() -> Filter {
         relation: None,
         state: None,
         master: None,
-        workers: -1,
+        workers: crate::objects::WorkerCount::of_data(-1),
         spared: None,
         reach: false,
     }
@@ -2194,7 +2194,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     );
     assert_eq!(
         kept(
-            with(|f| f.workers = 1),
+            with(|f| f.workers = crate::objects::WorkerCount::of_data(1)),
             &p,
             ObjectState::Alive,
             plain,
@@ -2288,9 +2288,9 @@ fn closest_object_takes_a_free_farm_its_searcher_gathers_from() {
         ..villager(1.0, 1.0)
     };
     let look = |id: ObjectId| match id.get() {
-        1 => Some((0, None)),
-        2 => Some((1, None)),
-        3 => Some((0, Some(object_id(9)))),
+        1 => Some((crate::objects::WorkerCount::ZERO, None)),
+        2 => Some((crate::objects::WorkerCount::ONE, None)),
+        3 => Some((crate::objects::WorkerCount::ZERO, Some(object_id(9)))),
         _ => None,
     };
     let farmer = Searcher {

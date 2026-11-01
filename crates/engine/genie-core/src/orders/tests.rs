@@ -465,7 +465,10 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             .map(|k| k.builders),
         Some(0)
     );
-    assert_eq!(t.players[0].objects[ListIndex::new(2)].workers, 1);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(2)].workers,
+        crate::objects::WorkerCount::of_data(1)
+    );
     // no table entry for wood: back to the foundation
     let mut t = world();
     t.unit_order(player_id(0), &object_ids([10]), 8).unwrap();
@@ -721,7 +724,10 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
             Some(object_id(61))
         )
     );
-    assert_eq!(t.players[0].objects[ListIndex::new(2)].workers, 1);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(2)].workers,
+        crate::objects::WorkerCount::of_data(1)
+    );
     t.players[1].objects[ListIndex::new(0)].ai = None;
     t.attack_notifies(
         PlayerId::new(1),
@@ -731,7 +737,10 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
         true,
     )
     .unwrap();
-    assert_eq!(t.players[0].objects[ListIndex::new(2)].workers, 2);
+    assert_eq!(
+        t.players[0].objects[ListIndex::new(2)].workers,
+        crate::objects::WorkerCount::of_data(2)
+    );
 }
 
 /// The attack task's Attack of a soldier without a unit AI (it cannot move) touching the wolf
@@ -2771,13 +2780,30 @@ fn an_action_s_new_target_is_taken_and_its_old_one_let_go() {
         ..Unit::default()
     };
     t.players[0].objects = vec![
-        deer(object_id(40), ObjectState::Alive, 1),
-        deer(object_id(41), ObjectState::Alive, 0),
-        deer(object_id(42), ObjectState::Removed, 0),
+        deer(
+            object_id(40),
+            ObjectState::Alive,
+            crate::objects::WorkerCount::of_data(1),
+        ),
+        deer(
+            object_id(41),
+            ObjectState::Alive,
+            crate::objects::WorkerCount::of_data(0),
+        ),
+        deer(
+            object_id(42),
+            ObjectState::Removed,
+            crate::objects::WorkerCount::of_data(0),
+        ),
     ]
     .into();
-    let workers =
-        |t: &World| -> Vec<i32> { t.players[0].objects.iter().map(|u| u.workers).collect() };
+    let workers = |t: &World| -> Vec<i32> {
+        t.players[0]
+            .objects
+            .iter()
+            .map(|u| u.workers.get())
+            .collect()
+    };
     assert_eq!(
         t.retarget_action(
             PlayerId::new(1),
@@ -2868,7 +2894,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
             snow: false,
             sprite_override: false,
         }),
-        workers: 1,
+        workers: crate::objects::WorkerCount::of_data(1),
         life: crate::objects::lifecycle::Lifecycle {
             master_id: master_id(79),
             ..crate::objects::lifecycle::Lifecycle::default()
@@ -2930,7 +2956,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     assert_eq!((build.target, build.added), (Some(object_id(61)), false));
     let site = |t: &World, i: ListIndex| {
         let u = &t.players[1].objects[i];
-        (u.construction.unwrap().builders, u.workers)
+        (u.construction.unwrap().builders, u.workers.get())
     };
     assert_eq!(
         (site(&t, ListIndex::new(1)), site(&t, ListIndex::new(2))),
@@ -4366,7 +4392,10 @@ fn a_gather_takes_a_farm_but_no_other_building() {
             t.players[0].objects[ListIndex::new(0)].workers,
             t.players[1].objects[ListIndex::new(3)].workers
         ),
-        (0, 1)
+        (
+            crate::objects::WorkerCount::of_data(0),
+            crate::objects::WorkerCount::of_data(1)
+        )
     );
     let mut t = world.clone();
     assert!(
@@ -4512,7 +4541,10 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
         (g.carry_to, g.state),
         (Some(object_id(700)), GatherState::Drop)
     );
-    assert_eq!(t.players[1].objects[ListIndex::new(2)].workers, 1);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(2)].workers,
+        crate::objects::WorkerCount::of_data(1)
+    );
     let mut t = foraging();
     t.players[1].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::WOOD);
     let before = t.players[1].objects[ListIndex::new(0)]
@@ -4565,7 +4597,10 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
         (h.carry_to, h.state),
         (Some(object_id(700)), HuntState::Drop)
     );
-    assert_eq!(t.players[1].objects[ListIndex::new(2)].workers, 1);
+    assert_eq!(
+        t.players[1].objects[ListIndex::new(2)].workers,
+        crate::objects::WorkerCount::of_data(1)
+    );
 }
 
 /// The drop-off orders fail on a sleeping object and on a unit whose action the slice does not

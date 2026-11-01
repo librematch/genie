@@ -234,7 +234,7 @@ impl GatherAction {
                     "a gather facing a pasture (its animals, slot 0x780)",
                 ));
             }
-            if 1 < target.workers {
+            if crate::objects::WorkerCount::ONE < target.workers {
                 return self.begin_farm_wait(c, unit, r);
             }
         }
@@ -312,7 +312,7 @@ impl GatherAction {
                 let at = unit.body.position();
                 let gap =
                     crate::movement::footprint_gap_squared(at, me, target.position, target.radius);
-                if target.workers as f32 <= WAIT_WORKERS || WAIT_GAP <= gap.get() {
+                if target.workers.as_f32() <= WAIT_WORKERS || WAIT_GAP <= gap.get() {
                     self.random_wait(c, unit);
                     return Ok(Next::Stay);
                 }

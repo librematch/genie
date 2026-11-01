@@ -291,7 +291,7 @@ impl World {
             &seeker,
             None,
             kind,
-            -1,
+            crate::objects::WorkerCount::NO_CAP,
             ResourceWorld {
                 map: self.spatial.map,
                 world: &mut self.spatial,

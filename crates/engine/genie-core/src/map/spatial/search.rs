@@ -505,7 +505,7 @@ pub(super) fn closest_kept(
     if filter.state.is_some_and(|state| seer.state != state) {
         return Ok(false);
     }
-    if filter.workers != -1 {
+    if filter.workers != crate::objects::WorkerCount::NO_CAP {
         return Err(GenieError::unsupported(
             "ClosestObject's workers cap (+0x644)",
         ));
@@ -549,7 +549,7 @@ pub(super) fn farm_kept(
         ));
     }
     if filter.master.is_none() {
-        if 1 <= workers {
+        if crate::objects::WorkerCount::ONE <= workers {
             return Ok(false);
         }
         // The fish trap (raw `0x6163`), which only the fishing ships gather from (`FUN_1411945a0`).

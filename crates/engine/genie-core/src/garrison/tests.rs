@@ -1895,7 +1895,7 @@ fn an_enter_gives_its_load_to_a_drop_site_and_needs_room() {
             worker_class: Some(class::VILLAGER),
             targets: vec![crate::unit_ai::task_finder::DropTarget {
                 class: class::CLASS_7,
-                workers: -1,
+                workers: crate::objects::WorkerCount::of_data(-1),
                 state: None,
                 attribute: Some(AttributeId::numbered(17)),
             }],

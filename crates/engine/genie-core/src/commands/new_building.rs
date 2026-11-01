@@ -332,7 +332,7 @@ impl World {
                 first_update: true,
                 ..Gate::default()
             }),
-            workers: 0,
+            workers: crate::objects::WorkerCount::ZERO,
             combat: true,
             default_task,
             default_fly: None,

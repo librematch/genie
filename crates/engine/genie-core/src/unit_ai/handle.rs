@@ -130,7 +130,7 @@ impl UnitAi {
                 relation: None,
                 state: None,
                 master: None,
-                workers: -1,
+                workers: crate::objects::WorkerCount::NO_CAP,
                 spared: None,
                 reach: Speed::ZERO < at.speed,
             },

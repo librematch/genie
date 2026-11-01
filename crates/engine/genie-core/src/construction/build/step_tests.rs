@@ -179,7 +179,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             ..Lifecycle::default()
         },
         construction: Some(construction(0.0, 0, true)),
-        workers: 1,
+        workers: crate::objects::WorkerCount::of_data(1),
         pasture: None,
         my_pasture: None,
         ..Unit::default()
@@ -304,7 +304,7 @@ const SEARCH: (NotifyKind, [i32; 3]) = (
 /// The house's builders, workers and state.
 fn house(t: &World) -> (u8, i32, ObjectState) {
     let u = t.players[1].objects.by_id(HOUSE).unwrap();
-    (u.repairers(), u.workers, u.life.state)
+    (u.repairers(), u.workers.get(), u.life.state)
 }
 
 /// Moves object `id` of player 1 to `at`, its body and its place on the map.
@@ -1246,7 +1246,7 @@ fn with_mill(t: &mut World) {
     mill.id = object_id(300);
     mill.life.master_id = master_id(68);
     mill.life.state = ObjectState::Alive;
-    mill.workers = 0;
+    mill.workers = crate::objects::WorkerCount::of_data(0);
     mill.construction = Some(construction(25.0, 0, false));
     mill.place_for_test(Position::new(15.5, 10.5, 0.0));
     t.players[1].objects.push(mill);
@@ -1268,7 +1268,7 @@ fn with_mill(t: &mut World) {
         worker_class: Some(class::VILLAGER),
         targets: vec![crate::unit_ai::task_finder::DropTarget {
             class: class::TREE,
-            workers: -1,
+            workers: crate::objects::WorkerCount::of_data(-1),
             state: None,
             attribute: Some(attribute::WOOD),
         }],
@@ -1294,7 +1294,14 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
     let mut t = site_world(class::VILLAGER, Position::new(2.5, 2.5, 0.0), b);
     with_mill(&mut t);
     own(&mut t, HOUSE).construction = Some(construction(0.0, 3, true));
-    let mill = |t: &World| t.players[1].objects.by_id(object_id(300)).unwrap().workers;
+    let mill = |t: &World| {
+        t.players[1]
+            .objects
+            .by_id(object_id(300))
+            .unwrap()
+            .workers
+            .get()
+    };
     let drop = |t: &mut World, search| {
         on_build(t, |b, c, u, reads| {
             b.set_drop(c, u, search, reads.by)?;
@@ -1407,7 +1414,7 @@ fn wood(t: &World) -> (f32, f32, i32) {
     let mill = t.players[1]
         .objects
         .by_id(object_id(300))
-        .map_or(-1, |m| m.workers);
+        .map_or(-1, |m| m.workers.get());
     (
         builder(t).life.amount.get(),
         t.players[1].attributes[1].get(),
@@ -1423,7 +1430,7 @@ fn wood(t: &World) -> (f32, f32, i32) {
 #[test]
 fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(MoveTo::Arrived));
-    own(&mut t, object_id(300)).workers = 1;
+    own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
     let b = build(&t);
     assert_eq!(wood(&t), (0.0, 10.0, 0));
@@ -1458,7 +1465,7 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
         )
     );
     let mut refused = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(MoveTo::Arrived));
-    own(&mut refused, object_id(300)).workers = 1;
+    own(&mut refused, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
     refused.drop_sites[0].targets[0].attribute = Some(attribute::STONE);
     let _ = code(&mut refused, 250);
     let b = build(&refused);
@@ -1544,7 +1551,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         lone(Position::new(-1.0, -1.0, -1.0)),
     );
     own(&mut t, BUILDER).ai = None;
-    own(&mut t, object_id(300)).workers = 1;
+    own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
     assert_eq!((build(&t).state, wood(&t).2), (BuildState::Halted, 0));
     assert!(stands(&t));

@@ -218,8 +218,8 @@ impl Lets<'_> {
         };
         if sleeps {
             let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-            if u.workers < 550 {
-                u.workers += 1;
+            if u.workers < crate::objects::WorkerCount::MOST {
+                u.workers = u.workers.plus(1);
             }
             let _ = others.wake(id, self.tracker, (self.masters, self.lines));
             return Ok(());
@@ -272,8 +272,8 @@ impl Lets<'_> {
             // a sleeping object (static: only those sleep) counts a worker less
             // (FUN_141197d00); asleep already (`+0x641`), it is not flagged again
             let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-            if 0 < u.workers {
-                u.workers -= 1;
+            if crate::objects::WorkerCount::ZERO < u.workers {
+                u.workers = u.workers.plus(-1);
             }
             return Ok(());
         }

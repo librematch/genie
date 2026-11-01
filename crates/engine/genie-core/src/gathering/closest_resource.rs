@@ -58,7 +58,7 @@ pub(crate) fn closest_resource_of(
     unit: &Unit,
     c: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
-    (kind, cap, site): (GatherGroup, i32, Option<ObjectId>),
+    (kind, cap, site): (GatherGroup, crate::objects::WorkerCount, Option<ObjectId>),
     (current, min_state, point): (Option<ObjectId>, crate::objects::ObjectState, Point),
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
@@ -252,7 +252,7 @@ impl Unit {
         &self,
         c: &mut Step<'_>,
         kind: GatherGroup,
-        cap: i32,
+        cap: crate::objects::WorkerCount,
     ) -> Result<Option<ObjectId>, GenieError> {
         self.resource_search_from(c, kind, cap, None)
     }
@@ -265,7 +265,7 @@ impl Unit {
         &self,
         c: &mut Step<'_>,
         kind: GatherGroup,
-        cap: i32,
+        cap: crate::objects::WorkerCount,
         site: Option<ObjectId>,
     ) -> Result<Option<ObjectId>, GenieError> {
         let others = OthersRef::of(&c.w.players, c.player)?;

@@ -179,7 +179,7 @@ pub struct Victim {
     pub capacity: CarryCapacity,
     /// `+0x644`, `worker_num`: the actions that have it as their target (a farm another farmer
     /// works).
-    pub workers: i32,
+    pub workers: crate::objects::WorkerCount,
     /// Its master's `area_effect_object_level` (`+0x62b`): the blast levels that reach it.
     pub blast_defense: BlastDefense,
     /// Flagged to sleep (`+0x641`, `+0x643`): a killing hit wakes it (`FUN_14119deb0` with 0).

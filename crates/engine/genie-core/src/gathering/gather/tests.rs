@@ -208,7 +208,7 @@ fn bush() -> Resource {
         class: class::CLASS_7,
         master: master_id(59),
         player: PlayerId::new(0),
-        workers: 0,
+        workers: crate::objects::WorkerCount::of_data(0),
         drop_site: false,
         gap: Distance::new(1.2),
         state: ObjectState::Alive,
@@ -245,7 +245,7 @@ fn farm() -> Resource {
         class: class::FARM,
         master: ids::FARM,
         player: PlayerId::new(1),
-        workers: 0,
+        workers: crate::objects::WorkerCount::of_data(0),
         drop_site: false,
         gap: Distance::ZERO,
         state: ObjectState::Alive,
@@ -832,7 +832,10 @@ fn a_gatherer_walks_to_its_target_and_faces_it_on_arrival() {
     let mut rig = Rig::on_the_path().with_house(ObjectState::Alive);
     rig.mover_mut().paths.clear();
     let mut g = walking(Some(MoveTo::Start));
-    assert_eq!(walk(&mut g, &mut rig, 0), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(0)),
+        Ok(Next::Stay)
+    );
     assert_eq!(
         (g.state, state(&g)),
         (GatherState::Walk, Some(MoveTo::Moving))
@@ -840,14 +843,20 @@ fn a_gatherer_walks_to_its_target_and_faces_it_on_arrival() {
     assert_eq!(rig.mover_mut().paths.len(), 2);
     let mut rig = Rig::on_the_path().with_house(ObjectState::Alive);
     let mut g = walking(Some(MoveTo::Moving));
-    assert_eq!(walk(&mut g, &mut rig, 0), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(0)),
+        Ok(Next::Stay)
+    );
     assert_eq!(state(&g), Some(MoveTo::Moving));
     // the target left the point the MoveTo holds: it starts again
     g.move_to = g.move_to.map(|m| MoveToAction {
         point: Position::new(35.0, 88.0, 0.0),
         ..m
     });
-    assert_eq!(walk(&mut g, &mut rig, 0), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(0)),
+        Ok(Next::Stay)
+    );
     assert_eq!(state(&g), Some(MoveTo::Start));
     let mut g = walking(Some(MoveTo::Waiting));
     g.move_to = g.move_to.map(|m| MoveToAction {
@@ -857,26 +866,41 @@ fn a_gatherer_walks_to_its_target_and_faces_it_on_arrival() {
         },
         ..m
     });
-    assert_eq!(walk(&mut g, &mut rig, 0), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(0)),
+        Ok(Next::Stay)
+    );
     assert_eq!(state(&g), Some(MoveTo::Start));
     let mut g = walking(Some(MoveTo::Arrived));
-    assert_eq!(walk(&mut g, &mut rig, 0), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(0)),
+        Ok(Next::Stay)
+    );
     assert_eq!(
         (g.state, g.move_to, g.timer),
         (GatherState::Face, None, Seconds::ZERO)
     );
     let mut g = walking(Some(MoveTo::Failed));
-    assert_eq!(walk(&mut g, &mut rig, 4), Ok(Next::Search));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(4)),
+        Ok(Next::Search)
+    );
     assert_eq!((g.state, g.timer), (GatherState::Search, SEARCH_WAIT));
     let mut rig = Rig::on_the_path();
     let mut g = walking(Some(MoveTo::Failed));
     let draw = rig.next_wait();
-    assert_eq!(walk(&mut g, &mut rig, 3), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(3)),
+        Ok(Next::Stay)
+    );
     assert_eq!(g.timer, Seconds::new(draw));
     assert!(rig.anim_stopped());
     // an empty list answers 1 ("There is no list."): the unit faces its target
     let mut g = walking(None);
-    assert_eq!(walk(&mut g, &mut rig, 0), Ok(Next::Stay));
+    assert_eq!(
+        walk(&mut g, &mut rig, crate::objects::WorkerCount::of_data(0)),
+        Ok(Next::Stay)
+    );
     assert_eq!((g.state, g.move_to), (GatherState::Face, None));
 }
 
@@ -1073,7 +1097,7 @@ fn a_farmer_at_a_farm_another_works_walks_back_to_search() {
         class: class::FARM,
         master_id: ids::FARM,
         radius: Footprint::new(1.5, 1.5),
-        workers: 2,
+        workers: crate::objects::WorkerCount::of_data(2),
         ..Victim::default()
     };
     assert_eq!(

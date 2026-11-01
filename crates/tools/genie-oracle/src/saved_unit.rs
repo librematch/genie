@@ -23,6 +23,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::Regeneration;
 use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
+use genie_core::objects::WorkerCount;
 use genie_core::objects::lifecycle::Lifecycle;
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
@@ -124,7 +125,7 @@ pub(super) fn unit(
             object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
         ),
         regen_stinger: Regeneration::new(object.combat().map_or(0.0, |c| c.regeneration_stinger)),
-        workers: s.worker_num,
+        workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
         town_bell,
         combat: object.combat().is_some(),

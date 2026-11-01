@@ -445,7 +445,7 @@ pub struct ResourceSearch {
     /// The gather group (`param_2`).
     pub kind: GatherGroup,
     /// Fewer workers than this (`param_4`; −1 any).
-    pub cap: i32,
+    pub cap: crate::objects::WorkerCount,
     /// The drop site the search starts from (`param_3`).
     pub site: Option<ObjectId>,
     /// The unit AI's current target (`+0x48`), which the search passes over.

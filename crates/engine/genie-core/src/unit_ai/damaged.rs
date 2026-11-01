@@ -357,7 +357,7 @@ impl UnitAi {
                     relation: Some(QueryRelation::Itself),
                     state: Some(ObjectState::Foundation),
                     master: None,
-                    workers: -1,
+                    workers: crate::objects::WorkerCount::NO_CAP,
                     spared: None,
                     reach: true,
                 },

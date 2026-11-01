@@ -371,7 +371,7 @@ fn sprite_of(t: &crate::world::World) -> Option<SpriteId> {
 /// The house's hit points, repairers and holders (its slot 0x180 count).
 fn the_house(t: &crate::world::World) -> (f32, u8, i32) {
     let h = t.object(object_id(10028)).unwrap().1;
-    (h.life.hp.get(), h.repairers(), h.workers)
+    (h.life.hp.get(), h.repairers(), h.workers.get())
 }
 
 /// The sprite its `MoveTo` shows: the task's moving sprite, else the default of its

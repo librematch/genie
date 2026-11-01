@@ -408,7 +408,11 @@ impl UnitAi {
                         relation: None,
                         state: None,
                         master: None,
-                        workers: if class == class::FARM { 1 } else { -1 },
+                        workers: if class == class::FARM {
+                            crate::objects::WorkerCount::ONE
+                        } else {
+                            crate::objects::WorkerCount::NO_CAP
+                        },
                         spared: None,
                         reach: true,
                     },
@@ -431,7 +435,11 @@ impl UnitAi {
                 // slot 0x80 from the notify's drop site: kind 0 below 2 workers, any other any
                 side.closest_resource(ResourceSearch {
                     kind,
-                    cap: if kind == GatherGroup::WOOD { 2 } else { -1 },
+                    cap: if kind == GatherGroup::WOOD {
+                        crate::objects::WorkerCount::of_data(2)
+                    } else {
+                        crate::objects::WorkerCount::NO_CAP
+                    },
                     site: ObjectId::of_field(n.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
@@ -495,7 +503,7 @@ impl UnitAi {
                         relation: None,
                         state: None,
                         master: None,
-                        workers: -1,
+                        workers: crate::objects::WorkerCount::NO_CAP,
                         spared,
                         reach: true,
                     },
@@ -516,9 +524,9 @@ impl UnitAi {
             }
             Some(kind) => {
                 let cap = if matches!(kind, GatherGroup::STONE | GatherGroup::GOLD) {
-                    4
+                    crate::objects::WorkerCount::of_data(4)
                 } else {
-                    -1
+                    crate::objects::WorkerCount::NO_CAP
                 };
                 side.closest_resource(ResourceSearch {
                     kind,

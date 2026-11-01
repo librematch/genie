@@ -223,7 +223,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         class: class::CLASS_7,
         master: master_id(59),
         player: PlayerId::new(0),
-        workers: 0,
+        workers: crate::objects::WorkerCount::of_data(0),
         drop_site: false,
         gap: Distance::new(1.2),
         state: ObjectState::Alive,

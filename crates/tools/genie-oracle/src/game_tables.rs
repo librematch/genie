@@ -1,6 +1,7 @@
 //! The game's own tables beside the `.dat`: the linked technologies, the unit lines and the
 //! drop sites.
 
+use genie_core::objects::WorkerCount;
 use genie_core::players::attribute::AttributeId;
 
 /// The game's linked technologies (`resources/_common/dat/linkedTechs.json`): each group's
@@ -192,7 +193,7 @@ pub fn drop_sites(
                     let field = |key: &str| t.get(key).map_or(-1, num);
                     Ok(genie_core::unit_ai::task_finder::DropTarget {
                         class: class(i, "object_group", field("object_group"))?,
-                        workers: field("worker_num") as i32,
+                        workers: WorkerCount::of_data(field("worker_num") as i32),
                         state: object_state(i, field("object_state"))?,
                         attribute: AttributeId::of_field(field("attribute_type") as i16)
                             .map_err(|_| DropSitesError::Attribute(i, "attribute_type"))?,

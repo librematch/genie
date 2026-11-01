@@ -385,7 +385,11 @@ impl UnitAi {
             // drop site, wood (0) for fewer than 2 workers, at any state
             let found = side.closest_resource(ResourceSearch {
                 kind,
-                cap: if kind == GatherGroup::WOOD { 2 } else { -1 },
+                cap: if kind == GatherGroup::WOOD {
+                    crate::objects::WorkerCount::of_data(2)
+                } else {
+                    crate::objects::WorkerCount::NO_CAP
+                },
                 site: None,
                 current: self.current_target,
                 point: o.shown,

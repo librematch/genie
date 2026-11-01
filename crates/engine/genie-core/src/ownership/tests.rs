@@ -44,14 +44,14 @@ fn walking_forager() -> World {
 /// the stop let go in the update (each held by one worker before it, none after).
 fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError> {
     for b in &mut t.players[0].objects {
-        b.workers = 1;
+        b.workers = crate::objects::WorkerCount::of_data(1);
     }
     let released = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
         u.capture_stop(c, class)?;
         let gone = OthersRef::of(&c.w.players, c.player)
             .unwrap()
             .foreign_iter()
-            .filter(|(_, b)| b.workers == 0);
+            .filter(|(_, b)| b.workers == crate::objects::WorkerCount::of_data(0));
         Ok(gone.map(|(_, b)| b.id.get()).collect())
     })?;
     Ok((

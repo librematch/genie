@@ -26,6 +26,7 @@ mod sprite_id;
 pub(crate) mod teardown;
 pub mod unit;
 mod work_rate;
+mod worker_count;
 
 pub use self::action_state::ActionState;
 pub use self::damaged_timer::DamagedTimer;
@@ -41,3 +42,4 @@ pub use self::relics::Relics;
 pub use self::sprite_flags::SpriteFlags;
 pub use self::sprite_id::SpriteId;
 pub use self::work_rate::WorkRate;
+pub use self::worker_count::WorkerCount;

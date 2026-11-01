@@ -170,7 +170,9 @@ impl GatherAction {
             }
         });
         if !self.worked {
-            if self.target_class == Some(class::FARM) && target.is_some_and(|t| 1 < t.workers) {
+            if self.target_class == Some(class::FARM)
+                && target.is_some_and(|t| crate::objects::WorkerCount::ONE < t.workers)
+            {
                 let walks = r.walks(&c.w.graphics, unit);
                 let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
                 self.set_walk_back(Distance::new(radius), mover, &walks)?;

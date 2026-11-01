@@ -170,7 +170,7 @@ pub struct Resource {
     /// Its owner.
     pub player: PlayerId,
     /// How many actions work on it (`+0x644`).
-    pub workers: i32,
+    pub workers: crate::objects::WorkerCount,
     /// The gatherer's master has its master (a building annex's main building's, `+0xbb8`) among
     /// its drop sites (`FUN_14109d4f0`).
     pub drop_site: bool,

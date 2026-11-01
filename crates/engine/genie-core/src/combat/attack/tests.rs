@@ -654,7 +654,7 @@ impl Rig {
     pub(crate) fn holding(mut self, id: i32, player: PlayerId) -> Self {
         let mut u = Unit {
             id: object_id(id),
-            workers: 1,
+            workers: crate::objects::WorkerCount::of_data(1),
             ..Unit::default()
         };
         u.life.state = ObjectState::Alive;
@@ -668,7 +668,7 @@ impl Rig {
         let own = &self.t.players[player.index()].objects;
         own.iter()
             .find(|u| u.id == object_id(id))
-            .map(|u| u.workers)
+            .map(|u| u.workers.get())
     }
 
     /// `f` on the attacker's step of `dt` ms with the fight and the reads.

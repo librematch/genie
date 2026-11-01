@@ -39,7 +39,7 @@ pub struct Candidate {
     /// `+0x640`.
     pub state: ObjectState,
     /// `+0x644`, `worker_num`.
-    pub workers: i32,
+    pub workers: crate::objects::WorkerCount,
     /// x, y, z.
     pub position: Position,
     /// `+0x790`, `parent_pasture_id`.
@@ -124,7 +124,7 @@ pub fn more_work(
         Tile::new(builder.position.x() as i32, builder.position.y() as i32).stepped_back(corner);
     let grid = blocked.and_then(|b| reached(start, GridSize::new(w, h), &|t| b(t.stepped(corner))));
     // gold, stone, food, wood: (the object, its workers, the group's least distance)
-    let mut groups: [Option<(Candidate, i32)>; 4] = [None; 4];
+    let mut groups: [Option<(Candidate, crate::objects::WorkerCount)>; 4] = [None; 4];
     let mut least = [90.0f32; 4];
     for x in x0..=x1 {
         for y in y0..=y1 {
@@ -162,7 +162,7 @@ pub fn more_work(
                 let d = crate::math::conversions::cvttss2si(crate::math::fmath::sqrt(
                     dy * dy + dx * dx,
                 )) as f32;
-                let workers = (o.workers - 1).max(0);
+                let workers = o.workers.plus(-1).max(crate::objects::WorkerCount::ZERO);
                 let take = match groups[g] {
                     Some((_, kept)) if least[g] <= d => workers < kept,
                     _ => true,
@@ -335,7 +335,7 @@ impl<W> std::fmt::Debug for ResourceWorld<'_, W> {
 pub fn closest_resource<W>(
     seeker: &Seeker,
     kind: GatherGroup,
-    max_workers: i32,
+    max_workers: crate::objects::WorkerCount,
     reads: ResourceWorld<'_, W>,
 ) -> Result<Option<ObjectId>, GenieError> {
     closest_resource_at(seeker, None, kind, max_workers, reads).map(|(id, _)| id)
@@ -364,7 +364,7 @@ pub fn closest_resource_at<W>(
     seeker: &Seeker,
     site: Option<&SearchSite>,
     kind: GatherGroup,
-    max_workers: i32,
+    max_workers: crate::objects::WorkerCount,
     reads: ResourceWorld<'_, W>,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     /// The fallback's steps before it has one (`1000000`).
@@ -401,8 +401,8 @@ pub fn closest_resource_at<W>(
         d(a) < d(b)
     };
     let passes = search_passes(site, map, &|t| passable(world, t), unit_tile, los, &nearer);
-    let cap = if max_workers == -1 {
-        i32::MAX
+    let cap = if max_workers == crate::objects::WorkerCount::NO_CAP {
+        crate::objects::WorkerCount::of_data(i32::MAX)
     } else {
         max_workers
     };
@@ -617,7 +617,7 @@ fn first_resource(
 /// the Build's search for more work lets an object of it have (`0x140ab0c57`): food (0, 15 to 17)
 /// forage (1) and 6, wood (0) and 2, stone (3) and 3, gold (4) and 3, the rest fish (2) and 2.
 #[must_use]
-pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, i32) {
+pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, crate::objects::WorkerCount) {
     let kind = match attribute.and_then(AttributeId::load_resource) {
         Some(attribute::FOOD) => GatherGroup::FORAGE,
         Some(attribute::WOOD) => GatherGroup::WOOD,
@@ -625,11 +625,11 @@ pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, i32) {
         Some(attribute::GOLD) => GatherGroup::GOLD,
         _ => GatherGroup::FISH,
     };
-    let workers = match kind {
+    let workers = crate::objects::WorkerCount::of_data(match kind {
         GatherGroup::FORAGE => 6,
         GatherGroup::STONE | GatherGroup::GOLD => 3,
         _ => 2,
-    };
+    });
     (kind, workers)
 }
 
@@ -648,7 +648,7 @@ mod tests {
             class: class::TREE,
             master: master_id(349),
             state: ObjectState::Alive,
-            workers: 0,
+            workers: crate::objects::WorkerCount::of_data(0),
             position: Position::new(x, y, 0.0),
             pasture: None,
             untargetable: false,
@@ -668,7 +668,7 @@ mod tests {
             auto_work: true,
             targets: vec![DropTarget {
                 class: class::TREE,
-                workers: -1,
+                workers: crate::objects::WorkerCount::of_data(-1),
                 state: None,
                 attribute: Some(attribute::WOOD),
             }],
@@ -705,7 +705,7 @@ mod tests {
         // 3 and 4 both 3 tiles away (truncated): x outer, so 3 (x 7) comes first; 4 is as far
         // with fewer workers than 3's kept 1 and takes over
         let mut trees = [tree(3, 7.5, 10.5), tree(4, 13.5, 10.5)];
-        trees[0].workers = 2;
+        trees[0].workers = crate::objects::WorkerCount::of_data(2);
         let objects = |tile: Tile| {
             Ok(trees
                 .iter()
@@ -728,7 +728,7 @@ mod tests {
         let mut entry = lumber_camp();
         entry.targets.push(DropTarget {
             class: class::CLASS_32,
-            workers: -1,
+            workers: crate::objects::WorkerCount::of_data(-1),
             state: None,
             attribute: Some(attribute::GOLD),
         });
@@ -808,7 +808,7 @@ mod tests {
         let found = closest_resource(
             &seeker,
             GatherGroup::WOOD,
-            2,
+            crate::objects::WorkerCount::of_data(2),
             ResourceWorld {
                 map: GridSize::new(40, 40),
                 world: &mut (),
@@ -831,7 +831,7 @@ mod tests {
         let found = closest_resource(
             &busy,
             GatherGroup::WOOD,
-            2,
+            crate::objects::WorkerCount::of_data(2),
             ResourceWorld {
                 map: GridSize::new(40, 40),
                 world: &mut (),
@@ -879,7 +879,7 @@ mod tests {
                 &seeker,
                 site,
                 GatherGroup::WOOD,
-                2,
+                crate::objects::WorkerCount::of_data(2),
                 ResourceWorld {
                     map: GridSize::new(40, 40),
                     world: &mut (),
@@ -933,7 +933,7 @@ mod tests {
     fn search_trees(
         seeker: &Seeker,
         trees: &[Candidate],
-        max_workers: i32,
+        max_workers: crate::objects::WorkerCount,
         explored: &Explored<'_, ()>,
         reach: &[ObjectId],
     ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
@@ -968,7 +968,13 @@ mod tests {
             ..SEEKER
         };
         assert_eq!(
-            search_trees(&low, &trees, 2, &|&(), _| Ok(true), &[object_id(1)]),
+            search_trees(
+                &low,
+                &trees,
+                crate::objects::WorkerCount::of_data(2),
+                &|&(), _| Ok(true),
+                &[object_id(1)]
+            ),
             Ok((None, None))
         );
         let tending = Seeker {
@@ -976,7 +982,13 @@ mod tests {
             ..SEEKER
         };
         assert_eq!(
-            search_trees(&tending, &trees, 2, &|&(), _| Ok(true), &[object_id(1)]),
+            search_trees(
+                &tending,
+                &trees,
+                crate::objects::WorkerCount::of_data(2),
+                &|&(), _| Ok(true),
+                &[object_id(1)]
+            ),
             Err(GenieError::unsupported(
                 "a resource search by a unit with a pasture of its own"
             ))
@@ -987,29 +999,53 @@ mod tests {
     fn a_full_resource_is_the_fallback_and_minus_1_workers_has_no_cap() {
         // a full tree (3 workers) 2 east, a free one 5 east
         let full = Candidate {
-            workers: 3,
+            workers: crate::objects::WorkerCount::of_data(3),
             ..tree(1, 12.5, 10.5)
         };
         let both = [full, tree(2, 15.5, 10.5)];
         let all = |&(): &(), _| Ok(true);
         // at most 2 workers: past the full one to the free one
         assert_eq!(
-            search_trees(&SEEKER, &both, 2, &all, &[object_id(1), object_id(2)]),
+            search_trees(
+                &SEEKER,
+                &both,
+                crate::objects::WorkerCount::of_data(2),
+                &all,
+                &[object_id(1), object_id(2)]
+            ),
             Ok((Some(object_id(2)), Some(5)))
         );
         // no cap: the full one first
         assert_eq!(
-            search_trees(&SEEKER, &both, -1, &all, &[object_id(1), object_id(2)]),
+            search_trees(
+                &SEEKER,
+                &both,
+                crate::objects::WorkerCount::of_data(-1),
+                &all,
+                &[object_id(1), object_id(2)]
+            ),
             Ok((Some(object_id(1)), Some(2)))
         );
         // only the full one: the pass ends with it as the fallback
         assert_eq!(
-            search_trees(&SEEKER, &[full], 2, &all, &[object_id(1)]),
+            search_trees(
+                &SEEKER,
+                &[full],
+                crate::objects::WorkerCount::of_data(2),
+                &all,
+                &[object_id(1)]
+            ),
             Ok((Some(object_id(1)), Some(2)))
         );
         // a fallback must be reachable
         assert_eq!(
-            search_trees(&SEEKER, &[full], 2, &all, &[]),
+            search_trees(
+                &SEEKER,
+                &[full],
+                crate::objects::WorkerCount::of_data(2),
+                &all,
+                &[]
+            ),
             Ok((None, None))
         );
     }
@@ -1019,7 +1055,13 @@ mod tests {
         let both = [tree(1, 12.5, 10.5), tree(2, 15.5, 10.5)];
         let dark = |&(): &(), t: Tile| Ok(t != Tile::new(12, 10));
         assert_eq!(
-            search_trees(&SEEKER, &both, 2, &dark, &[object_id(1), object_id(2)]),
+            search_trees(
+                &SEEKER,
+                &both,
+                crate::objects::WorkerCount::of_data(2),
+                &dark,
+                &[object_id(1), object_id(2)]
+            ),
             Ok((Some(object_id(2)), Some(5)))
         );
     }
@@ -1036,7 +1078,13 @@ mod tests {
         let with = |n: usize| {
             let mut trees: Vec<Candidate> = near[..n].to_vec();
             trees.push(far);
-            search_trees(&SEEKER, &trees, 2, &|&(), _| Ok(true), &[object_id(99)])
+            search_trees(
+                &SEEKER,
+                &trees,
+                crate::objects::WorkerCount::of_data(2),
+                &|&(), _| Ok(true),
+                &[object_id(99)],
+            )
         };
         // 30 tested: the 31st is the far one, taken
         assert_eq!(with(30), Ok((Some(object_id(99)), Some(8))));
@@ -1046,16 +1094,25 @@ mod tests {
 
     #[test]
     fn a_held_resource_names_its_gather_group_and_the_workers_the_build_lets_it_have() {
-        assert_eq!(gather_group(Some(attribute::WOOD)), (GatherGroup::WOOD, 2));
+        assert_eq!(
+            gather_group(Some(attribute::WOOD)),
+            (GatherGroup::WOOD, crate::objects::WorkerCount::of_data(2))
+        );
         assert_eq!(
             gather_group(Some(attribute::FARM_FOOD)),
-            (GatherGroup::FORAGE, 6)
+            (GatherGroup::FORAGE, crate::objects::WorkerCount::of_data(6))
         );
         assert_eq!(
             gather_group(Some(attribute::STONE)),
-            (GatherGroup::STONE, 3)
+            (GatherGroup::STONE, crate::objects::WorkerCount::of_data(3))
         );
-        assert_eq!(gather_group(Some(attribute::GOLD)), (GatherGroup::GOLD, 3));
-        assert_eq!(gather_group(None), (GatherGroup::FISH, 2));
+        assert_eq!(
+            gather_group(Some(attribute::GOLD)),
+            (GatherGroup::GOLD, crate::objects::WorkerCount::of_data(3))
+        );
+        assert_eq!(
+            gather_group(None),
+            (GatherGroup::FISH, crate::objects::WorkerCount::of_data(2))
+        );
     }
 }

@@ -1094,7 +1094,7 @@ impl UnitSide for ResourceSide {
             (NO_POINT, ObjectState::Alive)
         );
         self.searches
-            .push((search.kind, search.cap, search.site, search.current));
+            .push((search.kind, search.cap.get(), search.site, search.current));
         Ok(self.resource)
     }
 }
@@ -12616,7 +12616,7 @@ fn a_gone_target_of_a_type_sends_the_unit_to_the_closest_resource_of_its_kind() 
         side.searches,
         [ResourceSearch {
             kind: GatherGroup::WOOD,
-            cap: 2,
+            cap: crate::objects::WorkerCount::of_data(2),
             site: None,
             current: Some(object_id(7)),
             point: Point::new(12.5, 30.5),
@@ -12642,7 +12642,7 @@ fn a_gone_target_of_a_type_sends_the_unit_to_the_closest_resource_of_its_kind() 
     );
     assert_eq!(
         (side.searches[0].kind, side.searches[0].cap),
-        (GatherGroup::GOLD, -1)
+        (GatherGroup::GOLD, crate::objects::WorkerCount::of_data(-1))
     );
     let (r, fx, _) = run_order(&mut u, owned(67), class::VILLAGER, &mut side);
     assert_eq!((r, fx, side.searches.len()), (Ok(0), Vec::new(), 1));

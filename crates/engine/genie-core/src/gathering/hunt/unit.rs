@@ -326,7 +326,11 @@ impl Unit {
             None if hunt.target_class == Some(class::PREDATOR) => None,
             None => self.hunt_closest_object(c, class)?,
             Some(group) => {
-                let cap = if group == GatherGroup::WOOD { 2 } else { -1 };
+                let cap = if group == GatherGroup::WOOD {
+                    crate::objects::WorkerCount::of_data(2)
+                } else {
+                    crate::objects::WorkerCount::NO_CAP
+                };
                 self.resource_search(c, group, cap)?
             }
         };
@@ -363,7 +367,11 @@ impl Unit {
                 relation: None,
                 state: None,
                 master: None,
-                workers: if class == Some(class::FARM) { 1 } else { -1 },
+                workers: if class == Some(class::FARM) {
+                    crate::objects::WorkerCount::ONE
+                } else {
+                    crate::objects::WorkerCount::NO_CAP
+                },
                 spared: None,
                 reach: true,
             },

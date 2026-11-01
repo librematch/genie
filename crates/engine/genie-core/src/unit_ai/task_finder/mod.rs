@@ -160,7 +160,7 @@ pub struct DropTarget {
     /// `object_group`: the class of the objects.
     pub class: ClassId,
     /// `worker_num`: the most workers such an object may have.
-    pub workers: i32,
+    pub workers: crate::objects::WorkerCount,
     /// `object_state`: the state such an object must be in (none for −1, any).
     pub state: Option<ObjectState>,
     /// `attribute_type`: the resource it gives, none for −1.
@@ -176,11 +176,10 @@ impl DropSite {
         &self,
         class: ClassId,
         state: ObjectState,
-        workers: i32,
+        workers: crate::objects::WorkerCount,
     ) -> Option<AttributeId> {
         let t = self.targets.iter().find(|t| t.class == class)?;
-        if (0 <= t.workers && t.workers < workers) || t.state.is_some_and(|wanted| wanted != state)
-        {
+        if t.workers.caps(workers) || t.state.is_some_and(|wanted| wanted != state) {
             return None;
         }
         t.attribute
@@ -806,7 +805,7 @@ mod tests {
             resource_types: types,
             targets: vec![DropTarget {
                 class: class::TREE,
-                workers: -1,
+                workers: crate::objects::WorkerCount::NO_CAP,
                 state: None,
                 attribute,
             }],

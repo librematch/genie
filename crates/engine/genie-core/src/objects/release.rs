@@ -61,15 +61,15 @@ pub(crate) fn released_fields(
     if listed && let Some(i) = u.attacking_units.iter().position(|&t| t == by.id) {
         let _ = u.attacking_units.remove(i);
     }
-    if 0 < u.workers {
-        u.workers -= 1;
+    if crate::objects::WorkerCount::ZERO < u.workers {
+        u.workers = u.workers.plus(-1);
     }
     // COMISS hp with 0, JNC: a NaN does not count as alive
     let alive = (u.life.state == ObjectState::Alive && HitPoints::ZERO <= u.life.hp)
         || u.life.state == ObjectState::Undead;
     // The first master type whose slot 0x180 is not the static object's (`FUN_141197d00`, types 10
     // and 15): the animated object's (`FUN_141071ea0`, types 20 to 40) only counts a worker less.
-    if kind < ANIMATED && u.workers == 0 && alive {
+    if kind < ANIMATED && u.workers == crate::objects::WorkerCount::ZERO && alive {
         u.life.goto_sleep = true;
     }
     (u.combat && !by.id.is_recyclable()).then(|| Notify {

@@ -208,7 +208,7 @@ pub struct Unit {
     #[diff(
         gap = "genie counts a target the game does not (MarvinBlue/426048731's town centre 9156 at update 1900)"
     )]
-    pub workers: i32,
+    pub workers: crate::objects::WorkerCount,
     /// `+0x650`, `mLastHumanOrderTime`: the world time of the last order a human gave it
     /// (`FUN_140e5e780`, for a unit with a unit AI); an animal's idle check lowers it to 5000.
     pub last_human_order: WorldTime,

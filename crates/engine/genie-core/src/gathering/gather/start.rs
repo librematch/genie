@@ -240,7 +240,9 @@ impl GatherAction {
         // a farm another farmer works (`+0x644` above 1 with this one, which the constructor
         // took): set_state(11) to its point, then the farm goes (slot 0x68 with none; the caller
         // lets it go)
-        if self.target_class == Some(class::FARM) && 1 < target.workers + 1 {
+        if self.target_class == Some(class::FARM)
+            && crate::objects::WorkerCount::ONE < target.workers.plus(1)
+        {
             let radius = if STOP_FARMS.contains(&target.master) {
                 0.0
             } else {
@@ -310,7 +312,9 @@ impl GatherAction {
             return Ok(true);
         }
         // slot 0x68 takes the target: its workers count it once it is new
-        let workers = target.workers + i32::from(Some(target.id) != self.target);
+        let workers = target
+            .workers
+            .plus(i32::from(Some(target.id) != self.target));
         self.target = Some(target.id);
         self.point = target.position;
         self.target_class = target.class.or_none();
@@ -325,7 +329,7 @@ impl GatherAction {
                 self.farm = target.position.ground();
             }
         }
-        if target.class == class::FARM && 1 < workers {
+        if target.class == class::FARM && crate::objects::WorkerCount::ONE < workers {
             let radius = if STOP_FARMS.contains(&target.master) {
                 0.0
             } else {

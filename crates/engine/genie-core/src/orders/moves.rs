@@ -426,7 +426,7 @@ impl World {
             return Ok(PastureAfter::Tends(None));
         }
         let room = Attributes::get(self.players.player(player)?, PASTURE_WORKERS)?;
-        let workers = self.livestock_workers(on) as f32;
+        let workers = self.livestock_workers(on).as_f32();
         // COMISS room with the workers, JBE: a NaN is full
         if room > Amount::new(workers) {
             let Some(pick) = self.pasture_pick(on, player, idx)? else {

@@ -157,14 +157,14 @@ impl World {
     /// A pasture's slot 0x780 (`FUN_1411c5dd0`): the workers (`+0x644`) of its livestock
     /// ([`crate::objects::unit::Unit::livestock`]) the world holds, summed; 0 for an object the world does
     /// not hold.
-    pub(crate) fn livestock_workers(&self, pasture: ObjectId) -> i32 {
-        self.object(pasture).map_or(0, |(_, b)| {
+    pub(crate) fn livestock_workers(&self, pasture: ObjectId) -> crate::objects::WorkerCount {
+        crate::objects::WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
             b.livestock
                 .iter()
                 .filter_map(|&id| self.object(id))
-                .map(|(_, l)| l.workers)
+                .map(|(_, l)| l.workers.get())
                 .sum()
-        })
+        }))
     }
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
@@ -211,10 +211,10 @@ impl World {
         )?;
         let mut pick = None;
         for (id, workers, _) in tended {
-            if workers == 0 {
+            if workers == crate::objects::WorkerCount::ZERO {
                 return Ok(Some(id));
             }
-            if pick.is_none() && (workers as f32) < room.get() {
+            if pick.is_none() && workers.as_f32() < room.get() {
                 pick = Some(id);
             }
         }

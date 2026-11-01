@@ -126,7 +126,7 @@ pub enum Pick {
         /// The master (−1 any).
         master: Option<MasterId>,
         /// The workers cap (−1 none).
-        workers: i32,
+        workers: crate::objects::WorkerCount,
         /// The relation passed over (argument 9; −1 none).
         spared: Option<QueryRelation>,
         /// Argument 8: only objects the unit reaches count (slot 0x3d0); every caller but the
