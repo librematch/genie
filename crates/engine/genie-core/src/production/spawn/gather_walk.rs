@@ -95,7 +95,7 @@ impl World {
             ai.clear_notifies(world_time.since_start())?;
         }
         if villager {
-            unit.combat.town_bell.flag = false;
+            self.parts.set_town_bell_flag(unit.id, false);
         }
         unit.actions
             .list

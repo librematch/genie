@@ -144,7 +144,7 @@ impl World {
             .kind;
         let u = self.players.live_mut(up, ui)?;
         if COMBAT <= kind {
-            u.combat.town_bell.flag = false;
+            self.parts.set_town_bell_flag(u.id, false);
         }
         if let Some(ai) = u.combat.ai.as_mut() {
             ai.orders.clear();
@@ -203,7 +203,7 @@ impl World {
             let u = self.players.live_mut(up, ui)?;
             // a unit (type 70) is no longer under the town bell (`+0x9dc`)
             if COMBAT <= kind {
-                u.combat.town_bell.flag = false;
+                self.parts.set_town_bell_flag(u.id, false);
             }
             if let Some(ai) = u.combat.ai.as_mut() {
                 ai.orders.clear();
@@ -275,7 +275,8 @@ impl World {
             })?;
         }
         if COMBAT <= made.kind {
-            self.players.live_mut(up, ui)?.combat.town_bell.flag = false;
+            let id = self.players.live(up, ui)?.id;
+            self.parts.set_town_bell_flag(id, false);
         }
         Ok(())
     }
@@ -400,7 +401,7 @@ impl World {
                 _ => return Ok(false),
             },
         };
-        let mut bell = self.players.live(up, ui)?.combat.town_bell;
+        let mut bell = self.parts.town_bell_of(id);
         let lookup = |t: ObjectId| -> Result<Option<RecordTarget>, GenieError> {
             let Some((op, o)) = self.object(t) else {
                 return Ok(None);
@@ -417,7 +418,7 @@ impl World {
             }))
         };
         let (found, record) = bell.back_to_work(&lookup)?;
-        self.players.live_mut(up, ui)?.combat.town_bell = bell;
+        self.parts.set_town_bell(id, bell);
         if found.is_none() && record.target_class.is_some() && record.action.is_some() {
             let unit = self.players.live_mut(up, ui)?;
             if let Some(ai) = unit.combat.ai.as_mut() {
@@ -436,8 +437,8 @@ impl World {
             return self.back_outside(id, found.map(|f| f.id), record.point);
         };
         let out = self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?;
-        if out && let Some((_, u)) = self.object_mut(id) {
-            u.combat.town_bell.flag = false;
+        if out && self.object(id).is_some() {
+            self.parts.set_town_bell_flag(id, false);
         }
         Ok(out)
     }

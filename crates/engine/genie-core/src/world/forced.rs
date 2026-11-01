@@ -279,6 +279,7 @@ impl World {
             crate::world::parts::Part::Production(g.parts.production.clone().map(Box::new)),
         )?;
         self.set_part(id, crate::world::parts::Part::Missile(g.parts.missile))?;
+        self.set_part(id, crate::world::parts::Part::TownBell(g.parts.town_bell))?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
@@ -473,7 +474,8 @@ mod tests {
     }
 
     /// The forced objects: a frozen forager takes the game's (placed where the game has it,
-    /// running again, its gather point and production the game's) but keeps its hunted record,
+    /// running again, its gather point, production and town bell the game's) but keeps its
+    /// hunted record,
     /// which no save holds; a frozen object the game no longer holds leaves; one that changed
     /// hands or masters stays, noted; an object that runs, and a dead one the game does not
     /// resync, are the slice's; an object the game made and the slice did not is noted.
@@ -504,10 +506,12 @@ mod tests {
             ..crate::production::Production::default()
         };
         game.players[1][0].parts.production = Some(production.clone());
+        game.players[1][0].parts.town_bell.flag = true;
         let notes = t.force(&game);
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(t.parts.gather_point.get(object_id(9175)), Some(&gather));
         assert_eq!(t.parts.production.get(object_id(9175)), Some(&production));
+        assert!(t.parts.town_bell_of(object_id(9175)).flag);
         let forager = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
             (forager.position(), forager.stopped),

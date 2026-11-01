@@ -336,7 +336,7 @@ impl World {
         let villager = class == class::VILLAGER;
         let unit = self.players.live_mut(player, idx)?;
         if villager {
-            unit.combat.town_bell.flag = false;
+            self.parts.set_town_bell_flag(unit.id, false);
         }
         if a14 && let Some(ai) = unit.combat.ai.as_mut() {
             ai.orders.clear();

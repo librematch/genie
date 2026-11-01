@@ -276,7 +276,6 @@ impl World {
                 ai,
                 builders: crate::construction::BuilderCount::of_data(0),
                 work_rate_powerup: WorkRate::ZERO,
-                town_bell: crate::orders::town_bell::TownBell::default(),
                 capture_flag: CaptureKind::NONE,
                 hp_powerup: HpPowerup::default(),
                 regen_timer: Seconds::ZERO,

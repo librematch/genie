@@ -836,7 +836,7 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
     let walked = |notified| {
         let mut t = crate::world::tests::forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
-        u.combat.town_bell.flag = true;
+        t.parts.set_town_bell_flag(u.id, true);
         u.combat.ai.as_mut().unwrap().orders.push(queued_move());
         t.gather_move(
             PlayerId::new(1),
@@ -850,7 +850,7 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
     };
     let u = walked(true);
     assert_eq!(u.unit.body.mover().unwrap().waiting, 1);
-    assert!(!u.unit.combat.town_bell.flag);
+    assert!(!u.parts.town_bell.flag);
     let ai = u.unit.combat.ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),

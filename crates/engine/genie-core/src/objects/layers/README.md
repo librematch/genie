@@ -30,5 +30,5 @@ holds it for now, with the game's defaults below type 50. `building.rs` holds th
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`map`](../../map/), [`movement`](../../movement/), [`orders`](../../orders/), [`ownership`](../../ownership/), [`pathing`](../../pathing/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`map`](../../map/), [`movement`](../../movement/), [`ownership`](../../ownership/), [`pathing`](../../pathing/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

@@ -504,7 +504,9 @@ impl Unit {
         self.life.inside = Some(target);
         self.join_building(c, Some(target), bp, reload, me, bm)?;
         self.enter_sight(c, target, at, building_radius, placed, bm)?;
-        self.enter_town_bell(Some(target), at, state, me, bm)?;
+        let mut bell = c.w.parts.town_bell_of(id);
+        self.enter_town_bell(&mut bell, Some(target), at, state, (me, bm))?;
+        c.w.parts.set_town_bell(id, bell);
         Ok(())
     }
 
@@ -584,35 +586,34 @@ impl Unit {
         Ok(())
     }
 
-    /// [`Unit::go_inside`]'s `FUN_1412067f0` with 3, for a villager or master 1808: the
-    /// town-bell record of its work (`FUN_141206a20` with the flag clear: the Enter's target
+    /// [`Unit::go_inside`]'s `FUN_1412067f0` with 3, for a villager or master 1808 (`me`; the
+    /// building's master `bm`), on its town bell `bell` (the world's part): the town-bell record
+    /// of its work (`FUN_141206a20` with the flag clear: the Enter's target
     /// `target` at its place `at`, no target class, the unit AI's action, no second target),
     /// then the flag set for a building in state 2 (`state`; its own player's) that takes
     /// villagers; with 3 it is never cleared.
     fn enter_town_bell(
-        &mut self,
+        &self,
+        bell: &mut crate::orders::town_bell::TownBell,
         target: Option<ContainerId>,
         at: Position,
         state: ObjectState,
-        me: &Master,
-        bm: &Master,
+        (me, bm): (&Master, &Master),
     ) -> Result<(), GenieError> {
         if me.class != class::VILLAGER && me.id != MASTER_1808 {
             return Ok(());
         }
-        if !self.combat.town_bell.flag {
+        if !bell.flag {
             let action = self.combat.ai.as_ref().map(|ai| ai.current_action).ok_or(
                 GenieError::unsupported("a town-bell record of a unit without a unit AI"),
             )?;
-            self.combat
-                .town_bell
-                .record(crate::orders::town_bell::BackToWork {
-                    target: target.map(ContainerId::id),
-                    target_class: None,
-                    action,
-                    target2: None,
-                    point: at.ground(),
-                });
+            bell.record(crate::orders::town_bell::BackToWork {
+                target: target.map(ContainerId::id),
+                target_class: None,
+                action,
+                target2: None,
+                point: at.ground(),
+            });
         }
         if bm.kind == BUILDING
             && state == ObjectState::Alive
@@ -620,7 +621,7 @@ impl Unit {
                 .building
                 .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS))
         {
-            self.combat.town_bell.flag = true;
+            bell.flag = true;
         }
         Ok(())
     }

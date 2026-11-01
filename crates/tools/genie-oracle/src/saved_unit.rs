@@ -51,8 +51,8 @@ use genie_core::world::parts::{Object, ObjectParts};
 use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
-/// point, the production lists, the missile's own fields; the dead and own masters are the
-/// import's gaps, MISSING.md).
+/// point, the production lists, the missile's own fields, the town bell; the dead and own
+/// masters are the import's gaps, MISSING.md).
 pub(super) fn object(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -61,14 +61,16 @@ pub(super) fn object(
     masters: Option<&MasterTable>,
     players: usize,
 ) -> Object {
+    let (unit, town_bell) = row(object, objects, paths, civ, masters, players);
     Object {
-        unit: unit(object, objects, paths, civ, masters, players),
+        unit,
         parts: ObjectParts {
             dead_master: None,
             gather_point: gather_point(object).ok().flatten(),
             production: production(object).ok().flatten(),
             missile: saved_missile(object),
             own_master: None,
+            town_bell,
         },
     }
 }
@@ -111,6 +113,7 @@ pub(super) fn saved_missile(
 /// its first update ([`default_task`]); a save from later in the game holds them, and the slice
 /// imports the ones it models ([`saved_actions`]). A gather point or production lists the save
 /// holds that the slice cannot read are the row's unmodelled part.
+#[cfg(test)]
 pub(super) fn unit(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -119,10 +122,23 @@ pub(super) fn unit(
     masters: Option<&MasterTable>,
     players: usize,
 ) -> Unit {
+    row(object, objects, paths, civ, masters, players).0
+}
+
+/// [`unit`]'s row with the town bell its unit AI's read gives (a new unit's where the read
+/// fails), which is the object's part.
+fn row(
+    object: &genie_save::Object,
+    objects: &PlayerObjects,
+    paths: &[Path],
+    civ: CivId,
+    masters: Option<&MasterTable>,
+    players: usize,
+) -> (Unit, TownBell) {
     let saved = object.static_part();
     let named = saved.and_then(|s| ObjectId::try_from(s.id).ok());
     let (Some(s), Some(id)) = (saved, named) else {
-        return Unit {
+        let unit = Unit {
             id: ObjectId::UNSAVED,
             actions: genie_core::objects::layers::ActionLayer {
                 unmodelled_action: Some(GenieError::unsupported("an object without a static part")),
@@ -130,9 +146,10 @@ pub(super) fn unit(
             },
             ..Unit::default()
         };
+        return (unit, TownBell::default());
     };
     let Ok(master) = MasterId::try_from(s.master_obj) else {
-        return Unit {
+        let unit = Unit {
             id,
             actions: genie_core::objects::layers::ActionLayer {
                 unmodelled_action: Some(GenieError::invalid_input(
@@ -142,6 +159,7 @@ pub(super) fn unit(
             },
             ..Unit::default()
         };
+        return (unit, TownBell::default());
     };
     let saved = object
         .actions()
@@ -193,7 +211,6 @@ pub(super) fn unit(
             regen_stinger: Regeneration::new(
                 object.combat().map_or(0.0, |c| c.regeneration_stinger),
             ),
-            town_bell,
             next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
             raider_countdown: RaiderCountdown::of_data(
                 object.combat().map_or(0, |c| c.raider_build_countdown),
@@ -391,7 +408,7 @@ pub(super) fn unit(
         .and(production)
         .and(moving)
         .err();
-    unit
+    (unit, town_bell)
 }
 
 /// A saved building's lists of objects (none for another object).

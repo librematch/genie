@@ -1843,7 +1843,7 @@ fn a_gather_point_on_its_own_building_takes_the_new_unit_in() {
         ),
         (Some(container_id(100)), state, false, false)
     );
-    assert_eq!(v.combat.town_bell.work.target, Some(object_id(100)));
+    assert_eq!(t.parts.town_bell_of(v.id).work.target, Some(object_id(100)));
     assert_eq!(
         t.object(object_id(100)).unwrap().1.garrison,
         [object_id(1000)]
@@ -1859,8 +1859,8 @@ fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
     walker.stats = standing();
     v.body.put_mover(Some(walker));
     v.group.id = Some(group_id(7));
-    v.combat.town_bell.flag = true;
     let _ = t.push_live(PlayerId::new(1), v).unwrap();
+    t.parts.set_town_bell_flag(object_id(400), true);
     t.spatial.insert(
         object_id(400),
         crate::map::spatial::Placed {
@@ -2070,8 +2070,8 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
     let v = &mut t.players[2].objects[ListIndex::new(0)];
-    v.combat.town_bell.flag = true;
-    v.combat.town_bell.work = crate::orders::town_bell::BackToWork {
+    t.parts.set_town_bell_flag(v.id, true);
+    t.parts.town_bell_of(v.id).work = crate::orders::town_bell::BackToWork {
         point: Point::new(4.5, 4.5),
         ..crate::orders::town_bell::BackToWork::NONE
     };
@@ -2080,7 +2080,7 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     t.go_back_to_work(player_id(1), &object_ids([100])).unwrap();
     let v = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(v.life.inside, None);
-    assert!(!v.combat.town_bell.flag);
+    assert!(!t.parts.town_bell_of(v.id).flag);
     assert_eq!(t.players[1].objects[ListIndex::new(0)].garrison.len(), 0);
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].combat.firepower,
@@ -2092,11 +2092,9 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
-    t.players[2].objects[ListIndex::new(0)]
-        .combat
-        .town_bell
-        .work
-        .point = Point::new(4.5, 4.5);
+    let mut bell = t.parts.town_bell_of(object_id(2000));
+    bell.work.point = Point::new(4.5, 4.5);
+    t.parts.set_town_bell(object_id(2000), bell);
     t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(f32::NAN);
     assert!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(2000))
@@ -2114,13 +2112,9 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         [object_id(1000)]
     );
     t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(0.5);
-    t.object_mut(object_id(1000))
-        .unwrap()
-        .1
-        .combat
-        .town_bell
-        .work
-        .point = Point::new(4.5, 15.5);
+    let mut bell = t.parts.town_bell_of(object_id(1000));
+    bell.work.point = Point::new(4.5, 15.5);
+    t.parts.set_town_bell(object_id(1000), bell);
     assert!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(1000))
             .unwrap()
@@ -2155,13 +2149,17 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
         inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
         let (_, v) = t.object_mut(object_id(1000)).unwrap();
         v.combat.ai = Some(crate::unit_ai::UnitAi::default());
-        v.combat.town_bell.work = BackToWork {
-            target: Some(object_id(7)),
-            target_class: class_of(class),
-            action,
-            point: Point::new(4.5, 4.5),
-            ..BackToWork::NONE
+        let bell = crate::orders::town_bell::TownBell {
+            work: BackToWork {
+                target: Some(object_id(7)),
+                target_class: class_of(class),
+                action,
+                point: Point::new(4.5, 4.5),
+                ..BackToWork::NONE
+            },
+            ..t.parts.town_bell_of(object_id(1000))
         };
+        t.parts.set_town_bell(object_id(1000), bell);
         assert!(
             t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(1000))
                 .unwrap()
@@ -3367,7 +3365,7 @@ fn a_unit_inside_a_transport_unloaded_goes_ashore_about_it() {
     assert_eq!(v.life.inside, None);
     assert_eq!(v.position(), spot.with_height(0.0));
     assert_eq!(v.combat.ai.as_ref().unwrap().state_position, spot);
-    assert!(!v.combat.town_bell.flag);
+    assert!(!t.parts.town_bell_of(v.id).flag);
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
     assert_eq!(ship.actions.list.transport().copied(), None);
@@ -3480,9 +3478,9 @@ fn a_villager_beside_a_ship_enters_it_at_once() {
         v.actions.list.enter().map(|e| e.state),
         Some(EnterState::Done)
     );
-    assert!(!v.combat.town_bell.flag);
+    assert!(!t.parts.town_bell_of(v.id).flag);
     assert_eq!(
-        v.combat.town_bell.work,
+        t.parts.town_bell_of(v.id).work,
         crate::orders::town_bell::BackToWork {
             target: Some(object_id(200)),
             target_class: None,
@@ -3634,8 +3632,8 @@ fn unload_of_a_building_lets_every_unit_inside_out() {
         .garrison
         .insert(0, object_id(1500));
     for id in [1000, 1001] {
+        t.parts.set_town_bell_flag(object_id(id), true);
         let v = t.object_mut(object_id(id)).unwrap().1;
-        v.combat.town_bell.flag = true;
         v.combat.ai = Some(crate::unit_ai::UnitAi {
             orders: vec![crate::unit_ai::QueuedOrder::default()],
             ..crate::unit_ai::UnitAi::default()
@@ -3657,7 +3655,7 @@ fn unload_of_a_building_lets_every_unit_inside_out() {
     for id in [1000, 1001] {
         let v = t.object(object_id(id)).unwrap().1;
         assert_eq!(v.life.inside, None, "{id}");
-        assert!(!v.combat.town_bell.flag, "{id}");
+        assert!(!t.parts.town_bell_of(v.id).flag, "{id}");
         assert!(v.combat.ai.as_ref().unwrap().orders.is_empty(), "{id}");
     }
     let mut t = let_out_world();
@@ -3686,8 +3684,8 @@ fn unload_lets_a_unit_out_of_the_building_it_is_inside() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(1), 1001, VILLAGER);
+    t.parts.set_town_bell_flag(object_id(1000), true);
     let v = t.object_mut(object_id(1000)).unwrap().1;
-    v.combat.town_bell.flag = true;
     v.combat.ai = Some(crate::unit_ai::UnitAi::default());
     UnloadCommand {
         player: player_id(1),
@@ -3700,7 +3698,7 @@ fn unload_lets_a_unit_out_of_the_building_it_is_inside() {
     .unwrap();
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
-    assert!(!v.combat.town_bell.flag);
+    assert!(!t.parts.town_bell_of(v.id).flag);
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].garrison,
         [object_id(1001)]

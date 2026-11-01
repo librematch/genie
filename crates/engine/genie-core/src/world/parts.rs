@@ -18,6 +18,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
+use crate::orders::town_bell::TownBell;
 use crate::production::Production;
 use crate::world::World;
 use genie_diff::{Diff, Differ};
@@ -153,6 +154,10 @@ pub struct Parts {
     /// it; an object without one reads its player's. An ownership change gives it one
     /// ([`crate::ownership::change::change_hands`]), an upgrade of its own masters changes it.
     pub own_master: PartTable<Master>,
+    /// A combat object's town-bell flag and back-to-work records (`+0x9ac`..`+0x9dc`), only
+    /// where they differ from a new unit's ([`TownBell::default`]): a villager that worked or
+    /// sheltered, a building that sheltered.
+    pub town_bell: PartTable<TownBell>,
 }
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
@@ -176,6 +181,9 @@ pub struct ObjectParts {
         gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
     )]
     pub own_master: Option<Master>,
+    /// Its town bell ([`Parts::town_bell`]), a new unit's where the table holds none.
+    #[diff(path = "combat.town_bell")]
+    pub town_bell: TownBell,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -248,6 +256,7 @@ impl Parts {
             production,
             missile,
             own_master,
+            town_bell,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -264,6 +273,9 @@ impl Parts {
         if let Some(m) = own_master {
             let _ = self.own_master.insert(id, m);
         }
+        if town_bell != TownBell::default() {
+            let _ = self.town_bell.insert(id, town_bell);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -274,6 +286,7 @@ impl Parts {
             production: self.production.remove(id),
             missile: self.missile.remove(id),
             own_master: self.own_master.remove(id),
+            town_bell: self.town_bell.remove(id).unwrap_or_default(),
         }
     }
 
@@ -286,7 +299,34 @@ impl Parts {
             production: self.production.get(id).cloned(),
             missile: self.missile.get(id).copied(),
             own_master: self.own_master.get(id).cloned(),
+            town_bell: self.town_bell.get(id).copied().unwrap_or_default(),
         }
+    }
+
+    /// Object `id`'s town bell ([`Parts::town_bell`]): a new unit's where the table holds none.
+    #[must_use]
+    pub fn town_bell_of(&self, id: ObjectId) -> TownBell {
+        self.town_bell.get(id).copied().unwrap_or_default()
+    }
+
+    /// Object `id`'s town bell becomes `bell`, a new unit's leaving the table. The caller holds
+    /// the object: its row is borrowed from the world's lists, which this borrow leaves alone
+    /// ([`World::set_part`] checks the id where no row is held).
+    pub(crate) fn set_town_bell(&mut self, id: ObjectId, bell: TownBell) {
+        if bell == TownBell::default() {
+            let _ = self.town_bell.remove(id);
+        } else {
+            let _ = self.town_bell.insert(id, bell);
+        }
+    }
+
+    /// Object `id`'s town-bell flag (`+0x9dc`) becomes `flag` ([`Parts::set_town_bell`]).
+    pub(crate) fn set_town_bell_flag(&mut self, id: ObjectId, flag: bool) {
+        let bell = TownBell {
+            flag,
+            ..self.town_bell_of(id)
+        };
+        self.set_town_bell(id, bell);
     }
 
     /// Every object id a table holds, each once per table that holds it.
@@ -298,6 +338,7 @@ impl Parts {
             .chain(self.production.iter().map(|(id, _)| id))
             .chain(self.missile.iter().map(|(id, _)| id))
             .chain(self.own_master.iter().map(|(id, _)| id))
+            .chain(self.town_bell.iter().map(|(id, _)| id))
     }
 }
 
@@ -314,6 +355,8 @@ pub enum Part {
     Missile(Option<Missile>),
     /// The own master ([`Parts::own_master`]), boxed: a master is about 700 bytes.
     OwnMaster(Box<Master>),
+    /// The town bell ([`Parts::town_bell`]); a new unit's leaves the table.
+    TownBell(TownBell),
 }
 
 impl World {
@@ -355,6 +398,7 @@ impl World {
             Part::OwnMaster(m) => {
                 let _ = self.parts.own_master.insert(id, *m);
             }
+            Part::TownBell(b) => self.parts.set_town_bell(id, b),
         }
         Ok(())
     }
@@ -621,6 +665,50 @@ mod tests {
         t.check_parts().unwrap();
     }
 
+    /// A town bell that differs from a new unit's is in the table, a new unit's is not: the
+    /// flag's set files the object, its clear lets it go; a record keeps it; a loaded new unit's
+    /// bell files nothing, and a removal gives back a new unit's for an object without one.
+    #[test]
+    fn the_table_holds_only_the_town_bells_that_differ_from_a_new_unit_s() {
+        use crate::objects::ListIndex;
+        use crate::players::PlayerId;
+        let id = object_id(5);
+        let mut t = World::new(
+            crate::world::WorldTime::ZERO,
+            crate::world::FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![crate::world::Millis::ZERO],
+            vec![crate::world::player::Player {
+                objects: vec![Unit {
+                    id,
+                    ..Unit::default()
+                }]
+                .into(),
+                ..Default::default()
+            }],
+        );
+        t.load_parts(id, ObjectParts::default()).unwrap();
+        assert!(t.parts.town_bell.is_empty());
+        t.parts.set_town_bell_flag(id, true);
+        assert!(t.parts.town_bell_of(id).flag && t.parts.town_bell.contains(id));
+        t.parts.set_town_bell_flag(id, false);
+        assert!(t.parts.town_bell.is_empty());
+        let mut bell = t.parts.town_bell_of(id);
+        bell.record(crate::orders::town_bell::BackToWork {
+            point: crate::map::Point::new(2.0, 3.0),
+            ..crate::orders::town_bell::BackToWork::NONE
+        });
+        t.set_part(id, Part::TownBell(bell)).unwrap();
+        assert_eq!(t.parts.town_bell_of(id), bell);
+        t.check_parts().unwrap();
+        let gone = t
+            .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
+            .unwrap();
+        assert_eq!(gone.parts.town_bell, bell);
+        assert!(t.parts.town_bell.is_empty());
+        assert_eq!(t.parts.town_bell_of(id), TownBell::default());
+    }
+
     /// An object's own master is a part the world's master lookups read before its player's
     /// table ([`World::master_tables`], [`MasterTables::of`]); an object without one reads its
     /// player's, and its removal from the lists carries the part.
@@ -685,8 +773,8 @@ mod tests {
 
     /// A whole object compares its row's fields and its parts' at the paths they had on the
     /// object: the dead and own masters are known gaps (left out of the saved scope), the
-    /// gather point and the production compare at the building layer's paths, the missile at
-    /// its own, a row's field keeps its own path.
+    /// gather point and the production compare at the building layer's paths, the town bell at
+    /// the combat layer's, the missile at its own, a row's field keeps its own path.
     #[test]
     fn a_whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
@@ -700,6 +788,7 @@ mod tests {
         b.parts.gather_point = Some(gather_point(2.0));
         b.parts.production = Some(Production::default());
         b.parts.own_master = Some(Master::default());
+        b.parts.town_bell.flag = true;
         b.parts.missile = Some(Missile {
             max_range: crate::map::Distance::ZERO,
             fired_from: None,
@@ -719,7 +808,8 @@ mod tests {
                 "life.hp",
                 "building.gather_point",
                 "building.production",
-                "missile"
+                "missile",
+                "combat.town_bell.flag"
             ]
         );
         assert_eq!(
@@ -730,7 +820,8 @@ mod tests {
                 "building.gather_point",
                 "building.production",
                 "missile",
-                "own_master"
+                "own_master",
+                "combat.town_bell.flag"
             ]
         );
     }

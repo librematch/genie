@@ -1991,7 +1991,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
     );
     // each idle villager's town-bell record: no work, at its own place
     assert_eq!(
-        p.objects[ListIndex::new(1)].combat.town_bell.work,
+        t.parts.town_bell_of(p.objects[ListIndex::new(1)].id).work,
         crate::orders::town_bell::BackToWork {
             point: Point::new(29.0, 99.0),
             ..crate::orders::town_bell::BackToWork::NONE
@@ -7370,10 +7370,10 @@ fn the_way_back_after_a_drop_off_queues_the_order_on_the_recorded_work() {
         target2: None,
         point: Point::new(1.0, 2.0),
     };
-    t.players[1].objects[ListIndex::new(0)]
-        .combat
-        .town_bell
-        .work = work;
+    let id = t.players[1].objects[ListIndex::new(0)].id;
+    let mut bell = t.parts.town_bell_of(id);
+    bell.work = work;
+    t.parts.set_town_bell(id, bell);
     t.queue_way_back(PlayerId::new(1), ListIndex::new(0))
         .unwrap();
     let ai = t.players[1].objects[ListIndex::new(0)]
@@ -7397,13 +7397,11 @@ fn the_way_back_after_a_drop_off_queues_the_order_on_the_recorded_work() {
         }]
     );
     // a recorded target the world no longer holds: the record as it is, in front
-    t.players[1].objects[ListIndex::new(0)]
-        .combat
-        .town_bell
-        .work = BackToWork {
+    bell.work = BackToWork {
         target: Some(object_id(999)),
         ..work
     };
+    t.parts.set_town_bell(id, bell);
     t.queue_way_back(PlayerId::new(1), ListIndex::new(0))
         .unwrap();
     let first = t.players[1].objects[ListIndex::new(0)]

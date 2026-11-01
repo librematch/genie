@@ -42,8 +42,6 @@ pub struct Combat {
     pub raider_countdown: crate::garrison::RaiderCountdown,
     /// Its unit AI, when it has one.
     pub ai: Option<UnitAi>,
-    /// A combat object's town-bell flag and back-to-work records ([`crate::orders::town_bell`]).
-    pub town_bell: crate::orders::town_bell::TownBell,
     /// `berserker_timer` (`+0xa10`): the seconds the regeneration holds back toward its next
     /// whole hit point ([`crate::objects::unit::Unit::regenerate`]).
     pub regen_timer: Seconds,

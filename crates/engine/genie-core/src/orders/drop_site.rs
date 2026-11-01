@@ -307,7 +307,7 @@ impl World {
     /// unit AI only looks the records up.
     pub(crate) fn queue_way_back(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
         use crate::orders::town_bell::RecordTarget;
-        let mut bell = self.players.live(p, idx)?.combat.town_bell;
+        let mut bell = self.parts.town_bell_of(self.players.live(p, idx)?.id);
         let lookup = |t: ObjectId| -> Result<Option<RecordTarget>, GenieError> {
             let Some((op, o)) = self.object(t) else {
                 return Ok(None);
@@ -343,7 +343,7 @@ impl World {
             ),
         };
         let unit = self.players.live_mut(p, idx)?;
-        unit.combat.town_bell = bell;
+        self.parts.set_town_bell(unit.id, bell);
         let Some(ai) = unit.combat.ai.as_mut() else {
             return Ok(());
         };
