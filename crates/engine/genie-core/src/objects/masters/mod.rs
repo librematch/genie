@@ -198,7 +198,7 @@ impl Master {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct BuildingMaster {
     /// `+0x980`, `adjacent_mode`: walls and gates join their neighbours (`FUN_1411ce890`).
-    pub adjacent_mode: u8,
+    pub adjacent_mode: AdjacentMode,
     /// `+0x984`, `disappears_when_built`.
     pub disappears_when_built: bool,
     /// `+0x986`, `stack_unit_id`: the building becomes another (−1 for none).
@@ -250,7 +250,7 @@ pub struct Master {
     /// `+0x410`.
     pub class: ClassId,
     /// `+0x7b8`, the `.dat`'s `TaskSwapGroup` (the save does not carry it); 0 for none.
-    pub task_by_group: u8,
+    pub task_by_group: TaskGroup,
     /// `radius_x`, `radius_y` (`+0x5d8`, `+0x5dc`).
     pub radius: Footprint,
     /// `radius_z` (`+0x5e0`) is above 0: its objects count as tall on their tiles.
@@ -336,7 +336,7 @@ pub struct Master {
     /// (`FUN_1411859a0`).
     pub damage_sprites: bool,
     /// The `.dat`'s `fly_mode` (`+0x608`): 1 flies above the ground (a bird's Fly lifts it).
-    pub fly_mode: u8,
+    pub fly_mode: FlyMode,
     /// What a hit on an object of this master reads (`FUN_141082530`): its armor classes (class,
     /// amount; `+0x808`, count `+0x802`), its base armor for a class it does not list (`+0x800`),
     /// `bonus_damage_resistance` (`+0x824`), `combat_ability` (`+0x840`), `damage_reflection`
@@ -361,7 +361,7 @@ pub struct Master {
     /// `FUN_140fddf10`.
     pub attack_priority: AttackPriority,
     /// `special_attack_flag` (`+0x8d8`).
-    pub special_attack: u8,
+    pub special_attack: SpecialAttack,
     /// `friendly_fire_damage` (`+0x868`).
     pub friendly_fire: f32,
     /// It has a special graphic (`+0x8e8`).
@@ -394,10 +394,10 @@ pub struct Master {
     /// (`ClosestResourceObject`) takes it for ([`GatherGroup`]).
     pub gather_group: GatherGroup,
     /// `+0x604`, `hill_mode`: how a placement test checks the elevation.
-    pub hill_mode: u8,
+    pub hill_mode: HillMode,
     /// `+0x605`, `fog_visibility`: an object of it the player only explored stays a target
     /// (the Attack's update).
-    pub fog_visibility: u8,
+    pub fog_visibility: FogVisibility,
     /// `+0x5f0`, `available`: the player may make it (an effect's enable command, kind 2,
     /// changes it).
     pub available: bool,
@@ -406,7 +406,7 @@ pub struct Master {
     /// `+0x682`, `create_doppelganger_on_death`: 2 leaves ghosts of an object of it for the
     /// players who explored its tile but do not see it, at its death and once they lose sight
     /// of it ([`crate::vision::ghost`]).
-    pub ghost_on_death: u8,
+    pub ghost_on_death: GhostMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`).
     pub placement: PlacementTerrains,
     /// The death sprite (`+0x480`, −1 for none) and the death spawns (`+0x5e4`, `+0x5e6`, −1 for
@@ -486,15 +486,15 @@ pub struct Master {
     /// `+0x488`, the undead sprite (`undeadSpriteId`, −1 for none).
     pub undead_sprite: Option<SpriteId>,
     /// `+0x650`, `occlusion_flag` (the `.dat`'s `occlusion_mode`).
-    pub occlusion: u8,
+    pub occlusion: Occlusion,
     /// `+0x684`, the `.dat`'s `selection_effect`.
-    pub selection_effect: u8,
+    pub selection_effect: SelectionEffect,
     /// `+0x62f`, `unit_level` (the `.dat`'s `interface_kind`).
-    pub unit_level: u8,
+    pub unit_level: InterfaceKind,
     /// `+0x62d`, `select_level` (the `.dat`'s `interaction_mode`).
-    pub select_level: u8,
+    pub select_level: InteractionMode,
     /// `+0x62e`, `map_draw_level` (the `.dat`'s `minimap_mode`).
-    pub map_draw_level: u8,
+    pub map_draw_level: MinimapMode,
     /// The damage sprites (`+0x638`, 16 bytes each; the save's `damage_sprite`), which
     /// [`Master::damage_sprites`] follows.
     pub damage_graphics: Vec<DamageGraphic>,
@@ -503,7 +503,7 @@ pub struct Master {
     /// A moving master's trail (`+0x75e`..`+0x764`).
     pub trail: Trail,
     /// `+0x7b9`, `run_pattern`.
-    pub run_pattern: u8,
+    pub run_pattern: RunPattern,
     /// `+0x856`, `+0x858`, `+0x854` and `+0x8b0`: the attack, range, melee and pierce armor a
     /// combat master shows (`orig_weapon`, `orig_weapon_range`, `orig_armor`,
     /// `orig_pierce_armor`).
@@ -600,6 +600,7 @@ pub struct Masters {
 }
 
 pub mod action_type;
+mod adjacent_mode;
 mod attack_priority;
 pub mod attribute;
 mod blast_level;
@@ -608,24 +609,37 @@ mod class_id;
 mod class_mask;
 mod combat_ability;
 mod damage_class;
+mod fly_mode;
+mod fog_visibility;
 mod garrison_kinds;
 mod gather_group;
+mod ghost_mode;
 mod hero_flags;
+mod hill_mode;
 mod id_field;
 pub mod ids;
+mod interaction_mode;
+mod interface_kind;
 mod master_id;
 mod master_kind;
 pub mod master_type;
+mod minimap_mode;
 mod object_flags;
 mod obstruction_class;
 mod obstruction_type;
+mod occlusion;
 mod placement_terrains;
+mod run_pattern;
+mod selection_effect;
 mod sound_events;
+mod special_attack;
 mod task_flags;
+mod task_group;
 mod task_sprites;
 mod volley_spread;
 
 pub use self::action_type::ActionType;
+pub use self::adjacent_mode::AdjacentMode;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
 pub use self::blast_level::{BlastDefense, BlastLevel};
@@ -634,18 +648,30 @@ pub use self::class_mask::ClassMask;
 pub use self::combat_ability::CombatAbility;
 pub use self::conversion_adjust::ConversionAdjust;
 pub use self::damage_class::{ClassAmount, DamageClass};
+pub use self::fly_mode::FlyMode;
+pub use self::fog_visibility::FogVisibility;
 pub use self::garrison_kinds::GarrisonKinds;
 pub use self::gather_group::GatherGroup;
+pub use self::ghost_mode::GhostMode;
 pub use self::hero_flags::HeroFlags;
+pub use self::hill_mode::HillMode;
 pub use self::id_field::{MasterField, RestrictionField};
+pub use self::interaction_mode::InteractionMode;
+pub use self::interface_kind::InterfaceKind;
 pub use self::master_id::MasterId;
 pub use self::master_kind::MasterKind;
+pub use self::minimap_mode::MinimapMode;
 pub use self::object_flags::ObjectFlags;
 pub use self::obstruction_class::ObstructionClass;
 pub use self::obstruction_type::ObstructionType;
+pub use self::occlusion::Occlusion;
 pub use self::placement_terrains::PlacementTerrains;
+pub use self::run_pattern::RunPattern;
+pub use self::selection_effect::SelectionEffect;
 pub use self::sound_events::{SoundEventId, SoundEvents};
+pub use self::special_attack::SpecialAttack;
 pub use self::task_flags::TaskFlags;
+pub use self::task_group::TaskGroup;
 pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;
 

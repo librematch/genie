@@ -19,6 +19,7 @@ use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
@@ -235,7 +236,9 @@ impl World {
             return Ok(speed.get());
         }
         let master = unit.master(&self.masters, player)?;
-        if master.kind != CHARGER || master.max_charge <= Charge::ZERO || master.special_attack != 3
+        if master.kind != CHARGER
+            || master.max_charge <= Charge::ZERO
+            || master.special_attack != SpecialAttack::CHARGE
         {
             return Ok(speed.get());
         }

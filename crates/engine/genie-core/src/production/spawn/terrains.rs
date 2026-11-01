@@ -12,6 +12,7 @@ use crate::map::Tile;
 use crate::map::TileRect;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::HillMode;
 use crate::objects::masters::PlacementTerrains;
 use crate::players::PlayerId;
 use crate::production::spawn::PlaceMap;
@@ -38,7 +39,7 @@ pub struct BuildSite<'a> {
     /// The master's terrain restriction's value per terrain.
     pub restriction: &'a Restriction,
     /// `hill_mode` (`+0x604`, `p7`).
-    pub hill_mode: u8,
+    pub hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
     pub placement: PlacementTerrains,
     /// The world's zone mode (`+0x820`, `FUN_1415e8e10`).
@@ -53,7 +54,7 @@ pub struct BuildSite<'a> {
 /// 8), mode 2 flat ground alone, mode 3 a tile of the box's first column or last row within one
 /// step of the `base` elevation; the other modes take any. True when the tile fails (code 3).
 pub(super) fn hill_fails(
-    mode: u8,
+    mode: HillMode,
     map: &dyn PlaceMap,
     tile: Tile,
     corner: Tile,
@@ -65,9 +66,9 @@ pub(super) fn hill_fails(
         ))
     };
     Ok(match mode {
-        1 => !matches!(shape()?, 0 | 5..=8),
-        2 => shape()? != 0,
-        3 if tile.x() == corner.x() || tile.y() == corner.y() => {
+        HillMode::SIDE_SLOPES => !matches!(shape()?, 0 | 5..=8),
+        HillMode::FLAT => shape()? != 0,
+        HillMode::ONE_STEP if tile.x() == corner.x() || tile.y() == corner.y() => {
             let e = i32::from(map.elevation(tile).ok_or(GenieError::unsupported(
                 "a hill mode where the elevations are not known",
             ))?);

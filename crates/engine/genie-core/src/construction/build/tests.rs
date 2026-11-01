@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Lifecycle;
+use crate::objects::masters::AdjacentMode;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::ObstructionClass;
@@ -706,7 +707,7 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
         class: class::BUILDING,
         cost: costs(cost),
         building: Some(crate::objects::masters::BuildingMaster {
-            adjacent_mode: 0,
+            adjacent_mode: AdjacentMode::NONE,
             disappears_when_built: false,
             stack_unit: None,
             foundation_terrain: None,

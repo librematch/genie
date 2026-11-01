@@ -15,6 +15,7 @@ use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::footprint_gap;
 use crate::objects::ObjectId;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -245,5 +246,6 @@ pub(super) fn target_unseen(world: &Spatial, f: &Fight, t: &Placed) -> Result<bo
     let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
     Ok(t.player != PlayerId::GAIA
         && !world.sees_tile(f.own.player, Tile::new(tx, ty))
-        && !(f.victim.fog_visibility != 0 && world.explored(f.own.player, Tile::new(tx, ty))?))
+        && !(f.victim.fog_visibility != FogVisibility::INVISIBLE
+            && world.explored(f.own.player, Tile::new(tx, ty))?))
 }

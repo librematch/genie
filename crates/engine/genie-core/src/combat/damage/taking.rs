@@ -12,6 +12,7 @@ use crate::map::Position;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::CombatAbility;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::WONDER;
@@ -312,7 +313,7 @@ pub(super) fn take_unit(
         "a combat object without its combat values",
     ))?;
     let mut factor = factor;
-    if a.special_attack == 1 && !a.busy {
+    if a.special_attack == SpecialAttack::FRONT_DEFENCE && !a.busy {
         let off = facing_to(&a, t.position, src)?;
         if MINUS_FACING < off && off < FACING {
             factor *= SPECIAL;
@@ -360,7 +361,7 @@ pub(super) fn retaliates(
     let reach = src.source.weapon_range;
     let melee = reach <= Distance::new(RETALIATION_RANGE) && RETALIATION_RANGE != reach.get();
     // the conditions are pure: the ones the slice holds decide first
-    if !(a.special_attack == 2 && a.unit_ai && !a.busy && melee) {
+    if !(a.special_attack == SpecialAttack::RETALIATION && a.unit_ai && !a.busy && melee) {
         return Ok(false);
     }
     let idle = a.alert_idle.ok_or(GenieError::unsupported(

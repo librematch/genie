@@ -21,6 +21,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GhostMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -35,8 +36,6 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// The ghosts' master in every player's list (`player+0x28`'s entry 243, "DOPL").
 pub const GHOST_MASTER: MasterId = MasterId::named(243);
-/// A master's `create_doppelganger_on_death` that leaves ghosts.
-pub const LEAVES_GHOSTS: u8 = 2;
 /// The classes a building's watch leaves out (`FUN_1411cc980`) and the gates' class, whose annex
 /// stays watched.
 const UNWATCHED_CLASSES: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
@@ -306,7 +305,7 @@ impl World {
                     (u.life.state, m.kind, m.ghost_on_death, u.position());
                 let tile = Self::tile_at(position);
                 // the static load's watch of a dead object (FUN_14119df60)
-                if ghosts == LEAVES_GHOSTS && ObjectState::Alive < state {
+                if ghosts == GhostMode::LEAVES && ObjectState::Alive < state {
                     let _ = self.watch(p, id, tile)?;
                 }
                 // a building's load constructor (FUN_1411ac170, type 80 only): FUN_1411cc980
@@ -352,7 +351,7 @@ impl World {
             master: u.life.master_id,
         };
         let position = u.position();
-        if id.is_recyclable() || u.master(&self.masters, p)?.ghost_on_death != LEAVES_GHOSTS {
+        if id.is_recyclable() || u.master(&self.masters, p)?.ghost_on_death != GhostMode::LEAVES {
             return Ok(());
         }
         let tile = Self::tile_at(position);
@@ -704,14 +703,14 @@ mod tests {
             Master {
                 id: MINE,
                 kind: master_type::MOVING,
-                ghost_on_death: LEAVES_GHOSTS,
+                ghost_on_death: GhostMode::LEAVES,
                 ..Master::default()
             },
             Master {
                 id: HOUSE,
                 kind: BUILDING,
                 class: class::BUILDING,
-                ghost_on_death: LEAVES_GHOSTS,
+                ghost_on_death: GhostMode::LEAVES,
                 ..Master::default()
             },
             Master {

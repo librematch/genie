@@ -8,6 +8,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::MONASTERY;
@@ -335,7 +336,12 @@ pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32) {
         }
         return;
     }
-    if master.class == class::VILLAGER && matches!(master.task_by_group, 1 | 2) {
+    if master.class == class::VILLAGER
+        && matches!(
+            master.task_by_group,
+            TaskGroup::MALE_VILLAGERS | TaskGroup::FEMALE_VILLAGERS
+        )
+    {
         add(38);
     }
     if master.class == class::VILLAGER || CIVILIAN_CLASSES.contains(&master.class) {

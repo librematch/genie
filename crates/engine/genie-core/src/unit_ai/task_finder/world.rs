@@ -9,6 +9,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -165,7 +166,7 @@ pub(crate) fn task_search<'m>(
     if let Some(task) = find(own, filter)? {
         return Ok(Some((task, None)));
     }
-    if own.task_by_group == 0 {
+    if own.task_by_group == TaskGroup::NONE {
         return Ok(None);
     }
     for candidate in masters.iter() {

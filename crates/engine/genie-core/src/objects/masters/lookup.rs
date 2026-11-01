@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::action_type;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, MasterId, Masters, Task};
@@ -97,7 +98,9 @@ impl Masters {
         let own_task = find_task(
             own_list, actor, on.target, on.general, on.terrain, filter, dip,
         )?;
-        if own_task.is_none_or(|t| t.action_type == action_type::COMBAT) && own.task_by_group != 0 {
+        if own_task.is_none_or(|t| t.action_type == action_type::COMBAT)
+            && own.task_by_group != TaskGroup::NONE
+        {
             let (mut by_class, mut generic) = (None, None);
             for candidate in self.by_id.iter().flatten() {
                 if candidate.class != own.class

@@ -183,7 +183,7 @@ pub struct PathData {
 pub struct MoveStats {
     /// The master's `fly_mode` (`+0x608`): how its place takes the ground's height
     /// ([`Mover::grounded`]).
-    pub fly_mode: u8,
+    pub fly_mode: crate::objects::masters::FlyMode,
     /// The top speed (object slot 65, `maximumSpeed`, `0x141202c70` -> `FUN_14114d1d0`): the
     /// master's speed ([`MoveStats::base`]), times the current sprite's speed factor when that is
     /// above 0. A column derived from the two: the sprite's one transform writes it

@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::objects::Relics;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 
@@ -144,7 +145,7 @@ pub fn charge_hit(a: &Attacker, v: &Victim) -> bool {
 /// `FUN_1412161b0`: a master of special attack 3 whose charge is ready on its unit AI's (or
 /// group's) target in reach; false for other masters. Special attack 3 is not modelled.
 pub(super) const fn special_charge_ready(a: &Attacker) -> Result<bool, GenieError> {
-    if a.special_attack == 3 {
+    if a.special_attack.get() == SpecialAttack::CHARGE.get() {
         return Err(SPECIAL_CHARGE_GAP);
     }
     Ok(false)
@@ -158,7 +159,7 @@ pub(crate) const SPECIAL_CHARGE_GAP: GenieError =
 /// `FUN_141202580`: the damage a ready charge adds, the charge itself; a master of special
 /// attack 3 adds it only while [`special_charge_ready`] holds.
 pub(super) fn charge_damage(a: &Attacker) -> Result<f32, GenieError> {
-    if a.special_attack == 3 && !special_charge_ready(a)? {
+    if a.special_attack == SpecialAttack::CHARGE && !special_charge_ready(a)? {
         return Ok(0.0);
     }
     Ok(a.charge.get())

@@ -12,6 +12,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TargetOwner;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{ClassId, class};
 use crate::objects::masters::{MasterId, ids};
@@ -369,7 +370,7 @@ fn task_master(
         id,
         kind: master_type::COMBAT,
         class: class::VILLAGER,
-        task_by_group: 1,
+        task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: 25,
         tasks,
         ..crate::objects::masters::Master::default()
@@ -524,7 +525,7 @@ fn a_member_without_a_task_takes_the_swap_group_s_first_with_one() {
 #[test]
 fn a_master_without_a_swap_group_has_no_other_to_try() {
     let mut own = task_master(ids::VILLAGER_MALE, vec![]);
-    own.task_by_group = 0;
+    own.task_by_group = TaskGroup::NONE;
     let t = tasked_world(
         vec![
             own,
@@ -553,7 +554,7 @@ fn a_master_with_a_board_task_and_no_task_found_is_not_modelled() {
             Distance::new(1.0),
         )],
     );
-    own.task_by_group = 0;
+    own.task_by_group = TaskGroup::NONE;
     // its own list finds the board task for any target, so give it one for another object
     own.tasks[0].object_id = Some(master_id(999));
     let t = tasked_world(vec![own.clone(), building_master()], 9.0);

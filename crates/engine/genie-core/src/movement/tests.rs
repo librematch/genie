@@ -16,6 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
@@ -81,7 +82,7 @@ fn a_master_s_turning_values_follow_its_turn_speed_and_walking_sprite() {
 
 fn stats() -> MoveStats {
     MoveStats {
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
         speed: Speed::new(0.8),
         base: Speed::new(0.8),
         turn_rate: TurnRate::MAX,

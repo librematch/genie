@@ -8,6 +8,7 @@ use crate::objects::HitPoints;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::{
     AttributeWorld, Master, ROUND, add_sprite, attribute, cost_resource, id_of,
     insert_train_location, low8, low16, resize_train_locations, select_entry, set_sprite,
@@ -62,7 +63,7 @@ impl Master {
             | a::HERO_GLOW_GRAPHIC
             | a::GARRISON_GRAPHIC
             | a::ATTACK_GRAPHIC_2 => self.set_tribe_sprite(attribute, v, world),
-            a::SPECIAL_ABILITY => self.special_attack = low8(v),
+            a::SPECIAL_ABILITY => self.special_attack = SpecialAttack::of_data(low8(v)),
             a::RESOURCE_COSTS | a::FOOD_COSTS | a::WOOD_COSTS | a::GOLD_COSTS | a::STONE_COSTS => {
                 for c in self.costs_of(attribute) {
                     *c = low16(v);
@@ -215,7 +216,10 @@ impl Master {
             a::RECHARGE_RATE => self.recharge_rate += ChargeRate::new(v),
             a::CHARGE_EVENT => self.charge_event = self.charge_event.wrapping_add(low16(v)),
             a::SPECIAL_GRAPHIC => add_sprite(&mut self.special_sprite, v, world),
-            a::SPECIAL_ABILITY => self.special_attack = self.special_attack.wrapping_add(low8(v)),
+            a::SPECIAL_ABILITY => {
+                self.special_attack =
+                    SpecialAttack::of_data(self.special_attack.get().wrapping_add(low8(v)));
+            }
             a::IDLE_ATTACK_GRAPHIC => add_sprite(&mut self.idle_attack_sprite, v, world),
             a::HERO_GLOW_GRAPHIC => add_sprite(&mut self.hero_glow_sprite, v, world),
             a::GARRISON_GRAPHIC => add_sprite(&mut self.garrison_sprite, v, world),

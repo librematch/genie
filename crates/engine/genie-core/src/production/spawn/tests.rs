@@ -17,6 +17,8 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::FogVisibility;
+use crate::objects::masters::HillMode;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::class;
@@ -154,7 +156,7 @@ impl PlaceMap for Hill {
 fn a_hill_mode_takes_flat_ground_side_slopes_or_an_edge_within_one_step() {
     let fails = |mode, shape, elevation, at| {
         hill_fails(
-            mode,
+            HillMode::of_data(mode),
             &Hill(shape, elevation),
             Tile::from(at),
             Tile::new(2, 5),
@@ -240,7 +242,7 @@ fn sheep(state: ObjectState) -> Near {
         desolid: false,
         player: PlayerId::new(0),
         moving: true,
-        fog_visibility: 0,
+        fog_visibility: FogVisibility::INVISIBLE,
         fog_mask: None,
         holds: false,
         hp: HitPoints::new(7.0),
@@ -334,7 +336,7 @@ fn a_fogged_building_blocks_a_build_by_its_visibility_mask() {
         class: class::BUILDING,
         obstructs: true,
         restriction: &Restriction::new(vec![1.0]),
-        hill_mode: 0,
+        hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
         zones: false,
         own: &[],
@@ -409,7 +411,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         tall: true,
         class: class::VILLAGER,
         restriction: &Restriction::new(vec![1.0]),
-        hill_mode: 0,
+        hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
     };
     let map = Flat(vec![sheep(ObjectState::Alive)]);
@@ -429,7 +431,7 @@ fn the_first_object_of_a_tile_s_list_reports_the_block() {
         tall: true,
         class: class::VILLAGER,
         restriction: &Restriction::new(vec![1.0]),
-        hill_mode: 0,
+        hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
     };
     // a sheep that stays (state 2) and a soldier that does not, on the same tile
@@ -1064,7 +1066,7 @@ const fn house_site(restriction: &Restriction, human: bool) -> BuildSite<'_> {
         class: class::BUILDING,
         obstructs: true,
         restriction,
-        hill_mode: 0,
+        hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
         zones: false,
         own: &[],
@@ -1145,28 +1147,62 @@ fn build_s_scan_counts_what_the_player_sees_of_a_tile() {
         ..sheep(ObjectState::Alive)
     };
     let sees = |map: &dyn PlaceMap, o: Near, sight| build_sees(&site, map, &o, sight);
-    assert_eq!(sees(&flat, o(PlayerId::new(2), 0), (true, true)), Ok(true));
-    assert_eq!(sees(&flat, o(PlayerId::new(2), 3), (true, true)), Ok(false));
     assert_eq!(
-        sees(&fogged, o(PlayerId::new(2), 1), (true, false)),
+        sees(
+            &flat,
+            o(PlayerId::new(2), FogVisibility::INVISIBLE),
+            (true, true)
+        ),
         Ok(true)
     );
     assert_eq!(
-        sees(&fogged, o(PlayerId::new(2), 0), (true, false)),
+        sees(
+            &flat,
+            o(PlayerId::new(2), FogVisibility::ONLY_IN_FOG),
+            (true, true)
+        ),
         Ok(false)
     );
     assert_eq!(
-        sees(&fogged, o(PlayerId::new(1), 0), (true, false)),
+        sees(
+            &fogged,
+            o(PlayerId::new(2), FogVisibility::VISIBLE),
+            (true, false)
+        ),
         Ok(true)
     );
     assert_eq!(
-        sees(&Dark, o(PlayerId::new(2), 0), (false, false)),
+        sees(
+            &fogged,
+            o(PlayerId::new(2), FogVisibility::INVISIBLE),
+            (true, false)
+        ),
+        Ok(false)
+    );
+    assert_eq!(
+        sees(
+            &fogged,
+            o(PlayerId::new(1), FogVisibility::INVISIBLE),
+            (true, false)
+        ),
         Ok(true)
     );
     assert_eq!(
-        sees(&fogged, o(PlayerId::new(2), 3), (true, false))
-            .unwrap_err()
-            .reason(),
+        sees(
+            &Dark,
+            o(PlayerId::new(2), FogVisibility::INVISIBLE),
+            (false, false)
+        ),
+        Ok(true)
+    );
+    assert_eq!(
+        sees(
+            &fogged,
+            o(PlayerId::new(2), FogVisibility::ONLY_IN_FOG),
+            (true, false)
+        )
+        .unwrap_err()
+        .reason(),
         "a fogged object of fog visibility 3 near a BUILD"
     );
 }

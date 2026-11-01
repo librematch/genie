@@ -16,6 +16,7 @@ use crate::movement::move_to::{MoveToAction, graphic_of};
 use crate::movement::{Me, Mover};
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::Graphic;
@@ -349,7 +350,7 @@ impl Unit {
             self.position(),
             c.w.streams.get(Stream::Action),
         )));
-        if fly_mode == 1 {
+        if fly_mode == FlyMode::ABOVE {
             self.lift_to_fly_height(c)?;
         }
         Ok(())

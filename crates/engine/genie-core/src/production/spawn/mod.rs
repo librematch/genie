@@ -35,6 +35,7 @@ use crate::map::Point;
 use crate::map::Position;
 #[cfg(test)]
 use crate::objects::lifecycle::Lifecycle;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::player_master;
 use crate::players::PlayerId;
@@ -102,7 +103,8 @@ impl World {
     /// `0x1411a58b0`, slot 0x60's `FUN_141193a10`): its height the ground's by the master's fly
     /// mode; without the map's elevations the height stays.
     pub(crate) fn on_ground(&self, p: PlayerId, master: MasterId, at: Position) -> Position {
-        let fly_mode = player_master(&self.masters, p, master).map_or(0, |m| m.fly_mode);
+        let fly_mode =
+            player_master(&self.masters, p, master).map_or(FlyMode::GROUND, |m| m.fly_mode);
         self.spatial
             .terrain
             .as_ref()

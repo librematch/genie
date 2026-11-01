@@ -21,6 +21,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::class;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -463,7 +464,8 @@ pub(super) fn sees(
 ) -> Result<bool, GenieError> {
     let (tx, ty) = (at.x() as i32, at.y() as i32);
     Ok(map.sees_tile(f.own.player, Tile::new(tx, ty))
-        || (f.victim.fog_visibility != 0 && map.explored(f.own.player, Tile::new(tx, ty))?))
+        || (f.victim.fog_visibility != FogVisibility::INVISIBLE
+            && map.explored(f.own.player, Tile::new(tx, ty))?))
 }
 
 /// A unit's own Attack lets its target go (slot 0x68 with none: its slot 0x180) at once

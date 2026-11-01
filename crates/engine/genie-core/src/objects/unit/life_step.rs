@@ -7,6 +7,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::death_parts::forget_resource;
+use crate::objects::masters::GhostMode;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::{Outcome, Unit};
 use crate::world::slots::PlayerSlots;
@@ -82,8 +83,7 @@ impl Unit {
         let after = self.life.state;
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
             self.died(c, before)?;
-            if self.master(&c.w.masters, c.player)?.ghost_on_death
-                == crate::vision::ghost::LEAVES_GHOSTS
+            if self.master(&c.w.masters, c.player)?.ghost_on_death == GhostMode::LEAVES
                 && c.w.game_state != 2
             {
                 // the ghosts of the death (FUN_14118e990), the object lent to the world

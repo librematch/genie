@@ -438,6 +438,7 @@ mod stack_tests {
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::lifecycle::{Class, Lifecycle};
+    use crate::objects::masters::FlyMode;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::master_type;
@@ -823,7 +824,7 @@ mod stack_tests {
                     m.volley_missile = None;
                     // every building holds its movement state
                     m.moving = Some(crate::movement::MoveStats {
-                        fly_mode: 0,
+                        fly_mode: FlyMode::GROUND,
                         speed: Speed::ZERO,
                         base: Speed::ZERO,
                         turn_rate: TurnRate::ZERO,

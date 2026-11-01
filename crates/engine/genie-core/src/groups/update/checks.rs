@@ -15,6 +15,7 @@ use crate::map::Tile;
 use crate::objects::ActionState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
@@ -375,7 +376,7 @@ impl World {
             crate::math::conversions::cvttss2si(x),
             crate::math::conversions::cvttss2si(y),
         );
-        if master.fog_visibility == 0 {
+        if master.fog_visibility == FogVisibility::INVISIBLE {
             Ok(self.spatial.sees_tile(player, Tile::new(x, y)))
         } else {
             self.spatial.explored(player, Tile::new(x, y))

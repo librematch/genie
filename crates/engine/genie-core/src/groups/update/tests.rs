@@ -29,10 +29,12 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -300,7 +302,7 @@ fn a_target_is_pending_while_seen_and_no_ally_s() {
     assert!(!t.target_pending(group_id(1)).unwrap());
     for m in &mut t.masters {
         let mut master = m.get(master_id(4)).unwrap().clone();
-        master.fog_visibility = 1;
+        master.fog_visibility = FogVisibility::VISIBLE;
         *m = Masters::new([master]);
     }
     assert!(t.target_pending(group_id(1)).unwrap());
@@ -2139,7 +2141,7 @@ fn a_unit_s_speed_is_its_movers_unless_a_charge_runs() {
     m4.max_charge = Charge::new(1.0);
     t.masters[1] = Masters::new([m4.clone()]);
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
-    m4.special_attack = 3;
+    m4.special_attack = SpecialAttack::CHARGE;
     t.masters[1] = Masters::new([m4.clone()]);
     assert!(speed(&t, 10).is_err());
     m4.max_charge = Charge::ZERO;

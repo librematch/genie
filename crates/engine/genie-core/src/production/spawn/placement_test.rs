@@ -15,6 +15,8 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FogVisibility;
+use crate::objects::masters::HillMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
@@ -61,7 +63,7 @@ pub struct Near {
     /// Its master moves (speed above 0).
     pub moving: bool,
     /// Its master's `fog_visibility` (`+0x605`).
-    pub fog_visibility: u8,
+    pub fog_visibility: FogVisibility,
     /// A building's visibility mask (`+0x8f8`, the registry's) when its footprint has a UMV entry
     /// (`+0x904` not 0); None otherwise.
     pub fog_mask: Option<crate::vision::VisionBits>,
@@ -138,7 +140,7 @@ pub struct Placing<'a> {
     /// Its terrain restriction's value per terrain.
     pub restriction: &'a Restriction,
     /// `hill_mode` (`+0x604`).
-    pub hill_mode: u8,
+    pub hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
     pub placement: PlacementTerrains,
 }
@@ -334,7 +336,7 @@ pub(super) fn build_static_test(
         return Ok(Some(1));
     }
     // hill mode 3 measures the box's edge against the elevation of its first column's last row
-    let base = if site.hill_mode == 3 {
+    let base = if site.hill_mode == HillMode::ONE_STEP {
         Some(
             map.elevation(Tile::new(x0, y1))
                 .ok_or(GenieError::unsupported(
@@ -399,15 +401,19 @@ pub(super) fn build_sees(
 ) -> Result<bool, GenieError> {
     let player = site.player;
     if !(seen && visible) {
-        let fog = if seen { o.fog_visibility } else { 1 };
-        if fog == 3 {
+        let fog = if seen {
+            o.fog_visibility
+        } else {
+            FogVisibility::VISIBLE
+        };
+        if fog == FogVisibility::ONLY_IN_FOG {
             return Err(GenieError::unsupported(
                 "a fogged object of fog visibility 3 near a BUILD",
             ));
         }
         // without a fog visibility only the player's own objects count, and a
         // building (not a farm) whose visibility mask meets both the player's masks
-        if fog == 0 {
+        if fog == FogVisibility::INVISIBLE {
             let masks = map.vision(player);
             let shown = o.class != class::FARM
                 && master_type::RGE_COMBAT <= o.kind
@@ -417,7 +423,7 @@ pub(super) fn build_sees(
                 return Ok(false);
             }
         }
-    } else if o.fog_visibility == 3 {
+    } else if o.fog_visibility == FogVisibility::ONLY_IN_FOG {
         return Ok(false);
     }
     Ok(true)
@@ -540,7 +546,7 @@ pub fn placement(
                     break 'tiles;
                 }
                 seen = seen || map.explored(me.player, tile);
-                if me.hill_mode != 0 {
+                if me.hill_mode != HillMode::ANY {
                     return Err(GenieError::unsupported("a placement test of a hill mode"));
                 }
             }

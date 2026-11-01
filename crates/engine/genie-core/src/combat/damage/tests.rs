@@ -674,7 +674,7 @@ fn a_facing_offset_counts_facets_from_the_angle() {
 fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     let x = sheep.armored.as_mut().unwrap();
-    x.special_attack = 1;
+    x.special_attack = SpecialAttack::FRONT_DEFENCE;
     x.facing = Some(Facing {
         angle: Angle::new(std::f32::consts::FRAC_PI_2),
         facets: 8,
@@ -691,7 +691,7 @@ fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
     assert_eq!(sheep.hp, HitPoints::new(14.0 - 10.0 * SPECIAL));
     // a busy target does not, and an unknown facing is not modelled
     let mut busy = self::sheep();
-    busy.armored.as_mut().unwrap().special_attack = 1;
+    busy.armored.as_mut().unwrap().special_attack = SpecialAttack::FRONT_DEFENCE;
     busy.armored.as_mut().unwrap().busy = true;
     take(
         &mut busy,
@@ -704,7 +704,7 @@ fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
     .unwrap();
     assert_eq!(busy.hp, HitPoints::new(4.0));
     let mut unknown = self::sheep();
-    unknown.armored.as_mut().unwrap().special_attack = 1;
+    unknown.armored.as_mut().unwrap().special_attack = SpecialAttack::FRONT_DEFENCE;
     assert!(
         take(
             &mut unknown,
@@ -725,7 +725,7 @@ fn a_retaliation_strikes_the_melee_attacker_first() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     sheep.weapons = vec![ClassAmount::new(4, 5)];
     let x = sheep.armored.as_mut().unwrap();
-    x.special_attack = 2;
+    x.special_attack = SpecialAttack::RETALIATION;
     x.unit_ai = true;
     x.alert_idle = Some(true);
     x.facing = Some(Facing {

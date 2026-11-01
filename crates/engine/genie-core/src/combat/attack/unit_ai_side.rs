@@ -12,7 +12,9 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
@@ -346,7 +348,7 @@ impl UnitView<'_, '_> {
     ) -> Result<bool, GenieError> {
         let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
         Ok(self.c.w.spatial.sees_tile(self.player, Tile::new(tx, ty))
-            || (t_master.fog_visibility != 0
+            || (t_master.fog_visibility != FogVisibility::INVISIBLE
                 && self.c.w.spatial.explored(self.player, Tile::new(tx, ty))?))
     }
 
@@ -360,7 +362,7 @@ impl UnitView<'_, '_> {
         if master.class != class::VILLAGER {
             return None;
         }
-        let swap = if master.task_by_group == 1 {
+        let swap = if master.task_by_group == TaskGroup::MALE_VILLAGERS {
             // The villagers a villager's attack command switches to by its task swap group (its player's
             // master table's entries at `+0x298` and `+0x928`).
             VILLAGER_MALE

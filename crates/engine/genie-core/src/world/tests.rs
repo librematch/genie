@@ -66,6 +66,8 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::FlyMode;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
@@ -75,6 +77,7 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::RestrictionField;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskIndex;
 use crate::objects::masters::TaskSprites;
@@ -475,7 +478,7 @@ pub(crate) fn builder_masters() -> Masters {
         build_time: 0,
         // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
         moving: Some(crate::movement::MoveStats {
-            fly_mode: 0,
+            fly_mode: FlyMode::GROUND,
             speed: Speed::new(0.8),
             base: Speed::new(0.8),
             turn_rate: TurnRate::MAX,
@@ -510,16 +513,16 @@ pub(crate) fn builder_masters() -> Masters {
         ]
     };
     Masters::new([
-        villager(VILLAGER_MALE, 1, base()),
-        villager(ids::BUILDER, 1, builder()),
-        villager(master_id(212), 2, builder()),
-        villager(VILLAGER_FEMALE, 2, base()),
+        villager(VILLAGER_MALE, TaskGroup::MALE_VILLAGERS, base()),
+        villager(ids::BUILDER, TaskGroup::MALE_VILLAGERS, builder()),
+        villager(master_id(212), TaskGroup::FEMALE_VILLAGERS, builder()),
+        villager(VILLAGER_FEMALE, TaskGroup::FEMALE_VILLAGERS, base()),
         Master {
             id: ids::HOUSE,
             terrain_restriction: Some(RestrictionId::named(0)),
             kind: BUILDING,
             class: class::BUILDING,
-            task_by_group: 0,
+            task_by_group: TaskGroup::NONE,
             radius: Footprint::new(1.0, 1.0),
             tall: true,
             obstruction_type: ObstructionType::NONE,
@@ -1564,32 +1567,41 @@ fn a_combat_object_counts_in_its_player_s_class_attributes() {
         [a[37], a[38], a[40], a[235]].map(Amount::get)
     };
     assert_eq!(
-        counted(class::CLASS_6, master_id(4), 0),
+        counted(class::CLASS_6, master_id(4), TaskGroup::NONE),
         [0.0, 0.0, 2.0, 0.0]
     );
-    assert_eq!(counted(class::SIEGE, ids::ID_1663, 0), [0.0, 0.0, 2.0, 2.0]);
     assert_eq!(
-        counted(class::CLASS_57, ids::ID_1697, 0),
+        counted(class::SIEGE, ids::ID_1663, TaskGroup::NONE),
         [0.0, 0.0, 2.0, 2.0]
     );
     assert_eq!(
-        counted(class::VILLAGER, VILLAGER_MALE, 1),
+        counted(class::CLASS_57, ids::ID_1697, TaskGroup::NONE),
+        [0.0, 0.0, 2.0, 2.0]
+    );
+    assert_eq!(
+        counted(class::VILLAGER, VILLAGER_MALE, TaskGroup::MALE_VILLAGERS),
         [2.0, 2.0, 0.0, 0.0]
     );
     assert_eq!(
-        counted(class::VILLAGER, VILLAGER_MALE, 2),
+        counted(class::VILLAGER, VILLAGER_MALE, TaskGroup::FEMALE_VILLAGERS),
         [2.0, 2.0, 0.0, 0.0]
     );
     assert_eq!(
-        counted(class::VILLAGER, VILLAGER_MALE, 3),
+        counted(class::VILLAGER, VILLAGER_MALE, TaskGroup::FISHING_SHIPS),
         [2.0, 0.0, 0.0, 0.0]
     );
     assert_eq!(
-        counted(class::TRADE_CART, master_id(128), 0),
+        counted(class::TRADE_CART, master_id(128), TaskGroup::NONE),
         [2.0, 0.0, 0.0, 0.0]
     );
-    assert_eq!(counted(class::LIVESTOCK, ids::ID_1663, 1), [0.0; 4]);
-    assert_eq!(counted(class::BUILDING, ids::TOWN_CENTRE, 0), [0.0; 4]);
+    assert_eq!(
+        counted(class::LIVESTOCK, ids::ID_1663, TaskGroup::MALE_VILLAGERS),
+        [0.0; 4]
+    );
+    assert_eq!(
+        counted(class::BUILDING, ids::TOWN_CENTRE, TaskGroup::NONE),
+        [0.0; 4]
+    );
     let mut a = vec![Amount::new(5.0); 41];
     count_class(
         &mut a,
@@ -2112,7 +2124,7 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
     );
     // without a swap group there is no other list to try
     let alone = Master {
-        task_by_group: 0,
+        task_by_group: TaskGroup::NONE,
         ..masters.get(VILLAGER_MALE).unwrap().clone()
     };
     assert_eq!(search(&alone), None);
@@ -9283,7 +9295,7 @@ fn hands_masters() -> Vec<Masters> {
             kind: master_type::COMBAT,
             class: class::CLASS_0,
             line_of_sight: Distance::new(6.0 + f32::from(p)),
-            fog_visibility: p,
+            fog_visibility: FogVisibility::of_data(p),
             hit_points: 30 + 5 * i16::from(p),
             death_spawns: [Some(master_id(3)), None],
             storage: vec![
@@ -9309,7 +9321,7 @@ fn hands_masters() -> Vec<Masters> {
             kind: master_type::COMBAT,
             class: class::LIVESTOCK,
             line_of_sight: Distance::new(2.0 + f32::from(p)),
-            fog_visibility: p,
+            fog_visibility: FogVisibility::of_data(p),
             storage: vec![(Some(attribute::FARM_FOOD), Amount::new(100.0), 1)],
             ..Master::default()
         };
@@ -9437,7 +9449,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
     let own = u.own_master.as_deref().unwrap();
     assert_eq!(
         (own.hit_points, own.line_of_sight, own.fog_visibility),
-        (30, Distance::new(6.0), 1)
+        (30, Distance::new(6.0), FogVisibility::VISIBLE)
     );
     assert_eq!(u.dead_master.as_deref().map(|d| d.hit_points), Some(9));
     assert_eq!(
@@ -9495,7 +9507,7 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     let own = u.own_master.as_deref().unwrap();
     assert_eq!(
         (own.line_of_sight, own.fog_visibility),
-        (Distance::new(4.0), 2)
+        (Distance::new(4.0), FogVisibility::VISIBLE_IF_ALIVE)
     );
     assert_eq!(u.dead_master, None);
     let v = s.sight.as_ref().unwrap();
@@ -9518,7 +9530,7 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     let own = u.own_master.as_deref().unwrap();
     assert_eq!(
         (own.line_of_sight, own.fog_visibility),
-        (Distance::new(3.0), 1)
+        (Distance::new(3.0), FogVisibility::VISIBLE)
     );
     // player 1's archer: its dead archer is of type 25, and none is copied
     let mut s = hands_world(
@@ -9949,7 +9961,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     assert_eq!(archer.capture_flag, 0);
     assert_eq!(
         archer.own_master.as_deref().map(|m| m.fog_visibility),
-        Some(1)
+        Some(FogVisibility::VISIBLE)
     );
     let v = t.spatial.sight.as_ref().unwrap();
     assert_eq!(
@@ -14366,7 +14378,7 @@ fn a_villager_s_attack_command_switches_it_to_the_villager_first() {
         id,
         kind: master_type::COMBAT,
         class: class::VILLAGER,
-        task_by_group: 1,
+        task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: 25,
         standing_sprite: Some(SpriteId::named(300)),
         attack_sprite: Some(SpriteId::named(301)),
@@ -14713,7 +14725,7 @@ fn an_attack_command_of_a_unit_that_cannot_move_goes_ready_and_swings_at_once() 
 /// A house's movement values: it never moves (speed 0).
 const fn house_moves() -> crate::movement::MoveStats {
     crate::movement::MoveStats {
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
         speed: Speed::ZERO,
         base: Speed::ZERO,
         turn_rate: TurnRate::MAX,
@@ -15144,7 +15156,8 @@ fn a_fishing_ship_reseeds_a_fish_trap() {
         // a ship builds as itself: its own Build task, no group
         let tasks = ms.get(ids::BUILDER).unwrap().tasks.clone();
         let ship = ms.get_mut(master_id(259)).unwrap();
-        (ship.class, ship.task_by_group, ship.tasks) = (class::FISHING_SHIP, 0, tasks);
+        (ship.class, ship.task_by_group, ship.tasks) =
+            (class::FISHING_SHIP, TaskGroup::NONE, tasks);
         *ms = Masters::new(ms.iter().cloned().chain([trap]));
         t.players[1].farm_queue = 0;
     };

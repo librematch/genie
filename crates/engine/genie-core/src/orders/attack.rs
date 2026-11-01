@@ -12,6 +12,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
@@ -28,7 +29,7 @@ pub(super) struct Aim {
     pub(super) owner: PlayerId,
     /// The target's master's class and fog visibility.
     pub(super) class: ClassId,
-    pub(super) fog_visibility: u8,
+    pub(super) fog_visibility: FogVisibility,
     /// The object aimed at (the target, or a building annex's main building), its place and its
     /// master's class.
     pub(super) aimed: ObjectId,
@@ -120,7 +121,8 @@ impl World {
             .ok_or(crate::world::TARGET_UNPLACED)?;
         let (tx, ty) = (t_at.position.x() as i32, t_at.position.y() as i32);
         let visible = self.spatial.sees_tile(player, Tile::new(tx, ty))
-            || (aim.fog_visibility != 0 && self.spatial.explored(player, Tile::new(tx, ty))?);
+            || (aim.fog_visibility != FogVisibility::INVISIBLE
+                && self.spatial.explored(player, Tile::new(tx, ty))?);
         let ready = self.attack_ready(player, idx, target, (master, world_time))?;
         let speed = self
             .players

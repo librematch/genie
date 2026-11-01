@@ -61,8 +61,10 @@ use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
 use crate::players::Amount;
 use crate::players::AmountRate;
@@ -183,7 +185,7 @@ pub struct Victim {
     /// write-back gives it to the object's own master).
     pub decay: AmountRate,
     /// Its master's `fog_visibility` (`+0x605`): an Attack goes on against it in the fog.
-    pub fog_visibility: u8,
+    pub fog_visibility: FogVisibility,
     /// Its player, and that player's attributes 272 and 273 (a higher or lower attacker's hits
     /// add them) and 211 and 212 (its own hits from higher or lower up add them).
     pub player: PlayerId,
@@ -311,7 +313,7 @@ pub struct Armored {
     /// Its master's `invulnerability_level`.
     pub invulnerability: f32,
     /// Its master's `special_attack_flag`.
-    pub special_attack: u8,
+    pub special_attack: SpecialAttack,
     /// Its master's `friendly_fire_damage`.
     pub friendly_fire: f32,
     /// Its master has a special graphic (`+0x8e8`), which its special attack shows.
@@ -375,7 +377,7 @@ pub struct Attacker {
     /// Its master's `charge_target`.
     pub charge_target: i16,
     /// Its master's `special_attack_flag`.
-    pub special_attack: u8,
+    pub special_attack: SpecialAttack,
     /// Its charge (`+0x9e0`).
     pub charge: Charge,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.

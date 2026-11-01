@@ -13,6 +13,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
@@ -653,7 +654,7 @@ impl World {
         if let Some(task) = find(own, filter)? {
             return Ok(Some(task));
         }
-        if own.task_by_group == 0 {
+        if own.task_by_group == TaskGroup::NONE {
             return Ok(None);
         }
         let mut found = None;

@@ -7,6 +7,7 @@ use crate::map::Position;
 use crate::map::Restriction;
 use crate::map::Tile;
 use crate::objects::ObjectId;
+use crate::objects::masters::HillMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::FARM;
@@ -171,7 +172,7 @@ impl World {
             class: site.class,
             obstructs: site.obstruction_type.recorded(),
             restriction: self.site_restriction(site)?,
-            hill_mode: 0,
+            hill_mode: HillMode::ANY,
             placement: site.placement,
             zones: false,
             own,

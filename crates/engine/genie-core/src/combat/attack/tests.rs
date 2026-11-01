@@ -25,6 +25,7 @@ use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::RestrictionField;
@@ -479,7 +480,7 @@ fn soldier_mover(speed: f32) -> Mover {
         paths: vec![],
         factor: 1.0,
         stats: MoveStats {
-            fly_mode: 0,
+            fly_mode: FlyMode::GROUND,
             speed: Speed::new(speed),
             base: Speed::new(speed),
             turn_rate: TurnRate::MAX,

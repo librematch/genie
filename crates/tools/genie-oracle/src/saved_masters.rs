@@ -19,11 +19,13 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ClassAmount;
 use genie_core::objects::masters::CombatAbility;
+use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::HeroFlags;
 use genie_core::objects::masters::MasterField;
 use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::SoundEvents;
+use genie_core::objects::masters::SpecialAttack;
 use genie_core::objects::masters::TargetOwner;
 use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskSprites;
@@ -244,7 +246,7 @@ pub(super) fn work_masters(
             work.invulnerability = c.invulnerability_level;
             work.attack_priority =
                 genie_core::objects::masters::AttackPriority::of_byte(c.attack_priority);
-            work.special_attack = c.special_attack_flag;
+            work.special_attack = SpecialAttack::of_data(c.special_attack_flag);
             work.max_charge = Charge::new(c.max_charge);
             work.charge_target = c.charge_target;
         }
@@ -332,7 +334,7 @@ pub(super) fn work_masters(
                 arc: mm.ballistics_ratio,
                 speed: animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed)),
                 radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
-                fly_mode: table.fly_mode(civ, s.copy_id()).unwrap_or(0),
+                fly_mode: FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0)),
             });
         }
         work.damage_sprites = !s.damage_sprite.is_empty();
@@ -366,7 +368,7 @@ pub(super) fn work_masters(
             .iter()
             .filter_map(|t| t.location)
             .collect();
-        work.fly_mode = table.fly_mode(civ, s.copy_id()).unwrap_or(0);
+        work.fly_mode = FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0));
         work.standing_sprite = SpriteId::of_data(s.idle_sprite_id);
         work.standing_sprite_2 = SpriteId::of_data(s.idle2_sprite_id);
         (work.move_sprite, work.run_sprite) = moving_master(m).map_or((None, None), |mv| {
@@ -415,7 +417,7 @@ pub(super) fn moving_stats(
         .and_then(|w| table.graphics.get(&w))
         .map(|g| g.facets);
     Some(genie_core::movement::MoveStats {
-        fly_mode: table.fly_mode(civ, s.copy_id()).unwrap_or(0),
+        fly_mode: FlyMode::of_data(table.fly_mode(civ, s.copy_id()).unwrap_or(0)),
         speed: if 0.0 < factor {
             Speed::new(base * factor)
         } else {

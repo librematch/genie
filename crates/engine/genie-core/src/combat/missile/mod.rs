@@ -20,6 +20,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
@@ -83,7 +84,7 @@ pub struct MissileStats {
     /// Its master's radii (`+0x5d8`..`+0x5e0`).
     pub radius: Radii,
     /// The `.dat`'s `fly_mode` (`+0x608`): 0 holds it on the ground, 1 above it.
-    pub fly_mode: u8,
+    pub fly_mode: FlyMode,
 }
 
 /// Where a missile came from (`+0x9c`, `mProjectileData`, `FUN_140aa86e0`): the firing object's
@@ -488,11 +489,11 @@ pub fn on_target(at: Position, radius: Radii, target: Position, target_radius: F
 /// height; else `FUN_141193a10` by its master's fly mode: 0 puts it on the ground, 1 lifts it to
 /// the ground when it is below, others keep it.
 #[must_use]
-pub fn grounded(z: f32, ground: f32, flying: bool, fly_mode: u8) -> f32 {
+pub fn grounded(z: f32, ground: f32, flying: bool, fly_mode: FlyMode) -> f32 {
     match fly_mode {
         _ if flying => z,
-        0 => ground,
-        1 if z < ground => ground,
+        FlyMode::GROUND => ground,
+        FlyMode::ABOVE if z < ground => ground,
         _ => z,
     }
 }
@@ -661,11 +662,17 @@ mod tests {
     /// −0.3602 and is lifted onto it (the ground hit: its height is the ground's).
     #[test]
     fn a_spear_past_its_point_takes_the_ground_by_its_fly_mode() {
-        assert_eq!(grounded(0.349_624_8, 0.0, false, 1), 0.349_624_8);
-        assert_eq!(grounded(-0.360_166_4, 0.0, false, 1), 0.0);
+        assert_eq!(
+            grounded(0.349_624_8, 0.0, false, FlyMode::ABOVE),
+            0.349_624_8
+        );
+        assert_eq!(grounded(-0.360_166_4, 0.0, false, FlyMode::ABOVE), 0.0);
         // still flying it keeps any height; fly mode 0 always takes the ground
-        assert_eq!(grounded(-0.360_166_4, 0.0, true, 1), -0.360_166_4);
-        assert_eq!(grounded(0.349_624_8, 0.0, false, 0), 0.0);
+        assert_eq!(
+            grounded(-0.360_166_4, 0.0, true, FlyMode::ABOVE),
+            -0.360_166_4
+        );
+        assert_eq!(grounded(0.349_624_8, 0.0, false, FlyMode::GROUND), 0.0);
     }
 
     #[test]

@@ -5,10 +5,17 @@ use crate::movement::Speed;
 use crate::objects::WorkRate;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::FogVisibility;
+use crate::objects::masters::InteractionMode;
+use crate::objects::masters::InterfaceKind;
 use crate::objects::masters::MasterAttribute;
+use crate::objects::masters::MinimapMode;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::Occlusion;
+use crate::objects::masters::RunPattern;
+use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::{
     AttributeWorld, MISSILE_SPEED_CAP, Master, ROUND, SPEED_CAP, add_short, add_sprite, attribute,
     insert_damage_graphic, low8, low16, master_type, multiply_short, resize_damage_graphics,
@@ -40,8 +47,8 @@ impl Master {
                     *amount = Amount::new(f32::from(low16(v)));
                 }
             }
-            a::FOG_VISIBILITY => self.fog_visibility = low8(v),
-            a::OCCLUSION_MODE => self.occlusion = low8(v),
+            a::FOG_VISIBILITY => self.fog_visibility = FogVisibility::of_data(low8(v)),
+            a::OCCLUSION_MODE => self.occlusion = Occlusion::of_data(low8(v)),
             a::SIZE_Z => self.height = v,
             a::CAN_BE_BUILT_ON | a::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense = BlastDefense::new(low8(v));
@@ -67,7 +74,7 @@ impl Master {
                 self.obstruction_type = ObstructionType::set(low8(v));
             }
             a::BLOCKAGE_CLASS => self.obstruction_class = ObstructionClass::from(low8(v)),
-            a::SELECTION_EFFECT => self.selection_effect = low8(v),
+            a::SELECTION_EFFECT => self.selection_effect = SelectionEffect::of_data(low8(v)),
             a::DAMAGE_GRAPHIC
             | a::DAMAGE_GRAPHICS_ENTRY_MOD
             | a::DAMAGE_GRAPHICS_TOTAL_NUM
@@ -93,10 +100,10 @@ impl Master {
             // the save's byte, which the slice holds as its test against 0
             a::AVAILABLE_UNIT_FLAG => self.available = low8(v) != 0,
             a::DISABLED_UNIT_FLAG => self.disabled = low8(v) != 0,
-            a::INTERFACE_KIND => self.unit_level = low8(v),
+            a::INTERFACE_KIND => self.unit_level = InterfaceKind::of_data(low8(v)),
             a::COMBAT_LEVEL => self.combat_level = CombatLevel::of_data(low8(v)),
-            a::INTERACTION_MODE => self.select_level = low8(v),
-            a::MINIMAP_MODE => self.map_draw_level = low8(v),
+            a::INTERACTION_MODE => self.select_level = InteractionMode::of_data(low8(v)),
+            a::MINIMAP_MODE => self.map_draw_level = MinimapMode::of_data(low8(v)),
             _ => {}
         }
     }
@@ -183,7 +190,7 @@ impl Master {
                     *amount += Amount::new(f32::from(low16(v)));
                 }
             }
-            a::OCCLUSION_MODE => self.occlusion = self.occlusion.wrapping_add(low8(v)),
+            a::OCCLUSION_MODE => self.occlusion = self.occlusion.plus(low8(v)),
             a::SIZE_Z => self.height += v,
             a::CAN_BE_BUILT_ON | a::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense =
@@ -210,10 +217,10 @@ impl Master {
             a::DISABLED_UNIT_FLAG => {
                 self.disabled = u8::from(self.disabled).wrapping_add(low8(v)) != 0;
             }
-            a::INTERFACE_KIND => self.unit_level = self.unit_level.wrapping_add(low8(v)),
+            a::INTERFACE_KIND => self.unit_level = self.unit_level.plus(low8(v)),
             a::COMBAT_LEVEL => self.combat_level = self.combat_level.plus(low8(v)),
-            a::INTERACTION_MODE => self.select_level = self.select_level.wrapping_add(low8(v)),
-            a::MINIMAP_MODE => self.map_draw_level = self.map_draw_level.wrapping_add(low8(v)),
+            a::INTERACTION_MODE => self.select_level = self.select_level.plus(low8(v)),
+            a::MINIMAP_MODE => self.map_draw_level = self.map_draw_level.plus(low8(v)),
             // the sounds (92, 94, 96, 98, through slot 0x18) are the interface's
             _ => {}
         }
@@ -448,7 +455,7 @@ impl Master {
         match attribute {
             attribute::WORK_RATE => self.work_rate = WorkRate::new(v),
             attribute::SEARCH_RADIUS => self.search_radius = Distance::new(v),
-            attribute::RUN_PATTERN => self.run_pattern = low8(v),
+            attribute::RUN_PATTERN => self.run_pattern = RunPattern::of_data(low8(v)),
             // the command and move sounds (132 to 135) are the interface's
             attribute::COMMAND_SOUND
             | attribute::COMMAND_SOUND_EVENT
@@ -468,7 +475,7 @@ impl Master {
         match attribute {
             attribute::WORK_RATE => self.work_rate += WorkRate::new(v),
             attribute::SEARCH_RADIUS => self.search_radius += Distance::new(v),
-            attribute::RUN_PATTERN => self.run_pattern = self.run_pattern.wrapping_add(low8(v)),
+            attribute::RUN_PATTERN => self.run_pattern = self.run_pattern.plus(low8(v)),
             // the command and move sounds (through slot 0x18) are the interface's
             attribute::COMMAND_SOUND | attribute::MOVE_SOUND => {}
             _ => self.add_moving(attribute, v, world),

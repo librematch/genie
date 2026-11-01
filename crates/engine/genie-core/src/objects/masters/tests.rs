@@ -38,7 +38,7 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         id,
         kind: master_type::COMBAT,
         class: class::VILLAGER,
-        task_by_group,
+        task_by_group: TaskGroup::of_data(task_by_group),
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         obstruction_type: ObstructionType::NONE,
@@ -60,7 +60,7 @@ fn house() -> Master {
         id: ids::HOUSE,
         kind: master_type::BUILDING,
         class: class::BUILDING,
-        task_by_group: 0,
+        task_by_group: TaskGroup::NONE,
         radius: Footprint::new(1.0, 1.0),
         tall: true,
         obstruction_type: ObstructionType::NONE,
@@ -204,12 +204,12 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         (a::STORAGE_3, |m| m.storage[2].1.get(), [3.0, 5.0, 10.0]),
         (
             a::FOG_VISIBILITY,
-            |m| f32::from(m.fog_visibility),
+            |m| f32::from(m.fog_visibility.get()),
             [3.0, 3.0, 3.0],
         ),
         (
             a::OCCLUSION_MODE,
-            |m| f32::from(m.occlusion),
+            |m| f32::from(m.occlusion.get()),
             [3.0, 5.0, 5.0],
         ),
         (a::SIZE_Z, |m| m.height, [3.0, 5.0, 10.0]),
@@ -280,7 +280,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SELECTION_EFFECT,
-            |m| f32::from(m.selection_effect),
+            |m| f32::from(m.selection_effect.get()),
             [3.0, 3.0, 3.0],
         ),
         (
@@ -300,7 +300,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::INTERFACE_KIND,
-            |m| f32::from(m.unit_level),
+            |m| f32::from(m.unit_level.get()),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -310,12 +310,12 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::INTERACTION_MODE,
-            |m| f32::from(m.select_level),
+            |m| f32::from(m.select_level.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             a::MINIMAP_MODE,
-            |m| f32::from(m.map_draw_level),
+            |m| f32::from(m.map_draw_level.get()),
             [3.0, 5.0, 5.0],
         ),
         // the selected entry plus ten times the count: the set and the add select at most
@@ -530,7 +530,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::SPECIAL_ABILITY,
-            |m| f32::from(m.special_attack),
+            |m| f32::from(m.special_attack.get()),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -823,7 +823,7 @@ fn a_missile_s_smart_mode_multiply_sets_it() {
         arc: 0.5,
         speed: Speed::new(7.0),
         radius: Radii::ZERO,
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
     });
     m.reload = Seconds::new(2.0);
     m.multiply_attribute(attribute::PROJECTILE_SMART_MODE, 3.0, &world(false));
@@ -1041,7 +1041,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
     m.max_speed = Speed::new(1.0);
     m.radius = Footprint::new(0.2, 0.2);
     m.moving = Some(MoveStats {
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
         speed: Speed::new(1.5),
         base: Speed::new(1.5),
         turn_rate: TurnRate::new(1.0),
@@ -1137,7 +1137,11 @@ fn the_action_and_moving_setters_change_their_values() {
     assert_eq!(m, before);
     assert_eq!(
         (m.work_rate, m.search_radius, m.run_pattern),
-        (WorkRate::new(1.5), Distance::new(6.0), 1)
+        (
+            WorkRate::new(1.5),
+            Distance::new(6.0),
+            RunPattern::of_data(1)
+        )
     );
     assert_eq!(m.turn_speed, Seconds::new(1.0));
     assert_eq!(
@@ -1229,7 +1233,7 @@ fn the_missile_building_and_animated_setters() {
         arc: 0.25,
         speed: Speed::new(7.0),
         radius: Radii::ZERO,
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
     });
     m.add_attribute(attribute::PROJECTILE_SMART_MODE, 1.0, &world(false));
     m.add_attribute(attribute::PROJECTILE_HIT_MODE, 1.0, &world(false));
@@ -1284,7 +1288,7 @@ fn a_master_copy_keeps_its_id_class_and_flags() {
     );
     assert!(militia.available && !militia.disabled);
     assert_eq!((militia.hit_points, militia.tasks.len()), (45, 2));
-    assert_eq!(militia.task_by_group, 2);
+    assert_eq!(militia.task_by_group, TaskGroup::FEMALE_VILLAGERS);
 }
 
 /// The work command's choice for a gather (0x6a) on a farm (master 50, one of the objects

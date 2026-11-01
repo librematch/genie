@@ -5,6 +5,7 @@ use genie_core::movement::MoveAlgorithm;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::facing::SpriteFacets;
+use genie_core::objects::masters::FlyMode;
 use genie_save::generated::world::Master;
 
 /// A walker: master 83 standing as sprite 10, walking as 11 and running as 12.
@@ -74,7 +75,7 @@ fn a_walker_moves_by_its_sprites_speed_factors() {
     assert_eq!(stats.speed.get().to_bits(), 3.0_f32.to_bits());
     assert_eq!(
         (stats.fly_mode, stats.move_algorithm),
-        (2, MoveAlgorithm::ALTERNATES_SPRITES)
+        (FlyMode::of_data(2), MoveAlgorithm::ALTERNATES_SPRITES)
     );
     assert_eq!(
         (stats.restriction, stats.restriction_mask),

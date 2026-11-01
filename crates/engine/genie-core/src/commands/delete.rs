@@ -14,6 +14,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -476,8 +477,7 @@ impl World {
         }
         if ObjectState::Alive < new && old < ObjectState::Dying {
             self.leave_storage(owner, master, |flag| matches!(flag, 2 | 16))?;
-            if master.ghost_on_death == crate::vision::ghost::LEAVES_GHOSTS && self.game_state != 2
-            {
+            if master.ghost_on_death == GhostMode::LEAVES && self.game_state != 2 {
                 self.ghosts_at_death(owner.index(), id)?;
             }
         }

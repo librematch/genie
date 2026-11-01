@@ -35,6 +35,7 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::ObjectFlags;
@@ -947,7 +948,7 @@ fn walled_map(
         spatial.insert(object_id(id), p);
     }
     let stats = crate::movement::MoveStats {
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
         speed: Speed::new(0.8),
         base: Speed::new(0.8),
         turn_rate: TurnRate::MAX,
@@ -1595,7 +1596,7 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
 /// A unit's movement as the spot test reads it: terrain restriction 0, no speed.
 fn standing() -> crate::movement::MoveStats {
     crate::movement::MoveStats {
-        fly_mode: 0,
+        fly_mode: FlyMode::GROUND,
         speed: Speed::ZERO,
         base: Speed::ZERO,
         turn_rate: TurnRate::ZERO,

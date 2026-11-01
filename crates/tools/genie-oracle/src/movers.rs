@@ -15,6 +15,7 @@ use genie_core::movement::PathFlags;
 use genie_core::movement::Speed;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
+use genie_core::objects::masters::FlyMode;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
 use genie_save::generated::world::{
@@ -267,9 +268,11 @@ pub(super) fn mover(
         paths: levels,
         factor: 1.0,
         stats: MoveStats {
-            fly_mode: table
-                .fly_mode(civ, objects.dat_master(s.master_obj))
-                .unwrap_or(0),
+            fly_mode: FlyMode::of_data(
+                table
+                    .fly_mode(civ, objects.dat_master(s.master_obj))
+                    .unwrap_or(0),
+            ),
             speed: Speed::new(speed),
             base: Speed::new(base),
             turn_rate: genie_core::movement::turn_rate(Seconds::new(turn_speed), facets),

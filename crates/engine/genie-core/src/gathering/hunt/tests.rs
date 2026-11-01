@@ -20,6 +20,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::FlyMode;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -240,7 +241,7 @@ pub(crate) fn walker() -> Mover {
         paths: vec![],
         factor: 1.0,
         stats: MoveStats {
-            fly_mode: 0,
+            fly_mode: FlyMode::GROUND,
             speed: Speed::new(0.8),
             base: Speed::new(0.8),
             turn_rate: TurnRate::MAX,

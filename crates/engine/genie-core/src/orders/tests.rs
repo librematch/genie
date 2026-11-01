@@ -24,10 +24,12 @@ use crate::objects::SpriteId;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::FogVisibility;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TargetOwner;
+use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::action_type;
@@ -604,7 +606,7 @@ fn an_attack_task_aims_at_its_target_or_an_annex_s_main_building() {
     let aim = t.attack_aim(object_id(50)).unwrap();
     assert_eq!(
         (aim.owner, aim.class, aim.fog_visibility),
-        (PlayerId::new(0), class::PREDATOR, 0)
+        (PlayerId::new(0), class::PREDATOR, FogVisibility::INVISIBLE)
     );
     assert_eq!(
         (aim.aimed, aim.at, aim.aimed_class),
@@ -618,7 +620,7 @@ fn an_attack_task_aims_at_its_target_or_an_annex_s_main_building() {
     let aim = t.attack_aim(object_id(61)).unwrap();
     assert_eq!(
         (aim.owner, aim.class, aim.fog_visibility),
-        (PlayerId::new(0), class::TOWER, 1)
+        (PlayerId::new(0), class::TOWER, FogVisibility::VISIBLE)
     );
     assert_eq!(
         (aim.aimed, aim.at, aim.aimed_class),
@@ -759,14 +761,14 @@ fn annexed(t: &mut World) {
             id: master_id(200),
             kind: BUILDING,
             class: class::BUILDING,
-            fog_visibility: 1,
+            fog_visibility: FogVisibility::VISIBLE,
             ..Master::default()
         },
         Master {
             id: master_id(201),
             kind: BUILDING,
             class: class::TOWER,
-            fog_visibility: 1,
+            fog_visibility: FogVisibility::VISIBLE,
             ..Master::default()
         },
     ]);
@@ -2964,7 +2966,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_a_task() {
         id,
         kind: master_type::COMBAT,
         class: class::VILLAGER,
-        task_by_group: 1,
+        task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: 25,
         tasks,
         ..Master::default()

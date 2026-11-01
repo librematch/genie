@@ -10,9 +10,13 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
 use genie_core::objects::masters as work;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::AdjacentMode;
 use genie_core::objects::masters::CombatLevel;
+use genie_core::objects::masters::FogVisibility;
 use genie_core::objects::masters::GarrisonKinds;
 use genie_core::objects::masters::GatherGroup;
+use genie_core::objects::masters::GhostMode;
+use genie_core::objects::masters::HillMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObjectFlags;
 use genie_core::objects::masters::ObstructionClass;
@@ -22,6 +26,7 @@ use genie_core::objects::masters::RestrictionField;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TargetOwner;
 use genie_core::objects::masters::TaskFlags;
+use genie_core::objects::masters::TaskGroup;
 use genie_core::objects::masters::TaskIndex;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::TaskTerrain;
@@ -139,7 +144,7 @@ pub(super) fn dat_work(
         base_id: MasterId::of_data(base_id(unit.base_id)),
         class: genie_core::objects::masters::ClassId::of_master(unit.class),
         terrain_restriction: genie_core::map::RestrictionId::of_field(unit.terrain_restriction)?,
-        task_by_group: unit.bird.as_ref().map_or(0, |b| b.task_swap_group),
+        task_by_group: TaskGroup::of_data(unit.bird.as_ref().map_or(0, |b| b.task_swap_group)),
         radius: Radii::from(unit.collision_size).ground(),
         tall: 0.0 < Radii::from(unit.collision_size).z(),
         height: Radii::from(unit.collision_size).z(),
@@ -207,7 +212,7 @@ pub(super) fn dat_work(
             unit.type50.as_ref().map_or(-1, |t| t.defense_terrain_bonus),
         ),
         building: unit.building.as_ref().map(|b| work::BuildingMaster {
-            adjacent_mode: b.adjacent_mode,
+            adjacent_mode: AdjacentMode::of_data(b.adjacent_mode),
             disappears_when_built: b.disappears_when_built != 0,
             stack_unit: MasterId::of_data(b.stack_unit_id),
             foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
@@ -226,11 +231,11 @@ pub(super) fn dat_work(
         recyclable: unit.recyclable != 0,
         auto_gather: unit.enable_auto_gather != 0,
         gather_group: GatherGroup::from(unit.resource_gather_group),
-        hill_mode: unit.hill_mode,
-        fog_visibility: unit.fog_visibility,
+        hill_mode: HillMode::of_data(unit.hill_mode),
+        fog_visibility: FogVisibility::of_data(unit.fog_visibility),
         available: unit.enabled != 0,
         disabled: unit.disabled != 0,
-        ghost_on_death: unit.create_doppelganger_on_death,
+        ghost_on_death: GhostMode::of_data(unit.create_doppelganger_on_death),
         placement: PlacementTerrains::of_data([
             unit.placement_side_terrain[0],
             unit.placement_side_terrain[1],
