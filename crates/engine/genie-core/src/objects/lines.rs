@@ -12,17 +12,43 @@
 
 use crate::objects::masters::MasterId;
 
-/// The first line id (table 2's index 0): a line's id + 399 indexes table 2.
-pub const FIRST_LINE: i32 = -399;
 /// Table 2's entries (`DAT_143cc2990`, the builder's 200).
 pub const LINES: usize = 200;
+
+/// A unit line's id (`LineID`, an int): −399 and the 199 after it index table 2.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct LineId(i32);
+
+impl LineId {
+    /// The first line id (table 2's index 0): a line's id + 399 indexes table 2.
+    pub const FIRST: Self = Self(-399);
+
+    /// The line of the file's int `value`.
+    #[must_use]
+    pub const fn of_data(value: i32) -> Self {
+        Self(value)
+    }
+
+    /// The int.
+    #[must_use]
+    pub const fn get(self) -> i32 {
+        self.0
+    }
+
+    /// Table 2's index of the line, when within its 200 entries.
+    #[must_use]
+    pub fn slot(self) -> Option<usize> {
+        let slot = usize::try_from(self.0.checked_sub(Self::FIRST.0)?).ok()?;
+        (slot < LINES).then_some(slot)
+    }
+}
 
 /// One entry of the file's `UnitLines` as the builder reads it. A key the entry leaves out is
 /// `None` (`LineID`, `IDChain`) or false (`Building`) or empty (`Identifier`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct UnitLine {
     /// `LineID`.
-    pub line: Option<i32>,
+    pub line: Option<LineId>,
     /// `IDChain`: the masters, the line's first first.
     pub chain: Option<Vec<i32>>,
     /// `Building`.
@@ -34,10 +60,10 @@ pub struct UnitLine {
 /// A master's entry of table 1 (12 bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LineEntry {
-    /// `+0`: the master after it in its chain (−1 for the last).
-    pub next: i32,
-    /// `+4`: its line (−1 for none).
-    pub line: i32,
+    /// `+0`: the master after it in its chain (none for the last, the game's −1).
+    pub next: Option<MasterId>,
+    /// `+4`: its line (none, the game's −1).
+    pub line: Option<LineId>,
     /// `+8`: its line's `Building` flag.
     pub building: bool,
 }
@@ -45,8 +71,8 @@ pub struct LineEntry {
 impl LineEntry {
     /// The entry of a master in no line (the builder's fill: −1, −1, 0).
     pub const NONE: Self = Self {
-        next: -1,
-        line: -1,
+        next: None,
+        line: None,
         building: false,
     };
 }
@@ -57,18 +83,18 @@ impl LineEntry {
 pub struct UnitLines {
     /// Table 1, by master id.
     pub entries: Vec<LineEntry>,
-    /// Table 2, by line + 399: the line's first master (−1 for none).
-    pub firsts: Vec<i32>,
+    /// Table 2, by line + 399: the line's first master (none, the game's −1).
+    pub firsts: Vec<Option<MasterId>>,
     /// The identifiers, with their line, in the file's order.
-    pub identifiers: Vec<(i32, String)>,
+    pub identifiers: Vec<(LineId, String)>,
 }
 
 impl UnitLines {
     /// `FUN_140fde680` with `master_count` (Gaia's, `player+0x20`) on the file's `lines`: table 1
     /// holds `master_count` entries of no line and table 2 200 lines of no master. Each entry
     /// with both `IDChain` and `LineID` whose line + 399 is within table 2 fills its chain from
-    /// the last master to the first: a master id out of the masters' range is left out (and the
-    /// link passes over it); each other takes its line, the `Building` flag and the master after
+    /// the last master to the first: a master id out of the masters' range (0 to the count, a
+    /// short) is left out (and the link passes over it); each other takes its line, the `Building` flag and the master after
     /// it, and the first (index 0) becomes the line's first master. Its identifiers then join
     /// the list with its line. A later line's entry for a master replaces an earlier one's. The
     /// game logs the entries it leaves out.
@@ -77,7 +103,7 @@ impl UnitLines {
         let count = usize::try_from(master_count).unwrap_or(0);
         let mut out = Self {
             entries: vec![LineEntry::NONE; count],
-            firsts: vec![-1; LINES],
+            firsts: vec![None; LINES],
             identifiers: Vec::new(),
         };
         for l in lines {
@@ -85,29 +111,30 @@ impl UnitLines {
                 // "Unit line is incorrectly defined and is missing a key variable"
                 continue;
             };
-            let Some(first) = Self::slot(line).and_then(|slot| out.firsts.get_mut(slot)) else {
+            let Some(first) = line.slot().and_then(|slot| out.firsts.get_mut(slot)) else {
                 // "Unit line ID is out of bounds (%d)"
                 continue;
             };
-            let mut next = -1;
+            let mut next = None;
             for (i, &id) in chain.iter().enumerate().rev() {
-                let Some(e) = usize::try_from(id)
+                let Some((master, e)) = i16::try_from(id)
                     .ok()
                     .filter(|_| id < master_count)
-                    .and_then(|k| out.entries.get_mut(k))
+                    .and_then(MasterId::of_data)
+                    .and_then(|m| Some((m, out.entries.get_mut(m.index())?)))
                 else {
                     // "Unit type ID is out of bounds (%d)"
                     continue;
                 };
                 if i == 0 {
-                    *first = id;
+                    *first = Some(master);
                 }
                 *e = LineEntry {
                     next,
-                    line,
+                    line: Some(line),
                     building: l.building,
                 };
-                next = id;
+                next = Some(master);
             }
             out.identifiers
                 .extend(l.identifiers.iter().map(|s| (line, s.clone())));
@@ -115,29 +142,22 @@ impl UnitLines {
         out
     }
 
-    /// Table 2's index of `line`, when within its 200 entries.
-    fn slot(line: i32) -> Option<usize> {
-        let slot = usize::try_from(line.checked_sub(FIRST_LINE)?).ok()?;
-        (slot < LINES).then_some(slot)
+    /// `FUN_140fdd6c0`: the line of master `master` (none, the game's −1, for an id out of
+    /// table 1 or in no line).
+    #[must_use]
+    pub fn line_of(&self, master: MasterId) -> Option<LineId> {
+        self.entries.get(master.index()).and_then(|e| e.line)
     }
 
-    /// `FUN_140fdd6c0`: the line of master `master` (−1 for an id out of table 1 or in no line).
+    /// `FUN_140fdd6f0`: the first master of line `line` (none, the game's −1, for a line out
+    /// of table 2 or without one). Table 2 has its 200 entries once built; before, it holds
+    /// none.
     #[must_use]
-    pub fn line_of(&self, master: i32) -> i32 {
-        usize::try_from(master)
-            .ok()
-            .and_then(|k| self.entries.get(k))
-            .map_or(-1, |e| e.line)
-    }
-
-    /// `FUN_140fdd6f0`: the first master of line `line` (−1 for a line out of table 2 or
-    /// without one). Table 2 has its 200 entries once built; before, it holds none.
-    #[must_use]
-    pub fn first_of(&self, line: i32) -> i32 {
-        Self::slot(line)
+    pub fn first_of(&self, line: LineId) -> Option<MasterId> {
+        line.slot()
             .and_then(|s| self.firsts.get(s))
             .copied()
-            .unwrap_or(-1)
+            .flatten()
     }
 
     /// The master a line stands for (`FUN_141658430`'s and `FUN_14161e370`'s reading): the first
@@ -145,13 +165,9 @@ impl UnitLines {
     /// none, the game's −1).
     #[must_use]
     pub fn base(&self, master: MasterId) -> Option<MasterId> {
-        match self.line_of(i32::from(master.get())) {
-            -1 => Some(master),
-            // the builder files only the masters' range's ids (0 or more) as a first master
-            line => i16::try_from(self.first_of(line))
-                .ok()
-                .and_then(MasterId::of_data),
-        }
+        // the builder files only the masters' range's ids (0 or more) as a first master
+        self.line_of(master)
+            .map_or(Some(master), |line| self.first_of(line))
     }
 }
 
@@ -162,7 +178,7 @@ mod tests {
 
     fn line(id: i32, chain: &[i32], building: bool, names: &[&str]) -> UnitLine {
         UnitLine {
-            line: Some(id),
+            line: Some(LineId::of_data(id)),
             chain: Some(chain.to_vec()),
             building,
             identifiers: names.iter().map(|s| (*s).to_owned()).collect(),
@@ -184,21 +200,25 @@ mod tests {
         assert_eq!(
             lines.entries[24],
             LineEntry {
-                next: 492,
-                line: -299,
+                next: Some(master_id(492)),
+                line: Some(LineId::of_data(-299)),
                 building: false
             }
         );
-        assert_eq!(lines.entries[492].next, -1);
-        assert_eq!(lines.entries[4].next, 24);
+        assert_eq!(lines.entries[492].next, None);
+        assert_eq!(lines.entries[4].next, Some(master_id(24)));
         assert!(lines.entries[234].building);
         assert_eq!(
             (
-                lines.line_of(492),
-                lines.first_of(-299),
+                lines.line_of(master_id(492)),
+                lines.first_of(LineId::of_data(-299)),
                 lines.base(master_id(492))
             ),
-            (-299, 4, Some(master_id(4)))
+            (
+                Some(LineId::of_data(-299)),
+                Some(master_id(4)),
+                Some(master_id(4))
+            )
         );
         assert_eq!(
             (lines.base(master_id(235)), lines.base(master_id(83))),
@@ -207,8 +227,8 @@ mod tests {
         assert_eq!(
             lines.identifiers,
             vec![
-                (-299, "archer-line".to_owned()),
-                (-398, "watch-tower-line".to_owned())
+                (LineId::of_data(-299), "archer-line".to_owned()),
+                (LineId::of_data(-398), "watch-tower-line".to_owned())
             ]
         );
     }
@@ -218,15 +238,15 @@ mod tests {
         // chain 7, -3, 900, 6 with 600 masters: 6's next is -1, 7's next is 6; the first (7) is
         // in range, so it is the line's first
         let lines = UnitLines::build(600, &[line(-297, &[7, -3, 900, 6], false, &[])]);
-        assert_eq!(lines.entries[7].next, 6);
-        assert_eq!(lines.first_of(-297), 7);
+        assert_eq!(lines.entries[7].next, Some(master_id(6)));
+        assert_eq!(lines.first_of(LineId::of_data(-297)), Some(master_id(7)));
         // a chain whose index 0 is out of range leaves the line without a first master
         let lines = UnitLines::build(600, &[line(-296, &[600, 75], false, &[])]);
-        assert_eq!(lines.first_of(-296), -1);
-        assert_eq!(lines.line_of(75), -296);
+        assert_eq!(lines.first_of(LineId::of_data(-296)), None);
+        assert_eq!(lines.line_of(master_id(75)), Some(LineId::of_data(-296)));
         assert_eq!(lines.base(master_id(75)), None);
         // an id at the master count is out (the builder's `local_208 <= id`)
-        assert_eq!(lines.line_of(600), -1);
+        assert_eq!(lines.line_of(master_id(600)), None);
     }
 
     #[test]
@@ -237,7 +257,7 @@ mod tests {
                 line(-400, &[1], false, &["low"]),
                 line(-199, &[2], false, &["high"]),
                 UnitLine {
-                    line: Some(-299),
+                    line: Some(LineId::of_data(-299)),
                     chain: None,
                     ..UnitLine::default()
                 },
@@ -249,12 +269,21 @@ mod tests {
                 line(-200, &[4], false, &["last"]),
             ],
         );
-        assert_eq!([1, 2, 3, 4].map(|m| lines.line_of(m)), [-1, -1, -1, -200]);
-        assert_eq!(lines.identifiers, vec![(-200, "last".to_owned())]);
+        assert_eq!(
+            [1, 2, 3, 4].map(|m| lines.line_of(master_id(m))),
+            [None, None, None, Some(LineId::of_data(-200))]
+        );
+        assert_eq!(
+            lines.identifiers,
+            vec![(LineId::of_data(-200), "last".to_owned())]
+        );
         // an empty chain still lists its identifiers
         let lines = UnitLines::build(100, &[line(-250, &[], false, &["empty"])]);
-        assert_eq!(lines.identifiers, vec![(-250, "empty".to_owned())]);
-        assert_eq!(lines.first_of(-250), -1);
+        assert_eq!(
+            lines.identifiers,
+            vec![(LineId::of_data(-250), "empty".to_owned())]
+        );
+        assert_eq!(lines.first_of(LineId::of_data(-250)), None);
     }
 
     #[test]
@@ -269,13 +298,13 @@ mod tests {
         assert_eq!(
             lines.entries[11],
             LineEntry {
-                next: -1,
-                line: -280,
+                next: None,
+                line: Some(LineId::of_data(-280)),
                 building: true
             }
         );
         // the first line keeps its first master
-        assert_eq!(lines.first_of(-290), 10);
+        assert_eq!(lines.first_of(LineId::of_data(-290)), Some(master_id(10)));
     }
 
     #[test]
@@ -283,11 +312,11 @@ mod tests {
         let lines = UnitLines::default();
         assert_eq!(
             (
-                lines.line_of(4),
-                lines.first_of(-299),
+                lines.line_of(master_id(4)),
+                lines.first_of(LineId::of_data(-299)),
                 lines.base(master_id(4))
             ),
-            (-1, -1, Some(master_id(4)))
+            (None, None, Some(master_id(4)))
         );
     }
 }

@@ -543,6 +543,7 @@ impl crate::world::World {
 mod tests {
     use super::*;
     use crate::objects::MasterHitPoints;
+    use crate::objects::lines::LineId;
     use crate::objects::lines::UnitLine;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
@@ -657,7 +658,7 @@ mod tests {
         UnitLines::build(
             2000,
             &[UnitLine {
-                line: Some(-299),
+                line: Some(LineId::of_data(-299)),
                 chain: Some(vec![4, 24, 492]),
                 ..UnitLine::default()
             }],

@@ -573,22 +573,22 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
 #[test]
 fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     let unit = |id, link, age, tech| TreeUnit {
-        id,
-        link,
+        id: TreeMaster::of_data(id),
+        link: TreeMaster::of_data(link),
         age,
-        tech,
+        tech: TreeTech::of_data(tech),
     };
     let tree = TechTree {
         civs: vec![
             vec![TreeBuilding {
-                id: 12,
+                id: TreeMaster::of_data(12),
                 units: vec![
                     unit(74, 75, crate::world::Age::of_data(1), 87),
                     unit(93, -1, crate::world::Age::of_data(3), 197),
                 ],
             }],
             vec![TreeBuilding {
-                id: 87,
+                id: TreeMaster::of_data(87),
                 units: vec![unit(4, 24, crate::world::Age::of_data(2), -1)],
             }],
         ],
@@ -597,8 +597,8 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     let settings = crate::world::settings::Settings::default();
     let q = |civ, building, unit, ages_out| TreeQuery {
         civ,
-        building,
-        unit,
+        building: TreeMaster::of_data(building),
+        unit: TreeMaster::of_data(unit),
         ages_out,
         settings: &settings,
         fallback: CivId::new(0),
@@ -610,17 +610,20 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
             tree.link(&q(CivId::new(0), 12, 74, none)),
             tree.tech(&q(CivId::new(0), 12, 74, none))
         ),
-        (75, 87)
+        (TreeMaster::of_data(75), TreeTech::of_data(87))
     );
     assert!(!tree.has(&q(CivId::new(0), 12, 4, none)));
-    assert_eq!(tree.link(&q(CivId::new(0), 12, 4, none)), -1);
+    assert_eq!(tree.link(&q(CivId::new(0), 12, 4, none)), TreeMaster::NONE);
     assert!(!tree.has(&q(CivId::new(0), 87, 4, none)));
-    assert_eq!(tree.link(&q(CivId::new(5), 12, 74, none)), 0);
+    assert_eq!(
+        tree.link(&q(CivId::new(5), 12, 74, none)),
+        TreeMaster::of_data(0)
+    );
     // the Castle Age out of reach
     assert!(!tree.has(&q(CivId::new(0), 12, 93, [false, true, false])));
     assert_eq!(
         tree.tech(&q(CivId::new(0), 12, 93, [false, true, false])),
-        0
+        TreeTech::of_data(0)
     );
     // the last age 3: age 3 is out
     let early = crate::world::settings::Settings {
@@ -642,7 +645,7 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
         ..q(CivId::new(1), 12, 74, none)
     };
     assert!(tree.has(&fell));
-    assert_eq!(tree.link(&fell), 75);
+    assert_eq!(tree.link(&fell), TreeMaster::of_data(75));
     assert!(!tree.has(&q(CivId::new(1), 12, 74, none)));
 }
 
@@ -669,19 +672,19 @@ fn the_upgradable_count_follows_the_tech_tree() {
     t.players[1].techs = vec![crate::technology::TechState::default(); 200];
     t.tech_tree = TechTree {
         civs: vec![vec![TreeBuilding {
-            id: 12,
+            id: TreeMaster::of_data(12),
             units: vec![
                 TreeUnit {
-                    id: 74,
-                    link: -1,
+                    id: TreeMaster::of_data(74),
+                    link: TreeMaster::NONE,
                     age: crate::world::Age::of_data(1),
-                    tech: -1,
+                    tech: TreeTech::of_data(-1),
                 },
                 TreeUnit {
-                    id: 75,
-                    link: 74,
+                    id: TreeMaster::of_data(75),
+                    link: TreeMaster::of_data(74),
                     age: crate::world::Age::of_data(2),
-                    tech: 150,
+                    tech: TreeTech::of_data(150),
                 },
             ],
         }]],

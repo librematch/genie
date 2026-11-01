@@ -804,13 +804,13 @@ mod tests {
             lines,
             [
                 UnitLine {
-                    line: Some(-399),
+                    line: Some(genie_core::objects::lines::LineId::of_data(-399)),
                     chain: Some(vec![117, 155]),
                     building: true,
                     identifiers: vec!["stone-wall-line".to_owned()],
                 },
                 UnitLine {
-                    line: Some(-266),
+                    line: Some(genie_core::objects::lines::LineId::of_data(-266)),
                     chain: Some(vec![751, 753, 752]),
                     building: false,
                     identifiers: vec![
@@ -819,7 +819,7 @@ mod tests {
                     ],
                 },
                 UnitLine {
-                    line: Some(-1),
+                    line: Some(genie_core::objects::lines::LineId::of_data(-1)),
                     ..UnitLine::default()
                 },
             ]

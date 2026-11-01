@@ -99,7 +99,7 @@ pub fn unit_lines(json: &str) -> Result<Vec<genie_core::objects::lines::UnitLine
                 Some(name) => vec![text(i, name)?],
             };
             Ok(genie_core::objects::lines::UnitLine {
-                line,
+                line: line.map(genie_core::objects::lines::LineId::of_data),
                 chain,
                 building,
                 identifiers,

@@ -297,7 +297,7 @@ pub struct NewObject {
     /// The owner's posture (`+0x71c`, its slot 0x90 `FUN_1416224f0`).
     pub posture: Posture,
     /// The owner's attribute 6, the current age (`player+0x100` at `+0x30`).
-    pub age: f32,
+    pub age: crate::players::Amount,
 }
 
 impl NewObject {
@@ -326,7 +326,7 @@ impl NewObject {
                 .map_or(Distance::ZERO, |t| t.work_range),
             computer: false,
             posture: Posture::AGGRESSIVE,
-            age: 0.0,
+            age: crate::players::Amount::ZERO,
         }
     }
 }
@@ -363,7 +363,7 @@ pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
     if !new.computer
         && new.object_flags.contains(ObjectFlags::SCOUT)
         && new.copy_id == Some(new.master)
-        && new.age == 0.0
+        && new.age == crate::players::Amount::ZERO
     {
         return UnitStance::STAND_GROUND;
     }

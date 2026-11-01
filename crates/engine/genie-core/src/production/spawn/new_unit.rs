@@ -220,7 +220,7 @@ impl World {
             posture: owner.posture,
             // The player's attribute a new soldier's unit AI reads: the current age (`player+0x100` at
             // `+0x30`, `FUN_140c12300`).
-            age: (crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)?).get(),
+            age: crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)?,
             ..NewObject::of(position, master, made)
         })
     }

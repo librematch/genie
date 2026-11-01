@@ -47,9 +47,11 @@ use crate::world::WorldTime;
 mod counts;
 mod income;
 mod tech_tree;
+mod tree_ids;
 mod update;
 
 pub use self::tech_tree::{TechTree, TreeBuilding, TreeQuery, TreeUnit, UniqueUnit};
+pub use self::tree_ids::{TreeMaster, TreeTech};
 #[cfg(test)]
 use crate::world::World;
 
@@ -73,7 +75,11 @@ const UNKEPT_LOW: ClassMask = ClassMask::new(0x4800_0800, 31);
 const UNKEPT_HIGH: ClassMask = ClassMask::new(0x1402_04a0_0038_4006, 61);
 /// The ages' technologies (Feudal, Castle, Imperial: `0x3284`, `0x3304`, `0x3384` in the
 /// player's technologies), whose state −1 puts their units out of the player's tree.
-const AGES: [i32; 3] = [101, 102, 103];
+const AGES: [crate::technology::TechId; 3] = [
+    crate::technology::TechId::FIRST_AGE,
+    crate::technology::TechId::CASTLE_AGE,
+    crate::technology::TechId::LAST_AGE,
+];
 /// `FUN_140c7e6f0`: the civilisation the full tech tree reads, by the game's tagged value at
 /// `+0x680` ([`crate::world::World::mode_680`]): 18 for 1, 59 for 2, else 0.
 const fn full_tree_civ(mode_680: crate::world::Mode680) -> crate::players::CivId {

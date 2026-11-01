@@ -4911,21 +4911,21 @@ fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(
         stance(&|n| {
             n.object_flags = ObjectFlags::SCOUT;
-            n.age = -0.0;
+            n.age = Amount::new(-0.0);
         }),
         UnitStance::STAND_GROUND
     );
     assert_eq!(
         stance(&|n| {
             n.object_flags = ObjectFlags::SCOUT;
-            n.age = 1.0;
+            n.age = Amount::new(1.0);
         }),
         UnitStance::AGGRESSIVE
     );
     assert_eq!(
         stance(&|n| {
             n.object_flags = ObjectFlags::SCOUT;
-            n.age = f32::NAN;
+            n.age = Amount::new(f32::NAN);
         }),
         UnitStance::AGGRESSIVE
     );

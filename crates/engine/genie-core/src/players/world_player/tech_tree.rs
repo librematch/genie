@@ -1,23 +1,25 @@
 //! The game's tech tree table ([`TechTree`], `FUN_140c7e080`) and its lookups.
 
+use crate::players::world_player::{TreeMaster, TreeTech};
+
 /// One unit of a building in a civilisation's tech tree (`0x48` bytes).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TreeUnit {
     /// `+0x0`: the unit's master.
-    pub id: i32,
+    pub id: TreeMaster,
     /// `+0x4`: the master it links to ([`TechTree::link`]).
-    pub link: i32,
+    pub link: TreeMaster,
     /// `+0x8`: its age (2 Feudal, 3 Castle, 4 Imperial).
     pub age: crate::world::Age,
     /// `+0xc`: the technology that brings it ([`TechTree::tech`]).
-    pub tech: i32,
+    pub tech: TreeTech,
 }
 
 /// One building of a civilisation's tech tree (`0x48` bytes): its master and its units.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TreeBuilding {
     /// `+0x0`: the building's master.
-    pub id: i32,
+    pub id: TreeMaster,
     /// `+0x8` (count `+0x18`): its units, in order.
     pub units: Vec<TreeUnit>,
 }
@@ -27,11 +29,11 @@ pub struct TreeBuilding {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct UniqueUnit {
     /// The technology that makes it elite.
-    pub elite_tech: i32,
+    pub elite_tech: TreeTech,
     /// The unit.
-    pub unit: i32,
+    pub unit: TreeMaster,
     /// The elite unit.
-    pub elite: i32,
+    pub elite: TreeMaster,
 }
 
 /// The game's tech tree table (`FUN_140c7e080`: the game object's `+0xa60`, or `+0xa68` for a
@@ -63,9 +65,9 @@ pub struct TreeQuery<'a> {
     /// The civilisation index.
     pub civ: crate::players::CivId,
     /// The building's master.
-    pub building: i32,
+    pub building: TreeMaster,
     /// The unit's master.
-    pub unit: i32,
+    pub unit: TreeMaster,
     /// The Feudal, Castle and Imperial Ages out of reach.
     pub ages_out: [bool; 3],
     /// The game's options: the full tech tree and the last age.
@@ -133,14 +135,14 @@ impl TechTree {
     /// −1 without the building or the unit (a building found without the unit tries the
     /// fallback civilisation as one not found does).
     #[must_use]
-    pub fn link(&self, q: &TreeQuery<'_>) -> i32 {
-        self.field(q, |u| u.link)
+    pub fn link(&self, q: &TreeQuery<'_>) -> TreeMaster {
+        TreeMaster::of_data(self.field(q, |u| u.link.get()))
     }
 
     /// `FUN_1414f4c80`: the unit's technology (`+0xc`), as [`TechTree::link`].
     #[must_use]
-    pub fn tech(&self, q: &TreeQuery<'_>) -> i32 {
-        self.field(q, |u| u.tech)
+    pub fn tech(&self, q: &TreeQuery<'_>) -> TreeTech {
+        TreeTech::of_data(self.field(q, |u| u.tech.get()))
     }
 
     pub(super) fn field(&self, q: &TreeQuery<'_>, f: impl Fn(&TreeUnit) -> i32) -> i32 {

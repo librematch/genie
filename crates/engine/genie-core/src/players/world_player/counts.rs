@@ -13,7 +13,9 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::tracker::ListKey;
-use crate::players::world_player::{AGES, TOWN_CENTRES, TreeQuery, full_tree_civ, get};
+use crate::players::world_player::{
+    AGES, TOWN_CENTRES, TreeMaster, TreeQuery, TreeTech, full_tree_civ, get,
+};
 use crate::technology::ResearchState;
 use crate::world::World;
 
@@ -135,24 +137,19 @@ impl World {
         let full = self.settings.full_tech_tree;
         let fallback = full_tree_civ(self.mode_680);
         let civ = if full { fallback } else { player.civ };
-        let state = |t: i32| {
-            usize::try_from(t)
-                .ok()
-                .and_then(|t| player.techs.get(t))
-                .map(|t| t.state)
-        };
-        let ages_out = AGES.map(|t| state(t) == Some(ResearchState::Disabled));
+        let state = |t: TreeTech| t.index().and_then(|t| player.techs.get(t)).map(|t| t.state);
+        let ages_out = AGES.map(|t| state(TreeTech::of_tech(t)) == Some(ResearchState::Disabled));
         let unique = self
             .tech_tree
             .unique_units
             .get(player.civ.index())
             .copied()
             .flatten()
-            .map_or(-1, |u| match state(u.elite_tech) {
+            .map_or(TreeMaster::NONE, |u| match state(u.elite_tech) {
                 // A technology's state once researched.
                 Some(ResearchState::Researched) => u.elite,
                 Some(_) => u.unit,
-                None => -1,
+                None => TreeMaster::NONE,
             });
         let mut count = 0i16;
         for m in masters.iter() {
@@ -166,19 +163,18 @@ impl World {
             }
             let q = TreeQuery {
                 civ,
-                building: i32::from(building.get()),
-                unit: i32::from(m.id.get()),
+                building: TreeMaster::of_master(building),
+                unit: TreeMaster::of_master(m.id),
                 ages_out,
                 settings: &self.settings,
                 fallback,
             };
-            if (!full || i32::from(m.id.get()) != unique) && !self.tech_tree.has(&q) {
+            if (!full || TreeMaster::of_master(m.id) != unique) && !self.tech_tree.has(&q) {
                 continue;
             }
             let link = self.tech_tree.link(&q);
-            let had = i16::try_from(link)
-                .ok()
-                .and_then(MasterId::of_data)
+            let had = link
+                .master()
                 .and_then(|l| masters.get(l))
                 .map(|l| l.available);
             if had.is_none_or(|a| a) {
