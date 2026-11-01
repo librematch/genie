@@ -176,7 +176,7 @@ impl UnitAi {
             alert_mode: false,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
-            patrol_waypoint: 0,
+            patrol_waypoint: crate::movement::WaypointIndex::FIRST,
             stop_after_kill: false,
             home: None,
             hunted: None,
@@ -270,7 +270,7 @@ impl UnitAi {
     /// `zeroPatrolInformation` (`FUN_140c68de0`): the saved patrol goes and its waypoint is 0.
     pub fn zero_patrol(&mut self) {
         self.patrol_path = None;
-        self.patrol_waypoint = 0;
+        self.patrol_waypoint = crate::movement::WaypointIndex::FIRST;
     }
 
     /// `savePatrolInformation` (`FUN_140c63d20`): the saved patrol goes; the unit's slot 0x468
@@ -278,7 +278,7 @@ impl UnitAi {
     pub(super) fn save_patrol(&mut self, side: &dyn UnitSide) {
         let (path, waypoint) = side.patrol_information().unzip();
         self.patrol_path = path;
-        self.patrol_waypoint = waypoint.unwrap_or(0);
+        self.patrol_waypoint = waypoint.unwrap_or(crate::movement::WaypointIndex::FIRST);
     }
 
     /// `restorePatrolInformation` (`FUN_140c5e5b0`): without a saved patrol, false. Else the unit

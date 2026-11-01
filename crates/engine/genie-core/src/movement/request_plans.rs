@@ -5,6 +5,7 @@ use crate::map::Distance;
 use crate::movement::LevelFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::WaypointIndex;
 use crate::world::WorldTime;
 use std::ops::ControlFlow;
 
@@ -200,7 +201,7 @@ impl Mover {
             return Ok(());
         }
         np.planned = true;
-        let last = point_or_zero(&np.path, np.path.points.len() as i32 - 1);
+        let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
         let farther = w.distance < Distance::new(ground(w.waypoint, last));
         if farther {
             np.path.points.clear();
@@ -312,7 +313,7 @@ impl Mover {
         }
         np.found = true;
         np.partial = r == ShortFound::Partial;
-        let last = point_or_zero(&np.path, np.path.points.len() as i32 - 1);
+        let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
         np.end_gap = ground(w.waypoint, last);
         Ok(None)
     }
@@ -333,7 +334,8 @@ impl Mover {
         };
         let level = &mut self.paths[0];
         if reach < w.goal.gap {
-            if level.waypoint == level.points.len() as i32 - 1 && level.created == now {
+            if level.waypoint == WaypointIndex::last_of(level.points.len()) && level.created == now
+            {
                 self.stop()?;
                 self.reset_level();
                 self.paths[0].state = PathState::GaveUp;
@@ -417,7 +419,7 @@ impl Mover {
         let Some(r) = self.tile_plan(me, world, plan, ask, &mut other)? else {
             return Ok(());
         };
-        let last = point_or_zero(&other, other.points.len() as i32 - 1);
+        let last = point_or_zero(&other, WaypointIndex::last_of(other.points.len()));
         let end = ground(w.waypoint, last);
         if end <= w.distance.get() {
             // the game's `result - 1 < 2 || 4 < result`: above 4 the planner never returns

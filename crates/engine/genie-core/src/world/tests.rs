@@ -7857,7 +7857,7 @@ fn an_order_resets_its_units_sleeping_ones_too() {
         id: object_id(id),
         ai: Some(UnitAi {
             patrol_path: Some(crate::unit_ai::PatrolPath::default()),
-            patrol_waypoint: 2,
+            patrol_waypoint: crate::movement::WaypointIndex::of_data(2),
             adjusted_idle_timeout: Millis::new(100),
             secondary_timer: Millis::new(900),
             ..UnitAi::default()
@@ -13090,7 +13090,7 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
     top.points = vec![BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)];
     top.length = Distance::new(10.0);
     top.path_flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD;
-    top.waypoint = 1;
+    top.waypoint = crate::movement::WaypointIndex::of_data(1);
     m.paths = vec![walked, top];
     let (saved, waypoint) = patrol_information(Some(&m)).unwrap();
     assert_eq!(
@@ -13098,7 +13098,7 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
         [BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)]
     );
     assert_eq!(
-        (saved.path.length, saved.flags, waypoint),
+        (saved.path.length, saved.flags, waypoint.get()),
         (
             Distance::new(10.0),
             PathFlags::LOOPS | PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
@@ -13134,7 +13134,7 @@ fn a_restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
         ),
         ai: Some(UnitAi {
             patrol_path: Some(saved),
-            patrol_waypoint: 1,
+            patrol_waypoint: crate::movement::WaypointIndex::of_data(1),
             ..UnitAi::default()
         }),
         actions: ActionList::default().with_move_to(Some(MoveToAction {

@@ -13,6 +13,7 @@ use crate::math::fmath::{self, BVector};
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::Walker;
+use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
@@ -154,7 +155,7 @@ impl Motion {
         }
         let level = self.paths.checked_mut(0)?;
         if level.level == WaypointLevel::TOP {
-            level.waypoint = 1;
+            level.waypoint = WaypointIndex::SECOND;
             level.state = PathState::WantsPath;
             level.continue_counter = 10;
         } else {

@@ -495,7 +495,7 @@ pub struct UnitAi {
     /// off it, which `restorePatrolInformation` (`FUN_140c5e5b0`) walks on.
     pub patrol_path: Option<PatrolPath>,
     /// `+0x1c8`, `mPatrolCurrentWaypoint`: the saved patrol's waypoint the unit walked to.
-    pub patrol_waypoint: i32,
+    pub patrol_waypoint: crate::movement::WaypointIndex,
     /// `+0x1a8`, `stop_after_target_killed_value`: a move does not let the current action take its
     /// point (`FUN_140c41c10`).
     pub stop_after_kill: bool,

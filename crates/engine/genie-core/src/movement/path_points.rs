@@ -12,6 +12,7 @@ use crate::math::fmath::BVector;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
+use crate::movement::WaypointIndex;
 use crate::movement::{EPSILON, Motion, PathData, RANGE_FLOOR, SHORTEST};
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
@@ -35,18 +36,18 @@ pub(super) fn cut_path(path: &mut Path, i: i32) -> bool {
 
 /// A point of a path (`FUN_140f9bcd0`): outside it, the game's static point (`DAT_143f0dc88`),
 /// zero.
-pub(super) fn point_or_zero(path: &Path, index: i32) -> BVector {
-    usize::try_from(index)
-        .ok()
+pub(super) fn point_or_zero(path: &Path, index: WaypointIndex) -> BVector {
+    index
+        .slot()
         .and_then(|i| path.points.get(i))
         .copied()
         .unwrap_or(BVector::ZERO)
 }
 
 /// A waypoint of a level's path, or the game's static zero point outside it.
-pub(super) fn point_or_zero_of(level: &PathData, index: i32) -> BVector {
-    usize::try_from(index)
-        .ok()
+pub(super) fn point_or_zero_of(level: &PathData, index: WaypointIndex) -> BVector {
+    index
+        .slot()
         .and_then(|i| level.points.get(i))
         .copied()
         .unwrap_or(BVector::ZERO)

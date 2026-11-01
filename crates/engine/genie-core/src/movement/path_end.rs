@@ -227,10 +227,7 @@ impl Mover {
     pub fn follow_path_end(&mut self, point: Position) {
         let point = point.vector();
         if let Some(level) = self.paths.first_mut() {
-            if let Some(w) = usize::try_from(level.waypoint)
-                .ok()
-                .and_then(|i| level.points.get_mut(i))
-            {
+            if let Some(w) = level.waypoint.slot().and_then(|i| level.points.get_mut(i)) {
                 *w = point;
             }
             level.flags &= !(LevelFlags::REACHED | LevelFlags::AT_WAYPOINT);
@@ -287,7 +284,7 @@ impl Mover {
             path_flags: PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
             length,
             created: now,
-            waypoint: 1,
+            waypoint: crate::movement::WaypointIndex::SECOND,
             state: if planned {
                 PathState::WantsPath
             } else {
@@ -321,16 +318,19 @@ impl Mover {
     ) {
         let start = from.vector();
         let mut path = Path::default();
-        if ask.resume == -1 {
+        if ask.resume == crate::movement::WaypointIndex::NONE {
             let _ = path.insert(0, start);
         }
         for &w in &self.user_waypoints {
             let _ = path.push(w);
         }
         self.clear_user_waypoints();
-        if ask.resume == -1 {
+        if ask.resume == crate::movement::WaypointIndex::NONE {
             let end = goal.vector();
-            let last = point_or_zero(&path, path.points.len() as i32 - 1);
+            let last = point_or_zero(
+                &path,
+                crate::movement::WaypointIndex::last_of(path.points.len()),
+            );
             let mut d = fmath::sub(end, last);
             d = d.with_height(0.0);
             if EPSILON < fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()) {
@@ -367,7 +367,11 @@ impl Mover {
             level: WaypointLevel::TOP,
             points: path.points,
             path_flags,
-            waypoint: if ask.resume == -1 { 1 } else { ask.resume },
+            waypoint: if ask.resume == crate::movement::WaypointIndex::NONE {
+                crate::movement::WaypointIndex::SECOND
+            } else {
+                ask.resume
+            },
             state: PathState::WantsPath,
             range,
             target,
@@ -548,7 +552,9 @@ impl Mover {
             });
         }
         let mut pauses = Vec::new();
-        if level.waypoint < 2 || (level.waypoint < 3 && level.created.after(Millis::new(500)) < now)
+        if level.waypoint < crate::movement::WaypointIndex::of_data(2)
+            || (level.waypoint < crate::movement::WaypointIndex::of_data(3)
+                && level.created.after(Millis::new(500)) < now)
         {
             for &hit in hits {
                 let Some((id, other)) = met(hit)? else {

@@ -21,6 +21,7 @@ use crate::movement::PathData;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::master_type::COMBAT;
@@ -644,7 +645,7 @@ fn move_level(
         level.created = world_time;
         level.range = range;
         level.target = target;
-        level.waypoint = 1;
+        level.waypoint = WaypointIndex::SECOND;
         level.state = PathState::WantsPath;
         level.continue_counter = CONTINUE;
     }

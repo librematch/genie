@@ -70,6 +70,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`unit.rs`](unit.rs) | The movement actions in a unit's update: the velocity step, the unit's own `MoveTo`, its Explore and a bird's Fly. |
 | [`walk.rs`](walk.rs) | The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed control. |
 | [`waypoint.rs`](waypoint.rs) | A reached waypoint and what follows it: the next waypoint, a level's end and the moving state. |
+| [`waypoint_index.rs`](waypoint_index.rs) | A waypoint's place in a level's path. |
 | [`waypoint_level.rs`](waypoint_level.rs) | A path level's place in a unit's path data. |
 | [`move_to/`](move_to/) | The `MoveTo` action (`RGE_Action_Move_To`, type 1, vtable `0x142ed6030`): a unit walks to a target object or a point. |
 <!-- /files -->

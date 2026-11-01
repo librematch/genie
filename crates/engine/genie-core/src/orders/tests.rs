@@ -3619,7 +3619,7 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
             adjusted_idle_timeout: Millis::new(2000),
             secondary_timer: Millis::new(3000),
             patrol_path: Some(crate::unit_ai::PatrolPath::default()),
-            patrol_waypoint: 2,
+            patrol_waypoint: crate::movement::WaypointIndex::of_data(2),
             ..crate::unit_ai::UnitAi::default()
         });
     }
@@ -3761,7 +3761,10 @@ fn a_lone_unit_patrols_to_its_waypoint() {
         (ai.idle_timer, ai.adjusted_idle_timeout, ai.secondary_timer),
         (Millis::ZERO, Millis::new(750), Millis::new(750))
     );
-    assert_eq!((ai.patrol_path.is_none(), ai.patrol_waypoint), (true, 0));
+    assert_eq!(
+        (ai.patrol_path.is_none(), ai.patrol_waypoint.get()),
+        (true, 0)
+    );
     assert_eq!(t.groups.commands, Differentiator::of_data(1));
 }
 

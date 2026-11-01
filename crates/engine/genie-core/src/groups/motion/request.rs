@@ -15,6 +15,7 @@ use crate::math::fmath::BVector;
 use crate::movement::CONTINUE;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
     LongWalker, PathData, TileAsk, long_path_for, short_path_for, tile_plan_for,
@@ -86,12 +87,13 @@ pub(super) fn request(
         tile_plan(lead, world, &leg, target, &mut plan)?;
     }
     let level = motion.paths.checked(0)?;
-    let (short_range, beyond) =
-        if leg.level == WaypointLevel::TOP && level.points.len() as i32 == level.waypoint + 1 {
-            (leg.range, leg.way - leg.range.get())
-        } else {
-            (Distance::ZERO, leg.way)
-        };
+    let (short_range, beyond) = if leg.level == WaypointLevel::TOP
+        && level.waypoint == WaypointIndex::last_of(level.points.len())
+    {
+        (leg.range, leg.way - leg.range.get())
+    } else {
+        (Distance::ZERO, leg.way)
+    };
     let mut long = false;
     if !plan.has_plan || plan.path.points.len() < 3 {
         if leg.way <= SHORT_REACH
@@ -288,7 +290,7 @@ fn in_range(
 ) -> Result<Pass, GenieError> {
     if reach < Distance::new(target_gap2.get()) {
         let level = motion.paths.checked(0)?;
-        if level.waypoint == level.points.len() as i32 - 1 && level.created == now {
+        if level.waypoint == WaypointIndex::last_of(level.points.len()) && level.created == now {
             motion.stand();
             reset_level(&mut motion.paths)?;
             motion.paths.checked_mut(0)?.state = PathState::GaveUp;
@@ -397,7 +399,7 @@ pub(super) fn link(
     if (level.level == WaypointLevel::TOP && !found) || path.points.len() < 2 {
         if !found {
             if level.continue_counter < LAST_TRIES {
-                if level.points.len() as i32 - 1 <= level.waypoint {
+                if level.waypoint.at_or_past_last(level.points.len()) {
                     let patrols = lead.group.as_ref().is_some_and(LeadGroup::patrols);
                     if level.path_flags.contains(PathFlags::LOOPS) || patrols {
                         motion.paths.checked_mut(0)?.pause_time = PATROL_PAUSE;
@@ -406,7 +408,7 @@ pub(super) fn link(
                     let top_has_more = motion
                         .paths
                         .last()
-                        .is_some_and(|t| t.has_path && t.waypoint < t.points.len() as i32 - 1);
+                        .is_some_and(|t| t.has_path && !t.waypoint.at_or_past_last(t.points.len()));
                     if level.level < WaypointLevel::TOP && top_has_more {
                         motion.paths.checked_mut(0)?.state = PathState::Unplanned;
                         return Ok(Some(Pass::Next));
@@ -441,7 +443,7 @@ pub(super) fn link(
         created: now,
         range,
         target,
-        waypoint: 1,
+        waypoint: WaypointIndex::SECOND,
         state: if top && planned {
             PathState::WantsPath
         } else {

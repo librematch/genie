@@ -31,7 +31,7 @@ pub(super) const fn top_level(paths: &[PathData]) -> Option<&PathData> {
 pub fn on_last_high_level_waypoint(paths: &[PathData]) -> bool {
     top_level(paths)
         .filter(|t| t.has_path)
-        .is_some_and(|t| t.points.len() as i32 - 1 <= t.waypoint)
+        .is_some_and(|t| t.waypoint.at_or_past_last(t.points.len()))
 }
 
 /// `FUN_141046500`: the path of the walked level's top ancestor, or, without one, the walked

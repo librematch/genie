@@ -11,6 +11,7 @@ use crate::movement::LevelFlags;
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
     CLOSE, EPSILON, Goal, LOOK_AHEAD, Me, Motion, Mover, Next, PathData, RANGE_FLOOR,
@@ -48,13 +49,13 @@ impl Mover {
         }
         let level = &mut self.paths[0];
         level.flags &= !LevelFlags::REACHED;
-        level.waypoint += 1;
+        level.waypoint = level.waypoint.next();
         drop_edge_waypoints(level, self.stats.radius, world.map);
         if level.path_flags.contains(PathFlags::LOOPS) {
-            let reached = level.waypoint - 1;
+            let reached = level.waypoint.previous();
             level.waypoint = level.looping_next(reached);
             level.state = PathState::WantsPath;
-            return Ok(if level.waypoint == 0 {
+            return Ok(if level.waypoint == WaypointIndex::FIRST {
                 Next::LoopEnd
             } else {
                 Next::Dispatch
@@ -73,7 +74,7 @@ impl Mover {
         }
         // LAB_14115192d
         let level = &self.paths[0];
-        let left = point_or_zero_of(level, level.waypoint - 1);
+        let left = point_or_zero_of(level, level.waypoint.previous());
         let back = footprint_gap(
             self.position(),
             ground_radius,
@@ -97,7 +98,7 @@ impl Mover {
             beyond = Distance::ZERO;
         }
         let level = &mut self.paths[0];
-        if level.waypoint < level.points.len() as i32 {
+        if level.waypoint.within(level.points.len()) {
             if level.level != WaypointLevel::WALKED {
                 level.state = PathState::WantsPath;
             }
@@ -109,7 +110,7 @@ impl Mover {
                 || level.level == WaypointLevel::WALKED)
         {
             if EPSILON <= back.get() {
-                level.waypoint -= 1;
+                level.waypoint = level.waypoint.previous();
                 level.state = PathState::WantsPath;
                 return Ok(Next::Dispatch);
             }
@@ -131,7 +132,7 @@ impl Mover {
         now: WorldTime,
     ) -> Result<(), GenieError> {
         let level = &self.paths[0];
-        if level.waypoint < level.points.len() as i32 {
+        if level.waypoint.within(level.points.len()) {
             let p = level.point(level.waypoint);
             let at = self.set_position(p.position(), world.map);
             let at = self.grounded(at, world.terrain.as_ref());
@@ -153,14 +154,14 @@ impl Mover {
     /// A frozen object the query may meet.
     pub(super) fn drop_held_waypoint(&mut self, world: &Spatial) -> Result<(), GenieError> {
         let level = &self.paths[0];
-        let next = level.waypoint + 1;
-        if level.level == WaypointLevel::WALKED || level.points.len() as i32 <= next {
+        let next = level.waypoint.next();
+        if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
             return Ok(());
         }
-        let d = fmath::sub(self.position().vector(), level.points[next as usize]);
+        let d = fmath::sub(self.position().vector(), level.points[next.get() as usize]);
         // a NaN distance is not within
         if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() < TARGET_SHORT_REACH {
-            let [x, _, y] = (level.points[level.waypoint as usize]).get();
+            let [x, _, y] = (level.points[level.waypoint.get() as usize]).get();
             let ignore = world.manager_ignore();
             if world.object_holds(Point::new(x, y), world.manager_grow(), &ignore, false)? {
                 let level = &mut self.paths[0];
@@ -216,18 +217,18 @@ impl Mover {
         let parent = &self.paths[1];
         // the motion step's place of the unit: +0x824, where it last moved to
         let at = self.moved_at.vector();
-        let last = parent.points.len() as i32 - 1;
+        let last = WaypointIndex::last_of(parent.points.len());
         let from = parent.waypoint;
-        let mut k = (from + 5).min(last);
+        let mut k = from.ahead(5).min(last);
         while from < k {
-            let p = parent.points[k as usize];
+            let p = parent.points[k.get() as usize];
             let d = fmath::sub(p, at);
             if d.x() * d.x() + 0.0 + d.y() * d.y() <= LOOK_AHEAD
                 && self.straight(me, p, target, world)?
             {
                 break;
             }
-            k -= 1;
+            k = k.previous();
         }
         if k == from {
             return Ok(false);

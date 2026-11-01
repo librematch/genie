@@ -54,6 +54,7 @@ mod path_state;
 pub use self::move_algorithm::MoveAlgorithm;
 pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;
+pub use self::waypoint_index::WaypointIndex;
 mod request;
 mod request_plans;
 mod speed;
@@ -66,6 +67,7 @@ pub use self::step::GroupSpeed;
 mod unit;
 mod walk;
 mod waypoint;
+mod waypoint_index;
 mod waypoint_level;
 pub use self::waypoint_level::WaypointLevel;
 
@@ -114,7 +116,7 @@ pub struct PathAsk {
     pub back_and_forth: bool,
     /// `param_9`: the waypoint of the saved patrol the unit walks on from, −1 for a new path from
     /// the unit to the goal.
-    pub resume: i32,
+    pub resume: WaypointIndex,
     /// `param_10`: 1 (`Some(true)`) the unit attack-moves (`+0x7fb`) and the path does not loop,
     /// 0 it no longer does, 2 (`None`) it stays as it was.
     pub attack_move: Option<bool>,
@@ -126,7 +128,7 @@ impl Default for PathAsk {
             ends_in_range: true,
             patrol: false,
             back_and_forth: false,
-            resume: -1,
+            resume: WaypointIndex::NONE,
             attack_move: None,
         }
     }
@@ -148,7 +150,7 @@ pub struct PathData {
     /// The path's own flags (`+0xc`).
     pub path_flags: PathFlags,
     /// `+0x24`: the index of the waypoint the unit walks to.
-    pub waypoint: i32,
+    pub waypoint: WaypointIndex,
     /// `+0x28`: its state.
     pub state: PathState,
     /// `+0x2c`: how near the target counts as there.
@@ -416,26 +418,31 @@ impl PathData {
     /// its last; a path that goes back and forth ([`PathFlags::BACK_AND_FORTH`]) turns at its
     /// ends: at its first point it goes forward again ([`PathFlags::FORWARD`] set), at its last
     /// back (cleared). The units' and the groups' walks both take it.
-    pub(crate) fn looping_next(&mut self, index: i32) -> i32 {
-        let n = self.points.len() as i32;
+    pub(crate) fn looping_next(&mut self, index: WaypointIndex) -> WaypointIndex {
+        let n = self.points.len();
         if !self.path_flags.contains(PathFlags::LOOPS) {
-            return -1;
+            return WaypointIndex::NONE;
         }
         if !self.path_flags.contains(PathFlags::BACK_AND_FORTH) {
-            return if index + 1 < n { index + 1 } else { 0 };
+            let next = index.next();
+            return if next.within(n) {
+                next
+            } else {
+                WaypointIndex::FIRST
+            };
         }
         if self.path_flags.contains(PathFlags::FORWARD) {
-            let next = index + 1;
-            if n <= next {
+            let next = index.next();
+            if !next.within(n) {
                 self.path_flags.remove(PathFlags::FORWARD);
-                return n - 2;
+                return WaypointIndex::last_of(n).previous();
             }
             next
         } else {
-            let next = index - 1;
-            if next < 0 {
+            let next = index.previous();
+            if next < WaypointIndex::FIRST {
                 self.path_flags.insert(PathFlags::FORWARD);
-                return 1;
+                return WaypointIndex::SECOND;
             }
             next
         }
@@ -455,7 +462,7 @@ impl PathData {
             points: Vec::new(),
             has_path: true,
             path_flags: PathFlags::NEW,
-            waypoint: 0,
+            waypoint: WaypointIndex::FIRST,
             state: PathState::Idle,
             range: Distance::ZERO,
             target: None,
@@ -480,7 +487,7 @@ impl PathData {
             points: Vec::new(),
             has_path: false,
             path_flags: PathFlags::NONE,
-            waypoint: 0,
+            waypoint: WaypointIndex::FIRST,
             state: PathState::Idle,
             range: Distance::ZERO,
             target: None,
@@ -497,9 +504,9 @@ impl PathData {
 
     /// The waypoint at `index` (`FUN_140f9bcd0`); outside the path the game returns its static
     /// point `DAT_143f0dc88` ([`OUTSIDE_PATH`]).
-    fn point(&self, index: i32) -> BVector {
-        usize::try_from(index)
-            .ok()
+    fn point(&self, index: WaypointIndex) -> BVector {
+        index
+            .slot()
             .and_then(|i| self.points.get(i))
             .copied()
             .unwrap_or(OUTSIDE_PATH)
@@ -509,7 +516,7 @@ impl PathData {
     /// the world's table by its id `+0x20`) has none (0); else waypoints after the current one:
     /// not `count - 1 <= waypoint` in 32 bits, so an empty path has more for a waypoint below -1.
     const fn has_more(&self) -> bool {
-        self.has_path && self.waypoint < self.points.len() as i32 - 1
+        self.has_path && !self.waypoint.at_or_past_last(self.points.len())
     }
 }
 
@@ -597,7 +604,7 @@ fn pause_rank(
 fn drop_edge_waypoints(level: &mut PathData, radius: Radii, map: GridSize) {
     let (rx, ry) = (radius.x(), radius.y());
     let (w, h) = (map.width(), map.height());
-    while level.waypoint < level.points.len() as i32 {
+    while level.waypoint.within(level.points.len()) {
         let [x, _, y] = level.point(level.waypoint).get();
         if rx <= x && ry <= y && x <= w as f32 - rx && y <= h as f32 - ry {
             break;
@@ -611,9 +618,9 @@ fn drop_edge_waypoints(level: &mut PathData, radius: Radii, map: GridSize) {
 
 /// `FUN_140f98d50`: a path's point `i` goes, the later ones move down (true); an index outside
 /// the path (below 0 or past its last point) changes nothing (false).
-fn remove_point(points: &mut Vec<BVector>, i: i32) -> bool {
-    match usize::try_from(i) {
-        Ok(k) if k < points.len() => {
+fn remove_point(points: &mut Vec<BVector>, i: WaypointIndex) -> bool {
+    match i.slot() {
+        Some(k) if k < points.len() => {
             let _ = points.remove(k);
             true
         }

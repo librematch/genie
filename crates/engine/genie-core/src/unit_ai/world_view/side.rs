@@ -51,7 +51,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         ))
     }
 
-    fn patrol_information(&self) -> Option<(crate::unit_ai::PatrolPath, i32)> {
+    fn patrol_information(
+        &self,
+    ) -> Option<(crate::unit_ai::PatrolPath, crate::movement::WaypointIndex)> {
         patrol_information(self.unit.body.mover())
     }
 

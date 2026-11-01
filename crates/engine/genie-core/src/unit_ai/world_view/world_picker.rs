@@ -512,7 +512,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
 /// a path at the top.
 pub(crate) fn patrol_information(
     mover: Option<&Mover>,
-) -> Option<(crate::unit_ai::PatrolPath, i32)> {
+) -> Option<(crate::unit_ai::PatrolPath, crate::movement::WaypointIndex)> {
     let top = mover?.paths.last().filter(|l| l.has_path)?;
     let mut path = crate::pathing::tile_path::Path::default();
     path.append(&crate::pathing::tile_path::Path {

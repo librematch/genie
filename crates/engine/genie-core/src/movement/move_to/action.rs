@@ -776,15 +776,24 @@ mod tests {
             (m.state, step.target_moved)
         };
         assert_eq!(
-            walked(Position::new(30.0, 88.0, 0.0), 1),
+            walked(
+                Position::new(30.0, 88.0, 0.0),
+                crate::movement::WaypointIndex::of_data(1)
+            ),
             (MoveTo::Moving, false)
         );
         assert_eq!(
-            walked(Position::new(36.0, 88.0, 0.0), 1),
+            walked(
+                Position::new(36.0, 88.0, 0.0),
+                crate::movement::WaypointIndex::of_data(1)
+            ),
             (MoveTo::Moving, false)
         );
         assert_eq!(
-            walked(Position::new(36.0, 88.0, 0.0), 0),
+            walked(
+                Position::new(36.0, 88.0, 0.0),
+                crate::movement::WaypointIndex::of_data(0)
+            ),
             (MoveTo::Start, true)
         );
     }

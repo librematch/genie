@@ -220,7 +220,7 @@ fn the_builder_s_flood_tests_left_right_below_above() {
 }
 
 impl UnitSide for Recorder {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn table_drop_site(&mut self) -> Result<Option<ObjectId>, GenieError> {
@@ -290,7 +290,7 @@ struct HelpSide {
 }
 
 impl UnitSide for HelpSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
@@ -575,7 +575,7 @@ fn a_call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
 struct OffSide(OffFootprint, Vec<(ObjectId, Footprint)>);
 
 impl UnitSide for OffSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -776,7 +776,7 @@ fn the_unit_ai_s_calls_reach_the_unit_in_their_order() {
 struct WaitSide(bool, Vec<ObjectId>);
 
 impl UnitSide for WaitSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn builds(&self, _: ObjectId) -> Result<bool, GenieError> {
@@ -1047,7 +1047,7 @@ struct ResourceSide {
 }
 
 impl UnitSide for ResourceSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn builds(&self, _: ObjectId) -> Result<bool, GenieError> {
@@ -1829,7 +1829,7 @@ struct LionSide {
 }
 
 impl UnitSide for LionSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -1950,13 +1950,13 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
 struct SoldierSide {
     found: i32,
     attacks: Vec<(ObjectId, bool)>,
-    patrol: Option<(PatrolPath, i32)>,
+    patrol: Option<(PatrolPath, crate::movement::WaypointIndex)>,
     /// Slot 0xa0 refuses every target.
     refuses: bool,
 }
 
 impl UnitSide for SoldierSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         self.patrol.clone()
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -2014,7 +2014,7 @@ struct DamageSide {
     attacks: Vec<ObjectId>,
     helps: Vec<ObjectId>,
     under_attack: Vec<bool>,
-    patrol: Option<(PatrolPath, i32)>,
+    patrol: Option<(PatrolPath, crate::movement::WaypointIndex)>,
     harmless: Vec<ObjectId>,
     defended: Option<NearestAttacker>,
 }
@@ -2067,7 +2067,7 @@ impl UnitSide for DamageSide {
     fn make_scout_map(&mut self) -> Result<(), GenieError> {
         Err(GenieError::unsupported("no world here"))
     }
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         self.patrol.clone()
     }
     fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
@@ -3271,7 +3271,10 @@ fn a_soldier_with_a_target_attacks_back_from_buildings_only() {
             units: vec![foe(7, class::CLASS_6), foe(9, class)],
             found: 7,
             reaches: true,
-            patrol: Some((PatrolPath::default(), 2)),
+            patrol: Some((
+                PatrolPath::default(),
+                crate::movement::WaypointIndex::of_data(2),
+            )),
             ..DamageSide::default()
         };
         let r = u
@@ -3298,7 +3301,7 @@ fn a_soldier_with_a_target_attacks_back_from_buildings_only() {
     let (r, u, attacks) = run(class::BUILDING, Some(OrderKind::Patrol));
     assert_eq!((r, attacks), (BREAK, vec![object_id(7)]));
     assert_eq!(u.current_order, None);
-    assert_eq!(u.patrol_waypoint, 2);
+    assert_eq!(u.patrol_waypoint.get(), 2);
     assert!(u.patrol_path.is_some());
     assert_eq!(u.secondary_timer, Millis::new(750));
     assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
@@ -4223,7 +4226,7 @@ fn a_new_building_unit_ai_draws_its_three_timers() {
             alert_mode: false,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
-            patrol_waypoint: 0,
+            patrol_waypoint: crate::movement::WaypointIndex::of_data(0),
             stop_after_kill: false,
             home: None,
             hunted: None,
@@ -4315,7 +4318,7 @@ impl ArtifactSide {
 }
 
 impl UnitSide for ArtifactSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
@@ -4370,7 +4373,7 @@ struct ScoutSide {
 }
 
 impl UnitSide for ScoutSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -5087,7 +5090,7 @@ fn an_order_redraws_an_adjusted_idle_timeout_of_750_or_more_and_caps_the_seconda
         adjusted_idle_timeout: Millis::new(2600),
         secondary_timer: Millis::new(900),
         patrol_path: Some(PatrolPath::default()),
-        patrol_waypoint: 3,
+        patrol_waypoint: crate::movement::WaypointIndex::of_data(3),
         ..idle(UnitAiType::SOLDIER)
     };
     let mut r = rng();
@@ -5097,7 +5100,7 @@ fn an_order_redraws_an_adjusted_idle_timeout_of_750_or_more_and_caps_the_seconda
         (Millis::new(7241 % 1500 + 2250), Millis::new(750))
     );
     // FUN_140c68de0 first: the patrol path and its waypoint go
-    assert_eq!((u.patrol_path, u.patrol_waypoint), (None, 0));
+    assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (None, 0));
     let mut low = UnitAi {
         idle_timeout: Millis::new(3000),
         adjusted_idle_timeout: Millis::new(749),
@@ -8296,7 +8299,7 @@ struct StandSide {
 }
 
 impl UnitSide for StandSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -8995,7 +8998,7 @@ fn a_patrol_order_s_path_loops_and_turns_back_from_three_tiles() {
             ends_in_range: false,
             patrol: true,
             back_and_forth: false,
-            resume: -1,
+            resume: crate::movement::WaypointIndex::of_data(-1),
             attack_move: Some(false),
         }
     );
@@ -9023,15 +9026,15 @@ fn a_saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
             flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
             ..PatrolPath::default()
         }),
-        patrol_waypoint: 2,
+        patrol_waypoint: crate::movement::WaypointIndex::of_data(2),
         ..idle(UnitAiType::SOLDIER)
     };
     let ask = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(20.5, 20.0));
     assert_eq!(
-        (ask.resume, ask.back_and_forth, ask.attack_move),
+        (ask.resume.get(), ask.back_and_forth, ask.attack_move),
         (2, true, Some(false))
     );
-    assert_eq!((u.patrol_path, u.patrol_waypoint), (None, 0));
+    assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (None, 0));
 }
 
 /// A human player's soldier walking its patrol (711 with the move action, its `MoveTo` the
@@ -9103,7 +9106,7 @@ fn a_patrol_saves_itself_and_attacks_what_it_finds() {
     let mut side = SoldierSide {
         found: 77,
         attacks: Vec::new(),
-        patrol: Some((saved.clone(), 2)),
+        patrol: Some((saved.clone(), crate::movement::WaypointIndex::of_data(2))),
         refuses: false,
     };
     let mut r = rng();
@@ -9122,7 +9125,7 @@ fn a_patrol_saves_itself_and_attacks_what_it_finds() {
         (u.current_order, u.last_order),
         (None, Some(OrderKind::Wait))
     );
-    assert_eq!((u.patrol_path, u.patrol_waypoint), (Some(saved), 2));
+    assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (Some(saved), 2));
     assert_eq!(u.secondary_timer, Millis::new(750));
     assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
     assert!(0 < r.draws);
@@ -9257,11 +9260,14 @@ fn a_soldier_s_idle_check_holds_its_target_with_retargeting_off() {
     let (mut u, at) = patroller(0);
     let mut s = SoldierSide {
         refuses: true,
-        patrol: Some((PatrolPath::default(), 3)),
+        patrol: Some((
+            PatrolPath::default(),
+            crate::movement::WaypointIndex::of_data(3),
+        )),
         ..side(77)
     };
     assert_eq!(idle(&mut u, &at, &mut s, false), Ok(false));
-    assert_eq!((&u.patrol_path, u.patrol_waypoint), (&None, 0));
+    assert_eq!((&u.patrol_path, u.patrol_waypoint.get()), (&None, 0));
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
     at.task_0x69 = true;
@@ -9978,7 +9984,7 @@ struct ShipSide {
 }
 
 impl UnitSide for ShipSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn builds(&self, _: ObjectId) -> Result<bool, GenieError> {
@@ -10633,7 +10639,7 @@ struct SiegeSide {
 }
 
 impl UnitSide for SiegeSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -10958,7 +10964,7 @@ struct TailSide {
 }
 
 impl UnitSide for TailSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -11596,7 +11602,7 @@ impl OrderSide {
 }
 
 impl UnitSide for OrderSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -13136,7 +13142,7 @@ impl RetargetSide {
 }
 
 impl UnitSide for RetargetSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         self.soldier.patrol_information()
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {

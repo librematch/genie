@@ -81,7 +81,7 @@ fn level(level: u8, points: &[Point], waypoint: i32, state: PathState) -> PathDa
             .collect(),
         has_path: true,
         path_flags: PathFlags::NEW,
-        waypoint,
+        waypoint: WaypointIndex::of_data(waypoint),
         state,
         ..PathData::without_path()
     }
@@ -150,7 +150,7 @@ fn the_walked_levels_below_the_high_level_go() {
     assert_eq!(m.paths.len(), 1);
     let l = &m.paths[0];
     assert_eq!(
-        (l.level.get(), l.waypoint, l.state, l.continue_counter),
+        (l.level.get(), l.waypoint.get(), l.state, l.continue_counter),
         (2, 1, PathState::WantsPath, 10)
     );
     assert_eq!(l.points.len(), 3);
@@ -223,16 +223,37 @@ fn a_looping_path_goes_round_or_back_and_forth() {
         0,
         PathState::WantsPath,
     );
-    assert_eq!(l.looping_next(0), -1);
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(0)),
+        WaypointIndex::of_data(-1)
+    );
     l.path_flags = PathFlags::LOOPS;
-    assert_eq!(l.looping_next(1), 2);
-    assert_eq!(l.looping_next(2), 0);
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(1)),
+        WaypointIndex::of_data(2)
+    );
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(2)),
+        WaypointIndex::of_data(0)
+    );
     l.path_flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH;
-    assert_eq!(l.looping_next(1), 0);
-    assert_eq!(l.looping_next(0), 1);
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(1)),
+        WaypointIndex::of_data(0)
+    );
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(0)),
+        WaypointIndex::of_data(1)
+    );
     assert_eq!(l.path_flags & PathFlags::FORWARD, PathFlags::FORWARD);
-    assert_eq!(l.looping_next(1), 2);
-    assert_eq!(l.looping_next(2), 1);
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(1)),
+        WaypointIndex::of_data(2)
+    );
+    assert_eq!(
+        l.looping_next(WaypointIndex::of_data(2)),
+        WaypointIndex::of_data(1)
+    );
     assert_eq!(l.path_flags & PathFlags::FORWARD, PathFlags::NONE);
 }
 
@@ -631,7 +652,12 @@ fn a_top_level_without_a_planner_plans_the_straight_way() {
     assert_eq!(m.paths.len(), 2);
     let (new, top) = (&m.paths[0], &m.paths[1]);
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type, new.waypoint),
+        (
+            new.level.get(),
+            new.state,
+            new.linked_type,
+            new.waypoint.get()
+        ),
         (1, PathState::WantsPath, 1, 1)
     );
     assert_eq!(
@@ -848,7 +874,7 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
         (vec![PathData::without_path()], 0.0)
     );
     let mut m = at(2, &last, 2);
-    m.paths[0].waypoint = 0;
+    m.paths[0].waypoint = WaypointIndex::of_data(0);
     assert!(matches!(end(&mut m, &lead(), false), Some(Pass::Reached)));
     let mut m = at(2, &last, 3);
     assert!(matches!(
@@ -887,7 +913,7 @@ fn a_reached_waypoint_moves_the_level_on() {
     assert_eq!(
         (
             l.flags & (LevelFlags::REACHED | LevelFlags::AT_WAYPOINT),
-            l.waypoint,
+            l.waypoint.get(),
             l.state
         ),
         (LevelFlags::NONE, 2, PathState::WantsPath)
@@ -895,14 +921,14 @@ fn a_reached_waypoint_moves_the_level_on() {
     m.paths = vec![level(0, &three, 1, PathState::Walking)];
     reached(&mut m, None).unwrap();
     assert_eq!(
-        (m.paths[0].waypoint, m.paths[0].state),
+        (m.paths[0].waypoint.get(), m.paths[0].state),
         (2, PathState::Walking)
     );
     m.paths = vec![level(1, &three, 2, PathState::Walking)];
     m.paths[0].path_flags = PathFlags::LOOPS;
     reached(&mut m, None).unwrap();
     assert_eq!(
-        (m.paths[0].waypoint, m.paths[0].state),
+        (m.paths[0].waypoint.get(), m.paths[0].state),
         (0, PathState::WantsPath)
     );
 }
@@ -922,7 +948,7 @@ fn past_its_last_waypoint_a_level_steps_back_or_arrived() {
         m.paths[0].flags = LevelFlags::from_bits_retain(flags);
         reached(&mut m, target).unwrap();
         (
-            m.paths[0].waypoint,
+            m.paths[0].waypoint.get(),
             m.paths[0].state,
             m.paths[0].flags & LevelFlags::MET_TARGET,
         )
@@ -1006,7 +1032,7 @@ fn an_arrived_level_hands_over_by_its_link() {
         m.paths = vec![walked, parent];
         assert!(matches!(fx.pass(&mut m, lead), Pass::Next));
         assert_eq!(m.paths.len(), 1);
-        (m.paths[0].waypoint, m.paths[0].state)
+        (m.paths[0].waypoint.get(), m.paths[0].state)
     };
     assert_eq!(
         handed(&mut fx, 2, PathFlags::LOOPS, &lead(), 1),
@@ -1037,7 +1063,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     fx.spatial.insert(object_id(7), target_at(6.0));
     assert!(matches!(fx.pass(&mut m, &lead), Pass::Reached));
     assert_eq!(
-        (m.paths[0].waypoint, m.paths[0].state),
+        (m.paths[0].waypoint.get(), m.paths[0].state),
         (1, PathState::WantsPath)
     );
 }

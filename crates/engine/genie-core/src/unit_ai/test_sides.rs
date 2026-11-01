@@ -120,7 +120,7 @@ impl UnitSide for Vec<Effect> {
         Err(NO_WORLD)
     }
 
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
 }
@@ -231,7 +231,7 @@ impl UnitSide for With<'_> {
         self.side.make_scout_map()
     }
 
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         self.side.patrol_information()
     }
 

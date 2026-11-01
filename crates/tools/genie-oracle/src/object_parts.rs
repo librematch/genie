@@ -7,6 +7,7 @@ use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::Position;
 use genie_core::movement::PathFlags;
+use genie_core::movement::WaypointIndex;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteFlags;
@@ -151,7 +152,7 @@ pub(super) fn unit_ai(
         alert_mode: ai.alert_mode_value != 0,
         time_since_enemy: Seconds::new(ai.time_since_enemy_sighting),
         patrol_path: patrol_path(ai),
-        patrol_waypoint: ai.patrol_current_waypoint,
+        patrol_waypoint: WaypointIndex::of_data(ai.patrol_current_waypoint),
         stop_after_kill: ai.stop_after_target_killed_value != 0,
         home: home(combat),
         hunted: None,

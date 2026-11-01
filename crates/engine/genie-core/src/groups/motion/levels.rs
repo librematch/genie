@@ -43,9 +43,9 @@ pub(super) fn reset_level(paths: &mut Vec<PathData>) -> Result<(), GenieError> {
 }
 
 /// The waypoint at `index` (`FUN_140f9bcd0`), the game's static zero point outside the path.
-pub(super) fn point(level: &PathData, index: i32) -> BVector {
-    usize::try_from(index)
-        .ok()
+pub(super) fn point(level: &PathData, index: crate::movement::WaypointIndex) -> BVector {
+    index
+        .slot()
         .and_then(|i| level.points.get(i))
         .copied()
         .unwrap_or(BVector::ZERO)

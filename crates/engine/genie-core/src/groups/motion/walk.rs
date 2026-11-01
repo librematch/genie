@@ -194,7 +194,10 @@ fn walk_ends(
                 && NEAR < level.range.get()
                 && let Some(top) = top
             {
-                let end = point(top, top.points.len() as i32 - 1);
+                let end = point(
+                    top,
+                    crate::movement::WaypointIndex::last_of(top.points.len()),
+                );
                 let d = fmath::sub(at, end);
                 let gap = fmath::sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
                 if gap - level.range.get() < EPSILON {

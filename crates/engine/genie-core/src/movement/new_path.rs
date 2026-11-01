@@ -10,6 +10,7 @@ use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
     AfterRequest, CONTINUE, LONG_PATHER, Me, Mover, PathData, Planning, RANGE_FLOOR, ReachAsk,
@@ -48,7 +49,7 @@ impl Mover {
         }
         let level = &mut self.paths[0];
         if !found || level.range < Distance::new(to_end) {
-            if level.points.len() as i32 - 1 <= level.waypoint {
+            if level.waypoint.at_or_past_last(level.points.len()) {
                 if 0 < level.continue_counter {
                     // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
                     // (slot 0x5d0); the step returns 0
@@ -97,7 +98,7 @@ impl Mover {
         level.continue_counter = CONTINUE;
         new.range = level.range;
         new.target = level.target;
-        new.waypoint = 1;
+        new.waypoint = WaypointIndex::SECOND;
         if level.level == WaypointLevel::TOP && planned {
             new.length = path.length;
             new.points = path.points;

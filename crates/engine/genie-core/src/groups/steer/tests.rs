@@ -556,7 +556,7 @@ fn a_blocked_way_to_the_slot_goes_round() {
             m.paths.len(),
             walked.level.get(),
             walked.state,
-            walked.waypoint,
+            walked.waypoint.get(),
             walked.target
         ),
         (1, 0, PathState::Walking, 1, None)

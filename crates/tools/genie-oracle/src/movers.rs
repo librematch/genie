@@ -13,6 +13,7 @@ use genie_core::movement::LevelFlags;
 use genie_core::movement::MoveAlgorithm;
 use genie_core::movement::PathFlags;
 use genie_core::movement::Speed;
+use genie_core::movement::WaypointIndex;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
 use genie_core::objects::masters::FlyMode;
@@ -130,7 +131,7 @@ pub(super) fn path_level(
         points: path.map_or_else(Vec::new, |p| p.m_waypoints.iter().map(vec3).collect()),
         has_path: path.is_some(),
         path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_m_bits)),
-        waypoint: d.waypoint,
+        waypoint: WaypointIndex::of_data(d.waypoint),
         state: genie_core::movement::PathState::of_int(d.state)?,
         range: Distance::new(d.range),
         target: ObjectId::of_field(d.target_id),

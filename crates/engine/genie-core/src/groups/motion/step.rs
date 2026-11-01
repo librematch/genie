@@ -150,8 +150,8 @@ pub(super) fn pass(
                     parent.waypoint = parent.looping_next(w);
                 }
                 if patrols {
-                    parent.waypoint += 1;
-                    if parent.points.len() as i32 <= parent.waypoint {
+                    parent.waypoint = parent.waypoint.next();
+                    if !parent.waypoint.within(parent.points.len()) {
                         parent.state = PathState::Arrived;
                     }
                 }
@@ -179,8 +179,8 @@ pub(super) fn pass(
 pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<(), GenieError> {
     let level = motion.paths.checked(0)?;
     if level.flags.contains(LevelFlags::AT_WAYPOINT) {
-        if level.waypoint < level.points.len() as i32 {
-            let p = *level.points.checked(level.waypoint as usize)?;
+        if level.waypoint.within(level.points.len()) {
+            let p = *level.points.checked(level.waypoint.get() as usize)?;
             motion.new_position[0] = p;
             motion.position[0] = p;
         }
@@ -189,8 +189,8 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
     set_flag(&mut motion.paths, LevelFlags::REACHED, false);
     let at = motion.position[0];
     let level = motion.paths.checked_mut(0)?;
-    level.waypoint += 1;
-    let left = level.waypoint - 1;
+    level.waypoint = level.waypoint.next();
+    let left = level.waypoint.previous();
     if level.path_flags.contains(PathFlags::LOOPS) {
         level.waypoint = level.looping_next(left);
         level.state = PathState::WantsPath;
@@ -216,7 +216,7 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
         set_flag(&mut motion.paths, LevelFlags::MET_TARGET, false);
     }
     let level = motion.paths.checked_mut(0)?;
-    if level.waypoint < level.points.len() as i32 {
+    if level.waypoint.within(level.points.len()) {
         if level.level != WaypointLevel::WALKED {
             level.state = PathState::WantsPath;
         }
@@ -224,7 +224,7 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
         && (target.is_some() || CLOSE <= beyond || level.level == WaypointLevel::WALKED)
         && EPSILON <= d
     {
-        level.waypoint -= 1;
+        level.waypoint = level.waypoint.previous();
         level.state = PathState::WantsPath;
     } else {
         level.state = PathState::Arrived;

@@ -10,6 +10,7 @@ use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::movement::{
@@ -184,7 +185,9 @@ impl Mover {
             return Ok(None);
         }
         if WaypointLevel::PLANNED < level.level || !top_has_more {
-            if level.level == WaypointLevel::TOP && level.waypoint < level.points.len() as i32 - 1 {
+            if level.level == WaypointLevel::TOP
+                && !level.waypoint.at_or_past_last(level.points.len())
+            {
                 level.flags |= LevelFlags::REACHED;
                 level.continue_counter = CONTINUE;
                 return Ok(Some(AfterRequest::Again));
@@ -203,7 +206,7 @@ impl Mover {
     pub(super) fn straight_way(&self, position: BVector, np: &mut NewPath) {
         let level = &self.paths[0];
         let _ = np.path.insert(0, position);
-        let to = if level.waypoint < level.points.len() as i32 {
+        let to = if level.waypoint.within(level.points.len()) {
             level.point(level.waypoint)
         } else {
             position
@@ -263,7 +266,10 @@ impl Mover {
             self.stop()?;
             return Ok(None);
         }
-        let end = ground(waypoint, point_or_zero(path, path.points.len() as i32 - 1));
+        let end = ground(
+            waypoint,
+            point_or_zero(path, WaypointIndex::last_of(path.points.len())),
+        );
         if way < end {
             path.points.clear();
             path.length = Distance::ZERO;
@@ -350,7 +356,7 @@ impl Mover {
             return true;
         }
         level.target.is_some()
-            && level.points.len() as i32 == level.waypoint + 1
+            && level.waypoint == WaypointIndex::last_of(level.points.len())
             && way - level.range <= Distance::new(SHORT_REACH)
             && level.level == WaypointLevel::TOP
     }

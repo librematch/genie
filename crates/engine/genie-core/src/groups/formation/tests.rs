@@ -907,7 +907,7 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
         points: points.to_vec(),
         has_path: !points.is_empty(),
         path_flags: PathFlags::from_bits_retain(flags),
-        waypoint,
+        waypoint: crate::movement::WaypointIndex::of_data(waypoint),
         state: PathState::Idle,
         range: Distance::ZERO,
         target: None,
@@ -989,7 +989,7 @@ fn the_last_high_level_waypoint_is_the_top_levels_last_point() {
     assert!(on_last_high_level_waypoint(&[walked.clone(), top.clone()]));
     assert!(!on_last_high_level_waypoint(std::slice::from_ref(&top)));
     let mut early = top;
-    early.waypoint = 1;
+    early.waypoint = crate::movement::WaypointIndex::of_data(1);
     assert!(!on_last_high_level_waypoint(&[walked.clone(), early]));
     assert!(!on_last_high_level_waypoint(&[walked, level(&[], 5, 0)]));
 }

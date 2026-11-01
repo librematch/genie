@@ -166,7 +166,7 @@ pub trait UnitSide {
     /// The unit's slot 0x468 (`FUN_141157c50`, `getPatrolInformation`): a copy of its top path
     /// (`FUN_140f960f0`; `FUN_140f95c00` into a new path: its points, its length, its flags) and
     /// the waypoint of its top level (`+0x24`); None without one.
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)>;
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)>;
 
     /// The builder's search for another foundation (`FUN_140c1c7c0`), None when it finds none.
     ///
@@ -546,7 +546,7 @@ impl<F: FnMut(&Search<'_>) -> Result<Found, GenieError>> UnitSide for F {
 
     /// A side of searches alone stands for no unit with movement state, whose slot 0x468 (the
     /// static object's) holds no path.
-    fn patrol_information(&self) -> Option<(PatrolPath, i32)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
         None
     }
 }

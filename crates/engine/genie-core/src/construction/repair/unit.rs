@@ -167,8 +167,9 @@ impl Unit {
         let ai = self.ai.as_ref()?;
         let saved = ai.patrol_path.as_ref()?;
         let points = saved.path.points.clone();
-        let w = usize::try_from(ai.patrol_waypoint)
-            .ok()
+        let w = ai
+            .patrol_waypoint
+            .slot()
             .and_then(|i| points.get(i))
             .copied()
             .unwrap_or(BVector::ZERO);
