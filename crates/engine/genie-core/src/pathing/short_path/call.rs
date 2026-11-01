@@ -12,7 +12,7 @@ use crate::pathing::FixedRect;
 use crate::pathing::ShapeId;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::short_path::{
-    Ctx, FixedPoint, Goal, NONE, Search, TO_FIXED, TO_FLOAT, clip, tile_of,
+    Ctx, FixedPoint, Goal, NodeIndex, Search, TO_FIXED, TO_FLOAT, clip, tile_of,
 };
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
@@ -368,8 +368,8 @@ impl Pather {
             open: Vec::new(),
             arena: Vec::new(),
             polys: Vec::new(),
-            goal_node: NONE,
-            best: 0,
+            goal_node: None,
+            best: NodeIndex::START,
         };
         let started = s.start(q.from);
         self.remove_terrain(mesh);
@@ -447,8 +447,8 @@ impl Pather {
             open: Vec::new(),
             arena: Vec::new(),
             polys: Vec::new(),
-            goal_node: NONE,
-            best: 0,
+            goal_node: None,
+            best: NodeIndex::START,
         };
         s.run(q.from)
     }

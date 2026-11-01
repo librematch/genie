@@ -4,7 +4,7 @@ use crate::pathing::FixedDistance;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    FixedPoint, Hit, Kind, NONE, Node, Search, TO_FIXED, TO_FLOAT, contact_point, in_box,
+    FixedPoint, Hit, Kind, Node, NodeIndex, Search, TO_FIXED, TO_FLOAT, contact_point, in_box,
     shrunk_corner, snap_to_side, strictly_inside, through_float, tile_of,
 };
 use crate::pathing::{ShapeId, ShapeSide};
@@ -59,8 +59,8 @@ impl Search<'_> {
         let start = Node {
             g: FixedDistance::ZERO,
             f: FixedDistance::new(f),
-            idx: self.arena.len() as u32,
-            parent: NONE,
+            idx: NodeIndex::next_of(&self.arena),
+            parent: None,
             at: p,
             kind: Kind::Start,
         };
@@ -78,15 +78,19 @@ impl Search<'_> {
         let n = self.open.checked_mut(0)?;
         let f = self.goal.heuristic(n.at).wrapping_add(n.g);
         n.f = f;
-        let idx = n.idx as usize;
-        self.arena.checked_mut(idx)?.f = f;
+        let idx = n.idx;
+        self.node_mut(idx)?.f = f;
         Ok(1)
     }
 
     /// `FUN_140fa4410`'s scan around a held start `p`: every side of every shape not ignored
     /// over the tiles under the corners of the box twice the radius out (each tile once, the map's
     /// only) gives its escape candidates ([`Search::escape_side`]), children of node `root`.
-    pub(super) fn escape_candidates(&mut self, p: FixedPoint, root: u32) -> Result<(), GenieError> {
+    pub(super) fn escape_candidates(
+        &mut self,
+        p: FixedPoint,
+        root: NodeIndex,
+    ) -> Result<(), GenieError> {
         let mesh = self.ctx.mesh;
         let w = mesh.width as i32;
         let total = mesh.width * mesh.width;
@@ -126,7 +130,7 @@ impl Search<'_> {
     pub(super) fn escape_side(
         &mut self,
         p: FixedPoint,
-        root: u32,
+        root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         rr2: i64,
     ) -> Result<(), GenieError> {
@@ -187,7 +191,7 @@ impl Search<'_> {
     pub(super) fn escape_foot(
         &mut self,
         p: FixedPoint,
-        root: u32,
+        root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         (a, e): (FixedPoint, FixedPoint),
     ) -> Result<(), GenieError> {
@@ -228,7 +232,7 @@ impl Search<'_> {
     pub(super) fn escape_contacts(
         &mut self,
         p: FixedPoint,
-        root: u32,
+        root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
         rr2: i64,
     ) -> Result<(), GenieError> {

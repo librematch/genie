@@ -2,7 +2,7 @@
 
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, NONE, NUDGES, Node,
+    Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, NONE, NUDGES, Node, NodeIndex,
     OPEN_CORNER_WITHOUT_EMIT, Poly, RECT_HEURISTIC, Search, ShortPath, T_START, TO_FIXED, TO_FLOAT,
     UNSET, WalkDir, cheb, corner_emits, float_distance, in_box, isqrt, through_float,
 };
@@ -12,7 +12,7 @@ use crate::{GenieError, math::fmath};
 
 /// What a polygon's re-walk keeps fixed: the node it comes from, the polygon and its vertex count.
 struct Rewalk {
-    parent: u32,
+    parent: NodeIndex,
     poly: u32,
     count: u32,
 }
@@ -203,7 +203,7 @@ impl Search<'_> {
         let mut t = range_point(self.goal.range, p, self.goal.at)?;
         let mut frac = T_START;
         let reach = n.g.wrapping_add(float_distance(t, p));
-        if self.goal_node != NONE && (reach >= self.arena.checked(self.goal_node as usize)?.g) {
+        if !self.beats_goal(reach)? {
             return Ok(());
         }
         let mut found = self
@@ -253,8 +253,8 @@ impl Search<'_> {
             emit: None,
         };
         let node = self.add(g, n.idx, t, kind);
-        if self.goal_node == NONE || node.g < self.arena.checked(self.goal_node as usize)?.g {
-            self.goal_node = node.idx;
+        if self.beats_goal(node.g)? {
+            self.goal_node = Some(node.idx);
         }
         Ok(())
     }
@@ -286,7 +286,8 @@ impl Search<'_> {
                 FixedPoint::new(step.wrapping_add(p.x()), p.y()),
                 Kind::Waypoint,
             );
-            if self.best == NONE || w.g < self.arena.checked(self.best as usize)?.g {
+            // the game's test of the best for none (−1) never holds: it starts as the start node
+            if w.g < self.node(self.best)?.g {
                 self.best = w.idx;
             }
             return Ok(());
@@ -322,24 +323,24 @@ impl Search<'_> {
             }
             _ => {}
         }
-        self.goal_node = NONE;
-        self.best = 0;
+        self.goal_node = None;
+        self.best = NodeIndex::START;
         while let Some(n) = self.open.pop() {
             if let Some(direct) = self.expand(n, start)? {
                 return Ok(direct);
             }
         }
-        let mut result = 1;
-        if self.goal_node == NONE {
-            result = 2;
-            self.goal_node = self.best;
-        }
+        // without a goal node in range, the best one
+        let (result, goal) = match self.goal_node {
+            Some(goal) => (1, goal),
+            None => (2, self.best),
+        };
+        self.goal_node = Some(goal);
         // the path from the goal back, without the root
         let mut pts: Vec<FixedPoint> = Vec::new();
-        let mut node = *self.arena.checked(self.goal_node as usize)?;
-        let mut is_root = node.parent == NONE;
-        while !is_root {
-            let parent = *self.arena.checked(node.parent as usize)?;
+        let mut node = *self.node(goal)?;
+        while let Some(up) = node.parent {
+            let parent = *self.node(up)?;
             match node.kind {
                 Kind::Corner {
                     poly, dir, lo, hi, ..
@@ -363,7 +364,6 @@ impl Search<'_> {
                 }
                 _ => pts.push(node.at),
             }
-            is_root = parent.parent == NONE;
             node = parent;
         }
         if res4410 == 0 {

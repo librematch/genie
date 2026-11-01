@@ -3,7 +3,7 @@
 
 use crate::GenieError;
 use crate::pathing::short_path::{
-    FixedPoint, Kind, NONE, Node, RECT_HEURISTIC, Search, Token, WalkDir,
+    FixedPoint, Kind, Node, NodeIndex, RECT_HEURISTIC, Search, Token, WalkDir,
 };
 use crate::pathing::{FixedDistance, FixedRect, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -14,7 +14,7 @@ pub(super) struct Corner {
     /// The cost to the corner.
     pub(super) cost: FixedDistance,
     /// The node it was reached from.
-    pub(super) parent: u32,
+    pub(super) parent: NodeIndex,
     /// The walk's direction round the polygon.
     pub(super) dir: WalkDir,
     /// The first vertex of the walked run.
@@ -48,7 +48,7 @@ pub(super) struct Foot {
     /// The cost at the edge's start.
     pub(super) start_cost: FixedDistance,
     /// The node it was reached from.
-    pub(super) parent: u32,
+    pub(super) parent: NodeIndex,
 }
 
 /// `FUN_140fa3bc0`: whether a polygon corner at `v` between sides `prev` and `next` emits a node
@@ -183,20 +183,39 @@ pub(super) const fn cheb(a: FixedPoint, b: FixedPoint) -> FixedDistance {
 }
 
 impl Search<'_> {
+    /// The node at `i`.
+    pub(super) fn node(&self, i: NodeIndex) -> Result<&Node, GenieError> {
+        self.arena.checked(i.get())
+    }
+
+    /// The node at `i`, to change.
+    pub(super) fn node_mut(&mut self, i: NodeIndex) -> Result<&mut Node, GenieError> {
+        self.arena.checked_mut(i.get())
+    }
+
+    /// No goal node yet, or `g` cheaper than the goal node's cost: the game's
+    /// `goal == -1 || g < arena[goal].g`.
+    pub(super) fn beats_goal(&self, g: FixedDistance) -> Result<bool, GenieError> {
+        Ok(match self.goal_node {
+            None => true,
+            Some(goal) => g < self.node(goal)?.g,
+        })
+    }
+
     /// Append a node to the arena (`FUN_140fa3fe0`, `FUN_140fa40d0`, `FUN_140fa4210`,
     /// `FUN_140fa4340`): `f = g + h(at)`.
     pub(super) fn add(
         &mut self,
         g: FixedDistance,
-        parent: u32,
+        parent: NodeIndex,
         at: FixedPoint,
         kind: Kind,
     ) -> Node {
         let n = Node {
             g,
             f: self.goal.heuristic(at).wrapping_add(g),
-            idx: self.arena.len() as u32,
-            parent,
+            idx: NodeIndex::next_of(&self.arena),
+            parent: Some(parent),
             at,
             kind,
         };
@@ -218,7 +237,7 @@ impl Search<'_> {
     pub(super) fn side_node(
         &mut self,
         g: FixedDistance,
-        parent: u32,
+        parent: NodeIndex,
         shape: ShapeId,
         side: ShapeSide,
         at: FixedPoint,
@@ -253,9 +272,9 @@ impl Search<'_> {
             poly,
             emit: None,
         };
-        let better = self.goal_node == NONE || g < self.arena.checked(self.goal_node as usize)?.g;
+        let better = self.beats_goal(g)?;
         if self.goal.range2 < d2 || !better {
-            let b = *self.arena.checked(self.best as usize)?;
+            let b = *self.node(self.best)?;
             let h = i64::from(b.f.wrapping_sub(b.g).get());
             if d2 < (h * h) >> 22 {
                 let n = self.add(g, parent, pt, kind);
@@ -264,7 +283,7 @@ impl Search<'_> {
             return Ok(false);
         }
         let n = self.add(g, parent, pt, kind);
-        self.goal_node = n.idx;
+        self.goal_node = Some(n.idx);
         Ok(true)
     }
 
@@ -313,13 +332,13 @@ impl Search<'_> {
     /// cheaper than the goal: the new goal (true); no cheaper than the goal: pruned (true).
     pub(super) fn pop_test(&mut self, n: &Node) -> Result<bool, GenieError> {
         let h = n.f.wrapping_sub(n.g);
-        let b = *self.arena.checked(self.best as usize)?;
+        let b = *self.node(self.best)?;
         if h < b.f.wrapping_sub(b.g) {
             self.best = n.idx;
         }
-        let better = self.goal_node == NONE || n.g < self.arena.checked(self.goal_node as usize)?.g;
+        let better = self.beats_goal(n.g)?;
         if (h < self.goal.range || self.goal.rect_distance2(n.at) <= self.goal.range2) && better {
-            self.goal_node = n.idx;
+            self.goal_node = Some(n.idx);
             return Ok(true);
         }
         Ok(!better)

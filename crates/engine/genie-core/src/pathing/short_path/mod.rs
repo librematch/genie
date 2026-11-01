@@ -257,13 +257,38 @@ struct Emit {
     next: ShapeSide,
 }
 
+/// A node's place in the search's arena (a node's `+0x0c`, its parent's at `+0x10`; the game's
+/// −1 for none, a root's parent, is `None`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct NodeIndex(u32);
+
+impl NodeIndex {
+    /// The start node, the arena's first.
+    const START: Self = Self(0);
+
+    /// Node `i`.
+    const fn new(i: u32) -> Self {
+        Self(i)
+    }
+
+    /// The place the next node appended to `arena` gets (its length, as the game's 32 bits).
+    const fn next_of(arena: &[Node]) -> Self {
+        Self::new(arena.len() as u32)
+    }
+
+    /// The place as a slice index.
+    const fn get(self) -> usize {
+        self.0 as usize
+    }
+}
+
 /// A node (`0x34` bytes).
 #[derive(Clone, Copy, Debug)]
 struct Node {
     g: FixedDistance,
     f: FixedDistance,
-    idx: u32,
-    parent: u32,
+    idx: NodeIndex,
+    parent: Option<NodeIndex>,
     at: FixedPoint,
     kind: Kind,
 }
@@ -287,9 +312,10 @@ struct Search<'a> {
     open: Vec<Node>,
     arena: Vec<Node>,
     polys: Vec<Poly>,
-    /// `local_1a0`, `local_194`.
-    goal_node: u32,
-    best: u32,
+    /// `local_1a0`, `local_194`: the goal node so far (none, −1, until one is in range) and the
+    /// node of the lowest estimate (the start first).
+    goal_node: Option<NodeIndex>,
+    best: NodeIndex,
 }
 
 #[cfg(test)]

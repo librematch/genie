@@ -7,8 +7,8 @@ use crate::pathing::FixedRect;
 use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Corner, Emit, FixedPoint, Foot, Kind, Poly, Search, TRACE_STEPS, UNSET, WalkDir, cheb,
-    clamp_to_box, contact_point, corner_emits, in_box, inside, shrunk_corner,
+    Corner, Emit, FixedPoint, Foot, Kind, NodeIndex, Poly, Search, TRACE_STEPS, UNSET, WalkDir,
+    cheb, clamp_to_box, contact_point, corner_emits, in_box, inside, shrunk_corner,
 };
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -36,7 +36,7 @@ pub(super) struct Traced {
 /// A new polygon's walk: the polygon and the node it comes from.
 struct NewWalk {
     poly: u32,
-    parent: u32,
+    parent: NodeIndex,
 }
 
 impl Search<'_> {
@@ -468,7 +468,7 @@ impl Search<'_> {
         pi: u32,
         p: FixedPoint,
         g0: FixedDistance,
-        parent: u32,
+        parent: NodeIndex,
     ) -> Result<(), GenieError> {
         let poly = self.polys.checked(pi as usize)?.clone();
         let v = &poly.vertices;

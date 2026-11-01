@@ -30,16 +30,48 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
         open: Vec::new(),
         arena: Vec::new(),
         polys: Vec::new(),
-        goal_node: NONE,
-        best: 0,
+        goal_node: None,
+        best: NodeIndex::START,
     };
-    let _ = s.add(
-        FixedDistance::ZERO,
-        NONE,
-        FixedPoint::new(0, 0),
-        Kind::Start,
-    );
+    let origin = FixedPoint::new(0, 0);
+    s.arena.push(Node {
+        g: FixedDistance::ZERO,
+        f: s.goal.heuristic(origin),
+        idx: NodeIndex::START,
+        parent: None,
+        at: origin,
+        kind: Kind::Start,
+    });
     s
+}
+
+/// A node's index is its place in the arena, the start's 0; a goal node beats only a cheaper
+/// one, and anything beats none.
+#[test]
+fn a_node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
+    let mesh = Mesh::new(64);
+    let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
+    assert_eq!(NodeIndex::next_of(&s.arena), NodeIndex::new(1));
+    assert_eq!(NodeIndex::START.get(), 0);
+    assert!(s.beats_goal(FixedDistance::new(i32::MAX)).unwrap());
+    let n = s.add(
+        FixedDistance::TILE,
+        NodeIndex::START,
+        FixedPoint::new(ONE, 0),
+        Kind::Waypoint,
+    );
+    assert_eq!(
+        (n.idx, n.parent),
+        (NodeIndex::new(1), Some(NodeIndex::START))
+    );
+    s.goal_node = Some(n.idx);
+    assert!(s.beats_goal(FixedDistance::new(ONE - 1)).unwrap());
+    assert!(!s.beats_goal(FixedDistance::TILE).unwrap());
+    s.node_mut(n.idx).unwrap().g = FixedDistance::ZERO;
+    assert!(!s.beats_goal(FixedDistance::ZERO).unwrap());
+    // a goal node the arena does not hold fails
+    s.goal_node = Some(NodeIndex::new(7));
+    assert!(s.beats_goal(FixedDistance::ZERO).is_err());
 }
 
 /// `FUN_140fa3860`: a node within range becomes the goal while it is cheaper than the goal so
@@ -52,7 +84,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
     assert!(
         s.goal_test(Corner {
             cost: FixedDistance::new(5 * ONE),
-            parent: 0,
+            parent: NodeIndex::START,
             dir: WalkDir::Forward,
             low: 0,
             high: 0,
@@ -61,12 +93,12 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
         })
         .unwrap()
     );
-    assert_eq!(s.goal_node, 1);
+    assert_eq!(s.goal_node, Some(NodeIndex::new(1)));
     // in range but dearer: the best instead, as it lies nearer than the start's estimate
     assert!(
         !s.goal_test(Corner {
             cost: FixedDistance::new(6 * ONE),
-            parent: 0,
+            parent: NodeIndex::START,
             dir: WalkDir::Forward,
             low: 0,
             high: 0,
@@ -75,12 +107,15 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
         })
         .unwrap()
     );
-    assert_eq!((s.goal_node, s.best), (1, 2));
+    assert_eq!(
+        (s.goal_node, s.best),
+        (Some(NodeIndex::new(1)), NodeIndex::new(2))
+    );
     // out of range and farther than the best's estimate (one tile): nothing
     assert!(
         !s.goal_test(Corner {
             cost: FixedDistance::TILE,
-            parent: 0,
+            parent: NodeIndex::START,
             dir: WalkDir::Forward,
             low: 0,
             high: 0,
@@ -89,7 +124,7 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
         })
         .unwrap()
     );
-    assert_eq!((s.arena.len(), s.best), (3, 2));
+    assert_eq!((s.arena.len(), s.best), (3, NodeIndex::new(2)));
 }
 
 /// `FUN_140fa8210`: the goal's foot on an axis edge that spans it, reached at the edge's
@@ -108,7 +143,7 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
         high: 0,
         dir: WalkDir::Forward,
         start_cost: FixedDistance::TILE,
-        parent: 0,
+        parent: NodeIndex::START,
     })
     .unwrap();
     assert_eq!(s.arena.len(), 1);
@@ -121,10 +156,10 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
         high: 0,
         dir: WalkDir::Forward,
         start_cost: FixedDistance::TILE,
-        parent: 0,
+        parent: NodeIndex::START,
     })
     .unwrap();
-    let goal = s.arena[s.goal_node as usize];
+    let goal = *s.node(s.goal_node.unwrap()).unwrap();
     assert_eq!(
         (goal.at, goal.g),
         (
@@ -924,7 +959,7 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
         )
     );
     assert_eq!(n.f, s.goal.heuristic(n.at).wrapping_add(n.g));
-    assert_eq!(s.arena[n.idx as usize].f, n.f);
+    assert_eq!(s.node(n.idx).unwrap().f, n.f);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.goal.r = FixedDistance::new(ONE / 8);
     assert_eq!(s.start(FixedPoint::new(4 * ONE, 4 * ONE)).unwrap(), 2);
@@ -939,13 +974,13 @@ fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     let p = FixedPoint::new(4 * ONE, 3 * ONE);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.goal.r = FixedDistance::TILE;
-    s.escape_candidates(p, 0).unwrap();
+    s.escape_candidates(p, NodeIndex::START).unwrap();
     let mut one = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     one.goal.r = FixedDistance::TILE;
     for k in 0..4 {
         one.escape_side(
             p,
-            0,
+            NodeIndex::START,
             (ShapeId::new(0), ShapeSide::ALL[k]),
             4 * i64::from(ONE),
         )
@@ -962,7 +997,7 @@ fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.ctx.ignore = &ignore;
     s.goal.r = FixedDistance::TILE;
-    s.escape_candidates(p, 0).unwrap();
+    s.escape_candidates(p, NodeIndex::START).unwrap();
     assert_eq!(s.open.len(), 0);
 }
 
@@ -981,7 +1016,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(4 * ONE, 3 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
         rr2,
     )
@@ -1002,7 +1037,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(4 * ONE, 3 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[1]),
         rr2,
     )
@@ -1014,7 +1049,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(4 * ONE, 3 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[2]),
         rr2,
     )
@@ -1024,7 +1059,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(3 * ONE, 3 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
         rr2,
     )
@@ -1040,7 +1075,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(4 * ONE, 3 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
         rr2,
     )
@@ -1073,8 +1108,13 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     let p = FixedPoint::new(3 * ONE, 5 * ONE / 2);
     for k in 0..4 {
-        s.escape_foot(p, 0, (ShapeId::new(0), ShapeSide::ALL[k]), corners(k))
-            .unwrap();
+        s.escape_foot(
+            p,
+            NodeIndex::START,
+            (ShapeId::new(0), ShapeSide::ALL[k]),
+            corners(k),
+        )
+        .unwrap();
     }
     let mut got = opened(&s);
     got.sort_by_key(|&(_, g, _)| g);
@@ -1090,27 +1130,37 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_foot(
         FixedPoint::new(2 * ONE, 5 * ONE / 2),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
         corners(0),
     )
     .unwrap();
     s.escape_foot(
         FixedPoint::new(3 * ONE, 6 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[1]),
         corners(1),
     )
     .unwrap();
     assert_eq!(opened(&s), vec![]);
     s.bounds = FixedRect::new(0, 0, 64 * ONE, ONE);
-    s.escape_foot(p, 0, (ShapeId::new(0), ShapeSide::ALL[0]), corners(0))
-        .unwrap();
+    s.escape_foot(
+        p,
+        NodeIndex::START,
+        (ShapeId::new(0), ShapeSide::ALL[0]),
+        corners(0),
+    )
+    .unwrap();
     let mut held = shape_at_2_2();
     let _ = held.add(FixedRect::new(0, 0, 4 * ONE, 4 * ONE));
     let mut t = search_toward(&held, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    t.escape_foot(p, 0, (ShapeId::new(0), ShapeSide::ALL[0]), corners(0))
-        .unwrap();
+    t.escape_foot(
+        p,
+        NodeIndex::START,
+        (ShapeId::new(0), ShapeSide::ALL[0]),
+        corners(0),
+    )
+    .unwrap();
     assert_eq!((opened(&s), opened(&t)), (vec![], vec![]));
 }
 
@@ -1147,7 +1197,7 @@ fn a_side_s_contacts_become_candidates_when_wide_free_and_near() {
     s.ctx.ignore = &ignore;
     s.escape_contacts(
         FixedPoint::new(4 * ONE, 3 * ONE),
-        0,
+        NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
         4 * i64::from(ONE),
     )
