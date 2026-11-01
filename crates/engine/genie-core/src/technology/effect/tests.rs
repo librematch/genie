@@ -1649,7 +1649,13 @@ fn an_age_adds_its_event_to_the_history() {
         104
     ];
     t.world_time = WorldTime::from_millis(612_345);
-    t.players[0].history.entries = vec![[3, 0]; 20];
+    t.players[0].history.entries = vec![
+        crate::players::history::HistoryEntry {
+            civilian: crate::players::history::Population::of_data(3),
+            military: crate::players::history::Population::ZERO,
+        };
+        20
+    ];
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(100), None),
         Ok(true)
@@ -1664,7 +1670,7 @@ fn an_age_adds_its_event_to_the_history() {
         t.players[0].history.events,
         [crate::players::history::Event {
             kind: crate::players::history::EventKind::CASTLE_AGE,
-            time_slice: 20,
+            time_slice: crate::players::history::TimeSlice::of_data(20),
             world_time: WorldTime::from_millis(612_345),
             ..crate::players::history::Event::default()
         }]

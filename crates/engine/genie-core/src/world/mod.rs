@@ -142,7 +142,8 @@ pub(crate) const GATE_QUERY_RECORDS: usize = 10;
 pub(crate) const GATE_COUNT_CAP: usize = 25;
 /// The world constructor's history period (`FUN_141599e50`'s immediate 0x19 at `world+0x8b8`),
 /// until the `.dat`'s `time_slice` replaces it.
-pub const HISTORY_PERIOD: i32 = 25;
+pub const HISTORY_PERIOD: crate::players::history::HistoryUpdates =
+    crate::players::history::HistoryUpdates::of_data(25);
 
 /// The building top actions that keep RESEARCH from a building (`FUN_141227a00`: 0x7b to 0x7d).
 pub(crate) const BLOCKS_RESEARCH: [ActionType; 3] = [
@@ -307,7 +308,7 @@ pub struct World {
     pub dt: Millis,
     /// The history period (`world+0x8b8`, `time_slice`): the `.dat`'s, which the world reads
     /// after its constructor's [`HISTORY_PERIOD`] ([`crate::players::history::History::update`]).
-    pub history_period: i32,
+    pub history_period: crate::players::history::HistoryUpdates,
     /// Each player's `mAllowCapturingGaiaUnits` (`player+0x670`, saved; false for a player it
     /// lacks): a computer player takes Gaia's objects over by seeing them in the game modes
     /// outside the standard ones ([`crate::vision::visibility::sight_taker`]).

@@ -19,10 +19,14 @@
 //! first event of a kind `FUN_141560e20`, `get_history_event_by_time` `FUN_141560ea0`,
 //! `mark_new_battle` `FUN_141565470`, `update` `FUN_141569450`; the names are the 2016 HD PDB's.
 
+mod values;
+
+pub use values::{EntryKind, HistoryEntry, HistoryUpdates, Population, Share, Tally, TimeSlice};
+
 use crate::GenieError;
-use crate::math::conversions::{cvttss2si, cvttss2si_64};
-use crate::math::image::history::{BATTLE_RECORD, BATTLE_START};
+use crate::math::conversions::cvttss2si;
 use crate::players::Amount;
+use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
@@ -74,7 +78,7 @@ impl genie_diff::Diff for EventKind {
 }
 
 /// The entries' buffer grows by this many (`add_new_history_entry`).
-const ENTRY_GROWTH: i32 = 60;
+const ENTRY_GROWTH: TimeSlice = TimeSlice::of_data(60);
 /// The battles a history keeps before a new one has to push one out (`mark_new_battle`).
 const BATTLES_KEPT: usize = 3;
 /// The newest battles `mark_new_battle` looks among for one to push out, the new one included.
@@ -90,7 +94,7 @@ pub struct Event {
     /// `event` (`+0x0`): its kind.
     pub kind: EventKind,
     /// `time_slice` (`+0x4`): the number of entries when it happened.
-    pub time_slice: i32,
+    pub time_slice: TimeSlice,
     /// `world_time` (`+0x8`): the world's time then, in milliseconds.
     pub world_time: WorldTime,
     /// `data1` (`+0xc`).
@@ -106,82 +110,77 @@ pub struct Event {
 pub struct History {
     /// `history` (`+0x0`) up to `number_of_entries` (`+0x1c`): each entry's civilian and
     /// military population.
-    pub entries: Vec<[i16; 2]>,
+    pub entries: Vec<HistoryEntry>,
     /// `max_number_of_entries` (`+0x20`): the entries' buffer, grown by 60.
-    pub max_entries: i32,
+    pub max_entries: TimeSlice,
     /// `events` (`+0x8`), newest first (the list from its head).
     pub events: Vec<Event>,
     /// `number_of_events` (`+0x18`): as loaded; no writer counts it.
     pub number_of_events: i32,
     /// `update_history_count` (`+0x28`): the update's runs since the last period.
-    pub update_count: i32,
+    pub update_count: HistoryUpdates,
     /// `old_total_razings` (`+0x2c`): attribute 43 at the last period.
-    pub old_total_razings: i32,
+    pub old_total_razings: Tally,
     /// `old_build_value_razings` (`+0x30`): attribute 172.
-    pub old_build_value_razings: i32,
+    pub old_build_value_razings: Tally,
     /// `old_total_razings_other` (`+0x34`): attribute 155.
-    pub old_total_razings_other: i32,
+    pub old_total_razings_other: Tally,
     /// `old_build_value_razings_other` (`+0x38`): attribute 153.
-    pub old_build_value_razings_other: i32,
+    pub old_build_value_razings_other: Tally,
     /// `old_total_kills` (`+0x3c`): attribute 20.
-    pub old_total_kills: i32,
+    pub old_total_kills: Tally,
     /// `old_build_value_kills` (`+0x40`): attribute 170.
-    pub old_build_value_kills: i32,
+    pub old_build_value_kills: Tally,
     /// `old_total_kills_other` (`+0x44`): attribute 154.
-    pub old_total_kills_other: i32,
+    pub old_total_kills_other: Tally,
     /// `old_build_value_kills_other` (`+0x48`): attribute 152.
-    pub old_build_value_kills_other: i32,
+    pub old_build_value_kills_other: Tally,
     /// `razings_weight` (`+0x4c`): saved; no routine of 158041 reads it.
     pub razings_weight: f32,
     /// `kills_weight` (`+0x50`): saved; no routine reads it.
     pub kills_weight: f32,
     /// `razing_percent` (`+0x54`): saved; no routine reads it.
-    pub razing_percent: f32,
+    pub razing_percent: Share,
     /// `kills_perecent` (`+0x58`): saved; no routine reads it.
-    pub kills_percent: f32,
+    pub kills_percent: Share,
     /// `razings_flag` (`+0x5c`): saved; no routine reads it.
     pub razings_flag: u32,
     /// `battle_flag` (`+0x60`): a battle goes on.
     pub battle_flag: u32,
     /// `old_current_build_value_units` (`+0x64`): attribute 164.
-    pub old_current_build_value_units: i32,
+    pub old_current_build_value_units: Tally,
     /// `old_current_build_value_buildings` (`+0x68`): attribute 165.
-    pub old_current_build_value_buildings: i32,
+    pub old_current_build_value_buildings: Tally,
     /// `old_player_kill_BV` (`+0xb0`, `numMaxPlayers` of them): attribute 400 + i, outside a
     /// battle.
-    pub old_player_kill_bv: Vec<i32>,
+    pub old_player_kill_bv: Vec<Tally>,
     /// `old_player_razing_BV` (`+0xc8`): attribute 425 + i, outside a battle.
-    pub old_player_razing_bv: Vec<i32>,
+    pub old_player_razing_bv: Vec<Tally>,
     /// `running_ave_BV_percent` (`+0xe0`): the battle's share of the player's value so far.
-    pub running_ave_bv_percent: f32,
+    pub running_ave_bv_percent: Share,
     /// `running_total_BV_kills` (`+0xe4`).
-    pub running_total_bv_kills: i32,
+    pub running_total_bv_kills: Tally,
     /// `running_total_BV_razings` (`+0xe8`).
-    pub running_total_bv_razings: i32,
+    pub running_total_bv_razings: Tally,
     /// `running_total_kills` (`+0xec`; the save keeps its low 16 bits).
-    pub running_total_kills: i32,
+    pub running_total_kills: Tally,
     /// `running_total_razings` (`+0xf0`; the save keeps its low 16 bits).
-    pub running_total_razings: i32,
-}
-
-/// A float through `CVTTSS2SI` and a 16-bit `MOVSX` back to a float, as the update hands the
-/// populations to `add_new_history_entry`.
-fn short(x: f32) -> f32 {
-    f32::from(cvttss2si(x) as i16)
+    pub running_total_razings: Tally,
 }
 
 impl History {
     /// `add_new_history_entry` (`FUN_141560b90`): the buffer grows by 60 once full (its old
-    /// capacity copied, the rest zero); an entry of kind 0 holds the two values as shorts
-    /// (`CVTTSS2SI`), any other kind leaves its slot zero; the count goes up either way.
-    pub fn add_entry(&mut self, kind: u8, civilian: f32, military: f32) {
-        if self.max_entries <= self.entries.len() as i32 {
+    /// capacity copied, the rest zero); an entry of the population kind holds the two
+    /// populations (the floats the update hands over, as shorts: [`Population::of_count`]), any
+    /// other kind leaves its slot zero; the count goes up either way.
+    pub fn add_entry(&mut self, kind: EntryKind, civilian: Population, military: Population) {
+        if self.max_entries <= TimeSlice::of_count(self.entries.len()) {
             self.max_entries = self.max_entries.wrapping_add(ENTRY_GROWTH);
         }
-        self.entries.push(if kind == 0 {
-            [cvttss2si(civilian) as i16, cvttss2si(military) as i16]
+        self.entries.push(if kind == EntryKind::POPULATION {
+            HistoryEntry { civilian, military }
         } else {
-            [0, 0]
+            HistoryEntry::default()
         });
     }
 
@@ -203,7 +202,7 @@ impl History {
             0,
             Event {
                 kind,
-                time_slice: self.entries.len() as i32,
+                time_slice: TimeSlice::of_count(self.entries.len()),
                 world_time,
                 data1,
                 data2,
@@ -272,7 +271,7 @@ impl History {
     /// `time_slice`, as the position of the first from the head (1 based) and their count (a
     /// byte, wrapping); none gives `None` (the game's -1 and -1).
     #[must_use]
-    pub fn events_at(&self, time_slice: i32) -> Option<(i32, i8)> {
+    pub fn events_at(&self, time_slice: TimeSlice) -> Option<(i32, i8)> {
         let mut first = None;
         let mut count = 0i8;
         for (i, e) in self.events.iter().enumerate() {
@@ -317,51 +316,55 @@ impl History {
         &mut self,
         attributes: &[Amount],
         world_time: WorldTime,
-        period: i32,
+        period: HistoryUpdates,
     ) -> Result<(), GenieError> {
-        self.update_count = self.update_count.wrapping_add(1);
+        self.update_count = self.update_count.next();
         if self.update_count < period {
             return Ok(());
         }
         self.update_count = self.update_count.wrapping_sub(period);
         // the save holds every attribute of the .dat's count, these among them
         let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
-        let int = |i: usize| cvttss2si(a(i).get());
+        let tally = |i: usize| Tally::of_amount(a(i));
         let civilian = a(attribute::CIVILIAN_POPULATION.index());
         let military = a(attribute::MILITARY_POPULATION.index());
         if military + civilian < Amount::ZERO {
-            self.add_entry(0, 0.0, 0.0);
+            self.add_entry(EntryKind::POPULATION, Population::ZERO, Population::ZERO);
         } else {
-            self.add_entry(0, short(civilian.get()), short(military.get()));
+            self.add_entry(
+                EntryKind::POPULATION,
+                Population::of_count(civilian.get()),
+                Population::of_count(military.get()),
+            );
         }
-        let kills = int(attribute::KILLS.index()).wrapping_sub(self.old_total_kills);
+        let kills = tally(attribute::KILLS.index()).wrapping_sub(self.old_total_kills);
         let kills_value =
-            int(attribute::KILLS_VALUE.index()).wrapping_sub(self.old_build_value_kills);
-        let razings = int(attribute::RAZINGS.index()).wrapping_sub(self.old_total_razings);
+            tally(attribute::KILLS_VALUE.index()).wrapping_sub(self.old_build_value_kills);
+        let razings = tally(attribute::RAZINGS.index()).wrapping_sub(self.old_total_razings);
         let razings_value =
-            int(attribute::RAZINGS_VALUE.index()).wrapping_sub(self.old_build_value_razings);
+            tally(attribute::RAZINGS_VALUE.index()).wrapping_sub(self.old_build_value_razings);
         let kills_other =
-            int(attribute::KILLS_OTHER.index()).wrapping_sub(self.old_total_kills_other);
-        let kills_value_other = int(attribute::KILLS_VALUE_OTHER.index())
+            tally(attribute::KILLS_OTHER.index()).wrapping_sub(self.old_total_kills_other);
+        let kills_value_other = tally(attribute::KILLS_VALUE_OTHER.index())
             .wrapping_sub(self.old_build_value_kills_other);
         let razings_other =
-            int(attribute::RAZINGS_OTHER.index()).wrapping_sub(self.old_total_razings_other);
-        let razings_value_other = int(attribute::RAZINGS_VALUE_OTHER.index())
+            tally(attribute::RAZINGS_OTHER.index()).wrapping_sub(self.old_total_razings_other);
+        let razings_value_other = tally(attribute::RAZINGS_VALUE_OTHER.index())
             .wrapping_sub(self.old_build_value_razings_other);
         let value = self
             .old_current_build_value_buildings
             .wrapping_add(self.old_current_build_value_units);
-        let (share, total_share) = if value < 1 {
-            (0.0, 0.0)
+        let (share, total_share) = if value <= Tally::ZERO {
+            (Share::ZERO, Share::ZERO)
         } else {
             let own = razings_value.wrapping_add(kills_value);
             let all = razings_value_other
                 .wrapping_add(kills_value_other)
                 .wrapping_add(razings_value)
                 .wrapping_add(kills_value);
-            (own as f32 / value as f32, all as f32 / value as f32)
+            (Share::of(own, value), Share::of(all, value))
         };
-        let battling = f64::from(share) >= BATTLE_START;
+        let battling = share.battling();
         let goes_on = if self.battle_flag == 0 {
             if battling {
                 self.battle_flag = 1;
@@ -370,15 +373,15 @@ impl History {
         } else if battling {
             true
         } else {
-            if f64::from(self.running_ave_bv_percent) >= BATTLE_RECORD {
+            if self.running_ave_bv_percent.recorded() {
                 self.record_battle(attributes, value, world_time)?;
             }
             self.battle_flag = 0;
-            self.running_total_bv_kills = 0;
-            self.running_total_bv_razings = 0;
-            self.running_total_kills = 0;
-            self.running_total_razings = 0;
-            self.running_ave_bv_percent = 0.0;
+            self.running_total_bv_kills = Tally::ZERO;
+            self.running_total_bv_razings = Tally::ZERO;
+            self.running_total_kills = Tally::ZERO;
+            self.running_total_razings = Tally::ZERO;
+            self.running_ave_bv_percent = Share::ZERO;
             false
         };
         if goes_on {
@@ -390,28 +393,28 @@ impl History {
                 .wrapping_add(razings_value_other.wrapping_add(razings_value));
             self.running_total_kills = self
                 .running_total_kills
-                .wrapping_add(i32::from(kills as u16).wrapping_add(i32::from(kills_other as u16)));
-            self.running_total_razings = self.running_total_razings.wrapping_add(
-                i32::from(razings as u16).wrapping_add(i32::from(razings_other as u16)),
-            );
+                .wrapping_add(kills.low_short().wrapping_add(kills_other.low_short()));
+            self.running_total_razings = self
+                .running_total_razings
+                .wrapping_add(razings.low_short().wrapping_add(razings_other.low_short()));
             // total_share + running in the game; the share is never a NaN, so the order is moot
-            self.running_ave_bv_percent += total_share;
+            self.running_ave_bv_percent = self.running_ave_bv_percent.plus(total_share);
         }
-        self.old_total_razings = int(attribute::RAZINGS.index());
-        self.old_build_value_razings = int(attribute::RAZINGS_VALUE.index());
-        self.old_total_razings_other = int(attribute::RAZINGS_OTHER.index());
-        self.old_build_value_razings_other = int(attribute::RAZINGS_VALUE_OTHER.index());
-        self.old_total_kills = int(attribute::KILLS.index());
-        self.old_build_value_kills = int(attribute::KILLS_VALUE.index());
-        self.old_total_kills_other = int(attribute::KILLS_OTHER.index());
-        self.old_build_value_kills_other = int(attribute::KILLS_VALUE_OTHER.index());
-        self.old_current_build_value_units = int(attribute::UNITS_VALUE.index());
-        self.old_current_build_value_buildings = int(attribute::BUILDINGS_VALUE.index());
+        self.old_total_razings = tally(attribute::RAZINGS.index());
+        self.old_build_value_razings = tally(attribute::RAZINGS_VALUE.index());
+        self.old_total_razings_other = tally(attribute::RAZINGS_OTHER.index());
+        self.old_build_value_razings_other = tally(attribute::RAZINGS_VALUE_OTHER.index());
+        self.old_total_kills = tally(attribute::KILLS.index());
+        self.old_build_value_kills = tally(attribute::KILLS_VALUE.index());
+        self.old_total_kills_other = tally(attribute::KILLS_OTHER.index());
+        self.old_build_value_kills_other = tally(attribute::KILLS_VALUE_OTHER.index());
+        self.old_current_build_value_units = tally(attribute::UNITS_VALUE.index());
+        self.old_current_build_value_buildings = tally(attribute::BUILDINGS_VALUE.index());
         if self.battle_flag == 0 {
             for (i, kill) in self.old_player_kill_bv.iter_mut().enumerate() {
-                *kill = cvttss2si_64(a(KILL_VALUE_OF + i).get()) as i32;
+                *kill = Tally::of_amount_64(a(KILL_VALUE_OF + i));
                 if let Some(r) = self.old_player_razing_bv.get_mut(i) {
-                    *r = cvttss2si_64(a(RAZING_VALUE_OF + i).get()) as i32;
+                    *r = Tally::of_amount_64(a(RAZING_VALUE_OF + i));
                 }
             }
         }
@@ -424,30 +427,34 @@ impl History {
     fn record_battle(
         &mut self,
         attributes: &[Amount],
-        value: i32,
+        value: Tally,
         world_time: WorldTime,
     ) -> Result<(), GenieError> {
-        let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO).get();
+        let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
         let players = self.old_player_kill_bv.len();
-        let kills: Vec<i32> = self
+        let kills: Vec<Tally> = self
             .old_player_kill_bv
             .iter()
             .enumerate()
-            .map(|(i, &old)| (cvttss2si_64(a(KILL_VALUE_OF + i)) as i32).wrapping_sub(old))
+            .map(|(i, &old)| Tally::of_amount_64(a(KILL_VALUE_OF + i)).wrapping_sub(old))
             .collect();
-        let razings: Vec<i32> = (0..players)
+        let razings: Vec<Tally> = (0..players)
             .map(|i| {
-                let old = self.old_player_razing_bv.get(i).copied().unwrap_or(0);
-                (cvttss2si_64(a(RAZING_VALUE_OF + i)) as i32).wrapping_sub(old)
+                let old = self
+                    .old_player_razing_bv
+                    .get(i)
+                    .copied()
+                    .unwrap_or(Tally::ZERO);
+                Tally::of_amount_64(a(RAZING_VALUE_OF + i)).wrapping_sub(old)
             })
             .collect();
         let mut best = 0.0f32;
-        let mut opponent = 0i32;
-        for i in 0..players {
-            let weight = *razings.checked(i)? as f32 / value as f32 + *kills.checked(i)? as f32;
+        let mut opponent = PlayerId::GAIA;
+        for (i, q) in PlayerId::each(players).enumerate() {
+            let weight = razings.checked(i)?.ratio(value) + kills.checked(i)?.get() as f32;
             if weight > best {
                 best = weight;
-                opponent = i as i32;
+                opponent = q;
             }
         }
         if self.entries.is_empty() {
@@ -457,10 +464,10 @@ impl History {
             0,
             Event {
                 kind: EventKind::BATTLE,
-                time_slice: self.entries.len() as i32,
+                time_slice: TimeSlice::of_count(self.entries.len()),
                 world_time,
-                data1: opponent as f32,
-                data2: self.running_ave_bv_percent,
+                data1: opponent.index() as f32,
+                data2: self.running_ave_bv_percent.get(),
                 data3: 0.0,
             },
         );
@@ -472,6 +479,27 @@ impl History {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn entry(civilian: i16, military: i16) -> HistoryEntry {
+        HistoryEntry {
+            civilian: Population::of_data(civilian),
+            military: Population::of_data(military),
+        }
+    }
+
+    fn tallies(values: &[i32]) -> Vec<Tally> {
+        values.iter().copied().map(Tally::of_data).collect()
+    }
+
+    /// The update with the period of 30 runs.
+    fn update(h: &mut History, a: &[Amount], millis: u32) {
+        h.update(
+            a,
+            WorldTime::from_millis(millis),
+            HistoryUpdates::of_data(30),
+        )
+        .unwrap();
+    }
 
     /// A saved byte is its kind; the default is the Feudal Age's 0.
     #[test]
@@ -491,8 +519,8 @@ mod tests {
 
     fn with_entry() -> History {
         History {
-            entries: vec![[0, 0]],
-            max_entries: 60,
+            entries: vec![HistoryEntry::default()],
+            max_entries: TimeSlice::of_data(60),
             ..History::default()
         }
     }
@@ -502,18 +530,26 @@ mod tests {
     /// indefinite's low half, 0.
     #[test]
     fn an_entry_grows_the_buffer_by_sixty_and_keeps_shorts() {
+        let pop = |c: f32, m: f32| (Population::of_count(c), Population::of_count(m));
         let mut h = History::default();
-        h.add_entry(0, 7.9, 70_000.0);
+        let (c, m) = pop(7.9, 70_000.0);
+        h.add_entry(EntryKind::POPULATION, c, m);
         assert_eq!(
             (h.max_entries, h.entries.clone()),
-            (60, vec![[7, 70_000_i32 as i16]])
+            (TimeSlice::of_data(60), vec![entry(7, 70_000_i32 as i16)])
         );
-        h.add_entry(1, 3.0, 4.0);
-        h.add_entry(0, f32::NAN, -2.5);
-        assert_eq!(h.entries, vec![[7, 4464], [0, 0], [0, -2]]);
-        h.entries.resize(60, [0, 0]);
-        h.add_entry(0, 1.0, 1.0);
-        assert_eq!((h.max_entries, h.entries.len()), (120, 61));
+        let (c, m) = pop(3.0, 4.0);
+        h.add_entry(EntryKind::of_data(1), c, m);
+        let (c, m) = pop(f32::NAN, -2.5);
+        h.add_entry(EntryKind::POPULATION, c, m);
+        assert_eq!(h.entries, vec![entry(7, 4464), entry(0, 0), entry(0, -2)]);
+        h.entries.resize(60, HistoryEntry::default());
+        let (c, m) = pop(1.0, 1.0);
+        h.add_entry(EntryKind::POPULATION, c, m);
+        assert_eq!(
+            (h.max_entries, h.entries.len()),
+            (TimeSlice::of_data(120), 61)
+        );
     }
 
     /// `add_history_event`: nothing without an entry; else the event at the head, at the
@@ -529,7 +565,7 @@ mod tests {
             WorldTime::from_millis(5000),
         );
         assert_eq!(h.events, []);
-        h.entries = vec![[0, 0]; 3];
+        h.entries = vec![HistoryEntry::default(); 3];
         h.add_event(
             EventKind::FEUDAL_AGE,
             0.0,
@@ -549,7 +585,7 @@ mod tests {
             vec![
                 Event {
                     kind: EventKind::CASTLE_BUILT,
-                    time_slice: 3,
+                    time_slice: TimeSlice::of_data(3),
                     world_time: WorldTime::from_millis(9000),
                     data1: 2.0,
                     data2: 0.5,
@@ -557,7 +593,7 @@ mod tests {
                 },
                 Event {
                     kind: EventKind::FEUDAL_AGE,
-                    time_slice: 3,
+                    time_slice: TimeSlice::of_data(3),
                     world_time: WorldTime::from_millis(5000),
                     ..Event::default()
                 },
@@ -622,19 +658,19 @@ mod tests {
             events: vec![
                 Event {
                     kind: EventKind::CASTLE_AGE,
-                    time_slice: 4,
+                    time_slice: TimeSlice::of_data(4),
                     world_time: WorldTime::from_millis(9000),
                     ..Event::default()
                 },
                 Event {
                     kind: EventKind::FEUDAL_AGE,
-                    time_slice: 2,
+                    time_slice: TimeSlice::of_data(2),
                     world_time: WorldTime::from_millis(4000),
                     ..Event::default()
                 },
                 Event {
                     kind: EventKind::FEUDAL_AGE,
-                    time_slice: 2,
+                    time_slice: TimeSlice::of_data(2),
                     world_time: WorldTime::from_millis(1000),
                     ..Event::default()
                 },
@@ -646,9 +682,9 @@ mod tests {
             Some(WorldTime::from_millis(4000))
         );
         assert_eq!(h.event_of_kind(EventKind::IMPERIAL_AGE), None);
-        assert_eq!(h.events_at(2), Some((2, 2)));
-        assert_eq!(h.events_at(4), Some((1, 1)));
-        assert_eq!(h.events_at(3), None);
+        assert_eq!(h.events_at(TimeSlice::of_data(2)), Some((2, 2)));
+        assert_eq!(h.events_at(TimeSlice::of_data(4)), Some((1, 1)));
+        assert_eq!(h.events_at(TimeSlice::of_data(3)), None);
     }
 
     /// `FUN_140b077d0`: the seconds since the current age's event, else the world's seconds.
@@ -676,9 +712,9 @@ mod tests {
     #[test]
     fn the_period_s_update_adds_an_entry_and_keeps_the_attributes() {
         let mut h = History {
-            update_count: 28,
-            old_player_kill_bv: vec![0; 3],
-            old_player_razing_bv: vec![0; 3],
+            update_count: HistoryUpdates::of_data(28),
+            old_player_kill_bv: vec![Tally::ZERO; 3],
+            old_player_razing_bv: vec![Tally::ZERO; 3],
             ..History::default()
         };
         let mut a = attributes();
@@ -689,22 +725,31 @@ mod tests {
         a[attribute::BUILDINGS_VALUE.index()] = Amount::new(900.7);
         a[KILL_VALUE_OF + 2] = Amount::new(45.0);
         a[RAZING_VALUE_OF + 1] = Amount::new(5_000_000_000.0);
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
-        assert_eq!((h.update_count, h.entries.len()), (29, 0));
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
-        assert_eq!((h.update_count, h.entries.clone()), (0, vec![[12, 3]]));
+        update(&mut h, &a, 0);
+        assert_eq!(
+            (h.update_count, h.entries.len()),
+            (HistoryUpdates::of_data(29), 0)
+        );
+        update(&mut h, &a, 0);
+        assert_eq!(
+            (h.update_count, h.entries.clone()),
+            (HistoryUpdates::of_data(0), vec![entry(12, 3)])
+        );
         assert_eq!(
             (h.old_total_kills, h.old_current_build_value_buildings),
-            (2, 900)
+            (Tally::of_data(2), Tally::of_data(900))
         );
-        assert_eq!(h.old_player_kill_bv, vec![0, 0, 45]);
+        assert_eq!(h.old_player_kill_bv, tallies(&[0, 0, 45]));
         // 5e9 through the 64-bit conversion keeps its low half
-        assert_eq!(h.old_player_razing_bv, vec![0, 5_000_000_000_i64 as i32, 0]);
+        assert_eq!(
+            h.old_player_razing_bv,
+            tallies(&[0, 5_000_000_000_i64 as i32, 0])
+        );
         // a negative population sum gives an entry of zeros
         a[attribute::MILITARY_POPULATION.index()] = Amount::new(-13.0);
-        h.update_count = 29;
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
-        assert_eq!(h.entries[1], [0, 0]);
+        h.update_count = HistoryUpdates::of_data(29);
+        update(&mut h, &a, 0);
+        assert_eq!(h.entries[1], entry(0, 0));
     }
 
     /// A share of the player's value of 0.12 or more starts a battle and sums it; falling below
@@ -713,11 +758,11 @@ mod tests {
     #[test]
     fn a_battle_starts_sums_and_ends_with_its_event() {
         let mut h = History {
-            update_count: 29,
-            old_current_build_value_units: 600,
-            old_current_build_value_buildings: 400,
-            old_player_kill_bv: vec![0; 3],
-            old_player_razing_bv: vec![0; 3],
+            update_count: HistoryUpdates::of_data(29),
+            old_current_build_value_units: Tally::of_data(600),
+            old_current_build_value_buildings: Tally::of_data(400),
+            old_player_kill_bv: vec![Tally::ZERO; 3],
+            old_player_razing_bv: vec![Tally::ZERO; 3],
             ..History::default()
         };
         let mut a = attributes();
@@ -733,38 +778,38 @@ mod tests {
         a[KILL_VALUE_OF + 2] = Amount::new(40.0);
         a[RAZING_VALUE_OF + 2] = Amount::new(20_000.0);
         // (30 + 100) / 1000: the battle starts; all four: 160 / 1000
-        h.update(&a, WorldTime::from_millis(30_000), 30).unwrap();
+        update(&mut h, &a, 30_000);
         assert_eq!(h.battle_flag, 1);
         assert_eq!(
             (h.running_total_bv_kills, h.running_total_bv_razings),
-            (130, 30)
+            (Tally::of_data(130), Tally::of_data(30))
         );
         assert_eq!(
             (h.running_total_kills, h.running_total_razings),
-            (4464 + 3, 1)
+            (Tally::of_data(4464 + 3), Tally::of_data(1))
         );
-        assert_eq!(h.running_ave_bv_percent, 160.0 / 1000.0);
+        assert_eq!(h.running_ave_bv_percent, Share::of_data(160.0 / 1000.0));
         // in a battle the per-player values stay as they were
-        assert_eq!(h.old_player_kill_bv, vec![0, 0, 0]);
+        assert_eq!(h.old_player_kill_bv, tallies(&[0, 0, 0]));
         // nothing more: the share falls to 0, the battle ends with its event; player 2's
         // 20000 / 1000 + 40 outweighs player 1's 50
-        h.update_count = 29;
-        h.update(&a, WorldTime::from_millis(60_000), 30).unwrap();
+        h.update_count = HistoryUpdates::of_data(29);
+        update(&mut h, &a, 60_000);
         assert_eq!(h.battle_flag, 0);
-        assert_eq!(h.running_ave_bv_percent, 0.0);
+        assert_eq!(h.running_ave_bv_percent, Share::ZERO);
         assert_eq!(
             h.events,
             vec![Event {
                 kind: EventKind::BATTLE,
-                time_slice: 2,
+                time_slice: TimeSlice::of_data(2),
                 world_time: WorldTime::from_millis(60_000),
                 data1: 2.0,
                 data2: 160.0 / 1000.0,
                 data3: 1.0,
             }]
         );
-        assert_eq!(h.old_player_kill_bv, vec![0, 50, 40]);
-        assert_eq!(h.old_player_razing_bv, vec![0, 0, 20_000]);
+        assert_eq!(h.old_player_kill_bv, tallies(&[0, 50, 40]));
+        assert_eq!(h.old_player_razing_bv, tallies(&[0, 0, 20_000]));
     }
 
     /// A battle whose summed share stays below 0.15 ends without an event; a saved battle flag
@@ -772,30 +817,30 @@ mod tests {
     #[test]
     fn a_small_battle_ends_without_its_event() {
         let mut h = History {
-            update_count: 29,
+            update_count: HistoryUpdates::of_data(29),
             battle_flag: 2,
-            running_ave_bv_percent: 0.149_999,
-            old_current_build_value_units: 1000,
-            old_player_kill_bv: vec![0; 2],
-            old_player_razing_bv: vec![0; 2],
+            running_ave_bv_percent: Share::of_data(0.149_999),
+            old_current_build_value_units: Tally::of_data(1000),
+            old_player_kill_bv: vec![Tally::ZERO; 2],
+            old_player_razing_bv: vec![Tally::ZERO; 2],
             ..History::default()
         };
         let mut a = attributes();
         a[attribute::UNITS_VALUE.index()] = Amount::new(1000.0);
         a[attribute::KILLS_VALUE.index()] = Amount::new(130.0);
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
+        update(&mut h, &a, 0);
         assert_eq!(h.battle_flag, 2);
-        h.update_count = 29;
-        h.running_ave_bv_percent = 0.149_999;
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
+        h.update_count = HistoryUpdates::of_data(29);
+        h.running_ave_bv_percent = Share::of_data(0.149_999);
+        update(&mut h, &a, 0);
         assert_eq!((h.battle_flag, h.events.len()), (0, 0));
         // a NaN sum fails the record's COMISD (JC): no event either
-        h.update_count = 29;
+        h.update_count = HistoryUpdates::of_data(29);
         h.battle_flag = 1;
-        h.running_ave_bv_percent = f32::NAN;
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
+        h.running_ave_bv_percent = Share::of_data(f32::NAN);
+        update(&mut h, &a, 0);
         assert_eq!((h.battle_flag, h.events.len()), (0, 0));
-        assert_eq!(h.running_ave_bv_percent, 0.0);
+        assert_eq!(h.running_ave_bv_percent, Share::ZERO);
     }
 
     /// The share is a float compared as a double: 120 of 1000 as an f32 lies just below the
@@ -803,14 +848,14 @@ mod tests {
     #[test]
     fn a_share_of_exactly_twelve_percent_starts_no_battle() {
         let mut h = History {
-            update_count: 29,
-            old_current_build_value_units: 1000,
+            update_count: HistoryUpdates::of_data(29),
+            old_current_build_value_units: Tally::of_data(1000),
             ..History::default()
         };
         let mut a = attributes();
         a[attribute::UNITS_VALUE.index()] = Amount::new(1000.0);
         a[attribute::KILLS_VALUE.index()] = Amount::new(120.0);
-        h.update(&a, WorldTime::ZERO, 30).unwrap();
+        update(&mut h, &a, 0);
         assert_eq!(h.battle_flag, 0);
     }
 }

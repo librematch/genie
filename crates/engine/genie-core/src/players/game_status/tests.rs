@@ -166,14 +166,20 @@ fn a_defeat_names_the_player_with_the_most_of_its_own_attribute() {
     t.players[2].attributes[302] = Amount::new(3.0);
     t.players[3].attributes[303] = Amount::new(7.9);
     t.players[1].attributes[301] = Amount::new(50.0);
-    t.players[1].history.entries = vec![[1, 0]; 4];
+    t.players[1].history.entries = vec![
+        crate::players::history::HistoryEntry {
+            civilian: crate::players::history::Population::of_data(1),
+            military: crate::players::history::Population::ZERO,
+        };
+        4
+    ];
     t.world_time = WorldTime::from_millis(5_000);
     t.defeat_event(PlayerId::new(1)).unwrap();
     assert_eq!(
         t.players[1].history.events,
         [crate::players::history::Event {
             kind: crate::players::history::EventKind::DEFEAT,
-            time_slice: 4,
+            time_slice: crate::players::history::TimeSlice::of_data(4),
             world_time: WorldTime::from_millis(5_000),
             data1: 3.0,
             data2: 7.0,
@@ -181,7 +187,10 @@ fn a_defeat_names_the_player_with_the_most_of_its_own_attribute() {
         }]
     );
     t.players[2].resigned = true;
-    t.players[2].history.entries = vec![[1, 0]];
+    t.players[2].history.entries = vec![crate::players::history::HistoryEntry {
+        civilian: crate::players::history::Population::of_data(1),
+        military: crate::players::history::Population::ZERO,
+    }];
     t.defeat_event(PlayerId::new(2)).unwrap();
     assert_eq!(t.players[2].history.events, []);
 }

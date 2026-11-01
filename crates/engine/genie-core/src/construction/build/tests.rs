@@ -888,7 +888,11 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
         h.annex_of = main.then_some(object_id(10027));
         let mut t = site_world(world, vec![built_master(id, cost)], vec![h]);
         // a history records events from its first time slice on
-        t.players[1].history.add_entry(0, 3.0, 0.0);
+        t.players[1].history.add_entry(
+            crate::players::history::EntryKind::POPULATION,
+            crate::players::history::Population::of_data(3),
+            crate::players::history::Population::ZERO,
+        );
         t.complete_building(object_id(10026)).unwrap();
         assert_eq!(
             t.players[1]

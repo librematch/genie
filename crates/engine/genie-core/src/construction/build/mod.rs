@@ -664,7 +664,11 @@ mod stack_tests {
     fn a_castle_s_completion_records_its_owner_s_id_in_its_history() {
         let mut t = world();
         t.world_time = WorldTime::from_millis(912_000);
-        t.players[1].history.add_entry(0, 3.0, 0.0);
+        t.players[1].history.add_entry(
+            crate::players::history::EntryKind::POPULATION,
+            crate::players::history::Population::of_data(3),
+            crate::players::history::Population::ZERO,
+        );
         for ms in &mut t.masters {
             let castle = building(
                 82,
@@ -681,7 +685,7 @@ mod stack_tests {
             t.players[1].history.events,
             [crate::players::history::Event {
                 kind: crate::players::history::EventKind::CASTLE_BUILT,
-                time_slice: 1,
+                time_slice: crate::players::history::TimeSlice::of_data(1),
                 world_time: WorldTime::from_millis(912_000),
                 data1: 1.0,
                 data2: 0.0,

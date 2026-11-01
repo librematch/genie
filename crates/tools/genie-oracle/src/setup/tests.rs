@@ -160,10 +160,13 @@ fn a_technology_state_of_none_stops_every_player() {
 #[test]
 fn the_slice_takes_the_master_tables() {
     let mut table = MasterTable::of_master(0, 83, None, 0);
-    table.time_slice = 9;
+    table.time_slice = genie_core::players::history::HistoryUpdates::of_data(9);
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let turns = slice(&save, Some(&table));
-    assert_eq!(turns.history_period, 9);
+    assert_eq!(
+        turns.history_period,
+        genie_core::players::history::HistoryUpdates::of_data(9)
+    );
     assert_eq!(turns.masters.len(), 2);
     assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
 }

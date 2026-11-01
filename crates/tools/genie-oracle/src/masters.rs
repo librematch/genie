@@ -274,7 +274,7 @@ pub struct MasterTable {
     pub effects: Vec<Vec<genie_core::technology::EffectCommand>>,
     /// The history period (the `.dat`'s `time_slice`, which the world keeps at `+0x8b8`); the
     /// world constructor's [`genie_core::world::HISTORY_PERIOD`] without a `.dat`.
-    pub time_slice: i32,
+    pub time_slice: genie_core::players::history::HistoryUpdates,
 }
 
 /// A technology of the `.dat` as the tech tree holds it: its costs, its type and its effect's
@@ -465,7 +465,7 @@ impl MasterTable {
             })
             .collect();
         (table.techs, table.effects) = tech_tables(dat)?;
-        table.time_slice = dat.time_slice;
+        table.time_slice = genie_core::players::history::HistoryUpdates::of_data(dat.time_slice);
         Ok(table)
     }
 

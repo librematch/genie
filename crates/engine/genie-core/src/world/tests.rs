@@ -12381,7 +12381,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     t.spatial.set_annex(object_id(31), Some(object_id(30)));
     t.spatial.set_annex(object_id(32), Some(object_id(30)));
     // a history adds events once it has an entry
-    t.players[1].history.entries = vec![[0, 0]];
+    t.players[1].history.entries = vec![crate::players::history::HistoryEntry::default()];
     let mut v = t.victim(object_id(30), PlayerId::new(1)).unwrap().unwrap();
     let b = v.building.clone().unwrap();
     assert_eq!(
@@ -17999,7 +17999,10 @@ fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_le
     }
     assert_eq!(finish(&mut t), Ok((ObjectState::Removed, vec![])));
     let mut t = house_builder();
-    t.players[1].history.entries.push([0, 0]);
+    t.players[1]
+        .history
+        .entries
+        .push(crate::players::history::HistoryEntry::default());
     t.players[1].attributes.resize(250, Amount::ZERO);
     for masters in &mut t.masters {
         let castle = Master {

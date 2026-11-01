@@ -101,24 +101,36 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
         t.players[1].update_time,
         Seconds::new((0.25f32 + 0.9) - 1.0)
     );
-    assert_eq!(t.players[1].history.update_count, 1);
+    assert_eq!(
+        t.players[1].history.update_count,
+        crate::players::history::HistoryUpdates::of_data(1)
+    );
     t.dt_seconds = Seconds::new(2.5);
     t.players[2].update_time = Seconds::ZERO;
     t.update_world_player(PlayerId::new(2)).unwrap();
     assert_eq!(t.players[2].update_time, Seconds::new(0.5));
-    assert_eq!(t.players[2].history.update_count, 2);
+    assert_eq!(
+        t.players[2].history.update_count,
+        crate::players::history::HistoryUpdates::of_data(2)
+    );
     // below a second, or NaN, no loop
     t.dt_seconds = Seconds::new(0.5);
     t.players[3].update_time = Seconds::new(f32::NAN);
     t.update_world_player(PlayerId::new(3)).unwrap();
-    assert_eq!(t.players[3].history.update_count, 0);
+    assert_eq!(
+        t.players[3].history.update_count,
+        crate::players::history::HistoryUpdates::of_data(0)
+    );
     // Gaia: its own update time, no loop
     t.update_world_player(PlayerId::new(0)).unwrap();
     assert_eq!(
         (t.players[0].gaia_update_time, t.players[0].update_time),
         (Seconds::new(0.5), Seconds::ZERO)
     );
-    assert_eq!(t.players[0].history.update_count, 0);
+    assert_eq!(
+        t.players[0].history.update_count,
+        crate::players::history::HistoryUpdates::of_data(0)
+    );
 }
 
 /// Attribute 22: the explored tiles over the map's, in percent; 100 under the explored and
