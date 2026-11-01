@@ -22,6 +22,7 @@ use genie_diff::Diff;
 mod cell;
 mod goal_marks;
 mod grid;
+mod grid_level;
 mod path_trace;
 mod plan_tile;
 mod planning;
@@ -31,6 +32,7 @@ mod smoothing;
 pub use self::cell::{Cell, CellEdges, CellKind};
 pub use self::goal_marks::Request;
 pub use self::grid::{Blocked, Planner};
+pub use self::grid_level::GridLevel;
 pub use self::plan_tile::{PlanRect, PlanTile};
 use self::search::{Node, OpenList};
 #[cfg(test)]

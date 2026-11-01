@@ -3,7 +3,7 @@
 
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{
-    CellEdges, CellKind, EARLY_LEFT, EARLY_START, NO_COST, Planner, SHORTCUT_COST,
+    CellEdges, CellKind, EARLY_LEFT, EARLY_START, GridLevel, NO_COST, Planner, SHORTCUT_COST,
 };
 use crate::{math::fmath, math::msvc};
 
@@ -29,7 +29,7 @@ pub(super) struct Node {
     pub(super) f: f32,
     pub(super) g: f32,
     /// `+0x18`.
-    pub(super) level: u8,
+    pub(super) level: GridLevel,
     /// `+0x19`: the edge back to the parent (none for the start).
     pub(super) dir: CellEdges,
     /// `+0x1a`: the cost was measured from the grandparent.
@@ -118,7 +118,7 @@ pub(super) struct TileNode {
     /// The cell at its level.
     pub(super) at: PlanTile,
     /// The cell's level.
-    pub(super) level: u8,
+    pub(super) level: GridLevel,
     /// The cost so far.
     pub(super) cost: f32,
     /// The estimate to the goal.
@@ -195,7 +195,7 @@ impl Planner {
     /// the level where it is a node cell; Some when it lies in the goal.
     pub(super) fn expand(
         &mut self,
-        level: u8,
+        level: GridLevel,
         at: PlanTile,
         g: f32,
         parent: usize,
@@ -209,11 +209,11 @@ impl Planner {
         }
         if !cell.kind.contains(CellKind::NODE) {
             if !cell.kind.contains(CellKind::MIXED) {
-                return self.expand(level + 1, at.up(1), g, parent, dir);
+                return self.expand(level.up(), at.parent(), g, parent, dir);
             }
             // the children on the edge `dir`: (2x, 2y) above and left, (2x + 1, 2y) above and
             // right, (2x, 2y + 1) left and below, (2x + 1, 2y + 1) right and below
-            let ([c0, c1, c2, c3], l) = (at.children(), level - 1);
+            let ([c0, c1, c2, c3], l) = (at.children(), level.down());
             if dir.intersects(Ed::N | Ed::W)
                 && let Some(n) = self.expand(l, c0, g, parent, dir)
             {
@@ -272,7 +272,7 @@ impl Planner {
         parent: usize,
         dir: CellEdges,
     ) -> Option<usize> {
-        let i = self.index(0, at);
+        let i = self.index(GridLevel::TILES, at);
         let b0 = self.cells[i].edges;
         if !b0.intersects(dir) || b0.contains(CellEdges::CLOSED) {
             return None;
@@ -287,7 +287,7 @@ impl Planner {
         let h = self.estimate_from(at);
         let n = self.alloc(TileNode {
             at,
-            level: 0,
+            level: GridLevel::TILES,
             cost: d + g0,
             estimate: h,
             parent: Some(parent),
@@ -324,7 +324,7 @@ impl Planner {
     /// the node it stopped at as the best).
     pub(super) fn search_levels(
         &mut self,
-        level: u8,
+        level: GridLevel,
         cell: PlanTile,
         start: PlanTile,
         full: bool,
@@ -376,13 +376,13 @@ impl Planner {
 
     /// `FUN_140f79250`: A* over the tiles from the start's tile.
     pub(super) fn search_tiles(&mut self, start: PlanTile) -> Option<usize> {
-        if self.cell(0, start).edges.is_empty() {
+        if self.cell(GridLevel::TILES, start).edges.is_empty() {
             return None;
         }
         let h0 = self.start_estimate(start);
         let n = self.alloc(TileNode {
             at: start,
-            level: 0,
+            level: GridLevel::TILES,
             cost: 0.0,
             estimate: h0,
             parent: None,

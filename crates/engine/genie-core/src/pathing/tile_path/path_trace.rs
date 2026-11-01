@@ -2,13 +2,13 @@
 //! goal.
 
 use crate::math::fmath::BVector;
-use crate::pathing::tile_path::{Cell, CellEdges, CellKind, HALF, PlanTile, Planner};
+use crate::pathing::tile_path::{Cell, CellEdges, CellKind, GridLevel, HALF, PlanTile, Planner};
 
 impl Planner {
     /// `FUN_140f7b9e0`: the steps from a child cell to the goal's tile at that level (`to`),
     /// counted only where the goal lies right of or below it; `0xffff` for a cell off the map or
     /// without edges.
-    pub(super) fn steps_to(&self, to: PlanTile, level: u8, cell: PlanTile) -> u16 {
+    pub(super) fn steps_to(&self, to: PlanTile, level: GridLevel, cell: PlanTile) -> u16 {
         let dy = (to.y() - cell.y()).max(0);
         let dx = (to.x() - cell.x()).max(0);
         let c = self.cell(level, cell);
@@ -24,11 +24,11 @@ impl Planner {
     pub(super) fn tile_toward(&self, n: usize, goal: PlanTile) -> PlanTile {
         let node = self.nodes[n];
         let mut at = node.at;
-        for l in (1..=node.level).rev() {
-            let cl = l - 1;
+        for l in (1..=node.level.get()).rev().map(GridLevel::new) {
+            let cl = l.down();
             // the children in the order (2x, 2y), (2x, 2y + 1), (2x + 1, 2y), (2x + 1, 2y + 1)
             let [c0, c1, c2, c3] = at.children();
-            let to = goal.up(l - 1);
+            let to = goal.at_level(l.down());
             let d = [
                 self.steps_to(to, cl, c0),
                 self.steps_to(to, cl, c2),
@@ -94,11 +94,13 @@ impl Planner {
     pub(super) fn crossing(&self, n: usize) -> Option<PlanTile> {
         let node = self.nodes[n];
         let parent = self.nodes[node.parent?];
+        // the levels as the shifts from a cell to its tiles
         let (smaller, l) = if parent.level < node.level {
-            (parent.at, parent.level)
+            (parent.at, parent.level.get())
         } else {
-            (node.at, node.level)
+            (node.at, node.level.get())
         };
+        let nl = node.level.get();
         let (x, y) = (smaller.x(), smaller.y());
         let (nx, ny) = (node.at.x(), node.at.y());
         let dir = node.dir;
@@ -113,13 +115,15 @@ impl Planner {
         let (mut ox, mut oy) = if dir == CellEdges::N || dir == CellEdges::S {
             let (lo, mid, hi) = span(x);
             let row = if dir == CellEdges::N {
-                ny << node.level
+                ny << nl
             } else {
-                ((ny + 1) << node.level) - 1
+                ((ny + 1) << nl) - 1
             };
             let x = if 0 < l {
-                self.nearest_on_boundary(mid, lo, hi, dir, |s| self.cell(0, PlanTile::new(s, row)))
-                    .unwrap_or(mid)
+                self.nearest_on_boundary(mid, lo, hi, dir, |s| {
+                    self.cell(GridLevel::TILES, PlanTile::new(s, row))
+                })
+                .unwrap_or(mid)
             } else {
                 mid
             };
@@ -127,13 +131,15 @@ impl Planner {
         } else if dir == CellEdges::W || dir == CellEdges::E {
             let (lo, mid, hi) = span(y);
             let col = if dir == CellEdges::W {
-                nx << node.level
+                nx << nl
             } else {
-                ((nx + 1) << node.level) - 1
+                ((nx + 1) << nl) - 1
             };
             let y = if 0 < l {
-                self.nearest_on_boundary(mid, lo, hi, dir, |s| self.cell(0, PlanTile::new(col, s)))
-                    .unwrap_or(mid)
+                self.nearest_on_boundary(mid, lo, hi, dir, |s| {
+                    self.cell(GridLevel::TILES, PlanTile::new(col, s))
+                })
+                .unwrap_or(mid)
             } else {
                 mid
             };
@@ -157,11 +163,13 @@ impl Planner {
     pub(super) fn aim(&self, n: usize, toward: PlanTile, from: PlanTile) -> Option<PlanTile> {
         let node = self.nodes[n];
         let parent = self.nodes[node.parent?];
+        // the levels as the shifts from a cell to its tiles
         let (smaller, bl) = if parent.level < node.level {
-            (parent.at, parent.level)
+            (parent.at, parent.level.get())
         } else {
-            (node.at, node.level)
+            (node.at, node.level.get())
         };
+        let nl = node.level.get();
         let (bx, by) = (smaller.x(), smaller.y());
         let (nx, ny) = (node.at.x(), node.at.y());
         let (tx, ty, lx, ly) = (toward.x(), toward.y(), from.x(), from.y());
@@ -178,8 +186,8 @@ impl Planner {
         let (lo, hi, at, fixed) = if dir == CellEdges::N || dir == CellEdges::S {
             let lo = bx << bl;
             let hi = ((bx + 1) << bl) - 1;
-            let bottom = ((ny + 1) << node.level) - 1;
-            let top = ny << node.level;
+            let bottom = ((ny + 1) << nl) - 1;
+            let top = ny << nl;
             let last = self.last_tile();
             let hi = hi.min(last.x());
             let bottom = bottom.min(last.y());
@@ -192,8 +200,8 @@ impl Planner {
                 (lo, hi, lx, bottom)
             }
         } else {
-            let left = nx << node.level;
-            let right = ((nx + 1) << node.level) - 1;
+            let left = nx << nl;
+            let right = ((nx + 1) << nl) - 1;
             let lo = by << bl;
             let hi = ((by + 1) << bl) - 1;
             if dir == CellEdges::W {
@@ -207,9 +215,9 @@ impl Planner {
         };
         let passes = |s: i16| {
             let c = if dir == CellEdges::N || dir == CellEdges::S {
-                self.cell(0, PlanTile::new(s, fixed))
+                self.cell(GridLevel::TILES, PlanTile::new(s, fixed))
             } else {
-                self.cell(0, PlanTile::new(fixed, s))
+                self.cell(GridLevel::TILES, PlanTile::new(fixed, s))
             };
             c.edges.intersects(dir)
         };

@@ -3,7 +3,7 @@
 use crate::map::Distance;
 use crate::map::Point;
 use crate::pathing::tile_path::{
-    CellEdges, CellKind, FAR_SIDE, HALF, ONE, PlanRect, PlanTile, Planner,
+    CellEdges, CellKind, FAR_SIDE, GridLevel, HALF, ONE, PlanRect, PlanTile, Planner,
 };
 
 /// A search's request: from a point to a goal with its ranges, as the planner's entry passes
@@ -53,13 +53,13 @@ pub(super) const fn tile(v: f32) -> i16 {
 impl Planner {
     /// `FUN_140f7ba80`: whether `cell` of `level` lies within the goal's ranges of (`x`, `y`):
     /// one of its passable (or lone) tiles, measured from the tile's corner.
-    pub(super) fn in_range(&self, level: u8, cell: PlanTile, goal: Goal) -> bool {
+    pub(super) fn in_range(&self, level: GridLevel, cell: PlanTile, goal: Goal) -> bool {
         let Goal { x, y, radii, range } = goal;
         if !self.region.holds_at(level, cell) {
             return false;
         }
         let r = range + Distance::new(HALF);
-        let step = 1i16 << level;
+        let step = 1i16 << level.get();
         let off = |v: f32, centre: f32| {
             let d = (v - (centre + -HALF)).abs();
             let d = if d <= radii { 0.0 } else { d - radii };
@@ -73,7 +73,7 @@ impl Planner {
         let (x0, y0) = (first.x(), first.y());
         for tx in x0..=step - 1 + x0 {
             for ty in y0..=step - 1 + y0 {
-                let c = self.cell(0, PlanTile::new(tx, ty));
+                let c = self.cell(GridLevel::TILES, PlanTile::new(tx, ty));
                 if c.edges.is_empty() && !c.kind.contains(CellKind::LONE) {
                     continue;
                 }
@@ -136,15 +136,15 @@ impl Planner {
         let mut marked = 0;
         for cx in (x0 >> 3)..=(x1 >> 3) {
             for cy in (y0 >> 3)..=(y1 >> 3) {
-                marked += self.mark_cells(3, PlanTile::new(cx, cy), goal, set);
+                marked += self.mark_cells(GridLevel::TOP, PlanTile::new(cx, cy), goal, set);
             }
         }
         if marked != 0 {
             self.goal_marked = true;
             return;
         }
-        let Some(i) = (0..=3u8).rev().find_map(|l| {
-            let i = self.index(l, self.goal.up(l));
+        let Some(i) = GridLevel::ALL.into_iter().rev().find_map(|l| {
+            let i = self.index(l, self.goal.at_level(l));
             self.cells[i].kind.contains(CellKind::NODE).then_some(i)
         }) else {
             return;
@@ -156,19 +156,25 @@ impl Planner {
 
     /// `FUN_140f7d7a0`: the node cells under a cell within the goal's ranges, marked or cleared;
     /// returns how many changed.
-    pub(super) fn mark_cells(&mut self, level: u8, cell: PlanTile, goal: Goal, set: bool) -> i32 {
+    pub(super) fn mark_cells(
+        &mut self,
+        level: GridLevel,
+        cell: PlanTile,
+        goal: Goal,
+        set: bool,
+    ) -> i32 {
         if !self.region.holds_at(level, cell) {
             return 0;
         }
         let i = self.index(level, cell);
         if !self.cells[i].kind.contains(CellKind::NODE) {
-            if level == 0 {
+            if level == GridLevel::TILES {
                 return 0;
             }
             return cell
                 .children()
                 .into_iter()
-                .map(|c| self.mark_cells(level - 1, c, goal, set))
+                .map(|c| self.mark_cells(level.down(), c, goal, set))
                 .sum();
         }
         i32::from(self.in_range(level, cell, goal) && self.toggle_goal(i, set))
@@ -183,14 +189,14 @@ impl Planner {
         for ty in y0..=y1 {
             for tx in x0..=x1 {
                 let t = PlanTile::new(tx, ty);
-                if self.in_range(0, t, goal) {
-                    let i = self.index(0, t);
+                if self.in_range(GridLevel::TILES, t, goal) {
+                    let i = self.index(GridLevel::TILES, t);
                     changed |= self.toggle_goal(i, set);
                 }
             }
         }
         if !changed {
-            let i = self.index(0, self.goal);
+            let i = self.index(GridLevel::TILES, self.goal);
             let _ = self.toggle_goal(i, set);
         }
     }
@@ -209,19 +215,19 @@ impl Planner {
         self.region = PlanRect::new(rx0, ry0, rx1, ry1);
         for cx in (rx0 >> 3)..=(rx1 >> 3) {
             for cy in (ry0 >> 3)..=(ry1 >> 3) {
-                self.close_cells(3, PlanTile::new(cx, cy), set);
+                self.close_cells(GridLevel::TOP, PlanTile::new(cx, cy), set);
             }
         }
     }
 
     /// `FUN_140f7e070`: the node cells under `cell` of `level` within the region closed or
     /// reopened; the last child is walked by the loop, the others by recursion.
-    pub(super) fn close_cells(&mut self, mut level: u8, mut cell: PlanTile, set: bool) {
+    pub(super) fn close_cells(&mut self, mut level: GridLevel, mut cell: PlanTile, set: bool) {
         while !self.cell(level, cell).kind.contains(CellKind::NODE) {
-            if level == 0 {
+            if level == GridLevel::TILES {
                 return;
             }
-            level -= 1;
+            level = level.down();
             let [c0, c1, c2, c3] = cell.children();
             self.close_cells(level, c0, set);
             self.close_cells(level, c1, set);

@@ -174,15 +174,18 @@ fn a_full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
 fn an_open_map_is_one_node_cell_per_eight_tiles() {
     let p = Planner::new(GridSize::new(16, 8), vec![0; 128], vec![1.0], &open_map);
     let levels = [(16, 8), (8, 4), (4, 2), (2, 1)].map(|(w, h)| GridSize::new(w, h));
-    assert_eq!([0, 1, 2, 3].map(|l| p.level_size(l)), levels);
+    assert_eq!(GridLevel::ALL.map(|l| p.level_size(l)), levels);
     // level 3: two uniform node cells, joined across their shared edge only
     let node = |edges| Cell {
         edges,
         kind: CellKind::NODE,
     };
-    assert_eq!(p.level(3), &[node(CellEdges::E), node(CellEdges::W)]);
+    assert_eq!(
+        p.level(GridLevel::new(3)),
+        &[node(CellEdges::E), node(CellEdges::W)]
+    );
     // an inner tile has all four edges; a corner tile two
-    let tile = |x: usize, y: usize| p.level(0)[y * 16 + x].bytes();
+    let tile = |x: usize, y: usize| p.level(GridLevel::new(0))[y * 16 + x].bytes();
     assert_eq!(tile(3, 3), [CellEdges::EDGES.bits(), 0]);
     assert_eq!(tile(0, 0), [(CellEdges::E | CellEdges::S).bits(), 0]);
 }
@@ -191,12 +194,15 @@ fn an_open_map_is_one_node_cell_per_eight_tiles() {
 fn padding_tiles_of_a_map_that_is_not_a_multiple_of_eight_lie_off_the_map() {
     let p = Planner::new(GridSize::new(6, 6), vec![0; 36], vec![1.0], &open_map);
     let levels = [8, 4, 2, 1].map(|s| GridSize::new(s, s));
-    assert_eq!([0, 1, 2, 3].map(|l| p.level_size(l)), levels);
-    let tile = |x: usize, y: usize| p.level(0)[y * 8 + x].bytes();
+    assert_eq!(GridLevel::ALL.map(|l| p.level_size(l)), levels);
+    let tile = |x: usize, y: usize| p.level(GridLevel::new(0))[y * 8 + x].bytes();
     assert_eq!(tile(6, 0), [0, 0xf]);
     assert_eq!(tile(5, 5), [(CellEdges::N | CellEdges::W).bits(), 0]);
     // the level-1 cell (3, 0) covers tiles 6 and 7: off the map, both of its children
-    assert_eq!(p.level(1)[3].kind.off_map(), CellKind::OFF_MAP);
+    assert_eq!(
+        p.level(GridLevel::new(1))[3].kind.off_map(),
+        CellKind::OFF_MAP
+    );
 }
 
 #[test]
@@ -205,9 +211,15 @@ fn a_wall_splits_its_level_three_cell_into_its_children() {
     let wall = |t: Tile| t.x() == 3;
     let p = Planner::new(GridSize::new(8, 8), vec![0; 64], vec![1.0], &wall);
     let node_or_mixed = CellKind::NODE | CellKind::MIXED;
-    assert_eq!(p.level(3)[0].kind & node_or_mixed, CellKind::MIXED);
-    assert_eq!(p.level(0)[3], Cell::EMPTY);
-    assert_eq!(p.level(0)[2].edges, CellEdges::W | CellEdges::S);
+    assert_eq!(
+        p.level(GridLevel::new(3))[0].kind & node_or_mixed,
+        CellKind::MIXED
+    );
+    assert_eq!(p.level(GridLevel::new(0))[3], Cell::EMPTY);
+    assert_eq!(
+        p.level(GridLevel::new(0))[2].edges,
+        CellEdges::W | CellEdges::S
+    );
 }
 
 #[test]
@@ -345,16 +357,20 @@ fn a_closed_rectangle_closes_the_node_cells_under_it() {
     let mut p = Planner::new(GridSize::new(16, 8), vec![0; 128], vec![1.0], &walls);
     let open = p.clone();
     let node_or_mixed = CellKind::NODE | CellKind::MIXED;
-    assert_eq!(p.level(1)[0].kind & node_or_mixed, CellKind::MIXED);
-    assert!(p.level(0)[0].kind.contains(CellKind::NODE));
+    assert_eq!(
+        p.level(GridLevel::new(1))[0].kind & node_or_mixed,
+        CellKind::MIXED
+    );
+    assert!(p.level(GridLevel::new(0))[0].kind.contains(CellKind::NODE));
     // the corners swapped and the low y off the map
     p.close_rect(PlanRect::new(5, 3, 1, -2), true);
     assert_eq!(p.region, PlanRect::new(1, 0, 5, 3));
-    let closed = |p: &Planner, l: usize, x: usize, y: usize| {
+    let closed = |p: &Planner, l: u8, x: usize, y: usize| {
+        let l = GridLevel::new(l);
         let w = p.level_size(l).width() as usize;
         p.level(l)[y * w + x].edges.contains(CellEdges::CLOSED)
     };
-    let expected: [(usize, usize, usize, bool); 14] = [
+    let expected: [(u8, usize, usize, bool); 14] = [
         (0, 0, 0, false),
         (0, 1, 0, true),
         (0, 1, 1, true),
@@ -377,7 +393,7 @@ fn a_closed_rectangle_closes_the_node_cells_under_it() {
     let once = p.clone();
     p.close_rect(PlanRect::new(1, 0, 5, 3), true);
     assert_eq!(p, once);
-    assert_eq!(p.level(0)[1].edges, CellEdges::CLOSED);
+    assert_eq!(p.level(GridLevel::new(0))[1].edges, CellEdges::CLOSED);
     // the high corner past the map's size holds at its last tile: everything reopens
     p.close_rect(PlanRect::new(0, 0, 20, 9), false);
     assert_eq!(p.region, PlanRect::new(0, 0, 15, 7));
@@ -393,7 +409,7 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
         entry: PlanTile::new(0, 0),
         f,
         g: 0.0,
-        level: 0,
+        level: GridLevel::TILES,
         dir: CellEdges::NONE,
         shortcut: false,
         parent: None,
@@ -445,4 +461,15 @@ fn a_cell_keeps_the_game_s_two_bytes_and_byte_arithmetic() {
         CellKind::GOAL
     );
     assert_eq!(Cell::default(), Cell::EMPTY);
+}
+
+/// A grid level: the tiles at 0, the top at 3, each a step up or down, read as the shift and
+/// the per-level index.
+#[test]
+fn a_grid_level_steps_between_the_tiles_and_the_top() {
+    assert_eq!(GridLevel::ALL, [0, 1, 2, 3].map(GridLevel::new));
+    assert_eq!(GridLevel::TILES.up().up().up(), GridLevel::TOP);
+    assert_eq!(GridLevel::TOP.down(), GridLevel::new(2));
+    assert_eq!((GridLevel::TOP.get(), GridLevel::TOP.index()), (3, 3));
+    assert!(GridLevel::TILES < GridLevel::TOP);
 }

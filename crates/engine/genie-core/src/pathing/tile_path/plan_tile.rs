@@ -3,6 +3,7 @@
 
 use crate::map::Point;
 use crate::map::Tile;
+use crate::pathing::tile_path::GridLevel;
 
 /// A place on the tile planner's grid as the planner's shorts (x, y): at level 0 a tile, at
 /// level `l` a cell of 2^l × 2^l tiles (`+8`, `+0xa` of a node; the goal's tile `+0x410`).
@@ -49,10 +50,17 @@ impl PlanTile {
         Self([self.0[0] + dx, self.0[1] + dy])
     }
 
-    /// The cell holding it `levels` levels up: x and y shifted right.
+    /// The cell holding a tile at `level`: x and y shifted right by the level.
     #[must_use]
-    pub const fn up(self, levels: u8) -> Self {
-        Self([self.0[0] >> levels, self.0[1] >> levels])
+    pub const fn at_level(self, level: GridLevel) -> Self {
+        let l = level.get();
+        Self([self.0[0] >> l, self.0[1] >> l])
+    }
+
+    /// The cell holding a cell a level up: x and y shifted right by one.
+    #[must_use]
+    pub const fn parent(self) -> Self {
+        Self([self.0[0] >> 1, self.0[1] >> 1])
     }
 
     /// A cell's four children a level down, in the game's order: (2x, 2y), (2x + 1, 2y),
@@ -70,19 +78,21 @@ impl PlanTile {
 
     /// A cell's first tile at `level`: x and y shifted left.
     #[must_use]
-    pub const fn corner_at(self, level: u8) -> Self {
-        Self([self.0[0] << level, self.0[1] << level])
+    pub const fn corner_at(self, level: GridLevel) -> Self {
+        let l = level.get();
+        Self([self.0[0] << l, self.0[1] << l])
     }
 
     /// A cell's centre tile at `level` (its first tile plus half its side); the tile itself at
     /// level 0.
     #[must_use]
-    pub const fn centre_at(self, level: u8) -> Self {
-        if level == 0 {
+    pub const fn centre_at(self, level: GridLevel) -> Self {
+        let l = level.get();
+        if l == 0 {
             return self;
         }
-        let half = 1i16 << (level - 1);
-        Self([(self.0[0] << level) + half, (self.0[1] << level) + half])
+        let half = 1i16 << (l - 1);
+        Self([(self.0[0] << l) + half, (self.0[1] << l) + half])
     }
 
     /// The tile at level 0, widened.
@@ -116,12 +126,10 @@ impl PlanRect {
 
     /// Whether it holds `cell` of `level`: the corners shifted to the level, both included.
     #[must_use]
-    pub const fn holds_at(self, level: u8, cell: PlanTile) -> bool {
+    pub const fn holds_at(self, level: GridLevel, cell: PlanTile) -> bool {
         let [x0, y0, x1, y1] = self.0;
-        x0 >> level <= cell.x()
-            && y0 >> level <= cell.y()
-            && cell.x() <= x1 >> level
-            && cell.y() <= y1 >> level
+        let l = level.get();
+        x0 >> l <= cell.x() && y0 >> l <= cell.y() && cell.x() <= x1 >> l && cell.y() <= y1 >> l
     }
 }
 
@@ -134,7 +142,11 @@ mod tests {
         let t = PlanTile::new(13, -2);
         assert_eq!((t.x(), t.y(), t.get()), (13, -2, [13, -2]));
         assert_eq!(t.stepped(-1, 3), PlanTile::new(12, 1));
-        assert_eq!(PlanTile::new(13, 6).up(2), PlanTile::new(3, 1));
+        assert_eq!(
+            PlanTile::new(13, 6).at_level(GridLevel::new(2)),
+            PlanTile::new(3, 1)
+        );
+        assert_eq!(PlanTile::new(13, 6).parent(), PlanTile::new(6, 3));
         assert_eq!(t.tile(), Tile::new(13, -2));
         assert_eq!(
             PlanTile::of_point(Point::new(7.9, -0.5)),
@@ -159,19 +171,20 @@ mod tests {
             PlanTile::new(-0x8000, 0)
         );
         let c = PlanTile::new(3, 1);
-        assert_eq!(c.corner_at(2), PlanTile::new(12, 4));
-        assert_eq!(c.centre_at(2), PlanTile::new(14, 6));
-        assert_eq!(c.centre_at(0), c);
+        let two = GridLevel::new(2);
+        assert_eq!(c.corner_at(two), PlanTile::new(12, 4));
+        assert_eq!(c.centre_at(two), PlanTile::new(14, 6));
+        assert_eq!(c.centre_at(GridLevel::TILES), c);
     }
 
     #[test]
     fn a_rect_holds_a_cell_of_a_level_by_its_shifted_corners() {
         let r = PlanRect::new(8, 4, 23, 15);
         assert_eq!(r.get(), [8, 4, 23, 15]);
-        assert!(r.holds_at(0, PlanTile::new(8, 15)));
-        assert!(!r.holds_at(0, PlanTile::new(7, 15)));
+        assert!(r.holds_at(GridLevel::TILES, PlanTile::new(8, 15)));
+        assert!(!r.holds_at(GridLevel::TILES, PlanTile::new(7, 15)));
         // level 3: x 1..=2, y 0..=1
-        assert!(r.holds_at(3, PlanTile::new(2, 1)));
-        assert!(!r.holds_at(3, PlanTile::new(3, 1)));
+        assert!(r.holds_at(GridLevel::TOP, PlanTile::new(2, 1)));
+        assert!(!r.holds_at(GridLevel::TOP, PlanTile::new(3, 1)));
     }
 }

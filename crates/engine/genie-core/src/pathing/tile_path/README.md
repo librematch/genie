@@ -23,6 +23,7 @@ passability and the blocked tiles. A change to a building's tiles rebuilds the c
 | [`cell.rs`](cell.rs) | A planner grid's cell (`Cell`): its edges with the search's marks (`CellEdges`) and its kind (`CellKind`), the grid's two bytes. |
 | [`goal_marks.rs`](goal_marks.rs) | A search's request and goal: its ranges and the marks of the cells and tiles within them. |
 | [`grid.rs`](grid.rs) | A terrain restriction's planner (`Planner`) and its four-level grid: built, read and rebuilt over a changed rectangle. |
+| [`grid_level.rs`](grid_level.rs) | A level of a planner's grid (`GridLevel`). |
 | [`mod.rs`](mod.rs) | The tile pathfinder: a planner per terrain restriction in use (the world's list at `world + 0x140`, made by `FUN_140f7d310`), which searches a four-level grid of the map's tiles for the path a unit's top path level asks for (`FUN_140f7c530`, called from the motion step's state-2 branch). |
 | [`path_trace.rs`](path_trace.rs) | The path's points: the tiles a node's path crosses into and aims at, traced back from the goal. |
 | [`plan_tile.rs`](plan_tile.rs) | The planner's places as its shorts: a tile or a cell of a level (`PlanTile`) and a rectangle of tiles (`PlanRect`). |

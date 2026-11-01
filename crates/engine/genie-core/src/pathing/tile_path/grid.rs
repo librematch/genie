@@ -5,7 +5,7 @@ use crate::map::GridSize;
 use crate::map::Tile;
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::{
-    Cell, CellEdges, CellKind, NO_COST, Node, OpenList, PlanRect, PlanTile,
+    Cell, CellEdges, CellKind, GridLevel, NO_COST, Node, OpenList, PlanRect, PlanTile,
 };
 
 /// A terrain restriction's planner (`0x4a8` bytes, built by `FUN_140f74f90`).
@@ -97,7 +97,7 @@ impl Planner {
         };
         for x in (0..w0 >> 3).rev() {
             for y in (0..h0 >> 3).rev() {
-                let _ = planner.init_cell(3, PlanTile::new(x, y));
+                let _ = planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
             }
         }
         planner.update(PlanRect::new(0, 0, w, h), map);
@@ -117,44 +117,44 @@ impl Planner {
 
     /// The grid of `level`, row by row.
     #[must_use]
-    pub fn level(&self, level: usize) -> &[Cell] {
-        let start = self.offsets[level] as usize;
-        let size = self.levels[level];
+    pub fn level(&self, level: GridLevel) -> &[Cell] {
+        let start = self.offsets[level.index()] as usize;
+        let size = self.levels[level.index()];
         let n = (size.width() * size.height()) as usize;
         &self.cells[start..start + n]
     }
 
     /// The size of `level`'s grid in cells.
     #[must_use]
-    pub const fn level_size(&self, level: usize) -> GridSize {
-        self.levels[level]
+    pub const fn level_size(&self, level: GridLevel) -> GridSize {
+        self.levels[level.index()]
     }
 
     /// The cell `at` of `level`'s place in the cells.
-    pub(super) fn index(&self, level: u8, at: PlanTile) -> usize {
-        let l = usize::from(level);
+    pub(super) fn index(&self, level: GridLevel, at: PlanTile) -> usize {
+        let l = level.index();
         let i = i64::from(self.levels[l].width()) * i64::from(at.y())
             + i64::from(at.x())
             + i64::from(self.offsets[l]);
         usize::try_from(i).expect("a cell outside the planner's grid")
     }
 
-    pub(super) fn cell(&self, level: u8, at: PlanTile) -> Cell {
+    pub(super) fn cell(&self, level: GridLevel, at: PlanTile) -> Cell {
         self.cells[self.index(level, at)]
     }
 
     /// `FUN_140f7da90`: clear a cell and mark its children that lie off the map; true when all of
     /// it does.
-    pub(super) fn init_cell(&mut self, level: u8, at: PlanTile) -> bool {
+    pub(super) fn init_cell(&mut self, level: GridLevel, at: PlanTile) -> bool {
         let i = self.index(level, at);
         self.cells[i] = Cell::EMPTY;
-        if level == 0 {
+        if level == GridLevel::TILES {
             if self.size.width() <= i32::from(at.x()) || self.size.height() <= i32::from(at.y()) {
                 self.cells[i].kind = CellKind::OFF_MAP;
             }
         } else {
             for (bit, child) in at.children().into_iter().enumerate() {
-                if self.init_cell(level - 1, child) {
+                if self.init_cell(level.down(), child) {
                     self.cells[i].kind = self.cells[i].kind.plus(CellKind::child_off_map(bit));
                 }
             }
@@ -205,23 +205,23 @@ impl Planner {
         self.region = PlanRect::new(rx0, ry0, rx1, ry1);
         for cx in (rx0 >> 3)..=(rx1 >> 3) {
             for cy in (ry0 >> 3)..=(ry1 >> 3) {
-                let _ = self.rebuild(3, PlanTile::new(cx, cy), map);
+                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), map);
             }
         }
     }
 
     /// `FUN_140f7e5e0`: a cell's edges and kind from its tile (level 0) or its children; returns
     /// the cell.
-    pub(super) fn rebuild(&mut self, level: u8, at: PlanTile, map: &impl Blocked) -> Cell {
+    pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, map: &impl Blocked) -> Cell {
         let i = self.index(level, at);
         let old = self.cells[i].kind;
         let mut low = old.off_map();
-        if level == 0 {
+        if level == GridLevel::TILES {
             self.cells[i].kind = low;
             if old.contains(CellKind::LONE) {
                 self.cells[i].kind = low.plus(CellKind::LONE);
             }
-            if self.region.holds_at(0, at) {
+            if self.region.holds_at(GridLevel::TILES, at) {
                 let a = self.adjacency(at.tile(), map);
                 self.cells[i].edges = CellEdges::NONE;
                 if a & 1 == 0 {
@@ -248,7 +248,7 @@ impl Planner {
             }
             return self.cells[i];
         }
-        let l = level - 1;
+        let l = level.down();
         let children = at.children();
         let mut child = [Cell::EMPTY; 4];
         for (k, &c) in children.iter().enumerate() {
@@ -275,7 +275,7 @@ impl Planner {
                     self.cells[c].kind = self.cells[c].kind.plus(CellKind::NODE);
                 }
             }
-        } else if level == 3 {
+        } else if level == GridLevel::TOP {
             low = low.plus(CellKind::NODE);
         }
         self.cells[i] = Cell {
