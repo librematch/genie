@@ -9200,10 +9200,10 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
         p.resources(),
         crate::test_ids::amounts([154.0, 200.0, 200.0, 200.0])
     );
-    let production = p.objects[ListIndex::new(0)]
-        .building
+    let production = t
+        .parts
         .production
-        .as_ref()
+        .get(p.objects[ListIndex::new(0)].id)
         .unwrap();
     // the make action works in the tick it is created in
     let Some(crate::production::Making::Unit(make)) = production.action else {
@@ -9248,10 +9248,9 @@ fn a_queued_villager_is_male_or_female_by_an_action_stream_draw() {
         Some(master_id(293))
     };
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .building
+        t.parts
             .production
-            .as_ref()
+            .get(t.players[0].objects[ListIndex::new(0)].id)
             .unwrap()
             .queue
             .slots[0]
@@ -9270,9 +9269,9 @@ fn a_queue_the_player_cannot_pay_or_at_a_missing_building_queues_nothing() {
     assert_eq!(poor.players[0].attributes[0], Amount::new(40.0));
     let tc = &poor.players[0].objects[ListIndex::new(0)];
     assert!(
-        tc.building
+        poor.parts
             .production
-            .as_ref()
+            .get(tc.id)
             .is_none_or(|p| p.queue.entries().is_empty())
     );
     let mut idle = one_player(vec![centre(9)], [40.0, 0.0, 0.0, 0.0]);
@@ -9307,10 +9306,9 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
         })
     };
     let total = |t: &World, k: ListIndex| {
-        t.players[0].objects[k]
-            .building
+        t.parts
             .production
-            .as_ref()
+            .get(t.players[0].objects[k].id)
             .map_or(0, |p| p.queue.total.get())
     };
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
@@ -9322,10 +9320,10 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
     // a centre with work queued: 25 seconds less the work done the update gave it
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 99, 1)]);
-    let Some(crate::production::Making::Unit(make)) = t.players[0].objects[ListIndex::new(0)]
-        .building
+    let Some(crate::production::Making::Unit(make)) = t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[0].objects[ListIndex::new(0)].id)
         .and_then(|p| p.action)
     else {
         panic!("a make action");
@@ -9371,10 +9369,9 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
         t
     };
     let total = |t: &World, k: ListIndex| {
-        t.players[0].objects[k]
-            .building
+        t.parts
             .production
-            .as_ref()
+            .get(t.players[0].objects[k].id)
             .map_or(0, |p| p.queue.total.get())
     };
     let both = Command::Queue(QueueCommand {
@@ -9401,10 +9398,10 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
         crate::test_ids::amounts([200.0; 4])
     );
     assert!(
-        alone.players[0].objects[ListIndex::new(0)]
-            .building
+        !alone
+            .parts
             .production
-            .is_none()
+            .contains(alone.players[0].objects[ListIndex::new(0)].id)
     );
 }
 
@@ -9439,20 +9436,19 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
         crate::test_ids::amounts([200.0; 4])
     );
     assert_eq!(t.players[1].attributes[0], Amount::new(54.0));
-    let production = t.players[1].objects[ListIndex::new(0)]
-        .building
+    let production = t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     assert_eq!(production.queue.total, QueuedUnits::ONE);
     let mut t = two(false);
     t.tick_with(Millis::new(104), &[queue(10, 83, 1)]);
     assert_eq!(t.players[1].attributes[0], Amount::new(100.0));
     assert!(
-        t.players[1].objects[ListIndex::new(0)]
-            .building
+        !t.parts
             .production
-            .is_none()
+            .contains(t.players[1].objects[ListIndex::new(0)].id)
     );
 }
 
@@ -9474,17 +9470,16 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
     });
     t.tick_with(Millis::new(104), &[both]);
     assert!(t.players[0].unsupported.is_none());
-    let production = t.players[0].objects[ListIndex::new(0)]
-        .building
+    let production = t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[0].objects[ListIndex::new(0)].id)
         .unwrap();
     assert_eq!(production.queue.total, QueuedUnits::of_data(2));
     assert!(
-        t.players[0].sleeping[ListIndex::new(0)]
-            .building
+        !t.parts
             .production
-            .is_none()
+            .contains(t.players[0].sleeping[ListIndex::new(0)].id)
     );
 }
 
@@ -9641,10 +9636,10 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
             shift: false,
         };
         let r = research_listed(&mut t, &at);
-        let queued = t.players[0].objects[ListIndex::new(0)]
-            .building
+        let queued = t
+            .parts
             .production
-            .as_ref()
+            .get(t.players[0].objects[ListIndex::new(0)].id)
             .map_or(0, |p| p.queue.total.get());
         (r, queued)
     };
@@ -9711,10 +9706,9 @@ fn research_at(tech: i16, target: i32) -> ResearchCommand {
 #[test]
 fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
     let queued = |t: &World| {
-        t.players[0].objects[ListIndex::new(0)]
-            .building
+        t.parts
             .production
-            .as_ref()
+            .get(t.players[0].objects[ListIndex::new(0)].id)
             .map_or(0, |p| p.queue.total.get())
     };
     let mut t = research_world();
@@ -9769,10 +9763,10 @@ fn a_queued_research_starts_at_the_buildings_master() {
     t.produce(PlayerId::new(0), ListIndex::new(0), Seconds::ZERO)
         .unwrap();
     let master = t.players[0].objects[ListIndex::new(0)].life.master_id;
-    let action = t.players[0].objects[ListIndex::new(0)]
-        .building
+    let action = t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[0].objects[ListIndex::new(0)].id)
         .and_then(|p| p.action);
     let Some(crate::production::Making::Research(r)) = action else {
         panic!("a research action: {action:?}");
@@ -9862,10 +9856,9 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
     let mut one = one_player(vec![centre(9)], [100.0, 0.0, 0.0, 0.0]);
     one.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let queued = |t: &World| {
-        t.players[0].objects[ListIndex::new(0)]
-            .building
+        t.parts
             .production
-            .as_ref()
+            .get(t.players[0].objects[ListIndex::new(0)].id)
             .unwrap()
             .queue
             .total
@@ -9914,10 +9907,10 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
             with(QueuedUnits::ONE, QueueButton::of_data(1)),
         ],
     );
-    let q = &t.players[0].objects[ListIndex::new(0)]
-        .building
+    let q = &t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[0].objects[ListIndex::new(0)].id)
         .unwrap()
         .queue;
     assert_eq!(
@@ -9947,10 +9940,10 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
         .map(|k| with(QueuedUnits::ONE, QueueButton::of_data(k % 2)))
         .collect();
     t.tick_with(Millis::new(104), &alternating);
-    let q = &t.players[0].objects[ListIndex::new(0)]
-        .building
+    let q = &t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[0].objects[ListIndex::new(0)].id)
         .unwrap()
         .queue;
     assert_eq!((q.slots.len(), q.count.get(), q.total.get()), (20, 11, 11));
@@ -9972,10 +9965,10 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
         (p.attributes[0], p.attributes[80], p.attributes[81]),
         (Amount::new(1000.0), Amount::ZERO, Amount::ZERO)
     );
-    let production = p.objects[ListIndex::new(0)]
-        .building
+    let production = t
+        .parts
         .production
-        .as_ref()
+        .get(p.objects[ListIndex::new(0)].id)
         .unwrap();
     assert_eq!(
         (production.queue.count.get(), production.queue.total.get()),
@@ -9983,14 +9976,18 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
     );
     assert!(production.action.is_none());
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.players[0].objects[ListIndex::new(0)].building.production =
-        Some(crate::production::Production {
+    let tc = t.players[0].objects[ListIndex::new(0)].id;
+    t.set_part(
+        tc,
+        Part::Production(Some(Box::new(crate::production::Production {
             queue: crate::production::Queue {
                 enabled: false,
                 ..crate::production::Queue::default()
             },
             ..crate::production::Production::default()
-        });
+        }))),
+    )
+    .unwrap();
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
     assert_eq!(
@@ -9998,10 +9995,9 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
         (Amount::new(1.0), Amount::ZERO)
     );
     assert!(
-        p.objects[ListIndex::new(0)]
-            .building
+        t.parts
             .production
-            .as_ref()
+            .get(p.objects[ListIndex::new(0)].id)
             .unwrap()
             .action
             .is_none()
@@ -10016,10 +10012,10 @@ fn game_mode_16_queues_one_military_unit_at_a_time() {
     t.settings.game_mode = GameMode::of_data(16);
     t.tick_with(Millis::new(104), &[queue(9, 99, 3)]);
     t.tick_with(Millis::new(104), &[queue(9, 99, 2)]);
-    let q = &t.players[0].objects[ListIndex::new(0)]
-        .building
+    let q = &t
+        .parts
         .production
-        .as_ref()
+        .get(t.players[0].objects[ListIndex::new(0)].id)
         .unwrap()
         .queue;
     assert_eq!(q.total, QueuedUnits::ONE);

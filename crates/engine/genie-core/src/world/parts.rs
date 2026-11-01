@@ -16,6 +16,7 @@ use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
+use crate::production::Production;
 use crate::world::World;
 use genie_diff::{Diff, Differ};
 use std::borrow::Cow;
@@ -120,6 +121,9 @@ pub struct Parts {
     /// A building's gather point (`+0xc30`..`+0xc44`, the save's `gather_point_*`), which its
     /// trained units go to: SET GATHER POINT's and SET GATHER STATE's.
     pub gather_point: PartTable<GatherPoint>,
+    /// A building's production lists (`+0xc48`..`+0xd48`, the save's production queue, its make
+    /// action and its local lists): QUEUE's first entry makes them.
+    pub production: PartTable<Production>,
 }
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
@@ -132,6 +136,9 @@ pub struct ObjectParts {
     /// Its gather point ([`Parts::gather_point`]).
     #[diff(path = "building.gather_point")]
     pub gather_point: Option<GatherPoint>,
+    /// Its production lists ([`Parts::production`]).
+    #[diff(path = "building.production")]
+    pub production: Option<Production>,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -201,12 +208,16 @@ impl Parts {
         let ObjectParts {
             dead_master,
             gather_point,
+            production,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
         }
         if let Some(g) = gather_point {
             let _ = self.gather_point.insert(id, g);
+        }
+        if let Some(p) = production {
+            let _ = self.production.insert(id, p);
         }
     }
 
@@ -215,6 +226,7 @@ impl Parts {
         ObjectParts {
             dead_master: self.dead_master.remove(id),
             gather_point: self.gather_point.remove(id),
+            production: self.production.remove(id),
         }
     }
 
@@ -224,6 +236,7 @@ impl Parts {
         ObjectParts {
             dead_master: self.dead_master.get(id).cloned(),
             gather_point: self.gather_point.get(id).copied(),
+            production: self.production.get(id).cloned(),
         }
     }
 
@@ -233,6 +246,7 @@ impl Parts {
             .iter()
             .map(|(id, _)| id)
             .chain(self.gather_point.iter().map(|(id, _)| id))
+            .chain(self.production.iter().map(|(id, _)| id))
     }
 }
 
@@ -243,6 +257,8 @@ pub enum Part {
     DeadMaster(Box<Master>),
     /// The gather point ([`Parts::gather_point`]), none clearing it.
     GatherPoint(Option<GatherPoint>),
+    /// The production lists ([`Parts::production`]), boxed, none clearing them.
+    Production(Option<Box<Production>>),
 }
 
 impl World {
@@ -269,8 +285,30 @@ impl World {
             Part::GatherPoint(None) => {
                 let _ = self.parts.gather_point.remove(id);
             }
+            Part::Production(Some(p)) => {
+                let _ = self.parts.production.insert(id, *p);
+            }
+            Part::Production(None) => {
+                let _ = self.parts.production.remove(id);
+            }
         }
         Ok(())
+    }
+
+    /// Object `id`'s production lists, made empty when it has none (QUEUE's first entry at a
+    /// building, a technology's local list). The world must hold the object.
+    ///
+    /// # Errors
+    ///
+    /// An object the world does not hold.
+    pub fn production_or_new(&mut self, id: ObjectId) -> Result<&mut Production, GenieError> {
+        if !self.parts.production.contains(id) {
+            self.set_part(id, Part::Production(Some(Box::default())))?;
+        }
+        self.parts
+            .production
+            .get_mut(id)
+            .ok_or(GenieError::unreachable("a production the world just filed"))
     }
 
     /// A loaded object's saved parts go into the tables (the import, after the world's lists
@@ -461,6 +499,39 @@ mod tests {
         assert!(t.parts.gather_point.is_empty());
     }
 
+    /// A building's production lists are made empty at their first use and found again after;
+    /// an object the world does not hold gets none.
+    #[test]
+    fn a_production_is_made_empty_once_and_found_again() {
+        use crate::players::PlayerId;
+        let id = object_id(5);
+        let mut t = World::new(
+            crate::world::WorldTime::ZERO,
+            crate::world::FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![crate::world::Millis::ZERO],
+            vec![crate::world::player::Player {
+                objects: vec![Unit {
+                    id,
+                    ..Unit::default()
+                }]
+                .into(),
+                ..Default::default()
+            }],
+        );
+        assert!(t.production_or_new(object_id(6)).is_err());
+        assert!(t.parts.production.is_empty());
+        let made = t.production_or_new(id).unwrap();
+        assert_eq!(*made, Production::default());
+        made.disabled_techs.push(crate::test_ids::tech_id(3));
+        let again = t.production_or_new(id).unwrap();
+        assert_eq!(again.disabled_techs, [crate::test_ids::tech_id(3)]);
+        assert_eq!(t.parts.production.len(), 1);
+        t.set_part(id, Part::Production(None)).unwrap();
+        assert!(t.parts.production.is_empty());
+        t.check_parts().unwrap();
+    }
+
     /// A gather point at `x` on no target.
     fn gather_point(x: f32) -> GatherPoint {
         GatherPoint {
@@ -473,7 +544,8 @@ mod tests {
 
     /// A whole object compares its row's fields and its parts' at the paths they had on the
     /// object: the dead master is a known gap (left out of the saved scope), the gather point
-    /// compares at the building layer's path, a row's field keeps its own path.
+    /// and the production compare at the building layer's paths, a row's field keeps its own
+    /// path.
     #[test]
     fn a_whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
@@ -485,16 +557,25 @@ mod tests {
         b.parts.dead_master = Some(Master::default());
         b.unit.life.hp = crate::objects::HitPoints::new(7.0);
         b.parts.gather_point = Some(gather_point(2.0));
+        b.parts.production = Some(Production::default());
         let paths = |scope| {
             differences(&a, &b, scope)
                 .into_iter()
                 .map(|d| d.path)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(paths(Scope::Saved), ["life.hp", "building.gather_point"]);
+        assert_eq!(
+            paths(Scope::Saved),
+            ["life.hp", "building.gather_point", "building.production"]
+        );
         assert_eq!(
             paths(Scope::SavedWithGaps),
-            ["life.hp", "dead_master", "building.gather_point"]
+            [
+                "life.hp",
+                "dead_master",
+                "building.gather_point",
+                "building.production"
+            ]
         );
     }
 }

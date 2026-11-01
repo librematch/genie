@@ -221,7 +221,7 @@ impl Census {
             if player.done() {
                 continue;
             }
-            let block = lane_block(section, lane[8], state);
+            let block = lane_block(section, lane[8], state, &turns.parts);
             let words: Vec<(usize, u32, u32)> = (0..11)
                 .filter(|&w| block[w] != lane[w])
                 .map(|w| (w, block[w], lane[w]))

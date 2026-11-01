@@ -22,7 +22,6 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::QUEUED;
 use crate::production::CostCount;
-use crate::production::Production;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
 use crate::technology::TechId;
@@ -140,10 +139,10 @@ impl World {
         let mut found = Vec::new();
         for place in self.lookup(ids).into_iter().flatten() {
             let (_, building) = self.at(place)?;
-            let listed = building
-                .building
+            let listed = self
+                .parts
                 .production
-                .as_ref()
+                .get(building.id)
                 .is_some_and(|p| p.available_units.contains(&unit_id));
             if unit.available || listed {
                 found.push(place);
@@ -210,10 +209,10 @@ impl World {
                 loads.push(Seconds::ZERO);
                 continue;
             }
-            let total = building
-                .building
+            let total = self
+                .parts
                 .production
-                .as_ref()
+                .get(building.id)
                 .map_or(0, |p| p.queue.total.get());
             let room = per - i32::from(total);
             total_room += room.max(0);
@@ -283,7 +282,7 @@ impl World {
         building: &crate::objects::unit::Unit,
     ) -> Result<Seconds, GenieError> {
         let owner = self.players.player(p)?;
-        let Some(production) = building.building.production.as_ref() else {
+        let Some(production) = self.parts.production.get(building.id) else {
             return Ok(Seconds::ZERO);
         };
         let queue = &production.queue;
@@ -348,11 +347,9 @@ impl World {
             count = 1;
         }
         let total = self
-            .players
-            .live(player, i)?
-            .building
+            .parts
             .production
-            .as_ref()
+            .get(self.players.live(player, i)?.id)
             .map_or(0, |p| p.queue.total.get());
         if 14 < total {
             return Ok(false);
@@ -419,13 +416,14 @@ impl World {
         for _ in 0..n {
             owner.tracker.place(Some(master), class);
         }
-        let building = owner.objects.checked(i)?.life.master_id;
-        let production = owner
-            .objects
-            .checked_mut(i)?
-            .building
-            .production
-            .get_or_insert_with(Production::default);
+        let (building, id) = {
+            let b = owner.objects.checked(i)?;
+            (b.life.master_id, b.id)
+        };
+        let time = made
+            .filter(|m| COMBAT <= m.kind)
+            .map(|m| crate::production::train_time(&m.train_locations, building, button));
+        let production = self.production_or_new(id)?;
         if let Some(last) = production.queue.last()
             && last.master == Some(master)
             && last.button == button
@@ -439,9 +437,6 @@ impl World {
             queue.changes = queue.changes.bumped();
             return Ok(true);
         }
-        let time = made
-            .filter(|m| COMBAT <= m.kind)
-            .map(|m| crate::production::train_time(&m.train_locations, building, button));
         self.new_entry(
             player,
             i,
@@ -468,14 +463,8 @@ impl World {
         button: QueueButton,
         time: Option<WholeSeconds>,
     ) -> Result<(), GenieError> {
-        let queue = &self
-            .players
-            .live(player, i)?
-            .building
-            .production
-            .as_ref()
-            .ok_or(NO_QUEUE)?
-            .queue;
+        let id = self.players.live(player, i)?.id;
+        let queue = &self.parts.production.get(id).ok_or(NO_QUEUE)?.queue;
         let refill = if queue.full() {
             Some(
                 queue
@@ -488,14 +477,7 @@ impl World {
             None
         };
         let costs = self.entry_costs(player, tech, master)?;
-        let queue = &mut self
-            .players
-            .live_mut(player, i)?
-            .building
-            .production
-            .as_mut()
-            .ok_or(NO_QUEUE)?
-            .queue;
+        let queue = &mut self.parts.production.get_mut(id).ok_or(NO_QUEUE)?.queue;
         if let Some(refill) = refill {
             queue.grow(&refill);
         }

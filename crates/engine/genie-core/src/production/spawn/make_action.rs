@@ -83,7 +83,7 @@ impl World {
         dt_seconds: Seconds,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(p, i)?;
-        let Some(production) = unit.building.production.as_ref() else {
+        let Some(production) = self.parts.production.get(unit.id) else {
             return Ok(());
         };
         if !production.queue.enabled
@@ -102,7 +102,7 @@ impl World {
                         | action_type::UNPACK
                 )
             });
-        if let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut() {
+        if let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id) {
             production.queue.waiting = busy;
         }
         if busy {
@@ -120,11 +120,9 @@ impl World {
         }
         self.end_production_action(p, i)?;
         let Some(first) = self
-            .players
-            .live(p, i)?
-            .building
+            .parts
             .production
-            .as_ref()
+            .get(self.players.live(p, i)?.id)
             .and_then(|q| q.queue.first().copied())
         else {
             return Ok(());
@@ -136,7 +134,7 @@ impl World {
                 .map_or(Amount::ZERO, |m| population(&m.storage));
             self.players.player_mut(p)?.add_attribute(QUEUED, -pop)?;
         }
-        if let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut() {
+        if let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id) {
             production.queue.release_first()?;
         }
         Ok(())
@@ -147,11 +145,9 @@ impl World {
     /// production stops for this update.
     fn begin_production(&mut self, p: PlayerId, i: ListIndex) -> Result<bool, GenieError> {
         let production = self
-            .players
-            .live(p, i)?
-            .building
+            .parts
             .production
-            .as_ref()
+            .get(self.players.live(p, i)?.id)
             .ok_or(NO_QUEUE)?;
         if production.action.is_none() {
             let first = *production.queue.first().ok_or(EMPTY_QUEUE)?;
@@ -183,11 +179,9 @@ impl World {
     /// production list (`FUN_141616a40`'s shared technology), when the tree holds it.
     fn note_shared_research(&mut self, p: PlayerId, i: ListIndex) -> Result<(), GenieError> {
         if let Some(tech) = self
-            .players
-            .live(p, i)?
-            .building
+            .parts
             .production
-            .as_ref()
+            .get(self.players.live(p, i)?.id)
             .and_then(|q| q.queue.first())
             .and_then(|e| e.tech)
             && self
@@ -195,7 +189,7 @@ impl World {
                 .get(tech.index())
                 .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
             && tech.index() < self.players.player(p)?.techs.len()
-            && let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut()
+            && let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id)
         {
             production.note_shared_research(tech);
         }
@@ -234,7 +228,7 @@ impl World {
             }
             Making::Research(r) => self.start_research(p, i, r)?,
         }
-        if let Some(production) = self.players.live_mut(p, i)?.building.production.as_mut() {
+        if let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id) {
             production.action = Some(making);
         }
         Ok(())
@@ -252,12 +246,10 @@ impl World {
         let owner = self.players.player(p)?;
         let get = |k: AttributeId| owner.get(k);
         let factors = crate::technology::factors(r.tech, &get)?;
-        let paid = owner
-            .objects
-            .checked(i)?
-            .building
+        let paid = self
+            .parts
             .production
-            .as_ref()
+            .get(owner.objects.checked(i)?.id)
             .and_then(|q| q.queue.first())
             .map_or(crate::production::NO_COSTS, |e| e.costs);
         if !owner
@@ -287,11 +279,9 @@ impl World {
         dt_seconds: Seconds,
     ) -> Result<UpdateCode, GenieError> {
         let action = self
-            .players
-            .live(p, i)?
-            .building
+            .parts
             .production
-            .as_ref()
+            .get(self.players.live(p, i)?.id)
             .and_then(|q| q.action);
         match action {
             None => Ok(UpdateCode::DONE),
@@ -317,7 +307,7 @@ impl World {
     ) -> Result<UpdateCode, GenieError> {
         let building = &self.players.live(p, i)?;
         let Some(Some(Making::Unit(make))) =
-            building.building.production.as_ref().map(|q| q.action)
+            self.parts.production.get(building.id).map(|q| q.action)
         else {
             return Err(NO_MAKE_ACTION);
         };
@@ -332,11 +322,9 @@ impl World {
         let time = Seconds::of_master(make.time(made, building.life.master_id)).get();
         let progress = Seconds::new(rate * dt_seconds) + make.progress;
         if let Some(Some(Making::Unit(m))) = self
-            .players
-            .live_mut(p, i)?
-            .building
+            .parts
             .production
-            .as_mut()
+            .get_mut(self.players.live(p, i)?.id)
             .map(|q| q.action.as_mut())
         {
             m.progress = progress;
@@ -354,11 +342,9 @@ impl World {
             pop,
         )?;
         if let Some(Some(Making::Unit(m))) = self
-            .players
-            .live_mut(p, i)?
-            .building
+            .parts
             .production
-            .as_mut()
+            .get_mut(self.players.live(p, i)?.id)
             .map(|q| q.action.as_mut())
         {
             m.state = MakeObjState::Done;
@@ -375,11 +361,9 @@ impl World {
         i: ListIndex,
     ) -> Result<(), GenieError> {
         let Some(making) = self
-            .players
-            .live_mut(p, i)?
-            .building
+            .parts
             .production
-            .as_mut()
+            .get_mut(self.players.live(p, i)?.id)
             .and_then(|q| q.action.take())
         else {
             return Ok(());

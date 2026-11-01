@@ -6,7 +6,6 @@ use crate::construction::build::Construction;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
 use crate::players::Amount;
-use crate::production::Production;
 use crate::world::Gate;
 use crate::world::WorldTime;
 use genie_diff::Diff;
@@ -27,8 +26,6 @@ pub struct Building {
     pub annex_of: Option<crate::construction::MainBuildingId>,
     /// A main building's annexes (`+0xbc0`..`+0xbd8`, the save's linked objects).
     pub annexes: crate::construction::Annexes,
-    /// A building's production queue and make action.
-    pub production: Option<Production>,
     /// A building's gate lock ([`Gate`]).
     pub gate: Option<Gate>,
     /// A building's `mLivestockSummation` (`+0xc28`, saved): the livestock inside it (their

@@ -52,7 +52,7 @@ fn a_checkpoint_holds_or_is_the_players_mismatch() {
     let save = quiet();
     let start = header_slice(&save, None);
     let mut lanes = [[0; 11]; 8];
-    lanes[0] = lane_block(&save.players()[1], 1, &start.players[1]);
+    lanes[0] = lane_block(&save.players()[1], 1, &start.players[1], &start.parts);
     let mut later = [[0; 11]; 8];
     later[0] = wrong(1);
     let rec = recording(

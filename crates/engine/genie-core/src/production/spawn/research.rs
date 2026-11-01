@@ -87,7 +87,7 @@ impl World {
         let owner = self.players.player(p)?;
         let building = owner.objects.checked(i)?;
         let Some(Some(Making::Research(r))) =
-            building.building.production.as_ref().map(|q| q.action)
+            self.parts.production.get(building.id).map(|q| q.action)
         else {
             return Err(NO_RESEARCH_ACTION);
         };
@@ -120,7 +120,8 @@ impl World {
             progress = Seconds::new(32767.0);
         }
         state.research_done = progress;
-        set_progress(owner.objects.checked_mut(i)?, progress);
+        let id = owner.objects.checked(i)?.id;
+        set_progress(self.parts.production.get_mut(id), progress);
         if research_time(&location, r.tech, time_modifier) <= progress {
             if 0xff < times {
                 return Err(GenieError::unsupported(
@@ -177,11 +178,8 @@ impl World {
         }
         let building = self.players.live_mut(p, i)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(Some(Making::Research(r))) = building
-            .building
-            .production
-            .as_mut()
-            .map(|q| q.action.as_mut())
+        if let Some(Some(Making::Research(r))) =
+            self.parts.production.get_mut(id).map(|q| q.action.as_mut())
         {
             r.state = MakeTechState::Done;
         }
@@ -315,14 +313,9 @@ impl World {
     }
 }
 
-/// The research action of `building` takes the progress `progress`.
-fn set_progress(building: &mut crate::objects::unit::Unit, progress: Seconds) {
-    if let Some(Some(Making::Research(r))) = building
-        .building
-        .production
-        .as_mut()
-        .map(|q| q.action.as_mut())
-    {
+/// The research action of a building's `production` takes the progress `progress`.
+fn set_progress(production: Option<&mut crate::production::Production>, progress: Seconds) {
+    if let Some(Some(Making::Research(r))) = production.map(|q| q.action.as_mut()) {
         r.progress = progress;
     }
 }

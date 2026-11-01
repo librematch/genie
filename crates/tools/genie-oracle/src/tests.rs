@@ -41,24 +41,6 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         ..genie_core::production::Production::default()
     };
     let kind = ARTIFACT_TYPE;
-    let both = Unit {
-        actions: genie_core::objects::layers::ActionLayer {
-            list: ActionList::default().with_artifact(Some(artifact)),
-            ..Default::default()
-        },
-        building: genie_core::objects::layers::Building {
-            production: Some(making.clone()),
-            ..Default::default()
-        },
-        ..Unit::default()
-    };
-    assert_eq!(
-        checkpoint_action(&both),
-        Some(ActionTerm {
-            kind: Some(kind),
-            state: ActionState::new(6)
-        })
-    );
     let top = Unit {
         actions: genie_core::objects::layers::ActionLayer {
             list: ActionList::default().with_artifact(Some(artifact)),
@@ -67,27 +49,27 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         ..Unit::default()
     };
     assert_eq!(
-        checkpoint_action(&top),
+        checkpoint_action(&top, Some(&making)),
+        Some(ActionTerm {
+            kind: Some(kind),
+            state: ActionState::new(6)
+        })
+    );
+    assert_eq!(
+        checkpoint_action(&top, None),
         Some(ActionTerm {
             kind: Some(kind),
             state: ActionState::new(10)
         })
     );
-    let training = Unit {
-        building: genie_core::objects::layers::Building {
-            production: Some(making),
-            ..Default::default()
-        },
-        ..Unit::default()
-    };
     assert_eq!(
-        checkpoint_action(&training),
+        checkpoint_action(&Unit::default(), Some(&making)),
         Some(ActionTerm {
             kind: None,
             state: ActionState::new(6)
         })
     );
-    assert_eq!(checkpoint_action(&Unit::default()), None);
+    assert_eq!(checkpoint_action(&Unit::default(), None), None);
 }
 
 /// Each differing field of a matched object is one difference with the game's master; an

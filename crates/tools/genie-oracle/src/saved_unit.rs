@@ -50,7 +50,7 @@ use genie_core::world::parts::{Object, ObjectParts};
 use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
-/// point; the dead master is the import's gap, MISSING.md).
+/// point, the production lists; the dead master is the import's gap, MISSING.md).
 pub(super) fn object(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -59,12 +59,12 @@ pub(super) fn object(
     masters: Option<&MasterTable>,
     players: usize,
 ) -> Object {
-    let gather_point = gather_point(object).ok().flatten();
     Object {
         unit: unit(object, objects, paths, civ, masters, players),
         parts: ObjectParts {
             dead_master: None,
-            gather_point,
+            gather_point: gather_point(object).ok().flatten(),
+            production: production(object).ok().flatten(),
         },
     }
 }
@@ -72,8 +72,8 @@ pub(super) fn object(
 /// The slice's view of one saved object's row: its lifecycle, its unit AI and its actions. A save
 /// from the start of a game holds no actions, so an object starts its master's default task in
 /// its first update ([`default_task`]); a save from later in the game holds them, and the slice
-/// imports the ones it models ([`saved_actions`]). A gather point the save holds that the slice
-/// cannot read is the row's unmodelled part.
+/// imports the ones it models ([`saved_actions`]). A gather point or production lists the save
+/// holds that the slice cannot read are the row's unmodelled part.
 pub(super) fn unit(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -363,7 +363,7 @@ pub(super) fn unit(
             step,
         });
     }
-    let production = production(object).map(|p| unit.building.production = p);
+    let production = production(object).map(|_| ());
     let moving = mover(object, s, objects, paths, civ, masters).map(|m| unit.body.put_mover(m));
     unit.actions.unmodelled_action = life_read
         .and(ai_read)

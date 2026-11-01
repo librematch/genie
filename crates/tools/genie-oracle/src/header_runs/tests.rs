@@ -9,7 +9,14 @@ use genie_rec::de::Op;
 fn each_tick_gives_the_players_blocks() {
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let start = header_slice(&save, None);
-    let block = |p: usize| lane_block(&save.players()[p], p as u32, &start.players[p]);
+    let block = |p: usize| {
+        lane_block(
+            &save.players()[p],
+            p as u32,
+            &start.players[p],
+            &start.parts,
+        )
+    };
     let rec = recording(&save, &[Op::Sync { dt: 50 }, Op::Sync { dt: 50 }]);
     let blocks = blocks_per_tick(&rec, &[1, 0], 5, None).unwrap();
     assert_eq!(blocks, [[block(1), block(0)], [block(1), block(0)]]);

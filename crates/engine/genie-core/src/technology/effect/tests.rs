@@ -86,11 +86,11 @@ fn a_charge_keeps_its_share_of_a_changed_maximum() {
 /// building's Make); an empty queue or none at all is no action.
 #[test]
 fn an_object_has_actions_while_it_holds_one() {
-    let mut u = Unit::default();
-    assert!(!has_actions(&u));
-    u.building.production = Some(crate::production::Production::default());
-    assert!(!has_actions(&u));
-    u.building.production.as_mut().unwrap().action = Some(crate::production::Making::Research(
+    let u = Unit::default();
+    assert!(!has_actions(&u, None));
+    let mut production = crate::production::Production::default();
+    assert!(!has_actions(&u, Some(&production)));
+    production.action = Some(crate::production::Making::Research(
         crate::production::MakeTech {
             state: crate::production::MakeTechState::Researching,
             paid: false,
@@ -99,7 +99,7 @@ fn an_object_has_actions_while_it_holds_one() {
             progress: Seconds::ZERO,
         },
     ));
-    assert!(has_actions(&u));
+    assert!(has_actions(&u, Some(&production)));
 }
 
 /// An Attack's slot 0x50 (`FUN_140a7f800`): its sprites take the master's unless they are

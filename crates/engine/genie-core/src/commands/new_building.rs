@@ -310,7 +310,6 @@ impl World {
                 default_artifact: false,
             },
             building: crate::objects::layers::Building {
-                production: None,
                 construction: Some(Construction {
                     progress,
                     desolid,

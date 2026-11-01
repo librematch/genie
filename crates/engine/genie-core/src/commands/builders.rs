@@ -199,7 +199,7 @@ impl World {
             .live_object(q, id)
             .ok_or(GenieError::unsupported("a builder the slice does not have"))?;
         if unit.actions.list.artifact().is_some()
-            || unit.building.production.is_some()
+            || self.parts.production.contains(id)
             || unit.actions.list.fly().is_some()
         {
             return Err(GenieError::unsupported(

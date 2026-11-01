@@ -8,8 +8,10 @@ use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
 use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::production::Production;
 use genie_core::world::Tick;
 use genie_core::world::checkpoint::{ActionTerm, CheckpointObject, TopAction, player_block};
+use genie_core::world::parts::Parts;
 use genie_core::world::{Player, World};
 use genie_rec::de;
 use genie_save::{Header, PlayerSection};
@@ -121,7 +123,7 @@ pub fn simulate_word9(
             let simulated = &turns.players[id as usize];
             Ok(Word9 {
                 id,
-                simulated: lane_block(section, id, simulated)[9],
+                simulated: lane_block(section, id, simulated, &turns.parts)[9],
                 checkpoint: lane[9],
                 group_command,
                 unsupported: simulated
@@ -136,8 +138,13 @@ pub fn simulate_word9(
 /// A player's block with the slice's objects in place of the save's: the save gives what the slice
 /// leaves alone (the sleeping objects), the slice its resources, its live list (the objects it
 /// created included) and each object's master, position, state, held amount, top action and
-/// retarget timer.
-pub(super) fn lane_block(section: &PlayerSection<'_>, id: u32, simulated: &Player) -> [u32; 11] {
+/// retarget timer (and a building's production action, from the world's `parts`).
+pub(super) fn lane_block(
+    section: &PlayerSection<'_>,
+    id: u32,
+    simulated: &Player,
+    parts: &Parts,
+) -> [u32; 11] {
     let mut state = player_totals(section, id);
     state.resources = simulated.resources();
     state.sleeping_count = simulated.sleeping.len() as u32;
@@ -152,7 +159,7 @@ pub(super) fn lane_block(section: &PlayerSection<'_>, id: u32, simulated: &Playe
             amount_held: unit.life.amount,
             position: unit.position(),
             retarget_timer: unit.combat.ai.as_ref().map(|ai| ai.retarget_timer),
-            top_action: checkpoint_action(unit),
+            top_action: checkpoint_action(unit, parts.production.get(unit.id)),
         })
         .collect();
     player_block(&state)
@@ -162,13 +169,11 @@ pub(super) fn lane_block(section: &PlayerSection<'_>, id: u32, simulated: &Playe
 /// action's state (slot 86), but a building's (`TRIBE_Building_Object::actionState`,
 /// `0x1411cb7e0`) prefers the state of its production list's action (`+0xbf8`): a town centre
 /// that attacks while it trains counts its Attack's type with its make action's state.
-pub(super) fn checkpoint_action(unit: &Unit) -> Option<ActionTerm> {
-    let making = unit
-        .building
-        .production
-        .as_ref()
-        .and_then(|p| p.action)
-        .map(|a| a.state());
+pub(super) fn checkpoint_action(
+    unit: &Unit,
+    production: Option<&Production>,
+) -> Option<ActionTerm> {
+    let making = production.and_then(|p| p.action).map(|a| a.state());
     match (top_action(unit), making) {
         (Some(top), Some(state)) => Some(ActionTerm {
             kind: Some(top.kind),
@@ -262,7 +267,14 @@ pub fn blocks_per_tick(
         run(&mut turns, &mut decoder, std::slice::from_ref(&frame));
         out.push(
             ids.iter()
-                .map(|&id| lane_block(&sections[id as usize], id, &turns.players[id as usize]))
+                .map(|&id| {
+                    lane_block(
+                        &sections[id as usize],
+                        id,
+                        &turns.players[id as usize],
+                        &turns.parts,
+                    )
+                })
                 .collect(),
         );
     }

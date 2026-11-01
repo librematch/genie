@@ -7,7 +7,6 @@ use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
-use crate::production::Production;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
 use crate::technology::TechId;
@@ -60,14 +59,10 @@ impl World {
             .checked(t)?
             .listed_costs(def, crate::technology::factors(tech, &get)?)?;
         let costs = crate::production::as_entry_costs(listed);
-        let production = owner
-            .objects
-            .checked_mut(i)?
-            .building
-            .production
-            .get_or_insert_with(Production::default);
+        let id = owner.objects.checked(i)?.id;
+        let production = self.production_or_new(id)?;
         if join_last(&mut production.queue, tech, &costs, n)? {
-            let state = owner.techs.checked_mut(t)?;
+            let state = self.players.player_mut(player)?.techs.checked_mut(t)?;
             state.pending = state.pending.plus(n);
             return Ok(true);
         }

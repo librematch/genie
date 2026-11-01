@@ -419,7 +419,8 @@ impl crate::world::World {
             for u in player.objects.iter().chain(&player.sleeping) {
                 let k = self.tracker_key(p, u.life.master_id);
                 tracker.add(u.id, k);
-                for e in u.building.production.iter().flat_map(|q| q.queue.entries()) {
+                let queue = self.parts.production.get(u.id);
+                for e in queue.iter().flat_map(|q| q.queue.entries()) {
                     if let Some(master) = e.master.filter(|m| 0 < m.get())
                         && QueuedUnits::ZERO < e.count
                     {

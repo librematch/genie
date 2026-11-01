@@ -29,11 +29,11 @@ fn an_object_without_its_static_part_is_unmodelled() {
     assert!(u.actions.unmodelled_action.is_some());
 }
 
-/// A saved building's gather point is its object's part, not its row's; a state the import
-/// cannot read leaves the part out and is the row's unmodelled part. The dead master is the
-/// import's gap.
+/// A saved building's gather point and production lists are its object's parts, not its
+/// row's; a gather state the import cannot read leaves the part out and is the row's
+/// unmodelled part. The dead master is the import's gap.
 #[test]
-fn a_saved_gather_point_is_its_object_s_part() {
+fn a_saved_building_s_parts_are_its_object_s() {
     use genie_core::commands::GatherPointState;
     let whole = |state: i32| {
         let mut barracks = building_object(11, 12);
@@ -41,6 +41,7 @@ fn a_saved_gather_point_is_its_object_s_part() {
         b.gather_point_exists = state;
         b.gather_point_x = 3.5;
         b.gather_point_target = -1;
+        b.value = vec![3];
         object(
             &barracks,
             &PlayerObjects::default(),
@@ -57,6 +58,11 @@ fn a_saved_gather_point_is_its_object_s_part() {
         (GatherPointState::POINT, 3.5, None)
     );
     assert!(o.parts.dead_master.is_none());
+    let disabled = o.parts.production.map(|p| p.disabled_techs);
+    assert_eq!(
+        disabled,
+        Some(vec![genie_core::technology::TechId::try_from(3).unwrap()])
+    );
     let o = whole(0x100);
     assert!(o.parts.gather_point.is_none());
     assert!(o.unit.actions.unmodelled_action.is_some());
