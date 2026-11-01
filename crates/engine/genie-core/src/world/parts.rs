@@ -11,6 +11,7 @@
 //! part escapes the comparison with the game's save.
 
 use crate::GenieError;
+use crate::combat::missile::Missile;
 use crate::commands::GatherPoint;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
@@ -124,6 +125,8 @@ pub struct Parts {
     /// A building's production lists (`+0xc48`..`+0xd48`, the save's production queue, its make
     /// action and its local lists): QUEUE's first entry makes them.
     pub production: PartTable<Production>,
+    /// A missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`): its volley makes them.
+    pub missile: PartTable<Missile>,
 }
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
@@ -139,6 +142,9 @@ pub struct ObjectParts {
     /// Its production lists ([`Parts::production`]).
     #[diff(path = "building.production")]
     pub production: Option<Production>,
+    /// Its missile's own fields ([`Parts::missile`]).
+    #[diff(path = "missile")]
+    pub missile: Option<Missile>,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -209,6 +215,7 @@ impl Parts {
             dead_master,
             gather_point,
             production,
+            missile,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -219,6 +226,9 @@ impl Parts {
         if let Some(p) = production {
             let _ = self.production.insert(id, p);
         }
+        if let Some(m) = missile {
+            let _ = self.missile.insert(id, m);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -227,6 +237,7 @@ impl Parts {
             dead_master: self.dead_master.remove(id),
             gather_point: self.gather_point.remove(id),
             production: self.production.remove(id),
+            missile: self.missile.remove(id),
         }
     }
 
@@ -237,6 +248,7 @@ impl Parts {
             dead_master: self.dead_master.get(id).cloned(),
             gather_point: self.gather_point.get(id).copied(),
             production: self.production.get(id).cloned(),
+            missile: self.missile.get(id).copied(),
         }
     }
 
@@ -247,6 +259,7 @@ impl Parts {
             .map(|(id, _)| id)
             .chain(self.gather_point.iter().map(|(id, _)| id))
             .chain(self.production.iter().map(|(id, _)| id))
+            .chain(self.missile.iter().map(|(id, _)| id))
     }
 }
 
@@ -259,6 +272,8 @@ pub enum Part {
     GatherPoint(Option<GatherPoint>),
     /// The production lists ([`Parts::production`]), boxed, none clearing them.
     Production(Option<Box<Production>>),
+    /// The missile's own fields ([`Parts::missile`]), none clearing them.
+    Missile(Option<Missile>),
 }
 
 impl World {
@@ -290,6 +305,12 @@ impl World {
             }
             Part::Production(None) => {
                 let _ = self.parts.production.remove(id);
+            }
+            Part::Missile(Some(m)) => {
+                let _ = self.parts.missile.insert(id, m);
+            }
+            Part::Missile(None) => {
+                let _ = self.parts.missile.remove(id);
             }
         }
         Ok(())
@@ -458,8 +479,8 @@ mod tests {
     }
 
     /// A loaded object's parts go into the tables only for an object the world holds; the
-    /// gather point's part is set and cleared in the object's life, and its removal from the
-    /// lists carries it.
+    /// gather point's and the missile's parts are set and cleared in the object's life, and its
+    /// removal from the lists carries them.
     #[test]
     fn a_loaded_object_s_parts_go_into_the_tables() {
         use crate::objects::ListIndex;
@@ -480,14 +501,26 @@ mod tests {
             }],
         );
         let gather = gather_point(3.5);
+        let missile = Missile {
+            max_range: crate::map::Distance::new(7.0),
+            fired_from: None,
+            charge: true,
+            flying: true,
+            step: crate::map::Offset::ZERO,
+        };
         let parts = ObjectParts {
             gather_point: Some(gather),
+            missile: Some(missile),
             ..ObjectParts::default()
         };
         assert!(t.load_parts(object_id(6), parts.clone()).is_err());
         assert!(t.parts.gather_point.is_empty());
         t.load_parts(id, parts).unwrap();
         assert_eq!(t.parts.gather_point.get(id), Some(&gather));
+        assert_eq!(t.parts.missile.get(id), Some(&missile));
+        t.set_part(id, Part::Missile(None)).unwrap();
+        assert!(t.parts.missile.is_empty());
+        t.set_part(id, Part::Missile(Some(missile))).unwrap();
         t.check_parts().unwrap();
         t.set_part(id, Part::GatherPoint(None)).unwrap();
         assert!(t.parts.gather_point.is_empty());
@@ -495,8 +528,11 @@ mod tests {
         let gone = t
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
-        assert_eq!(gone.parts.gather_point, Some(gather));
-        assert!(t.parts.gather_point.is_empty());
+        assert_eq!(
+            (gone.parts.gather_point, gone.parts.missile),
+            (Some(gather), Some(missile))
+        );
+        assert!(t.parts.gather_point.is_empty() && t.parts.missile.is_empty());
     }
 
     /// A building's production lists are made empty at their first use and found again after;
@@ -544,8 +580,8 @@ mod tests {
 
     /// A whole object compares its row's fields and its parts' at the paths they had on the
     /// object: the dead master is a known gap (left out of the saved scope), the gather point
-    /// and the production compare at the building layer's paths, a row's field keeps its own
-    /// path.
+    /// and the production compare at the building layer's paths, the missile at its own, a
+    /// row's field keeps its own path.
     #[test]
     fn a_whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
@@ -558,6 +594,13 @@ mod tests {
         b.unit.life.hp = crate::objects::HitPoints::new(7.0);
         b.parts.gather_point = Some(gather_point(2.0));
         b.parts.production = Some(Production::default());
+        b.parts.missile = Some(Missile {
+            max_range: crate::map::Distance::ZERO,
+            fired_from: None,
+            charge: false,
+            flying: true,
+            step: crate::map::Offset::ZERO,
+        });
         let paths = |scope| {
             differences(&a, &b, scope)
                 .into_iter()
@@ -566,7 +609,12 @@ mod tests {
         };
         assert_eq!(
             paths(Scope::Saved),
-            ["life.hp", "building.gather_point", "building.production"]
+            [
+                "life.hp",
+                "building.gather_point",
+                "building.production",
+                "missile"
+            ]
         );
         assert_eq!(
             paths(Scope::SavedWithGaps),
@@ -574,7 +622,8 @@ mod tests {
                 "life.hp",
                 "dead_master",
                 "building.gather_point",
-                "building.production"
+                "building.production",
+                "missile"
             ]
         );
     }

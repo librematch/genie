@@ -82,14 +82,15 @@ fn a_charge_keeps_its_share_of_a_changed_maximum() {
     );
 }
 
-/// An object has actions while it holds a top action or its production list holds one (a
-/// building's Make); an empty queue or none at all is no action.
+/// An object has actions while it holds a top action, its production list holds one (a
+/// building's Make) or it is a missile; an empty queue or none at all is no action.
 #[test]
 fn an_object_has_actions_while_it_holds_one() {
     let u = Unit::default();
-    assert!(!has_actions(&u, None));
+    assert!(!has_actions(&u, None, false));
+    assert!(has_actions(&u, None, true));
     let mut production = crate::production::Production::default();
-    assert!(!has_actions(&u, Some(&production)));
+    assert!(!has_actions(&u, Some(&production), false));
     production.action = Some(crate::production::Making::Research(
         crate::production::MakeTech {
             state: crate::production::MakeTechState::Researching,
@@ -99,7 +100,7 @@ fn an_object_has_actions_while_it_holds_one() {
             progress: Seconds::ZERO,
         },
     ));
-    assert!(has_actions(&u, Some(&production)));
+    assert!(has_actions(&u, Some(&production), false));
 }
 
 /// An Attack's slot 0x50 (`FUN_140a7f800`): its sprites take the master's unless they are

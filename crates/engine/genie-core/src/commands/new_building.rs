@@ -354,7 +354,6 @@ impl World {
             my_pasture: None,
             undeletable: false,
             group: crate::groups::GroupLink::default(),
-            missile: None,
             garrison: Vec::new(),
             damaged_lately: crate::objects::DamagedTimer::OUT,
             workers: crate::objects::WorkerCount::ZERO,

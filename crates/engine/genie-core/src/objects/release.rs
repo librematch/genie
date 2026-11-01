@@ -89,7 +89,12 @@ impl World {
     /// owner's watched list (`FUN_141091310`), a recyclable master's missile goes to the pool of
     /// type 60 (the world's `+0x1d8`), and it leaves the mesh. Every step runs; returns the
     /// world's leave of the place that the slice does not model.
-    pub(crate) fn leave_world(&mut self, p: PlayerId, gone: &Unit) -> Result<(), GenieError> {
+    pub(crate) fn leave_world(
+        &mut self,
+        p: PlayerId,
+        gone: &crate::world::parts::Object,
+    ) -> Result<(), GenieError> {
+        let (missile, gone) = (gone.parts.missile, &gone.unit);
         self.track_remove(p, gone.id, gone.life.master_id)?;
         let master = gone.master(&self.masters, p)?;
         forget_resource(&mut self.spatial, Some(master), gone.id, gone.position())?;
@@ -99,7 +104,7 @@ impl World {
         let recyclable = master.recyclable;
         let left = self.spatial.leave(gone.id);
         self.unwatch(p, gone.id)?;
-        if let Some(m) = gone.missile.as_ref().filter(|_| recyclable) {
+        if let Some(m) = missile.filter(|_| recyclable) {
             self.recycling.missiles.push((gone.id, m.flying));
         }
         self.pathing.removed(gone.id);

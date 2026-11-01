@@ -376,8 +376,12 @@ pub(super) fn within_table(masters: &Masters, unit: MasterId) -> bool {
 }
 
 /// The object has an action in its list (`+0x880`'s first node; a building producing has its
-/// Make in its `production`): the slice's top actions.
-pub(super) fn has_actions(u: &Unit, production: Option<&crate::production::Production>) -> bool {
+/// Make in its `production`, a missile its own part, `missile`): the slice's top actions.
+pub(super) fn has_actions(
+    u: &Unit,
+    production: Option<&crate::production::Production>,
+    missile: bool,
+) -> bool {
     u.actions.list.artifact().is_some()
         || u.actions.list.build().is_some()
         || u.actions.list.move_to().is_some()
@@ -388,7 +392,7 @@ pub(super) fn has_actions(u: &Unit, production: Option<&crate::production::Produ
         || u.actions.list.explore().is_some()
         || u.actions.list.enter().is_some()
         || u.actions.list.transport().is_some()
-        || u.missile.is_some()
+        || missile
         || u.actions.list.make().is_some()
         || production.is_some_and(|q| q.action.is_some())
 }

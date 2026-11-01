@@ -2,6 +2,7 @@
 
 use crate::OTHER_SUB_ACTION;
 use crate::fixtures::{action_list, combat_master, combat_mut, combat_object, with_masters};
+use crate::saved_unit::saved_missile;
 use crate::test_ids::action_type;
 use crate::test_ids::class_id;
 use crate::test_ids::object_id;
@@ -523,10 +524,8 @@ fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
 
 #[test]
 fn a_missile_flies_with_its_actions_course() {
-    let m = import(&missile(), &PlayerObjects::default(), Unit::default())
-        .unwrap()
-        .missile
-        .unwrap();
+    assert!(import(&missile(), &PlayerObjects::default(), Unit::default()).is_ok());
+    let m = saved_missile(&missile()).unwrap();
     assert_eq!(
         (m.fired_from, m.max_range.get().to_bits()),
         (Some(ShooterId::new(object_id(900))), 7.0_f32.to_bits())
@@ -534,14 +533,7 @@ fn a_missile_flies_with_its_actions_course() {
     assert!(m.flying && !m.charge);
     // a charge projectile; one at the landing distance has landed
     let landing = genie_core::combat::missile::LANDING;
-    let m = import(
-        &missile_of(landing, 1),
-        &PlayerObjects::default(),
-        Unit::default(),
-    )
-    .unwrap()
-    .missile
-    .unwrap();
+    let m = saved_missile(&missile_of(landing, 1)).unwrap();
     assert!(m.charge && !m.flying);
     let action = import(&missile(), &PlayerObjects::default(), Unit::default())
         .unwrap()

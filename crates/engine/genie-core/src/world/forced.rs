@@ -234,7 +234,7 @@ impl World {
                     continue;
                 }
                 let gone = self.swap_remove_live(p, i)?;
-                if let Err(e) = self.leave_world(p, &gone.unit) {
+                if let Err(e) = self.leave_world(p, &gone) {
                     notes.push((p, Some(id), e));
                 }
                 continue;
@@ -278,6 +278,7 @@ impl World {
             id,
             crate::world::parts::Part::Production(g.parts.production.clone().map(Box::new)),
         )?;
+        self.set_part(id, crate::world::parts::Part::Missile(g.parts.missile))?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);

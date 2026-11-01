@@ -537,13 +537,6 @@ impl Unit {
                 master: made.life,
             },
             body: crate::objects::layers::Body::new(position, None, Some(mover)),
-            missile: Some(crate::combat::missile::Missile {
-                max_range: shot.reach,
-                fired_from: Some(ShooterId::new(self.id)),
-                charge: false,
-                flying,
-                step: Offset::ZERO,
-            }),
             // its +0x900, the firing object's attack count when fired
             combat: crate::objects::layers::Combat {
                 attack_count: self.combat.attack_count,
@@ -565,6 +558,20 @@ impl Unit {
             crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, made.id),
         );
         let class = made.class;
+        let own = crate::combat::missile::Missile {
+            max_range: shot.reach,
+            fired_from: Some(ShooterId::new(self.id)),
+            charge: false,
+            flying,
+            step: Offset::ZERO,
+        };
+        let missile = crate::world::parts::Object {
+            unit: missile,
+            parts: crate::world::parts::ObjectParts {
+                missile: Some(own),
+                ..Default::default()
+            },
+        };
         let _ = c.w.push_live(c.player, missile)?;
         let missile = Releaser {
             id,

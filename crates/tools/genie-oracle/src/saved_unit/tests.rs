@@ -169,7 +169,7 @@ fn a_missile_without_its_action_keeps_flying() {
         })),
         ..genie_save::Object::default()
     };
-    let u = unit(
+    let o = object(
         &arrow,
         &PlayerObjects::default(),
         &[],
@@ -177,7 +177,7 @@ fn a_missile_without_its_action_keeps_flying() {
         None,
         PLAYERS,
     );
-    let flying = u.missile.unwrap();
+    let (u, flying) = (o.unit, o.parts.missile.unwrap());
     assert_eq!(flying.fired_from, Some(ShooterId::new(object_id(900))));
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());

@@ -33,6 +33,7 @@ use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
 use genie_core::objects::WorkerCount;
 use genie_core::objects::lifecycle::Lifecycle;
+use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
@@ -65,8 +66,42 @@ pub(super) fn object(
             dead_master: None,
             gather_point: gather_point(object).ok().flatten(),
             production: production(object).ok().flatten(),
+            missile: saved_missile(object),
         },
     }
+}
+
+/// A saved missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`), its object's part:
+/// flying (`+0x994`, not saved) while its missile action's distance is past
+/// [`genie_core::combat::missile::LANDING`]; a missile without its action (one that met its
+/// target, dying) takes the 1 the load's constructor sets. None for an object that is no
+/// missile.
+pub(super) fn saved_missile(
+    object: &genie_save::Object,
+) -> Option<genie_core::combat::missile::Missile> {
+    let mo = object
+        .rge_object
+        .as_deref()
+        .and_then(|r| r.rge_missile_object.as_deref())?;
+    let step = object.moving_part().map_or(Offset::ZERO, |m| {
+        Offset::new(m.velocity_x, m.velocity_y, m.velocity_z)
+    });
+    let distance = object
+        .actions()
+        .and_then(|a| a.entries().next())
+        .filter(|&(kind, _)| {
+            ActionType::try_from(kind).ok() == Some(genie_core::combat::missile::MISSILE)
+        })
+        .and_then(|(_, action)| action.rge_action_by_type.as_deref())
+        .and_then(|t| t.rge_action_missile.as_deref())
+        .map(|ma| ma.distance);
+    Some(genie_core::combat::missile::Missile {
+        max_range: Distance::new(mo.max_range),
+        fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
+        charge: mo.is_charge_projectile != 0,
+        flying: distance.is_none_or(|d| genie_core::combat::missile::LANDING < d),
+        step,
+    })
 }
 
 /// The slice's view of one saved object's row: its lifecycle, its unit AI and its actions. A save
@@ -343,25 +378,6 @@ pub(super) fn unit(
     if saved {
         // a saved object's Fly is its saved action's: none starts again (it never ends)
         unit.actions.default_fly = false;
-    }
-    // a missile without its action (one that met its target, dying): the object's own fields, and
-    // the flying flag the load constructor sets (`+0x994` 1, not saved)
-    if unit.missile.is_none()
-        && let Some(mo) = object
-            .rge_object
-            .as_deref()
-            .and_then(|r| r.rge_missile_object.as_deref())
-    {
-        let step = object.moving_part().map_or(Offset::ZERO, |m| {
-            Offset::new(m.velocity_x, m.velocity_y, m.velocity_z)
-        });
-        unit.missile = Some(genie_core::combat::missile::Missile {
-            max_range: Distance::new(mo.max_range),
-            fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
-            charge: mo.is_charge_projectile != 0,
-            flying: true,
-            step,
-        });
     }
     let production = production(object).map(|_| ());
     let moving = mover(object, s, objects, paths, civ, masters).map(|m| unit.body.put_mover(m));

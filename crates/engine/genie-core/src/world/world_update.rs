@@ -162,7 +162,7 @@ impl World {
         match outcome {
             Outcome::Leave => {
                 let gone = self.swap_remove_live(p, i)?;
-                if let Err(e) = self.leave_world(p, &gone.unit) {
+                if let Err(e) = self.leave_world(p, &gone) {
                     crate::trace::player_unsupported(self.ticks, p, &e);
                     let _ = self
                         .players

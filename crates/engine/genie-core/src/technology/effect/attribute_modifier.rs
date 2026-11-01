@@ -156,7 +156,13 @@ impl World {
         };
         let master = u.master(&self.masters, p)?.clone();
         let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(id)).copied();
-        if master.kind < master_type::ACTION || !has_actions(u, self.parts.production.get(u.id)) {
+        if master.kind < master_type::ACTION
+            || !has_actions(
+                u,
+                self.parts.production.get(u.id),
+                self.parts.missile.contains(u.id),
+            )
+        {
             let sprite = match (attribute, u.idle_variant) {
                 (a::STANDING_GRAPHIC, 0) => master.standing_sprite,
                 (a::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,

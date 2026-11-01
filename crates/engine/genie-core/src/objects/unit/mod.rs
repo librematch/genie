@@ -77,8 +77,6 @@ pub struct Unit {
     pub undeletable: bool,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).
     pub group: crate::groups::GroupLink,
-    /// A missile's own part with its action ([`crate::combat::missile`]).
-    pub missile: Option<crate::combat::missile::Missile>,
     /// The objects inside it (`+0x2f8`), in the order they came in (`FUN_141164af0`); one that
     /// leaves takes the last one's place (`FUN_141166450`).
     /// Not saved as a list: a load lists them by each one's `+0x2f0` in the objects' order.

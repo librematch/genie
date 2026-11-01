@@ -9091,13 +9091,6 @@ fn the_forced_replay_s_removal_leaves_as_an_update_s_leave_does() {
     let missile = Unit {
         id: object_id(9),
         stopped: true,
-        missile: Some(crate::combat::missile::Missile {
-            max_range: Distance::ZERO,
-            fired_from: None,
-            charge: false,
-            flying: true,
-            step: Offset::ZERO,
-        }),
         life: Lifecycle {
             master_id: master_id(54),
             ..Lifecycle::default()
@@ -9105,6 +9098,17 @@ fn the_forced_replay_s_removal_leaves_as_an_update_s_leave_does() {
         ..Unit::default()
     };
     let mut t = one_player(vec![live(7), missile], [0.0; 4]);
+    t.set_part(
+        object_id(9),
+        Part::Missile(Some(crate::combat::missile::Missile {
+            max_range: Distance::ZERO,
+            fired_from: None,
+            charge: false,
+            flying: true,
+            step: Offset::ZERO,
+        })),
+    )
+    .unwrap();
     t.masters = vec![Masters::new([Master {
         id: master_id(54),
         kind: master_type::MISSILE,
@@ -17091,7 +17095,7 @@ pub(crate) fn missiles(t: &World) -> Vec<(i32, i16, Position)> {
     t.players[1]
         .objects
         .iter()
-        .filter(|u| u.missile.is_some())
+        .filter(|u| t.parts.missile.contains(u.id))
         .map(|u| (u.id.get(), u.life.master_id.get(), u.position()))
         .collect()
 }
@@ -17294,7 +17298,7 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
     // the missile's own +0x900 is its archer's attack count when fired
     let counts: Vec<crate::combat::AttackCount> = one.players[1].objects.as_slice()[1..]
         .iter()
-        .filter(|u| u.missile.is_some())
+        .filter(|u| one.parts.missile.contains(u.id))
         .map(|u| u.combat.attack_count)
         .collect();
     assert_eq!(

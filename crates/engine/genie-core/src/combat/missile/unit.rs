@@ -44,13 +44,15 @@ impl Unit {
     /// (`FUN_14113e170`), the sprite's pitch facet and the projectile types 1 and 2 are not
     /// modelled.
     pub(crate) fn fly(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let Some(mut missile) = self.missile.take() else {
+        let Some(mut missile) = c.w.parts.missile.get(self.id).copied() else {
             return Ok(());
         };
         let mut action = self.actions.list.take_missile();
         let flown = self.fly_missile(&mut missile, &mut action, c);
         self.actions.list.set_missile(action);
-        self.missile = Some(missile);
+        if let Some(own) = c.w.parts.missile.get_mut(self.id) {
+            *own = missile;
+        }
         flown
     }
 

@@ -1,5 +1,6 @@
 //! A saved object's top action as the slice models it ([`saved_actions`]).
 
+use crate::saved_unit::saved_missile;
 use crate::{OTHER_SUB_ACTION, combat_master, saved_attack, saved_move_wait, saved_sprite};
 use genie_core::GenieError;
 use genie_core::combat::missile::ShooterId;
@@ -292,16 +293,15 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
         .ok_or(GenieError::unsupported(
             "a saved missile action without its part",
         ))?;
-    let mo = object
-        .rge_object
-        .as_deref()
-        .and_then(|r| r.rge_missile_object.as_deref())
-        .ok_or(GenieError::unsupported(
+    // the missile's own fields are its part (saved_unit's saved_missile)
+    if saved_missile(object).is_none() {
+        return Err(GenieError::unsupported(
             "a missile action of an object that is not a missile",
-        ))?;
-    let moving = object
-        .moving_part()
-        .ok_or(GenieError::unsupported("a missile without its moving part"))?;
+        ));
+    }
+    if object.moving_part().is_none() {
+        return Err(GenieError::unsupported("a missile without its moving part"));
+    }
     // the hit mode copies the master's (`+0x80`, a miss's 1 is not saved)
     let hit_mode = saved
         .objects
@@ -311,13 +311,6 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
         .map_or(genie_core::combat::missile::HitMode::TARGET_ALONE, |m| {
             genie_core::combat::missile::HitMode::of_data(m.missile_hit_info)
         });
-    unit.missile = Some(genie_core::combat::missile::Missile {
-        max_range: Distance::new(mo.max_range),
-        fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
-        charge: mo.is_charge_projectile != 0,
-        flying: genie_core::combat::missile::LANDING < ma.distance,
-        step: Offset::new(moving.velocity_x, moving.velocity_y, moving.velocity_z),
-    });
     unit.actions
         .list
         .set_missile(Some(genie_core::combat::missile::MissileAction {

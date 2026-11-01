@@ -121,7 +121,8 @@ pub(crate) fn victim_of(
             mode_680,
             player: p,
             kill_bonus_tasks: tasks(crate::objects::masters::action_type::LOOT),
-            fired_from: u.missile.as_ref().and_then(|m| m.fired_from),
+            // a missile's own (its part): its own strike sets it ([`Unit::own_strike`])
+            fired_from: None,
         },
         weapons: master.weapons.clone(),
         master_hp: master.hit_points,
