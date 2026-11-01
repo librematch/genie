@@ -104,6 +104,7 @@ fn a_building_s_relics_scale_its_elevation_factor() {
 
 use super::*;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
+use crate::construction::MainBuildingId;
 use crate::map::Tile;
 use crate::objects::HpPowerup;
 use crate::objects::masters::ChargeEvent;
@@ -1204,7 +1205,7 @@ fn a_hit_on_an_annex_goes_to_its_main_building() {
         id,
         hp: HitPoints::new(2400.0),
         building: Some(Building {
-            main: Some(object_id(10)),
+            main: Some(MainBuildingId::new(object_id(10))),
             ..Building::default()
         }),
         ..house()
@@ -1542,7 +1543,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
         radius: Footprint::new(0.5, 0.5),
         blast_defense: BlastDefense::new(0),
         building: Some(Building {
-            main: Some(object_id(20)),
+            main: Some(MainBuildingId::new(object_id(20))),
             ..Building::default()
         }),
         ..house()
@@ -1719,7 +1720,7 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
     let mut annex = Victim {
         id: object_id(501),
         building: Some(Building {
-            main: Some(object_id(500)),
+            main: Some(MainBuildingId::new(object_id(500))),
             blast_taken: HitPoints::new(2.0),
             ..Building::default()
         }),
@@ -1748,7 +1749,7 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
     );
     let mut orphan = Victim {
         building: Some(Building {
-            main: Some(object_id(999)),
+            main: Some(MainBuildingId::new(object_id(999))),
             ..Building::default()
         }),
         ..house()
@@ -1969,7 +1970,7 @@ fn a_blast_s_hit_adds_a_building_s_loss_to_its_ledger() {
     let mut annex = Victim {
         id: object_id(501),
         building: Some(Building {
-            main: Some(object_id(500)),
+            main: Some(MainBuildingId::new(object_id(500))),
             ..Building::default()
         }),
         ..house()

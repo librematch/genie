@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::combat::MissileCount;
 use crate::combat::damage::Victim;
 use crate::combat::missile::AimAt;
+use crate::combat::missile::ShooterId;
 use crate::map::Distance;
 use crate::map::Radii;
 use crate::map::spatial::Placed;
@@ -479,7 +480,7 @@ impl Unit {
         let mut action = crate::combat::missile::MissileAction {
             state: crate::combat::missile::MissileState::New,
             target: aimed.target,
-            fired_from: shot.shooter.then_some(self.id),
+            fired_from: shot.shooter.then_some(ShooterId::new(self.id)),
             point: shot.point,
             timer: Distance::ZERO,
             direction: Offset::ZERO,
@@ -539,7 +540,7 @@ impl Unit {
             body: crate::objects::layers::Body::new(position, None, Some(mover)),
             missile: Some(crate::combat::missile::Missile {
                 max_range: shot.reach,
-                fired_from: Some(self.id),
+                fired_from: Some(ShooterId::new(self.id)),
                 charge: false,
                 flying,
                 step: Offset::ZERO,
@@ -619,7 +620,7 @@ pub(crate) fn same_members(a: &[ObjectId], b: &[ObjectId]) -> bool {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Fired {
     pub(crate) charge: bool,
-    pub(crate) by: Option<ObjectId>,
+    pub(crate) by: Option<ShooterId>,
 }
 
 /// A missile [`Unit::launch`] makes: its master, where it starts, the point its action aims at,

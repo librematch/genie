@@ -1,6 +1,7 @@
 //! The hunt and gather commands, a build's and a repair's start, retake and target.
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
 use crate::construction::repair::RepairState;
 use crate::gathering::hunt::HuntTask;
 use crate::map::Position;
@@ -522,7 +523,7 @@ impl World {
         };
         let kind = f.master(&self.masters, p)?.kind;
         Ok(Some(if kind == BUILDING {
-            f.annex_of.unwrap_or(id)
+            f.annex_of.map_or(id, MainBuildingId::id)
         } else {
             id
         }))

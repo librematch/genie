@@ -162,7 +162,11 @@ impl World {
         let mains: Vec<ObjectId> = target
             .into_iter()
             .chain(near.iter().map(|v| v.id))
-            .filter_map(|id| self.spatial.annex_of(id))
+            .filter_map(|id| {
+                self.spatial
+                    .annex_of(id)
+                    .map(crate::construction::MainBuildingId::id)
+            })
             .collect();
         for m in mains {
             if m != unit.id

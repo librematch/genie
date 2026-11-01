@@ -43,7 +43,11 @@ impl Mover {
             .ok_or(GenieError::unsupported("a walker without a place"))?
             .player;
         for &hit in hits {
-            let Some(id) = world.annex_of(hit).or_else(|| hit.key()) else {
+            let Some(id) = world
+                .annex_of(hit)
+                .map(crate::construction::MainBuildingId::id)
+                .or_else(|| hit.key())
+            else {
                 continue;
             };
             if level.targets(id) {

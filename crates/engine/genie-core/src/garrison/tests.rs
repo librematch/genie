@@ -3,6 +3,7 @@ use crate::combat::Firepower;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
+use crate::construction::MainBuildingId;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::map::Distance;
@@ -202,7 +203,7 @@ fn garrison_world() -> World {
         .objects
         .push(unit(200, SHIP, HitPoints::new(100.0)));
     let mut gate = unit(300, GATE, HitPoints::new(2750.0));
-    gate.annex_of = Some(object_id(100));
+    gate.annex_of = Some(MainBuildingId::new(object_id(100)));
     t.players[1].objects.push(gate);
     t
 }
@@ -2252,7 +2253,7 @@ pub(crate) fn building_at(
 ) {
     let mut b = unit(id, m, HitPoints::new(2400.0));
     b.place_for_test(at.with_height(0.0));
-    b.annex_of = annex_of;
+    b.annex_of = annex_of.map(MainBuildingId::new);
     t.players[1].objects.push(b);
     t.spatial.insert(
         object_id(id),

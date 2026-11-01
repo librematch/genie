@@ -764,7 +764,9 @@ mod stack_tests {
         );
         let unit = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
         assert_eq!(
-            [8769, 8770, 8771, 8772, 8773].map(|a| unit(object_id(a)).annex_of),
+            [8769, 8770, 8771, 8772, 8773].map(|a| unit(object_id(a))
+                .annex_of
+                .map(crate::construction::MainBuildingId::id)),
             [
                 Some(object_id(8768)),
                 Some(object_id(8768)),

@@ -2,6 +2,7 @@
 //! queries.
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Tile;
@@ -247,7 +248,7 @@ impl Spatial {
     }
 
     /// An annex's main building, or none.
-    pub fn set_annex(&mut self, id: ObjectId, main: Option<ObjectId>) {
+    pub fn set_annex(&mut self, id: ObjectId, main: Option<MainBuildingId>) {
         match main {
             Some(m) => {
                 let _ = self.annexes.insert(id, m);
@@ -275,14 +276,14 @@ impl Spatial {
     pub fn annexes_of(&self, main: ObjectId) -> Vec<ObjectId> {
         self.annexes
             .iter()
-            .filter(|&(_, &m)| m == main)
+            .filter(|&(_, &m)| m.id() == main)
             .map(|(&a, _)| a)
             .collect()
     }
 
     /// The main building of the annex `id`, if it is one.
     #[must_use]
-    pub fn annex_of(&self, id: impl ObjectKey) -> Option<ObjectId> {
+    pub fn annex_of(&self, id: impl ObjectKey) -> Option<MainBuildingId> {
         self.annexes.get(&id.key()?).copied()
     }
 

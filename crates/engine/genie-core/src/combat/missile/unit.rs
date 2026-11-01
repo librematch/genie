@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::missile::MissileState;
+use crate::combat::missile::ShooterId;
 use crate::combat::missile::StrikeResult;
 use crate::combat::missile::VanishMode;
 use crate::combat::victims::{readable, victim, victim_of, write_strike_back};
@@ -400,7 +401,7 @@ impl Unit {
     pub(crate) fn own_strike(
         &mut self,
         action: &crate::combat::missile::MissileAction,
-        fired_from: Option<ObjectId>,
+        fired_from: Option<ShooterId>,
         c: &mut Step<'_>,
     ) -> Result<StrikeResult, GenieError> {
         if action.origin.owner.is_some() {
@@ -545,7 +546,10 @@ impl Unit {
     ) -> Result<(), GenieError> {
         if let Some(a) = slot.take() {
             let by = self.releaser(c)?;
-            for t in [a.target, a.fired_from].into_iter().flatten() {
+            for t in [a.target, a.fired_from.map(ShooterId::id)]
+                .into_iter()
+                .flatten()
+            {
                 crate::world::lets::release(c, self, t, by)?;
             }
         }

@@ -9,6 +9,7 @@
 //! notifies held while the AI's side runs ([`Step::side_notifies`]).
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::Masters;
 use crate::objects::masters::master_type::BUILDING;
@@ -350,7 +351,7 @@ impl Lets<'_> {
     fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> Result<ObjectId, GenieError> {
         // The building master type RESEARCH asks for (`'P'`, 80).
         Ok(if f.master(self.masters, p)?.kind == BUILDING {
-            f.annex_of.unwrap_or(id)
+            f.annex_of.map_or(id, MainBuildingId::id)
         } else {
             id
         })

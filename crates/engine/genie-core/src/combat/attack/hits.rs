@@ -171,7 +171,7 @@ pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<HitPoi
     };
     blasted
         .iter()
-        .find(|v| v.id == main)
+        .find(|v| v.id == main.id())
         .map(|m| {
             m.building
                 .as_ref()

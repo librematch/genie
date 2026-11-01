@@ -391,7 +391,7 @@ impl UnitAi {
             if BUILDING <= n.kind
                 && let Some(main) = n.main
             {
-                id = Some(main);
+                id = Some(main.id());
             }
         }
         let Some(id) = id.filter(|&id| Some(id) != self.current_target) else {

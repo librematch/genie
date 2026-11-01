@@ -1,5 +1,6 @@
 use super::*;
 use crate::construction::FoundationId;
+use crate::construction::MainBuildingId;
 use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
 use crate::map::DistanceSquared;
@@ -13277,7 +13278,7 @@ fn retargeting(target: i32) -> (UnitAi, Surroundings) {
                 object_id(41),
                 class::BUILDING,
                 BUILDING,
-                Some(object_id(40)),
+                Some(MainBuildingId::new(object_id(40))),
             ),
             seen(object_id(42), class::CLASS_54, BUILDING, None),
             seen(object_id(43), class::FARM, BUILDING, None),

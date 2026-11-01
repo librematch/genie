@@ -1,6 +1,7 @@
 //! The Build's update on the step ([`BuildAction::update`] through [`Unit::build_part`]), on
 //! World fixtures: the state of the builder, its foundation and the world after each update.
 
+use crate::construction::MainBuildingId;
 use crate::gathering::DropSiteId;
 use crate::map::GridSize;
 use crate::map::Restriction;
@@ -345,7 +346,7 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     main.life.hp = HitPoints::new(0.5);
     let mut annex = own(&mut t, HOUSE).clone();
     annex.id = ANNEX;
-    annex.annex_of = Some(HOUSE);
+    annex.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.life.hp = HitPoints::new(1.0);
     annex.construction = Some(construction(1.0, 0, false));
     t.players[1].objects.push(annex);
@@ -1638,14 +1639,15 @@ fn annex(t: &mut World, at: Position) -> i32 {
     const ANNEX: i32 = 10029;
     let mut annex = own(t, HOUSE).clone();
     annex.id = object_id(ANNEX);
-    annex.annex_of = Some(HOUSE);
+    annex.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.place_for_test(at);
     t.players[1].objects.push(annex);
     t.spatial.insert(
         object_id(ANNEX),
         placed(at, 1.0, class::BUILDING, ids::HOUSE),
     );
-    t.spatial.set_annex(object_id(ANNEX), Some(HOUSE));
+    t.spatial
+        .set_annex(object_id(ANNEX), Some(MainBuildingId::new(HOUSE)));
     ANNEX
 }
 

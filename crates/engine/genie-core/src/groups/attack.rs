@@ -185,7 +185,10 @@ impl World {
     fn main_object(&self, target: ObjectId) -> Result<ObjectId, GenieError> {
         let (player, unit) = self.object(target).ok_or_else(|| member_gone(target))?;
         let building = unit.master(&self.masters, player)?.kind == BUILDING;
-        Ok(unit.annex_of.filter(|_| building).unwrap_or(target))
+        Ok(unit
+            .annex_of
+            .filter(|_| building)
+            .map_or(target, crate::construction::MainBuildingId::id))
     }
 
     /// Slot 0x520 (`FUN_14106d530`) of object `id`: where it last moved to ([`moved_place`]).

@@ -34,6 +34,7 @@ mod miss_spread;
 mod missile_modes;
 mod missile_state;
 mod projectile_type;
+mod shooter_id;
 mod strike_result;
 pub(crate) mod unit;
 
@@ -43,6 +44,7 @@ pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
 pub use self::projectile_type::ProjectileType;
+pub use self::shooter_id::{Shooter, ShooterId};
 pub use self::strike_result::StrikeResult;
 
 /// The missile action's type, which word 9 adds when it is the top action.
@@ -148,7 +150,7 @@ pub struct MissileAction {
     /// −1 for none.
     pub target: Option<ObjectId>,
     /// The object it was fired from (`+0x28`, its id `+0x34`).
-    pub fired_from: Option<ObjectId>,
+    pub fired_from: Option<ShooterId>,
     /// `+0x38`..`+0x40`: the target's place when fired.
     pub point: Position,
     /// `+0x44`: the way flown so far (a straight missile's).
@@ -178,7 +180,7 @@ pub struct Missile {
     /// `+0x990`: how far it flies at most (`max_range`).
     pub max_range: Distance,
     /// `+0x998` (`fired_from_id`) and `+0x99c` (`mIsChargeProjectile`).
-    pub fired_from: Option<ObjectId>,
+    pub fired_from: Option<ShooterId>,
     /// `+0x99c` (`mIsChargeProjectile`): a charge's projectile.
     pub charge: bool,
     /// `+0x994`: farther than [`LANDING`] from its point; the ground does not stop it.
@@ -542,7 +544,7 @@ mod tests {
         let mut a = MissileAction {
             state: MissileState::Launch,
             target: Some(object_id(9655)),
-            fired_from: Some(object_id(9171)),
+            fired_from: Some(ShooterId::new(object_id(9171))),
             point: Position::ORIGIN,
             timer: Distance::ZERO,
             direction: Offset::ZERO,

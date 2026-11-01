@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::Charge;
+use crate::construction::MainBuildingId;
 use crate::garrison::ContainerId;
 use crate::gathering::make::MakeState;
 use crate::map::Distance;
@@ -582,7 +583,7 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
     main.life.master_id = master_id(30);
     main.construction = Some(built());
     let mut annex = unit_of(21, master_id(31), HitPoints::new(50.0));
-    annex.annex_of = Some(object_id(20));
+    annex.annex_of = Some(MainBuildingId::new(object_id(20)));
     annex.construction = Some(built());
     let mut foundation = unit_of(22, master_id(30), HitPoints::new(10.0));
     foundation.life.state = ObjectState::Foundation;

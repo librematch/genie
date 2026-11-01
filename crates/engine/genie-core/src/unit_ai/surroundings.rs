@@ -326,7 +326,7 @@ pub struct UnitSeen {
     /// Its type (`+0xf`).
     pub kind: MasterKind,
     /// An annex's main building (`+0xbb8`).
-    pub main: Option<ObjectId>,
+    pub main: Option<crate::construction::MainBuildingId>,
     /// The unit's owner counts its owner as its own or an ally (`FUN_141663d90` with the ally
     /// flag, [`crate::unit_ai::task_finder::allied`]).
     pub allied: bool,

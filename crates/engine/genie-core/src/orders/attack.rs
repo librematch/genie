@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::{Attack, AttackReads, Fight};
+use crate::construction::MainBuildingId;
 use crate::gathering::hunt::HuntRetarget;
 use crate::map::Distance;
 use crate::map::Position;
@@ -187,7 +188,7 @@ impl World {
         let tm = t.master(&self.masters, owner)?;
         // A building's master type (`'P'`); types below 30 do not move.
         let aimed = if tm.kind == BUILDING {
-            t.annex_of.unwrap_or(target)
+            t.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         };

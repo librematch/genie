@@ -2,6 +2,7 @@ use super::*;
 use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::damage::ArmorPair;
+use crate::combat::missile::ShooterId;
 use crate::combat::missile::SmartMode;
 use crate::commands::GameSub;
 use crate::commands::GatherPointState;
@@ -17,6 +18,7 @@ use crate::commands::{
     UnitList, UnitOrderAction, UnitOrderCommand, UnloadCommand, UnmodelledCommand, Waypoints,
 };
 use crate::construction::FoundationId;
+use crate::construction::MainBuildingId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildTask, Construction};
 use crate::construction::gates::gate_units;
@@ -2213,7 +2215,7 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
 #[test]
 fn a_task_target_reads_an_annex_as_its_main_building() {
     let mut t = sent_off_world(vec![]);
-    t.players[1].objects[ListIndex::new(0)].annex_of = Some(object_id(10028));
+    t.players[1].objects[ListIndex::new(0)].annex_of = Some(MainBuildingId::new(object_id(10028)));
     let find = |id: ObjectId| t.object(id);
     let at = |steps| {
         task_target_with(object_id(9175), steps, &find, &t.masters)
@@ -2358,7 +2360,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
     let mut t = sent_off_world(vec![]);
     let annex = Unit {
         id: object_id(10031),
-        annex_of: Some(object_id(10028)),
+        annex_of: Some(MainBuildingId::new(object_id(10028))),
         ..t.players[1].objects[ListIndex::new(1)].clone()
     };
     t.players[1].objects.push(annex);
@@ -2384,8 +2386,10 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
             },
         );
     }
-    t.spatial
-        .set_annex(object_id(10031), Some(object_id(10028)));
+    t.spatial.set_annex(
+        object_id(10031),
+        Some(MainBuildingId::new(object_id(10028))),
+    );
     assert_eq!(
         t.work_building(object_id(10031), Seconds::new(0.021)),
         Ok(true)
@@ -5558,7 +5562,7 @@ fn lets_world() -> World {
     }
     t.players[0].objects.push(Unit {
         id: object_id(530),
-        annex_of: Some(object_id(520)),
+        annex_of: Some(MainBuildingId::new(object_id(520))),
         life: Lifecycle {
             state: ObjectState::Foundation,
             master_id: master_id(99),
@@ -8412,13 +8416,13 @@ fn gate_world() -> World {
                         object_id(27746),
                         master_id(88),
                         18.5,
-                        Some(object_id(27745)),
+                        Some(MainBuildingId::new(object_id(27745))),
                     ),
                     unit(
                         object_id(27747),
                         master_id(88),
                         21.5,
-                        Some(object_id(27745)),
+                        Some(MainBuildingId::new(object_id(27745))),
                     ),
                     unit(object_id(1), master_id(4), 19.6, None),
                 ]
@@ -10942,7 +10946,7 @@ fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
     let mut t = deaths_world();
     let mut main = t.players[1].objects[ListIndex::new(3)].clone();
     main.id = object_id(10030);
-    t.players[1].objects[ListIndex::new(3)].annex_of = Some(object_id(10030));
+    t.players[1].objects[ListIndex::new(3)].annex_of = Some(MainBuildingId::new(object_id(10030)));
     t.players[1].objects[ListIndex::new(3)]
         .construction
         .as_mut()
@@ -12689,7 +12693,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
             state: ObjectState::Alive,
             ..Lifecycle::default()
         },
-        annex_of,
+        annex_of: annex_of.map(MainBuildingId::new),
         ..Unit::default()
     };
     let player = |objects| Player {
@@ -12731,8 +12735,10 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
     };
     let masters = Masters::new([castle, annex]);
     t.masters = vec![masters.clone(), masters.clone(), masters];
-    t.spatial.set_annex(object_id(31), Some(object_id(30)));
-    t.spatial.set_annex(object_id(32), Some(object_id(30)));
+    t.spatial
+        .set_annex(object_id(31), Some(MainBuildingId::new(object_id(30))));
+    t.spatial
+        .set_annex(object_id(32), Some(MainBuildingId::new(object_id(30))));
     // a history adds events once it has an entry
     t.players[1].history.entries = vec![crate::players::history::HistoryEntry::default()];
     let mut v = t.victim(object_id(30), PlayerId::new(1)).unwrap().unwrap();
@@ -12742,7 +12748,10 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
         (None, vec![object_id(31), object_id(32)], 650.0, false)
     );
     let a = t.victim(object_id(31), PlayerId::new(1)).unwrap().unwrap();
-    assert_eq!(a.building.and_then(|b| b.main), Some(object_id(30)));
+    assert_eq!(
+        a.building.and_then(|b| b.main),
+        Some(MainBuildingId::new(object_id(30)))
+    );
     v.hp = HitPoints::ZERO;
     v.killed = Some(crate::combat::damage::Kill {
         attacker: object_id(9),
@@ -13613,7 +13622,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                 objects: vec![
                     building(object_id(7228), master_id(88), HitPoints::new(-58.0)),
                     Unit {
-                        annex_of: Some(object_id(7228)),
+                        annex_of: Some(MainBuildingId::new(object_id(7228))),
                         ..building(object_id(7229), master_id(95), HitPoints::new(1650.0))
                     },
                 ]
@@ -13735,13 +13744,13 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
                         object_id(34602),
                         master_id(1192),
                         HitPoints::new(1.0),
-                        Some(object_id(34600)),
+                        Some(MainBuildingId::new(object_id(34600))),
                     ),
                     foundation(
                         object_id(34601),
                         master_id(1192),
                         HitPoints::new(1.0),
-                        Some(object_id(34600)),
+                        Some(MainBuildingId::new(object_id(34600))),
                     ),
                     foundation(object_id(34600), master_id(800), HitPoints::ZERO, None),
                 ]
@@ -13751,10 +13760,14 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             },
         ],
     );
-    t.spatial
-        .set_annex(object_id(34602), Some(object_id(34600)));
-    t.spatial
-        .set_annex(object_id(34601), Some(object_id(34600)));
+    t.spatial.set_annex(
+        object_id(34602),
+        Some(MainBuildingId::new(object_id(34600))),
+    );
+    t.spatial.set_annex(
+        object_id(34601),
+        Some(MainBuildingId::new(object_id(34600))),
+    );
     t.masters = vec![
         Masters::new([]),
         Masters::new([
@@ -13793,7 +13806,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             ),
         ),
     ]);
-    let looks = |t: &World| -> Vec<(ObjectId, ObjectState, f32, Option<ObjectId>)> {
+    let looks = |t: &World| -> Vec<(ObjectId, ObjectState, f32, Option<MainBuildingId>)> {
         t.players[1]
             .objects
             .iter()
@@ -16643,12 +16656,12 @@ fn a_volley_s_own_missiles_hit_without_the_shooter() {
     let mut expected = vec![364; usize::from(fired) - 1];
     expected.push(363);
     assert_eq!(masters, expected);
-    let shooters: Vec<Option<ObjectId>> = t.players[1].objects.as_slice()[1..]
+    let shooters: Vec<Option<ShooterId>> = t.players[1].objects.as_slice()[1..]
         .iter()
         .filter_map(|u| u.actions.missile().map(|a| a.fired_from))
         .collect();
     let mut expected = vec![None; usize::from(fired) - 1];
-    expected.push(Some(object_id(123)));
+    expected.push(Some(ShooterId::new(object_id(123))));
     assert_eq!(shooters, expected);
     for _ in 0..3 {
         t.tick(Millis::new(100));
@@ -18018,12 +18031,14 @@ fn annexed_house() -> World {
         .unwrap()
         .clone();
     annex.id = object_id(10030);
-    annex.annex_of = Some(object_id(10028));
+    annex.annex_of = Some(MainBuildingId::new(object_id(10028)));
     t.players[1].objects.push(annex);
     let placed = *t.spatial.get(object_id(10028)).unwrap();
     t.spatial.insert(object_id(10030), placed);
-    t.spatial
-        .set_annex(object_id(10030), Some(object_id(10028)));
+    t.spatial.set_annex(
+        object_id(10030),
+        Some(MainBuildingId::new(object_id(10028))),
+    );
     let k = crate::players::tracker::key(t.masters.get(1), &t.lines, ids::HOUSE);
     t.players[1].tracker.add(object_id(10030), k);
     t
@@ -18368,8 +18383,10 @@ fn a_foundation_whose_build_points_reached_its_build_time_completes() {
         [Some(object_id(10028))]
     );
     let short: fn(&mut Unit) = |h| h.construction.as_mut().unwrap().progress = Seconds::new(24.0);
-    let annex: fn(&mut Unit) =
-        |h| (h.life.master_id, h.annex_of) = (master_id(109), Some(object_id(700)));
+    let annex: fn(&mut Unit) = |h| {
+        (h.life.master_id, h.annex_of) =
+            (master_id(109), Some(MainBuildingId::new(object_id(700))));
+    };
     for setup in [short, annex] {
         let (t, r) = completed_house(setup);
         assert_eq!(r, (vec![], 0));
@@ -18968,9 +18985,11 @@ fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
     main.id = object_id(10029);
     main.place_for_test(Position::new(34.0, 88.0, 0.0));
     t.players[1].objects.push(main);
-    t.players[1].objects[ListIndex::new(1)].annex_of = Some(object_id(10029));
-    t.spatial
-        .set_annex(object_id(10028), Some(object_id(10029)));
+    t.players[1].objects[ListIndex::new(1)].annex_of = Some(MainBuildingId::new(object_id(10029)));
+    t.spatial.set_annex(
+        object_id(10028),
+        Some(MainBuildingId::new(object_id(10029))),
+    );
     let p = *t.spatial.get(object_id(10028)).unwrap();
     t.spatial.insert(
         object_id(10029),
@@ -19292,8 +19311,9 @@ fn finished_with(
 fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
     use crate::objects::sprite::{Graphic, building_death};
     let mut t = house_builder();
-    t.spatial.set_annex(object_id(700), Some(object_id(10028)));
-    t.players[1].objects[ListIndex::new(2)].annex_of = Some(object_id(10028));
+    t.spatial
+        .set_annex(object_id(700), Some(MainBuildingId::new(object_id(10028))));
+    t.players[1].objects[ListIndex::new(2)].annex_of = Some(MainBuildingId::new(object_id(10028)));
     let house = &t.players[1].objects[ListIndex::new(1)];
     let master = t.masters[1].get(house.life.master_id).unwrap();
     let progress = house.construction.unwrap().progress;

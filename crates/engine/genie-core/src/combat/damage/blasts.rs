@@ -6,6 +6,7 @@ use crate::combat::damage::{
     Attacker, CONE, ELEPHANT_ARCHER, Kill, MINUS_CONE, RAMS, Victim, WIDE_CONE, armor_damage,
     bonus_damage, charge_hit, elevation_factor, facing_offset, kill_bonus, lose, shield, take,
 };
+use crate::combat::missile::ShooterId;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Tile;
@@ -61,7 +62,7 @@ pub(super) fn damage(
     let master_hp = i32::from(t.master_hp.get());
     if src.source.class != ELEPHANT_ARCHER {
         let sender = if src.kind == MISSILE {
-            src.source.fired_from
+            src.source.fired_from.map(ShooterId::id)
         } else {
             Some(src.id)
         };
@@ -286,7 +287,7 @@ pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> Result<Option<u
         |m| {
             targets
                 .iter()
-                .position(|v| v.id == m)
+                .position(|v| v.id == m.id())
                 .map(Some)
                 .ok_or(crate::construction::build::NOT_HELD)
         },

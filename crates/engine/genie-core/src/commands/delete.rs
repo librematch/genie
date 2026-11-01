@@ -791,6 +791,7 @@ mod tests {
 #[cfg(test)]
 mod clearing_tests {
     use super::*;
+    use crate::construction::MainBuildingId;
     use crate::map::Distance;
     use crate::map::Footprint;
     use crate::map::GridSize;
@@ -1154,7 +1155,10 @@ mod clearing_tests {
             ])
         );
         assert_eq!(
-            crate::objects::lifecycle::death_parts::refund_of(&house, Some(object_id(9))),
+            crate::objects::lifecycle::death_parts::refund_of(
+                &house,
+                Some(MainBuildingId::new(object_id(9)))
+            ),
             []
         );
         let castle = Master {

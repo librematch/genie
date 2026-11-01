@@ -187,7 +187,7 @@ impl crate::world::World {
                     if m.life.state == ObjectState::Foundation
                         && crate::math::fmath::at_most_or_unordered(1.0, m.life.hp.get()) =>
                 {
-                    at = main;
+                    at = main.id();
                 }
                 _ => break,
             }

@@ -413,7 +413,7 @@ impl World {
         let mut id = id;
         for _ in 0..steps {
             match self.object(id).and_then(|(_, u)| u.annex_of) {
-                Some(main) => id = main,
+                Some(main) => id = main.id(),
                 None => break,
             }
         }

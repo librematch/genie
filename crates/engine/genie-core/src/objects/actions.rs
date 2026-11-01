@@ -210,7 +210,10 @@ impl Action {
                 Some(s) => Some(s.id()),
                 None => None,
             },
-            Self::Missile(m) => m.fired_from,
+            Self::Missile(m) => match m.fired_from {
+                Some(s) => Some(s.id()),
+                None => None,
+            },
             Self::Attack(a) => a.target2,
             _ => None,
         }

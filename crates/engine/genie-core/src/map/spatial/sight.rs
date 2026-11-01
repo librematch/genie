@@ -399,7 +399,7 @@ impl Spatial {
             return Ok(None);
         };
         let main = self.annexes.get(&id).and_then(|main| {
-            let place = self.objects.get(main)?.position;
+            let place = self.objects.get(&main.id())?.position;
             Some((place, v.seer(*main).map_or(0, |s| s.umv)))
         });
         v.combat_sight(id, p.player, p.position, p.radius, p.class, main)

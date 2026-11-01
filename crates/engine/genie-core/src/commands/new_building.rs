@@ -416,8 +416,9 @@ impl World {
     ) -> Result<(), GenieError> {
         let not_held = crate::construction::build::NOT_HELD;
         let (_, a) = self.object_mut(aid).ok_or_else(|| not_held.clone())?;
-        a.annex_of = Some(id);
-        self.spatial.set_annex(aid, Some(id));
+        let main = crate::construction::MainBuildingId::new(id);
+        a.annex_of = Some(main);
+        self.spatial.set_annex(aid, Some(main));
         if made.class != class::GATE {
             self.unwatch(player, aid)?;
         }

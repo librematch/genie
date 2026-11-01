@@ -13,7 +13,9 @@ use genie_core::combat::Charge;
 use genie_core::combat::Firepower;
 use genie_core::combat::MissileCount;
 use genie_core::combat::damage::ArmorPair;
+use genie_core::combat::missile::ShooterId;
 use genie_core::construction::BuilderCount;
+use genie_core::construction::MainBuildingId;
 use genie_core::garrison::RaiderCountdown;
 use genie_core::gathering::PastureId;
 use genie_core::map::Distance;
@@ -115,7 +117,8 @@ pub(super) fn unit(
         annex_of: object
             .tribe_building_object
             .as_deref()
-            .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id)),
+            .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
+            .map(MainBuildingId::new),
         group: group_link(s),
         hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {
             taken: HitPoints::new(c.hitpoints_powerup),
@@ -315,7 +318,7 @@ pub(super) fn unit(
         });
         unit.missile = Some(genie_core::combat::missile::Missile {
             max_range: Distance::new(mo.max_range),
-            fired_from: ObjectId::of_field(mo.fired_from_id),
+            fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
             charge: mo.is_charge_projectile != 0,
             flying: true,
             step,

@@ -34,6 +34,7 @@ building's own steps first, then the builder's or repairer's action.
 | [`footprint_waits.rs`](footprint_waits.rs) | A builder's waits for an occupied footprint. |
 | [`foundation_id.rs`](foundation_id.rs) | A foundation's id as its own type: the building a builder builds and its footprint clears. |
 | [`gates.rs`](gates.rs) | The gates: the units in a gate, a player's gate list and passes, and the gates opened before and closed after a player's update. |
+| [`main_building_id.rs`](main_building_id.rs) | A main building's id as its own type: the building whose annexes are its parts. |
 | [`mod.rs`](mod.rs) | Building and repairing: the Build and Repair actions with each worker's part of its update, the wait for a foundation, a building's own update and the gates. |
 | [`wait_solidify.rs`](wait_solidify.rs) | A villager's wait for a foundation: `TRIBE_Action_Wait_Solidify` (action type 0x9a, vtable `0x142ed82f8`). |
 | [`wait_solidify_state.rs`](wait_solidify_state.rs) | A Wait Solidify's state: waiting for its foundation to turn solid. |
@@ -45,5 +46,5 @@ building's own steps first, then the builder's or repairer's action.
 
 <!-- uses -->
 - Uses: [`combat`](../combat/), [`commands`](../commands/), [`gathering`](../gathering/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
-- Used by: [`combat`](../combat/), [`commands`](../commands/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`players`](../players/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
+- Used by: [`combat`](../combat/), [`commands`](../commands/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`pathing`](../pathing/), [`players`](../players/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

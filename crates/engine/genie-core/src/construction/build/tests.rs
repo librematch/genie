@@ -1,4 +1,5 @@
 use super::*;
+use crate::construction::MainBuildingId;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
@@ -890,7 +891,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             sprite_override: false,
         };
         let mut h = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
-        h.annex_of = main.then_some(object_id(10027));
+        h.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
         let mut t = site_world(world, vec![built_master(id, cost)], vec![h]);
         // a history records events from its first time slice on
         t.players[1].history.add_entry(
@@ -1026,8 +1027,14 @@ fn the_work_starts_the_desolid_annexes_first() {
     world.insert(object_id(10028), at(30.0, master_id(665)));
     world.insert(object_id(10029), at(28.5, master_id(1192)));
     world.insert(object_id(10030), at(31.5, master_id(1192)));
-    world.set_annex(object_id(10029), Some(object_id(10028)));
-    world.set_annex(object_id(10030), Some(object_id(10028)));
+    world.set_annex(
+        object_id(10029),
+        Some(MainBuildingId::new(object_id(10028))),
+    );
+    world.set_annex(
+        object_id(10030),
+        Some(MainBuildingId::new(object_id(10028))),
+    );
     let foundation = |desolid| Construction {
         progress: Seconds::ZERO,
         desolid,
@@ -1054,7 +1061,7 @@ fn the_work_starts_the_desolid_annexes_first() {
             life(master),
             foundation(desolid),
         );
-        u.annex_of = (master == master_id(1192)).then_some(object_id(10028));
+        u.annex_of = (master == master_id(1192)).then_some(MainBuildingId::new(object_id(10028)));
         u
     };
     let mut post = built_master(master_id(1192), &Vec::new());
@@ -1188,7 +1195,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
             ..Lifecycle::default()
         };
         let mut post = foundation_at(10029, Position::new(1.0, 2.0, 0.0), life, foundation);
-        post.annex_of = Some(object_id(10028));
+        post.annex_of = Some(MainBuildingId::new(object_id(10028)));
         let gate = foundation_at(
             10028,
             Position::new(2.0, 2.0, 0.0),

@@ -1,6 +1,7 @@
 //! The repair part of the update and the unit's attackers and seen target.
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::payment::PaidAttributes;
 use crate::construction::repair::{CountedIn, RepairReads, Repairee};
@@ -224,7 +225,7 @@ fn repairee_of(
         moves: MOVING <= tm.kind && tm.moving.as_ref().is_some_and(|m| Speed::ZERO < m.speed),
     };
     let counting = if tm.kind == BUILDING {
-        t.annex_of.unwrap_or(target)
+        t.annex_of.map_or(target, MainBuildingId::id)
     } else {
         target
     };
@@ -304,11 +305,12 @@ pub(crate) fn repair_target(
 fn reached_ids(spatial: &Spatial, t: &Unit, target: ObjectId, building: bool) -> Vec<ObjectId> {
     let mut ids = vec![target];
     if building {
-        let head = t.annex_of.unwrap_or(target);
-        if head != target {
-            ids.push(head);
+        // the annex's main building, else the target is its own
+        let head = t.annex_of.unwrap_or_else(|| MainBuildingId::new(target));
+        if head.id() != target {
+            ids.push(head.id());
         }
-        let mut annexes = spatial.annexes_of(head);
+        let mut annexes = spatial.annexes_of(head.id());
         annexes.sort_unstable();
         ids.extend(annexes.iter().copied().filter(|&a| a != target));
     }

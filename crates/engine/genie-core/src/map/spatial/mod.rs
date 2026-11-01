@@ -597,7 +597,7 @@ pub struct Spatial {
     /// Each player's scout map (`player+0x1370`, `mIsScoutMapEnabled` `+0x1368`), once made.
     scout_maps: BTreeMap<PlayerId, crate::movement::explore::InfluenceMap>,
     /// Each annex's main building (`+0xbb8`), which the walk's avoidance takes for the annex.
-    annexes: BTreeMap<ObjectId, ObjectId>,
+    annexes: BTreeMap<ObjectId, crate::construction::MainBuildingId>,
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.
     pub relations: crate::players::ByPlayer<crate::players::Relations>,
     /// What each player's queries make of the other players' objects (`player+0x278`, the

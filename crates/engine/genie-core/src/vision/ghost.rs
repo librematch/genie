@@ -669,6 +669,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::construction::MainBuildingId;
     use crate::map::Distance;
     use crate::map::GridSize;
     use crate::map::TileOffset;
@@ -1299,14 +1300,14 @@ mod tests {
             ObjectState::Alive,
             Position::new(2.5, 2.5, 0.0),
         );
-        g.annex_of = Some(object_id(9));
+        g.annex_of = Some(MainBuildingId::new(object_id(9)));
         let mut a = object(
             11,
             master_id(89),
             ObjectState::Alive,
             Position::new(3.5, 2.5, 0.0),
         );
-        a.annex_of = Some(object_id(9));
+        a.annex_of = Some(MainBuildingId::new(object_id(9)));
         t.players[1].objects.extend([
             g,
             a,

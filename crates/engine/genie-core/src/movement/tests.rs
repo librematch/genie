@@ -1,4 +1,5 @@
 use super::*;
+use crate::construction::MainBuildingId;
 use crate::groups::MoveReason;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -1354,8 +1355,8 @@ fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
     world.insert(object_id(100), wall(10.0, class::GATE));
     world.insert(object_id(101), wall(12.0, class::WALL));
     world.insert(object_id(102), wall(8.0, class::WALL));
-    world.set_annex(object_id(101), Some(object_id(100)));
-    world.set_annex(object_id(102), Some(object_id(100)));
+    world.set_annex(object_id(101), Some(MainBuildingId::new(object_id(100))));
+    world.set_annex(object_id(102), Some(MainBuildingId::new(object_id(100))));
     let near = (Position::new(13.5, 10.0, 0.0), Footprint::new(0.2, 0.2));
     let gate = *world.get(object_id(100)).unwrap();
     let own = footprint_gap(near.0, near.1, gate.position, gate.radius);

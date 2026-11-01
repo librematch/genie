@@ -67,7 +67,7 @@ pub struct Repaired {
     /// Its hit point powerup (`+0xa38`, `+0xa3c`).
     pub hp_powerup: HpPowerup,
     /// An annex's main building (`+0xbb8`).
-    pub main: Option<ObjectId>,
+    pub main: Option<crate::construction::MainBuildingId>,
     /// A main building's annexes (`+0xbc0`, its four slots in their order).
     pub annexes: Vec<ObjectId>,
     /// Its owner's attribute 270 ([`UNIT_REPAIR_COST`]): a unit's repair cost rate.
@@ -124,7 +124,7 @@ pub fn repair_building(
         return Ok(RepairOutcome::Unpaid);
     }
     if top && let Some(main) = set[idx].main {
-        let m = find(set, main)?;
+        let m = find(set, main.id())?;
         return repair_building(set, m, amount, true, payer);
     }
     for annex in set[idx].annexes.clone() {

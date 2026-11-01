@@ -101,7 +101,7 @@ pub struct Unit {
     /// `capture_flag` (`+0x924`).
     pub capture_flag: CaptureKind,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
-    pub annex_of: Option<ObjectId>,
+    pub annex_of: Option<crate::construction::MainBuildingId>,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).
     pub group: crate::groups::GroupLink,
     /// `mHitpointsPowerup` and `mHitpointsMaxPowerup` (`+0xa38`, `+0xa3c`), which the task finder
@@ -349,7 +349,7 @@ pub(crate) fn annexes_of<'a>(
 ) -> Vec<ObjectId> {
     let mut annexes: Vec<ObjectId> = objects
         .into_iter()
-        .filter(|u| u.annex_of == Some(id))
+        .filter(|u| u.annex_of.map(crate::construction::MainBuildingId::id) == Some(id))
         .map(|u| u.id)
         .collect();
     annexes.sort_unstable();

@@ -234,7 +234,7 @@ impl UnitView<'_, '_> {
             .and_then(|u| u.annex_of)
         {
             Some(m) => match self.c.w.spatial.get(m).copied() {
-                Some(p) => Some(mark(m, &p)?),
+                Some(p) => Some(mark(m.id(), &p)?),
                 None => None,
             },
             None => None,

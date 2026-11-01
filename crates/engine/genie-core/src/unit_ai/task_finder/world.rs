@@ -108,7 +108,7 @@ pub(crate) fn task_target_with<'a>(
     let mut id = id;
     for _ in 0..steps {
         match find(id).and_then(|(_, u)| u.annex_of) {
-            Some(main) => id = main,
+            Some(main) => id = main.id(),
             None => break,
         }
     }

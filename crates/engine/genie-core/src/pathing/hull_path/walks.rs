@@ -125,7 +125,14 @@ impl HullPather<'_> {
             let second = self.hits(p, to)?;
             let fine = match second[..] {
                 [] => true,
-                [h] => target.is_some_and(|t| h.id == t || self.world.annex_of(h.id) == Some(t)),
+                [h] => target.is_some_and(|t| {
+                    h.id == t
+                        || self
+                            .world
+                            .annex_of(h.id)
+                            .map(crate::construction::MainBuildingId::id)
+                            == Some(t)
+                }),
                 _ => false,
             };
             if fine {

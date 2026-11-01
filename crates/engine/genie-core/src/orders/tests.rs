@@ -1,6 +1,7 @@
 use super::*;
 use crate::commands::UnitOrderAction;
 use crate::commands::UnloadPick;
+use crate::construction::MainBuildingId;
 use crate::construction::build::BuildState;
 use crate::garrison::ContainerId;
 use crate::gathering::DropSiteId;
@@ -695,7 +696,7 @@ fn an_attack_task_aims_at_its_target_or_an_annex_s_main_building() {
         r.err().map(|e| e.reason()),
         Some("an attack task's target the slice does not hold")
     );
-    t.players[0].objects[ListIndex::new(2)].annex_of = Some(object_id(99));
+    t.players[0].objects[ListIndex::new(2)].annex_of = Some(MainBuildingId::new(object_id(99)));
     let r = t.attack_aim(object_id(61));
     assert_eq!(
         r.err().map(|e| e.reason()),
@@ -859,7 +860,7 @@ fn annexed(t: &mut World) {
         object_id(61),
         master_id(201),
         Position::new(22.0, 20.5, 0.0),
-        Some(object_id(60)),
+        Some(MainBuildingId::new(object_id(60))),
     ));
 }
 
@@ -2742,7 +2743,7 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
     };
     t.players[1].objects = vec![
         building(object_id(60), None),
-        building(object_id(70), Some(object_id(60))),
+        building(object_id(70), Some(MainBuildingId::new(object_id(60)))),
     ]
     .into();
     t.leave_builders(object_id(70)).unwrap();
@@ -4414,7 +4415,7 @@ fn a_gather_takes_a_farm_but_no_other_building() {
     t.players[1].objects.push(farm(
         object_id(802),
         ObjectState::Alive,
-        Some(object_id(4444)),
+        Some(MainBuildingId::new(object_id(4444))),
     ));
     let world = t.clone();
     assert_eq!(

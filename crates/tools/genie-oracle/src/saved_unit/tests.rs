@@ -2,6 +2,7 @@ use crate::fixtures::{action_list, combat_mut, combat_object};
 use crate::masters::{DefaultAction, MasterTable};
 use crate::saved_unit::unit;
 use crate::test_ids::object_id;
+use genie_core::combat::missile::ShooterId;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
@@ -138,7 +139,7 @@ fn a_missile_without_its_action_keeps_flying() {
         PLAYERS,
     );
     let flying = u.missile.unwrap();
-    assert_eq!(flying.fired_from, Some(object_id(900)));
+    assert_eq!(flying.fired_from, Some(ShooterId::new(object_id(900))));
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());
     assert_eq!(u.attack_count, genie_core::combat::AttackCount::of_data(2));

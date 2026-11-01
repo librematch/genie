@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::damage::ArmorPair;
+use crate::construction::MainBuildingId;
 use crate::map::TerrainFlags;
 use crate::movement::Me;
 use crate::movement::Speed;
@@ -244,7 +245,7 @@ fn an_annex_s_repair_goes_to_its_main_building_and_its_annexes() {
     ]);
     let mut set = vec![
         Repaired {
-            main: Some(object_id(2)),
+            main: Some(MainBuildingId::new(object_id(2))),
             ..house(1, HitPoints::new(500.0))
         },
         Repaired {

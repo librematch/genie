@@ -135,7 +135,10 @@ pub(crate) fn combat_dies(
 /// for the castle, 82, and the wonder, 276), nothing for an annex (`+0xbb8`). Each attribute is
 /// held at 0 or more after (slot 0xf0 with 0), the caller's.
 #[must_use]
-pub(crate) fn refund_of(master: &Master, main: Option<ObjectId>) -> Vec<(AttributeId, Amount)> {
+pub(crate) fn refund_of(
+    master: &Master,
+    main: Option<crate::construction::MainBuildingId>,
+) -> Vec<(AttributeId, Amount)> {
     let mut cost = 0.0f32;
     for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
         if paid {

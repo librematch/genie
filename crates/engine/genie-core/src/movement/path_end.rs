@@ -509,7 +509,11 @@ impl Mover {
             .player;
         // a hit the world holds no object of (a map edge's record) is passed over
         let met = |hit: RecordId| -> Result<Option<(ObjectId, &Placed)>, GenieError> {
-            let Some(id) = world.annex_of(hit).or_else(|| hit.key()) else {
+            let Some(id) = world
+                .annex_of(hit)
+                .map(crate::construction::MainBuildingId::id)
+                .or_else(|| hit.key())
+            else {
                 return Ok(None);
             };
             Ok(world.get_known(id)?.map(|p| (id, p)))

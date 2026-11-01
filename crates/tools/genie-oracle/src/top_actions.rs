@@ -2,6 +2,7 @@
 
 use crate::{OTHER_SUB_ACTION, combat_master, saved_attack, saved_move_wait, saved_sprite};
 use genie_core::GenieError;
+use genie_core::combat::missile::ShooterId;
 use genie_core::construction::build::{BuildAction, BuildTask};
 use genie_core::garrison::ContainerId;
 use genie_core::gathering::DropSiteId;
@@ -312,7 +313,7 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
         });
     unit.missile = Some(genie_core::combat::missile::Missile {
         max_range: Distance::new(mo.max_range),
-        fired_from: ObjectId::of_field(mo.fired_from_id),
+        fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
         charge: mo.is_charge_projectile != 0,
         flying: genie_core::combat::missile::LANDING < ma.distance,
         step: Offset::new(moving.velocity_x, moving.velocity_y, moving.velocity_z),
@@ -321,7 +322,7 @@ fn import_missile(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
         .set_missile(Some(genie_core::combat::missile::MissileAction {
             state: genie_core::combat::missile::MissileState::of_byte(base.state)?,
             target: ObjectId::of_field(base.target_id),
-            fired_from: ObjectId::of_field(base.target2_id),
+            fired_from: ObjectId::of_field(base.target2_id).map(ShooterId::new),
             point: saved.point(),
             timer: Distance::new(base.timer),
             direction: Offset::new(ma.velocity_x, ma.velocity_y, ma.velocity_z),

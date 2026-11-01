@@ -157,8 +157,8 @@ impl BuildAction {
     ) -> Result<PartTests, GenieError> {
         let mut parts = Vec::new();
         if let Some(main) = c.w.spatial.annex_of(site) {
-            parts.push(main);
-            parts.extend(c.w.spatial.annexes_of(main));
+            parts.push(main.id());
+            parts.extend(c.w.spatial.annexes_of(main.id()));
         }
         parts.extend(c.w.spatial.annexes_of(site));
         let mut tests = PartTests {

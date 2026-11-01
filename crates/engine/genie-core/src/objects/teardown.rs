@@ -2,6 +2,7 @@
 //! (its slot 0): what they leave the unit's world to apply.
 
 use crate::GenieError;
+use crate::combat::missile::ShooterId;
 use crate::garrison::ContainerId;
 use crate::gathering::DropSiteId;
 use crate::movement::Speed;
@@ -133,7 +134,7 @@ impl Action {
             }
             Self::Missile(m) => {
                 torn.release(m.target);
-                torn.release(m.fired_from);
+                torn.release(m.fired_from.map(ShooterId::id));
             }
         }
         Ok(torn)

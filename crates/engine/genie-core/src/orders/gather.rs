@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::{Arms, Engagement};
+use crate::construction::MainBuildingId;
 use crate::gathering::DropSiteId;
 use crate::gathering::gather::{GatherRetarget, GatherStart};
 use crate::gathering::hunt::{HuntAction, HuntMove, HuntStart, HuntTask, Quarry};
@@ -205,7 +206,7 @@ impl World {
         ))?;
         let tm = t.master(&self.masters, tp)?;
         let main = if tm.kind == BUILDING {
-            t.annex_of.unwrap_or(target)
+            t.annex_of.map_or(target, MainBuildingId::id)
         } else {
             target
         };

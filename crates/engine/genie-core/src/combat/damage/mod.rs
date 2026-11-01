@@ -232,7 +232,7 @@ pub struct Victim {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Building {
     /// `+0xbb8`: an annex's main building, whose slot 0xe8 takes a hit on the annex.
-    pub main: Option<ObjectId>,
+    pub main: Option<crate::construction::MainBuildingId>,
     /// `+0xbc0`..`+0xbd8`: its annexes, which take its hit points after each hit.
     pub annexes: Vec<ObjectId>,
     /// `+0xb90` (not saved): the damage the blast under way has done to it ([`blast`]).
@@ -396,7 +396,7 @@ pub struct Attacker {
     /// Its master has a task of action type 0x9a (a kill bonus).
     pub kill_bonus_tasks: bool,
     /// What a missile was fired from (`+0x998`), its damage notify's sender.
-    pub fired_from: Option<ObjectId>,
+    pub fired_from: Option<crate::combat::missile::ShooterId>,
 }
 
 #[cfg(test)]

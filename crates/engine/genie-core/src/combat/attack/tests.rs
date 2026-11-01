@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::damage::Allied;
+use crate::construction::MainBuildingId;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Radii;
@@ -795,7 +796,7 @@ fn a_strike_on_an_annex_hits_its_main_building() {
         21,
         Position::new(10.5, 10.0, 0.0),
         damage::Building {
-            main: Some(object_id(20)),
+            main: Some(MainBuildingId::new(object_id(20))),
             ..damage::Building::default()
         },
     );
@@ -943,7 +944,7 @@ fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
             21,
             Position::new(10.2, 10.0, 0.0),
             damage::Building {
-                main: Some(object_id(20)),
+                main: Some(MainBuildingId::new(object_id(20))),
                 ..damage::Building::default()
             },
         ),
@@ -1007,11 +1008,23 @@ fn a_trample_reads_a_building_s_blast_so_far_or_its_main_building_s() {
         ..main
     };
     assert_eq!(
-        blast_so_far(&building(Some(object_id(20)), HitPoints::new(3.0)), &[main]),
+        blast_so_far(
+            &building(
+                Some(MainBuildingId::new(object_id(20))),
+                HitPoints::new(3.0)
+            ),
+            &[main]
+        ),
         Ok(HitPoints::new(5.0))
     );
     assert_eq!(
-        blast_so_far(&building(Some(object_id(20)), HitPoints::new(3.0)), &[]),
+        blast_so_far(
+            &building(
+                Some(MainBuildingId::new(object_id(20))),
+                HitPoints::new(3.0)
+            ),
+            &[]
+        ),
         Err(crate::construction::build::NOT_HELD)
     );
     let unit = Victim {
@@ -2094,7 +2107,7 @@ fn a_gate_s_reach_is_to_its_nearest_part() {
                     ..*world.get(object_id(7)).unwrap()
                 },
             );
-            world.set_annex(object_id(id), Some(object_id(7)));
+            world.set_annex(object_id(id), Some(MainBuildingId::new(object_id(7))));
         }
         world
     };

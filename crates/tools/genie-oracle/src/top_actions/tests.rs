@@ -7,6 +7,7 @@ use crate::test_ids::class_id;
 use crate::test_ids::object_id;
 use crate::top_actions::saved_actions;
 use genie_core::GenieError;
+use genie_core::combat::missile::ShooterId;
 use genie_core::construction::build::BuildTask;
 use genie_core::gathering::DropSiteId;
 use genie_core::map::Distance;
@@ -520,7 +521,7 @@ fn a_missile_flies_with_its_actions_course() {
         .unwrap();
     assert_eq!(
         (m.fired_from, m.max_range.get().to_bits()),
-        (Some(object_id(900)), 7.0_f32.to_bits())
+        (Some(ShooterId::new(object_id(900))), 7.0_f32.to_bits())
     );
     assert!(m.flying && !m.charge);
     // a charge projectile; one at the landing distance has landed
@@ -544,7 +545,7 @@ fn a_missile_flies_with_its_actions_course() {
         (action.state, action.fired_from, action.hit_mode),
         (
             genie_core::combat::missile::MissileState::Flying,
-            Some(object_id(900)),
+            Some(ShooterId::new(object_id(900))),
             genie_core::combat::missile::HitMode::TARGET_ALONE
         )
     );

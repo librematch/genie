@@ -1,5 +1,6 @@
 use crate::combat::Charge;
 use crate::combat::attack::AttackState;
+use crate::construction::MainBuildingId;
 use crate::garrison::ContainerId;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
@@ -2083,9 +2084,10 @@ fn gate_world() -> World {
     t.players[2].objects[ListIndex::new(0)].life.master_id = master_id(5);
     let mut annex = soldier(21, 2.5, 2.5);
     annex.life.master_id = master_id(5);
-    annex.annex_of = Some(object_id(20));
+    annex.annex_of = Some(MainBuildingId::new(object_id(20)));
     t.players[2].objects.push(annex);
-    t.spatial.set_annex(object_id(21), Some(object_id(20)));
+    t.spatial
+        .set_annex(object_id(21), Some(MainBuildingId::new(object_id(20))));
     t
 }
 
@@ -2106,7 +2108,8 @@ fn a_gate_out_of_reach_is_struck_at_its_nearest_part() {
         object_id(20)
     );
     // within its weapon range and above the least one: the gate itself
-    t.spatial.set_annex(object_id(21), Some(object_id(20)));
+    t.spatial
+        .set_annex(object_id(21), Some(MainBuildingId::new(object_id(20))));
     let mut m4 = t.masters[1].get(master_id(4)).unwrap().clone();
     m4.weapon_range = Distance::new(10.0);
     t.masters[1] = Masters::new([m4.clone()]);
