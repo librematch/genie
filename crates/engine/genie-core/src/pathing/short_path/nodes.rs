@@ -5,7 +5,7 @@ use crate::GenieError;
 use crate::pathing::short_path::{
     FixedPoint, Kind, Node, NodeIndex, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, Token,
 };
-use crate::pathing::{FixedDistance, FixedRect, ShapeId, ShapeSide};
+use crate::pathing::{FixedDistance, FixedDistanceSquared, FixedRect, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
 
 /// A polygon corner reached as a goal candidate (`FUN_140fa3860`'s arguments, [`Search::goal_test`]).
@@ -253,12 +253,14 @@ impl Search<'_> {
             run,
             point: pt,
         } = corner;
-        let d2: i64 = if RECT_HEURISTIC {
+        let d2 = if RECT_HEURISTIC {
             self.goal.rect_distance2(pt)
         } else {
             let dx = i64::from(self.goal.at.x().wrapping_sub(pt.x()));
             let dy = i64::from(self.goal.at.y().wrapping_sub(pt.y()));
-            i64::from((((dy * dy) >> 22) as i32).wrapping_add(((dx * dx) >> 22) as i32))
+            FixedDistanceSquared::new(i64::from(
+                (((dy * dy) >> 22) as i32).wrapping_add(((dx * dx) >> 22) as i32),
+            ))
         };
         let kind = Kind::Corner {
             run: Some(run),
@@ -267,8 +269,7 @@ impl Search<'_> {
         let better = self.beats_goal(g)?;
         if self.goal.range2 < d2 || !better {
             let b = *self.node(self.best)?;
-            let h = i64::from(b.f.wrapping_sub(b.g).get());
-            if d2 < (h * h) >> 22 {
+            if d2 < FixedDistanceSquared::of(b.f.wrapping_sub(b.g)) {
                 let n = self.add(g, parent, pt, kind);
                 self.best = n.idx;
             }

@@ -26,7 +26,7 @@ use crate::pathing::tile_path::Planner;
 use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
-pub use self::fixed_distance::FixedDistance;
+pub use self::fixed_distance::{FixedDistance, FixedDistanceSquared};
 pub use self::fixed_point::FixedPoint;
 pub use self::fixed_rect::FixedRect;
 pub use self::shape_id::ShapeId;
@@ -465,6 +465,21 @@ mod tests {
             -ONE
         );
         assert!(FixedDistance::ZERO < FixedDistance::TILE);
+    }
+
+    /// A fixed-point length squares in 64 bits, `>> 22`: a tile's square is a tile, a length
+    /// past 32 bits' square root does not wrap, and the sign drops.
+    #[test]
+    fn a_fixed_distance_squares_in_64_bits() {
+        let tile = FixedDistanceSquared::of(FixedDistance::TILE);
+        assert_eq!(tile.get(), i64::from(ONE));
+        let far = FixedDistance::new(i32::MAX);
+        assert_eq!(
+            FixedDistanceSquared::of(far).get(),
+            (i64::from(i32::MAX) * i64::from(i32::MAX)) >> 22
+        );
+        assert_eq!(FixedDistanceSquared::of(FixedDistance::new(-ONE)), tile);
+        assert!(FixedDistanceSquared::ZERO < tile);
     }
 
     /// `FUN_14165d6f0`: no budget once the plans reached a set attempt cap, unless the walker

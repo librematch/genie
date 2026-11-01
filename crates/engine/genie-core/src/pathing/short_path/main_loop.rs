@@ -218,8 +218,8 @@ impl Search<'_> {
             let b = self.bounds;
             for dir in NUDGES {
                 let tj = FixedPoint::new(
-                    ((i64::from(dir.x()) * i64::from(self.goal.rx)) >> 22) as i32 + t.x(),
-                    ((i64::from(dir.y()) * i64::from(self.goal.ry)) >> 22) as i32 + t.y(),
+                    ((i64::from(dir.x()) * i64::from(self.goal.rx.get())) >> 22) as i32 + t.x(),
+                    ((i64::from(dir.y()) * i64::from(self.goal.ry.get())) >> 22) as i32 + t.y(),
                 );
                 if !in_box(tj, b) {
                     continue;

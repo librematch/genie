@@ -1,12 +1,12 @@
 //! The start's node, the hits' points and the two legs of an L.
 
-use crate::pathing::FixedDistance;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
     FixedPoint, Hit, Kind, Node, NodeIndex, RayFraction, Search, TO_FIXED, TO_FLOAT, contact_point,
     in_box, shrunk_corner, snap_to_side, strictly_inside, through_float, tile_of,
 };
+use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
@@ -108,7 +108,9 @@ impl Search<'_> {
         let w = mesh.width as i32;
         let total = mesh.width * mesh.width;
         let rr = ((i64::from(self.goal.r.get()) << 23) >> 22) as i32;
-        let rr2 = i64::from(((i64::from(rr) * i64::from(rr)) >> 22) as i32);
+        // squared in 64 bits, its low 32 kept
+        let rr2 =
+            FixedDistanceSquared::new(i64::from(((i64::from(rr) * i64::from(rr)) >> 22) as i32));
         let [px, py] = p.get();
         let tile = |x: i32, y: i32| (tile_of(y).wrapping_mul(w)).wrapping_add(tile_of(x)) as u32;
         let tiles = [
@@ -145,7 +147,7 @@ impl Search<'_> {
         p: FixedPoint,
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
-        rr2: i64,
+        rr2: FixedDistanceSquared,
     ) -> Result<(), GenieError> {
         let d = self.ctx.d;
         let r = *self.ctx.mesh.shapes.checked(id.index())?;
@@ -159,19 +161,21 @@ impl Search<'_> {
             let t = ((i64::from(py - a.y()) * u) >> 22) as i32;
             let perp = i64::from((py - a.y()) - (((i64::from(t) * u) >> 22) as i32));
             let dx = i64::from(px - a.x());
-            (t, ((perp * perp) >> 22) + ((dx * dx) >> 22), e.y() - a.y())
+            let dist2 = FixedDistanceSquared::new(((perp * perp) >> 22) + ((dx * dx) >> 22));
+            (t, dist2, e.y() - a.y())
         } else {
             let u = i64::from(dir.x());
             let t = ((i64::from(px - a.x()) * u) >> 22) as i32;
             let perp = i64::from((px - a.x()) - (((i64::from(t) * u) >> 22) as i32));
             let dy = i64::from(py - a.y());
-            (t, ((dy * dy) >> 22) + ((perp * perp) >> 22), e.x() - a.x())
+            let dist2 = FixedDistanceSquared::new(((dy * dy) >> 22) + ((perp * perp) >> 22));
+            (t, dist2, e.x() - a.x())
         };
         if dist2 > rr2 {
             return Ok(());
         }
         let b = self.bounds;
-        let h = (fmath::sqrt((rr2 - dist2) as f32 * TO_FLOAT) * TO_FIXED) as i32;
+        let h = (fmath::sqrt((rr2.get() - dist2.get()) as f32 * TO_FLOAT) * TO_FIXED) as i32;
         for c in [t - h, h + t] {
             if 0 < c && c < span {
                 let q = FixedPoint::new(
@@ -188,9 +192,10 @@ impl Search<'_> {
         if in_box(a, b) && self.ctx.holder_but(a, id, d)?.is_none() {
             let dx = i64::from(px - a.x());
             let dy = i64::from(py - a.y());
-            let d2 = ((dx * dx) >> 22) + ((dy * dy) >> 22);
+            let d2 = FixedDistanceSquared::new(((dx * dx) >> 22) + ((dy * dy) >> 22));
             if d2 < rr2 {
-                let g = FixedDistance::new((fmath::sqrt(d2 as f32 * TO_FLOAT) * TO_FIXED) as i32);
+                let g =
+                    FixedDistance::new((fmath::sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32);
                 self.side_node(g, root, id, side, a);
             }
         }
@@ -247,7 +252,7 @@ impl Search<'_> {
         p: FixedPoint,
         root: NodeIndex,
         (id, side): (ShapeId, ShapeSide),
-        rr2: i64,
+        rr2: FixedDistanceSquared,
     ) -> Result<(), GenieError> {
         let [px, py] = p.get();
         let mesh = self.ctx.mesh;
@@ -277,9 +282,9 @@ impl Search<'_> {
             }
             let dx = i64::from(px - q.x());
             let dy = i64::from(py - q.y());
-            let d2 = ((dy * dy) >> 22) + ((dx * dx) >> 22);
+            let d2 = FixedDistanceSquared::new(((dy * dy) >> 22) + ((dx * dx) >> 22));
             if d2 < rr2 {
-                let g0 = (fmath::sqrt(d2 as f32 * TO_FLOAT) * TO_FIXED) as i32;
+                let g0 = (fmath::sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32;
                 let g = FixedDistance::new(if c.side == side { g0 + 0x32 } else { g0 });
                 self.side_node(g, root, id, side, q);
             }

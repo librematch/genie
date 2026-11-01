@@ -36,7 +36,7 @@ members' steering (`groups/steer/`) ask the same planners.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`fixed_distance.rs`](fixed_distance.rs) | A length in the pathing's fixed point (`FixedDistance`). |
+| [`fixed_distance.rs`](fixed_distance.rs) | A length in the pathing's fixed point (`FixedDistance`) and a squared one (`FixedDistanceSquared`). |
 | [`fixed_point.rs`](fixed_point.rs) | A point in the pathing's fixed point (`FixedPoint`). |
 | [`fixed_rect.rs`](fixed_rect.rs) | A rectangle in the pathing's fixed point (`FixedRect`). |
 | [`long_path.rs`](long_path.rs) | The long pather (`FUN_140f9eb70`, run on the global at `0x1439e6910`): a best-first search over the map's tiles from a unit's tile to a goal tile, which the reachability test of a point (`FUN_140fa0370`, `crate::movement::Mover::reaches`) runs for a goal more than a tile from the unit. |

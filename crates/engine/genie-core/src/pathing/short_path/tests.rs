@@ -4,6 +4,7 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::TerrainMask;
+use crate::pathing::FixedDistanceSquared;
 use crate::pathing::ShortFound;
 use crate::test_ids::object_id;
 
@@ -13,12 +14,12 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
     let goal = Goal {
         at,
         r: FixedDistance::ZERO,
-        rx: 0,
-        ry: 0,
-        rrx: 0,
-        rry: 0,
+        rx: FixedDistance::ZERO,
+        ry: FixedDistance::ZERO,
+        rrx: FixedDistance::ZERO,
+        rry: FixedDistance::ZERO,
         range: FixedDistance::new(range),
-        range2: (i64::from(range) * i64::from(range)) >> 22,
+        range2: FixedDistanceSquared::of(FixedDistance::new(range)),
     };
     let mut s = Search {
         ctx: Ctx {
@@ -1117,7 +1118,7 @@ fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
             p,
             NodeIndex::START,
             (ShapeId::new(0), ShapeSide::ALL[k]),
-            4 * i64::from(ONE),
+            FixedDistanceSquared::of(FixedDistance::new(2 * ONE)),
         )
         .unwrap();
     }
@@ -1147,7 +1148,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
         shape: ShapeId::new(shape),
         side: ShapeSide::ALL[side],
     };
-    let rr2 = 4 * i64::from(ONE);
+    let rr2 = FixedDistanceSquared::of(FixedDistance::new(2 * ONE));
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.escape_side(
         FixedPoint::new(4 * ONE, 3 * ONE),
@@ -1334,7 +1335,7 @@ fn a_side_s_contacts_become_candidates_when_wide_free_and_near() {
         FixedPoint::new(4 * ONE, 3 * ONE),
         NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
-        4 * i64::from(ONE),
+        FixedDistanceSquared::of(FixedDistance::new(2 * ONE)),
     )
     .unwrap();
     let side = Kind::Side {

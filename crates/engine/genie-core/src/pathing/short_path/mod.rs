@@ -7,9 +7,9 @@
 
 use crate::GenieError;
 use crate::math::fmath;
-use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::{Mesh, ONE};
+use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{FixedPoint, ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
 
@@ -23,6 +23,7 @@ mod raycast;
 mod start;
 mod token;
 
+use self::call::Fixed;
 pub use self::call::{Call, Entry, Listed, Pather, Query, ShortPath, Target, to_path};
 #[cfg(test)]
 use self::geometry::segment_hit;
@@ -180,22 +181,40 @@ const OPEN_CORNER_WITHOUT_EMIT: GenieError =
 struct Goal {
     at: FixedPoint,
     r: FixedDistance,
-    rx: i32,
-    ry: i32,
-    rrx: i64,
-    rry: i64,
+    rx: FixedDistance,
+    ry: FixedDistance,
+    rrx: FixedDistance,
+    rry: FixedDistance,
     range: FixedDistance,
-    range2: i64,
+    range2: FixedDistanceSquared,
 }
 
 impl Goal {
+    /// The goal at `at` of the query `q`: the target's half sizes, their sums with the radius
+    /// (32-bit adds) and the range, squared in 64 bits.
+    fn toward(at: FixedPoint, q: &Fixed) -> Self {
+        let (r, [sx, sy]) = (q.radius, q.target_size.get());
+        Self {
+            at,
+            r,
+            rx: FixedDistance::new(sx),
+            ry: FixedDistance::new(sy),
+            rrx: r.wrapping_add(FixedDistance::new(sx)),
+            rry: r.wrapping_add(FixedDistance::new(sy)),
+            range: q.range,
+            range2: FixedDistanceSquared::of(q.range),
+        }
+    }
+
     /// The squared distance from `p` to the target's box grown by the radius (`>> 22` each).
-    fn rect_distance2(&self, p: FixedPoint) -> i64 {
-        let lx = i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - self.rrx;
-        let ly = i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - self.rry;
+    fn rect_distance2(&self, p: FixedPoint) -> FixedDistanceSquared {
+        let lx =
+            i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - i64::from(self.rrx.get());
+        let ly =
+            i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - i64::from(self.rry.get());
         let a = if lx < 0 { 0 } else { lx * lx };
         let b = if ly < 0 { 0 } else { ly * ly };
-        (b >> 22) + (a >> 22)
+        FixedDistanceSquared::new((b >> 22) + (a >> 22))
     }
 
     /// `FUN_140fa3f10`: the estimate from `p` to the goal.
@@ -205,8 +224,10 @@ impl Goal {
             let fx = (self.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
             return FixedDistance::new((fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
         }
-        let lx = i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - self.rrx;
-        let ly = i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - self.rry;
+        let lx =
+            i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - i64::from(self.rrx.get());
+        let ly =
+            i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - i64::from(self.rry.get());
         let a = if lx < 0 { 0 } else { (lx * lx) as u64 };
         let b = if ly < 0 { 0 } else { (ly * ly) as u64 };
         FixedDistance::new(isqrt((b & !0x3f_ffff).wrapping_add(a & !0x3f_ffff)) as i32)

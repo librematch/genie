@@ -1,4 +1,5 @@
-//! A length in the pathing's fixed point ([`FixedDistance`]).
+//! A length in the pathing's fixed point ([`FixedDistance`]) and a squared one
+//! ([`FixedDistanceSquared`]).
 
 use genie_diff::Diff;
 
@@ -39,5 +40,37 @@ impl FixedDistance {
     #[must_use]
     pub const fn wrapping_sub(self, other: Self) -> Self {
         Self(self.0.wrapping_sub(other.0))
+    }
+}
+
+/// A squared length in fixed point, `d * d >> 22` in 64 bits, as the short pather compares them:
+/// its goal's range, a point's distance to the goal's box, the escape circle's radius.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff)]
+pub struct FixedDistanceSquared(
+    /// Its value, as the game's 64-bit register holds it.
+    i64,
+);
+
+impl FixedDistanceSquared {
+    /// No length.
+    pub const ZERO: Self = Self(0);
+
+    /// The squared length of `value` units.
+    #[must_use]
+    pub const fn new(value: i64) -> Self {
+        Self(value)
+    }
+
+    /// `d` squared in 64 bits, `(d * d) >> 22`.
+    #[must_use]
+    pub fn of(d: FixedDistance) -> Self {
+        let v = i64::from(d.0);
+        Self((v * v) >> 22)
+    }
+
+    /// Its value.
+    #[must_use]
+    pub const fn get(self) -> i64 {
+        self.0
     }
 }

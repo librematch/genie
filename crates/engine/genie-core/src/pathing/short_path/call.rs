@@ -347,16 +347,7 @@ impl Pather {
         );
         self.remove_terrain(mesh);
         self.add_terrain(mesh, words, q.blocked, bounds);
-        let goal = Goal {
-            at: FixedPoint::new(gx, gy),
-            r: q.radius,
-            rx: q.target_size.x(),
-            ry: q.target_size.y(),
-            rrx: i64::from(r.wrapping_add(q.target_size.x())),
-            rry: i64::from(r.wrapping_add(q.target_size.y())),
-            range: q.range,
-            range2: (i64::from(q.range.get()) * i64::from(q.range.get())) >> 22,
-        };
+        let goal = Goal::toward(FixedPoint::new(gx, gy), q);
         let ignore = self.ignore.clone();
         let mut s = Search {
             ctx: Ctx {
@@ -426,16 +417,7 @@ impl Pather {
         }
         self.remove_terrain(mesh);
         self.add_terrain(mesh, words, q.blocked, bounds);
-        let goal = Goal {
-            at: FixedPoint::new(gx, gy),
-            r: q.radius,
-            rx: q.target_size.x(),
-            ry: q.target_size.y(),
-            rrx: i64::from(r.wrapping_add(q.target_size.x())),
-            rry: i64::from(r.wrapping_add(q.target_size.y())),
-            range: q.range,
-            range2: (i64::from(q.range.get()) * i64::from(q.range.get())) >> 22,
-        };
+        let goal = Goal::toward(FixedPoint::new(gx, gy), q);
         let ignore = self.ignore.clone();
         let mut s = Search {
             ctx: Ctx {
