@@ -12,11 +12,9 @@ use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, Sprite
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
 use crate::world::step::Step;
-use std::collections::BTreeMap;
 
 /// A sub-action list's code that a quiet `MoveTo` does not give: 4 is its target let go when it
 /// is not quiet.
@@ -32,7 +30,7 @@ pub(super) const QUIET_CODE: GenieError =
 pub(super) fn move_reads<'g>(
     unit: &Unit,
     r: &AttackReads,
-    graphics: &'g BTreeMap<SpriteId, Graphic>,
+    graphics: &'g crate::objects::Graphics,
 ) -> Result<MoveToReads<'g>, GenieError> {
     let _ = speed_of(unit)?;
     let sprites = SpriteReads {

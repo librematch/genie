@@ -132,7 +132,7 @@ impl Unit {
     /// 1.4003 when the spears kill it in update 3147, moves at its master's 0.737 with its
     /// dying sprite).
     fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> Result<(), GenieError> {
-        let g = c.w.graphics.get(&id).copied().ok_or(NO_DYING_SPRITE)?;
+        let g = c.w.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
         crate::objects::sprite::new_sprite(
             &mut self.sprite,
             self.body.move_stats_mut(),

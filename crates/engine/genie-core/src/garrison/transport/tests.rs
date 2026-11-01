@@ -6,6 +6,7 @@ use crate::map::terrain::TileTerrain;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
@@ -159,8 +160,7 @@ fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
 }
 
 /// The sprites' table of a world without sprites.
-static NO_GRAPHICS: std::collections::BTreeMap<SpriteId, Graphic> =
-    std::collections::BTreeMap::new();
+static NO_GRAPHICS: Graphics = Graphics::new();
 
 fn ship(loaded: bool) -> Ship<'static> {
     Ship {

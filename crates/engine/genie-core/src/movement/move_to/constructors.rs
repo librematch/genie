@@ -15,11 +15,9 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::{Master, Masters};
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
-use std::collections::BTreeMap;
 
 /// The last object state a `MoveTo` takes as its target (`FUN_140a7a230`: one above is refused,
 /// its id −1).
@@ -92,7 +90,7 @@ impl<'g> MoveToReads<'g> {
     /// to), with the sprites' table `graphics`: an object without movement has no speed (a
     /// static object's slot 0x208).
     #[must_use]
-    pub fn of(unit: &Unit, master: &Master, graphics: &'g BTreeMap<SpriteId, Graphic>) -> Self {
+    pub fn of(unit: &Unit, master: &Master, graphics: &'g crate::objects::Graphics) -> Self {
         Self {
             sprites: SpriteReads::of(master, unit.abilities.look.as_ref(), graphics),
             state: unit.life.state,
@@ -245,7 +243,7 @@ impl Unit {
         &self,
         every: &[Masters],
         player: PlayerId,
-        graphics: &'g BTreeMap<SpriteId, Graphic>,
+        graphics: &'g crate::objects::Graphics,
     ) -> Result<MoveToReads<'g>, GenieError> {
         Ok(MoveToReads::of(self, self.master(every, player)?, graphics))
     }

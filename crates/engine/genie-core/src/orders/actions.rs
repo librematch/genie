@@ -8,7 +8,6 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -337,7 +336,7 @@ impl World {
 pub(crate) struct SwitchWorld<'a> {
     pub(crate) spatial: &'a mut crate::map::spatial::Spatial,
     pub(crate) pathing: &'a mut crate::pathing::Pathing,
-    pub(crate) graphics: &'a std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+    pub(crate) graphics: &'a crate::objects::Graphics,
     pub(crate) sprite: &'a mut crate::math::rng::Well512,
 }
 
@@ -454,7 +453,7 @@ pub(crate) fn switch_master(
         if !world.graphics.is_empty() && old.standing_sprite != next.standing_sprite {
             let g = next
                 .standing_sprite
-                .and_then(|s| world.graphics.get(&s).copied())
+                .and_then(|s| world.graphics.get(s).copied())
                 .ok_or(GenieError::unsupported(
                     "a new master's standing sprite the data file does not have",
                 ))?;

@@ -48,7 +48,7 @@ impl World {
             masters: Vec::new(),
             spatial: Spatial::default(),
             pathing: Pathing::default(),
-            graphics: std::collections::BTreeMap::default(),
+            graphics: crate::objects::Graphics::default(),
             drop_sites: Vec::new(),
             lines: crate::objects::lines::UnitLines::default(),
             linked_techs: std::collections::BTreeMap::new(),

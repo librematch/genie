@@ -7,9 +7,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
 use crate::movement::move_to::{MoveToAction, MoveToReads, SpriteReads, TargetMoved, WalkTo};
-use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 
 /// What the Gather's and the Hunt's `MoveTo` constructors read of the unit as `set_state` makes
@@ -46,17 +44,14 @@ impl GatherReads {
     /// What the `MoveTo`s the update makes read of `unit`, with the sprites' table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
-        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &'g crate::objects::Graphics,
         unit: &Unit,
     ) -> Walks<'g> {
         Walks::of(self.sprites_of(graphics), unit)
     }
 
     /// The sprites a `MoveTo` takes when its maker gives none.
-    const fn sprites_of<'g>(
-        &self,
-        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
-    ) -> SpriteReads<'g> {
+    const fn sprites_of<'g>(&self, graphics: &'g crate::objects::Graphics) -> SpriteReads<'g> {
         SpriteReads {
             defaults: self.defaults,
             graphics,

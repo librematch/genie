@@ -155,7 +155,7 @@ impl World {
             return Ok(());
         };
         let master = u.master(&self.masters, p)?.clone();
-        let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(&id)).copied();
+        let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(id)).copied();
         if master.kind < master_type::ACTION || !has_actions(u) {
             let sprite = match (attribute, u.idle_variant) {
                 (a::STANDING_GRAPHIC, 0) => master.standing_sprite,

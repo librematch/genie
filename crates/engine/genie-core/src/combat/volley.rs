@@ -381,7 +381,7 @@ impl Unit {
         // the setups' draws: static (its sprite, its facet), then moving (its angle)
         let standing = made
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(&s).copied());
+            .and_then(|s| c.w.graphics.get(s).copied());
         if let Some(g) = standing {
             let _ = ActiveSprite::start(g, c.w.streams.get(Stream::Sprite));
             if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {

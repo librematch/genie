@@ -36,7 +36,6 @@ use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
 use crate::objects::ObjectId;
-use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -44,7 +43,6 @@ use crate::objects::masters::Masters;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::master_type;
-use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -264,7 +262,7 @@ pub struct World {
     /// The planners and the mesh.
     pub pathing: Pathing,
     /// What the sprite clock reads of each graphic (the `.dat`'s).
-    pub graphics: std::collections::BTreeMap<SpriteId, Graphic>,
+    pub graphics: crate::objects::Graphics,
     /// The game's drop-site table (`dropsites.json`).
     pub drop_sites: Vec<DropSite>,
     /// The game's unit lines (`unitlines.json`, [`crate::objects::lines`]); empty when not loaded.

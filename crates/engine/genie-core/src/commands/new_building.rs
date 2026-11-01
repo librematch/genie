@@ -179,7 +179,7 @@ impl World {
         // (slot 0x798, FUN_1412029f0): their draws, the sprite and the angle it faces
         let standing = made
             .standing_sprite
-            .and_then(|s| self.graphics.get(&s).copied());
+            .and_then(|s| self.graphics.get(s).copied());
         let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |g| {
             let (s, _, angle) = self.setup_draws(g);
             (Some(s), angle)
@@ -234,7 +234,7 @@ impl World {
         if foundation && WholeSeconds::ZERO < made.build_time {
             let shown = building
                 .construction_sprite
-                .and_then(|s| self.graphics.get(&s).copied())
+                .and_then(|s| self.graphics.get(s).copied())
                 .or(standing);
             if let Some(g) = shown {
                 crate::objects::sprite::new_sprite(

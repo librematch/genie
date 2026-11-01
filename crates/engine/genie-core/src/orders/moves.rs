@@ -230,7 +230,7 @@ impl World {
         let master = unit.master(&self.masters, player)?;
         let look = unit.abilities.look.as_ref();
         Ok(crate::movement::move_to::point_sprite(master, look, false)
-            .and_then(|id| self.graphics.get(&id).copied()))
+            .and_then(|id| self.graphics.get(id).copied()))
     }
 
     /// The unit's slot 0x340 from its unit AI's move off a footprint (slot 0x148,

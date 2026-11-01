@@ -14,9 +14,9 @@ pub(crate) fn stand_sprite(
     task: &HuntTask,
     standing: Option<SpriteId>,
     held: Held,
-    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    graphics: &crate::objects::Graphics,
 ) -> Option<Graphic> {
-    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
+    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     let carrying = task.sprites.carrying;
     if task.resource.is_some()
         && task.resource == held.kind

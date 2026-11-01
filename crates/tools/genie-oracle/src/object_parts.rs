@@ -62,7 +62,7 @@ pub(super) fn lifecycle(
     let after = death_sprite.or_else(|| SpriteId::of_data(s.sprite));
     let death_facets = masters
         .zip(after)
-        .and_then(|(t, after)| t.graphics.get(&after))
+        .and_then(|(t, after)| t.graphics.get(after))
         .filter(|g| {
             pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several()
         })

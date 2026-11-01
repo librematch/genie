@@ -41,6 +41,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`facet.rs`](facet.rs) | A sprite's facets: their count and the facet an object faces. |
 | [`facing.rs`](facing.rs) | Where an object faces: its angle (`+0x7e8`, radians on the map, 0 to 2π) and its facet (`+0xe`), counted in its current sprite's facets (`+0x140` -> `+0xa`). |
 | [`frame.rs`](frame.rs) | A sprite's frame and its animation state. |
+| [`graphics.rs`](graphics.rs) | The world's sprite table as one type: each sprite's graphic by its id, a dense column. |
 | [`hit_points.rs`](hit_points.rs) | A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and 80): the heal, the gain and the loss, the regeneration and the powerup's clamp (slots 0x110, 0xb8 and 0x260, and the update's checks). |
 | [`hp.rs`](hp.rs) | An object's hit points (`HitPoints`), with the game's `f32` operations, and a master's whole hit points (`MasterHitPoints`). |
 | [`id_table.rs`](id_table.rs) | A table of values by object id: a dense column per sign of the id, so that a lookup indexes and a walk takes the ids in a sorted map's order, the most negative first (the order the side tables kept as `BTreeMap`s). |

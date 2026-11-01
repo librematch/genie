@@ -15,7 +15,6 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
-use crate::objects::SpriteId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
@@ -23,7 +22,6 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, Masters};
-use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -197,7 +195,7 @@ impl Unit {
             given,
             standing: master
                 .standing_sprite
-                .and_then(|s| c.w.graphics.get(&s))
+                .and_then(|s| c.w.graphics.get(s))
                 .copied(),
         };
         // written back before an error too: the stop's context reads the list
@@ -217,7 +215,7 @@ impl Unit {
         (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
         (masters, graphics, sprite_rng): (
             Option<&Masters>,
-            &std::collections::BTreeMap<SpriteId, Graphic>,
+            &crate::objects::Graphics,
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
@@ -282,7 +280,7 @@ impl Unit {
     pub(crate) fn set_entered(
         &mut self,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let enter = self

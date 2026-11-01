@@ -251,7 +251,7 @@ pub(super) fn mover(
         "a moving master without a moving part",
     ))?;
     let facets = SpriteId::of_data(walking)
-        .and_then(|w| table.graphics.get(&w))
+        .and_then(|w| table.graphics.get(w))
         .map(|g| g.facets);
     let velocity = (m.have_movement == 1).then(|| Velocity {
         velocity: m.velocity.as_ref().map_or(BVector::ZERO, vec3),

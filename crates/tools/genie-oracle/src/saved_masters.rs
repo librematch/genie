@@ -84,7 +84,7 @@ pub(super) fn master_facets(
     let mut seen = sprites
         .into_iter()
         .filter_map(SpriteId::of_data)
-        .filter_map(|id| table.graphics.get(&id))
+        .filter_map(|id| table.graphics.get(id))
         .map(|g| genie_core::objects::facing::SpriteFacets {
             count: g.facets,
             turns: g.flags.contains(genie_core::objects::SpriteFlags::TURNS),
@@ -445,7 +445,7 @@ pub(super) fn moving_stats(
     let turning = table.turning(civ, MasterId::of_data(s.copy_id())?)?;
     let restriction = genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id)?;
     let facets = SpriteId::of_data(moving.move_sprite_id)
-        .and_then(|w| table.graphics.get(&w))
+        .and_then(|w| table.graphics.get(w))
         .map(|g| g.facets);
     Some(genie_core::movement::MoveStats {
         fly_mode: MasterId::of_data(s.copy_id())

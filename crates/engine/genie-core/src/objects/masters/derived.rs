@@ -16,9 +16,9 @@ use crate::world::WholeSeconds;
 pub(super) fn sprite_speed(
     base: Speed,
     sprite: Option<SpriteId>,
-    graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+    graphics: &crate::objects::Graphics,
 ) -> Speed {
-    crate::objects::sprite::top_speed(base, sprite.and_then(|s| graphics.get(&s)))
+    crate::objects::sprite::top_speed(base, sprite.and_then(|s| graphics.get(s)))
 }
 
 impl Master {
@@ -29,7 +29,7 @@ impl Master {
     #[must_use]
     pub fn sprite_facets(
         &self,
-        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> Option<crate::objects::facing::SpriteFacets> {
         let mut sprites = vec![self.standing_sprite, self.standing_sprite_2];
         if master_type::MOVING <= self.kind {
@@ -44,7 +44,7 @@ impl Master {
         let mut seen = sprites
             .into_iter()
             .flatten()
-            .filter_map(|id| graphics.get(&id))
+            .filter_map(|id| graphics.get(id))
             .map(|g| crate::objects::facing::SpriteFacets {
                 count: g.facets,
                 turns: g.flags.contains(SpriteFlags::TURNS),
@@ -61,7 +61,7 @@ impl Master {
         &self,
         stats: &mut MoveStats,
         attribute: MasterAttribute,
-        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+        graphics: &crate::objects::Graphics,
         terrain: Option<&crate::map::terrain::Terrain>,
     ) {
         use crate::objects::masters::attribute as a;
@@ -109,7 +109,7 @@ impl Master {
     pub fn follow(
         &mut self,
         attribute: MasterAttribute,
-        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+        graphics: &crate::objects::Graphics,
         terrain: Option<&crate::map::terrain::Terrain>,
     ) {
         use crate::objects::masters::attribute as a;

@@ -21,6 +21,7 @@ use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
 use crate::movement::PathFlags;
+use crate::objects::Graphics;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
@@ -881,7 +882,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         flags: SpriteFlags::ANIMATED,
     };
     let mut t = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
-    t.graphics = std::collections::BTreeMap::from([
+    t.graphics = Graphics::from([
         (SpriteId::named(300), standing),
         (
             SpriteId::named(301),
@@ -2135,7 +2136,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         ..Unit::default()
     };
     let mut pathing = crate::pathing::Pathing::default();
-    let graphics = std::collections::BTreeMap::new();
+    let graphics = Graphics::new();
     let mut rng = crate::math::rng::Well512::default();
     let world = SwitchWorld {
         spatial: &mut spatial,

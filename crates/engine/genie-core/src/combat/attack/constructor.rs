@@ -22,8 +22,8 @@ use crate::objects::layers::Body;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
+use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
-use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
@@ -352,7 +352,7 @@ impl Attack {
 #[must_use]
 pub fn arms(
     master: &crate::objects::masters::Master,
-    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    graphics: &crate::objects::Graphics,
     sprites: TaskSprites,
     moving: Option<SpriteId>,
 ) -> Arms {
@@ -370,11 +370,11 @@ pub fn arms(
 pub fn arms_looking(
     master: &crate::objects::masters::Master,
     look: Option<&crate::combat::abilities::Look>,
-    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    graphics: &crate::objects::Graphics,
     sprites: TaskSprites,
     moving: Option<SpriteId>,
 ) -> Arms {
-    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
+    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     Arms {
         move_sprite: g(moving)
             .or_else(|| g(crate::objects::sprite::running(master, look)))

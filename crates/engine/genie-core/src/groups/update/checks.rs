@@ -496,7 +496,7 @@ impl World {
         let Some(sprite) = self.sprite_to_show(id, shown)? else {
             return Ok(false);
         };
-        let graphic = self.graphics.get(&sprite).copied();
+        let graphic = self.graphics.get(sprite).copied();
         let (_, u) = self.object_mut(id).ok_or_else(|| member_gone(id))?;
         if let Some(m) = u.body.mover_mut() {
             m.shows(graphic.as_ref());

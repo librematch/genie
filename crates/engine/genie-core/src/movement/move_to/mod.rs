@@ -284,12 +284,12 @@ const SPRITE_LACKING: GenieError =
 ///
 /// A sprite the table lacks.
 pub fn graphic_of(
-    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    graphics: &crate::objects::Graphics,
     id: Option<SpriteId>,
 ) -> Result<Option<Graphic>, GenieError> {
     id.map(|id| {
         graphics
-            .get(&id)
+            .get(id)
             .copied()
             .ok_or_else(|| SPRITE_LACKING.with("sprite", id))
     })
@@ -303,7 +303,7 @@ pub struct SpriteReads<'a> {
     /// The constructors' defaults ([`MoveDefaults::of`]).
     pub defaults: MoveDefaults,
     /// The sprites' table.
-    pub graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
+    pub graphics: &'a crate::objects::Graphics,
 }
 
 impl<'a> SpriteReads<'a> {
@@ -313,7 +313,7 @@ impl<'a> SpriteReads<'a> {
     pub fn of(
         master: &crate::objects::masters::Master,
         look: Option<&crate::combat::abilities::Look>,
-        graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &'a crate::objects::Graphics,
     ) -> Self {
         Self {
             defaults: MoveDefaults::of(master, look),
@@ -349,7 +349,7 @@ pub struct Sprites<'a> {
     /// The Sprite stream.
     pub rng: &'a mut Well512,
     /// The sprites' table.
-    pub graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
+    pub graphics: &'a crate::objects::Graphics,
 }
 
 impl Sprites<'_> {

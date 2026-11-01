@@ -510,7 +510,7 @@ impl<'a> Ship<'a> {
         unit: &Unit,
         master: &Master,
         map: GridSize,
-        graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &'a crate::objects::Graphics,
         task: Option<TaskId>,
     ) -> Result<Self, GenieError> {
         let walk = MoveToReads::of(unit, master, graphics);

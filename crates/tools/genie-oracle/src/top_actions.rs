@@ -20,7 +20,6 @@ use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::world::Seconds;
 use genie_save::generated::world::{Action, PlayerObjects, RgeAction, RgeStaticObject};
-use std::collections::BTreeMap;
 
 mod gathering;
 
@@ -46,7 +45,7 @@ pub(super) fn saved_actions(
     work: impl Fn(i16) -> Result<BuildTask, GenieError>,
     fly_task: impl Fn(i16) -> Result<Task, GenieError>,
     task_at: impl Fn(i16, i16) -> Result<Task, GenieError>,
-    graphics: Option<&BTreeMap<SpriteId, Graphic>>,
+    graphics: Option<&genie_core::objects::Graphics>,
     unit: &mut Unit,
 ) -> Result<(), GenieError> {
     let mut entries = object
@@ -138,7 +137,7 @@ struct Saved<'a> {
     objects: &'a PlayerObjects,
     action: &'a Action,
     base: &'a RgeAction,
-    graphics: Option<&'a BTreeMap<SpriteId, Graphic>>,
+    graphics: Option<&'a genie_core::objects::Graphics>,
 }
 
 impl Saved<'_> {
@@ -241,7 +240,7 @@ fn import_move_to(saved: &Saved<'_>, unit: &mut Unit) -> Result<(), GenieError> 
 /// range, sprite and wait. The save does not hold `+0x60`: `quiet` is its maker's.
 pub(crate) fn saved_move_to(
     action: &Action,
-    graphics: Option<&BTreeMap<SpriteId, Graphic>>,
+    graphics: Option<&genie_core::objects::Graphics>,
     quiet: bool,
 ) -> Result<MoveToAction, GenieError> {
     let base = action.base().ok_or(MOVE_TO_BASELESS)?;
@@ -267,13 +266,13 @@ const MOVE_TO_BASELESS: GenieError = GenieError::unsupported("a saved MoveTo wit
 /// A saved `MoveTo`'s sprite (`id`, none for −1) from the sprites' table.
 fn saved_move_to_sprite(
     id: Option<SpriteId>,
-    graphics: Option<&BTreeMap<SpriteId, Graphic>>,
+    graphics: Option<&genie_core::objects::Graphics>,
 ) -> Result<Option<Graphic>, GenieError> {
     let Some(id) = id else {
         return Ok(None);
     };
     graphics
-        .and_then(|g| g.get(&id).copied())
+        .and_then(|g| g.get(id).copied())
         .map(Some)
         .ok_or_else(|| {
             GenieError::missing_data("a saved MoveTo's sprite outside the sprites' table")

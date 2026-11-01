@@ -15,6 +15,7 @@ use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveTo, MoveToReads, MoveWait, SpriteReads};
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
@@ -23,6 +24,7 @@ use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
+use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Animated;
 use crate::objects::masters::BlastDefense;
@@ -50,7 +52,6 @@ use crate::unit_ai::NotifyKind;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::step::Step;
-use std::collections::BTreeMap;
 
 /// `FUN_140a82ae0` case 6 after the hit: a ranged unit whose attack timer ran out is done
 /// without a target and ready again past its interrupt frame (its firing frame without one);
@@ -104,12 +105,12 @@ fn a_swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
 }
 
 /// The sprites' table of a world without sprites.
-pub(crate) static NO_GRAPHICS: BTreeMap<SpriteId, Graphic> = BTreeMap::new();
+pub(crate) static NO_GRAPHICS: Graphics = Graphics::new();
 
 /// What a new `MoveTo` reads of a unit in object state `state` with top speed `speed`: the
 /// sprites' table `graphics` with the defaults `defaults`.
 fn walking_reads(
-    graphics: &BTreeMap<SpriteId, Graphic>,
+    graphics: &Graphics,
     defaults: MoveDefaults,
     state: ObjectState,
     speed: f32,
@@ -1793,7 +1794,7 @@ fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics: BTreeMap<SpriteId, Graphic> = [10, 11, 12, 20, 21]
+    let graphics: Graphics = [10, 11, 12, 20, 21]
         .into_iter()
         .map(|id| (SpriteId::named(id), g(SpriteId::named(id))))
         .collect();
@@ -2452,7 +2453,10 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
             last_frame: crate::objects::Frame::of_data(frame - 1),
             changed: true,
             looped: false,
-            ..ActiveSprite::start(t.graphics[&SpriteId::named(301)], &mut Well512::default())
+            ..ActiveSprite::start(
+                *t.graphics.get(SpriteId::named(301)).unwrap(),
+                &mut Well512::default(),
+            )
         };
         crate::world::tests::in_update(t, (PlayerId::new(1), ListIndex::new(0)), 100, |u, c| {
             a.swing_to_hit(c, u, &mut f, &r, sprite)
@@ -2541,7 +2545,10 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
         frame: crate::objects::Frame::of_data(5),
         last_frame: crate::objects::Frame::of_data(4),
         changed: true,
-        ..ActiveSprite::start(t.graphics[&SpriteId::named(301)], &mut Well512::default())
+        ..ActiveSprite::start(
+            *t.graphics.get(SpriteId::named(301)).unwrap(),
+            &mut Well512::default(),
+        )
     };
     crate::world::tests::in_update(
         &mut t,
@@ -2694,7 +2701,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
 #[test]
 fn an_attack_s_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
     let at = Position::new(12.0, 10.0, 0.0);
-    let table = BTreeMap::from([(STANDING.id, STANDING)]);
+    let table = Graphics::from([(STANDING.id, STANDING)]);
     let made = |gap, speed, state, mode| {
         let mut a = own_attack(7, AttackState::Move, Distance::new(2.0));
         a.arms.move_sprite = Some(STANDING);

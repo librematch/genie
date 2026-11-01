@@ -193,7 +193,7 @@ impl Unit {
                 )
                 .ok();
                 let graphic =
-                    |id: Option<SpriteId>| id.and_then(|id| c.w.graphics.get(&id).copied());
+                    |id: Option<SpriteId>| id.and_then(|id| c.w.graphics.get(id).copied());
                 let look = self.abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));

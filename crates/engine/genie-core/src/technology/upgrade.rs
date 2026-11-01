@@ -17,7 +17,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
 use crate::objects::masters::{Master, Task, master_type, player_master};
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::orders::Place;
 use crate::players::Amount;
@@ -108,11 +107,7 @@ pub(crate) fn damage_sprites(
     u: &mut Unit,
     master: &Master,
     before: HpPercent,
-    (graphics, object, sprite): (
-        &std::collections::BTreeMap<SpriteId, Graphic>,
-        &mut Well512,
-        &mut Well512,
-    ),
+    (graphics, object, sprite): (&crate::objects::Graphics, &mut Well512, &mut Well512),
 ) -> Result<HpPercent, GenieError> {
     let entries = &master.damage_graphics;
     let Some((share, hp)) = share_of(u, master) else {
@@ -138,11 +133,8 @@ pub(crate) fn damage_sprites(
         i.and_then(|i| entries.get(i).copied())
             .filter(|e| e.sprite.is_some())
     };
-    let graphic = |id: Option<SpriteId>| {
-        id.and_then(|id| graphics.get(&id))
-            .copied()
-            .ok_or(NO_SPRITE)
-    };
+    let graphic =
+        |id: Option<SpriteId>| id.and_then(|id| graphics.get(id)).copied().ok_or(NO_SPRITE);
     if let Some(e) = shown(now) {
         match e.apply_mode {
             SPRITE_SCATTERED => {
@@ -562,7 +554,7 @@ impl World {
         if self.graphics.is_empty() {
             return Ok(());
         }
-        let g = self.graphics.get(&id).copied().ok_or(NO_SPRITE)?;
+        let g = self.graphics.get(id).copied().ok_or(NO_SPRITE)?;
         let rng = self.streams.get(Stream::Sprite);
         let u = match place {
             Place::Live(q, i) => self.players.live_mut(q, i)?,
@@ -609,7 +601,7 @@ impl World {
         };
         let old_task = |id: TaskId| old.tasks.iter().find(|t| t.id == id).copied();
         let graphics = &self.graphics;
-        let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
+        let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
         let sprites = crate::technology::effect::MasterSprites {
             moving: g(new.move_sprite),
             attack: g(new.attack_sprite),
@@ -717,6 +709,7 @@ mod tests {
     use crate::objects::masters::action_type;
     use crate::objects::masters::{BuildingMaster, DamageGraphic, Masters};
     use crate::objects::masters::{MasterId, ids};
+    use crate::objects::sprite::Graphic;
     use crate::ownership::CaptureKind;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
@@ -793,7 +786,7 @@ mod tests {
     /// does nothing to the simulation for mode 0.
     #[test]
     fn the_damage_sprites_follow_the_share_of_the_hit_points() {
-        let graphics: std::collections::BTreeMap<SpriteId, Graphic> = [70, 1070, 2095, 2120, 2145]
+        let graphics: crate::objects::Graphics = [70, 1070, 2095, 2120, 2145]
             .map(|id| (SpriteId::named(id), graphic(id)))
             .into_iter()
             .collect();

@@ -10,6 +10,7 @@ use crate::movement::move_to::{
 };
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
@@ -52,8 +53,7 @@ fn reads() -> GatherReads {
 }
 
 /// The sprites' table of a world without sprites.
-static NO_GRAPHICS: std::collections::BTreeMap<SpriteId, Graphic> =
-    std::collections::BTreeMap::new();
+static NO_GRAPHICS: Graphics = Graphics::new();
 
 /// What the `MoveTo` constructors read of a villager that carries `held`: no sprites.
 fn walks(held: Held) -> Walks<'static> {

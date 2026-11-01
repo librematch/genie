@@ -399,7 +399,7 @@ impl World {
             .master(&self.masters, player)?;
         let range = crate::movement::move_to::object_range(Distance::ZERO, Some(master));
         let sprite = crate::movement::move_to::object_sprite(master)
-            .and_then(|id| self.graphics.get(&id).copied());
+            .and_then(|id| self.graphics.get(id).copied());
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
         let mover = unit.body.mover_mut().ok_or(GenieError::unsupported(

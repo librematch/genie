@@ -310,7 +310,7 @@ impl World {
         let new_object = self.new_object(p, master, made, position)?;
         let standing = made
             .standing_sprite
-            .and_then(|s| self.graphics.get(&s).copied())
+            .and_then(|s| self.graphics.get(s).copied())
             .ok_or(GenieError::unsupported(
                 "a new unit's standing sprite the data file does not have",
             ))?;

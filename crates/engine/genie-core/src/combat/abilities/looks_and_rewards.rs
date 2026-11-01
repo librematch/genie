@@ -130,7 +130,7 @@ impl World {
             i16::try_from(id)
                 .ok()
                 .and_then(SpriteId::of_data)
-                .is_some_and(|id| graphics.contains_key(&id))
+                .is_some_and(|id| graphics.contains_key(id))
         };
         let look = look(task, mask, flags, exists);
         let unit = &mut self.players[p].objects[i];

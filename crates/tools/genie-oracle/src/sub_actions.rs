@@ -59,11 +59,11 @@ pub(super) fn saved_reload(
 /// for a graphic the table lacks.
 pub(super) fn saved_sprite(
     s: &RgeStaticObject,
-    graphics: &std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>,
+    graphics: &genie_core::objects::Graphics,
 ) -> Option<genie_core::objects::sprite::ActiveSprite> {
     let list = s.active_sprite_list.as_deref()?;
     let graphic = SpriteId::of_data(s.sprite)
-        .and_then(|id| graphics.get(&id))
+        .and_then(|id| graphics.get(id))
         .copied()?;
     let nodes = || {
         list.sprite_type_list
@@ -103,7 +103,7 @@ pub(super) fn saved_sprite(
 /// swing's times (`+0xb0`, `+0xb4`) are not saved, and a loaded Attack starts without them.
 pub(super) fn saved_attack(
     sub: &genie_save::generated::world::Action,
-    graphics: Option<&std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>>,
+    graphics: Option<&genie_core::objects::Graphics>,
 ) -> Result<genie_core::combat::attack::Attack, GenieError> {
     use genie_core::movement::move_to::MOVE_TO;
     let b = sub
@@ -119,7 +119,7 @@ pub(super) fn saved_attack(
     let graphics = graphics.ok_or(GenieError::unsupported(
         "a saved Attack without the sprites' table",
     ))?;
-    let g = |id: u16| SpriteId::of_data(id as i16).and_then(|id| graphics.get(&id).copied());
+    let g = |id: u16| SpriteId::of_data(id as i16).and_then(|id| graphics.get(id).copied());
     // every MoveTo of the Attack is quiet (`FUN_140a7a170` with 1)
     let move_to = match first_action(&b.sub_actions)? {
         None => None,

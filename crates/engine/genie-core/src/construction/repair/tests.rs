@@ -40,7 +40,7 @@ const SHOWING: RepairTask = RepairTask {
 
 /// The sprites' table of the tests: the task's 3 and 4, the master's standing sprite 5 and the
 /// `MoveTo`s' defaults 20 (to a point) and 21 (to an object), each of speed factor 1.
-fn graphics() -> std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic> {
+fn graphics() -> crate::objects::Graphics {
     [3, 4, 5, 20, 21]
         .map(|id| {
             let g = crate::objects::sprite::Graphic {
@@ -65,9 +65,7 @@ const DEFAULTS: MoveDefaults = MoveDefaults {
 
 /// What the tests' repairer's `MoveTo`s read of it: [`DEFAULTS`] in the table `graphics`, alive
 /// (state 2), of speed 1, at (10, 10) with radii 0.2.
-const fn move_reads(
-    graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
-) -> MoveToReads<'_> {
+const fn move_reads(graphics: &crate::objects::Graphics) -> MoveToReads<'_> {
     MoveToReads {
         sprites: SpriteReads {
             defaults: DEFAULTS,
@@ -330,7 +328,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    let standing = graphics()[&SpriteId::named(5)];
+    let standing = *graphics().get(SpriteId::named(5)).unwrap();
     v.sprite = Some(crate::objects::sprite::ActiveSprite::start(
         standing,
         &mut crate::math::rng::Well512::default(),
@@ -438,7 +436,7 @@ fn a_repair_s_move_tos_are_quiet() {
         point: Position::new(11.0, 10.0, 0.0),
         target: Some(object_id(20)),
         range: Distance::new(1.5),
-        sprite: Some(g[&SpriteId::named(21)]),
+        sprite: Some(*g.get(SpriteId::named(21)).unwrap()),
         quiet: true,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         wait: MoveWait::NEW,
@@ -449,7 +447,7 @@ fn a_repair_s_move_tos_are_quiet() {
         Ok(Some(MoveToAction::sub_to_point(
             Position::new(1.0, 2.0, 0.0),
             Distance::ZERO,
-            Some(g[&SpriteId::named(20)])
+            Some(*g.get(SpriteId::named(20)).unwrap())
         )))
     );
 }

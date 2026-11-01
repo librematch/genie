@@ -20,9 +20,9 @@ use crate::world::WorldTime;
 pub fn swing_sprites(
     look: Option<&crate::combat::abilities::Look>,
     master: &crate::objects::masters::Master,
-    graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+    graphics: &crate::objects::Graphics,
 ) -> SwingSprites {
-    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(&s).copied());
+    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     SwingSprites {
         look: g(look.and_then(|l| l.attacking)),
         special: master

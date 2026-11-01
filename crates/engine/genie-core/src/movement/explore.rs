@@ -23,14 +23,12 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::{Unit, object_master};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
 use crate::world::step::Step;
 use genie_diff::Diff;
-use std::collections::BTreeMap;
 
 /// The Explore action's type.
 pub const EXPLORE: ActionType = ActionType::named(4);
@@ -84,7 +82,7 @@ pub struct ExploreMove<'a> {
 impl<'a> ExploreMove<'a> {
     /// What the `MoveTo` of `unit` of `master` reads, with the sprites' table `graphics`.
     #[must_use]
-    pub fn of(unit: &Unit, master: &Master, graphics: &'a BTreeMap<SpriteId, Graphic>) -> Self {
+    pub fn of(unit: &Unit, master: &Master, graphics: &'a crate::objects::Graphics) -> Self {
         Self {
             reads: MoveToReads::of(unit, master, graphics),
             given: master.move_sprite,
@@ -605,7 +603,7 @@ impl Unit {
         let standing = self
             .master(&c.w.masters, c.player)?
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(&s))
+            .and_then(|s| c.w.graphics.get(s))
             .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());
@@ -627,7 +625,7 @@ impl Unit {
 
 /// The sprites' table of a world without sprites.
 #[cfg(test)]
-static NO_GRAPHICS: BTreeMap<SpriteId, Graphic> = BTreeMap::new();
+static NO_GRAPHICS: crate::objects::Graphics = crate::objects::Graphics::new();
 
 /// What an Explore's `MoveTo` reads of a unit in state 2 with speed 1 in a world without sprites,
 /// for tests that make an Explore.
@@ -653,9 +651,11 @@ mod tests {
     use super::*;
     use crate::map::Footprint;
     use crate::movement::Speed;
+    use crate::objects::Graphics;
     use crate::objects::ObjectState;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    use crate::objects::sprite::Graphic;
     use crate::world::Seconds;
 
     const WALKING: Graphic = Graphic {
@@ -670,7 +670,7 @@ mod tests {
 
     /// What an Explore's `MoveTo` reads of a unit in state 2 with speed 1: the sprites in
     /// `graphics` with the point default 20, and the walking sprite `given`.
-    fn walk_of(graphics: &BTreeMap<SpriteId, Graphic>, given: Option<SpriteId>) -> ExploreMove<'_> {
+    fn walk_of(graphics: &Graphics, given: Option<SpriteId>) -> ExploreMove<'_> {
         let defaults = MoveDefaults {
             point: Some(SpriteId::named(20)),
             object: Some(SpriteId::named(21)),
@@ -695,7 +695,7 @@ mod tests {
             id: SpriteId::named(20),
             ..WALKING
         };
-        let table = BTreeMap::from([(SpriteId::named(7), WALKING), (SpriteId::named(20), other)]);
+        let table = Graphics::from([(SpriteId::named(7), WALKING), (SpriteId::named(20), other)]);
         let sprite = |given| {
             let walk = walk_of(&table, given);
             let (a, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &walk).unwrap();
@@ -745,7 +745,7 @@ mod tests {
     /// 0, the sprite its maker resolved, a new wait), which a code of 1 drops again.
     #[test]
     fn an_explore_without_a_point_waits_for_one_then_walks() {
-        let table = BTreeMap::from([(SpriteId::named(7), WALKING)]);
+        let table = Graphics::from([(SpriteId::named(7), WALKING)]);
         let walk = walk_of(&table, Some(SpriteId::named(7)));
         let (mut a, owner) = ExploreAction::new(Position::new(-1.0, -1.0, 0.0), &walk).unwrap();
         assert_eq!(

@@ -5,12 +5,10 @@ use crate::GenieError;
 use crate::math::rng::{Stream, Well512};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::unit_ai::{AiCommand, Effect};
 use crate::world::step::Step;
@@ -41,7 +39,7 @@ impl Unit {
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
         self.tear_down_actions(releases, builder_leaves, by)?;
@@ -77,13 +75,13 @@ impl Unit {
     pub(crate) fn show_standing(
         &mut self,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
         let standing = self
             .master_in(masters)?
             .standing_sprite
-            .and_then(|s| graphics.get(&s))
+            .and_then(|s| graphics.get(s))
             .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());

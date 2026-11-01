@@ -449,7 +449,7 @@ pub(super) const MOVING_TASK: BuildTask = BuildTask {
 
 /// The sprites' table of the Build's tests: 3 (the moving sprite of [`MOVING_TASK`]), 7, 20 and
 /// 21, each looped, 10 frames of 16 facets.
-pub(crate) fn graphics() -> BTreeMap<SpriteId, crate::objects::sprite::Graphic> {
+pub(crate) fn graphics() -> crate::objects::Graphics {
     [3, 7, 20, 21]
         .map(|id| {
             let g = crate::objects::sprite::Graphic {

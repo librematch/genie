@@ -19,20 +19,18 @@ use crate::movement::{Me, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
-use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Body;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::class;
+use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
-use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 use crate::world::step::Step;
-use std::collections::BTreeMap;
 
 impl Attack {
     /// The update of an Attack whose target is gone (its target −1 after [`Attack::lost`]): the
@@ -389,7 +387,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-        graphics: &BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::GotoSeen, unit)?;
         self.range = f.own.source.weapon_range;
@@ -407,7 +405,7 @@ impl Attack {
         &mut self,
         unit: &Unit,
         r: &AttackReads,
-        graphics: &BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> Result<(), GenieError> {
         self.walk_to_seen(&move_reads(unit, r, graphics)?)
     }

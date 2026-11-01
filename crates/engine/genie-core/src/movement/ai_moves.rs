@@ -7,7 +7,6 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
-use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
@@ -22,7 +21,6 @@ use crate::movement::move_to::{
 use crate::objects::masters::Masters;
 use crate::objects::masters::class;
 use crate::objects::release::Releaser;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 
 use crate::unit_ai::AiMove;
@@ -90,7 +88,7 @@ impl Unit {
         ),
         (masters, graphics, sprite_rng): (
             Option<&Masters>,
-            &std::collections::BTreeMap<SpriteId, Graphic>,
+            &crate::objects::Graphics,
             &mut Well512,
         ),
     ) -> Result<bool, GenieError> {
@@ -127,7 +125,7 @@ impl Unit {
         let look = self.abilities.look.as_ref();
         let sprite = ai_sprite(master, m.walk)
             .or_else(|| point_sprite(master, look, false))
-            .and_then(|id| graphics.get(&id).copied());
+            .and_then(|id| graphics.get(id).copied());
         let move_to = MoveToAction::to_point(m.point, m.range, sprite, self.body.mover_mut());
         if move_to.shows_standing() {
             self.shows_standing_sprite(masters, graphics, sprite_rng)?;
@@ -159,7 +157,7 @@ impl Unit {
         point: Position,
         player: PlayerId,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> Result<PointMove, GenieError> {
         if self.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
@@ -209,7 +207,7 @@ impl Unit {
     fn point_sprites<'g>(
         &self,
         masters: Option<&Masters>,
-        graphics: &'g std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &'g crate::objects::Graphics,
     ) -> Result<SpriteReads<'g>, GenieError> {
         Ok(SpriteReads::of(
             self.master_in(masters)?,
@@ -354,7 +352,7 @@ impl Unit {
         let range = crate::movement::move_to::object_range(range, Some(own));
         let sprite = ai_sprite(own, false)
             .or_else(|| object_sprite(own))
-            .and_then(|id| c.w.graphics.get(&id).copied());
+            .and_then(|id| c.w.graphics.get(id).copied());
         let here = self.position();
         let mover = self.body.mover_mut().expect("tested above");
         let move_to = MoveToAction::to_object(
@@ -392,7 +390,7 @@ impl Unit {
         stance: crate::unit_ai::UnitStance,
         (masters, graphics, sprite_rng): (
             Option<&Masters>,
-            &std::collections::BTreeMap<SpriteId, Graphic>,
+            &crate::objects::Graphics,
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
@@ -412,13 +410,13 @@ impl Unit {
     pub(crate) fn shows_standing_sprite(
         &mut self,
         masters: Option<&Masters>,
-        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let standing = self
             .master_in(masters)?
             .standing_sprite
-            .and_then(|s| graphics.get(&s))
+            .and_then(|s| graphics.get(s))
             .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());

@@ -99,7 +99,7 @@ impl Unit {
             .copied()
             .filter(|&v| Amount::ZERO < v)
             .unwrap_or(Amount::new(1.0));
-        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(&s).copied());
+        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
         Ok(HuntReads {
             defaults: MoveDefaults::of(master, self.abilities.look.as_ref()),
             attack: AttackReads::of(
@@ -233,7 +233,7 @@ impl Unit {
                 Some(
                     master
                         .special_sprite
-                        .and_then(|s| c.w.graphics.get(&s))
+                        .and_then(|s| c.w.graphics.get(s))
                         .copied()
                         .ok_or(GenieError::unsupported(
                             "a special graphic the data file does not have",

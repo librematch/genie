@@ -9,6 +9,7 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::movement::Speed;
+use crate::objects::Graphics;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -286,7 +287,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
                 &crate::movement::move_to::MoveToReads {
                     sprites: crate::movement::move_to::SpriteReads {
                         defaults: crate::movement::move_to::MoveDefaults::default(),
-                        graphics: &std::collections::BTreeMap::new(),
+                        graphics: &Graphics::new(),
                     },
                     state: ObjectState::Alive,
                     speed: Speed::new(1.0),

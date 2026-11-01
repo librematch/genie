@@ -311,7 +311,7 @@ fn move_to() -> Action {
 /// walks, and the `MoveTo` comes with its state.
 #[test]
 fn a_saved_attack_reads_its_target_range_and_move_to() {
-    let graphics = std::collections::BTreeMap::new();
+    let graphics = genie_core::objects::Graphics::new();
     let a = saved_attack(
         &attack(5, vec![(genie_core::movement::move_to::MOVE_TO, move_to())]),
         Some(&graphics),

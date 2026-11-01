@@ -10,6 +10,7 @@ use crate::map::Tile;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveWaitState;
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
@@ -204,7 +205,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
         ],
     );
     t.masters = vec![masters.clone(), masters];
-    t.graphics = BTreeMap::from([
+    t.graphics = Graphics::from([
         (WALKING, graphic(WALKING)),
         (STANDING, graphic(STANDING)),
         (TASK_SPRITE, graphic(TASK_SPRITE)),

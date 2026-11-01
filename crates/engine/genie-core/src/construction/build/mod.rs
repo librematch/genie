@@ -291,12 +291,12 @@ pub(crate) fn show_built(
     stats: Option<&mut crate::movement::MoveStats>,
     master: &Master,
     frame: crate::objects::Frame,
-    graphics: &BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+    graphics: &crate::objects::Graphics,
     sprite_rng: &mut crate::math::rng::Well512,
 ) {
     let standing = master
         .standing_sprite
-        .and_then(|s| graphics.get(&s).copied());
+        .and_then(|s| graphics.get(s).copied());
     if let Some(g) = standing {
         crate::objects::sprite::new_sprite(sprite, stats, g, sprite_rng);
         if let Some(s) = sprite.as_mut().filter(|s| s.graphic.id == g.id) {
@@ -327,7 +327,7 @@ mod built_sprite_tests {
             replay_delay: Seconds::ZERO,
             flags,
         };
-        let graphics = BTreeMap::from([
+        let graphics = crate::objects::Graphics::from([
             (
                 SpriteId::named(10),
                 g(SpriteId::named(10), SpriteFlags::ANIMATED),
@@ -363,7 +363,7 @@ mod built_sprite_tests {
                 crate::objects::Frame::of_data(2)
             )
         );
-        let statics = BTreeMap::from([(
+        let statics = crate::objects::Graphics::from([(
             SpriteId::named(11),
             g(SpriteId::named(11), SpriteFlags::NONE),
         )]);

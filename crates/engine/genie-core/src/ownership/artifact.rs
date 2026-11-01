@@ -579,13 +579,13 @@ mod tests {
     use crate::movement::move_to::MoveWaitState;
     use crate::movement::move_to::{MoveDefaults, MoveToReads, MoveWait, SpriteReads, WalkTo};
     use crate::objects::ActionState;
+    use crate::objects::Graphics;
     use crate::objects::ObjectId;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::masters::class;
     use crate::objects::sprite::Graphic;
     use crate::test_ids::object_id;
-    use std::collections::BTreeMap;
 
     #[test]
     fn a_check_finds_no_owner_and_waits_one_second() {
@@ -1074,7 +1074,7 @@ mod tests {
 
     /// The `MoveTo`s' sprites without defaults or a table: a `MoveTo` shows none.
     fn sprites() -> SpriteReads<'static> {
-        static NONE: BTreeMap<SpriteId, Graphic> = BTreeMap::new();
+        static NONE: Graphics = Graphics::new();
         SpriteReads {
             defaults: MoveDefaults::default(),
             graphics: &NONE,
@@ -1218,7 +1218,7 @@ mod tests {
     #[test]
     fn an_artifact_s_walk_shows_its_sprite_as_it_starts() {
         let mut a = Artifact::new(false, Some(SpriteId::named(3)));
-        let graphics = BTreeMap::from([(SpriteId::named(3), graphic(3))]);
+        let graphics = Graphics::from([(SpriteId::named(3), graphic(3))]);
         let with_3 = SpriteReads {
             defaults: MoveDefaults::default(),
             graphics: &graphics,

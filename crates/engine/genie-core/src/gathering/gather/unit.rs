@@ -19,7 +19,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
-use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::{Unit, second_target_checked};
 use crate::players::Amount;
@@ -34,7 +33,6 @@ use crate::unit_ai::world_view::DropWorld;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
-use std::collections::BTreeMap;
 
 /// The Gather's update, or what follows it, without the Gather its caller found.
 const NO_GATHER: GenieError = GenieError::unreachable("a Gather's update without its Gather");
@@ -122,7 +120,7 @@ impl Unit {
         &self,
         every: &[Masters],
         player: PlayerId,
-        graphics: &'g BTreeMap<SpriteId, Graphic>,
+        graphics: &'g crate::objects::Graphics,
     ) -> Result<Walks<'g>, GenieError> {
         let sprites = SpriteReads::of(
             self.master(every, player)?,
@@ -147,7 +145,7 @@ impl Unit {
         gather: &crate::gathering::gather::GatherAction,
     ) -> Result<crate::gathering::gather::GatherReads, GenieError> {
         let master = self.master(&c.w.masters, c.player)?;
-        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(&s).copied());
+        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
         Ok(crate::gathering::gather::GatherReads {

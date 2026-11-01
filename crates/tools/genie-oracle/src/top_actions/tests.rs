@@ -145,7 +145,7 @@ fn import_drawn(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     mut unit: Unit,
-    graphics: Option<&std::collections::BTreeMap<SpriteId, Graphic>>,
+    graphics: Option<&genie_core::objects::Graphics>,
 ) -> Result<Unit, GenieError> {
     let s = object.static_part().expect("a test object's static part");
     saved_actions(
@@ -314,7 +314,7 @@ fn a_move_to_takes_its_sprite_from_the_sprites_table() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics = std::collections::BTreeMap::from([(walking.id, walking)]);
+    let graphics = genie_core::objects::Graphics::from([(walking.id, walking)]);
     let mut action = move_to(4, 0.5);
     let mut shown = |sprite: i16, graphics| {
         let parts = action.rge_action_by_type.as_deref_mut().unwrap();
@@ -707,7 +707,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics = std::collections::BTreeMap::from([(carried.id, carried)]);
+    let graphics = genie_core::objects::Graphics::from([(carried.id, carried)]);
     let a = import_drawn(
         &acting(BUILD, build(dropping)),
         &objects,
@@ -1189,7 +1189,7 @@ fn a_wait_solidify_waits_for_its_foundation() {
 }
 
 /// The sprites' table of the Attack tests: an attack sprite 21 of ten frames of 0.1 s.
-fn swing_sprites() -> std::collections::BTreeMap<SpriteId, Graphic> {
+fn swing_sprites() -> genie_core::objects::Graphics {
     let swing = Graphic {
         id: SpriteId::named(21),
         frames: Frame::of_data(10),
@@ -1199,7 +1199,7 @@ fn swing_sprites() -> std::collections::BTreeMap<SpriteId, Graphic> {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    std::collections::BTreeMap::from([(swing.id, swing)])
+    genie_core::objects::Graphics::from([(swing.id, swing)])
 }
 
 /// An Attack in state `state` that walks with sprite `walk` (`short_val`) and swings sprite 21

@@ -23,7 +23,6 @@ use crate::objects::masters::ids;
 use crate::objects::masters::ids::HOUSE;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::COMBAT;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, annexes_of};
 use crate::players::Amount;
@@ -331,7 +330,7 @@ impl Unit {
         &mut self,
         standing: Option<SpriteId>,
         second: Option<SpriteId>,
-        graphics: &std::collections::BTreeMap<SpriteId, Graphic>,
+        graphics: &crate::objects::Graphics,
         sprite_rng: &mut Well512,
     ) {
         let Some(second) = second else {
@@ -360,7 +359,7 @@ impl Unit {
         } else {
             Some(second)
         };
-        if let Some(&g) = next.and_then(|next| graphics.get(&next)) {
+        if let Some(&g) = next.and_then(|next| graphics.get(next)) {
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
                 self.body.move_stats_mut(),

@@ -270,7 +270,7 @@ pub struct MasterTable {
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
     sprite_speed: HashMap<SpriteId, SpeedMultiplier>,
     /// What the sprite clock reads of each graphic.
-    pub graphics: std::collections::BTreeMap<SpriteId, genie_core::objects::sprite::Graphic>,
+    pub graphics: genie_core::objects::Graphics,
     /// The terrain table.
     pub terrain: TerrainTable,
     /// The drop-site table (`dropsites.json` beside the `.dat`, [`crate::drop_sites`]); empty
@@ -505,7 +505,7 @@ impl MasterTable {
                 })
                 .collect(),
             sprite_speed: HashMap::new(),
-            graphics: std::collections::BTreeMap::default(),
+            graphics: genie_core::objects::Graphics::default(),
             terrain: TerrainTable::default(),
             drop_sites: Vec::new(),
             linked_techs: std::collections::BTreeMap::new(),

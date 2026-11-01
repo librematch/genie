@@ -8,6 +8,7 @@ use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::movement::MoveAlgorithm;
 use crate::movement::TurnRate;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Regeneration;
@@ -956,11 +957,7 @@ fn the_train_location_attributes_change_the_selected_entry() {
         (m.train_locations.len(), m.train_location_entry.get()),
         (2, 1)
     );
-    m.follow(
-        attribute::TRAIN_TIME,
-        &std::collections::BTreeMap::new(),
-        None,
-    );
+    m.follow(attribute::TRAIN_TIME, &Graphics::new(), None);
     assert_eq!(
         (m.trained_at.clone(), m.build_time),
         (
@@ -996,11 +993,7 @@ fn the_damage_sprite_attributes_resize_and_select() {
     m.multiply_attribute(attribute::DAMAGE_GRAPHICS_ENTRY_MOD, -3.0, &world(false));
     assert_eq!(m.damage_graphics, []);
     assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(0xff));
-    m.follow(
-        attribute::DAMAGE_GRAPHICS_ENTRY_MOD,
-        &std::collections::BTreeMap::new(),
-        None,
-    );
+    m.follow(attribute::DAMAGE_GRAPHICS_ENTRY_MOD, &Graphics::new(), None);
     assert!(!m.damage_sprites);
 }
 

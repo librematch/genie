@@ -14,7 +14,6 @@ use crate::movement::{Me, Planning, footprint_gap};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
@@ -171,12 +170,12 @@ impl Unit {
         let master = self.master(&c.w.masters, c.player)?;
         let standing = master
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(&s).copied());
+            .and_then(|s| c.w.graphics.get(s).copied());
         let carrying = gather
             .task
             .sprites
             .carrying
-            .and_then(|s| c.w.graphics.get(&s).copied());
+            .and_then(|s| c.w.graphics.get(s).copied());
         Ok(match carrying {
             Some(g)
                 if gather.task.resource.is_some()
@@ -328,7 +327,7 @@ impl Unit {
         &mut self,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
-        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
@@ -365,7 +364,7 @@ impl Unit {
         &mut self,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
-        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(

@@ -553,7 +553,7 @@ impl Unit {
         let standing = self
             .master(&c.w.masters, c.player)?
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(&s))
+            .and_then(|s| c.w.graphics.get(s))
             .copied();
         if let Some(m) = self.body.mover_mut() {
             m.shows(standing.as_ref());

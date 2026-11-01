@@ -42,13 +42,13 @@ impl World {
     ///
     /// [`AttributeWorld`]: crate::objects::masters::AttributeWorld
     pub(super) fn attribute_world(
-        graphics: &std::collections::BTreeMap<SpriteId, crate::objects::sprite::Graphic>,
+        graphics: &crate::objects::Graphics,
     ) -> impl Fn(i32) -> bool + '_ {
         move |id| {
             i16::try_from(id)
                 .ok()
                 .and_then(SpriteId::of_data)
-                .is_some_and(|id| graphics.contains_key(&id))
+                .is_some_and(|id| graphics.contains_key(id))
         }
     }
 

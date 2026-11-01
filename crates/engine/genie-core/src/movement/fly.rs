@@ -20,7 +20,6 @@ use crate::objects::masters::ActionType;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskSprites;
-use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
@@ -66,7 +65,7 @@ pub struct FlightSprites<'a> {
     /// The bird's master's walking sprite, None for none.
     pub walking: Option<SpriteId>,
     /// The sprites' table.
-    pub graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
+    pub graphics: &'a crate::objects::Graphics,
 }
 
 /// The height a bird of fly mode 1 flies at once its Fly starts (`FUN_140a84900`).
@@ -384,6 +383,7 @@ mod tests {
     use crate::objects::layers::Body;
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::TaskTerrain;
+    use crate::objects::sprite::Graphic;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::unit_ai::UnitAi;
@@ -471,7 +471,7 @@ mod tests {
 
     /// The hawk's sprites: 846 (its task's moving and working one, its master's walking one)
     /// and 1595 (the task's proceeding one).
-    fn hawk_graphics() -> std::collections::BTreeMap<SpriteId, Graphic> {
+    fn hawk_graphics() -> crate::objects::Graphics {
         [(846, 0.0625), (1595, 0.0625)]
             .map(|(id, frame_duration)| {
                 let g = Graphic {
@@ -667,7 +667,7 @@ mod tests {
         // the sprite draw: the task's moving 846, working 846, proceeding 1595 from r % 3 on
         let drawn = [846, 846, 1595][e.rand15() as usize % 3];
         let to = point.with_height(9.0);
-        let sprite = hawk_graphics().get(&SpriteId::named(drawn)).copied();
+        let sprite = hawk_graphics().get(SpriteId::named(drawn)).copied();
         assert_eq!(
             (fly.state, fly.move_to),
             (

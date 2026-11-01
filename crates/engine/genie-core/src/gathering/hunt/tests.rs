@@ -16,6 +16,7 @@ use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, TargetMoved, WalkTo,
 };
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
@@ -60,8 +61,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
 }
 
 /// The sprites' table of a world without sprites.
-static NO_GRAPHICS: std::collections::BTreeMap<SpriteId, Graphic> =
-    std::collections::BTreeMap::new();
+static NO_GRAPHICS: Graphics = Graphics::new();
 
 /// What the `MoveTo` constructors read of a hunter that carries `held`: no sprites, a unit in
 /// state 2.

@@ -60,6 +60,7 @@ use crate::movement::fly::FlyState;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{MoveTo, MoveToAction};
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::ListIndex;
@@ -68,6 +69,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
+use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
@@ -838,7 +840,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
     };
-    t.graphics = std::collections::BTreeMap::from([
+    t.graphics = Graphics::from([
         (SpriteId::named(13124), idle(SpriteId::named(13124))),
         (SpriteId::named(13170), idle(SpriteId::named(13170))),
     ]);
@@ -1688,7 +1690,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics: std::collections::BTreeMap<SpriteId, Graphic> = [
+    let graphics: Graphics = [
         (SpriteId::named(100), g(SpriteId::named(100))),
         (SpriteId::named(101), g(SpriteId::named(101))),
     ]
@@ -13474,7 +13476,7 @@ fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
             Position::new(100.5, 158.5, 0.0),
         )
     });
-    t.graphics = std::collections::BTreeMap::from([(
+    t.graphics = Graphics::from([(
         SpriteId::named(1751),
         Graphic {
             id: SpriteId::named(1751),
@@ -13645,7 +13647,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         Masters::new([]),
         Masters::new([gate(master_id(88)), gate(master_id(95))]),
     ];
-    t.graphics = std::collections::BTreeMap::from([(SpriteId::named(1751), g)]);
+    t.graphics = Graphics::from([(SpriteId::named(1751), g)]);
     t.tick(Millis::new(100));
     assert_eq!(t.players[1].unsupported, None);
     let states: Vec<(i32, ObjectState)> = t.players[1]
@@ -13788,7 +13790,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             ),
         ]),
     ];
-    t.graphics = std::collections::BTreeMap::from([
+    t.graphics = Graphics::from([
         (
             SpriteId::named(1751),
             g(SpriteId::named(1751), SpriteFlags::NONE),
@@ -14242,7 +14244,7 @@ fn ai_move_of(
 
 /// The master 83 of [`mover_unit`] with its running (13154), walking (13153) and standing
 /// (13151) sprites, and their table.
-fn scout_sprites() -> (Masters, std::collections::BTreeMap<SpriteId, Graphic>) {
+fn scout_sprites() -> (Masters, Graphics) {
     let master = Master {
         id: VILLAGER_MALE,
         run_sprite: Some(SpriteId::named(13154)),
@@ -14476,7 +14478,7 @@ fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
             crate::objects::masters::Task::default(),
             object_id(10028),
         )));
-    let none = std::collections::BTreeMap::new();
+    let none = Graphics::new();
     assert_eq!(
         u.head_takes_point(AI_POINT, PlayerId::new(1), None, &none),
         Ok(PointMove::Declined)
@@ -14523,7 +14525,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
         id: SpriteId::named(765),
         ..standing
     };
-    let graphics = std::collections::BTreeMap::from([
+    let graphics = Graphics::from([
         (SpriteId::named(764), standing),
         (SpriteId::named(765), walking),
     ]);
@@ -14595,11 +14597,7 @@ fn scout_attack(
 /// `groups`, as the unit's update runs it: what `f` gives and the world after the update.
 fn on_side<R>(
     (gaia, own, tracker): (Player, Vec<Unit>, crate::players::tracker::Tracker),
-    (spatial, every, graphics): (
-        Spatial,
-        Vec<Masters>,
-        std::collections::BTreeMap<SpriteId, Graphic>,
-    ),
+    (spatial, every, graphics): (Spatial, Vec<Masters>, Graphics),
     groups: crate::groups::UnitGroups,
     f: impl FnOnce(&mut crate::unit_ai::world_view::UnitView<'_, '_>) -> R,
 ) -> (R, World) {
@@ -14682,7 +14680,7 @@ fn scout_attack_on(
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics = std::collections::BTreeMap::from([
+    let graphics = Graphics::from([
         (SpriteId::named(300), standing),
         (
             SpriteId::named(301),
@@ -14812,7 +14810,7 @@ fn attack_by(
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics = std::collections::BTreeMap::from([
+    let graphics = Graphics::from([
         (SpriteId::named(300), standing),
         (
             SpriteId::named(301),
@@ -15062,7 +15060,7 @@ fn help_view<R>(
     let masters = Masters::new([scout]);
     let every = vec![Masters::new([wolf]), masters];
     let tracker = crate::players::tracker::Tracker::default();
-    let graphics = std::collections::BTreeMap::new();
+    let graphics = Graphics::new();
     let (answer, _) = on_side(
         (gaia, vec![unit, helper], tracker),
         (spatial, every, graphics),
@@ -16324,7 +16322,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    t.graphics = std::collections::BTreeMap::from([
+    t.graphics = Graphics::from([
         (SpriteId::named(300), sprite(SpriteId::named(300))),
         (SpriteId::named(301), sprite(SpriteId::named(301))),
     ]);

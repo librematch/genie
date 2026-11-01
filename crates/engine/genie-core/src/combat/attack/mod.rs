@@ -22,7 +22,6 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, TargetMoved};
 use crate::objects::ObjectId;
-use crate::objects::SpriteId;
 use crate::objects::layers::Body;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
@@ -311,17 +310,14 @@ impl AttackReads {
     pub(crate) fn of(
         unit: &Unit,
         master: &Master,
-        (masters, graphics): (
-            Option<&Masters>,
-            &std::collections::BTreeMap<SpriteId, Graphic>,
-        ),
+        (masters, graphics): (Option<&Masters>, &crate::objects::Graphics),
         ai: Option<&UnitAi>,
         (computer, now): (bool, WorldTime),
     ) -> Self {
         Self {
             standing: master
                 .standing_sprite
-                .and_then(|s| graphics.get(&s))
+                .and_then(|s| graphics.get(s))
                 .copied(),
             volleys: masters.is_some_and(|m| volleys(master, m)),
             reload: unit.reload_stinger + (master.reload - unit.reload_powerup),
@@ -398,7 +394,7 @@ pub(crate) struct Ground<'a> {
     /// The notifies' list while the unit AI is out of the unit.
     pub(crate) buffer: Option<&'a mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>>,
     /// The sprites' table, which a `MoveTo` the Attack makes takes its sprite from.
-    pub(crate) graphics: &'a std::collections::BTreeMap<SpriteId, Graphic>,
+    pub(crate) graphics: &'a crate::objects::Graphics,
 }
 
 impl Ground<'_> {
