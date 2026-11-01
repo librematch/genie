@@ -37,7 +37,7 @@ impl Spatial {
             manager_ignore: Vec::new(),
             tile_records: std::collections::BTreeSet::new(),
             manager_buffer: None,
-            objects: BTreeMap::new(),
+            objects: crate::objects::IdTable::new(),
             records: RecordCells::default(),
             inside: BTreeMap::new(),
             tiles,
@@ -74,7 +74,7 @@ impl Spatial {
     /// An object gets its obstruction record (`FUN_141056460` for a started foundation): a static
     /// one marks its tiles.
     pub fn add_record(&mut self, id: ObjectId, o: Obstruction) {
-        let Some(p) = self.objects.get_mut(&id) else {
+        let Some(p) = self.objects.get_mut(id) else {
             return;
         };
         p.obstruction = Some(o);
@@ -96,7 +96,7 @@ impl Spatial {
     /// counted); 0 for an object the world does not hold.
     #[must_use]
     pub fn tile_place(&self, id: ObjectId) -> usize {
-        self.objects.get(&id).map_or(0, |o| {
+        self.objects.get(id).map_or(0, |o| {
             let list = self
                 .tiles
                 .list(Tile::new(o.position.x() as i32, o.position.y() as i32));
@@ -117,7 +117,7 @@ impl Spatial {
         self.tiles
             .list(tile)
             .iter()
-            .filter_map(|id| self.objects.get(id).map(|o| (*id, o)))
+            .filter_map(|id| self.objects.get(*id).map(|o| (*id, o)))
     }
 
     /// The object's obstruction record goes (`FUN_141055b40`'s record part), by its master's
@@ -127,7 +127,7 @@ impl Spatial {
     /// drops its record (true), false without one. The mesh shape's removal is the caller's
     /// (`Pathing::removed`).
     pub fn dropped_record(&mut self, id: ObjectId) -> bool {
-        let Some(p) = self.objects.get(&id).copied() else {
+        let Some(p) = self.objects.get(id).copied() else {
             return false;
         };
         let kind = p.obstruction_type;
@@ -140,7 +140,7 @@ impl Spatial {
                 return true;
             }
         }
-        match self.objects.get_mut(&id) {
+        match self.objects.get_mut(id) {
             Some(o) if o.obstruction.is_some() => {
                 o.obstruction = None;
                 self.refile(id);
@@ -161,7 +161,7 @@ impl Spatial {
         let objects = &self.objects;
         let static_record = |o: ObjectId| {
             objects
-                .get(&o)
+                .get(o)
                 .and_then(|q| q.obstruction)
                 .is_some_and(|r| r.kind.marks_tiles())
         };
@@ -174,7 +174,7 @@ impl Spatial {
     /// dying unit's own master copy has none, `FUN_14121cc40`); the tiles' counts are not
     /// redone, as the game does not redo them.
     pub fn set_tall(&mut self, id: ObjectId, tall: bool) {
-        if let Some(o) = self.objects.get_mut(&id) {
+        if let Some(o) = self.objects.get_mut(id) {
             o.tall = tall;
         }
     }
@@ -182,13 +182,10 @@ impl Spatial {
     /// The objects whose place lies within `x0`..`x1` and `y0`..`y1`, by id.
     pub fn objects_within(&self, area: Rect) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         let (x0, y0, x1, y1) = (area.x0(), area.y0(), area.x1(), area.y1());
-        self.objects
-            .iter()
-            .filter(move |(_, o)| {
-                let (x, y) = (o.position.x(), o.position.y());
-                x0 <= x && x <= x1 && y0 <= y && y <= y1
-            })
-            .map(|(&id, o)| (id, o))
+        self.objects.iter().filter(move |(_, o)| {
+            let (x, y) = (o.position.x(), o.position.y());
+            x0 <= x && x <= x1 && y0 <= y && y <= y1
+        })
     }
 
     /// The tile rectangles whose static marks changed since the last call.
@@ -216,7 +213,7 @@ impl Spatial {
     #[must_use]
     pub fn get(&self, id: impl ObjectKey) -> Option<&Placed> {
         let id = id.key()?;
-        self.objects.get(&id).or_else(|| self.inside.get(&id))
+        self.objects.get(id).or_else(|| self.inside.get(&id))
     }
 
     /// An object whose place the slice knows: an object of a player the slice stopped is known
@@ -235,7 +232,7 @@ impl Spatial {
     /// The slice stops updating the object: from now on its place is known only within its speed
     /// times the time since.
     pub fn freeze(&mut self, id: ObjectId) {
-        if let Some(p) = self.objects.get_mut(&id) {
+        if let Some(p) = self.objects.get_mut(id) {
             let _ = p.unknown.get_or_insert(0.0);
             let _ = self.frozen_for.entry(id).or_insert(Seconds::ZERO);
         }
@@ -243,7 +240,7 @@ impl Spatial {
 
     /// The object's place is the game's again (the oracle's forced replay): it is known.
     pub fn unfreeze(&mut self, id: ObjectId) {
-        if let Some(p) = self.objects.get_mut(&id) {
+        if let Some(p) = self.objects.get_mut(id) {
             p.unknown = None;
         }
         let _ = self.frozen_for.remove(&id);
@@ -352,7 +349,7 @@ impl Spatial {
     pub(super) fn frozen(&self) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         self.frozen_for
             .keys()
-            .filter_map(|&id| self.objects.get(&id).map(|p| (id, p)))
+            .filter_map(|&id| self.objects.get(id).map(|p| (id, p)))
             .filter(|(_, p)| p.unknown.is_some())
     }
 
@@ -378,15 +375,15 @@ impl Spatial {
     /// Whether listed object `id` counts as tall (its master's height radius above 0, which
     /// `FUN_140f5f0a0` and `FUN_140f5f560` read): a ghost, whose master the slice does not hold,
     /// counts as not tall.
-    pub(super) fn is_tall(objects: &BTreeMap<ObjectId, Placed>, id: ObjectId) -> bool {
-        objects.get(&id).is_some_and(|p| p.tall)
+    pub(super) fn is_tall(objects: &crate::objects::IdTable<Placed>, id: ObjectId) -> bool {
+        objects.get(id).is_some_and(|p| p.tall)
     }
 
     /// The object's master changed (`FUN_1411a6a70`): it takes the new master's radii, class,
     /// obstruction and speed (`placed`, at its place), its static record's marks follow, and it
     /// keeps its slot in its tile's list and the tile's tall count, which the game does not redo.
     pub fn change_master(&mut self, id: ObjectId, placed: Placed) {
-        let Some(old) = self.objects.get(&id).copied() else {
+        let Some(old) = self.objects.get(id).copied() else {
             return self.insert(id, placed);
         };
         if self.tiles.tile_of(old.position) != self.tiles.tile_of(placed.position) {
@@ -406,7 +403,7 @@ impl Spatial {
     /// The object leaves the world: its place, its sight's state and its records in the registry
     /// (its destructor, `FUN_141073060`) go.
     pub fn leave(&mut self, id: ObjectId) -> Result<(), GenieError> {
-        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(&id)) {
+        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
             v.registry_leave(id, p.player, p.position, p.radius, p.class)?;
             v.remove_seer(id);
         }
@@ -418,7 +415,7 @@ impl Spatial {
     /// (`FUN_140f5f560`) and the obstruction manager (`FUN_141055b40`), and takes its container's
     /// x and y (`FUN_14118c890`).
     pub fn go_inside(&mut self, id: ObjectId, at: Position) {
-        let Some(mut p) = self.objects.get(&id).copied() else {
+        let Some(mut p) = self.objects.get(id).copied() else {
             return;
         };
         self.remove(id);
@@ -452,7 +449,7 @@ impl Spatial {
     /// The object `id` leaves the world.
     pub fn remove(&mut self, id: ObjectId) {
         let _ = self.inside.remove(&id);
-        if let Some(gone) = self.objects.remove(&id) {
+        if let Some(gone) = self.objects.remove(id) {
             self.refile(id);
             if let Some(i) = self.tiles.tile_of(gone.position) {
                 let objects = &self.objects;

@@ -97,7 +97,7 @@ impl Spatial {
     /// which moves the object with it (FD-045-D15); a tool that asks a query from another place
     /// moves the index alone.
     pub fn set_position(&mut self, id: ObjectId, position: Position) -> Result<(), GenieError> {
-        if let Some(p) = self.objects.get_mut(&id) {
+        if let Some(p) = self.objects.get_mut(id) {
             let from = p.position;
             p.position = position;
             let (old, new) = (self.tiles.tile_of(from), self.tiles.tile_of(position));
@@ -111,7 +111,7 @@ impl Spatial {
                 }
             }
             self.refile(id);
-            let Some(p) = self.objects.get(&id) else {
+            let Some(p) = self.objects.get(id) else {
                 return Ok(());
             };
             if let Some(v) = self.sight.as_mut() {
@@ -316,7 +316,7 @@ impl Spatial {
                 Ok(Found {
                     id,
                     enemies: !found[UnitRelation::ENEMY].is_empty(),
-                    position: id.and_then(|id| self.objects.get(&id)).map(|p| p.position),
+                    position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
                     fresh,
                     players: players_seen(found),
                     distance: crate::map::WholeDistance::of_data(
@@ -347,7 +347,7 @@ impl Spatial {
                 Ok(Found {
                     id,
                     enemies: !self.last_found()?[UnitRelation::ENEMY].is_empty(),
-                    position: id.and_then(|id| self.objects.get(&id)).map(|p| p.position),
+                    position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
                     fresh,
                     players: 0,
                     distance: crate::map::WholeDistance::NONE,
@@ -377,7 +377,7 @@ impl Spatial {
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<(Option<ObjectId>, f32), GenieError> {
-        let at = self.objects.get(&me);
+        let at = self.objects.get(me);
         let searcher = Searcher {
             class_10: at.is_some_and(|m| m.class == class::PREDATOR),
             // The villagers' class, which gathers from farms (`FUN_141195750`).
@@ -400,7 +400,7 @@ impl Spatial {
                 let sight = self.sight.as_ref().ok_or(GenieError::unsupported(
                     "a search without the players' sight",
                 ))?;
-                let (Some(seer), Some(p)) = (sight.seer(record.id), self.objects.get(&record.id))
+                let (Some(seer), Some(p)) = (sight.seer(record.id), self.objects.get(record.id))
                 else {
                     continue;
                 };

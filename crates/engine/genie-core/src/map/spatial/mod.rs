@@ -573,7 +573,8 @@ pub struct Spatial {
     /// set it reset it at their end but `FindShortPath`'s quick-only exit, and the queries that
     /// set none read what is left ([`Spatial::manager_grow`]).
     manager_buffer: Option<Distance>,
-    objects: BTreeMap<ObjectId, Placed>,
+    /// The placed objects by id (T7: a dense column, walked in the ids' order).
+    objects: crate::objects::IdTable<Placed>,
     /// The cell of each object's record ([`RecordCells`]), kept with `objects`
     /// ([`Spatial::refile`]).
     records: RecordCells,

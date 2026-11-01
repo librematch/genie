@@ -56,7 +56,7 @@ fn the_record_cells_answer_as_the_full_scan_does() {
         s.objects
             .iter()
             .filter(|(_, p)| p.obstruction.is_some_and(|o| s.visits(p, o.kind, rect)))
-            .map(|(&id, _)| id)
+            .map(|(id, _)| id)
             .collect()
     };
     let at = |next: &mut dyn FnMut() -> u32| (next() % 560) as f32 * 0.25 - 8.0;
@@ -73,7 +73,7 @@ fn the_record_cells_answer_as_the_full_scan_does() {
             4 => {
                 let here = s
                     .objects
-                    .get(&object_id(id))
+                    .get(object_id(id))
                     .map_or(position, |p| p.position.ground());
                 s.change_master(object_id(id), placed(here, r, kind));
             }
@@ -978,7 +978,7 @@ fn a_record_goes_by_its_master_s_obstruction_type() {
     let mut site = wall;
     site.obstruction = None;
     s.insert(object_id(4), site);
-    s.objects.get_mut(&object_id(3)).unwrap().obstruction = None;
+    s.objects.get_mut(object_id(3)).unwrap().obstruction = None;
     assert!(!s.dropped_record(object_id(4)));
     assert_eq!(s.tiles().word(Tile::new(12, 12)), Some(1));
     let unit = villager(15.5, 15.5);

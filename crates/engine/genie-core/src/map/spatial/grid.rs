@@ -40,7 +40,7 @@ impl Spatial {
     pub fn records(&self) -> impl Iterator<Item = (ObjectId, ObstructionType, Rect)> + '_ {
         self.objects
             .iter()
-            .filter_map(|(&id, p)| Some((id, p.obstruction?.kind, p.bounds())))
+            .filter_map(|(id, p)| Some((id, p.obstruction?.kind, p.bounds())))
     }
 
     /// Each obstruction record's grid cell ([`Spatial::filed`]): the object's id, the level and
@@ -48,7 +48,7 @@ impl Spatial {
     pub fn record_cells(&self) -> impl Iterator<Item = (ObjectId, (i32, i32, i32))> + '_ {
         self.objects
             .iter()
-            .filter_map(|(&id, p)| Some((id, self.filed(p, p.obstruction?.kind))))
+            .filter_map(|(id, p)| Some((id, self.filed(p, p.obstruction?.kind))))
     }
 
     /// The grid cell an object's record of kind `kind` is filed in (`FUN_141056460`): level and
@@ -115,7 +115,7 @@ impl Spatial {
     pub(super) fn refile(&mut self, id: ObjectId) {
         let cell = self
             .objects
-            .get(&id)
+            .get(id)
             .and_then(|p| p.obstruction.map(|o| self.filed(p, o.kind)));
         let records = &mut self.records;
         let old = records.filed.get(&id).copied();
@@ -179,7 +179,7 @@ impl Spatial {
     pub(super) fn records_in(&self, rect: Rect) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         self.visited_records(rect)
             .into_iter()
-            .filter_map(|id| self.objects.get(&id).map(|p| (id, p)))
+            .filter_map(|id| self.objects.get(id).map(|p| (id, p)))
     }
 
     /// The object moved: its record moves with it, and it changes tiles when its centre crosses

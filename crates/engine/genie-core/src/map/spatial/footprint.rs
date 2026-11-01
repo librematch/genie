@@ -147,7 +147,7 @@ impl Spatial {
         Ok(self
             .objects
             .iter()
-            .filter(|&(&id, o)| {
+            .filter(|&(id, o)| {
                 id != site_id.id()
                     && (obstructs || o.speed <= Speed::ZERO)
                     && !o.buildable_on.passed()
@@ -157,7 +157,7 @@ impl Spatial {
                     && (o.position.y() - sy).abs() <= ry
                     && counts(id, o)
             })
-            .map(|(&id, _)| id)
+            .map(|(id, _)| id)
             .collect())
     }
 

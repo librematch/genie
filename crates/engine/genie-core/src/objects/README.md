@@ -43,6 +43,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`frame.rs`](frame.rs) | A sprite's frame and its animation state. |
 | [`hit_points.rs`](hit_points.rs) | A combat object's hit points, a unit's or a building's (`TRIBE_Combat_Object`, types 70 and 80): the heal, the gain and the loss, the regeneration and the powerup's clamp (slots 0x110, 0xb8 and 0x260, and the update's checks). |
 | [`hp.rs`](hp.rs) | An object's hit points (`HitPoints`), with the game's `f32` operations, and a master's whole hit points (`MasterHitPoints`). |
+| [`id_table.rs`](id_table.rs) | A table of values by object id: a dense column per sign of the id, so that a lookup indexes and a walk takes the ids in a sorted map's order, the most negative first (the order the side tables kept as `BTreeMap`s). |
 | [`layers.rs`](layers.rs) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |
 | [`lines.rs`](lines.rs) | The unit lines (`resources/_common/dat/unitlines.json`): each line names the masters of one upgrade chain, its first master first. |
 | [`list_index.rs`](list_index.rs) | An object's place in its player's list (`ListIndex`) and a list's places (`Places`). |

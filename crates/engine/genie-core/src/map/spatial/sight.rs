@@ -64,7 +64,7 @@ impl Spatial {
         // searches about its record there
         let p = self
             .objects
-            .get(&me)
+            .get(me)
             .or_else(|| self.inside.get(&me))
             .ok_or(GenieError::unsupported(
                 "an owner search of an object the world does not hold",
@@ -200,7 +200,7 @@ impl Spatial {
         los: Distance,
         sees: bool,
     ) -> Result<(), GenieError> {
-        let Some(p) = self.objects.get_mut(&id) else {
+        let Some(p) = self.objects.get_mut(id) else {
             return Err(GenieError::unsupported(
                 "an ownership change of an object the world does not hold",
             ));
@@ -395,11 +395,11 @@ impl Spatial {
     /// main building's place and UMV entry. The changed mask of an object others take over by
     /// seeing it is the answer.
     pub fn combat_sight(&mut self, id: ObjectId) -> Result<Option<VisionBits>, GenieError> {
-        let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(&id)) else {
+        let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) else {
             return Ok(None);
         };
         let main = self.annexes.get(&id).and_then(|main| {
-            let place = self.objects.get(&main.id())?.position;
+            let place = self.objects.get(main.id())?.position;
             Some((place, v.seer(*main).map_or(0, |s| s.umv)))
         });
         v.combat_sight(id, p.player, p.position, p.radius, p.class, main)
@@ -407,7 +407,7 @@ impl Spatial {
 
     /// The object's `set_state` to `state` ([`Visibility::state_changed`]).
     pub fn sight_state(&mut self, id: ObjectId, state: ObjectState) -> Result<(), GenieError> {
-        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(&id)) {
+        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
             v.state_changed(id, p.position, p.radius, state)?;
         }
         Ok(())
@@ -425,7 +425,7 @@ impl Spatial {
         master: MasterId,
         los: Distance,
     ) -> Result<(), GenieError> {
-        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(&id)) {
+        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
             v.master_changed(id, p.position, p.radius, radius, master, los)?;
             v.registry_master(
                 id,
