@@ -336,25 +336,28 @@ impl Mover {
         // the gap to the target, else to where the top level's path ends; a gate's is the
         // least over it and its first two annexes (slot 0x680), each annex's less 0.1
         // (`MINSS`, 0x1411512b8)
-        let gap = target.as_ref().map_or(FAR, |(id, t)| {
+        let gap = target.as_ref().map_or(Distance::new(FAR), |(id, t)| {
             let own = footprint_gap(self.position(), ground_radius, t.position, t.radius);
             let near = (self.position(), ground_radius);
             gate_gap(world, near, (*id, t), own, |g| g - ANNEX_GAP)
         });
         let to_end = match (&target, self.paths.len()) {
             (Some(_), _) => gap,
-            (None, 1) => FAR,
-            (None, _) => self.top_path().and_then(|p| p.last()).map_or(FAR, |&end| {
-                footprint_gap(
-                    self.position(),
-                    ground_radius,
-                    end.position().with_z(0.0),
-                    Footprint::new(0.0, 0.0),
-                )
-                .get()
-            }),
+            (None, 1) => Distance::new(FAR),
+            (None, _) => {
+                self.top_path()
+                    .and_then(|p| p.last())
+                    .map_or(Distance::new(FAR), |&end| {
+                        footprint_gap(
+                            self.position(),
+                            ground_radius,
+                            end.position().with_z(0.0),
+                            Footprint::new(0.0, 0.0),
+                        )
+                    })
+            }
         };
-        Ok((target, Distance::new(gap), Distance::new(to_end)))
+        Ok((target, gap, to_end))
     }
 
     /// [`Mover::motion_passes`]'s dispatch on the level's state toward `goal`: an arrived level (4,
@@ -567,8 +570,8 @@ impl Mover {
                 let own =
                     footprint_gap(self.position(), ground_radius, t.position, t.radius) - range;
                 let near = (self.position(), ground_radius);
-                let gap = gate_gap(world, near, (id, t), own, |g| g - range.get());
-                if gap < EPSILON {
+                let gap = gate_gap(world, near, (id, t), own, |g| g - range);
+                if gap.get() < EPSILON {
                     // in range of the target: the waypoint counts as reached
                     let level = &mut self.paths[0];
                     level.flags &= !LevelFlags::AT_WAYPOINT;

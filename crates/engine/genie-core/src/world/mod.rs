@@ -215,10 +215,11 @@ pub(crate) const COMPUTER_QUEUE_LIMIT: usize = 2;
 pub(crate) const SEARCH_AGAIN: Seconds = Seconds::new(-10.0);
 /// `FUN_140ac4670`'s first argument when a hunt's target went on the walk to it, or its `MoveTo`
 /// failed (`DAT_142eb9430`): the hunt searches within this of its point.
-pub(crate) const TREE_SEARCH_WITHIN: f32 = crate::math::image::turn::TREE_SEARCH_WITHIN;
+pub(crate) const TREE_SEARCH_WITHIN: Distance =
+    Distance::new(crate::math::image::turn::TREE_SEARCH_WITHIN);
 /// `FUN_140ac4670`'s second argument when a hunt's Attack failed (`DAT_14330ebb8`): the tree
 /// found counts within this of the unit.
-pub(crate) const TREE_NEAR: f32 = crate::math::image::hunt::TREE_NEAR;
+pub(crate) const TREE_NEAR: Distance = Distance::new(crate::math::image::hunt::TREE_NEAR);
 /// A velocity longer than this sets the animation speed (`DAT_142eb0c60`).
 pub(crate) const SPEED_EPSILON: f32 = crate::math::image::turn::SPEED_EPSILON;
 /// A building attacks with a firepower above this (`FUN_14120ea30`).

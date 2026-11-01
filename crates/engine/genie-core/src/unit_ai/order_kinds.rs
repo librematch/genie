@@ -14,6 +14,7 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
     AiMove, CIVILIAN, EXPLORE_Z, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
@@ -363,11 +364,11 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         ai: &mut Well512,
-    ) -> Result<u32, GenieError> {
+    ) -> Result<OrderOutcome, GenieError> {
         if Self::world_object(o.target, at, side)?.is_some() {
             side.effect_now(Effect::OrderOnTarget(*o), self, ai)?;
             self.ordered_on_target = true;
-            return Ok(1);
+            return Ok(OrderOutcome::Taken);
         }
         if let Some(target_type) = o.target_type {
             // the class of the target's type: its owner's master's, else the type itself
@@ -375,11 +376,11 @@ impl UnitAi {
                 None => target_type.class(),
                 Some(owner) => match side.master_class(owner, target_type.master())? {
                     Some(class) => class,
-                    None => return Ok(0),
+                    None => return Ok(OrderOutcome::NotTaken),
                 },
             };
             let Some(kind) = self.resource_kind(class) else {
-                return Ok(0);
+                return Ok(OrderOutcome::NotTaken);
             };
             // slot 0x88 (`FUN_140c4b0f0`): slot 0x80 from the order's shown point, without a
             // drop site, wood (0) for fewer than 2 workers, at any state
@@ -407,7 +408,7 @@ impl UnitAi {
                     ai,
                 )?;
             }
-            return Ok(0);
+            return Ok(OrderOutcome::NotTaken);
         }
         let Some(m) = self.move_to(AiMove {
             point: o.point,
@@ -415,7 +416,7 @@ impl UnitAi {
             force: true,
             walk: true,
         }) else {
-            return Ok(0);
+            return Ok(OrderOutcome::NotTaken);
         };
         side.effect_now(Effect::Move(m), self, ai)?;
         Ok(self.order_tail(Some(o.order), o.priority, class, false, ai))

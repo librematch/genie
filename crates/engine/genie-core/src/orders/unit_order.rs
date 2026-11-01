@@ -1,6 +1,7 @@
 //! An artifact's and a herd's take, an order's cancel and a unit's order.
 
 use crate::GenieError;
+use crate::commands::UnitOrderAction;
 use crate::gathering::hunt::HUNT;
 use crate::map::Tile;
 use crate::math::rng::Stream;
@@ -227,17 +228,20 @@ impl World {
         &mut self,
         _player: PlayerId,
         ids: &[Option<ObjectId>],
-        action: u8,
+        action: UnitOrderAction,
     ) -> Result<(), GenieError> {
-        if !matches!(action, 6..=8) {
-            return Err(GenieError::unsupported(
-                "a UNIT_ORDER other than the garrison (5) and the drop-offs (6 to 8)",
-            ));
-        }
         // 8 records an unaimed action's work for the town bell and queues the way back after;
         // 6 asks no gather action (the search alone)
-        let way_back = action == 8;
-        let asks = action != 6;
+        let (asks, way_back) = match action {
+            UnitOrderAction::DropOffSearch => (false, false),
+            UnitOrderAction::DropOff => (true, false),
+            UnitOrderAction::DropOffAndBack => (true, true),
+            _ => {
+                return Err(GenieError::unsupported(
+                    "a UNIT_ORDER other than the garrison (5) and the drop-offs (6 to 8)",
+                ));
+            }
+        };
         for &id in ids {
             let Some(place) = self.place(id) else {
                 continue;

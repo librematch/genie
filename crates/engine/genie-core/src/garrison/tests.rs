@@ -2259,7 +2259,7 @@ fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_ga
         Shelters {
             buildings: object_id_list([101, 100]),
             transports: Vec::new(),
-            counts: vec![1, 0, 0],
+            counts: vec![InsideCount::ONE, InsideCount::ZERO, InsideCount::ZERO],
         }
     );
     // the gates' list: no gate is a building, each pushes its count
@@ -2272,7 +2272,7 @@ fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_ga
         Shelters {
             buildings: Vec::new(),
             transports: Vec::new(),
-            counts: vec![0, 0],
+            counts: vec![InsideCount::ZERO, InsideCount::ZERO],
         }
     );
 }
@@ -2441,7 +2441,7 @@ fn a_garrison_into_a_transport_pairs_the_units_whose_class_has_the_flags() {
     let shelters = Shelters {
         buildings: Vec::new(),
         transports: object_id_list([200]),
-        counts: vec![0],
+        counts: vec![InsideCount::ZERO],
     };
     t.shelter(
         PlayerId::new(1),
@@ -3654,7 +3654,7 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
         u.life.inside = Some(object_id(100));
         t.players[p].objects.push(u);
     }
-    assert_eq!(t.garrisoned(object_id(100)), Ok(3));
+    assert_eq!(t.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
     // a raider inside a building: its +0xc2c share is not kept
     t.object_mut(object_id(1000)).unwrap().1.raider_countdown = RaiderCountdown::of_data(20);
     assert!(t.garrisoned(object_id(100)).is_err());
@@ -3663,7 +3663,7 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     u.life.inside = Some(object_id(200));
     u.raider_countdown = RaiderCountdown::of_data(20);
     t.players[1].objects.push(u);
-    assert_eq!(t.garrisoned(object_id(200)), Ok(1));
+    assert_eq!(t.garrisoned(object_id(200)), Ok(InsideCount::ONE));
 }
 
 /// [`coast_world`] with its ship 200 at `ship`, the mesh built, after UNLOAD to `to`; `set` then

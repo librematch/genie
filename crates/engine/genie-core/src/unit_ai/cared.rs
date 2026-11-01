@@ -214,14 +214,14 @@ pub(crate) fn search_area(
     los: Distance,
     radius: Distance,
     computer: bool,
-) -> Result<(&'static [ClassId], f32), GenieError> {
+) -> Result<(&'static [ClassId], Distance), GenieError> {
     let classes = cared_classes(ai_type, class, computer)?;
     let radius = if matches!(ai_type, CIVILIAN | FISHING_AI) {
         civilian_search_radius(los, radius)
     } else {
         search_radius(los, radius)
     };
-    Ok((classes, radius.get()))
+    Ok((classes, radius))
 }
 
 /// The action values that need a live target (the target block's mask `0x4002080d` over the

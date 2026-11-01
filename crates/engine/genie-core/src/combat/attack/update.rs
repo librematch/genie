@@ -342,7 +342,7 @@ impl Attack {
             }
             Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
             Readiness::Waiting => {}
-            Readiness::Away(gap) => self.follow(unit, &mut g, r, f, Distance::new(gap))?,
+            Readiness::Away(gap) => self.follow(unit, &mut g, r, f, gap)?,
         }
         Ok(UpdateCode::UNDER_WAY)
     }

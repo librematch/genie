@@ -10,6 +10,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -511,7 +512,7 @@ impl UnitAi {
             }
             let order = *self.orders.checked(k)?;
             let r = self.process_order(&order, Some((at, computer)), None, ai, side)?;
-            if r == 0xe {
+            if r == OrderOutcome::NotReady {
                 k += 1;
                 continue;
             }
@@ -520,7 +521,7 @@ impl UnitAi {
             if k < self.orders.len() {
                 let _ = self.orders.remove(k);
             }
-            if r == 1 {
+            if r == OrderOutcome::Taken {
                 return Ok(());
             }
         }

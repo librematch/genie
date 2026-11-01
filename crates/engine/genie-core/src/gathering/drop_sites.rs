@@ -243,15 +243,15 @@ pub(crate) fn nearest_drop_site(
     others: OthersRef<'_>,
     sites: &[MasterId],
     at: Position,
-) -> Option<(ObjectId, f32)> {
-    let mut best: Option<(ObjectId, f32)> = None;
+) -> Option<(ObjectId, DistanceSquared)> {
+    let mut best: Option<(ObjectId, DistanceSquared)> = None;
     for o in others.own_iter() {
         if !sites.contains(&o.life.master_id) || o.life.state != ObjectState::Alive {
             continue;
         }
         let (x, y) = (at.x(), at.y());
         let (dx, dy) = (x - o.position().x(), y - o.position().y());
-        let d = dy * dy + dx * dx;
+        let d = DistanceSquared::new(dy * dy + dx * dx);
         if best.is_none_or(|(_, b)| d < b) {
             best = Some((o.id, d));
         }

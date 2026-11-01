@@ -281,7 +281,7 @@ impl UnitAi {
         let (classes, radius) = self.search_area(at, computer)?;
         let found = side.closest(&Search {
             at: at.position.ground(),
-            radius: Distance::new(radius),
+            radius,
             classes,
             size: at.size,
             pick: Pick::Look,
@@ -305,7 +305,7 @@ impl UnitAi {
         &self,
         at: &Surroundings,
         computer: bool,
-    ) -> Result<(&'static [ClassId], f32), GenieError> {
+    ) -> Result<(&'static [ClassId], Distance), GenieError> {
         search_area(self.ai_type, at.class, at.los, at.search_radius, computer)
     }
 

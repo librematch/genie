@@ -403,7 +403,7 @@ const SPLIT: f32 = crate::math::image::movement::SPLIT;
 const PLANS: u32 = 3;
 /// What a gate's annex's gap loses against the gate's own (`XMM14`, the motion step's load at
 /// 0x1411510e7, the same as [`RANGE_FLOOR`]'s).
-const ANNEX_GAP: f32 = crate::math::image::movement::RANGE_FLOOR;
+const ANNEX_GAP: Distance = Distance::new(crate::math::image::movement::RANGE_FLOOR);
 /// The widest unit the new short pather takes (`DAT_142e7f384`, `FUN_140f9e540`'s load at
 /// 0x140f9e713).
 const NEW_PATHER_RADIUS: f32 = crate::math::image::movement::NEW_PATHER_RADIUS;
@@ -553,22 +553,22 @@ pub(crate) fn gate_gap(
     (at, radius): (Position, Footprint),
     (id, target): (ObjectId, &Placed),
     own: Distance,
-    annex: impl Fn(f32) -> f32,
-) -> f32 {
+    annex: impl Fn(Distance) -> Distance,
+) -> Distance {
     // The class the motion step measures by its annexes (`-0xe85` encoded).
     if target.class != class::GATE {
-        return own.get();
+        return own;
     }
     let mut gap = own;
     for a in world.annexes_of(id).into_iter().take(2) {
         if let Some(p) = world.get(a) {
             gap = Distance::new(fmath::minss(
-                annex(footprint_gap(at, radius, p.position, p.radius).get()),
+                annex(footprint_gap(at, radius, p.position, p.radius)).get(),
                 gap.get(),
             ));
         }
     }
-    gap.get()
+    gap
 }
 
 /// [`Mover::avoid`]'s rank for the pause of a walker (`me` of `player`, a `computer`'s or not)

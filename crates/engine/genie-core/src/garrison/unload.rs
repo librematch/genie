@@ -248,7 +248,7 @@ impl World {
             center: at.ground(),
             radius: Footprint::new(r.x() + r.x(), r.y() + r.y()),
         };
-        let Some(spot) = self.drop_location((hp, hi), inner, &made, around, u32::MAX, last)? else {
+        let Some(spot) = self.drop_location((hp, hi), inner, &made, around, None, last)? else {
             return Ok(());
         };
         let (up, ui) = self.live_inside(inner)?;

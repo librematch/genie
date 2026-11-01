@@ -260,7 +260,7 @@ impl World {
         }
         let mut failed = None;
         for u in &moved {
-            if let Err(e) = self.hand_over_attributes(p.index(), new.index(), u) {
+            if let Err(e) = self.hand_over_attributes(p, new, u) {
                 let _ = failed.get_or_insert(e);
             }
         }

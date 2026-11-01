@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::garrison::ClassFlags;
+use crate::garrison::InsideCount;
 use crate::garrison::{
     COMPUTER_IDS, FAR, HUMAN_IDS, NEARBY, TOWN_BELL_REACH, class_has_flags, has_garrison_task,
 };
@@ -13,6 +14,7 @@ use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
@@ -49,7 +51,7 @@ pub(crate) struct Shelters {
     /// The transports.
     pub transports: Vec<ObjectId>,
     /// The counts ([`World::garrisoned`], slot 0x498).
-    pub counts: Vec<i32>,
+    pub counts: Vec<InsideCount>,
 }
 /// A building takes units in only above this share of its master's hit points (`FUN_14120eb10`,
 /// in doubles).
@@ -270,7 +272,7 @@ impl World {
                 .object(building)
                 .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
             let bm = b.master(&self.masters, bp)?;
-            capacities.push((bm.kind == BUILDING, i32::from(bm.garrison.get()), bm.class));
+            capacities.push((bm.kind == BUILDING, bm.garrison, bm.class));
         }
         let first_transport = shelters.buildings.len();
         for (i, &id) in units.iter().enumerate() {
@@ -287,7 +289,7 @@ impl World {
             };
             for (j, &building) in shelters.buildings.iter().enumerate() {
                 let (is_building, capacity, _) = capacities[j];
-                if is_building && capacity != 0 && self.takes_in(building, player, copy)? {
+                if is_building && capacity.holds() && self.takes_in(building, player, copy)? {
                     let gap = gap_to(building)?;
                     if gap < reach {
                         pairs.push((i, j, gap));
@@ -429,8 +431,8 @@ impl World {
 fn assign_shelters(
     pairs: &[(usize, usize, f32)],
     units: &[ObjectId],
-    (all, capacities): (&[ObjectId], &[(bool, i32, ClassId)]),
-    mut counts: Vec<i32>,
+    (all, capacities): (&[ObjectId], &[(bool, GarrisonCapacity, ClassId)]),
+    mut counts: Vec<InsideCount>,
 ) -> Result<(Vec<Vec<ObjectId>>, Vec<ObjectId>), GenieError> {
     let mut taken = vec![false; units.len()];
     // each shelter's units, by shelter index, and the order of the shelters' first take
@@ -440,10 +442,10 @@ fn assign_shelters(
         // the count list is at least as long as the shelters: its callers push a count for
         // each shelter, and FUN_14161e370 one for each gate and annex beside
         let count = counts.get_mut(j).ok_or(NO_COUNT)?;
-        if !taken[i] && *count < capacities[j].1 {
+        if !taken[i] && count.below(capacities[j].1) {
             going[j].push(units[i]);
             first_taken.push(all[j]);
-            *count += 1;
+            *count = count.plus(InsideCount::ONE);
             taken[i] = true;
         }
     }

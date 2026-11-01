@@ -170,7 +170,7 @@ impl UnitAi {
         let (classes, radius) = self.search_area(at, computer)?;
         let found = side.closest(&Search {
             at: from.ground(),
-            radius: Distance::new(radius),
+            radius,
             classes,
             size: at.size,
             pick: Pick::Attack {

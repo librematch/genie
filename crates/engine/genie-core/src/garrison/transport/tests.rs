@@ -11,6 +11,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
 use crate::objects::masters::TaskSprites;
+use crate::pathing::zones::ZoneId;
 use crate::test_ids::object_id;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
@@ -25,8 +26,8 @@ struct Coast {
 }
 
 impl Shore for Coast {
-    fn zone(&mut self, tile: Tile) -> Result<crate::pathing::zones::ZoneId, GenieError> {
-        Ok(crate::pathing::zones::ZoneId::new(if tile.x() < 0 {
+    fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError> {
+        Ok(ZoneId::new(if tile.x() < 0 {
             0
         } else {
             (tile.x() / 10) as u16 + 1
@@ -829,8 +830,17 @@ fn a_drop_location_is_drawn_on_a_side_past_both_footprints() {
 /// one beside it on the zone map; without a map only zone 0's tiles, none beside.
 #[test]
 fn a_drop_location_lies_in_the_transport_s_zone_or_beside_it() {
-    assert_eq!(in_zone(Point::new(3.5, 4.5), u32::MAX, None), Ok(true));
-    assert_eq!(in_zone(Point::new(3.5, 4.5), 0, None), Ok(true));
-    assert_eq!(in_zone(Point::new(3.5, 4.5), 2, None), Ok(false));
-    assert_eq!(in_zone(Point::new(-0.5, 4.5), 0, None), Ok(true));
+    assert_eq!(in_zone(Point::new(3.5, 4.5), None, None), Ok(true));
+    assert_eq!(
+        in_zone(Point::new(3.5, 4.5), Some(ZoneId::new(0)), None),
+        Ok(true)
+    );
+    assert_eq!(
+        in_zone(Point::new(3.5, 4.5), Some(ZoneId::new(2)), None),
+        Ok(false)
+    );
+    assert_eq!(
+        in_zone(Point::new(-0.5, 4.5), Some(ZoneId::new(0)), None),
+        Ok(true)
+    );
 }

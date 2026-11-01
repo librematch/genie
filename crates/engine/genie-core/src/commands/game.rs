@@ -14,6 +14,7 @@ use crate::objects::masters::ids::FARM;
 use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerId;
+use crate::players::Stance;
 use crate::players::attribute;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -118,8 +119,12 @@ impl World {
         let target = g.target(n);
         match g.sub {
             GameSub::DIPLOMACY if self.alliance_locked == 0 => {
-                if let Some(p) = target {
-                    self.set_diplomacy(p, i32::from(g.a), g.value)?;
+                // a relation without a stance or a player number outside a byte changes nothing
+                let other = u8::try_from(g.a).ok().map(PlayerId::from);
+                if let (Some(p), Some(q), Some(stance)) =
+                    (target, other, Stance::of_diplomacy(g.value))
+                {
+                    self.set_diplomacy(p, q, stance)?;
                 }
             }
             GameSub::QUICK_BUILD if self.settings.cheats_enabled => {
@@ -309,7 +314,7 @@ mod tests {
     fn world() -> World {
         let player = || Player {
             attributes: vec![Amount::ZERO; 300],
-            diplomacy: crate::players::ByPlayer::new(vec![crate::players::Stance::NONE; 9]),
+            diplomacy: crate::players::ByPlayer::new(vec![Stance::NONE; 9]),
             ..Player::default()
         };
         World::new(
@@ -347,7 +352,7 @@ mod tests {
                 t.players[1].diplomacy.get(PlayerId::new(2)).copied(),
                 t.players[1].allied_victory
             ),
-            (Some(crate::players::Stance::NONE), 0)
+            (Some(Stance::NONE), 0)
         );
         t.alliance_locked = 0;
         // relation 0: the ally's stance (4)
@@ -358,7 +363,7 @@ mod tests {
                 t.players[1].diplomacy.get(PlayerId::new(2)).copied(),
                 t.players[1].allied_victory
             ),
-            (Some(crate::players::Stance::ALLY), 1)
+            (Some(Stance::ALLY), 1)
         );
         // no castle: no treason
         t.game(&game(1, GameSub::TREASON, 1, 0, 0)).unwrap();

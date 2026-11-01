@@ -16,6 +16,7 @@ use crate::map::Tile;
 use crate::map::terrain::Terrain;
 use crate::math::conversions::cvttss2si;
 use crate::math::rng::Well512;
+use crate::pathing::zones::ZoneId;
 
 /// `FUN_140aa3ba0`'s new point once no unit went ashore: from the old point (x, y), draws of the
 /// Action stream ("Unload": x, then y), each `r / 0xccc` tiles plus the old coordinate less
@@ -156,8 +157,8 @@ impl<'a> DropDraws<'a> {
     }
 }
 
-/// A drop location's zone test (`FUN_141192d10`'s, for the Transport's unload): any for `zone`
-/// −1 (`u32::MAX`); else the zone of the place's tile on the transport's zone map (`zone_map`:
+/// A drop location's zone test (`FUN_141192d10`'s, for the Transport's unload): any for no
+/// `zone` (the game's −1, `u32::MAX`); else the zone of the place's tile on the transport's zone map (`zone_map`:
 /// `FUN_1411958c0` on its `CVTTSS2SI` tile, 0 below 0 or without a map), cut to its low byte,
 /// is `zone` or touches it (`FUN_141414f70` on both low bytes; without a map none does).
 ///
@@ -166,28 +167,28 @@ impl<'a> DropDraws<'a> {
 /// A zone past the adjacency table.
 pub(crate) fn in_zone(
     at: Point,
-    zone: u32,
+    zone: Option<ZoneId>,
     zone_map: Option<&crate::pathing::zones::ZoneMap>,
 ) -> Result<bool, GenieError> {
     let (x, y) = (at.x(), at.y());
-    if zone == u32::MAX {
+    let Some(zone) = zone else {
         return Ok(true);
-    }
+    };
     let (tx, ty) = (cvttss2si(x), cvttss2si(y));
     let tile_zone = match zone_map {
         Some(m) if 0 <= tx && 0 <= ty => m.zone(Tile::new(tx, ty)),
-        _ => crate::pathing::zones::ZoneId::OFF_MAP,
+        _ => ZoneId::OFF_MAP,
     };
     let low = tile_zone.byte();
-    if u32::from(low) == zone {
+    if u16::from(low) == zone.get() {
         return Ok(true);
     }
     let Some(m) = zone_map else {
         return Ok(false);
     };
     m.adjacent(
-        crate::pathing::zones::ZoneId::new(u16::from(low)),
-        crate::pathing::zones::ZoneId::new((zone & 0xff) as u16),
+        ZoneId::new(u16::from(low)),
+        ZoneId::new(u16::from(zone.byte())),
     )
     .ok_or(GenieError::unreachable("a zone adjacency past its table"))
 }
@@ -253,25 +254,18 @@ impl<'a> MapShore<'a> {
 }
 
 impl Shore for MapShore<'_> {
-    fn zone(&mut self, tile: Tile) -> Result<crate::pathing::zones::ZoneId, GenieError> {
+    fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError> {
         if tile.x() < 0 || tile.y() < 0 {
-            return Ok(crate::pathing::zones::ZoneId::OFF_MAP);
+            return Ok(ZoneId::OFF_MAP);
         }
-        Ok(self
-            .zone_map()?
-            .map_or(crate::pathing::zones::ZoneId::OFF_MAP, |m| m.zone(tile)))
+        Ok(self.zone_map()?.map_or(ZoneId::OFF_MAP, |m| m.zone(tile)))
     }
 
     fn near(&mut self, zone: u8, reach: Distance) -> Result<bool, GenieError> {
         let tile = self.tile;
-        Ok(self.zone_map()?.is_some_and(|m| {
-            m.near(
-                crate::pathing::zones::ZoneId::new(u16::from(zone)),
-                tile,
-                reach,
-            )
-            .is_some()
-        }))
+        Ok(self
+            .zone_map()?
+            .is_some_and(|m| m.near(ZoneId::new(u16::from(zone)), tile, reach).is_some()))
     }
 
     fn flags(&self, tile: Tile) -> TerrainFlags {

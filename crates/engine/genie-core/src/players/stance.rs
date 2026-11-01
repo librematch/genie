@@ -28,6 +28,18 @@ impl Stance {
         self.0
     }
 
+    /// The stance GAME's diplomacy (`FUN_141639690`) sets for the command's relation `value`:
+    /// 0 an ally's, 1 a neutral's, 3 and 4 an enemy's; another none, which changes nothing.
+    #[must_use]
+    pub const fn of_diplomacy(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::ALLY),
+            1 => Some(Self::NEUTRAL),
+            3 | 4 => Some(Self::ENEMY),
+            _ => None,
+        }
+    }
+
     /// `FUN_1416397d0`'s relation for the stance: 1 and 2 an enemy's (relation 4 while
     /// `FUN_1415e8e10` holds: the world's `+0x820` object in its state 1, which the slice does
     /// not hold, as the task finder's [`crate::unit_ai::task_finder::allied`]), 3 a neutral's,
@@ -72,5 +84,24 @@ mod tests {
         assert_eq!(relation(5), Some(Relation::ALLY));
         assert_eq!(relation(6), None);
         assert_eq!(Stance::ALLY.get(), 4);
+    }
+
+    /// GAME's diplomacy: relation 0 an ally's stance, 1 a neutral's, 3 and 4 an enemy's, 2 and
+    /// the others none.
+    #[test]
+    fn a_diplomacy_command_s_relation_makes_its_stance() {
+        let stances = [0, 1, 2, 3, 4, 5, u32::MAX].map(Stance::of_diplomacy);
+        assert_eq!(
+            stances,
+            [
+                Some(Stance::ALLY),
+                Some(Stance::NEUTRAL),
+                None,
+                Some(Stance::ENEMY),
+                Some(Stance::ENEMY),
+                None,
+                None
+            ]
+        );
     }
 }

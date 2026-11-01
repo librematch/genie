@@ -94,7 +94,7 @@ impl Attack {
         }
         let mut posted = Vec::new();
         let begun = a.begin(
-            (e, e.gap.get()),
+            (e, e.gap),
             (true, PlayerId::GAIA),
             mover,
             &mut posted,
@@ -240,7 +240,7 @@ impl Attack {
     /// [`NO_RANGE`]: crate::combat::attack::NO_RANGE
     pub(super) fn begin(
         &mut self,
-        (e, reach_gap): (&Engagement, f32),
+        (e, reach_gap): (&Engagement, Distance),
         (visible, target_owner): (bool, PlayerId),
         mover: &mut Mover,
         posted: &mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>,
@@ -262,7 +262,7 @@ impl Attack {
                 posted.push((crate::unit_ai::NotifyKind::TOO_CLOSE, [-1; 3]));
             }
             failed_first = !movable;
-        } else if !crate::math::fmath::at_most_or_unordered(reach_gap, self.reach().get()) {
+        } else if !crate::math::fmath::at_most_or_unordered(reach_gap.get(), self.reach().get()) {
             if !self.sub_action {
                 posted.push((crate::unit_ai::NotifyKind::OUT_OF_REACH, [0; 3]));
             }

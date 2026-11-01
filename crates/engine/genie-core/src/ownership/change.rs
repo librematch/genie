@@ -50,7 +50,7 @@ impl World {
             return Ok(());
         }
         let unit = self.players.player_mut(q)?.objects.swap_remove(j)?;
-        let handed = self.hand_over_attributes(q.index(), 0, &unit);
+        let handed = self.hand_over_attributes(q, PlayerId::GAIA, &unit);
         // the old owner's remove and Gaia's add (slots 0x2d8, 0x2d0) move it between the
         // trackers; a building whose build points reach its build time completes in Gaia's
         // (`FUN_1411cd860`, `COMISS`/`JC`: a NaN does not)
@@ -133,7 +133,7 @@ impl World {
             self.unrecord(id);
         }
         if state == ObjectState::Alive {
-            lose_built_storage(self.players.player_mut(old)?, &master, held, amount.get())?;
+            lose_built_storage(self.players.player_mut(old)?, &master, held, amount)?;
         }
         if state == ObjectState::Foundation {
             self.foundation_sight_off(id, placed)?;
@@ -151,7 +151,7 @@ impl World {
         }
         if state == ObjectState::Alive {
             self.built_with_new_owner(owner, id, &master, rice)?;
-            gain_built_storage(self.players.player_mut(owner)?, &master, held, amount.get())?;
+            gain_built_storage(self.players.player_mut(owner)?, &master, held, amount)?;
         }
         self.garrison_leaves(owner, id)?;
         if state < ObjectState::Dying {
@@ -301,7 +301,7 @@ impl World {
         let idx = self.put_back_own(old, unit)?;
         Ok(if changed? {
             let unit = self.players.player_mut(old)?.objects.swap_remove(idx)?;
-            let handed = self.hand_over_attributes(old.index(), new.index(), &unit);
+            let handed = self.hand_over_attributes(old, new, &unit);
             let master_id = unit.life.master_id;
             self.players.player_mut(new)?.objects.push(unit);
             self.track_remove(old, id, master_id)?;
@@ -392,8 +392,8 @@ impl World {
     /// moves come between the first two, which nothing here reads.
     pub(crate) fn hand_over_attributes(
         &mut self,
-        old: usize,
-        new: usize,
+        old: PlayerId,
+        new: PlayerId,
         u: &Unit,
     ) -> Result<(), GenieError> {
         let Some(m) = u.own_master.as_deref() else {
@@ -403,16 +403,16 @@ impl World {
             if let Some(kind) = kind
                 && matches!(flag, 2 | 16 | 32)
             {
-                self.players[old].add_attribute(kind, -amount)?;
+                self.players[old.index()].add_attribute(kind, -amount)?;
             }
         }
-        count_class(&mut self.players[old].attributes, m, -1.0);
-        count_class(&mut self.players[new].attributes, m, 1.0);
+        count_class(&mut self.players[old.index()].attributes, m, -1.0);
+        count_class(&mut self.players[new.index()].attributes, m, 1.0);
         for &(kind, amount, flag) in &m.storage {
             if let Some(kind) = kind
                 && matches!(flag, 1 | 2 | 32)
             {
-                self.players[new].add_attribute(kind, amount)?;
+                self.players[new.index()].add_attribute(kind, amount)?;
             }
         }
         Ok(())
@@ -508,7 +508,7 @@ pub(crate) fn lose_built_storage(
     p: &mut Player,
     master: &Master,
     held: Option<AttributeId>,
-    amount: f32,
+    amount: Amount,
 ) -> Result<(), GenieError> {
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
@@ -519,7 +519,7 @@ pub(crate) fn lose_built_storage(
     }
     // The population headroom attribute, which a building's held amount gives (`+0x308` 4).
     if held == Some(attribute::HEADROOM) {
-        p.add_attribute(attribute::HEADROOM, Amount::new(-amount))?;
+        p.add_attribute(attribute::HEADROOM, -amount)?;
     }
     Ok(())
 }
@@ -534,7 +534,7 @@ pub(crate) fn gain_built_storage(
     p: &mut Player,
     master: &Master,
     held: Option<AttributeId>,
-    amount: f32,
+    amount: Amount,
 ) -> Result<(), GenieError> {
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
@@ -544,7 +544,7 @@ pub(crate) fn gain_built_storage(
         }
     }
     if held == Some(attribute::HEADROOM) {
-        p.add_attribute(attribute::HEADROOM, Amount::new(amount))?;
+        p.add_attribute(attribute::HEADROOM, amount)?;
     }
     Ok(())
 }

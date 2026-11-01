@@ -354,7 +354,7 @@ impl Unit {
             ));
         };
         gather.carry_to = site;
-        gather.set_drop(at, Distance::new(gap), mover, &walks)?;
+        gather.set_drop(at, gap, mover, &walks)?;
         Ok(site.filter(|_| site != carry_to))
     }
 
@@ -396,7 +396,7 @@ impl Unit {
             ));
         };
         hunt.carry_to = site;
-        hunt.set_drop(at, Distance::new(gap), mover, &walks)?;
+        hunt.set_drop(at, gap, mover, &walks)?;
         Ok(site.filter(|_| site != carry_to))
     }
 
@@ -410,7 +410,7 @@ impl Unit {
         others: OthersRef<'_>,
         carry_to: Option<ObjectId>,
         state: ActionState,
-    ) -> Result<(Option<ObjectId>, f32), GenieError> {
+    ) -> Result<(Option<ObjectId>, Distance), GenieError> {
         let master = self.master_in(c.masters)?;
         let mover = self
             .body
@@ -435,7 +435,7 @@ impl Unit {
             };
         }
         let Some(site) = site else {
-            return Ok((None, 0.0));
+            return Ok((None, Distance::ZERO));
         };
         let ground = mover.stats.radius.ground();
         let s = c
@@ -444,7 +444,7 @@ impl Unit {
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         Ok((
             Some(site),
-            (footprint_gap(self.position(), ground, s.position, s.radius)).get(),
+            footprint_gap(self.position(), ground, s.position, s.radius),
         ))
     }
 

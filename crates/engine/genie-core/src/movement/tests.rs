@@ -1371,13 +1371,14 @@ fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
         Footprint::new(0.5, 0.5),
     );
     assert!((annex - Distance::new(0.8)).get().abs() < 1e-6);
-    assert_eq!(gap, (annex - Distance::new(ANNEX_GAP)).get());
+    assert_eq!(gap, annex - ANNEX_GAP);
     // not a gate: its own
     let mut post = gate;
     post.class = class::WALL;
     assert_eq!(
-        gate_gap(&world, near, (object_id(100), &post), own, |g| g - 1.0),
-        own.get()
+        gate_gap(&world, near, (object_id(100), &post), own, |g| g
+            - Distance::new(1.0)),
+        own
     );
 }
 

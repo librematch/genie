@@ -314,7 +314,7 @@ impl World {
         )?;
         let search = crate::unit_ai::Search {
             at: u.position().ground(),
-            radius: Distance::new(radius),
+            radius,
             classes,
             size: master.radius,
             pick: crate::unit_ai::Pick::Look,

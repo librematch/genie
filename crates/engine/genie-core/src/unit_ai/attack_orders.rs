@@ -11,6 +11,7 @@ use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
@@ -69,7 +70,7 @@ impl UnitAi {
             None => self.clear_notifies(Millis::ZERO)?,
         }
         let front = *self.orders.checked(0)?;
-        if self.process_order(&front, world, place, ai, side)? != 0xe {
+        if self.process_order(&front, world, place, ai, side)? != OrderOutcome::NotReady {
             let _ = self.orders.remove(0);
         }
         Ok(())

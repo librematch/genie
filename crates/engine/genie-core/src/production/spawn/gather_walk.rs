@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::GatherPoint;
+use crate::garrison::InsideCount;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Stream;
@@ -19,6 +20,10 @@ use crate::world::slots::PlayerSlots;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+
+/// A building takes in its own gather point's new unit at once while it holds fewer than these
+/// (10, `FUN_140ace9c0`'s test) or fewer than its capacity.
+const FORCED_ENTRY_BELOW: InsideCount = InsideCount::new(10);
 
 impl World {
     /// `FUN_140ace9c0` with a gather point without a target, and an unloaded unit's move
@@ -207,9 +212,9 @@ impl World {
         if g.target == Some(building)
             && let Some((bp, b)) = self.object(building)
         {
-            let room = i32::from(b.master(&self.masters, bp)?.garrison.get());
+            let room = b.master(&self.masters, bp)?.garrison;
             let held = self.garrisoned(b.id)?;
-            if held < 10 || held < room {
+            if held < FORCED_ENTRY_BELOW || held.below(room) {
                 return self.enter_forced(p, new, building);
             }
         }

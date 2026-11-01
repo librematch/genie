@@ -9,6 +9,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::{
     CIVILIAN, DEFENDLESS_MASTER, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI,
@@ -78,9 +79,9 @@ impl UnitAi {
         place: Option<(Point, Option<ClassId>)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<u32, GenieError> {
+    ) -> Result<OrderOutcome, GenieError> {
         if !o.ready {
-            return Ok(0xe);
+            return Ok(OrderOutcome::NotReady);
         }
         let place = world
             .as_ref()
@@ -151,7 +152,7 @@ impl UnitAi {
             _ => false,
         };
         if !taken {
-            return Ok(0);
+            return Ok(OrderOutcome::NotTaken);
         }
         Ok(self.order_tail(Some(o.order), o.priority, class, attack_move, ai))
     }
@@ -286,12 +287,12 @@ impl UnitAi {
         class: Option<ClassId>,
         attack_move: bool,
         ai: &mut Well512,
-    ) -> u32 {
+    ) -> OrderOutcome {
         if order == Some(OrderKind::Stop) {
             self.leave_patrol_timers(ai);
             self.current_order = None;
             self.order_priority = OrderPriority::NONE;
-            return 1;
+            return OrderOutcome::Taken;
         }
         let new = if order == Some(OrderKind::AttackRoundup) || attack_move {
             self.leave_patrol_timers(ai);
@@ -308,7 +309,7 @@ impl UnitAi {
         };
         self.current_order = new;
         self.order_priority = priority;
-        1
+        OrderOutcome::Taken
     }
 
     /// Slot 400 as the full update stands: the target of the unit's top action now

@@ -39,6 +39,7 @@ mod notifies;
 mod notify_kind;
 mod order_kind;
 mod order_kinds;
+mod order_outcome;
 mod order_priority;
 mod process_order;
 mod retarget;
@@ -108,6 +109,7 @@ pub use self::issuer::Issuer;
 pub use self::notifies::Inbox;
 pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;
+pub use self::order_outcome::OrderOutcome;
 pub use self::order_priority::OrderPriority;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{

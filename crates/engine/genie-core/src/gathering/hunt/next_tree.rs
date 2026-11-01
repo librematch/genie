@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::gathering::hunt::HuntRetarget;
+use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
@@ -27,14 +28,14 @@ impl Unit {
     pub(crate) fn hunt_tree_search(
         &mut self,
         c: &mut Step<'_>,
-        within: Option<f32>,
-        near: Option<f32>,
+        within: Option<Distance>,
+        near: Option<Distance>,
     ) -> Result<bool, GenieError> {
         // NaN compares false as the game's `comiss` does
-        let beyond = |a: Position, b: Position, limit: f32| {
+        let beyond = |a: Position, b: Position, limit: Distance| {
             let (dx, dz, dy) = (a.x() - b.x(), a.z() - b.z(), a.y() - b.y());
             let d = crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy);
-            d.partial_cmp(&limit) != Some(std::cmp::Ordering::Less)
+            d.partial_cmp(&limit.get()) != Some(std::cmp::Ordering::Less)
         };
         let hunt = self.actions.hunt().expect("the caller's");
         if let Some(within) = within
@@ -64,7 +65,7 @@ impl Unit {
                 self.position().z() - t.position().z(),
                 self.position().y() - t.position().y(),
             );
-            if near < crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy) {
+            if near.get() < crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy) {
                 return Ok(false);
             }
         }

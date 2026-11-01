@@ -16,6 +16,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
+use crate::pathing::zones::ZoneId;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
 
@@ -152,7 +153,7 @@ impl crate::world::World {
         let restriction = unit.master(&self.masters, p)?.terrain_restriction;
         let (x, y) = (t.point.x(), t.point.y());
         let zone = if x == NONE {
-            u32::MAX
+            None
         } else {
             let mut shore = MapShore::new(
                 &self.spatial,
@@ -161,7 +162,7 @@ impl crate::world::World {
                 restriction,
                 unit.position(),
             )?;
-            u32::from(shore.zone(t.point.tile())?.get())
+            Some(shore.zone(t.point.tile())?)
         };
         let count = self.unload_all(p, i, zone)?;
         let computer = self.players.player(p)?.computer;
@@ -219,8 +220,8 @@ impl crate::world::World {
         Ok(())
     }
 
-    /// `FUN_141191b40`: the objects inside the transport at (`p`, `i`) go ashore in `zone` (−1
-    /// for any), from the last in: each where a drop location is free ([`World::drop_location`])
+    /// `FUN_141191b40`: the objects inside the transport at (`p`, `i`) go ashore in `zone` (none,
+    /// the game's −1, for any), from the last in: each where a drop location is free ([`World::drop_location`])
     /// about the last spot one took (the first: the transport's place and radii), else about the
     /// spot before, and so on back; one that finds none stays inside, and so does every one
     /// after it (the spots are used up). A unit put ashore ([`World::come_ashore`]) makes its
@@ -230,7 +231,7 @@ impl crate::world::World {
         &mut self,
         p: PlayerId,
         i: ListIndex,
-        zone: u32,
+        zone: Option<ZoneId>,
     ) -> Result<u8, GenieError> {
         const SPOTS: usize = 0x1d;
         let ship = &self.players.player(p)?.objects[i];
@@ -293,7 +294,7 @@ impl crate::world::World {
         id: ObjectId,
         made: &crate::objects::masters::Master,
         around: Around,
-        zone: u32,
+        zone: Option<ZoneId>,
         last: &mut Option<Point>,
     ) -> Result<Option<Point>, GenieError> {
         let ship = &self.players.player(p)?.objects[i];
@@ -304,7 +305,7 @@ impl crate::world::World {
             .as_ref()
             .ok_or(crate::pathing::zones::NO_TERRAIN)?;
         let zone_map = match restriction {
-            Some(r) if zone != u32::MAX => {
+            Some(r) if zone.is_some() => {
                 let values = terrain
                     .restriction(r)
                     .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;

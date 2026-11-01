@@ -147,6 +147,7 @@ use crate::unit_ai::Attackers;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
@@ -3501,7 +3502,12 @@ fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(6.0));
     let world = t.clone();
-    t.unit_order(player_id(1), &object_ids([9175]), 6).unwrap();
+    t.unit_order(
+        player_id(1),
+        &object_ids([9175]),
+        UnitOrderAction::DropOffSearch,
+    )
+    .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     let g = v
         .actions
@@ -3521,7 +3527,12 @@ fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
     for masters in &mut t.masters {
         masters.get_mut(master_id(120)).unwrap().drop_sites = vec![ids::ID_45, ids::TOWN_CENTRE];
     }
-    t.unit_order(player_id(1), &object_ids([9175]), 6).unwrap();
+    t.unit_order(
+        player_id(1),
+        &object_ids([9175]),
+        UnitOrderAction::DropOffSearch,
+    )
+    .unwrap();
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
             .actions
@@ -3534,7 +3545,12 @@ fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
     for i in [2, 3] {
         t.players[1].objects[ListIndex::new(i)].life.state = ObjectState::Unfinished;
     }
-    t.unit_order(player_id(1), &object_ids([9175]), 6).unwrap();
+    t.unit_order(
+        player_id(1),
+        &object_ids([9175]),
+        UnitOrderAction::DropOffSearch,
+    )
+    .unwrap();
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)]
             .actions
@@ -5870,7 +5886,7 @@ fn a_hunt_that_lost_its_tree_takes_the_next_one() {
         })
     };
     let mut t = lumber_world(31.5);
-    assert_eq!(search(&mut t, Some(8.0), None), Ok(true));
+    assert_eq!(search(&mut t, Some(Distance::new(8.0)), None), Ok(true));
     let h = t.players[1].objects[ListIndex::new(0)]
         .actions
         .hunt()
@@ -5890,8 +5906,8 @@ fn a_hunt_that_lost_its_tree_takes_the_next_one() {
         .hunt_mut()
         .unwrap()
         .point = Position::new(40.0, 89.5, 0.0);
-    assert_eq!(search(&mut t, Some(8.0), None), Ok(false));
-    assert_eq!(search(&mut t, None, Some(1.5)), Ok(false));
+    assert_eq!(search(&mut t, Some(Distance::new(8.0)), None), Ok(false));
+    assert_eq!(search(&mut t, None, Some(Distance::new(1.5))), Ok(false));
     let mut t = lumber_world(31.5);
     for i in [2, 3] {
         t.players[0].objects[ListIndex::new(i)].life.amount = Amount::ZERO;
@@ -6790,7 +6806,7 @@ fn a_queued_build_order_builds_and_leaves_a_patrol_order() {
         (PlayerId::new(1), ListIndex::new(0)),
         |ai, at, side, _, rng| {
             let r = ai.process_order(&order, Some((at, false)), None, rng, side)?;
-            assert_eq!(r, 1);
+            assert_eq!(r, OrderOutcome::Taken);
             Ok(())
         },
     )
@@ -7067,8 +7083,18 @@ fn a_unit_order_drop_off_takes_any_player_s_unit() {
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     (v.life.attribute_type, v.life.amount) = (Some(attribute::WOOD), Amount::new(5.0));
     let before = t.players[1].objects[ListIndex::new(0)].clone();
-    t.unit_order(player_id(1), &object_ids([9175]), 8).unwrap();
-    t.unit_order(player_id(0), &object_ids([9175]), 8).unwrap();
+    t.unit_order(
+        player_id(1),
+        &object_ids([9175]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
+    t.unit_order(
+        player_id(0),
+        &object_ids([9175]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
     assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
 }
 
@@ -12130,10 +12156,12 @@ fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
     t.players[0].attributes[4] = Amount::new(5.0);
     t.players[0].attributes[40] = Amount::new(2.0);
     let mut u = hands_unit(1, master_id(4));
-    t.hand_over_attributes(0, 1, &u).unwrap();
+    t.hand_over_attributes(PlayerId::GAIA, PlayerId::new(1), &u)
+        .unwrap();
     assert_eq!(t.players[0].attributes[4], Amount::new(5.0));
     u.own_master = hands_masters()[0].get(master_id(4)).cloned().map(Box::new);
-    t.hand_over_attributes(0, 1, &u).unwrap();
+    t.hand_over_attributes(PlayerId::GAIA, PlayerId::new(1), &u)
+        .unwrap();
     assert_eq!(
         [t.players[0].attributes[4], t.players[0].attributes[40]],
         crate::test_ids::amounts([4.0, 1.0])
@@ -19793,7 +19821,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
         }),
         routes(&t, &unit_order(9, true), PlayerId::new(1), |w| {
             w.human_order(&v);
-            w.unit_order(player_id(1), &v, 9)
+            w.unit_order(player_id(1), &v, UnitOrderAction::Other(9))
         }),
     ];
     assert_eq!(

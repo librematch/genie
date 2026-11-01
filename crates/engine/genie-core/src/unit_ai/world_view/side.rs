@@ -403,7 +403,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         // none about the town centre: the unit AI's own search (slot 0x90)
         let seeker = crate::movement::explore::Seeker {
             at,
-            line_of_sight: Distance::new(line_of_sight),
+            line_of_sight,
             order: ai.current_order,
             target_point: ai.target_point.ground(),
             computer,
@@ -420,13 +420,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let scouted = self.c.w.spatial.scout_map(player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
         area.scouted = scouted;
-        let found = crate::movement::explore::beyond_sight(
-            &mut area,
-            at,
-            Distance::new(line_of_sight),
-            map,
-            rng,
-        )?;
+        let found = crate::movement::explore::beyond_sight(&mut area, at, line_of_sight, map, rng)?;
         // the point found is marked in the scout map (FUN_140f4d5e0 with 1)
         if let Some(t) = found {
             self.c.w.spatial.scout(player, t);

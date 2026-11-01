@@ -479,7 +479,7 @@ const ATTACK_WITHOUT_TARGET: GenieError =
 enum Readiness {
     Ready,
     Waiting,
-    Away(f32),
+    Away(Distance),
 }
 
 #[cfg(test)]

@@ -113,7 +113,7 @@ impl UnitOrderCommand {
                 w.garrison_order(self.player, ids, self.target, self.through_ai, self.nearby)
             }
             UnitOrderAction::Cancel => w.cancel_order(ids, self.param, self.through_ai),
-            action => w.unit_order(self.player, ids, action.byte()),
+            action => w.unit_order(self.player, ids, action),
         }
     }
 }

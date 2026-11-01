@@ -276,7 +276,7 @@ impl Attack {
             // (`set_state` 4); a ready unit only faces it; the swing goes on either way
             AfterHit::Continue { check: true } => {
                 if let Readiness::Away(gap) = self.ready_to_attack(unit, &mut g, f, r, false)? {
-                    self.follow(unit, &mut g, r, f, Distance::new(gap))?;
+                    self.follow(unit, &mut g, r, f, gap)?;
                 }
             }
             AfterHit::Continue { check: false } => {}

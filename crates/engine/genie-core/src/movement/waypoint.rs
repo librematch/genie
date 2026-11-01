@@ -91,9 +91,9 @@ impl Mover {
                         - range)
                         - Distance::new(RANGE_FLOOR);
                     let near = (self.position(), ground_radius);
-                    Distance::new(gate_gap(world, near, (id, t), own, |g| {
-                        (g - range.get()) - RANGE_FLOOR
-                    }))
+                    gate_gap(world, near, (id, t), own, |g| {
+                        (g - range) - Distance::new(RANGE_FLOOR)
+                    })
                 });
         if goal.target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
             self.clear_bit_2();

@@ -214,7 +214,7 @@ impl UnitView<'_, '_> {
     }
 
     /// What an explorer's searches ask of the world, the map's size and the unit's line of sight.
-    pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, f32), GenieError> {
+    pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, Distance), GenieError> {
         let unit = &*self.unit;
         let master = unit.master(&self.c.w.masters, self.player)?;
         let mover = unit.body.mover().ok_or(GenieError::unsupported(
@@ -259,7 +259,7 @@ impl UnitView<'_, '_> {
             reach: master.line_of_sight - LOS_MARGIN,
             scouted: false,
         };
-        Ok((area, map, master.line_of_sight.get()))
+        Ok((area, map, master.line_of_sight))
     }
 }
 

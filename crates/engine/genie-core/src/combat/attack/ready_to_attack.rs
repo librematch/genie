@@ -47,7 +47,7 @@ impl Attack {
         match self.ready_to_attack(unit, g, f, r, false)? {
             Readiness::Ready => self.set_swing(unit, g, f, r),
             Readiness::Waiting => Ok(()),
-            Readiness::Away(gap) => self.follow(unit, g, r, f, Distance::new(gap)),
+            Readiness::Away(gap) => self.follow(unit, g, r, f, gap),
         }
     }
 
@@ -139,7 +139,7 @@ impl Attack {
         }
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
         let gap = crate::movement::gate_gap(g.map, (at, ground), (target, &t), gap, |g| g);
-        if self.reach() < Distance::new(gap) {
+        if self.reach() < gap {
             if !self.sub_action {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
             }

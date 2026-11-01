@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::UnitOrderAction;
 use crate::commands::UnloadPick;
 use crate::construction::build::BuildState;
 use crate::gathering::gather::GatherState;
@@ -432,7 +433,12 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         resource_types: vec![attribute::WOOD],
         ..crate::unit_ai::task_finder::DropSite::default()
     }];
-    t.unit_order(player_id(0), &object_ids([10]), 8).unwrap();
+    t.unit_order(
+        player_id(0),
+        &object_ids([10]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
     let build = t.players[0].objects[ListIndex::new(0)]
         .actions
         .build()
@@ -473,7 +479,12 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     );
     // no table entry for wood: back to the foundation
     let mut t = world();
-    t.unit_order(player_id(0), &object_ids([10]), 8).unwrap();
+    t.unit_order(
+        player_id(0),
+        &object_ids([10]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
     let build = t.players[0].objects[ListIndex::new(0)]
         .actions
         .build()
@@ -490,7 +501,12 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     // carrying nothing: not ordered
     let mut t = world();
     t.players[0].objects[ListIndex::new(0)].life.amount = Amount::ZERO;
-    t.unit_order(player_id(0), &object_ids([10]), 8).unwrap();
+    t.unit_order(
+        player_id(0),
+        &object_ids([10]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
@@ -507,7 +523,8 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         resource_types: vec![attribute::WOOD],
         ..crate::unit_ai::task_finder::DropSite::default()
     }];
-    t.unit_order(player_id(0), &object_ids([10]), 7).unwrap();
+    t.unit_order(player_id(0), &object_ids([10]), UnitOrderAction::DropOff)
+        .unwrap();
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
@@ -516,7 +533,12 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         Some((BuildState::Drop, Some(object_id(503))))
     );
     let mut t = world();
-    t.unit_order(player_id(0), &object_ids([10]), 6).unwrap();
+    t.unit_order(
+        player_id(0),
+        &object_ids([10]),
+        UnitOrderAction::DropOffSearch,
+    )
+    .unwrap();
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)]
             .actions
@@ -524,7 +546,10 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             .map(|b| b.state),
         Some(BuildState::Work)
     );
-    assert!(t.unit_order(player_id(0), &object_ids([10]), 3).is_err());
+    assert!(
+        t.unit_order(player_id(0), &object_ids([10]), UnitOrderAction::Gather)
+            .is_err()
+    );
 }
 
 /// The work command's Attack (`0x140a7f8c0`) of a soldier that may move, touching Gaia's
@@ -4547,7 +4572,8 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
 #[test]
 fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
     let mut t = foraging();
-    t.unit_order(player_id(1), &object_ids([9175]), 7).unwrap();
+    t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
+        .unwrap();
     let g = t.players[1].objects[ListIndex::new(0)]
         .actions
         .gather()
@@ -4567,7 +4593,8 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
         .actions
         .gather()
         .copied();
-    t.unit_order(player_id(1), &object_ids([9175]), 7).unwrap();
+    t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
+        .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(v.actions.gather().copied(), before);
     let ai = v.ai.as_ref().expect("the forager's unit AI");
@@ -4582,7 +4609,12 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
         .gather_mut()
         .unwrap();
     (g.target, g.point) = (None, Position::new(NO_POINT, NO_POINT, 0.0));
-    t.unit_order(player_id(1), &object_ids([9175]), 8).unwrap();
+    t.unit_order(
+        player_id(1),
+        &object_ids([9175]),
+        UnitOrderAction::DropOffAndBack,
+    )
+    .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
         v.actions.gather().map(|g| (g.carry_to, g.state)),
@@ -4603,7 +4635,8 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
     // the sprites' table of the world holds none
     hunt.task.sprites = TaskSprites::NONE;
     v.actions.set_hunt(Some(hunt));
-    t.unit_order(player_id(1), &object_ids([9175]), 7).unwrap();
+    t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
+        .unwrap();
     let h = t.players[1].objects[ListIndex::new(0)]
         .actions
         .hunt()
@@ -4627,7 +4660,7 @@ fn a_drop_off_order_fails_on_what_it_does_not_hold() {
     t.players[1].objects[ListIndex::new(0)].unmodelled_action =
         Some(GenieError::unsupported("a test's action"));
     assert_eq!(
-        t.unit_order(player_id(1), &object_ids([9175]), 7)
+        t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
             .err()
             .map(|e| e.reason()),
         Some("a UNIT_ORDER drop-off of an action not held")
@@ -4635,8 +4668,12 @@ fn a_drop_off_order_fails_on_what_it_does_not_hold() {
     let mut t = foraging();
     t.players[1].objects[ListIndex::new(0)].life.amount = Amount::ZERO;
     let before = t.players[1].objects[ListIndex::new(0)].clone();
-    t.unit_order(player_id(1), &object_ids([9175, 12345]), 7)
-        .unwrap();
+    t.unit_order(
+        player_id(1),
+        &object_ids([9175, 12345]),
+        UnitOrderAction::DropOff,
+    )
+    .unwrap();
     assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
 }
 

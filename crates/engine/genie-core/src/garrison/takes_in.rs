@@ -1,6 +1,7 @@
 //! A building's test whether it takes a unit in (`FUN_14120eb10`), its room and what it holds.
 
 use crate::GenieError;
+use crate::garrison::InsideCount;
 use crate::garrison::{CLASS_FLAGS, ClassFlags, LEAST_HP_SHARE};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -115,12 +116,12 @@ impl World {
         b: &crate::objects::unit::Unit,
         unit: Option<ObjectId>,
     ) -> Result<bool, GenieError> {
-        let capacity = i32::from(b.master(&self.masters, bp)?.garrison.get());
+        let capacity = b.master(&self.masters, bp)?.garrison;
         let with = match unit {
-            Some(u) => self.garrisoned(u)? + 1,
-            None => 1,
+            Some(u) => self.garrisoned(u)?.plus(InsideCount::ONE),
+            None => InsideCount::ONE,
         };
-        Ok(self.garrisoned(b.id)? + with <= capacity)
+        Ok(self.garrisoned(b.id)?.plus(with).within(capacity))
     }
 }
 
@@ -216,7 +217,7 @@ impl World {
     /// running `raider_build_countdown` (`+0x9a0`, `FUN_1411cb850`/`FUN_1411d6ad0`). Not
     /// modelled: an object inside that holds others (the slice reads no `+0x9a8`) and, in a
     /// building, a unit with its countdown set (`+0xc2c`, which the slice does not keep).
-    pub(crate) fn garrisoned(&self, building: ObjectId) -> Result<i32, GenieError> {
+    pub(crate) fn garrisoned(&self, building: ObjectId) -> Result<InsideCount, GenieError> {
         let holds = |id: ObjectId| {
             self.players.iter().any(|q| {
                 q.objects
@@ -250,6 +251,6 @@ impl World {
                 count += 1;
             }
         }
-        Ok(count)
+        Ok(InsideCount::new(count))
     }
 }
