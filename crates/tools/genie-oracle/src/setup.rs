@@ -233,8 +233,8 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     // the world's load resets every player's (FUN_140c90040), then a wonder's
                     // action in state 7 sets its time (its load, FUN_140ae8fa0)
                     wonder: wonder_time(p),
-                    ruins: p.world_player().ruin_held_time,
-                    artifacts: p.world_player().artifact_held_time,
+                    ruins: Seconds::new(p.world_player().ruin_held_time),
+                    artifacts: Seconds::new(p.world_player().artifact_held_time),
                 },
             }
         })
@@ -453,7 +453,7 @@ fn stop_all(turns: &mut World, e: &genie_core::GenieError) {
 /// (`TRIBE_Action_Wonder`, type 120) of the player's objects, live then sleeping, in its load
 /// (`FUN_140ae8fa0`) when in state 7 sets its timer (`mTimer`, `+0x44`) where it is less or the
 /// countdown below 0 (`FUN_140c91500`).
-pub(super) fn wonder_time(p: &PlayerSection<'_>) -> f32 {
+pub(super) fn wonder_time(p: &PlayerSection<'_>) -> Seconds {
     let mut countdown = -1.0;
     for o in p.live_objects().chain(p.sleeping_objects()) {
         let Some(actions) = o.actions() else {
@@ -470,7 +470,7 @@ pub(super) fn wonder_time(p: &PlayerSection<'_>) -> f32 {
             }
         }
     }
-    countdown
+    Seconds::new(countdown)
 }
 
 /// A player's ghosts (its doppelganger list) as saved: each one's id, place, state, the original's

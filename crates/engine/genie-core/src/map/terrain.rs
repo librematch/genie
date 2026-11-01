@@ -219,7 +219,7 @@ pub struct Foundation {
     pub terrain_bonus: crate::objects::masters::RestrictionField,
     /// The game's setting `FUN_140ec0cd0` reads at `+0x680` ([`crate::world::World::mode_680`]):
     /// at 1 a foundation without a snow layer goes into the layer, not the terrain.
-    pub mode_680: i32,
+    pub mode_680: crate::world::Mode680,
 }
 
 /// The class bit of a terrain's flags (the `.dat`'s `is_water` byte) in the terrain
@@ -569,7 +569,7 @@ impl Terrain {
                 }
                 let cell = self.layers.checked_mut(i)?;
                 *cell = layer;
-                if into_terrain || layer.is_some() || f.mode_680 != 1 {
+                if into_terrain || layer.is_some() || !f.mode_680.is_one() {
                     *self.kinds.checked_mut(i)? = kind;
                 } else {
                     *cell = Some(kind);
@@ -794,7 +794,7 @@ mod tests {
             master: ids::HOUSE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::of_data(4),
-            mode_680: 0,
+            mode_680: crate::world::Mode680::ZERO,
         })
         .unwrap();
         assert_eq!(t.kinds, ids(&[6, 6, 6, 6]));
@@ -824,7 +824,7 @@ mod tests {
             master: TOWN_CENTRE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::of_data(4),
-            mode_680: 0,
+            mode_680: crate::world::Mode680::ZERO,
         })
         .unwrap();
         #[rustfmt::skip]
@@ -850,7 +850,7 @@ mod tests {
             master: ids::HOUSE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::NONE,
-            mode_680: 0,
+            mode_680: crate::world::Mode680::ZERO,
         })
         .unwrap();
         assert_eq!(t.kinds, ids(&[27, 2, 27, 47]));
@@ -870,7 +870,7 @@ mod tests {
             master: ids::FARM,
             class: class::FARM,
             terrain_bonus: RestrictionField::NONE,
-            mode_680: 1,
+            mode_680: crate::world::Mode680::ONE,
         };
         t.cover(&farm).unwrap();
         assert_eq!(
@@ -898,7 +898,7 @@ mod tests {
             master,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::NONE,
-            mode_680: 1,
+            mode_680: crate::world::Mode680::ONE,
         };
         for master in [master_id(357), master_id(1188)] {
             let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);

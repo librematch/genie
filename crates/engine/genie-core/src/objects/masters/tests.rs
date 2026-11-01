@@ -156,9 +156,9 @@ fn stocked(kind: MasterKind) -> Master {
         ],
         cost: costs(&[(player_attribute::FOOD, 1, true)]),
         damage_graphics: vec![DamageGraphic::default(); 2],
-        damage_graphic_entry: 1,
+        damage_graphic_entry: DamageGraphicEntry::of_data(1),
         train_locations: vec![TrainLocation::default(); 2],
-        train_location_entry: 1,
+        train_location_entry: TrainLocationEntry::of_data(1),
         ..Master::default()
     }
 }
@@ -330,7 +330,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         // the last, the multiply inserts at 2 and selects it
         (
             a::DAMAGE_GRAPHICS_ENTRY_MOD,
-            |m| f32::from(m.damage_graphic_entry) + 10.0 * m.damage_graphics.len() as f32,
+            |m| f32::from(m.damage_graphic_entry.get()) + 10.0 * m.damage_graphics.len() as f32,
             [21.0, 21.0, 32.0],
         ),
         // the add's count is the selected entry (1) plus 2
@@ -341,12 +341,12 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::DAMAGE_GRAPHIC_PERCENT,
-            |m| f32::from(m.damage_graphics[1].percent),
+            |m| f32::from(m.damage_graphics[1].percent.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             a::DAMAGE_GRAPHIC_APPLY_MODE,
-            |m| f32::from(m.damage_graphics[1].apply_mode),
+            |m| f32::from(m.damage_graphics[1].apply_mode.get()),
             [3.0, 5.0, 5.0],
         ),
     ];
@@ -515,7 +515,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             a::HOTKEY_ID,
-            |m| m.train_locations[1].hotkey as f32,
+            |m| m.train_locations[1].hotkey.get() as f32,
             [3.0; 3],
         ),
         (a::MAXIMUM_CHARGE, |m| m.max_charge.get(), [3.0, 5.0, 10.0]),
@@ -635,7 +635,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         // the selected entry plus ten times the count, as the damage sprites'
         (
             a::TRAIN_LOCATIONS_ENTRY_MOD,
-            |m| f32::from(m.train_location_entry) + 10.0 * m.train_locations.len() as f32,
+            |m| f32::from(m.train_location_entry.get()) + 10.0 * m.train_locations.len() as f32,
             [21.0, 21.0, 32.0],
         ),
         (
@@ -916,31 +916,31 @@ fn the_train_location_attributes_change_the_selected_entry() {
         location: Some(master_id(12)),
         time,
         button: LocationButton::of_data(1),
-        hotkey: 16_000,
+        hotkey: crate::production::HotkeyId::of_data(16_000),
     };
     let mut m = of_type(master_type::COMBAT);
     m.train_locations = vec![
         barracks(WholeSeconds::of_data(21)),
         barracks(WholeSeconds::of_data(30)),
     ];
-    m.train_location_entry = 1;
+    m.train_location_entry = TrainLocationEntry::of_data(1);
     m.multiply_attribute(attribute::TRAIN_TIME, 0.9, &world(false));
     // 30 × 0.9 + 0.5 = 27.5
     assert_eq!(m.train_locations[1].time, WholeSeconds::of_data(27));
     m.set_attribute(attribute::TRAIN_LOCATIONS_ENTRY_MOD, 9.0, &world(false));
-    assert_eq!(m.train_location_entry, 1);
+    assert_eq!(m.train_location_entry, TrainLocationEntry::of_data(1));
     // the add's count is the selected entry plus the amount: 1 + 2
     m.add_attribute(attribute::TRAIN_LOCATIONS_TOTAL_NUM, 2.0, &world(false));
     assert_eq!(m.train_locations.len(), 3);
     assert_eq!(m.train_locations[2], m.train_locations[1]);
     m.set_attribute(attribute::TRAIN_LOCATIONS_TOTAL_NUM, -4.0, &world(false));
     assert_eq!(m.train_locations, []);
-    assert_eq!(m.train_location_entry, -1);
+    assert_eq!(m.train_location_entry, TrainLocationEntry::of_data(-1));
     m.train_locations = vec![
         barracks(WholeSeconds::of_data(21)),
         barracks(WholeSeconds::of_data(30)),
     ];
-    m.train_location_entry = 0;
+    m.train_location_entry = TrainLocationEntry::of_data(0);
     // ~(−1) = 0: the first goes, the entry stays at 0
     m.multiply_attribute(attribute::TRAIN_LOCATIONS_ENTRY_MOD, -1.0, &world(false));
     assert_eq!(
@@ -948,7 +948,10 @@ fn the_train_location_attributes_change_the_selected_entry() {
         (1, WholeSeconds::of_data(30))
     );
     m.multiply_attribute(attribute::TRAIN_LOCATIONS_ENTRY_MOD, 5.0, &world(false));
-    assert_eq!((m.train_locations.len(), m.train_location_entry), (2, 1));
+    assert_eq!(
+        (m.train_locations.len(), m.train_location_entry.get()),
+        (2, 1)
+    );
     m.follow(
         attribute::TRAIN_TIME,
         &std::collections::BTreeMap::new(),
@@ -969,14 +972,14 @@ fn the_train_location_attributes_change_the_selected_entry() {
 #[test]
 fn the_damage_sprite_attributes_resize_and_select() {
     let mut m = of_type(master_type::ANIMATED);
-    m.damage_graphic_entry = 2;
+    m.damage_graphic_entry = DamageGraphicEntry::of_data(2);
     m.set_attribute(attribute::DAMAGE_GRAPHICS_TOTAL_NUM, 2.0, &world(false));
     assert_eq!(m.damage_graphics, vec![DamageGraphic::default(); 2]);
-    assert_eq!(m.damage_graphic_entry, 1);
+    assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(1));
     m.set_attribute(attribute::DAMAGE_GRAPHIC, 40.0, &world(false));
     m.set_attribute(attribute::DAMAGE_GRAPHIC_PERCENT, 75.0, &world(false));
     assert_eq!(m.damage_graphics[1].sprite, Some(SpriteId::named(40)));
-    assert_eq!(m.damage_graphics[1].percent, 75);
+    assert_eq!(m.damage_graphics[1].percent, HpPercent::of_data(75));
     m.set_attribute(
         attribute::DAMAGE_GRAPHICS_TOTAL_NUM,
         f32::NAN,
@@ -984,11 +987,11 @@ fn the_damage_sprite_attributes_resize_and_select() {
     );
     assert_eq!(m.damage_graphics.len(), 255);
     m.set_attribute(attribute::DAMAGE_GRAPHICS_TOTAL_NUM, 0.0, &world(false));
-    assert_eq!(m.damage_graphic_entry, 1);
+    assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(1));
     m.damage_graphics = vec![DamageGraphic::default()];
     m.multiply_attribute(attribute::DAMAGE_GRAPHICS_ENTRY_MOD, -3.0, &world(false));
     assert_eq!(m.damage_graphics, []);
-    assert_eq!(m.damage_graphic_entry, 0xff);
+    assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(0xff));
     m.follow(
         attribute::DAMAGE_GRAPHICS_ENTRY_MOD,
         &std::collections::BTreeMap::new(),
@@ -1198,8 +1201,8 @@ fn the_action_and_moving_setters_change_their_values() {
         m.trail,
         Trail {
             unit: MasterField::of(Some(master_id(1302))),
-            mode: 3,
-            density: 3.0
+            mode: TrailMode::of_data(3),
+            density: TrailDensity::new(3.0)
         }
     );
 }

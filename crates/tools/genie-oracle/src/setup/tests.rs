@@ -36,7 +36,7 @@ fn wonder(id: i32, state: u8, timer: f32) -> Object {
 fn a_player_without_a_standing_wonder_has_no_countdown() {
     let save = header(vec![human(vec![combat_object(1, 83), wonder(2, 1, 50.0)])]);
     assert_eq!(
-        wonder_time(&save.players()[0]).to_bits(),
+        wonder_time(&save.players()[0]).get().to_bits(),
         (-1.0_f32).to_bits()
     );
 }
@@ -58,7 +58,7 @@ fn the_countdown_is_the_least_standing_wonders_timer() {
         .object_type_list;
     let save = header(vec![player]);
     assert_eq!(
-        wonder_time(&save.players()[0]).to_bits(),
+        wonder_time(&save.players()[0]).get().to_bits(),
         200.0_f32.to_bits()
     );
 }
@@ -105,8 +105,8 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)
     );
     assert!(p.dropped && !p.resigned);
-    assert_eq!(p.victory_times.ruins.to_bits(), 12.5_f32.to_bits());
-    assert_eq!(p.victory_times.wonder.to_bits(), (-1.0_f32).to_bits());
+    assert_eq!(p.victory_times.ruins.get().to_bits(), 12.5_f32.to_bits());
+    assert_eq!(p.victory_times.wonder.get().to_bits(), (-1.0_f32).to_bits());
     assert_eq!(
         p.objects.iter().map(|u| u.id.get()).collect::<Vec<_>>(),
         [7]

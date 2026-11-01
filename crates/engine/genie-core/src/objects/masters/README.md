@@ -48,8 +48,10 @@ file for what the save does not hold.
 | [`damage_amount.rs`](damage_amount.rs) | An attack's or an armor's amount. |
 | [`damage_class.rs`](damage_class.rs) | An armor or attack entry's class as one type, and the entry: the `.dat`'s armor and attack classes. |
 | [`damage_share.rs`](damage_share.rs) | A master's share of a damage: resisted, reflected, dealt to its own or by its blast. |
+| [`damage_sprite.rs`](damage_sprite.rs) | A master's damage sprite (`DamageGraphic`): its sprite, the hit point share it shows from and how it is applied. |
 | [`derived.rs`](derived.rs) | The values the slice derives from a master after a change (`Master::follow`): the sprites' speed and facets, a moving unit's values. |
 | [`dispatch.rs`](dispatch.rs) | The attribute setters by master type (slots 0x18, 0x20 and 0x28), the master copy (slot 8), the loader's defaults and the selected entries. |
+| [`entries.rs`](entries.rs) | A master's selected entries: the damage sprite (`+0x731`) and the train location (`+0x940`) the effects change. |
 | [`fly_mode.rs`](fly_mode.rs) | A master's fly mode (`+0x608`): where its objects' height goes on the ground. |
 | [`fog_visibility.rs`](fog_visibility.rs) | A master's fog visibility (`+0x605`): whether its objects show in the fog of war. |
 | [`formation_class.rs`](formation_class.rs) | A master's formation category (`+0x8bc`): the sub-formation its units take in a group. |
@@ -79,6 +81,7 @@ file for what the save does not hold.
 | [`run_pattern.rs`](run_pattern.rs) | A master's run pattern (`+0x7b9`). |
 | [`selection_effect.rs`](selection_effect.rs) | A master's selection effect (`+0x684`): how a selected object of it shows. |
 | [`sound_events.rs`](sound_events.rs) | A task's two sound events (`SoundEvents`) and a sound event's id (`SoundEventId`). |
+| [`spacing_modifier.rs`](spacing_modifier.rs) | A master's spacing in a group's formation. |
 | [`special_attack.rs`](special_attack.rs) | A master's special attack (`+0x8d8`): what a hit on its objects or their charge does. |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
 | [`target_owner.rs`](target_owner.rs) | A task's owner type (`+0x18`): whose targets the task is for. |
@@ -89,6 +92,7 @@ file for what the save does not hold.
 | [`task_sprites.rs`](task_sprites.rs) | A task's four sprites (`TaskSprites`). |
 | [`task_terrain.rs`](task_terrain.rs) | A task's terrain (`+0x16`): the terrain a task finder's task is for, or a terrain look task's flag mask. |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`trail.rs`](trail.rs) | A moving master's trail: the master it leaves behind, its mode and its density. |
 | [`tribe_setters.rs`](tribe_setters.rs) | The TRIBE combat and building masters' setters: the costs, the charge, the sprites and the train locations. |
 | [`values.rs`](values.rs) | What the attribute setters share: the caps, the truncations, the sprite and class amounts, the damage sprites' and train locations' entries. |
 | [`volley_spread.rs`](volley_spread.rs) | How far a volley's missiles scatter (`VolleySpread`). |

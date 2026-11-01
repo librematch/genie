@@ -42,7 +42,7 @@ fn human() -> Player {
         attributes: attributes(),
         relations: relation_row([1, 0, 3, 3]),
         victory_times: VictoryTimes {
-            ruins: 0.0,
+            ruins: crate::world::Seconds::ZERO,
             ..VictoryTimes::default()
         },
         ..Player::default()
@@ -396,22 +396,22 @@ fn a_running_victory_timer_keeps_the_player() {
     assert!(!VictoryTimes::default().running());
     for t in [
         VictoryTimes {
-            wonder: 0.0,
+            wonder: crate::world::Seconds::new(0.0),
             ..VictoryTimes::default()
         },
         VictoryTimes {
-            ruins: 12.5,
+            ruins: crate::world::Seconds::new(12.5),
             ..VictoryTimes::default()
         },
         VictoryTimes {
-            artifacts: 0.0,
+            artifacts: crate::world::Seconds::new(0.0),
             ..VictoryTimes::default()
         },
     ] {
         assert!(t.running(), "{t:?}");
     }
     let nan = VictoryTimes {
-        wonder: f32::NAN,
+        wonder: crate::world::Seconds::new(f32::NAN),
         ..VictoryTimes::default()
     };
     assert!(!nan.running());

@@ -231,7 +231,7 @@ pub fn armor_damage(
             sum += v;
         }
     }
-    let least = if attacker.mode_680 == 1 { 0.0 } else { 1.0 };
+    let least = if attacker.mode_680.is_one() { 0.0 } else { 1.0 };
     Ok(HitPoints::new(if weapons.is_empty() {
         sum
     } else if least > sum {

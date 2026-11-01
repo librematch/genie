@@ -389,7 +389,7 @@ pub struct Attacker {
     /// ([`crate::world::World::mode_680`]: at 1 a hit may do no damage).
     pub attack_powerup: f32,
     /// The game's setting `+0x680` ([`crate::world::World::mode_680`]).
-    pub mode_680: i32,
+    pub mode_680: crate::world::Mode680,
     /// Its player and whether its master has a task of action type 0x9a (a kill bonus,
     /// `FUN_1415c6510`).
     pub player: PlayerId,

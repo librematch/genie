@@ -109,7 +109,7 @@ impl Unit {
             speed: self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
             map: c.w.spatial.map,
             dt_seconds: c.dt.seconds(),
-            mode_1: (c.w.mode_680 == 1),
+            mode_1: c.w.mode_680.is_one(),
             busy,
             player,
             class: match class {

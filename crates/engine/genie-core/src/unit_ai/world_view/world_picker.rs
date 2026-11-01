@@ -71,7 +71,7 @@ pub(crate) struct WorldPicker<'a> {
     /// The world's time.
     pub(crate) now: WorldTime,
     /// The game's setting `+0x680`.
-    pub(crate) mode_680: i32,
+    pub(crate) mode_680: crate::world::Mode680,
 }
 
 /// An object the picker reads: its owner, the object, its owner's attributes and its master.

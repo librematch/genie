@@ -62,7 +62,7 @@ impl FormationUnit {
         let full =
             Distance::ZERO < master.height && 0.0 < master.radius.x() && 0.0 < master.radius.y();
         let radius = if COMBAT <= master.kind && full {
-            master.spacing_modifier * master.radius.x()
+            master.spacing_modifier.get() * master.radius.x()
         } else {
             DEFAULT_RADIUS
         };
@@ -811,7 +811,7 @@ mod tests {
                 let m = masters.get_mut(master_id(id)).unwrap();
                 m.radius = Footprint::new(r, r);
                 m.height = Distance::new(1.0);
-                m.spacing_modifier = 1.0;
+                m.spacing_modifier = crate::objects::masters::SpacingModifier::new(1.0);
             }
         }
         t.groups.get_mut(group_id(1)).unwrap().desired_spacing = Distance::ZERO;

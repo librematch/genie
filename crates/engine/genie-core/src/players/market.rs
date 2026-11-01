@@ -11,6 +11,7 @@ use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
+use crate::players::{NetTrades, Price, PriceSwing};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -36,22 +37,22 @@ const ROUND: f32 = crate::math::image::market::ROUND;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Commodity {
     /// Its price in gold (wood `+0x874`, food `+0x878`, stone `+0x87c`, ore `+0x880`).
-    pub price: f32,
+    pub price: Price,
     /// The purchases less the sales (the save's `*_price_delta`: wood `+0x884`, stone `+0x88c`,
     /// food `+0x894`, ore `+0x89c`, an int).
-    pub trades: i32,
+    pub trades: NetTrades,
     /// The swing (the save's `old_*_price_adj`: `+0x888`, `+0x890`, `+0x898`, `+0x8a0`), which
     /// every trade grows by 2.
-    pub swing: f32,
+    pub swing: PriceSwing,
 }
 
 /// The world's market.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Market {
     /// `world_min_price` (`+0x868`): a sale lowers no price below it.
-    pub min_price: f32,
+    pub min_price: Price,
     /// `world_max_price` (`+0x86c`): a purchase raises no price above it.
-    pub max_price: f32,
+    pub max_price: Price,
     /// Food (attribute 0).
     pub food: Commodity,
     /// Wood (attribute 1).
@@ -64,25 +65,25 @@ pub struct Market {
 
 impl Market {
     /// The commodity of attribute `commodity` with its starting price, none for another.
-    const fn commodity(&mut self, commodity: AttributeId) -> Option<(&mut Commodity, f32)> {
+    const fn commodity(&mut self, commodity: AttributeId) -> Option<(&mut Commodity, Price)> {
         match commodity {
-            attribute::FOOD => Some((&mut self.food, FOOD_START)),
-            attribute::WOOD => Some((&mut self.wood, WOOD_START)),
-            attribute::STONE => Some((&mut self.stone, STONE_START)),
-            attribute::ORE => Some((&mut self.ore, ORE_START)),
+            attribute::FOOD => Some((&mut self.food, Price::new(FOOD_START))),
+            attribute::WOOD => Some((&mut self.wood, Price::new(WOOD_START))),
+            attribute::STONE => Some((&mut self.stone, Price::new(STONE_START))),
+            attribute::ORE => Some((&mut self.ore, Price::new(ORE_START))),
             _ => None,
         }
     }
 
     /// `FUN_1415cd3c0`: the price of attribute `commodity`'s commodity, −1 for another.
     #[must_use]
-    pub const fn price(&self, commodity: AttributeId) -> f32 {
+    pub const fn price(&self, commodity: AttributeId) -> Price {
         match commodity {
             attribute::FOOD => self.food.price,
             attribute::WOOD => self.wood.price,
             attribute::STONE => self.stone.price,
             attribute::ORE => self.ore.price,
-            _ => UNKNOWN_PRICE,
+            _ => Price::new(UNKNOWN_PRICE),
         }
     }
 
@@ -97,32 +98,28 @@ impl Market {
         let Some((c, start)) = self.commodity(commodity) else {
             return;
         };
-        c.trades = if buy {
-            c.trades.wrapping_add(1)
-        } else {
-            c.trades.wrapping_sub(1)
-        };
-        if c.trades == 0 {
-            c.swing = 0.0;
+        c.trades = c.trades.traded(buy);
+        if c.trades == NetTrades::ZERO {
+            c.swing = PriceSwing::ZERO;
             c.price = start;
             return;
         }
-        let next = c.swing + SWING;
-        let mut growth = next - c.swing;
+        let next = c.swing.get() + SWING;
+        let mut growth = next - c.swing.get();
         if 0.0 > growth {
             growth *= FLIP;
         }
         let step = cvttss2si(growth) as f32 / PERCENT;
         if buy {
             // ADDSS step, price: a NaN price stays itself (the step is never one)
-            c.price += step;
-            c.swing = next;
+            c.price = c.price.raised(step);
+            c.swing = PriceSwing::new(next);
             if c.price > max {
                 c.price = max;
             }
         } else {
-            c.price -= step;
-            c.swing = next;
+            c.price = c.price.lowered(step);
+            c.swing = PriceSwing::new(next);
             if min > c.price {
                 c.price = min;
             }
@@ -164,7 +161,7 @@ impl World {
             if below_or_unordered(held.get(), volume as f32) {
                 return Ok(());
             }
-            let price = self.market.price(commodity);
+            let price = self.market.price(commodity).get();
             if at_most_or_unordered(price, 0.0) {
                 return Ok(());
             }
@@ -203,7 +200,7 @@ impl World {
                 .player(p)?
                 .attribute(attribute::GOLD)
                 .unwrap_or(Amount::ZERO);
-            let price = self.market.price(commodity);
+            let price = self.market.price(commodity).get();
             if at_most_or_unordered(price, 0.0) {
                 return Ok(());
             }
@@ -232,13 +229,13 @@ mod tests {
 
     fn market() -> Market {
         let at = |price| Commodity {
-            price,
-            trades: 0,
-            swing: 0.0,
+            price: Price::new(price),
+            trades: NetTrades::ZERO,
+            swing: PriceSwing::ZERO,
         };
         Market {
-            min_price: 0.2,
-            max_price: 9.99,
+            min_price: Price::new(0.2),
+            max_price: Price::new(9.99),
             food: at(1.15),
             wood: at(1.0),
             stone: at(1.3),
@@ -256,50 +253,50 @@ mod tests {
         assert_eq!(
             m.wood,
             Commodity {
-                price: 1.0 + 0.02,
-                trades: 1,
-                swing: 2.0,
+                price: Price::new(1.0 + 0.02),
+                trades: NetTrades::new(1),
+                swing: PriceSwing::new(2.0),
             }
         );
         m.trade(attribute::WOOD, true);
         assert_eq!(
-            (m.wood.price, m.wood.trades, m.wood.swing),
+            (m.wood.price.get(), m.wood.trades.get(), m.wood.swing.get()),
             (0.02 + (1.0 + 0.02), 2, 4.0)
         );
         m.trade(attribute::WOOD, false);
         assert_eq!(
-            (m.wood.price, m.wood.trades, m.wood.swing),
+            (m.wood.price.get(), m.wood.trades.get(), m.wood.swing.get()),
             (0.02 + (1.0 + 0.02) - 0.02, 1, 6.0)
         );
         m.trade(attribute::WOOD, false);
         assert_eq!(
             m.wood,
             Commodity {
-                price: 1.0,
-                trades: 0,
-                swing: 0.0,
+                price: Price::new(1.0),
+                trades: NetTrades::new(0),
+                swing: PriceSwing::new(0.0),
             }
         );
         // the stone's start, the bounds, another attribute
-        m.stone.price = 9.98;
+        m.stone.price = Price::new(9.98);
         m.trade(attribute::STONE, true);
         m.trade(attribute::STONE, true);
-        assert_eq!(m.stone.price, 9.99);
+        assert_eq!(m.stone.price.get(), 9.99);
         m.trade(attribute::STONE, false);
         m.trade(attribute::STONE, false);
-        assert_eq!(m.stone.price, 1.3);
-        m.food.price = 0.21;
+        assert_eq!(m.stone.price.get(), 1.3);
+        m.food.price = Price::new(0.21);
         m.trade(attribute::FOOD, false);
         m.trade(attribute::FOOD, false);
-        assert_eq!(m.food.price, 0.2);
+        assert_eq!(m.food.price.get(), 0.2);
         let before = m;
         m.trade(attribute::HEADROOM, true);
-        assert_eq!((m, m.price(attribute::HEADROOM)), (before, -1.0));
+        assert_eq!((m, m.price(attribute::HEADROOM).get()), (before, -1.0));
         // a swing so large that 2 more does not change it: no step
-        m.ore.swing = 1.0e8;
-        m.ore.trades = 5;
+        m.ore.swing = PriceSwing::new(1.0e8);
+        m.ore.trades = NetTrades::new(5);
         m.trade(attribute::ORE, true);
-        assert_eq!((m.ore.price, m.ore.swing), (1.0, 1.0e8));
+        assert_eq!((m.ore.price.get(), m.ore.swing.get()), (1.0, 1.0e8));
     }
 
     /// Player 1 with 100 of each resource, a commodity volume of 100, a fee of 0.3 and the
@@ -340,7 +337,7 @@ mod tests {
             (Amount::new(70.0), Amount::new(70.0))
         );
         assert_eq!(
-            (t.market.wood.price, t.market.wood.trades),
+            (t.market.wood.price.get(), t.market.wood.trades.get()),
             (1.0 - 0.02, -1)
         );
     }
@@ -363,7 +360,7 @@ mod tests {
             (Amount::ZERO, Amount::ZERO)
         );
         assert_eq!(
-            (t.market.food.price, t.market.food.trades),
+            (t.market.food.price.get(), t.market.food.trades.get()),
             (0.02 + 1.15, 1)
         );
         let mut t = trading();

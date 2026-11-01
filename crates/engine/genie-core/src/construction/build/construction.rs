@@ -73,7 +73,7 @@ pub(super) fn lay_foundation(
     master: &Master,
     building: &crate::objects::masters::BuildingMaster,
     stack_master: Option<MasterId>,
-    mode_680: i32,
+    mode_680: crate::world::Mode680,
 ) -> Result<(), GenieError> {
     /// The terrain the pasture master 1889's stack unit on mangrove or rice terrain lays
     /// (`0x3f`).

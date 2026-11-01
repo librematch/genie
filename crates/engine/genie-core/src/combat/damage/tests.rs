@@ -312,7 +312,7 @@ fn a_hunter_strikes_its_sheep_for_twelve() {
         Ok(HitPoints::new(1.0))
     );
     let zero = Attacker {
-        mode_680: 1,
+        mode_680: crate::world::Mode680::ONE,
         ..hunter.source
     };
     assert_eq!(
@@ -1025,7 +1025,7 @@ fn a_building_takes_its_damage_and_at_least_its_least_hit() {
         (crate::objects::DamagedTimer::of_data(60), true, 0)
     );
     // at 1 a hit may do nothing: the least takes 1 more
-    villager.source.mode_680 = 1;
+    villager.source.mode_680 = crate::world::Mode680::ONE;
     let mut h = house();
     h.armored.as_mut().unwrap().armors = vec![ClassAmount::new(4, 10)];
     take(
@@ -1292,7 +1292,7 @@ fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
         ..house()
     };
     let mut villager = hunter();
-    villager.source.mode_680 = 1;
+    villager.source.mode_680 = crate::world::Mode680::ONE;
     // no damage at 1, the least takes it below 1 but its damage did not kill it
     let mut t = trebuchet(HitPoints::new(1.5));
     t.armored.as_mut().unwrap().armors = vec![ClassAmount::new(4, 10)];

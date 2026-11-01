@@ -368,8 +368,12 @@ pub(super) fn work_masters(
             .iter()
             .map(|d| genie_core::objects::masters::DamageGraphic {
                 sprite: SpriteId::of_data(d.temp_id),
-                percent: d.sprite_info_damage_percent,
-                apply_mode: d.sprite_info_flag,
+                percent: genie_core::objects::masters::HpPercent::of_data(
+                    d.sprite_info_damage_percent,
+                ),
+                apply_mode: genie_core::objects::masters::DamageSpriteMode::of_data(
+                    d.sprite_info_flag,
+                ),
             })
             .collect();
         // a master without a combat part has no train locations, whatever its copy's are
@@ -380,7 +384,7 @@ pub(super) fn work_masters(
                     location: MasterId::of_data(t.train_location_id),
                     time: WholeSeconds::of_data(t.train_time),
                     button: LocationButton::of_data(t.button_location_id),
-                    hotkey: t.hotkey_id,
+                    hotkey: genie_core::production::HotkeyId::of_data(t.hotkey_id),
                 })
                 .collect()
         });

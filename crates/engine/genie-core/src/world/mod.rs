@@ -58,6 +58,7 @@ mod after_step;
 mod ai_values;
 mod clock;
 mod forced;
+mod mode_680;
 mod object_step;
 mod options;
 pub mod schedule;
@@ -68,6 +69,7 @@ mod world_update;
 pub use self::ai_values::{LureDestination, Percent, TargetingMode, VillagerGarrison};
 pub use self::clock::{Millis, Seconds, WholeSeconds, WorldTime};
 pub use self::forced::GameState;
+pub use self::mode_680::Mode680;
 pub use self::options::{
     Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
 };
@@ -271,7 +273,7 @@ pub struct World {
     /// they differ. It is not the options' content mode: MarvinBlue/426048731 saves
     /// `mSelectedContentMode` 2 and the tick oracle reads this as 0. Its writer is not located
     /// and the save does not hold it; genie-oracle leaves it at 0.
-    pub mode_680: i32,
+    pub mode_680: Mode680,
     /// The Empire Wars start's pass is due ([`crate::orders::start_work`]): the world's `+0x6c6` is
     /// clear in game mode 13, which a game's start has.
     pub start_work_due: bool,

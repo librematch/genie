@@ -54,7 +54,7 @@ impl World {
             linked_techs: std::collections::BTreeMap::new(),
             settings: crate::world::settings::Settings::default(),
             start_work_due: false,
-            mode_680: 0,
+            mode_680: crate::world::Mode680::ZERO,
             spawned_relics: 0,
             game_state: 0,
             victory_conquest: false,

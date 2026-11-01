@@ -32,7 +32,7 @@ impl World {
     /// (`FUN_140b26630`) with at least one in its tracker's done list (`FUN_14104eea0`).
     #[must_use]
     pub fn has_treason_building(&self, p: PlayerId) -> bool {
-        let castle = if self.mode_680 == 1 {
+        let castle = if self.mode_680.is_one() {
             CASTLE_MODE_1
         } else {
             CASTLE

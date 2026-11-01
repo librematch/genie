@@ -31,6 +31,7 @@ use genie_diff::Diff;
 
 mod button;
 mod costs;
+mod hotkey;
 mod make_obj_state;
 mod make_tech_state;
 pub mod spawn;
@@ -40,6 +41,7 @@ pub use self::costs::{
     as_entry_costs, cost_test, costed, master_costs, pay, refund, refund_master, refund_research,
     refund_tech,
 };
+pub use self::hotkey::HotkeyId;
 pub use self::make_obj_state::MakeObjState;
 pub use self::make_tech_state::MakeTechState;
 
@@ -637,7 +639,7 @@ mod tests {
             location,
             time,
             button,
-            hotkey: 0,
+            hotkey: HotkeyId::of_data(0),
         };
         let locations = [
             at(

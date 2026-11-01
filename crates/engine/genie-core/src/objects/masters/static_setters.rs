@@ -7,8 +7,11 @@ use crate::objects::WorkRate;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::DamageGraphicEntry;
+use crate::objects::masters::DamageSpriteMode;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::GarrisonCapacity;
+use crate::objects::masters::HpPercent;
 use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
 use crate::objects::masters::MasterAttribute;
@@ -25,6 +28,7 @@ use crate::objects::masters::{
     select_entry, set_sprite,
 };
 use crate::objects::masters::{MasterField, MasterId};
+use crate::objects::masters::{TrailDensity, TrailMode};
 use crate::players::Amount;
 use crate::world::Seconds;
 
@@ -148,7 +152,7 @@ impl Master {
             }
             a::DAMAGE_GRAPHICS_ENTRY_MOD => {
                 if let Some(n) = select_entry(self.damage_graphics.len(), cvttss2si(v)) {
-                    self.damage_graphic_entry = n as u8;
+                    self.damage_graphic_entry = DamageGraphicEntry::of_selected(n);
                 }
             }
             a::DAMAGE_GRAPHICS_TOTAL_NUM => {
@@ -160,12 +164,12 @@ impl Master {
             }
             a::DAMAGE_GRAPHIC_PERCENT => {
                 if let Some(g) = self.damage_graphic_mut() {
-                    g.percent = low8(v);
+                    g.percent = HpPercent::of_data(low8(v));
                 }
             }
             a::DAMAGE_GRAPHIC_APPLY_MODE => {
                 if let Some(g) = self.damage_graphic_mut() {
-                    g.apply_mode = low8(v);
+                    g.apply_mode = DamageSpriteMode::of_data(low8(v));
                 }
             }
             _ => {}
@@ -270,14 +274,14 @@ impl Master {
                 }
             }
             a::DAMAGE_GRAPHICS_ENTRY_MOD => {
-                let n = cvttss2si(f32::from(self.damage_graphic_entry) + v);
+                let n = cvttss2si(f32::from(self.damage_graphic_entry.get()) + v);
                 if let Some(n) = select_entry(self.damage_graphics.len(), n) {
-                    self.damage_graphic_entry = n as u8;
+                    self.damage_graphic_entry = DamageGraphicEntry::of_selected(n);
                 }
             }
             // the game's: the selected entry plus the amount, not the count
             a::DAMAGE_GRAPHICS_TOTAL_NUM => {
-                let count = f32::from(self.damage_graphic_entry) + v;
+                let count = f32::from(self.damage_graphic_entry.get()) + v;
                 resize_damage_graphics(
                     &mut self.damage_graphics,
                     &mut self.damage_graphic_entry,
@@ -286,12 +290,12 @@ impl Master {
             }
             a::DAMAGE_GRAPHIC_PERCENT => {
                 if let Some(g) = self.damage_graphic_mut() {
-                    g.percent = g.percent.wrapping_add(low8(v));
+                    g.percent = g.percent.plus(low8(v));
                 }
             }
             a::DAMAGE_GRAPHIC_APPLY_MODE => {
                 if let Some(g) = self.damage_graphic_mut() {
-                    g.apply_mode = g.apply_mode.wrapping_add(low8(v));
+                    g.apply_mode = g.apply_mode.plus(low8(v));
                 }
             }
             _ => {}
@@ -425,8 +429,8 @@ impl Master {
             a::WALKING_GRAPHIC => set_sprite(&mut self.move_sprite, cvttss2si(v), world),
             a::RUNNING_GRAPHIC => set_sprite(&mut self.run_sprite, cvttss2si(v), world),
             a::TRAILING_UNIT => self.trail.unit = MasterField::of_data(low16(v)),
-            a::TRAIL_MODE => self.trail.mode = low8(v),
-            a::TRAIL_DENSITY => self.trail.density = v,
+            a::TRAIL_MODE => self.trail.mode = TrailMode::of_data(low8(v)),
+            a::TRAIL_DENSITY => self.trail.density = TrailDensity::new(v),
             _ => self.set_animated(attribute, v, world),
         }
     }
@@ -446,8 +450,8 @@ impl Master {
             a::TRAILING_UNIT => {
                 self.trail.unit = self.trail.unit.plus(low16(v));
             }
-            a::TRAIL_MODE => self.trail.mode = self.trail.mode.wrapping_add(low8(v)),
-            a::TRAIL_DENSITY => self.trail.density += v,
+            a::TRAIL_MODE => self.trail.mode = self.trail.mode.plus(low8(v)),
+            a::TRAIL_DENSITY => self.trail.density += TrailDensity::new(v),
             _ => self.add_animated(attribute, v, world),
         }
     }

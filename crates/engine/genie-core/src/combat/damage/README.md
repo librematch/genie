@@ -40,5 +40,5 @@ When a melee hit lands is decided in `combat/attack/`. A missile's hit is decide
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/).
+- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

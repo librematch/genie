@@ -198,7 +198,9 @@ pub(super) fn dat_work(
                     location: MasterId::of_data(t.location_id),
                     time: WholeSeconds::of_data(t.queue_time),
                     button: LocationButton::of_data(t.button_id),
-                    hotkey: t.hot_key_id.unwrap_or_default(),
+                    hotkey: genie_core::production::HotkeyId::of_data(
+                        t.hot_key_id.unwrap_or_default(),
+                    ),
                 })
                 .collect()
         }),
@@ -267,10 +269,11 @@ pub(super) fn dat_work(
             .map_or(Firepower::ZERO, Firepower::new),
         volley_fire: Firepower::new(unit.creatable.as_ref().map_or(0.0, |c| c.total_projectiles)),
         // the DE master's mSpacingModifier (+0x8b8), the data file's "flank attack modifier"
-        spacing_modifier: unit
-            .creatable
-            .as_ref()
-            .map_or(0.0, |c| c.flank_attack_modifier),
+        spacing_modifier: work::SpacingModifier::new(
+            unit.creatable
+                .as_ref()
+                .map_or(0.0, |c| c.flank_attack_modifier),
+        ),
         max_volley: MissileCount::of_data(
             unit.creatable
                 .as_ref()

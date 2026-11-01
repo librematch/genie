@@ -25,7 +25,7 @@ pub(crate) fn victim_in(
     (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
-    mode_680: i32,
+    mode_680: crate::world::Mode680,
 ) -> Victim {
     let mut v = victim_of(u, master, attributes, p, spatial.terrain.as_ref(), mode_680);
     v.allied = Allied::new(dip.allied(attacker, p, true), dip.allied(p, attacker, true));
@@ -48,7 +48,7 @@ pub(crate) fn victim_of(
     attributes: &[Amount],
     p: PlayerId,
     terrain: Option<&crate::map::terrain::Terrain>,
-    mode_680: i32,
+    mode_680: crate::world::Mode680,
 ) -> Victim {
     let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
     let kind = master.kind;

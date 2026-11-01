@@ -11,6 +11,8 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::DamageSpriteMode;
+use crate::objects::masters::HpPercent;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
@@ -63,9 +65,9 @@ const SAME_AI_CLASSES: [(ClassId, ClassId); 3] = [
 
 /// What a damage sprite apply mode does to the simulation (`FUN_1411859a0`'s switch on the
 /// entry's `+0x9`).
-const SPRITE_PLACED: u8 = 0;
-const SPRITE_SCATTERED: u8 = 1;
-const SPRITE_SHOWN: u8 = 2;
+const SPRITE_PLACED: DamageSpriteMode = DamageSpriteMode::PLACED;
+const SPRITE_SCATTERED: DamageSpriteMode = DamageSpriteMode::SCATTERED;
+const SPRITE_SHOWN: DamageSpriteMode = DamageSpriteMode::SHOWN;
 
 /// Slot 0xa8 (`FUN_141201670` for a combat object and a building; the base's `FUN_14106a520`
 /// answers 1): whether an object of a master of type `kind` in state `state` takes an upgrade
@@ -105,19 +107,19 @@ fn storage_share(master: &Master, state: ObjectState) -> bool {
 pub(crate) fn damage_sprites(
     u: &mut Unit,
     master: &Master,
-    before: u8,
+    before: HpPercent,
     (graphics, object, sprite): (
         &std::collections::BTreeMap<SpriteId, Graphic>,
         &mut Well512,
         &mut Well512,
     ),
-) -> Result<u8, GenieError> {
+) -> Result<HpPercent, GenieError> {
     let entries = &master.damage_graphics;
     let Some((share, hp)) = share_of(u, master) else {
         return Ok(before);
     };
     u.life.hp = HitPoints::new(hp);
-    if share == before || 100 <= share {
+    if share == before || HpPercent::WHOLE <= share {
         return Ok(share);
     }
     let (mut now, mut was) = (None, None);
@@ -185,7 +187,7 @@ pub(crate) fn damage_sprites(
 /// The damage share [`damage_sprites`] finds for object `u` under `master`, with its hit points
 /// after it (within 0 and the master's for a share of hit points); None where it leaves the
 /// share (no damage sprites, or a master below 1 hit point).
-fn share_of(u: &Unit, master: &Master) -> Option<(u8, f32)> {
+fn share_of(u: &Unit, master: &Master) -> Option<(HpPercent, f32)> {
     if master.damage_graphics.is_empty() {
         return None;
     }
@@ -196,9 +198,10 @@ fn share_of(u: &Unit, master: &Master) -> Option<(u8, f32)> {
             .iter()
             .take(3)
             .find(|&&(kind, _, _)| kind == u.life.attribute_type);
-        let share = held.map_or(0, |&(_, amount, _)| {
-            crate::math::conversions::cvttss2si(WHOLE - u.life.amount.get() * WHOLE / amount.get())
-                as u8
+        let share = held.map_or(HpPercent::of_data(0), |&(_, amount, _)| {
+            HpPercent::of_data(crate::math::conversions::cvttss2si(
+                WHOLE - u.life.amount.get() * WHOLE / amount.get(),
+            ) as u8)
         });
         return Some((share, hp));
     }
@@ -213,7 +216,7 @@ fn share_of(u: &Unit, master: &Master) -> Option<(u8, f32)> {
         hp = 0.0;
     }
     Some((
-        crate::math::conversions::cvttss2si(WHOLE - hp * WHOLE / most) as u8,
+        HpPercent::of_data(crate::math::conversions::cvttss2si(WHOLE - hp * WHOLE / most) as u8),
         hp,
     ))
 }
@@ -221,8 +224,8 @@ fn share_of(u: &Unit, master: &Master) -> Option<(u8, f32)> {
 /// The damage share (`+0xd`) object `u` holds under `master`, which every change of its hit
 /// points or master set through [`damage_sprites`] (the slice does not hold it); 0 where that
 /// check would leave it.
-fn damage_share_of(u: &Unit, master: &Master) -> u8 {
-    share_of(u, master).map_or(0, |(s, _)| s)
+fn damage_share_of(u: &Unit, master: &Master) -> HpPercent {
+    share_of(u, master).map_or(HpPercent::of_data(0), |(s, _)| s)
 }
 
 /// `FUN_1415c6aa0` on player `p`'s masters `new` and `old` (by id): the unit's new class needs
@@ -522,8 +525,8 @@ impl World {
         &mut self,
         place: Place,
         master: &Master,
-        before: u8,
-    ) -> Result<u8, GenieError> {
+        before: HpPercent,
+    ) -> Result<HpPercent, GenieError> {
         let graphics = std::mem::take(&mut self.graphics);
         let mut object = std::mem::take(self.streams.get(Stream::Object));
         let mut sprite = std::mem::take(self.streams.get(Stream::Sprite));
@@ -739,7 +742,7 @@ mod tests {
 
     /// A building master `id` of `hp` hit points with three damage sprites of `mode`, its
     /// standing sprite `id + 1000`, its death spawn `dead`.
-    fn building(id: i16, hp: i16, mode: u8, dead: i16) -> Master {
+    fn building(id: i16, hp: i16, mode: DamageSpriteMode, dead: i16) -> Master {
         Master {
             id: master_id(id),
             kind: master_type::BUILDING,
@@ -750,7 +753,7 @@ mod tests {
             damage_graphics: [25, 50, 75]
                 .map(|percent| DamageGraphic {
                     sprite: Some(SpriteId::named(id + 2000 + i16::from(percent))),
-                    percent,
+                    percent: HpPercent::of_data(percent),
                     apply_mode: mode,
                 })
                 .to_vec(),
@@ -794,23 +797,57 @@ mod tests {
             ..Master::default()
         };
         let mut u = object_of(HitPoints::new(150.0));
-        let r = damage_sprites(&mut u, &bare, 7, (&graphics, &mut object, &mut sprite));
-        assert_eq!((r, u.life.hp), (Ok(7), HitPoints::new(150.0)));
+        let r = damage_sprites(
+            &mut u,
+            &bare,
+            HpPercent::of_data(7),
+            (&graphics, &mut object, &mut sprite),
+        );
+        assert_eq!(
+            (r, u.life.hp),
+            (Ok(HpPercent::of_data(7)), HitPoints::new(150.0))
+        );
         let placed = building(70, 100, SPRITE_PLACED, -1);
-        let r = damage_sprites(&mut u, &placed, 0, (&graphics, &mut object, &mut sprite));
-        assert_eq!((r, u.life.hp), (Ok(0), HitPoints::new(100.0)));
+        let r = damage_sprites(
+            &mut u,
+            &placed,
+            HpPercent::of_data(0),
+            (&graphics, &mut object, &mut sprite),
+        );
+        assert_eq!(
+            (r, u.life.hp),
+            (Ok(HpPercent::of_data(0)), HitPoints::new(100.0))
+        );
         let mut low = object_of(HitPoints::new(-5.0));
-        let r = damage_sprites(&mut low, &placed, 0, (&graphics, &mut object, &mut sprite));
-        assert_eq!((r, low.life.hp), (Ok(100), HitPoints::ZERO));
+        let r = damage_sprites(
+            &mut low,
+            &placed,
+            HpPercent::of_data(0),
+            (&graphics, &mut object, &mut sprite),
+        );
+        assert_eq!(
+            (r, low.life.hp),
+            (Ok(HpPercent::of_data(100)), HitPoints::ZERO)
+        );
         let mut nan = object_of(HitPoints::new(f32::NAN));
-        let _ = damage_sprites(&mut nan, &placed, 0, (&graphics, &mut object, &mut sprite));
+        let _ = damage_sprites(
+            &mut nan,
+            &placed,
+            HpPercent::of_data(0),
+            (&graphics, &mut object, &mut sprite),
+        );
         assert!(nan.life.hp.get().is_nan());
         // mode 0: nothing drawn
         let before = object.clone();
         let mut hurt = object_of(HitPoints::new(40.0));
         assert_eq!(
-            damage_sprites(&mut hurt, &placed, 0, (&graphics, &mut object, &mut sprite)),
-            Ok(60)
+            damage_sprites(
+                &mut hurt,
+                &placed,
+                HpPercent::of_data(0),
+                (&graphics, &mut object, &mut sprite)
+            ),
+            Ok(HpPercent::of_data(60))
         );
         assert_eq!(object, before);
         // mode 1: two draws of the Object stream
@@ -822,10 +859,10 @@ mod tests {
             damage_sprites(
                 &mut hurt,
                 &scattered,
-                0,
+                HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite)
             ),
-            Ok(60)
+            Ok(HpPercent::of_data(60))
         );
         assert_eq!(object, expected);
         // the same entry (25 < 30 and 40, below 50): nothing more
@@ -834,10 +871,10 @@ mod tests {
             damage_sprites(
                 &mut hurt,
                 &scattered,
-                30,
+                HpPercent::of_data(30),
                 (&graphics, &mut object, &mut sprite)
             ),
-            Ok(40)
+            Ok(HpPercent::of_data(40))
         );
         assert_eq!(object, expected);
         // mode 2: the entry's sprite, then the standing one when it goes
@@ -850,14 +887,24 @@ mod tests {
             ..object_of(HitPoints::new(40.0))
         };
         assert_eq!(
-            damage_sprites(&mut u, &shown, 0, (&graphics, &mut object, &mut sprite)),
-            Ok(60)
+            damage_sprites(
+                &mut u,
+                &shown,
+                HpPercent::of_data(0),
+                (&graphics, &mut object, &mut sprite)
+            ),
+            Ok(HpPercent::of_data(60))
         );
         assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(2120)));
         u.life.hp = HitPoints::new(100.0);
         assert_eq!(
-            damage_sprites(&mut u, &shown, 60, (&graphics, &mut object, &mut sprite)),
-            Ok(0)
+            damage_sprites(
+                &mut u,
+                &shown,
+                HpPercent::of_data(60),
+                (&graphics, &mut object, &mut sprite)
+            ),
+            Ok(HpPercent::of_data(0))
         );
         assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(1070)));
     }
@@ -876,19 +923,19 @@ mod tests {
             storage: vec![(Some(attribute::WOOD), Amount::new(100.0), 0)],
             damage_graphics: vec![DamageGraphic {
                 sprite: None,
-                percent: 50,
-                apply_mode: 0,
+                percent: HpPercent::of_data(50),
+                apply_mode: DamageSpriteMode::of_data(0),
             }],
             ..Master::default()
         };
         let mut u = object(1, master_id(1), ObjectState::Dying, HitPoints::new(20.0));
         (u.life.attribute_type, u.life.amount) = (Some(attribute::WOOD), Amount::new(25.0));
-        assert_eq!(share_of(&u, &tree), Some((75, 20.0)));
+        assert_eq!(share_of(&u, &tree), Some((HpPercent::of_data(75), 20.0)));
         u.life.attribute_type = Some(attribute::STONE);
-        assert_eq!(share_of(&u, &tree), Some((0, 20.0)));
+        assert_eq!(share_of(&u, &tree), Some((HpPercent::of_data(0), 20.0)));
         u.life.state = ObjectState::Alive;
         u.life.hp = HitPoints::new(5.0);
-        assert_eq!(share_of(&u, &tree), Some((75, 5.0)));
+        assert_eq!(share_of(&u, &tree), Some((HpPercent::of_data(75), 5.0)));
     }
 
     /// Slot 0xa8 and `FUN_1415c6aa0`: a combat object or building takes an upgrade below state

@@ -15,6 +15,7 @@ use crate::objects::masters::InvulnerabilityLevel;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::SpecialAttack;
+use crate::objects::masters::TrainLocationEntry;
 use crate::objects::masters::{
     AttributeWorld, Master, ROUND, add_sprite, attribute, cost_resource, id_of,
     insert_train_location, low8, low16, resize_train_locations, select_entry, set_sprite,
@@ -182,7 +183,7 @@ impl Master {
             }
             a::HOTKEY_ID => {
                 if let Some(t) = self.train_location_mut() {
-                    t.hotkey = cvttss2si(v);
+                    t.hotkey = crate::production::HotkeyId::of_data(cvttss2si(v));
                 }
             }
             a::TRAIN_TIME => {
@@ -192,7 +193,7 @@ impl Master {
             }
             a::TRAIN_LOCATIONS_ENTRY_MOD => {
                 if let Some(n) = select_entry(self.train_locations.len(), cvttss2si(v)) {
-                    self.train_location_entry = n as i16;
+                    self.train_location_entry = TrainLocationEntry::of_selected(n);
                 }
             }
             a::TRAIN_LOCATIONS_TOTAL_NUM => {
@@ -265,14 +266,14 @@ impl Master {
                 *self.volley_spread.lane_mut(attribute) += crate::map::Distance::new(v);
             }
             a::TRAIN_LOCATIONS_ENTRY_MOD => {
-                let n = cvttss2si(f32::from(self.train_location_entry) + v);
+                let n = cvttss2si(f32::from(self.train_location_entry.get()) + v);
                 if let Some(n) = select_entry(self.train_locations.len(), n) {
-                    self.train_location_entry = n as i16;
+                    self.train_location_entry = TrainLocationEntry::of_selected(n);
                 }
             }
             // the game's: the selected entry plus the amount, not the count
             a::TRAIN_LOCATIONS_TOTAL_NUM => {
-                let count = f32::from(self.train_location_entry) + v;
+                let count = f32::from(self.train_location_entry.get()) + v;
                 resize_train_locations(
                     &mut self.train_locations,
                     &mut self.train_location_entry,

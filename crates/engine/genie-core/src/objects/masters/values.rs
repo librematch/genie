@@ -155,10 +155,14 @@ pub(super) fn resize_count(v: f32) -> u64 {
 
 /// The damage sprites resized to `v` (`FUN_1410e87c0`): new entries are zero, the selected entry
 /// (an unsigned byte compare with the count less one) at most the last.
-pub(super) fn resize_damage_graphics(list: &mut Vec<DamageGraphic>, entry: &mut u8, v: f32) {
+pub(super) fn resize_damage_graphics(
+    list: &mut Vec<DamageGraphic>,
+    entry: &mut crate::objects::masters::DamageGraphicEntry,
+    v: f32,
+) {
     let n = resize_count(v).min(MOST_DAMAGE_GRAPHICS) as usize;
     list.resize(n, DamageGraphic::default());
-    let last = (n as u8).wrapping_sub(1);
+    let last = crate::objects::masters::DamageGraphicEntry::of_data((n as u8).wrapping_sub(1));
     if last < *entry {
         *entry = last;
     }
@@ -167,11 +171,15 @@ pub(super) fn resize_damage_graphics(list: &mut Vec<DamageGraphic>, entry: &mut 
 /// The train locations resized to `v` (`FUN_141249220`): new entries copy the last one (zero
 /// for an empty list), the selected entry (a signed short compare with the count less one) at
 /// most the last, −1 for none.
-pub(super) fn resize_train_locations(list: &mut Vec<TrainLocation>, entry: &mut i16, v: f32) {
+pub(super) fn resize_train_locations(
+    list: &mut Vec<TrainLocation>,
+    entry: &mut crate::objects::masters::TrainLocationEntry,
+    v: f32,
+) {
     let n = resize_count(v).min(MOST_TRAIN_LOCATIONS) as usize;
     let fill = list.last().copied().unwrap_or_default();
     list.resize(n, fill);
-    let last = (n as i16).wrapping_sub(1);
+    let last = crate::objects::masters::TrainLocationEntry::of_data((n as i16).wrapping_sub(1));
     if last < *entry {
         *entry = last;
     }
@@ -181,7 +189,11 @@ pub(super) fn resize_train_locations(list: &mut Vec<TrainLocation>, entry: &mut 
 /// below 0 the entry at its complement (at most the last) goes, else a zero entry comes at it
 /// (at most the count; none past 0xfe entries). The selected entry is that place, at most the
 /// last (−1, so 0xff, with none left); an empty list or a full one changes nothing.
-pub(super) fn insert_damage_graphic(list: &mut Vec<DamageGraphic>, entry: &mut u8, v: f32) {
+pub(super) fn insert_damage_graphic(
+    list: &mut Vec<DamageGraphic>,
+    entry: &mut crate::objects::masters::DamageGraphicEntry,
+    v: f32,
+) {
     let mut at = crate::math::conversions::cvttss2si(v);
     if at < 0 {
         if list.is_empty() {
@@ -197,13 +209,18 @@ pub(super) fn insert_damage_graphic(list: &mut Vec<DamageGraphic>, entry: &mut u
         list.insert(at as usize, DamageGraphic::default());
     }
     let last = list.len() as i32 - 1;
-    *entry = if last < at { last as u8 } else { at as u8 };
+    *entry =
+        crate::objects::masters::DamageGraphicEntry::of_selected(if last < at { last } else { at });
 }
 
 /// A multiply of the train locations' selected entry (`FUN_141249040`): as
 /// [`insert_damage_graphic`], up to 0x7ffe entries, the new one a copy of the last (zero for an
 /// empty list).
-pub(super) fn insert_train_location(list: &mut Vec<TrainLocation>, entry: &mut i16, v: f32) {
+pub(super) fn insert_train_location(
+    list: &mut Vec<TrainLocation>,
+    entry: &mut crate::objects::masters::TrainLocationEntry,
+    v: f32,
+) {
     let mut at = crate::math::conversions::cvttss2si(v);
     if at < 0 {
         if list.is_empty() {
@@ -220,7 +237,8 @@ pub(super) fn insert_train_location(list: &mut Vec<TrainLocation>, entry: &mut i
         list.insert(at as usize, fill);
     }
     let last = list.len() as i32 - 1;
-    *entry = if last < at { last as i16 } else { at as i16 };
+    *entry =
+        crate::objects::masters::TrainLocationEntry::of_selected(if last < at { last } else { at });
 }
 
 /// The selected entry moved to `n` (the attributes 154 and 158): at most the last of `count`

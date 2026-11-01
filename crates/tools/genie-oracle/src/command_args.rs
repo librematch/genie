@@ -73,13 +73,13 @@ pub(super) fn market(
     w: &genie_save::generated::world::World,
 ) -> genie_core::players::market::Market {
     let commodity = |price: f32, trades: f32, swing: f32| genie_core::players::market::Commodity {
-        price,
-        trades: trades.to_bits().cast_signed(),
-        swing,
+        price: genie_core::players::Price::new(price),
+        trades: genie_core::players::NetTrades::new(trades.to_bits().cast_signed()),
+        swing: genie_core::players::PriceSwing::new(swing),
     };
     genie_core::players::market::Market {
-        min_price: w.world_min_price,
-        max_price: w.world_max_price,
+        min_price: genie_core::players::Price::new(w.world_min_price),
+        max_price: genie_core::players::Price::new(w.world_max_price),
         food: commodity(w.world_food_price, w.food_price_delta, w.old_food_price_adj),
         wood: commodity(w.world_wood_price, w.wood_price_delta, w.old_wood_price_adj),
         stone: commodity(

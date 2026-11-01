@@ -159,7 +159,8 @@ pub(super) fn take_building(
     // the kill of its damage ran slot 0x8b0, which counts it (+0x954)
     let counted = t.killed.is_some();
     if blast_taken == HitPoints::ZERO {
-        let least = if src.source.mode_680 == 1 && LEAST_HIT_CLASSES.contains(&src.source.class) {
+        let least = if src.source.mode_680.is_one() && LEAST_HIT_CLASSES.contains(&src.source.class)
+        {
             LEAST_CLASS_HIT
         } else {
             ONE

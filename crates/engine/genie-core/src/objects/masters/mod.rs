@@ -34,21 +34,25 @@ mod cost_slot;
 mod derived;
 mod dispatch;
 mod lookup;
+mod spacing_modifier;
 mod static_setters;
 mod target_owner;
 mod task_id;
 mod task_index;
 mod task_terrain;
+mod trail;
 mod tribe_setters;
 mod values;
 
 pub use self::combat_level::CombatLevel;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
 pub use self::lookup::{PlayersMasters, player_master};
+pub use self::spacing_modifier::SpacingModifier;
 pub use self::target_owner::TargetOwner;
 pub use self::task_id::TaskId;
 pub use self::task_index::TaskIndex;
 pub use self::task_terrain::TaskTerrain;
+pub use self::trail::{Trail, TrailDensity, TrailMode};
 pub use self::values::AttributeWorld;
 pub(crate) use self::values::cost_resource;
 use self::values::{
@@ -315,7 +319,7 @@ pub struct Master {
     pub hero_flag: HeroFlags,
     /// `+0x8b8`, `mSpacingModifier`: with the radius on x the unit's radius in a group's
     /// formation (`FUN_141025920`). The player's masters copy it from the data file's.
-    pub spacing_modifier: f32,
+    pub spacing_modifier: SpacingModifier,
     /// `+0x688`, `+0x68c`: the `.dat`'s `outline_size` (x, y), an obstruction-type-11 object's
     /// shape radii (`FUN_141054fe0`).
     pub outline: Footprint,
@@ -501,7 +505,7 @@ pub struct Master {
     /// [`Master::damage_sprites`] follows.
     pub damage_graphics: Vec<DamageGraphic>,
     /// `+0x731`, `mDamageSpriteEntryMod`: the damage sprite the attributes 91, 156 and 157 change.
-    pub damage_graphic_entry: u8,
+    pub damage_graphic_entry: DamageGraphicEntry,
     /// A moving master's trail (`+0x75e`..`+0x764`).
     pub trail: Trail,
     /// `+0x7b9`, `run_pattern`.
@@ -515,7 +519,7 @@ pub struct Master {
     pub train_locations: Vec<TrainLocation>,
     /// `+0x940`, `mTrainLocationEntryMod`: the train location the attributes 42, 43, 58 and 101
     /// change.
-    pub train_location_entry: i16,
+    pub train_location_entry: TrainLocationEntry,
     /// `+0x8b4`, `regeneration_rate`.
     pub regeneration: crate::objects::Regeneration,
     /// `+0x91c`, `mRechargeRate`.
@@ -534,28 +538,6 @@ pub struct Master {
     pub building_facet: i16,
 }
 
-/// One damage sprite of a master (`+0x638`'s entries; the save's `damage_sprite`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
-pub struct DamageGraphic {
-    /// `+0x0`, the sprite (`tempId`, −1 for none).
-    pub sprite: Option<SpriteId>,
-    /// `+0x8`, `damage_percent`.
-    pub percent: u8,
-    /// `+0x9`, the `flag` (the `.dat`'s `apply_mode`).
-    pub apply_mode: u8,
-}
-
-/// A new damage sprite entry: no sprite, zero bytes (the game zeroes its 16 bytes).
-impl Default for DamageGraphic {
-    fn default() -> Self {
-        Self {
-            sprite: None,
-            percent: 0,
-            apply_mode: 0,
-        }
-    }
-}
-
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's
 /// `train_location`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
@@ -567,19 +549,7 @@ pub struct TrainLocation {
     /// `+0x4`, `buttonLocationID`.
     pub button: crate::production::LocationButton,
     /// `+0x8`, `hotkeyID`.
-    pub hotkey: i32,
-}
-
-/// A moving master's trail (`obj_trail_id`, `obj_trail_options`, `obj_trail_spacing`; the
-/// `.dat`'s tracking unit, its mode and density).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
-pub struct Trail {
-    /// `+0x75e`: the master it leaves behind.
-    pub unit: MasterField,
-    /// `+0x760`.
-    pub mode: u8,
-    /// `+0x764`.
-    pub density: f32,
+    pub hotkey: crate::production::HotkeyId,
 }
 
 /// What a combat master shows of its values (`+0x856`, `+0x858`, `+0x854`, `+0x8b0`).
@@ -617,6 +587,8 @@ mod combat_ability;
 mod damage_amount;
 mod damage_class;
 mod damage_share;
+mod damage_sprite;
+mod entries;
 mod fly_mode;
 mod fog_visibility;
 mod formation_class;
@@ -667,6 +639,8 @@ pub use self::conversion_adjust::ConversionAdjust;
 pub use self::damage_amount::DamageAmount;
 pub use self::damage_class::{ClassAmount, DamageClass};
 pub use self::damage_share::DamageShare;
+pub use self::damage_sprite::{DamageGraphic, DamageSpriteMode, HpPercent};
+pub use self::entries::{DamageGraphicEntry, TrainLocationEntry};
 pub use self::fly_mode::FlyMode;
 pub use self::fog_visibility::FogVisibility;
 pub use self::formation_class::FormationClass;

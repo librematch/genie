@@ -160,13 +160,13 @@ impl Master {
     /// The selected damage sprite (`+0x731` below the count, an unsigned compare).
     pub(super) fn damage_graphic_mut(&mut self) -> Option<&mut DamageGraphic> {
         self.damage_graphics
-            .get_mut(usize::from(self.damage_graphic_entry))
+            .get_mut(self.damage_graphic_entry.index())
     }
 
     /// The selected train location (`FUN_1412669d0`: `+0x940` sign-extended, below the count as
     /// an unsigned value, so a negative entry selects none).
     pub(super) fn train_location_mut(&mut self) -> Option<&mut TrainLocation> {
-        let i = usize::try_from(i64::from(self.train_location_entry) as u64).ok()?;
-        self.train_locations.get_mut(i)
+        self.train_locations
+            .get_mut(self.train_location_entry.index()?)
     }
 }

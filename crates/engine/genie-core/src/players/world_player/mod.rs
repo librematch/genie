@@ -41,6 +41,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 
 mod counts;
@@ -75,8 +76,8 @@ const UNKEPT_HIGH: ClassMask = ClassMask::new(0x1402_04a0_0038_4006, 61);
 const AGES: [i32; 3] = [101, 102, 103];
 /// `FUN_140c7e6f0`: the civilisation the full tech tree reads, by the game's tagged value at
 /// `+0x680` ([`crate::world::World::mode_680`]): 18 for 1, 59 for 2, else 0.
-const fn full_tree_civ(mode_680: i32) -> crate::players::CivId {
-    crate::players::CivId::new(match mode_680 {
+const fn full_tree_civ(mode_680: crate::world::Mode680) -> crate::players::CivId {
+    crate::players::CivId::new(match mode_680.get() {
         1 => 0x12,
         2 => 0x3b,
         _ => 0,
@@ -94,20 +95,23 @@ pub struct VictoryTimes {
     /// The game's wonder countdown of the player (the game object's `+0x4ec[id]`,
     /// `FUN_140c88300`): the least time left of its wonders' actions (`TRIBE_Action_Wonder`,
     /// `FUN_140c91500`), −1 without one (`FUN_140c90040`).
-    pub wonder: f32,
+    pub wonder: Seconds,
     /// `ruin_held_time` (`+0xdb0`, saved).
-    pub ruins: f32,
+    pub ruins: Seconds,
     /// `artifact_held_time` (`+0xdb4`, saved).
-    pub artifacts: f32,
+    pub artifacts: Seconds,
 }
+
+/// A victory timer that does not run (−1).
+const NO_TIMER: Seconds = Seconds::new(-1.0);
 
 /// No timer runs.
 impl Default for VictoryTimes {
     fn default() -> Self {
         Self {
-            wonder: -1.0,
-            ruins: -1.0,
-            artifacts: -1.0,
+            wonder: NO_TIMER,
+            ruins: NO_TIMER,
+            artifacts: NO_TIMER,
         }
     }
 }
@@ -119,7 +123,7 @@ impl VictoryTimes {
     pub fn running(&self) -> bool {
         [self.wonder, self.ruins, self.artifacts]
             .into_iter()
-            .any(|t| !below_or_unordered(t, 0.0))
+            .any(|t| !below_or_unordered(t.get(), 0.0))
     }
 }
 

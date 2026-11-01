@@ -905,7 +905,7 @@ mod tests {
             for masters in &mut t.masters {
                 *masters = Masters::new(masters.iter().cloned().map(|mut m| {
                     m.height = Distance::new(1.0);
-                    m.spacing_modifier = spacing;
+                    m.spacing_modifier = crate::objects::masters::SpacingModifier::new(spacing);
                     m
                 }));
             }

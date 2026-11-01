@@ -8595,7 +8595,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
             location: Some(ids::TOWN_CENTRE),
             time,
             button: LocationButton::of_data(1),
-            hotkey: 0,
+            hotkey: crate::production::HotkeyId::of_data(0),
         }],
         ..Master::default()
     };

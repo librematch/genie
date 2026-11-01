@@ -129,7 +129,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
         relations: &ByPlayer::new(vec![Relation::ALLY, Relation::ALLY, Relation::ALLY]),
         ai_settings: crate::world::player::AiSettings::default(),
         now: WorldTime::ZERO,
-        mode_680: 0,
+        mode_680: crate::world::Mode680::ZERO,
     };
     picker.harmless(&spatial, object_id(50)).unwrap()
 }
@@ -239,7 +239,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         relations: &ByPlayer::new(vec![Relation::ALLY, Relation::ALLY, Relation::ALLY]),
         ai_settings: crate::world::player::AiSettings::default(),
         now: WorldTime::ZERO,
-        mode_680: 0,
+        mode_680: crate::world::Mode680::ZERO,
     };
     assert_eq!(
         picker.nearest_attacker_of(object_id(20)),
@@ -392,7 +392,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         relations: &ByPlayer::new(vec![Relation::ALLY, Relation::ALLY, Relation::ALLY]),
         ai_settings: crate::world::player::AiSettings::default(),
         now: WorldTime::ZERO,
-        mode_680: 0,
+        mode_680: crate::world::Mode680::ZERO,
     };
     let c = picker
         .candidate(
