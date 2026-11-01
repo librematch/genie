@@ -53,6 +53,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`explore_state.rs`](explore_state.rs) | An Explore's state: waiting for a point or walking to it. |
 | [`fly.rs`](fly.rs) | A bird's Fly action (type 10, vtable `0x142ed4c88`; update `0x140a84b40`, `set_state` `0x140a84a50`): the bird rests (state 2), picks a point to fly to from the Action stream (state 3) and flies there with a `MoveTo` sub-action (state 4) until its flight time runs out or the `MoveTo` ends; then it rests for its task's wait time, or picks the next flight at once. |
 | [`fly_state.rs`](fly_state.rs) | A Fly's state: a bird resting, choosing its flight and flying. |
+| [`levels.rs`](levels.rs) | The levels of a unit's path data by their role: the walked level and its parent. |
 | [`long_walk.rs`](long_walk.rs) | A step's reach of its waypoint, the long pather's walker and the units whose tiles it lowers. |
 | [`mod.rs`](mod.rs) | A unit's movement (`RGE_Moving_Object`, MovingObject.cpp in 158041): the velocity step that moves it along its forward vector, and the motion step that steers it along its path. |
 | [`move_algorithm.rs`](move_algorithm.rs) | A moving master's move algorithm (`MoveAlgorithm`, `move_algorithm`). |

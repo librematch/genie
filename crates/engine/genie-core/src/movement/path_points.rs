@@ -199,10 +199,9 @@ pub(super) fn split(path: &mut Path, i: i32) {
         return;
     };
     // a signed `count - 1`: an empty path has no stretch
-    if path.points.len() as i64 - 1 <= at as i64 {
+    let Some(&[a, b]) = path.points.get(at..at + 2) else {
         return;
-    }
-    let (a, b) = (path.points[at], path.points[at + 1]);
+    };
     let d = fmath::sub(b, a);
     let length = fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
     if length < EPSILON {

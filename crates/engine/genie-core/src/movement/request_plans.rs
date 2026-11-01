@@ -3,6 +3,7 @@
 
 use crate::map::Distance;
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::PathState;
 use crate::movement::WaypointIndex;
 use crate::world::Seconds;
@@ -151,7 +152,7 @@ impl Mover {
         {
             return Ok(false);
         }
-        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end);
+        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
         let r = self.short_path_to(me, world, plan, w, near, np)?;
         if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
             np.failed = true;
@@ -194,7 +195,7 @@ impl Mover {
         if !r.leads() {
             return Ok(());
         }
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         if r == Found::Nearest
             && (level.level != WaypointLevel::TOP || level.flags.contains(LevelFlags::NEAREST))
         {
@@ -255,7 +256,7 @@ impl Mover {
         w: &Way<'_>,
         np: &mut NewPath,
     ) -> Result<ControlFlow<AfterRequest, bool>, GenieError> {
-        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end);
+        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
         if np.found && 3 <= np.path.points.len() {
             return Ok(ControlFlow::Continue(too_short(&np.path)));
         }
@@ -332,13 +333,13 @@ impl Mover {
         } else {
             Distance::new(RANGE_FLOOR)
         };
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         if reach < w.goal.gap {
             if level.waypoint == WaypointIndex::last_of(level.points.len()) && level.created == now
             {
                 self.stop()?;
-                self.reset_level();
-                self.paths[0].state = PathState::GaveUp;
+                self.reset_level()?;
+                self.paths.walked_mut()?.state = PathState::GaveUp;
                 return Ok(AfterRequest::GaveUp);
             }
             level.flags |= LevelFlags::REACHED;

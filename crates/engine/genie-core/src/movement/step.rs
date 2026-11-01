@@ -9,6 +9,7 @@ use crate::map::spatial::{Placed, RecordId, Spatial, WalkQuery};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -382,7 +383,7 @@ impl Mover {
         plans: &mut StepPlans,
         include: &[ObjectId],
     ) -> Result<Next, GenieError> {
-        match self.paths[0].state {
+        match self.paths.walked()?.state {
             PathState::Arrived | PathState::Unplanned => self.arrived(goal),
             PathState::WantsPath => {
                 let plan = plan.ok_or(GenieError::unsupported(
@@ -439,7 +440,7 @@ impl Mover {
                 gap,
                 to_end,
             };
-            if self.paths[0].flags.contains(LevelFlags::REACHED) {
+            if self.paths.walked()?.flags.contains(LevelFlags::REACHED) {
                 let now = plan.as_deref().map_or(WorldTime::ZERO, |p| p.now);
                 let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
                 match self.reached(me, world, pathing, goal, now)? {
@@ -503,14 +504,13 @@ impl Mover {
             walked,
             heading,
         } = step;
-        let ground_radius = self.stats.radius.ground();
         // LAB_141153bd1: the waypoint's distance, the direction (slot 0x610), the step's end
         // (slot 0x638) and its query (FUN_14114cc60) start at +0x824, where the unit last moved to
         let position = self.moved_at.vector();
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         let waypoint = point_or_zero_of(level, level.waypoint);
         if ground(position, waypoint).get() < EPSILON {
-            self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
+            self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
             return Ok(Next::Again);
         }
         let direction = self.direction_to(position, waypoint);
@@ -518,12 +518,14 @@ impl Mover {
         let projected = self.projected(direction, dt);
         match reach(waypoint, position, projected) {
             Reach::Away => {
-                self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
+                self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
                 return Ok(Next::Again);
             }
-            Reach::Reached => self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT,
+            Reach::Reached => {
+                self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
+            }
             Reach::Short if 2 < self.substitute_count.get() => {
-                self.paths[0].flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
+                self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
             }
             Reach::Short => {}
         }
@@ -554,7 +556,7 @@ impl Mover {
                 if avoided.at_target {
                     // FUN_140f9b4d0 three times: bit 0 on and bit 1 off on the walked level, bit 2
                     // on for it and its parents; then back to the top of the step
-                    let level = &mut self.paths[0];
+                    let level = self.paths.walked_mut()?;
                     level.flags = (level.flags | LevelFlags::REACHED) & !LevelFlags::AT_WAYPOINT;
                     for l in &mut self.paths {
                         l.flags |= LevelFlags::MET_TARGET;
@@ -567,7 +569,24 @@ impl Mover {
                 }
             }
         }
-        let level = &self.paths[0];
+        if let Some(next) = self.walk_ends(world, goal)? {
+            return Ok(next);
+        }
+        let clipped = self.steer(direction, dt)?;
+        self.control_speed(waypoint, clipped);
+        Ok(Next::Done(Motion::Moving))
+    }
+
+    /// [`Mover::walk`]'s ends before its steer: a walk to a target in range of it counts the
+    /// waypoint reached and the motion step starts again; a walk to a point with a range ends
+    /// where its top level's path ends (the unit stops, the step returns 2). None walks on.
+    ///
+    /// # Errors
+    ///
+    /// Path data without the walked level, and what the stop does not model.
+    fn walk_ends(&mut self, world: &Spatial, goal: Goal<'_>) -> Result<Option<Next>, GenieError> {
+        let ground_radius = self.stats.radius.ground();
+        let level = self.paths.walked()?;
         match goal.target {
             Some((id, t)) => {
                 let range = level.range;
@@ -577,10 +596,10 @@ impl Mover {
                 let gap = gate_gap(world, near, (id, t), own, |g| g - range);
                 if gap.get() < EPSILON {
                     // in range of the target: the waypoint counts as reached
-                    let level = &mut self.paths[0];
+                    let level = self.paths.walked_mut()?;
                     level.flags &= !LevelFlags::AT_WAYPOINT;
                     level.flags |= LevelFlags::REACHED;
-                    return Ok(Next::Again);
+                    return Ok(Some(Next::Again));
                 }
             }
             // a walk to a point with a range ends where its top level's path ends
@@ -595,17 +614,15 @@ impl Mover {
                         Footprint::new(0.0, 0.0),
                     );
                     if gap - level.range < Distance::new(EPSILON) {
-                        self.reset_level();
+                        self.reset_level()?;
                         self.stop()?;
-                        return Ok(Next::Done(Motion::Arrived));
+                        return Ok(Some(Next::Done(Motion::Arrived)));
                     }
                 }
             }
             None => {}
         }
-        let clipped = self.steer(direction, dt)?;
-        self.control_speed(waypoint, clipped);
-        Ok(Next::Done(Motion::Moving))
+        Ok(None)
     }
 
     /// The motion step's end on a loop back at its first waypoint (`LAB_141155637`): the unit

@@ -8,6 +8,7 @@ use crate::map::Rect;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::LinkedPathType;
 use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
@@ -23,6 +24,7 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use crate::world::WorldTime;
+use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
 impl Mover {
@@ -46,10 +48,10 @@ impl Mover {
         now: WorldTime,
     ) -> Result<Next, GenieError> {
         let ground_radius = self.stats.radius.ground();
-        if self.paths[0].flags.contains(LevelFlags::AT_WAYPOINT) {
+        if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
             self.take_waypoint_place(me, world, pathing, now)?;
         }
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         level.flags &= !LevelFlags::REACHED;
         level.waypoint = level.waypoint.next();
         drop_edge_waypoints(level, self.stats.radius, world.map);
@@ -68,14 +70,14 @@ impl Mover {
             .paths
             .get(1)
             .is_some_and(|p| p.level == WaypointLevel::PLANNED && !p.points.is_empty());
-        if self.paths[0].level == WaypointLevel::WALKED
+        if self.paths.walked()?.level == WaypointLevel::WALKED
             && parent_is_level_1
             && self.look_ahead(me, world)?
         {
             return Ok(Next::Again);
         }
         // LAB_14115192d
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         let left = point_or_zero_of(level, level.waypoint.previous());
         let back = footprint_gap(
             self.position(),
@@ -96,10 +98,10 @@ impl Mover {
                     })
                 });
         if goal.target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
-            self.clear_bit_2();
+            self.clear_bit_2()?;
             beyond = Distance::ZERO;
         }
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         if level.waypoint.within(level.points.len()) {
             if level.level != WaypointLevel::WALKED {
                 level.state = PathState::WantsPath;
@@ -133,14 +135,14 @@ impl Mover {
         pathing: Option<&mut Pathing>,
         now: WorldTime,
     ) -> Result<(), GenieError> {
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         if level.waypoint.within(level.points.len()) {
             let p = level.point(level.waypoint);
             let at = self.set_position(p.position(), world.map);
             let at = self.grounded(at, world.terrain.as_ref());
             self.moved_to(me, at, world, pathing, now)?;
         }
-        self.paths[0].flags &= !LevelFlags::AT_WAYPOINT;
+        self.paths.walked_mut()?.flags &= !LevelFlags::AT_WAYPOINT;
         Ok(())
     }
 
@@ -155,18 +157,21 @@ impl Mover {
     ///
     /// A frozen object the query may meet.
     pub(super) fn drop_held_waypoint(&mut self, world: &Spatial) -> Result<(), GenieError> {
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         let next = level.waypoint.next();
         if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
             return Ok(());
         }
-        let d = fmath::sub(self.position().vector(), level.points[next.get() as usize]);
+        let d = fmath::sub(
+            self.position().vector(),
+            *level.points.checked(next.get() as usize)?,
+        );
         // a NaN distance is not within
         if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() < TARGET_SHORT_REACH {
-            let [x, _, y] = (level.points[level.waypoint.get() as usize]).get();
+            let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
             let ignore = world.manager_ignore();
             if world.object_holds(Point::new(x, y), world.manager_grow(), &ignore, false)? {
-                let level = &mut self.paths[0];
+                let level = self.paths.walked_mut()?;
                 let removed = remove_point(&mut level.points, level.waypoint);
                 debug_assert!(removed, "the waypoint lies within the path");
             }
@@ -190,7 +195,7 @@ impl Mover {
         world: &Spatial,
         goal: Goal<'_>,
     ) -> Result<Next, GenieError> {
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         let created = level.created;
         let own = world.get(me.id).map(|p| p.player);
         let yields = self.stats.weapon_range == Distance::ZERO
@@ -200,11 +205,11 @@ impl Mover {
                     || (moved == created && (own.is_some_and(|o| o < t.player) || me.id < target))
             });
         if yields {
-            self.reset_level();
+            self.reset_level()?;
             self.stop()?;
             return Ok(Next::Done(Motion::Arrived));
         }
-        self.paths[0].state = PathState::GaveUp;
+        self.paths.walked_mut()?.state = PathState::GaveUp;
         self.stop()?;
         Ok(Next::Done(Motion::Done))
     }
@@ -215,15 +220,15 @@ impl Mover {
     /// (`FUN_141142750`) becomes the parent's waypoint; level 0 goes, and the parent asks for a
     /// path (state 2) as the motion step starts again. True when it did.
     pub(super) fn look_ahead(&mut self, me: &Me, world: &mut Spatial) -> Result<bool, GenieError> {
-        let target = self.paths[0].target;
-        let parent = &self.paths[1];
+        let target = self.paths.walked()?.target;
+        let parent = self.paths.parent()?;
         // the motion step's place of the unit: +0x824, where it last moved to
         let at = self.moved_at.vector();
         let last = WaypointIndex::last_of(parent.points.len());
         let from = parent.waypoint;
         let mut k = from.ahead(5).min(last);
         while from < k {
-            let p = parent.points[k.get() as usize];
+            let p = *parent.points.checked(k.get() as usize)?;
             let d = fmath::sub(p, at);
             if d.x() * d.x() + 0.0 + d.y() * d.y() <= LOOK_AHEAD
                 && self.straight(me, p, target, world)?
@@ -236,7 +241,7 @@ impl Mover {
             return Ok(false);
         }
         let _ = self.paths.remove(0);
-        let parent = &mut self.paths[0];
+        let parent = self.paths.walked_mut()?;
         parent.waypoint = k;
         parent.state = PathState::WantsPath;
         Ok(true)
@@ -340,20 +345,20 @@ impl Mover {
     /// waypoint reached, 2 has the parent ask again (a looping parent moves on first), 3 has it
     /// ask again; the step starts again with the parent.
     pub(super) fn arrived(&mut self, goal: Goal<'_>) -> Result<Next, GenieError> {
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         if self.paths.len() == 1 || goal.gap <= level.range {
-            self.reset_level();
+            self.reset_level()?;
             self.stop()?;
             return Ok(Next::Done(Motion::Arrived));
         }
         match level.linked_type {
             LinkedPathType::REACHES_WAYPOINT => {
                 let _ = self.paths.remove(0);
-                self.paths[0].flags |= LevelFlags::REACHED;
+                self.paths.walked_mut()?.flags |= LevelFlags::REACHED;
             }
             LinkedPathType::MOVES_ON => {
                 let _ = self.paths.remove(0);
-                let parent = &mut self.paths[0];
+                let parent = self.paths.walked_mut()?;
                 parent.state = PathState::WantsPath;
                 // a looping parent path moves on (FUN_140f98bc0 with 1)
                 if parent.has_path && parent.path_flags.contains(PathFlags::LOOPS) {
@@ -362,7 +367,7 @@ impl Mover {
             }
             LinkedPathType::ASKS_AGAIN => {
                 let _ = self.paths.remove(0);
-                self.paths[0].state = PathState::WantsPath;
+                self.paths.walked_mut()?.state = PathState::WantsPath;
             }
             // the game's switch has no case: the level stays and the step goes on past the
             // request to the walk (`LAB_141153bd1`)
@@ -373,9 +378,9 @@ impl Mover {
 
     /// `FUN_140f98e80` on the walked level: its path goes, its parents with it, and it holds the
     /// defaults (its tries back to 10, flags clear; its repath time stays).
-    pub(crate) fn reset_level(&mut self) {
+    pub(crate) fn reset_level(&mut self) -> Result<(), GenieError> {
         self.paths.truncate(1);
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         *level = PathData {
             repath_time: level.repath_time,
             created: WorldTime::ZERO,
@@ -383,6 +388,7 @@ impl Mover {
             path_flags: PathFlags::NONE,
             ..PathData::new(WorldTime::ZERO)
         };
+        Ok(())
     }
 
     /// The unit shows the sprite `shown` (None: none): its top speed (slot 0x208, the master's
@@ -393,11 +399,12 @@ impl Mover {
     }
 
     /// `FUN_140f9b4d0(level, 2, 0)`: bit 2 goes off the walked level and on for its parents.
-    pub(super) fn clear_bit_2(&mut self) {
-        self.paths[0].flags &= !LevelFlags::MET_TARGET;
-        for parent in &mut self.paths[1..] {
+    pub(super) fn clear_bit_2(&mut self) -> Result<(), GenieError> {
+        self.paths.walked_mut()?.flags &= !LevelFlags::MET_TARGET;
+        for parent in self.paths.iter_mut().skip(1) {
             parent.flags |= LevelFlags::MET_TARGET;
         }
+        Ok(())
     }
 
     /// Slot 0x560 (`FUN_1411616f0`): the unit stops ([`Mover::stop`], slot 0x5d0) and its walked
@@ -409,7 +416,7 @@ impl Mover {
     pub(crate) fn stand(&mut self) -> Result<(), GenieError> {
         self.stop()?;
         if !self.paths.is_empty() {
-            self.reset_level();
+            self.reset_level()?;
         }
         Ok(())
     }

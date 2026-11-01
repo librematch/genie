@@ -27,6 +27,7 @@ use crate::objects::unit::{Unit, object_master};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
+use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 use genie_diff::Diff;
 
@@ -224,7 +225,7 @@ impl ExploreAction {
         .ok();
         let villager = master.is_some_and(|m| m.class == class::VILLAGER);
         let gives_up = GiveUp {
-            waits: villager && !c.w.players[c.player.index()].computer,
+            waits: villager && !c.w.players.player(c.player)?.computer,
             stance: explorer
                 .ai
                 .as_ref()

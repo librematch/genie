@@ -21,6 +21,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::SPEED_EPSILON;
+use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
 impl Unit {
@@ -122,7 +123,7 @@ impl Unit {
                 .as_ref()
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
             self.own_move_gave_up(
-                villager && !c.w.players[c.player.index()].computer,
+                villager && !c.w.players.player(c.player)?.computer,
                 stance,
                 (
                     c.w.masters.of(c.player),

@@ -4,6 +4,7 @@ use crate::groups::MoveReason;
 use crate::map::Distance;
 use crate::map::Tile;
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -446,8 +447,8 @@ impl Mover {
         projected: BVector,
         world: &Spatial,
         now: WorldTime,
-    ) -> bool {
-        let level = &self.paths[0];
+    ) -> Result<bool, GenieError> {
+        let level = self.paths.walked()?;
         let top = self.paths.last().filter(|l| !l.points.is_empty());
         let ground = self.stats.radius.ground();
         let o = other.position.vector();
@@ -468,7 +469,7 @@ impl Mover {
         }
         let outranks = player < other.player || (player == other.player && me.id < id);
         let outranks = level.created < last_move || (outranks && level.created == last_move);
-        !(next_overlap < now_overlap || (!pushed && !outranks))
+        Ok(!(next_overlap < now_overlap || (!pushed && !outranks)))
     }
 
     /// The walk's avoidance of what its step hits (`0x141150f00`, after `FUN_14114cc60`). The first
@@ -502,7 +503,7 @@ impl Mover {
         dt: Seconds,
         (now, computer): (WorldTime, bool),
     ) -> Result<Avoided, GenieError> {
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         let player = world
             .get(me.id)
             .ok_or(GenieError::unsupported("a walker without a place"))?
@@ -535,7 +536,7 @@ impl Mover {
             if own_move && !KEPT_BY_MEMBERS.contains(&other.class) {
                 continue;
             }
-            if self.keeps_hit(me, player, (id, other), projected, world, now) {
+            if self.keeps_hit(me, player, (id, other), projected, world, now)? {
                 kept.push(id);
             }
         }

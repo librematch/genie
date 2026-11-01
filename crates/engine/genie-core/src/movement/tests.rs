@@ -3061,7 +3061,7 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         to_end: Distance::new(FAR),
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
-    assert_eq!(m.in_reach(near, start), Some(AfterRequest::Again));
+    assert_eq!(m.in_reach(near, start).unwrap(), Some(AfterRequest::Again));
     assert_eq!(m.paths[0].state, PathState::Arrived);
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
     m.paths[0].range = Distance::ZERO;
@@ -3069,7 +3069,7 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         gap: Distance::new(RANGE_FLOOR),
         ..near
     };
-    assert_eq!(m.in_reach(floor, start), Some(AfterRequest::Again));
+    assert_eq!(m.in_reach(floor, start).unwrap(), Some(AfterRequest::Again));
     assert_eq!(m.paths[0].state, PathState::Arrived);
     let far = Goal {
         target: None,
@@ -3077,13 +3077,16 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         to_end: Distance::new(FAR),
     };
     let mut m = builder_9177().placed(Position::new(28.0, 89.0, 0.0));
-    assert_eq!(m.in_reach(far, start), None);
+    assert_eq!(m.in_reach(far, start).unwrap(), None);
     assert_eq!(
         (m.paths[0].state, m.paths[0].flags),
         (PathState::Walking, LevelFlags::NONE)
     );
     let waypoint = BVector::new(30.0, 0.0, 88.0);
-    assert_eq!(m.in_reach(far, waypoint), Some(AfterRequest::Again));
+    assert_eq!(
+        m.in_reach(far, waypoint).unwrap(),
+        Some(AfterRequest::Again)
+    );
     assert_eq!(
         m.paths[0].flags,
         LevelFlags::REACHED | LevelFlags::AT_WAYPOINT
@@ -3093,7 +3096,10 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         gap: Distance::new(FAR),
         ..near
     };
-    assert_eq!(m.in_reach(on_house, waypoint), Some(AfterRequest::Again));
+    assert_eq!(
+        m.in_reach(on_house, waypoint).unwrap(),
+        Some(AfterRequest::Again)
+    );
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
 }
 
@@ -3223,13 +3229,13 @@ fn a_unit_without_a_footprint_takes_the_straight_way() {
     let m = builder_9177();
     let start = BVector::new(28.0, 0.0, 89.0);
     let mut np = NewPath::new(WorldTime::ZERO);
-    m.straight_way(start, &mut np);
+    m.straight_way(start, &mut np).unwrap();
     assert_eq!(np.path.points, [start, BVector::new(30.0, 0.0, 88.0)]);
     assert!(np.found);
     let mut m = builder_9177();
     m.paths[0].waypoint = WaypointIndex::of_data(2);
     let mut np = NewPath::new(WorldTime::ZERO);
-    m.straight_way(start, &mut np);
+    m.straight_way(start, &mut np).unwrap();
     assert_eq!(
         (np.path.points, np.path.length),
         (vec![start], Distance::ZERO)

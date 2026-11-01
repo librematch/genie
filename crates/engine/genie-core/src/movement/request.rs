@@ -7,6 +7,7 @@ use crate::map::Rect;
 use crate::map::spatial::{Placed, Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -62,7 +63,7 @@ impl Mover {
         // the request measures and plans from +0x824 (`pfVar14`, `local_18c8`), where the unit
         // last moved to
         let position = self.moved_at.vector();
-        if let Some(step) = self.in_reach(goal, position) {
+        if let Some(step) = self.in_reach(goal, position)? {
             return Ok(step);
         }
         let solid = self.stats.radius.sized();
@@ -83,7 +84,7 @@ impl Mover {
         self.waiting = 0;
         let mut np = NewPath::new(plan.now);
         if solid {
-            let level = &self.paths[0];
+            let level = self.paths.walked()?;
             let waypoint = level.point(level.waypoint);
             let w = Way {
                 goal,
@@ -101,22 +102,26 @@ impl Mover {
                 return Ok(step);
             }
         } else {
-            self.straight_way(position, &mut np);
+            self.straight_way(position, &mut np)?;
         }
         if np.path.points.len() < 2 || np.path.length.get() < EPSILON {
             return self.no_path(np.found, goal.target.map(|(_, t)| t), goal.to_end);
         }
-        Ok(self.link(np.new, np.path, np.found, np.partial, np.planned, solid))
+        self.link(np.new, np.path, np.found, np.partial, np.planned, solid)
     }
 
     /// The request's first exits: a target within the level's range (at least
     /// [`RANGE_FLOOR`]) puts the level in state 4; a unit on its waypoint marks the level
     /// (flag 1, and 2 when away from the target's footprint by more than [`EPSILON`] or
     /// without one). Both go again.
-    pub(super) fn in_reach(&mut self, goal: Goal<'_>, position: BVector) -> Option<AfterRequest> {
+    pub(super) fn in_reach(
+        &mut self,
+        goal: Goal<'_>,
+        position: BVector,
+    ) -> Result<Option<AfterRequest>, GenieError> {
         let ground_radius = self.stats.radius.ground();
         let here = self.position();
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         let reach = if level.range <= Distance::ZERO {
             RANGE_FLOOR
         } else {
@@ -124,11 +129,11 @@ impl Mover {
         };
         if goal.target.is_some() && goal.gap <= Distance::new(reach) {
             level.state = PathState::Arrived;
-            return Some(AfterRequest::Again);
+            return Ok(Some(AfterRequest::Again));
         }
         let waypoint = level.point(level.waypoint);
         if ground(position, waypoint) != Distance::ZERO {
-            return None;
+            return Ok(None);
         }
         let away = goal.target.is_none_or(|(_, t)| {
             EPSILON < footprint_gap(here, ground_radius, t.position, t.radius).get()
@@ -137,7 +142,7 @@ impl Mover {
             level.flags |= LevelFlags::AT_WAYPOINT;
         }
         level.flags |= LevelFlags::REACHED;
-        Some(AfterRequest::Again)
+        Ok(Some(AfterRequest::Again))
     }
 
     /// Whether a solid unit may plan: a trade cart plans only within its owner's budget
@@ -181,7 +186,7 @@ impl Mover {
             return Ok(None);
         }
         let top_has_more = self.top_has_more();
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         level.continue_counter = level.continue_counter.spent();
         if level.continue_counter.left() {
             return Ok(None);
@@ -194,8 +199,8 @@ impl Mover {
                 level.continue_counter = crate::movement::PlanTries::FULL;
                 return Ok(Some(AfterRequest::Again));
             }
-            self.reset_level();
-            self.paths[0].state = PathState::GaveUp;
+            self.reset_level()?;
+            self.paths.walked_mut()?.state = PathState::GaveUp;
             self.stop()?;
             return Ok(Some(AfterRequest::GaveUp));
         }
@@ -205,8 +210,12 @@ impl Mover {
 
     /// A unit without a footprint: the straight way to its waypoint (to where it stands past
     /// the level's last).
-    pub(super) fn straight_way(&self, position: BVector, np: &mut NewPath) {
-        let level = &self.paths[0];
+    pub(super) fn straight_way(
+        &self,
+        position: BVector,
+        np: &mut NewPath,
+    ) -> Result<(), GenieError> {
+        let level = self.paths.walked()?;
         let _ = np.path.insert(0, position);
         let to = if level.waypoint.within(level.points.len()) {
             level.point(level.waypoint)
@@ -216,6 +225,7 @@ impl Mover {
         let _ = np.path.push(to);
         np.path.measure();
         np.found = true;
+        Ok(())
     }
 
     /// The long pather's plan for a far waypoint (`0x141150f00` at `LAB_141152f9c`): the new path
@@ -305,8 +315,9 @@ impl Mover {
         let player = me_at.map(|p| p.player);
         let ignore = world.query_ignore(&[Some(me.id), target_id]);
         let grow = self.stats.radius.x() * LONG_PATH_GROW;
-        for i in 0..path.points.len().saturating_sub(1) {
-            let (from, to) = self.query_ends(path.points[i], path.points[i + 1], world.map);
+        let stretches = path.points.iter().zip(path.points.iter().skip(1));
+        for (i, (&a, &b)) in stretches.enumerate() {
+            let (from, to) = self.query_ends(a, b, world.map);
             let rect = Rect::spanning(from, to);
             world.check_known_records(rect.grown(Distance::new(grow)))?;
             let hits = world.walk_hits(WalkQuery {
@@ -348,15 +359,20 @@ impl Mover {
     /// `FUN_14114d3d0`: the walked level's goal is in reach: its target's gap (else where its top
     /// path ends) within its range, or a target's last waypoint at most 16 tiles beyond its
     /// range on a top level.
-    pub(super) fn near_goal(&self, way: Distance, gap: Distance, to_end: Distance) -> bool {
-        let level = &self.paths[0];
+    pub(super) fn near_goal(
+        &self,
+        way: Distance,
+        gap: Distance,
+        to_end: Distance,
+    ) -> Result<bool, GenieError> {
+        let level = self.paths.walked()?;
         let d = if level.target.is_none() { to_end } else { gap };
         if (d - level.range).get() < EPSILON {
-            return true;
+            return Ok(true);
         }
-        level.target.is_some()
+        Ok(level.target.is_some()
             && level.waypoint == WaypointIndex::last_of(level.points.len())
             && way - level.range <= Distance::new(SHORT_REACH)
-            && level.level == WaypointLevel::TOP
+            && level.level == WaypointLevel::TOP)
     }
 }

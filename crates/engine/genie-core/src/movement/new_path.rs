@@ -8,6 +8,7 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::LinkedPathType;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
@@ -26,6 +27,7 @@ use crate::pathing::ShortFound;
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::world::WorldTime;
+use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath, pathing::short_path};
 
 impl Mover {
@@ -41,14 +43,14 @@ impl Mover {
         to_end: Distance,
     ) -> Result<AfterRequest, GenieError> {
         let top_has_more = self.top_has_more();
-        if target.is_some() && self.paths[0].flags.contains(LevelFlags::MET_TARGET) {
+        if target.is_some() && self.paths.walked()?.flags.contains(LevelFlags::MET_TARGET) {
             // FUN_140f9b4d0(level, 2, 0): bit 2 goes off the level and on for its parents
-            self.paths[0].flags &= !LevelFlags::MET_TARGET;
-            for parent in &mut self.paths[1..] {
+            self.paths.walked_mut()?.flags &= !LevelFlags::MET_TARGET;
+            for parent in self.paths.iter_mut().skip(1) {
                 parent.flags |= LevelFlags::MET_TARGET;
             }
         }
-        let level = &mut self.paths[0];
+        let level = self.paths.walked_mut()?;
         if !found || level.range < to_end {
             if level.waypoint.at_or_past_last(level.points.len()) {
                 if level.continue_counter.left() {
@@ -93,8 +95,8 @@ impl Mover {
         partial: bool,
         planned: bool,
         solid: bool,
-    ) -> AfterRequest {
-        let level = &mut self.paths[0];
+    ) -> Result<AfterRequest, GenieError> {
+        let level = self.paths.walked_mut()?;
         level.state = PathState::Idle;
         level.continue_counter = crate::movement::PlanTries::FULL;
         new.range = level.range;
@@ -111,15 +113,18 @@ impl Mover {
                 LinkedPathType::MOVES_ON
             };
             self.paths.insert(0, new);
-            return if SHORT_PATHER || LONG_PATHER {
+            return Ok(if SHORT_PATHER || LONG_PATHER {
                 AfterRequest::Again
             } else {
                 AfterRequest::Walk
-            };
+            });
         }
         let mut i = path.points.len() as i32 - 1;
         while 0 < i {
-            let (a, b) = (path.points[i as usize], path.points[i as usize - 1]);
+            let (a, b) = (
+                *path.points.checked(i as usize)?,
+                *path.points.checked(i as usize - 1)?,
+            );
             let mut d = fmath::sub(a, b);
             d = d.with_height(0.0);
             if SPLIT < d.x() * d.x() + 0.0 + d.y() * d.y() {
@@ -139,7 +144,7 @@ impl Mover {
         if !solid {
             // the walked level lets its path go (FUN_140f95b70): it holds none (path id -1),
             // which reads as no points, flags, length or time
-            let level = &mut self.paths[0];
+            let level = self.paths.walked_mut()?;
             level.has_path = false;
             level.points.clear();
             level.path_flags = PathFlags::NONE;
@@ -147,7 +152,7 @@ impl Mover {
             level.created = WorldTime::ZERO;
         }
         self.paths.insert(0, new);
-        AfterRequest::Walk
+        Ok(AfterRequest::Walk)
     }
 
     /// The objects the short pather ignores (`FUN_14114ece0`, its path from the unit, `line` the two

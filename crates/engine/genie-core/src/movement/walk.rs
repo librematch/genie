@@ -7,6 +7,7 @@ use crate::map::spatial::{RecordId, Spatial};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
+use crate::movement::Levels;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::{
@@ -37,7 +38,7 @@ impl Mover {
         hits: &[RecordId],
         computer: bool,
     ) -> Result<Next, GenieError> {
-        let level = &self.paths[0];
+        let level = self.paths.walked()?;
         let player = world
             .get(me.id)
             .ok_or(GenieError::unsupported("a walker without a place"))?
@@ -92,7 +93,7 @@ impl Mover {
             return Ok(Next::Done(Motion::Done));
         }
         let _ = self.paths.remove(0);
-        self.paths[0].state = PathState::WantsPath;
+        self.paths.walked_mut()?.state = PathState::WantsPath;
         Ok(Next::Again)
     }
 
@@ -129,7 +130,7 @@ impl Mover {
         flat = flat.with_height(0.0);
         let flat = fmath::normalize(flat);
         let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt));
-        if self.paths[0].flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
+        if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
             return Ok(clipped);
         }
         self.yaw(turn, self.facets())?;
