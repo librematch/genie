@@ -13,6 +13,7 @@ use genie_core::groups::Differentiator;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ListIndex;
 use genie_core::players::Amount;
+use genie_core::players::game_status::GameStatus;
 use genie_core::world::WorldTime;
 use genie_core::world::{GameState, World};
 use genie_save::Header;
@@ -70,7 +71,7 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
     let mut turns = slice(&save, None);
     let mut after = same(&save, &turns);
     turns.game_state = 2;
-    after.game.statuses = vec![(0, false), (1, false)];
+    after.game.statuses = vec![(GameStatus::PLAYING, false), (GameStatus::WON, false)];
     turns.players[1]
         .freezes
         .push((5, object_id(7), GenieError::unsupported("a test's freeze")));

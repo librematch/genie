@@ -91,7 +91,7 @@ impl World {
             return Ok(());
         }
         self.defeat_check(p)?;
-        if self.players.player(p)?.game_status == crate::players::game_status::PLAYING {
+        if self.players.player(p)?.game_status == crate::players::game_status::GameStatus::PLAYING {
             self.trickles(p)?;
             self.mill_food(p, time)?;
         }
@@ -144,7 +144,7 @@ impl World {
                 player.sudden_death_eliminable = true;
             }
         }
-        if self.players.player(p)?.game_status == crate::players::game_status::LOST {
+        if self.players.player(p)?.game_status == crate::players::game_status::GameStatus::LOST {
             return Ok(());
         }
         let kingless = self.settings.regicide()
@@ -155,7 +155,7 @@ impl World {
                 .list(ListKey::master(ids::KING))
                 .is_empty();
         if !stays || kingless {
-            self.set_status(p, crate::players::game_status::LOST)?;
+            self.set_status(p, crate::players::game_status::GameStatus::LOST)?;
             set(
                 &mut self.players.player_mut(p)?.attributes,
                 attribute::SURVIVAL,

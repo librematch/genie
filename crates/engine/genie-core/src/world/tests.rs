@@ -108,6 +108,7 @@ use crate::players::PlayerType;
 use crate::players::Relation;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::players::game_status::GameStatus;
 use crate::players::relation_row;
 use crate::players::relations;
 use crate::players::tracker::ListKey;
@@ -9647,7 +9648,7 @@ fn owner_search_unit(s: &mut Spatial, id: i32, p: PlayerId, x: f32) {
 
 /// Players of attribute 97 `attribute_97` and game status `status`, as an Artifact's owner
 /// search reads them.
-fn artifact_players(attribute_97: &[f32], status: &[u8]) -> Vec<Player> {
+fn artifact_players(attribute_97: &[f32], status: &[GameStatus]) -> Vec<Player> {
     status
         .iter()
         .enumerate()
@@ -9679,25 +9680,63 @@ fn an_owner_search_passes_over_a_player_out_of_the_game() {
     unit(&mut s, 1, PlayerId::new(1), 11.5);
     let none = [0.0; 3];
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(Some(PlayerId::new(1)))
     );
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 2, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::PLAYING]
+            )
+        ),
         Ok(None)
     );
     // of two players, the nearest takes it: player 2 once player 1 is out
     unit(&mut s, 2, PlayerId::new(2), 12.5);
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(Some(PlayerId::new(1)))
     );
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 2, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::PLAYING]
+            )
+        ),
         Ok(Some(PlayerId::new(2)))
     );
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 2, 1])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::WON]
+            )
+        ),
         Ok(None)
     );
 }
@@ -9721,20 +9760,44 @@ fn an_owner_search_keeps_the_owner_s_animal_unless_attribute_97_takes_it() {
     unit(&mut s, 1, PlayerId::new(1), 11.5);
     unit(&mut s, 2, PlayerId::new(2), 11.5);
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(None)
     );
     assert_eq!(
         s.artifact_owner(
             object_id(27530),
-            &artifact_players(&[0.0, 0.0, 1.0], &[0, 0, 0])
+            &artifact_players(
+                &[0.0, 0.0, 1.0],
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
         ),
         Ok(Some(PlayerId::new(2)))
     );
     assert_eq!(
         s.artifact_owner(
             object_id(27530),
-            &artifact_players(&[0.0, 1.0, 1.0], &[0, 0, 0])
+            &artifact_players(
+                &[0.0, 1.0, 1.0],
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
         ),
         Ok(None)
     );
@@ -9753,7 +9816,17 @@ fn an_owner_search_keeps_the_owner_s_animal_unless_attribute_97_takes_it() {
     };
     s.insert(object_id(3), building);
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(None)
     );
     let mut s = hands_world(
@@ -9766,7 +9839,17 @@ fn an_owner_search_keeps_the_owner_s_animal_unless_attribute_97_takes_it() {
     unit(&mut s, 1, PlayerId::new(1), 11.5);
     s.go_inside(object_id(27530), Position::new(10.5, 10.5, 0.0));
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(Some(PlayerId::new(1)))
     );
 }
@@ -9776,7 +9859,7 @@ fn an_owner_search_keeps_the_owner_s_animal_unless_attribute_97_takes_it() {
 #[test]
 fn an_owner_search_s_unmodelled_parts_fail() {
     let none = [0.0; 3];
-    let reason = |s: &Spatial, me, status: &[u8]| {
+    let reason = |s: &Spatial, me, status: &[GameStatus]| {
         s.artifact_owner(me, &artifact_players(&none, status))
             .unwrap_err()
             .reason()
@@ -9789,7 +9872,15 @@ fn an_owner_search_s_unmodelled_parts_fail() {
         Distance::new(2.0),
     );
     assert_eq!(
-        reason(&s, object_id(99), &[0, 0, 0]),
+        reason(
+            &s,
+            object_id(99),
+            &[
+                GameStatus::PLAYING,
+                GameStatus::PLAYING,
+                GameStatus::PLAYING
+            ]
+        ),
         "an owner search of an object the world does not hold"
     );
     let mut s = hands_world(
@@ -9801,7 +9892,15 @@ fn an_owner_search_s_unmodelled_parts_fail() {
     );
     owner_search_unit(&mut s, 1, PlayerId::new(3), 11.5);
     assert_eq!(
-        reason(&s, object_id(27530), &[0, 0, 0]),
+        reason(
+            &s,
+            object_id(27530),
+            &[
+                GameStatus::PLAYING,
+                GameStatus::PLAYING,
+                GameStatus::PLAYING
+            ]
+        ),
         "an owner search's unit of a player beyond the list"
     );
     let mut s = hands_world(
@@ -9818,7 +9917,15 @@ fn an_owner_search_s_unmodelled_parts_fail() {
     };
     s.insert(object_id(1), stopped);
     assert_eq!(
-        reason(&s, object_id(27530), &[0, 0, 0]),
+        reason(
+            &s,
+            object_id(27530),
+            &[
+                GameStatus::PLAYING,
+                GameStatus::PLAYING,
+                GameStatus::PLAYING
+            ]
+        ),
         "an owner search near a stopped unit that counts"
     );
 }
@@ -9856,12 +9963,32 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
     owner_search_unit(&mut s, 1, PlayerId::new(1), 11.5);
     let none = [0.0; 3];
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(None)
     );
     owner_search_unit(&mut s, 2, PlayerId::new(1), 12.5);
     assert_eq!(
-        s.artifact_owner(object_id(27530), &artifact_players(&none, &[0, 0, 0])),
+        s.artifact_owner(
+            object_id(27530),
+            &artifact_players(
+                &none,
+                &[
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING,
+                    GameStatus::PLAYING
+                ]
+            )
+        ),
         Ok(Some(PlayerId::new(1)))
     );
 }

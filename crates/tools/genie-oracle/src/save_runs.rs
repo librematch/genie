@@ -69,8 +69,8 @@ fn player_differences(
     {
         let d = format!(
             "game status slice {:?} game {:?} (status, resigned)",
-            (player.game_status, player.resigned),
-            (status, resigned)
+            (player.game_status.get(), player.resigned),
+            (status.get(), resigned)
         );
         report.differences.push((id, d));
     }

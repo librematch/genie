@@ -27,7 +27,7 @@ use crate::orders::Place;
 use crate::orders::object_gone;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::game_status::LOST;
+use crate::players::game_status::GameStatus;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -88,7 +88,8 @@ impl World {
         // TRIBE combat objects' type, whose slot 0xa0 is `FUN_14121cc40`.
         // A player's game status once it lost (`+0x89`).
         // A town centre's master whose delete also tells the world's `+0x820` (`FUN_1414615d0`).
-        let lost_ally = self.players.player(owner)?.game_status == LOST && mutual(player, owner);
+        let lost_ally =
+            self.players.player(owner)?.game_status == GameStatus::LOST && mutual(player, owner);
         if owner != player && !self.settings.cheats_enabled && !lost_ally {
             return Ok(());
         }

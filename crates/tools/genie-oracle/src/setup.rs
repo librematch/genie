@@ -6,6 +6,7 @@ use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::objects::ListIndex;
 use genie_core::players::Amount;
+use genie_core::players::game_status::GameStatus;
 use genie_core::production::LocationButton;
 use genie_core::technology::EffectId;
 use genie_core::world::Millis;
@@ -173,7 +174,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 unsupported: None,
                 freezes: Vec::new(),
                 stopped: false,
-                game_status: p.world_player().base.game_status,
+                game_status: GameStatus::of_data(p.world_player().base.game_status),
                 // `+0x8b` holds the drop in its bit 1 (the load moves it to `+0x8c`)
                 resigned: p.world_player().base.resigned & 2 == 0
                     && p.world_player().base.resigned != 0,

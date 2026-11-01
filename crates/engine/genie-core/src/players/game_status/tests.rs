@@ -892,7 +892,10 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
     let mut t = game();
     t.resign(player_id(1), false).unwrap();
     let p = &t.players[1];
-    assert_eq!((p.game_status, p.resigned, p.dropped), (LOST, true, false));
+    assert_eq!(
+        (p.game_status, p.resigned, p.dropped),
+        (GameStatus::LOST, true, false)
+    );
     assert_eq!(p.attributes[0], Amount::new(46.0));
     assert_eq!(
         (p.attributes[80], p.attributes[81]),
@@ -913,7 +916,7 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
     assert_eq!(t.game_state, 1);
     assert_eq!(
         (t.players[1].game_status, t.players[2].game_status),
-        (LOST, WON)
+        (GameStatus::LOST, GameStatus::WON)
     );
 }
 
@@ -943,10 +946,15 @@ fn early_in_the_game_a_resignation_leaves_the_objects_alone() {
 #[test]
 fn one_side_left_after_a_resignation_ends_a_conquest_game() {
     let mut c = Count::default();
-    c.add(PlayerId::new(1), LOST, 0, (Relation::ALLY, Relation::ALLY));
+    c.add(
+        PlayerId::new(1),
+        GameStatus::LOST,
+        0,
+        (Relation::ALLY, Relation::ALLY),
+    );
     c.add(
         PlayerId::new(2),
-        PLAYING,
+        GameStatus::PLAYING,
         0,
         (Relation::ALLY, Relation::ALLY),
     );
@@ -955,13 +963,13 @@ fn one_side_left_after_a_resignation_ends_a_conquest_game() {
     let mut c = Count::default();
     c.add(
         PlayerId::new(1),
-        PLAYING,
+        GameStatus::PLAYING,
         0,
         (Relation::ALLY, Relation::ALLY),
     );
     c.add(
         PlayerId::new(2),
-        PLAYING,
+        GameStatus::PLAYING,
         0,
         (Relation::ENEMY, Relation::ENEMY),
     );
@@ -970,15 +978,25 @@ fn one_side_left_after_a_resignation_ends_a_conquest_game() {
     let mut c = Count::default();
     c.add(
         PlayerId::new(1),
-        PLAYING,
+        GameStatus::PLAYING,
         1,
         (Relation::ALLY, Relation::ALLY),
     );
     c.add(
         PlayerId::new(2),
-        PLAYING,
+        GameStatus::PLAYING,
         1,
         (Relation::ALLY, Relation::ALLY),
     );
     assert_eq!((c.playing, c.side), (2, 1));
+}
+
+/// A game status keeps the game's byte; won and lost are the ended ones.
+#[test]
+fn a_game_status_keeps_its_byte_and_knows_the_ended_ones() {
+    assert_eq!(GameStatus::of_data(2), GameStatus::LOST);
+    assert_eq!(GameStatus::WON.get(), 1);
+    assert_eq!(GameStatus::default(), GameStatus::PLAYING);
+    assert!(GameStatus::WON.ended() && GameStatus::LOST.ended());
+    assert!(!GameStatus::PLAYING.ended() && !GameStatus::of_data(3).ended());
 }

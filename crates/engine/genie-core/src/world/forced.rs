@@ -33,7 +33,7 @@ pub struct GameState {
     /// Every player's technology states.
     pub techs: Vec<Vec<crate::technology::TechState>>,
     /// Every player's game status and resignation (`+0x89`, `+0x8b`).
-    pub statuses: Vec<(u8, bool)>,
+    pub statuses: Vec<(crate::players::game_status::GameStatus, bool)>,
     /// The world's game state (`+0x88`).
     pub game_state: u32,
     /// Objects the slice modelled but got wrong this tick: they take the game's state too.
@@ -307,6 +307,7 @@ mod tests {
     use super::*;
     use crate::map::Position;
     use crate::objects::masters::ids;
+    use crate::players::game_status::GameStatus;
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
     use crate::world::tests::forage_world;
@@ -348,7 +349,7 @@ mod tests {
             resources: vec![[0.0; 4], [1.0, 2.0, 3.0, 4.0]],
             pending_debit: vec![[0.0; 4], [5.0; 4]],
             techs: vec![vec![], vec![crate::technology::TechState::default(); 2]],
-            statuses: vec![(0, false), (2, true)],
+            statuses: vec![(GameStatus::PLAYING, false), (GameStatus::LOST, true)],
             ..GameState::default()
         };
         let mut t = forage_world();
@@ -357,7 +358,10 @@ mod tests {
         assert!(!t.force_player_values(PlayerId::new(1), &game).unwrap());
         let player = &t.players[1];
         assert_eq!(player.resources(), before);
-        assert_eq!((player.game_status, player.resigned), (2, true));
+        assert_eq!(
+            (player.game_status, player.resigned),
+            (GameStatus::LOST, true)
+        );
         assert!(player.unsupported.is_none());
         t.players[1].stopped = true;
         assert!(t.force_player_values(PlayerId::new(1), &game).unwrap());

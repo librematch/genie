@@ -127,7 +127,7 @@ pub struct Player {
     /// A command the slice could not model stopped the whole player: its objects freeze.
     pub stopped: bool,
     /// `game_status` (`+0x89`, saved): playing, won or lost ([`crate::players::game_status`]).
-    pub game_status: u8,
+    pub game_status: crate::players::game_status::GameStatus,
     /// `+0x8b` (saved with `+0x8c` as its bit 1): the player resigned (slot 3, RESIGN).
     pub resigned: bool,
     /// `+0x8c`: its resignation was a drop from the game.

@@ -11,6 +11,7 @@ use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::objects::ObjectId;
+use genie_core::players::game_status::GameStatus;
 use genie_core::world::World;
 use genie_save::Header;
 
@@ -547,7 +548,7 @@ pub(super) fn game_state(
         game.pending_debit.push(p.world_player().base.pending_debit);
         let base = &p.world_player().base;
         game.statuses.push((
-            base.game_status,
+            GameStatus::of_data(base.game_status),
             base.resigned & 2 == 0 && base.resigned != 0,
         ));
         let techs = &p.world_player().tech_tree.tech_player_tree;

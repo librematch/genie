@@ -19,12 +19,43 @@ use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::WorldTime;
 
-/// The player still plays.
-pub const PLAYING: u8 = 0;
-/// The player won.
-pub const WON: u8 = 1;
-/// The player lost (or resigned).
-pub const LOST: u8 = 2;
+/// A player's game status (`game_status`, `+0x89`, saved): playing, won or lost. Every byte is
+/// kept.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct GameStatus(u8);
+
+impl GameStatus {
+    /// 0: the player still plays.
+    pub const PLAYING: Self = Self(0);
+    /// 1: the player won.
+    pub const WON: Self = Self(1);
+    /// 2: the player lost (or resigned).
+    pub const LOST: Self = Self(2);
+
+    /// The status of the save's byte `value`.
+    #[must_use]
+    pub const fn of_data(value: u8) -> Self {
+        Self(value)
+    }
+
+    /// Whether the player's game ended: won or lost.
+    #[must_use]
+    pub const fn ended(self) -> bool {
+        matches!(self, Self::WON | Self::LOST)
+    }
+
+    /// The byte, as the save holds it.
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+impl genie_diff::Diff for GameStatus {
+    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, d);
+    }
+}
 
 /// The game mode whose status changes shrink the map (battle royale, 12).
 const BATTLE_ROYALE: i32 = 12;
@@ -71,12 +102,12 @@ impl Count {
     fn add(
         &mut self,
         i: PlayerId,
-        status: u8,
+        status: GameStatus,
         allied_victory: u8,
         relations: (crate::players::Relation, crate::players::Relation),
     ) {
         match status {
-            PLAYING => {
+            GameStatus::PLAYING => {
                 self.playing += 1;
                 if self.first != PlayerId::GAIA && self.side != 0 {
                     // another side unless the two count each other's victory as their own
@@ -91,8 +122,8 @@ impl Count {
                     self.first = i;
                 }
             }
-            WON => self.won += 1,
-            LOST => self.lost += 1,
+            GameStatus::WON => self.won += 1,
+            GameStatus::LOST => self.lost += 1,
             _ => {}
         }
     }

@@ -6,7 +6,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::game_status::{
-    BATTLE_ROYALE, Count, DEFEAT_IDS, KILLS_OF, LOST, PLAYING, STOP_AFTER_MS, WON,
+    BATTLE_ROYALE, Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_AFTER_MS,
 };
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -59,7 +59,7 @@ impl World {
             ))?;
         p.dropped = dropped;
         p.resigned = true;
-        self.set_status(player, LOST)
+        self.set_status(player, GameStatus::LOST)
     }
 
     /// The status setter (slot 1, `FUN_141639860`) of player `p`: `FUN_1416768e0` takes the new
@@ -76,13 +76,13 @@ impl World {
     /// ([`World::stop_everything`]) once the game is a minute old; its fealty (`+0x12f8`) would
     /// give its resources and units away while the game goes on, which is not modelled. A
     /// newly lost player's history takes its defeat ([`World::defeat_event`]).
-    pub(crate) fn set_status(&mut self, p: PlayerId, status: u8) -> Result<(), GenieError> {
+    pub(crate) fn set_status(&mut self, p: PlayerId, status: GameStatus) -> Result<(), GenieError> {
         let old = self.players.player(p)?.game_status;
-        if status != old && (!self.players.player(p)?.resigned || status == LOST) {
+        if status != old && (!self.players.player(p)?.resigned || status == GameStatus::LOST) {
             self.players.player_mut(p)?.game_status = status;
         }
         let now = self.players.player(p)?.game_status;
-        if now != old && matches!(now, WON | LOST) && !self.game_ended() {
+        if now != old && now.ended() && !self.game_ended() {
             // the map revealed to the player (FUN_1412847b0 with 0x4000000040000000): every
             // tile of the unified map and the player's masks take the ended bits; the view's
             // refresh (FUN_140c80bb0) is not held
@@ -93,14 +93,15 @@ impl World {
                 "a status change in a battle royale (game mode 12)",
             ));
         }
-        if now == LOST {
+        if now == GameStatus::LOST {
             if STOP_AFTER_MS < self.world_time {
                 self.stop_everything(p)?;
             }
-            if old != LOST {
+            if old != GameStatus::LOST {
                 self.defeat_event(p)?;
             }
-            if old != LOST && 0 < self.players.player(p)?.fealty && self.game_state == 0 {
+            if old != GameStatus::LOST && 0 < self.players.player(p)?.fealty && self.game_state == 0
+            {
                 return Err(GenieError::unsupported(
                     "a defeated player's fealty (its resources and units given away)",
                 ));
@@ -148,9 +149,9 @@ impl World {
     /// `FUN_14165d720`: player `i`'s status for the victory check. A player still playing whose
     /// victory conditions are met (`FUN_1414f35d0`) wins (slot 1 with won; the world's `+0x8c`,
     /// 2, is not held); one counting its allies' victory as its own is not modelled.
-    pub(super) fn own_victory(&mut self, i: PlayerId) -> Result<u8, GenieError> {
+    pub(super) fn own_victory(&mut self, i: PlayerId) -> Result<GameStatus, GenieError> {
         let p = &self.players.player(i)?;
-        if p.game_status == LOST || p.victory != 2 {
+        if p.game_status == GameStatus::LOST || p.victory != 2 {
             return Ok(p.game_status);
         }
         if p.allied_victory != 0 {
@@ -158,7 +159,7 @@ impl World {
                 "a player's victory with its allies' (allied victory)",
             ));
         }
-        self.set_status(i, WON)?;
+        self.set_status(i, GameStatus::WON)?;
         Ok(self.players.player(i)?.game_status)
     }
 
@@ -184,17 +185,17 @@ impl World {
             count.add(i, status, allied_victory, rel);
         }
         let outcome = if 0 < count.won {
-            LOST
+            GameStatus::LOST
         } else if self.victory_conquest
             && ((0 < count.lost && 0 < count.side) || count.playing == 0)
         {
-            WON
+            GameStatus::WON
         } else {
             return Ok(());
         };
         self.game_state = 1;
         for i in PlayerId::each(self.players.len()).skip(1) {
-            if self.players.player(i)?.game_status == PLAYING
+            if self.players.player(i)?.game_status == GameStatus::PLAYING
                 && let Err(e) = self.set_status(i, outcome)
             {
                 self.stop_player(i, e);

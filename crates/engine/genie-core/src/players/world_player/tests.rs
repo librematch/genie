@@ -17,7 +17,7 @@ use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute;
-use crate::players::game_status::{LOST, PLAYING};
+use crate::players::game_status::GameStatus;
 use crate::players::relation_row;
 use crate::players::tracker::Key;
 use crate::technology::ResearchState;
@@ -191,7 +191,7 @@ fn the_trickles_give_a_sixtieth_of_their_rate_each_second() {
         [166, 167, 168, 169, 49].map(|k| p.attributes[k]),
         crate::test_ids::amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
     );
-    t.players[1].game_status = LOST;
+    t.players[1].game_status = GameStatus::LOST;
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].attributes[3], Amount::new(1.0));
 }
@@ -361,7 +361,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
     t.players[1].objects = vec![object(3, master_id(117), ObjectState::Alive)].into();
     t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, LOST);
+    assert_eq!(t.players[1].game_status, GameStatus::LOST);
     assert_eq!(t.players[1].attributes[45], Amount::ZERO);
     // one that a villager keeps plays on
     let mut t = world();
@@ -374,7 +374,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
     .into();
     t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, PLAYING);
+    assert_eq!(t.players[1].game_status, GameStatus::PLAYING);
     assert_eq!(t.players[1].attributes[45], Amount::new(1.0));
 }
 
@@ -469,20 +469,20 @@ fn sudden_death_and_regicide_end_a_player_their_ways() {
     t.players[1].tracker.add(object_id(5), tc_key);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert!(t.players[1].sudden_death_eliminable);
-    assert_eq!(t.players[1].game_status, PLAYING);
+    assert_eq!(t.players[1].game_status, GameStatus::PLAYING);
     assert_eq!(t.first_town_centre(PlayerId::new(1)), Some(object_id(5)));
     // the town centre falls (state 3): the villager no longer keeps the player
     t.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Dying;
     assert_eq!(t.first_town_centre(PlayerId::new(1)), None);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, LOST);
+    assert_eq!(t.players[1].game_status, GameStatus::LOST);
     // regicide (sub-mode bit 2): no king, a villager notwithstanding
     let mut t = world();
     t.masters = vec![masters; 4];
     t.settings.sub_game_mode_flag = 4;
     t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, LOST);
+    assert_eq!(t.players[1].game_status, GameStatus::LOST);
     let mut t2 = world();
     t2.settings.game_mode = 1;
     t2.players[1].tracker.add(
@@ -495,7 +495,7 @@ fn sudden_death_and_regicide_end_a_player_their_ways() {
         },
     );
     t2.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t2.players[1].game_status, PLAYING);
+    assert_eq!(t2.players[1].game_status, GameStatus::PLAYING);
 }
 
 /// `FUN_141625a20`'s count: masters of type 70 and up, had, not disabled, trained at the

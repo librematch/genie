@@ -69,7 +69,7 @@ impl World {
         let n = self.players.len();
         let mut masks: ByPlayer<VisionMasks> = PlayerId::each(self.players.len())
             .zip(&self.players)
-            .map(|(p, player)| own_masks(p, matches!(player.game_status, 1 | 2)))
+            .map(|(p, player)| own_masks(p, player.game_status.ended()))
             .collect();
         let mut flares = Vec::new();
         for (p, me) in PlayerId::each(self.players.len())
