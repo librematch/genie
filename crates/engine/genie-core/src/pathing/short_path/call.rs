@@ -13,7 +13,7 @@ use crate::pathing::ShapeId;
 use crate::pathing::ShortFound;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::short_path::{
-    Ctx, FixedPoint, Goal, NodeIndex, Search, TO_FIXED, TO_FLOAT, clip, tile_of,
+    Ctx, FixedPoint, Goal, NodeIndex, Search, Started, TO_FIXED, TO_FLOAT, clip, tile_of,
 };
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
@@ -374,7 +374,7 @@ impl Pather {
         };
         let started = s.start(q.from);
         self.remove_terrain(mesh);
-        Ok(started? == 2)
+        Ok(started? == Started::Stuck)
     }
 
     /// `FUN_140fa53d0`. Its call counter (`DAT_143f0f364 += 1` at entry) has no reader (its only

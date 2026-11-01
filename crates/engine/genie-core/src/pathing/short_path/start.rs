@@ -41,15 +41,28 @@ fn float_distance(p: FixedPoint, a: FixedPoint) -> FixedDistance {
     FixedDistance::new((fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
+/// What the search's start found (`FUN_140fa4410`'s result).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Started {
+    /// 0: the start is free; its node is open.
+    Free,
+    /// 1: a shape holds the start; the cheapest of its escape candidates stays open.
+    Escaped,
+    /// 2: a shape holds the start, with fewer than two escape candidates.
+    Stuck,
+    /// 3: the start lies within range already.
+    InRange,
+}
+
 impl Search<'_> {
-    /// `FUN_140fa4410`: the start's node (type 0, cost 0, the Euclidean estimate); 3 when the start
-    /// already lies within range, 0 when it is free (the node opened), else the escape
-    /// candidates (type 2) around it within twice the radius: 2 for fewer than two, else 1 with
-    /// only the cheapest kept open.
-    pub(super) fn start(&mut self, p: FixedPoint) -> Result<i32, GenieError> {
+    /// `FUN_140fa4410`: the start's node (type 0, cost 0, the Euclidean estimate); in range when
+    /// the start already lies within range, free when no shape holds it (the node opened), else
+    /// the escape candidates (type 2) around it within twice the radius: stuck for fewer than
+    /// two, else escaped with only the cheapest kept open.
+    pub(super) fn start(&mut self, p: FixedPoint) -> Result<Started, GenieError> {
         let g = &self.goal;
         if g.range2 >= g.rect_distance2(p) {
-            return Ok(3);
+            return Ok(Started::InRange);
         }
         let fx = (g.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
         let fy = (g.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
@@ -67,11 +80,11 @@ impl Search<'_> {
         self.arena.push(start);
         if self.ctx.holder(p)?.is_none() {
             self.push(start);
-            return Ok(0);
+            return Ok(Started::Free);
         }
         self.escape_candidates(p, start.idx)?;
         if self.open.len() < 2 {
-            return Ok(2);
+            return Ok(Started::Stuck);
         }
         let keep = self.open.len() - 1;
         let _ = self.open.drain(..keep);
@@ -80,7 +93,7 @@ impl Search<'_> {
         n.f = f;
         let idx = n.idx;
         self.node_mut(idx)?.f = f;
-        Ok(1)
+        Ok(Started::Escaped)
     }
 
     /// `FUN_140fa4410`'s scan around a held start `p`: every side of every shape not ignored

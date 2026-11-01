@@ -268,7 +268,7 @@ fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
         r,
         &mut t,
     );
-    assert_eq!((hit, t), (Some((1, ShapeSide::LowX)), ONE / 2));
+    assert_eq!((hit, t), (Some((Meet::Cross, ShapeSide::LowX)), ONE / 2));
     // a ray going the other way meets the right side
     let mut t = T_START;
     let hit = ray_rect(
@@ -277,7 +277,7 @@ fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
         r,
         &mut t,
     );
-    assert_eq!((hit, t), (Some((1, ShapeSide::HighX)), ONE / 4));
+    assert_eq!((hit, t), (Some((Meet::Cross, ShapeSide::HighX)), ONE / 4));
     // a ray beside the box meets nothing
     let mut t = T_START;
     assert_eq!(
@@ -310,7 +310,7 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
             FixedPoint::new(x, 3 * ONE),
             T_START
         ),
-        (Some((1, ShapeSide::LowY)), ONE / 4)
+        (Some((Meet::Cross, ShapeSide::LowY)), ONE / 4)
     );
     // down from 3 to -1: the top at a quarter
     assert_eq!(
@@ -319,7 +319,7 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
             FixedPoint::new(x, -ONE),
             T_START
         ),
-        (Some((1, ShapeSide::HighY)), ONE / 4)
+        (Some((Meet::Cross, ShapeSide::HighY)), ONE / 4)
     );
     // a nearer hit already: none
     assert_eq!(
@@ -357,26 +357,63 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
         FixedPoint::new(2 * ONE + 3 * ONE / 4, 3 * ONE),
     );
     let mut t = T_START;
-    let k = segment_hit(
+    let Some(k) = segment_hit(
         a,
         b,
         FixedPoint::new(2 * ONE, 0),
         FixedPoint::new(3 * ONE, 0),
         &mut t,
-    );
-    assert_ne!(k, 0);
+    ) else {
+        panic!("the ray meets the bottom");
+    };
     assert_eq!(cast(a, b, T_START), (Some((k, ShapeSide::LowY)), t));
     // and down through the top
     let mut t = T_START;
-    let k = segment_hit(
+    let Some(k) = segment_hit(
         b,
         a,
         FixedPoint::new(2 * ONE, 2 * ONE),
         FixedPoint::new(3 * ONE, 2 * ONE),
         &mut t,
-    );
-    assert_ne!(k, 0);
+    ) else {
+        panic!("the ray meets the top");
+    };
     assert_eq!(cast(b, a, T_START), (Some((k, ShapeSide::HighY)), t));
+}
+
+/// `FUN_140faa380`'s four outcomes: a proper crossing (its parameter into `t`), a touch at the
+/// ray's end, a touch at the ray's start on the segment's end (`t` 0), and none for a parallel
+/// segment or one beyond `t`.
+#[test]
+fn a_segment_meets_a_ray_by_crossing_or_touching() {
+    let p = |x: i32, y: i32| FixedPoint::new(x * ONE, y * ONE);
+    let (c, e) = (p(2, 0), p(2, 2));
+    let mut t = T_START;
+    assert_eq!(
+        segment_hit(p(0, 1), p(4, 1), c, e, &mut t),
+        Some(Meet::Cross)
+    );
+    assert_eq!(t, ONE / 2);
+    let mut t = T_START;
+    assert_eq!(
+        segment_hit(p(0, 1), p(2, 1), c, e, &mut t),
+        Some(Meet::Touch)
+    );
+    assert_eq!(t, ONE);
+    let mut t = T_START;
+    assert_eq!(
+        segment_hit(c, p(4, 1), c, e, &mut t),
+        Some(Meet::TouchAtStart)
+    );
+    assert_eq!(t, 0);
+    let mut t = T_START;
+    assert_eq!(
+        segment_hit(p(0, 1), p(4, 1), p(0, 2), p(4, 2), &mut t),
+        None
+    );
+    let mut t = ONE / 4;
+    assert_eq!(segment_hit(p(0, 1), p(4, 1), c, e, &mut t), None);
+    assert_eq!(t, ONE / 4);
 }
 
 /// `FUN_140fa16d0`: a segment through the box keeps the part inside, each end moved to the
@@ -995,9 +1032,15 @@ fn shape_at_2_2() -> Mesh {
 fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
     let mesh = shape_at_2_2();
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 2 * ONE);
-    assert_eq!(s.start(FixedPoint::new(11 * ONE, 12 * ONE)).unwrap(), 3);
+    assert_eq!(
+        s.start(FixedPoint::new(11 * ONE, 12 * ONE)).unwrap(),
+        Started::InRange
+    );
     assert_eq!((s.arena.len(), s.open.len()), (1, 0));
-    assert_eq!(s.start(FixedPoint::new(10 * ONE, 10 * ONE)).unwrap(), 0);
+    assert_eq!(
+        s.start(FixedPoint::new(10 * ONE, 10 * ONE)).unwrap(),
+        Started::Free
+    );
     assert_eq!((s.arena.len(), s.open.len()), (2, 1));
     assert_eq!(
         (s.open[0].at, s.open[0].kind),
@@ -1005,7 +1048,10 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
     );
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.goal.r = FixedDistance::TILE;
-    assert_eq!(s.start(FixedPoint::new(4 * ONE, 3 * ONE)).unwrap(), 1);
+    assert_eq!(
+        s.start(FixedPoint::new(4 * ONE, 3 * ONE)).unwrap(),
+        Started::Escaped
+    );
     assert_eq!(s.open.len(), 1);
     let n = s.open[0];
     // the touching point on side 1 has the lowest estimate toward (12, 12)
@@ -1020,7 +1066,10 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
     assert_eq!(s.node(n.idx).unwrap().f, n.f);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.goal.r = FixedDistance::new(ONE / 8);
-    assert_eq!(s.start(FixedPoint::new(4 * ONE, 4 * ONE)).unwrap(), 2);
+    assert_eq!(
+        s.start(FixedPoint::new(4 * ONE, 4 * ONE)).unwrap(),
+        Started::Stuck
+    );
 }
 
 /// `FUN_140fa4410`'s scan: every corner tile of the box twice the radius out is read once;

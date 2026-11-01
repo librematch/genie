@@ -26,8 +26,9 @@ mod token;
 pub use self::call::{Call, Entry, Listed, Pather, Query, ShortPath, Target, to_path};
 #[cfg(test)]
 use self::geometry::segment_hit;
-use self::geometry::{contact_point, ray_rect, shrunk_corner, snap_to_side};
+use self::geometry::{Meet, contact_point, ray_rect, shrunk_corner, snap_to_side};
 use self::nodes::{Corner, Foot, cheb, clamp_to_box, clip, corner_emits, in_box};
+use self::start::Started;
 use self::token::Token;
 
 /// `DAT_142f43b10`, `DAT_142f43a10`: fixed point to float and back.

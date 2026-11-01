@@ -1,11 +1,12 @@
 //! The search's run: its main loop and a popped node's expansion by its type.
 
 use crate::pathing::short_path::axis_dir::AxisDir;
+use crate::pathing::short_path::outline::Outline;
 use crate::pathing::short_path::{
-    Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, NUDGES, Node, NodeIndex,
-    OPEN_CORNER_WITHOUT_EMIT, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, ShortPath, T_START,
-    TO_FIXED, TO_FLOAT, UNSET, VertexIndex, WalkDir, cheb, corner_emits, float_distance, in_box,
-    isqrt, through_float,
+    Callback, Corner, Ctx, Emit, FixedPoint, Hit, Kind, Meet, NUDGES, Node, NodeIndex,
+    OPEN_CORNER_WITHOUT_EMIT, Poly, PolyIndex, RECT_HEURISTIC, Run, Search, ShortPath, Started,
+    T_START, TO_FIXED, TO_FLOAT, UNSET, VertexIndex, WalkDir, cheb, corner_emits, float_distance,
+    in_box, isqrt, through_float,
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide, ShortFound};
 use crate::world::slots::CheckedIndex;
@@ -49,7 +50,8 @@ impl Search<'_> {
         }
         self.polys.push(Poly::default());
         let mut poly = Poly::default();
-        let mut rc = self.trace(shape, side, Some(p), &mut poly)?;
+        // the game's code: 1 the trace's step limit, 2 a vertex on an older polygon's edge
+        let mut failed = self.trace(shape, side, Some(p), &mut poly)? == Outline::StepLimit;
         let last = self.polys.len() - 1;
         'older: for j in 0..last {
             for k in 0..poly.vertices.len() {
@@ -62,14 +64,14 @@ impl Search<'_> {
                     d,
                 );
                 if hit.is_some() {
-                    rc = 2;
+                    failed = true;
                     continue 'older;
                 }
             }
         }
         let empty = poly.vertices.is_empty();
         *self.polys.checked_mut(last)? = poly;
-        if rc == 1 || rc == 2 || empty {
+        if failed || empty {
             return Ok(Some(ShortPath {
                 result: ShortFound::Invalid,
                 points: Vec::new(),
@@ -238,7 +240,7 @@ impl Search<'_> {
                 return Ok(());
             }
         }
-        if let Some((1, hit)) = found {
+        if let Some((Meet::Cross, hit)) = found {
             let mut h = Self::at_fraction(p, t, frac);
             let shape = self.settle(&mut h, hit)?;
             if h != p {
@@ -307,21 +309,21 @@ impl Search<'_> {
 impl Search<'_> {
     /// The search itself, after the prologue: the start, the main loop, the path.
     pub(super) fn run(&mut self, start: FixedPoint) -> Result<ShortPath, GenieError> {
-        let res4410 = self.start(start)?;
-        match res4410 {
-            3 => {
+        let started = self.start(start)?;
+        match started {
+            Started::InRange => {
                 return Ok(ShortPath {
                     result: ShortFound::InRange,
                     points: Vec::new(),
                 });
             }
-            2 => {
+            Started::Stuck => {
                 return Ok(ShortPath {
                     result: ShortFound::Blocked,
                     points: Vec::new(),
                 });
             }
-            _ => {}
+            Started::Free | Started::Escaped => {}
         }
         self.goal_node = None;
         self.best = NodeIndex::START;
@@ -367,7 +369,7 @@ impl Search<'_> {
             }
             node = parent;
         }
-        if res4410 == 0 {
+        if started == Started::Free {
             pts.push(start);
         }
         // the smoothing, with half the radius
@@ -390,7 +392,7 @@ impl Search<'_> {
             }
             i += 1;
         }
-        if res4410 != 0 {
+        if started != Started::Free {
             pts.push(start);
         }
         pts.reverse();
@@ -426,7 +428,7 @@ impl Search<'_> {
                             points: vec![start, p, t],
                         }));
                     }
-                    Some((2, hit)) => self.touch_from(n, p, t, frac, hit)?,
+                    Some((Meet::Touch, hit)) => self.touch_from(n, p, t, frac, hit)?,
                     Some((_, hit)) => {
                         let mut h = Self::at_fraction(p, t, frac);
                         let shape = self.settle(&mut h, hit)?;
@@ -520,8 +522,8 @@ impl Search<'_> {
 }
 
 /// Whether a raycast's hit is a touch (its result 2), which the corner's nudges try to get past.
-const fn touches(found: Option<(i32, Hit)>) -> bool {
-    matches!(found, Some((2, _)))
+const fn touches(found: Option<(Meet, Hit)>) -> bool {
+    matches!(found, Some((Meet::Touch, _)))
 }
 
 /// `FUN_140fa31b0`: the point on the circle of `range` around `goal` toward `p` (the goal itself

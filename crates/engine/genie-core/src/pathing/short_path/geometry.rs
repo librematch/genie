@@ -88,22 +88,34 @@ pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d:
     }
 }
 
+/// How a ray meets a segment or a shape's side (the non-zero results of [`segment_hit`], the
+/// ray's side tests and [`ray_rect`]; the game's 0 for none is `None`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Meet {
+    /// 1: a proper crossing.
+    Cross,
+    /// 2: a touch or a graze.
+    Touch,
+    /// 3: a touch at the ray's start on an end of the segment.
+    TouchAtStart,
+}
+
 /// `FUN_140faa380`: segment `a`–`b` against segment `c`–`e` in fixed point; `t` the parameter along
-/// `a`–`b` (`ONE` is `b`). 1: a proper crossing nearer than `t`; 2: a touch or graze (tolerances
-/// 1e-4 and 1e-3); 3: a touch at `a` itself on an end of `c`–`e`; 0: none. Sets `t` on a hit.
+/// `a`–`b` (`ONE` is `b`). A proper crossing nearer than `t`; a touch or graze (tolerances 1e-4
+/// and 1e-3); a touch at `a` itself on an end of `c`–`e`; none. Sets `t` on a hit.
 pub(super) fn segment_hit(
     a: FixedPoint,
     b: FixedPoint,
     c: FixedPoint,
     e: FixedPoint,
     t: &mut i32,
-) -> i32 {
+) -> Option<Meet> {
     let w = |v: i32| i64::from(v);
     let (x1, y1, x2, y2) = (w(a.x()), w(a.y()), w(b.x()), w(b.y()));
     let (x3, y3, x4, y4) = (w(c.x()), w(c.y()), w(e.x()), w(e.y()));
     let den = (((y4 - y3) * (x2 - x1)) >> 22) - (((y2 - y1) * (x4 - x3)) >> 22);
     if den == 0 {
-        return 0;
+        return None;
     }
     let ua =
         (((((y1 - y3) * (x4 - x3)) >> 22) - (((y4 - y3) * (x1 - x3)) >> 22)) * 0x40_0000) / den;
@@ -113,57 +125,57 @@ pub(super) fn segment_hit(
     let mut test_ub_low = true;
     if ua < 0x1a3 {
         if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
-            return 0;
+            return None;
         }
     } else if 0x3f_fe5d < ua {
         if 0x40_1062 < ua || current <= ua {
-            return 0;
+            return None;
         }
     } else {
         if current <= ua {
-            return 0;
+            return None;
         }
         if 0x1a2 < ub {
             if ub < 0x3f_fe5e {
                 *t = ua as i32;
-                return 1;
+                return Some(Meet::Cross);
             }
             test_ub_low = false;
         }
     }
     if test_ub_low && ub < -0x1062 {
-        return 0;
+        return None;
     }
     if 0x40_1062 < ub {
-        return 0;
+        return None;
     }
     *t = ua as i32;
-    if ua == 0 && (ub & !0x40_0000) == 0 {
-        3
+    Some(if ua == 0 && (ub & !0x40_0000) == 0 {
+        Meet::TouchAtStart
     } else {
-        2
-    }
+        Meet::Touch
+    })
 }
 
 /// `FUN_140faa4e0`: the ray `a`–`b` against the sides of the rectangle `r` it faces (the right side
-/// for a ray going left, the left for one going right, then the bottom or the top): the hit, 1..3
-/// as [`segment_hit`], and the side hit; none for 0. A y side wins only when strictly nearer.
+/// for a ray going left, the left for one going right, then the bottom or the top): how it meets
+/// one, as [`segment_hit`], and the side; none for none. A y side wins only when strictly nearer.
 pub(super) fn ray_rect(
     a: FixedPoint,
     b: FixedPoint,
     r: FixedRect,
     t: &mut i32,
-) -> Option<(i32, ShapeSide)> {
+) -> Option<(Meet, ShapeSide)> {
     let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
     let mut found = None;
     // the side across x it faces: the right (1) for a ray going left, the left (3) for one going
     // right
     let (k, s) = match dx {
         ..0 => (ray_right_side(a, b, r, t), ShapeSide::HighX),
-        0 => (0, ShapeSide::HighX),
+        0 => (None, ShapeSide::HighX),
         _ => (ray_left_side(a, b, r, t), ShapeSide::LowX),
     };
-    if k != 0 {
+    if let Some(k) = k {
         found = Some((k, s));
     }
     // then the bottom (0) for a ray going up in y, the top (2) for one going down
@@ -172,9 +184,9 @@ pub(super) fn ray_rect(
         0 => return found,
         _ => (ray_top_side(a, b, r, t), ShapeSide::HighY),
     };
-    if k == 0 {
+    let Some(k) = k else {
         return found;
-    }
+    };
     Some((k, s))
 }
 
@@ -184,9 +196,14 @@ pub(super) fn ray_ratio(num: i32, den: i32) -> i32 {
 }
 
 /// [`ray_rect`]'s right side (x1) for the ray `a`–`b` going left: a ray along x (no y step)
-/// crosses it within its open span from at or right of it to left of it, nearer than `t` (1, its
-/// ratio into `t`); any other ray as [`segment_hit`]; 0 for none.
-pub(super) fn ray_right_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+/// crosses it within its open span from at or right of it to left of it, nearer than `t` (a
+/// crossing, its ratio into `t`); any other ray as [`segment_hit`]; none for none.
+pub(super) fn ray_right_side(
+    a: FixedPoint,
+    b: FixedPoint,
+    r: FixedRect,
+    t: &mut i32,
+) -> Option<Meet> {
     let [_, ry0, rx1, ry1] = r.get();
     if b.y() - a.y() != 0 {
         return segment_hit(
@@ -198,22 +215,27 @@ pub(super) fn ray_right_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut
         );
     }
     if a.y() <= ry0 || ry1 <= a.y() {
-        return 0;
+        return None;
     }
     if rx1 <= b.x() || a.x() < rx1 {
-        return 0;
+        return None;
     }
     let u = ray_ratio(rx1 - a.x(), b.x() - a.x());
     if *t <= u {
-        return 0;
+        return None;
     }
     *t = u;
-    1
+    Some(Meet::Cross)
 }
 
 /// [`ray_rect`]'s left side (x0) for the ray `a`–`b` going right, as [`ray_right_side`]: a ray
 /// along x crosses it from at or left of it to right of it.
-pub(super) fn ray_left_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+pub(super) fn ray_left_side(
+    a: FixedPoint,
+    b: FixedPoint,
+    r: FixedRect,
+    t: &mut i32,
+) -> Option<Meet> {
     let [rx0, ry0, _, ry1] = r.get();
     if b.y() - a.y() != 0 {
         return segment_hit(
@@ -225,23 +247,28 @@ pub(super) fn ray_left_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut 
         );
     }
     if a.y() <= ry0 || ry1 <= a.y() {
-        return 0;
+        return None;
     }
     if b.x() <= rx0 || rx0 < a.x() {
-        return 0;
+        return None;
     }
     let u = ray_ratio(rx0 - a.x(), b.x() - a.x());
     if *t <= u {
-        return 0;
+        return None;
     }
     *t = u;
-    1
+    Some(Meet::Cross)
 }
 
 /// [`ray_rect`]'s bottom side (y0) for the ray `a`–`b` going up in y: a ray along y (no x step)
-/// crosses it within its open span from at or below it to above it, nearer than `t` (1, its
-/// ratio into `t`); any other ray as [`segment_hit`]; 0 for none.
-pub(super) fn ray_bottom_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+/// crosses it within its open span from at or below it to above it, nearer than `t` (a
+/// crossing, its ratio into `t`); any other ray as [`segment_hit`]; none for none.
+pub(super) fn ray_bottom_side(
+    a: FixedPoint,
+    b: FixedPoint,
+    r: FixedRect,
+    t: &mut i32,
+) -> Option<Meet> {
     let [rx0, ry0, rx1, _] = r.get();
     if b.x() - a.x() != 0 {
         return segment_hit(
@@ -253,22 +280,27 @@ pub(super) fn ray_bottom_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mu
         );
     }
     if !(rx0 < a.x() && a.x() < rx1) {
-        return 0;
+        return None;
     }
     if b.y() <= ry0 || ry0 < a.y() {
-        return 0;
+        return None;
     }
     let u = ray_ratio(ry0 - a.y(), b.y() - a.y());
     if *t <= u {
-        return 0;
+        return None;
     }
     *t = u;
-    1
+    Some(Meet::Cross)
 }
 
 /// [`ray_rect`]'s top side (y1) for the ray `a`–`b` going down in y, as [`ray_bottom_side`]: a
 /// ray along y crosses it from at or above it to below it.
-pub(super) fn ray_top_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i32) -> i32 {
+pub(super) fn ray_top_side(
+    a: FixedPoint,
+    b: FixedPoint,
+    r: FixedRect,
+    t: &mut i32,
+) -> Option<Meet> {
     let [rx0, _, rx1, ry1] = r.get();
     if b.x() - a.x() != 0 {
         return segment_hit(
@@ -280,15 +312,15 @@ pub(super) fn ray_top_side(a: FixedPoint, b: FixedPoint, r: FixedRect, t: &mut i
         );
     }
     if !(rx0 < a.x() && a.x() < rx1) {
-        return 0;
+        return None;
     }
     if ry1 <= b.y() || a.y() < ry1 {
-        return 0;
+        return None;
     }
     let u = ray_ratio(ry1 - a.y(), b.y() - a.y());
     if *t <= u {
-        return 0;
+        return None;
     }
     *t = u;
-    1
+    Some(Meet::Cross)
 }

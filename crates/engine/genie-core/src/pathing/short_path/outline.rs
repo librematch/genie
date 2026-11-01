@@ -34,6 +34,15 @@ pub(super) struct Traced {
     pub(super) winding: i32,
 }
 
+/// How an outline's trace ended (`FUN_140fa8fa0`'s result).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Outline {
+    /// 0: the outline closed.
+    Closed,
+    /// 1: it ran [`TRACE_STEPS`] steps without closing.
+    StepLimit,
+}
+
 /// A new polygon's walk: the polygon and the node it comes from.
 struct NewWalk {
     poly: PolyIndex,
@@ -134,14 +143,14 @@ impl Search<'_> {
     /// `FUN_140fa8fa0`: trace the outline of the cluster of touching shapes from shape `shape0`'s
     /// side `s0` at `start` (counter-clockwise, the shapes on the left): along each side to its
     /// nearest contact ahead (ties to the first in the list) or its end; around the bounds' border
-    /// where it leaves them. 0 when the outline closes, 1 after 2,000 steps.
+    /// where it leaves them. Closed when the outline closes, the step limit after 2,000 steps.
     pub(super) fn trace(
         &self,
         shape0: ShapeId,
         s0: ShapeSide,
         start: Option<FixedPoint>,
         poly: &mut Poly,
-    ) -> Result<i32, GenieError> {
+    ) -> Result<Outline, GenieError> {
         let d = self.ctx.d;
         let mesh = self.ctx.mesh;
         let b = self.bounds;
@@ -199,7 +208,7 @@ impl Search<'_> {
             loop {
                 steps += 1;
                 if TRACE_STEPS <= steps {
-                    return Ok(1);
+                    return Ok(Outline::StepLimit);
                 }
                 let out = !in_box(pos, b);
                 if out {
@@ -224,7 +233,7 @@ impl Search<'_> {
                         },
                     ) {
                         poly.costs = vec![UNSET; poly.vertices.len()];
-                        return Ok(0);
+                        return Ok(Outline::Closed);
                     }
                     if !out {
                         wprev = winding;
@@ -238,7 +247,7 @@ impl Search<'_> {
                     wp -= 1;
                     steps += 1;
                     if TRACE_STEPS <= steps {
-                        return Ok(1);
+                        return Ok(Outline::StepLimit);
                     }
                     winding = wp;
                 }

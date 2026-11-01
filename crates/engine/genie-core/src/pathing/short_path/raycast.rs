@@ -8,7 +8,7 @@ use crate::pathing::FixedRect;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Callback, Ctx, FixedPoint, Hit, Sweep, T_START, Token, inside, ray_rect, strictly_inside,
+    Callback, Ctx, FixedPoint, Hit, Meet, Sweep, T_START, Token, inside, ray_rect, strictly_inside,
     tile_of,
 };
 use crate::pathing::{ShapeId, ShapeSide};
@@ -76,7 +76,7 @@ impl Ctx<'_> {
 
     /// One tile of the raycast: the callback over the tile's shapes; its last hit (each nearer
     /// than the one before) and the callback's result for it, none without one.
-    pub(super) fn ray_tile(&self, tile: RayTile<'_>) -> Result<Option<(i32, Hit)>, GenieError> {
+    pub(super) fn ray_tile(&self, tile: RayTile<'_>) -> Result<Option<(Meet, Hit)>, GenieError> {
         let RayTile {
             callback: cb,
             list,
@@ -115,13 +115,13 @@ impl Ctx<'_> {
                     let Some((k, side)) = ray_rect(a, b, shrunk, &mut tt) else {
                         continue;
                     };
-                    let k = if k == 3 {
+                    let k = if k == Meet::TouchAtStart {
                         let own = Token::of_shape(id);
                         if Token::of_side(side) == *token || own == *token {
                             *token = own;
                             continue;
                         }
-                        2
+                        Meet::Touch
                     } else {
                         k
                     };
@@ -156,7 +156,11 @@ impl Ctx<'_> {
                     }
                     let mut tt = *t;
                     if let Some((k, side)) = ray_rect(a, b, shrunk, &mut tt) {
-                        let k = if k == 3 { 2 } else { k };
+                        let k = if k == Meet::TouchAtStart {
+                            Meet::Touch
+                        } else {
+                            k
+                        };
                         result = Some((k, Hit { shape: id, side }));
                         *t = tt;
                     }
@@ -176,7 +180,7 @@ impl Ctx<'_> {
         b: FixedPoint,
         t: &mut i32,
         mut cb: Callback,
-    ) -> Result<Option<(i32, Hit)>, GenieError> {
+    ) -> Result<Option<(Meet, Hit)>, GenieError> {
         let (x0, y0, x1, y1) = (a.x(), a.y(), b.x(), b.y());
         let dx = x1.wrapping_sub(x0);
         let adx = dx.wrapping_abs();
