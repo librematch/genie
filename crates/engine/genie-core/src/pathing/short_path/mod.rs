@@ -193,14 +193,14 @@ impl Goal {
     /// The goal at `at` of the query `q`: the target's half sizes, their sums with the radius
     /// (32-bit adds) and the range, squared in 64 bits.
     fn toward(at: FixedPoint, q: &Fixed) -> Self {
-        let (r, [sx, sy]) = (q.radius, q.target_size.get());
+        let r = q.radius;
         Self {
             at,
             r,
-            rx: FixedDistance::new(sx),
-            ry: FixedDistance::new(sy),
-            rrx: r.wrapping_add(FixedDistance::new(sx)),
-            rry: r.wrapping_add(FixedDistance::new(sy)),
+            rx: q.half_x,
+            ry: q.half_y,
+            rrx: r.wrapping_add(q.half_x),
+            rry: r.wrapping_add(q.half_y),
             range: q.range,
             range2: FixedDistanceSquared::of(q.range),
         }

@@ -49,10 +49,8 @@ impl Query {
             from: self.from,
             to: self.to,
             radius: FixedDistance::new(fixed(self.radius)),
-            target_size: FixedPoint::new(
-                fixed(Distance::new(self.target_size.x())),
-                fixed(Distance::new(self.target_size.y())),
-            ),
+            half_x: FixedDistance::new(fixed(Distance::new(self.target_size.x()))),
+            half_y: FixedDistance::new(fixed(Distance::new(self.target_size.y()))),
             range: FixedDistance::new(fixed(self.range)),
             blocked: self.blocked,
         }
@@ -65,8 +63,10 @@ pub(super) struct Fixed {
     pub(super) from: FixedPoint,
     pub(super) to: FixedPoint,
     pub(super) radius: FixedDistance,
-    /// The target's half sizes, x and y.
-    pub(super) target_size: FixedPoint,
+    /// The target's half size on x.
+    pub(super) half_x: FixedDistance,
+    /// The target's half size on y.
+    pub(super) half_y: FixedDistance,
     pub(super) range: FixedDistance,
     pub(super) blocked: u64,
 }
