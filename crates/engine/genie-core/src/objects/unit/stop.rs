@@ -176,7 +176,7 @@ impl Unit {
                 ))?;
                 let m = match e {
                     Effect::Move(m) => Some(m),
-                    _ => self.restore_patrol(),
+                    _ => self.restore_patrol(c.w.parts.unit_ai.get(self.id)),
                 };
                 m.map_or(Ok(()), |m| self.ai_move(m, class, c))
             }

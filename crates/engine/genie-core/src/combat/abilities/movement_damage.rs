@@ -283,7 +283,7 @@ impl World {
         };
         let m = u.master(self.master_tables(), q)?;
         let mut v = crate::combat::victims::victim_of(
-            u,
+            (u, self.parts.unit_ai.contains(u.id)),
             m,
             &self.players.player(q)?.attributes,
             q,

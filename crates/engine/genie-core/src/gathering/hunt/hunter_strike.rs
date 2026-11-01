@@ -69,7 +69,7 @@ impl Unit {
         }
         let next = next?;
         // the retaliation's kill of the unit itself, which follows its step
-        if let Some(k) = self.hit_back(f.own)? {
+        if let Some(k) = self.hit_back(f.own, c.w.parts.unit_ai.get_mut(self.id))? {
             file_kill(c, self, KillLeft::own(self.id, k))?;
         }
         match next {
@@ -112,15 +112,20 @@ impl Unit {
                     ),
                     &c.w.graphics,
                 ),
-                self.combat.ai.as_ref(),
+                c.w.parts.unit_ai.get(self.id),
                 (owner.computer, c.w.world_time),
             ),
             work_rate: self.combat.work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity,
             stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),
-            has_ai: self.combat.ai.is_some(),
-            ai_class: self.combat.ai.as_ref().and_then(|ai| ai.target_class),
+            has_ai: c.w.parts.unit_ai.contains(self.id),
+            ai_class: c
+                .w
+                .parts
+                .unit_ai
+                .get(self.id)
+                .and_then(|ai| ai.target_class),
             tree_searched: tree_lost,
             predator_hunts_end: c.w.settings.predator_hunts_end(),
             sprites: HuntSprites {
@@ -139,7 +144,7 @@ impl Unit {
     /// that finds none, searches (`set_state(3)` with the target kept,
     /// [`Unit::hunt_search_state`]).
     pub(crate) fn hunt_attack_failed(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let tree = self.combat.ai.as_ref().is_some_and(|ai| {
+        let tree = c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
             let class = ai
                 .target_class
                 .or_else(|| self.actions.list.hunt().and_then(|h| h.target_class));
@@ -181,7 +186,7 @@ impl Unit {
         let (me_at, them) = (at(Some(self.id))?, at(action.target)?);
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.combat.ai.as_ref(),
+            c.w.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,

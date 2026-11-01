@@ -53,6 +53,7 @@ use crate::players::PlayerId;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::unit_ai::{ActionKind, OrderKind, QueuedOrder, UnitAi};
+use crate::world::parts::Object;
 use crate::world::step::Step;
 use crate::world::tests::in_update;
 use crate::world::{Player, World};
@@ -158,15 +159,6 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             attribute_type: None,
             ..Lifecycle::default()
         },
-        combat: crate::objects::layers::Combat {
-            ai: Some(UnitAi {
-                ai_type: crate::unit_ai::CIVILIAN,
-                current_target: None,
-                last_target: None,
-                ..UnitAi::default()
-            }),
-            ..Default::default()
-        },
         actions: crate::objects::layers::ActionLayer {
             list: ActionList::default().with_build(Some(build)),
             ..Default::default()
@@ -212,7 +204,16 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
                 ..Player::default()
             },
         ],
-    );
+    )
+    .with_ais([(
+        BUILDER,
+        UnitAi {
+            ai_type: crate::unit_ai::CIVILIAN,
+            current_target: None,
+            last_target: None,
+            ..UnitAi::default()
+        },
+    )]);
     t.masters = vec![masters.clone(), masters];
     t.graphics = Graphics::from([
         (WALKING, graphic(WALKING)),
@@ -306,7 +307,7 @@ fn stands(t: &World) -> bool {
 
 /// The notifies the builder's unit AI heard.
 fn heard(t: &World) -> Vec<(NotifyKind, [i32; 3])> {
-    let ai = builder(t).combat.ai.as_ref().unwrap();
+    let ai = t.parts.unit_ai.get(builder(t).id).unwrap();
     ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
 }
 
@@ -356,11 +357,14 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     main.building.construction = Some(construction(1.0, 1, false));
     main.life.hp = HitPoints::new(0.5);
     let mut annex = own(&mut t, HOUSE).clone();
+    let annex_ai = t.parts.unit_ai.get(HOUSE).cloned();
     annex.id = ANNEX;
     annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.life.hp = HitPoints::new(1.0);
     annex.building.construction = Some(construction(1.0, 0, false));
-    let _ = t.push_live(PlayerId::new(1), annex).unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(annex, annex_ai))
+        .unwrap();
     t.spatial.insert(
         ANNEX,
         placed(
@@ -1035,10 +1039,13 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         sighted(&mut t);
         own(&mut t, BUILDER).footprint_waits = crate::construction::FootprintWaits::of_data(waits);
         let mut other = own(&mut t, BUILDER).clone();
+        let other_ai = t.parts.unit_ai.get(BUILDER).cloned();
         other.id = object_id(6);
         other.actions.list = ActionList::default();
         other.place_for_test(Position::new(10.6, 10.6, 0.0));
-        let _ = t.push_live(PlayerId::new(1), other).unwrap();
+        let _ = t
+            .push_live(PlayerId::new(1), Object::with_ai(other, other_ai))
+            .unwrap();
         let me = *t.spatial.get(BUILDER).unwrap();
         t.spatial.insert(
             object_id(6),
@@ -1051,13 +1058,10 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         let _ = code(&mut t, 20);
         let b = build(&t);
         assert_eq!((b.state, builder(&t).footprint_waits.get()), (state, after));
-        let sent = t.players[1]
-            .objects
-            .by_id(object_id(6))
-            .unwrap()
-            .combat
-            .ai
-            .as_ref()
+        let sent = t
+            .parts
+            .unit_ai
+            .get(t.players[1].objects.by_id(object_id(6)).unwrap().id)
             .unwrap();
         let sent = sent
             .notifies
@@ -1099,7 +1103,7 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
     h.building.stack_made = Some(object_id(10031));
     let v = own(&mut t, BUILDER);
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(7.0));
-    let ai = v.combat.ai.as_mut().unwrap();
+    let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
     (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(ActionKind::Build));
     assert_eq!(code(&mut t, 20), HeadCode::Deletes);
     let b = build(&t);
@@ -1112,7 +1116,7 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
         [ActionKind::Build.value(), 10031, 0],
     );
     assert_eq!(heard(&t), [built]);
-    let ai = builder(&t).combat.ai.as_ref().unwrap();
+    let ai = t.parts.unit_ai.get(builder(&t).id).unwrap();
     assert_eq!((ai.current_order, ai.current_action), (None, None));
     assert_eq!((house(&t).0, house(&t).1), (0, 0));
     assert_eq!(t.players[1].attributes[0], Amount::new(7.0));
@@ -1240,7 +1244,7 @@ fn a_villager_works_the_farm_it_built() {
         target: Some(object_id(99)),
         ..QueuedOrder::default()
     };
-    let ai = own(&mut t, BUILDER).combat.ai.as_mut().unwrap();
+    let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
     ai.orders = vec![order(OrderKind::Build), order(OrderKind::Hunt)];
     let worked = update(&mut t, 20).unwrap();
     // the work command within the update: [`site_world`]'s villager has no farm task, so it
@@ -1248,7 +1252,7 @@ fn a_villager_works_the_farm_it_built() {
     // left its Hunt order in
     let walks = Some(crate::movement::move_to::MOVE_TO);
     assert_eq!(worked, (HeadCode::Keeps, (walks, Some(HOUSE))));
-    assert_eq!(builder(&t).combat.ai.as_ref().unwrap().orders, vec![]);
+    assert_eq!(t.parts.unit_ai.get(builder(&t).id).unwrap().orders, vec![]);
 }
 
 /// A builder beside its foundation works in its first update (state 6); census v5's 208 stops
@@ -1280,13 +1284,16 @@ fn a_builder_at_the_foundation_works_in_its_first_update_the_others_walk_to_it()
 /// drop site of the table for the villagers' wood (resource 1).
 fn with_mill(t: &mut World) {
     let mut mill = own(t, HOUSE).clone();
+    let mill_ai = t.parts.unit_ai.get(HOUSE).cloned();
     mill.id = object_id(300);
     mill.life.master_id = master_id(68);
     mill.life.state = ObjectState::Alive;
     mill.workers = crate::objects::WorkerCount::of_data(0);
     mill.building.construction = Some(construction(25.0, 0, false));
     mill.place_for_test(Position::new(15.5, 10.5, 0.0));
-    let _ = t.push_live(PlayerId::new(1), mill).unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(mill, mill_ai))
+        .unwrap();
     t.spatial.insert(
         object_id(300),
         placed(
@@ -1562,14 +1569,14 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         ..QueuedOrder::default()
     };
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), lone(AT_HOUSE));
-    let ai = own(&mut t, BUILDER).combat.ai.as_mut().unwrap();
+    let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
     ai.current_order = Some(OrderKind::Hunt);
     ai.orders = vec![
         order(OrderKind::Hunt, Some(object_id(77))),
         order(OrderKind::Build, Some(object_id(78))),
     ];
     assert_eq!(code(&mut t, 250), HeadCode::Deletes);
-    let ai = builder(&t).combat.ai.as_ref().unwrap();
+    let ai = t.parts.unit_ai.get(builder(&t).id).unwrap();
     assert_eq!(
         ai.orders,
         vec![order(OrderKind::Build, Some(object_id(78)))]
@@ -1578,10 +1585,10 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
     assert_eq!((build(&t).state, wood(&t).1), (BuildState::Done, 10.0));
     assert!(stands(&t));
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), lone(AT_HOUSE));
-    let ai = own(&mut t, BUILDER).combat.ai.as_mut().unwrap();
+    let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
     ai.orders = vec![order(OrderKind::OnTarget, Some(object_id(77)))];
     assert_eq!(code(&mut t, 250), HeadCode::Keeps);
-    assert_eq!(builder(&t).combat.ai.as_ref().unwrap().orders.len(), 0);
+    assert_eq!(t.parts.unit_ai.get(builder(&t).id).unwrap().orders.len(), 0);
     assert_eq!(heard(&t), [SEARCH]);
     assert_eq!(
         (build(&t).state, build(&t).site),
@@ -1592,7 +1599,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         Position::new(14.0, 10.5, 0.0),
         lone(Position::new(-1.0, -1.0, -1.0)),
     );
-    own(&mut t, BUILDER).combat.ai = None;
+    t.parts.set_unit_ai(BUILDER, None);
     own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
     assert_eq!((build(&t).state, wood(&t).2), (BuildState::Halted, 0));
@@ -1601,7 +1608,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
         Position::new(14.0, 10.5, 0.0),
         lone(Position::new(5.0, 6.0, 0.0)),
     );
-    own(&mut t, BUILDER).combat.ai = None;
+    t.parts.set_unit_ai(BUILDER, None);
     let _ = code(&mut t, 250);
     let walk = build(&t).move_to.unwrap();
     assert_eq!(
@@ -1635,12 +1642,15 @@ fn a_drop_off_whose_site_went_past_state_6_searches_again() {
 /// Player 1's standing lumber camp 30 (master 562, built) at `at`.
 fn camp(t: &mut World, at: Position) {
     let mut camp = own(t, HOUSE).clone();
+    let camp_ai = t.parts.unit_ai.get(HOUSE).cloned();
     camp.id = object_id(30);
     camp.life.master_id = master_id(562);
     camp.life.state = ObjectState::Alive;
     camp.building.construction = Some(construction(25.0, 0, false));
     camp.place_for_test(at);
-    let _ = t.push_live(PlayerId::new(1), camp).unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(camp, camp_ai))
+        .unwrap();
     t.spatial.insert(
         object_id(30),
         placed(at, 1.0, class::BUILDING, master_id(562)),
@@ -1650,10 +1660,13 @@ fn camp(t: &mut World, at: Position) {
 /// Player 1's villager 6, a copy of the builder without actions, standing at `at`.
 fn villager(t: &mut World, at: Position) {
     let mut other = own(t, BUILDER).clone();
+    let other_ai = t.parts.unit_ai.get(BUILDER).cloned();
     other.id = object_id(6);
     other.actions.list = ActionList::default();
     other.place_for_test(at);
-    let _ = t.push_live(PlayerId::new(1), other).unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(other, other_ai))
+        .unwrap();
     let me = *t.spatial.get(BUILDER).unwrap();
     t.spatial.insert(
         object_id(6),
@@ -1669,10 +1682,13 @@ fn villager(t: &mut World, at: Position) {
 fn annex(t: &mut World, at: Position) -> i32 {
     const ANNEX: i32 = 10029;
     let mut annex = own(t, HOUSE).clone();
+    let annex_ai = t.parts.unit_ai.get(HOUSE).cloned();
     annex.id = object_id(ANNEX);
     annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
     annex.place_for_test(at);
-    let _ = t.push_live(PlayerId::new(1), annex).unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(annex, annex_ai))
+        .unwrap();
     t.spatial.insert(
         object_id(ANNEX),
         placed(at, 1.0, class::BUILDING, ids::HOUSE),
@@ -1683,13 +1699,10 @@ fn annex(t: &mut World, at: Position) -> i32 {
 
 /// How often villager 6 was sent off (notify 0x216).
 fn sent_off(t: &World) -> usize {
-    let ai = t.players[1]
-        .objects
-        .by_id(object_id(6))
-        .unwrap()
-        .combat
-        .ai
-        .as_ref()
+    let ai = t
+        .parts
+        .unit_ai
+        .get(t.players[1].objects.by_id(object_id(6)).unwrap().id)
         .unwrap();
     ai.notifies
         .iter()

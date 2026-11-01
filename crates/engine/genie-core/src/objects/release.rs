@@ -37,14 +37,15 @@ pub(crate) struct Releaser {
 /// 699, the releaser's master class as its first parameter; none from an object of a negative
 /// id). A building's (`FUN_1411d6020`) first drops the releaser's first entry from its attacking
 /// units (`+0xce0`, the rest keeping their order) when it lists it (`listed`, [`Unit::lists_taker`]).
+/// `ai` is the object's unit AI.
 pub(crate) fn released(
     u: &mut Unit,
-    kind: MasterKind,
-    listed: bool,
+    ai: Option<&mut crate::unit_ai::UnitAi>,
+    (kind, listed): (MasterKind, bool),
     by: Releaser,
 ) -> Result<(), GenieError> {
     let state = u.life.state;
-    match (released_fields(u, kind, listed, by), u.combat.ai.as_mut()) {
+    match (released_fields(u, kind, listed, by), ai) {
         (Some(n), Some(ai)) => ai.post(n, state),
         _ => Ok(()),
     }

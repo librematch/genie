@@ -841,10 +841,13 @@ fn the_reach_pass_raises_the_range_and_sends_a_member_in_reach() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 38.0, 45.0)]);
     register(&mut t);
     for u in &mut t.players[1].objects {
-        u.combat.ai = Some(crate::unit_ai::UnitAi {
-            retarget_timer: Millis::new(7),
-            ..crate::unit_ai::UnitAi::default()
-        });
+        t.parts.set_unit_ai(
+            u.id,
+            Some(crate::unit_ai::UnitAi {
+                retarget_timer: Millis::new(7),
+                ..crate::unit_ai::UnitAi::default()
+            }),
+        );
         u.body
             .put_mover(Some(crate::gathering::hunt::tests::walker()));
     }
@@ -858,7 +861,7 @@ fn the_reach_pass_raises_the_range_and_sends_a_member_in_reach() {
     let timers: Vec<u32> = t.players[1]
         .objects
         .iter()
-        .map(|u| u.combat.ai.as_ref().unwrap().retarget_timer.get())
+        .map(|u| t.parts.unit_ai.get(u.id).unwrap().retarget_timer.get())
         .collect();
     assert_eq!(timers, [7, 750 + draw % 500]);
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);

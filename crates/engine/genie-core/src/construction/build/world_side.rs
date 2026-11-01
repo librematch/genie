@@ -64,7 +64,7 @@ impl crate::world::World {
             ),
             masters: self.masters.of(owner),
             computer: self.players.player(owner)?.computer,
-            ai: u.combat.ai.is_some(),
+            ai: self.parts.unit_ai.contains(u.id),
         };
         let part = completion.first_part(&construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
@@ -243,9 +243,9 @@ impl crate::world::World {
     ) -> Result<(), GenieError> {
         let (_, old) = self.object(building).ok_or(NOT_HELD)?;
         let (orders, gather) = (
-            old.combat
-                .ai
-                .as_ref()
+            self.parts
+                .unit_ai
+                .get(old.id)
                 .map(|ai| ai.building_orders.clone())
                 .unwrap_or_default(),
             self.parts.gather_point.get(building).copied(),
@@ -309,10 +309,16 @@ impl crate::world::World {
         if let Some(g) = point.filter(|_| building_made) {
             self.set_part(new, crate::world::parts::Part::GatherPoint(g))?;
         }
-        let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
-        if building_made && let Some(ai) = nu.combat.ai.as_mut().filter(|_| !orders.is_empty()) {
+        if building_made
+            && let Some(ai) = self
+                .parts
+                .unit_ai
+                .get_mut(new)
+                .filter(|_| !orders.is_empty())
+        {
             ai.building_orders.extend(orders);
         }
+        let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
         // a gate's stack gate takes the old one's lock (its slot 0x670 with `+0xc7c`)
         if let Some(lock) = gate_lock {
             let locked = lock.ok_or(GenieError::unreachable(

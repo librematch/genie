@@ -6,7 +6,6 @@ use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ListIndex;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
-use crate::objects::unit::Unit;
 use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
@@ -15,6 +14,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::others::OthersRef;
+use crate::world::parts::Object;
 use crate::world::tests::{forage_world, in_update};
 
 /// [`forage_world`]'s forager walking to (40, 80) on the bush 600, its unit AI on a gather
@@ -32,7 +32,7 @@ fn walking_forager() -> World {
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         wait: MoveWait::default(),
     }));
-    let ai = u.combat.ai.as_mut().unwrap();
+    let ai = t.parts.unit_ai.get_mut(u.id).unwrap();
     (ai.current_order, ai.current_action, ai.current_target) = (
         Some(OrderKind::Move),
         Some(ActionKind::Move),
@@ -41,9 +41,10 @@ fn walking_forager() -> World {
     t
 }
 
-/// Object 0 of player 1's capture stop as master class `class`, then the unit and Gaia's bushes
-/// the stop let go in the update (each held by one worker before it, none after).
-fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError> {
+/// Object 0 of player 1's capture stop as master class `class`, then the object (its row and
+/// parts) and Gaia's bushes the stop let go in the update (each held by one worker before it,
+/// none after).
+fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieError> {
     for b in &mut t.players[0].objects {
         b.workers = crate::objects::WorkerCount::of_data(1);
     }
@@ -57,8 +58,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError>
     })?;
     Ok((
         t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
-            .unwrap()
-            .unit,
+            .unwrap(),
         released,
     ))
 }
@@ -67,13 +67,14 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Unit, Vec<i32>), GenieError>
 /// unit), then the unit AI of any class but livestock ends its order and forgets its target.
 #[test]
 fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
-    let (u, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
+    let (o, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
+    let u = &o.unit;
     assert_eq!(u.actions.list.move_to().copied(), None);
     assert_eq!(released, []);
     let m = u.body.mover().unwrap();
     assert_eq!(m.animated.speed, Speed::new(0.0));
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.0);
-    let ai = u.combat.ai.as_ref().unwrap();
+    let ai = o.parts.unit_ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (None, None, None)
@@ -83,23 +84,22 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
         (Some(OrderKind::Move), Some(ActionKind::Move))
     );
     // livestock's unit AI, and one on action 0x2c2, keep their order and target
-    let (u, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
-    assert_eq!(u.actions.list.move_to().copied(), None);
+    let (o, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
+    assert_eq!(o.unit.actions.list.move_to().copied(), None);
     let kept = |ai: &crate::unit_ai::UnitAi| (ai.current_order, ai.current_target);
     assert_eq!(
-        kept(u.combat.ai.as_ref().unwrap()),
+        kept(o.parts.unit_ai.as_ref().unwrap()),
         (Some(OrderKind::Move), Some(object_id(600)))
     );
     let mut t = walking_forager();
-    t.players[1].objects[ListIndex::new(0)]
-        .combat
-        .ai
-        .as_mut()
+    t.parts
+        .unit_ai
+        .get_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .current_action = Some(ActionKind::HeroPower);
-    let (u, _) = stopped(t, class::VILLAGER).unwrap();
+    let (o, _) = stopped(t, class::VILLAGER).unwrap();
     assert_eq!(
-        kept(u.combat.ai.as_ref().unwrap()),
+        kept(o.parts.unit_ai.as_ref().unwrap()),
         (Some(OrderKind::Move), Some(object_id(600)))
     );
 }
@@ -120,7 +120,8 @@ fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
         .actions
         .list
         .set_artifact(Some(artifact()));
-    let (u, released) = stopped(t, class::LIVESTOCK).unwrap();
+    let (o, released) = stopped(t, class::LIVESTOCK).unwrap();
+    let u = o.unit;
     let a = u.actions.list.artifact().copied().unwrap();
     assert_eq!(
         (a.move_to, a.goal, a.target, a.state),

@@ -379,7 +379,7 @@ impl World {
         )?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let (Some(ai), Some((point, clears))) = (unit.combat.ai.as_mut(), notify) {
+        if let (Some(ai), Some((point, clears))) = (self.parts.unit_ai.get_mut(unit.id), notify) {
             ai.notify_work(
                 Some(OrderKind::Gather),
                 Some(ActionKind::Gather),
@@ -477,7 +477,7 @@ impl World {
             .ok_or(crate::world::TARGET_UNPLACED)?;
         let speed = unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         crate::combat::attack::engagement(
-            unit.combat.ai.as_ref(),
+            self.parts.unit_ai.get(unit.id),
             speed,
             master,
             me,
@@ -550,7 +550,7 @@ impl World {
         quarry.drop_site = self.drops_at_main(player, idx, target)?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut().filter(|_| notify) {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id).filter(|_| notify) {
             ai.notify_work(
                 Some(OrderKind::Hunt),
                 Some(ActionKind::Hunt),

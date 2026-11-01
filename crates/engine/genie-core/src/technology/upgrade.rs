@@ -573,7 +573,8 @@ impl World {
         let ai = new.unit_ai_type(new.id).and_then(|t| {
             crate::unit_ai::UnitAi::constructed(t, &made, self.streams.get(Stream::Ai))
         });
-        self.object_at_mut(place)?.combat.ai = ai;
+        let id = self.object_at(place)?.id;
+        self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;
         Ok(())
     }
 

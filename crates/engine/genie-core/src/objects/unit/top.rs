@@ -80,16 +80,16 @@ impl Unit {
     }
 
     /// `why` with what this object was doing in its context: its id and master, its top action
-    /// (type and state) and its unit AI's order, action and target.
+    /// (type and state) and its unit AI's (`ai`) order, action and target.
     #[must_use]
-    pub fn in_context(&self, why: GenieError) -> GenieError {
+    pub fn in_context(&self, ai: Option<&crate::unit_ai::UnitAi>, why: GenieError) -> GenieError {
         let mut why = why
             .with("object", self.id)
             .with("master", self.life.master_id);
         if let Some(a) = self.top_action() {
             why = why.with("action", format_args!("{} state {}", a.kind, a.state));
         }
-        if let Some(ai) = &self.combat.ai {
+        if let Some(ai) = ai {
             why = why.with(
                 "unit AI",
                 format_args!(

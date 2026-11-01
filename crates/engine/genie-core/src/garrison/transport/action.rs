@@ -28,6 +28,7 @@ use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::unit_ai::{ActionKind, UnitAi};
 use crate::world::World;
+use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -220,6 +221,7 @@ impl TransportAction {
             pathing,
             streams,
             graphics,
+            parts,
             ..
         } = &mut *c.w;
         let sprites = SpriteReads {
@@ -230,7 +232,8 @@ impl TransportAction {
         let ship = Ship::of(unit, r.radius, spatial.map, walk, r.given);
         let mut shore = MapShore::new(spatial, zones, pathing, r.restriction, ship.position)?;
         let look = (r.standing, streams.get(Stream::Sprite));
-        match self.state_update(walked, (&ship, &mut shore), unit, look, computer)? {
+        let posts = (&mut *unit, &mut parts.unit_ai);
+        match self.state_update(walked, (&ship, &mut shore), posts, look, computer)? {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
                 self.unload(c, unit)?;
@@ -280,7 +283,7 @@ impl TransportAction {
         &mut self,
         walked: UpdateCode,
         (ship, shore): (&Ship<'_>, &mut impl Shore),
-        unit: &mut Unit,
+        (unit, ais): (&mut Unit, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
         computer: bool,
     ) -> Result<Updated, GenieError> {
@@ -301,6 +304,7 @@ impl TransportAction {
                 let changed = self.set_state(TransportState::Idle, ship, shore)?;
                 stand(unit, changed, look)?;
                 unit.post_own(
+                    ais,
                     crate::unit_ai::NotifyKind::ACTION_FAILED,
                     [ActionKind::Transport.value(), 0, 0],
                 )?;
@@ -404,7 +408,7 @@ impl TransportAction {
         let walks = start || state == MoveTo::Moving;
         let ask = if start {
             UnitAi::path_ask(
-                unit.combat.ai.as_mut(),
+                c.w.parts.unit_ai.get_mut(unit.id),
                 unit.body.position().ground(),
                 self.point.ground(),
             )
@@ -417,7 +421,7 @@ impl TransportAction {
         };
         let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
         if walks {
-            unit.post_in_the_way()?;
+            unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
         }
         Ok(code)
     }

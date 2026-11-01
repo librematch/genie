@@ -118,16 +118,16 @@ impl World {
             || order.point,
             |c| offset_point(unit.position().ground(), c, order.point, map),
         );
-        let takes_it = unit
-            .combat
-            .ai
-            .as_ref()
+        let takes_it = self
+            .parts
+            .unit_ai
+            .get(unit.id)
             .is_none_or(|ai| !order.queued && (order.direct || !ai.has_unready_order()));
         if takes_it {
             // slot 0x128 with 1 (FUN_141211b80): `+0xa14` is 1 and a unit AI's order queue
             // empties (FUN_140c5e010); FUN_14106c590 passes the order on unless the target is the
             // unit itself (and counts `+0x888`, not held)
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.orders.clear();
             }
             if order.target == Some(id) {
@@ -159,10 +159,10 @@ impl World {
             target_type,
         };
         let state = unit.life.state;
-        let ai = unit
-            .combat
-            .ai
-            .as_mut()
+        let ai = self
+            .parts
+            .unit_ai
+            .get_mut(unit.id)
             .ok_or(GenieError::unreachable("unreachable: no unit AI"))?;
         let _ = ai.queue_order(state, queued, false, false)?;
         if !order.queued && !order.direct {
@@ -185,7 +185,7 @@ impl World {
         point: Point,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
         }
         if target == Some(unit.id) {
@@ -215,9 +215,7 @@ impl World {
             return Ok(());
         };
         if work.notified
-            && let Some(ai) = self
-                .live_object_mut(player, id)
-                .and_then(|u| u.combat.ai.as_mut())
+            && let Some(ai) = self.parts.unit_ai.get_mut(id)
         {
             ai.orders.clear();
         }
@@ -261,11 +259,9 @@ impl World {
             .master(self.master_tables(), player)?
             .class;
         let ai = self
-            .players
-            .live_mut(player, idx)?
-            .combat
-            .ai
-            .as_mut()
+            .parts
+            .unit_ai
+            .get_mut(self.players.live(player, idx)?.id)
             .ok_or(GenieError::unsupported(
                 "an order on a target without a unit AI",
             ))?;
@@ -474,7 +470,7 @@ impl World {
     /// (`FUN_140c4ee90`: `+0x1d6` is 0) is the command's seventh argument, as the game passes it.
     pub(super) fn first_unit_target(&self, units: &[ObjectId]) -> Option<(ObjectId, Point, bool)> {
         let (_, first) = units.iter().find_map(|&id| self.object(id))?;
-        let ai = first.combat.ai.as_ref()?;
+        let ai = self.parts.unit_ai.get(first.id)?;
         let t = self.world_object(ai.current_target)?;
         Some((t.id(), t.position().ground(), ai.retarget_disabled == 0))
     }

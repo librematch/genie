@@ -226,10 +226,11 @@ impl ExploreAction {
         let villager = master.is_some_and(|m| m.class == class::VILLAGER);
         let gives_up = GiveUp {
             waits: villager && !c.w.players.player(c.player)?.computer,
-            stance: explorer
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(explorer.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
         };
         let how = ListUpdate {
@@ -597,6 +598,7 @@ impl Unit {
                 ));
             }
             Owner::WantsPoint => self.post_own(
+                &mut c.w.parts.unit_ai,
                 crate::unit_ai::NotifyKind::REQUIRES_SEARCH,
                 [ActionKind::Explore.value(), 0, 0],
             )?,

@@ -187,10 +187,10 @@ impl World {
             };
             let master = u.master(self.master_tables(), p)?;
             let unit = FormationUnit::of(master);
-            let ai = u
-                .combat
-                .ai
-                .as_ref()
+            let ai = self
+                .parts
+                .unit_ai
+                .get(u.id)
                 .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
             let view = MemberView {
                 id,
@@ -296,10 +296,10 @@ impl World {
         let (p, u) = self.object(id).ok_or(GenieError::unsupported(
             "a group member's search for a unit not held",
         ))?;
-        let ai = u
-            .combat
-            .ai
-            .as_ref()
+        let ai = self
+            .parts
+            .unit_ai
+            .get(u.id)
             .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
         let ai_type = ai.ai_type;
         if self.players.player(p)?.computer {
@@ -330,7 +330,7 @@ impl World {
         ))?;
         if fresh {
             let enemies = !lists[UnitRelation::ENEMY].is_empty();
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
+            if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.alert_mode = enemies;
                 if enemies {
                     ai.time_since_enemy = Seconds::ZERO;
@@ -604,6 +604,7 @@ mod tests {
     use crate::unit_ai::UnitAiType;
     use crate::vision::registry::UnitUpdate;
     use crate::world::Player;
+    use crate::world::parts::Object;
 
     /// Slot 0x238 (`FUN_14108d9b0`): the weapon range, plus `charge_event` for a ready charge of
     /// type 6 or 7 that works on the target (here every class, −1); without the charge ready, of
@@ -656,11 +657,11 @@ mod tests {
             u.life.state = ObjectState::Alive;
             u
         };
-        let mut soldier = unit(10, master_id(4), 5.0, 5.0);
-        soldier.combat.ai = Some(crate::unit_ai::UnitAi {
+        let soldier = unit(10, master_id(4), 5.0, 5.0);
+        let soldier_ai = crate::unit_ai::UnitAi {
             ai_type: crate::unit_ai::SOLDIER_AI,
             ..crate::unit_ai::UnitAi::default()
-        });
+        };
         let mut dying = unit(21, master_id(4), 5.0, 6.0);
         dying.life.state = ObjectState::Dying;
         let players = vec![
@@ -688,7 +689,8 @@ mod tests {
             PlayerId::new(0),
             vec![Millis::ZERO; 4],
             players,
-        );
+        )
+        .with_ais([(object_id(10), soldier_ai)]);
         let master = |id: MasterId, class: ClassId| Master {
             id,
             kind: master_type::COMBAT,
@@ -774,19 +776,18 @@ mod tests {
     #[test]
     fn a_member_s_search_lists_its_enemies_then_the_neutrals_it_attacks() {
         let mut t = searched_world();
-        t.players[1].objects[ListIndex::new(0)]
-            .combat
-            .ai
-            .as_mut()
+        t.parts
+            .unit_ai
+            .get_mut(t.players[1].objects[ListIndex::new(0)].id)
             .unwrap()
             .time_since_enemy = Seconds::new(7.0);
         let mut objects = Vec::new();
         t.member_objects(object_id(10), &mut objects).unwrap();
         assert_eq!(objects, [object_id(20), object_id(30)]);
-        let ai = t.players[1].objects[ListIndex::new(0)]
-            .combat
-            .ai
-            .as_ref()
+        let ai = t
+            .parts
+            .unit_ai
+            .get(t.players[1].objects[ListIndex::new(0)].id)
             .unwrap();
         assert_eq!((ai.alert_mode, ai.time_since_enemy), (true, Seconds::ZERO));
         t.member_objects(object_id(10), &mut objects).unwrap();
@@ -807,9 +808,16 @@ mod tests {
         let world = |ai_type: UnitAiType| {
             let mut t = searched_world();
             let mut far = t.players[2].objects[ListIndex::new(0)].clone();
+            let far_ai = t
+                .parts
+                .unit_ai
+                .get(t.players[2].objects[ListIndex::new(0)].id)
+                .cloned();
             far.id = object_id(22);
             far.place_for_test(Position::new(13.0, 5.0, 0.0));
-            let _ = t.push_live(PlayerId::new(2), far).unwrap();
+            let _ = t
+                .push_live(PlayerId::new(2), Object::with_ai(far, far_ai))
+                .unwrap();
             let sight = t.spatial.sight.as_mut().unwrap();
             sight
                 .registry
@@ -825,10 +833,9 @@ mod tests {
                     new: VisionBits::from_bits_retain(1 << 1),
                 })
                 .unwrap();
-            t.players[1].objects[ListIndex::new(0)]
-                .combat
-                .ai
-                .as_mut()
+            t.parts
+                .unit_ai
+                .get_mut(t.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
                 .ai_type = ai_type;
             t
@@ -839,10 +846,9 @@ mod tests {
             t.member_objects(object_id(10), &mut objects).unwrap();
             (
                 objects,
-                t.players[1].objects[ListIndex::new(0)]
-                    .combat
-                    .ai
-                    .as_ref()
+                t.parts
+                    .unit_ai
+                    .get(t.players[1].objects[ListIndex::new(0)].id)
                     .unwrap()
                     .alert_mode,
             )
@@ -921,6 +927,11 @@ mod tests {
                 }));
             }
             let mut stray = t.players[1].objects[ListIndex::new(0)].clone();
+            let stray_ai = t
+                .parts
+                .unit_ai
+                .get(t.players[1].objects[ListIndex::new(0)].id)
+                .cloned();
             stray.id = object_id(11);
             stray.place_for_test(Position::new(6.0, 6.0, 0.0));
             stray
@@ -929,7 +940,9 @@ mod tests {
             stray.body.mover_mut().unwrap().moved_at = Position::new(6.0, 6.0, 0.0);
             stray.group.id = Some(group_id(1));
             t.players[1].objects[ListIndex::new(0)].group.id = Some(group_id(1));
-            let _ = t.push_live(PlayerId::new(1), stray).unwrap();
+            let _ = t
+                .push_live(PlayerId::new(1), Object::with_ai(stray, stray_ai))
+                .unwrap();
             let g = t.groups.get_mut(group_id(1)).unwrap();
             g.flags = GroupFlags::NONE;
             g.members = order

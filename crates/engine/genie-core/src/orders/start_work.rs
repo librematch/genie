@@ -95,10 +95,10 @@ impl World {
                 i = i.next();
                 continue;
             };
-            let idle = unit
-                .combat
-                .ai
-                .as_ref()
+            let idle = self
+                .parts
+                .unit_ai
+                .get(unit.id)
                 .is_some_and(|ai| ai.orders.is_empty());
             if !idle || !unit.interruptible()? {
                 i = i.next();
@@ -198,9 +198,13 @@ impl World {
         unit: &crate::objects::unit::Unit,
     ) -> Result<(gather_search::Seeker, Me), GenieError> {
         let master = unit.master(self.master_tables(), p)?;
-        let ai = unit.combat.ai.as_ref().ok_or(GenieError::unsupported(
-            "a resource search without a unit AI",
-        ))?;
+        let ai = self
+            .parts
+            .unit_ai
+            .get(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a resource search without a unit AI",
+            ))?;
         let seeker = gather_search::Seeker {
             player: p,
             position: unit.position(),

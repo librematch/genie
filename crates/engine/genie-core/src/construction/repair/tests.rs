@@ -369,10 +369,10 @@ fn repair_of(t: &crate::world::World) -> RepairAction {
 
 /// The notifies the repairer's unit AI heard, each with the repair's action value.
 fn heard(t: &crate::world::World) -> Vec<crate::unit_ai::NotifyKind> {
-    let ai = t.players[1].objects[ListIndex::new(0)]
-        .combat
-        .ai
-        .as_ref()
+    let ai = t
+        .parts
+        .unit_ai
+        .get(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     let repair = crate::unit_ai::ActionKind::Repair.value();
     ai.notifies

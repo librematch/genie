@@ -32,6 +32,8 @@ pub(crate) struct Lets<'l> {
     pub(crate) player: PlayerId,
     pub(crate) relations: &'l crate::players::Relations,
     pub(crate) masters: crate::objects::masters::MasterTables<'l>,
+    /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]).
+    pub(crate) ais: &'l mut crate::world::parts::PartTable<crate::unit_ai::UnitAi>,
     pub(crate) lines: &'l UnitLines,
     pub(crate) tracker: &'l mut Tracker,
     pub(crate) own_notifies: &'l mut Vec<(Notify, crate::objects::ObjectState)>,
@@ -89,6 +91,7 @@ impl World {
                 &self.masters,
                 &self.parts.own_master,
             ),
+            ais: &mut self.parts.unit_ai,
             lines: &self.lines,
             tracker,
             own_notifies,
@@ -289,7 +292,7 @@ impl Lets<'_> {
         let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
         let m = u.master(self.masters, p)?;
         let (kind, listed) = (m.kind, u.lists_taker(m, allied));
-        released(u, kind, listed, by)
+        released(u, self.ais.get_mut(id), (kind, listed), by)
     }
 
     /// [`Lets::release`] on the updating object `me` itself, of the lets' player: a live
@@ -313,7 +316,7 @@ impl Lets<'_> {
             return Ok(());
         };
         let state = me.life.state;
-        if let Some(ai) = me.combat.ai.as_mut() {
+        if let Some(ai) = self.ais.get_mut(me.id) {
             return ai.post(n, state);
         }
         self.own_notifies.push((n, state));

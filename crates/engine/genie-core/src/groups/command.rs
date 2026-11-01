@@ -283,7 +283,7 @@ impl World {
             .collect();
         for id in ids {
             // FUN_1415417a0 finds a sleeping member too
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
+            if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.clear_notifies(world_time.since_start())?;
             }
         }
@@ -884,19 +884,9 @@ mod tests {
         top.has_path = true;
         top.path_flags = PathFlags::LOOPS;
         t.groups.get_mut(group_id(1)).unwrap().motion.paths = vec![walked, top];
-        let asleep = t.remove_live(PlayerId::new(1), ListIndex::new(0)).unwrap();
-        let _ = t
-            .push_asleep(
-                PlayerId::new(1),
-                Unit {
-                    combat: crate::objects::layers::Combat {
-                        ai: Some(crate::unit_ai::UnitAi::default()),
-                        ..asleep.unit.combat
-                    },
-                    ..asleep.unit
-                },
-            )
-            .unwrap();
+        let mut asleep = t.remove_live(PlayerId::new(1), ListIndex::new(0)).unwrap();
+        asleep.parts.unit_ai = Some(crate::unit_ai::UnitAi::default());
+        let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
         assert!(
             t.command_move_to(group_id(1), None, Point::new(2.0, 3.0), MoveTo::default())
                 .unwrap()
@@ -906,10 +896,10 @@ mod tests {
             g.flags
                 .contains(GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN)
         );
-        let ai = t.players[1].sleeping[ListIndex::new(0)]
-            .combat
-            .ai
-            .as_ref()
+        let ai = t
+            .parts
+            .unit_ai
+            .get(t.players[1].sleeping[ListIndex::new(0)].id)
             .unwrap();
         assert_eq!(ai.last_update_time, Millis::new(50));
         let mut t = moving_world();

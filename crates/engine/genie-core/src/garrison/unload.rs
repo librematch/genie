@@ -146,7 +146,7 @@ impl World {
         if COMBAT <= kind {
             self.parts.set_town_bell_flag(u.id, false);
         }
-        if let Some(ai) = u.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
             ai.orders.clear();
         }
         Ok(())
@@ -170,10 +170,10 @@ impl World {
         sound: bool,
     ) -> Result<(), GenieError> {
         let unit = self.players.live(player, idx)?;
-        if unit
-            .combat
-            .ai
-            .as_ref()
+        if self
+            .parts
+            .unit_ai
+            .get(unit.id)
             .is_some_and(|ai| !ai.building_orders.is_empty())
         {
             return Err(GenieError::unsupported(
@@ -205,7 +205,7 @@ impl World {
             if COMBAT <= kind {
                 self.parts.set_town_bell_flag(u.id, false);
             }
-            if let Some(ai) = u.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
                 ai.orders.clear();
             }
         }
@@ -268,7 +268,7 @@ impl World {
         self.leave_container((hp, hi), (up, ui), &made, spot.with_height(at.z()))?;
         let unit = self.players.live_mut(up, ui)?;
         let place = (unit.position().ground(), Some(made.class));
-        if unit.combat.ai.is_some() {
+        if self.parts.unit_ai.contains(unit.id) {
             self.run_ai_calls((up, ui), |ai, side, rng| {
                 let stance = ai.stance;
                 crate::orders::set_stance(ai, stance, place, side, rng)
@@ -323,7 +323,7 @@ impl World {
             ready: true,
             target_type: Some(crate::unit_ai::OrderTargetType::of_master(master.id)),
         };
-        if unit.combat.ai.is_none() {
+        if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
         }
         self.run_unit_ai((player, idx), |ai, at, side, computer, rng| {
@@ -421,10 +421,11 @@ impl World {
         self.parts.set_town_bell(id, bell);
         if found.is_none() && record.target_class.is_some() && record.action.is_some() {
             let unit = self.players.live_mut(up, ui)?;
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.set_action(record.action);
             }
             unit.post_own(
+                &mut self.parts.unit_ai,
                 crate::unit_ai::NotifyKind::REQUIRES_SEARCH,
                 [
                     ActionKind::field(record.action),

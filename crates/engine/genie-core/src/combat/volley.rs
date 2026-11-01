@@ -47,11 +47,12 @@ use crate::world::step::Step;
 impl Unit {
     /// The unit's own part of its hit, written back: what a retaliation or reflected damage left
     /// of its hit points and powerups, its charge and `+0x8a8`, the damage notify (500) a
-    /// retaliation posts to its unit AI; a retaliation that killed it is the caller's (Gaia
+    /// retaliation posts to its unit AI (`ai`); a retaliation that killed it is the caller's (Gaia
     /// taking a killed attacker is not modelled).
     pub(crate) fn hit_back(
         &mut self,
         own: Victim,
+        ai: Option<&mut crate::unit_ai::UnitAi>,
     ) -> Result<Option<crate::combat::damage::Kill>, GenieError> {
         self.life.hp = own.hp;
         if let Some(a) = own.armored.as_ref() {
@@ -59,7 +60,7 @@ impl Unit {
         }
         self.combat.charge = own.source.charge;
         self.combat.charge_hit = own.source.charge_hit;
-        if let Some(ai) = self.combat.ai.as_mut() {
+        if let Some(ai) = ai {
             for &(attacker, p) in &own.damaged {
                 let n = Notify {
                     caller: attacker,
@@ -157,7 +158,11 @@ impl Unit {
             if all {
                 self.combat.next_volley = MissileCount::ZERO;
                 if notifies {
-                    self.post_own(NotifyKind::ACTION_EXECUTED, [600, -1, 0])?;
+                    self.post_own(
+                        &mut c.w.parts.unit_ai,
+                        NotifyKind::ACTION_EXECUTED,
+                        [600, -1, 0],
+                    )?;
                 }
             }
             (
@@ -239,6 +244,7 @@ impl Unit {
         self.launch(c, aimed, &shot)?;
         if !matches!(self.life.master_id, ids::ID_73 | ids::ID_559) {
             self.post_own(
+                &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_EXECUTED,
                 [600, ObjectId::field(aimed.target), 0],
             )?;
@@ -334,7 +340,11 @@ impl Unit {
         };
         self.launch(c, aimed, &shot)?;
         if !matches!(self.life.master_id, ids::ID_73 | ids::ID_559) {
-            self.post_own(NotifyKind::ACTION_EXECUTED, [600, -1, 0])?;
+            self.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_EXECUTED,
+                [600, -1, 0],
+            )?;
         }
         Ok(())
     }

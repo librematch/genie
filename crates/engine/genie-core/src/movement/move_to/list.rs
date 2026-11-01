@@ -7,7 +7,6 @@ use crate::movement::{Me, PathAsk};
 use crate::objects::UpdateCode;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
-use crate::unit_ai::Inbox;
 use crate::world::step::Step;
 
 /// What an owner gives its sub-action list's update.
@@ -46,6 +45,6 @@ pub(crate) fn update_sub_actions(
         rng: beside.sprite_rng,
         graphic: move_to.sprite.or(how.otherwise),
     });
-    let mut inbox = Inbox::of(&mut unit.combat.ai, unit.id, unit.life.state);
+    let mut inbox = beside.ais.inbox(unit.id, unit.life.state);
     move_to.sub_update(&mut walk, how.ask, how.gives_up, held, shown, &mut inbox)
 }

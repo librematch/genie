@@ -27,6 +27,7 @@ use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiMove;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::world::World;
@@ -78,10 +79,11 @@ impl Unit {
             scenario: c.w.settings.game_mode.scenario(),
             rate: self.combat.work_rate_powerup + own.work_rate,
             waits: own.class == class::VILLAGER && !c.w.players.player(c.player)?.computer,
-            stance: self
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
             standing: own.standing_sprite,
             restriction: own.terrain_restriction,
@@ -173,8 +175,8 @@ impl Unit {
     /// and height), and it moves to the saved waypoint (slot 0x340: range 0, forced, running; a
     /// waypoint outside the path is the game's static zero point): that move, the caller's
     /// ([`Unit::ai_move`]). None without a saved patrol.
-    pub(crate) fn restore_patrol(&mut self) -> Option<AiMove> {
-        let ai = self.combat.ai.as_ref()?;
+    pub(crate) fn restore_patrol(&mut self, ai: Option<&UnitAi>) -> Option<AiMove> {
+        let ai = ai?;
         let saved = ai.patrol_path.as_ref()?;
         let points = saved.path.points.clone();
         let w = ai

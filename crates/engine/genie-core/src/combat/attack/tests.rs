@@ -649,10 +649,13 @@ impl Rig {
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         unit.life.state = ObjectState::Alive;
         unit.life.master_id = master_id(4);
-        unit.combat.ai = Some(UnitAi {
-            current_action: Some(ActionKind::Attack),
-            ..UnitAi::default()
-        });
+        t.parts.set_unit_ai(
+            unit.id,
+            Some(UnitAi {
+                current_action: Some(ActionKind::Attack),
+                ..UnitAi::default()
+            }),
+        );
         Self {
             t,
             f: Fight { victim, own },
@@ -727,7 +730,7 @@ impl Rig {
             map: spatial,
             sprite_rng: sprite,
             object_rng: Some(object),
-            buffer: None,
+            posts: Posts::Ais(&mut parts.unit_ai),
             graphics: &NO_GRAPHICS,
         };
         let r = f(&mut unit, &mut g, &self.f, &self.r);
@@ -745,6 +748,23 @@ impl Rig {
         &mut self.t.players[1].objects[ListIndex::new(0)]
     }
 
+    /// The attacker's unit AI.
+    pub(crate) fn ai(&self) -> Option<&UnitAi> {
+        self.t.parts.unit_ai.get(self.unit().id)
+    }
+
+    /// The attacker's unit AI to change.
+    pub(crate) fn ai_mut(&mut self) -> Option<&mut UnitAi> {
+        let id = self.unit().id;
+        self.t.parts.unit_ai.get_mut(id)
+    }
+
+    /// The attacker's unit AI is `ai` (none: it has none).
+    pub(crate) fn set_ai(&mut self, ai: Option<UnitAi>) {
+        let id = self.unit().id;
+        self.t.parts.set_unit_ai(id, ai);
+    }
+
     /// Its movement state.
     pub(crate) fn mover(&self) -> &Mover {
         self.unit().body.mover().expect("the rig's attacker moves")
@@ -760,7 +780,7 @@ impl Rig {
 
     /// The notifies the attacker posted to its unit AI: kind and parameters, in order.
     pub(crate) fn posted(&self) -> Vec<(NotifyKind, [i32; 3])> {
-        self.unit().combat.ai.as_ref().map_or_else(Vec::new, |ai| {
+        self.ai().map_or_else(Vec::new, |ai| {
             ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
         })
     }
@@ -1171,11 +1191,11 @@ fn an_attack_on_a_target_out_of_sight_fails() {
     let run = |a: &mut Attack, class, ai_type, queue_empty| {
         let mut rig = Rig::on_the_path(Victim::default()).holding(77, PlayerId::new(1));
         (rig.f.own.class, rig.r.ai_type, rig.r.queue_empty) = (class, ai_type, queue_empty);
-        let ai = rig.unit_mut().combat.ai.as_mut().unwrap();
+        let ai = rig.ai_mut().unwrap();
         ai.current_target = Some(object_id(77));
         ai.home = Some(crate::unit_ai::Home::default());
         let code = rig.run(100, |c, u, f, r| a.out_of_sight(c, u, f, r));
-        let ai = rig.unit().combat.ai.as_ref().unwrap();
+        let ai = rig.ai().unwrap();
         let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().go_home);
         let let_go = rig.workers(77, PlayerId::new(1)) == Some(0);
         (code, let_go, forgot, home, rig.posted())
@@ -2402,10 +2422,13 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     attack.arms.idle_sprite = Some(stand);
     centre.actions.list.set_attack(Some(attack));
     // its unit AI on the attack's action, which takes the Attack's invalidation
-    centre.combat.ai = Some(UnitAi {
-        current_action: Some(ActionKind::Attack),
-        ..UnitAi::default()
-    });
+    t.parts.set_unit_ai(
+        centre.id,
+        Some(UnitAi {
+            current_action: Some(ActionKind::Attack),
+            ..UnitAi::default()
+        }),
+    );
     in_update(&mut t, (PlayerId::new(1), ListIndex::new(2)), 50, |u, c| {
         let code = u.attack_part(c, me(object_id(700)), None)?;
         u.end_head_update(c, code)
@@ -2420,7 +2443,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
         ),
         (Some(SpriteId::named(9)), Some(Speed::new(1.0)))
     );
-    let posted = &centre.combat.ai.as_ref().unwrap().notifies;
+    let posted = &t.parts.unit_ai.get(centre.id).unwrap().notifies;
     assert!(
         posted
             .iter()
@@ -3297,19 +3320,12 @@ fn an_attack_on_a_dead_target_posts_by_its_unit_ai() {
     let lost = |order: AiOrder, set: fn(&mut Rig)| {
         let (mut rig, mut a) = on_target(dead, true, (AttackState::Ready, false));
         rig.r.ai_order = order;
-        rig.unit_mut().combat.ai.as_mut().unwrap().current_target = Some(object_id(7));
+        rig.ai_mut().unwrap().current_target = Some(object_id(7));
         set(&mut rig);
         let code = rig
             .run(20, |c, u, f, r| a.lost(c, u, f, r))
             .map_err(|e| e.reason().to_owned());
-        let forgot = rig
-            .unit()
-            .combat
-            .ai
-            .as_ref()
-            .unwrap()
-            .current_target
-            .is_none();
+        let forgot = rig.ai().unwrap().current_target.is_none();
         (
             code,
             rig.posted(),

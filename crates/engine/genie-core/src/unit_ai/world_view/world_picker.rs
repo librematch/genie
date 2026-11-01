@@ -61,6 +61,8 @@ pub(crate) struct WorldPicker<'a> {
     pub(crate) foreign: Foreign<'a>,
     /// Every player's masters.
     pub(crate) every: crate::objects::masters::MasterTables<'a>,
+    /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]); the unit's own is out of it.
+    pub(crate) ais: &'a crate::world::parts::PartTable<crate::unit_ai::UnitAi>,
     /// The unit's master's terrain restriction (`+0x606`).
     pub(crate) restriction: Option<crate::map::RestrictionId>,
     /// The unit itself.
@@ -117,9 +119,9 @@ impl WorldPicker<'_> {
         let (_, p, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
             "a priest's conversion test of an object the slice does not hold",
         ))?;
-        if p.combat
-            .ai
-            .as_ref()
+        if self
+            .ais
+            .get(p.id)
             .is_none_or(|a| a.ai_type != crate::unit_ai::PRIEST_AI)
         {
             return Ok(false);
@@ -160,8 +162,22 @@ impl WorldPicker<'_> {
         let (fq, f, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
         let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
         let terrain = spatial.terrain.as_ref();
-        let target = victim_of(t, tm, ta, tq, terrain, self.mode_680);
-        let unit = victim_of(f, fm, fa, fq, terrain, self.mode_680);
+        let target = victim_of(
+            (t, self.ais.contains(t.id)),
+            tm,
+            ta,
+            tq,
+            terrain,
+            self.mode_680,
+        );
+        let unit = victim_of(
+            (f, self.ais.contains(f.id)),
+            fm,
+            fa,
+            fq,
+            terrain,
+            self.mode_680,
+        );
         let mut factor = crate::combat::damage::elevation_factor(
             f.position().z(),
             unit.attack_elevation,
@@ -209,14 +225,28 @@ impl WorldPicker<'_> {
             return Ok(false);
         }
         let terrain = spatial.terrain.as_ref();
-        let v = victim_of(o, om, attributes, q, terrain, self.mode_680);
+        let v = victim_of(
+            (o, self.ais.contains(o.id)),
+            om,
+            attributes,
+            q,
+            terrain,
+            self.mode_680,
+        );
         let attacked = (o.top_action_kind() == Some(crate::combat::attack::ATTACK))
             .then(|| o.top_target())
             .flatten();
         let target = match attacked {
-            Some(t) => self
-                .held(t)?
-                .map(|(tq, t, ta, tm)| victim_of(t, tm, ta, tq, terrain, self.mode_680)),
+            Some(t) => self.held(t)?.map(|(tq, t, ta, tm)| {
+                victim_of(
+                    (t, self.ais.contains(t.id)),
+                    tm,
+                    ta,
+                    tq,
+                    terrain,
+                    self.mode_680,
+                )
+            }),
             None => None,
         };
         let shown = crate::combat::damage::Shown {
@@ -252,7 +282,7 @@ impl WorldPicker<'_> {
         let Some((_, t, _, tm)) = self.held(target)? else {
             return Ok(NearestAttacker::NoUnitAi);
         };
-        let Some(ai) = t.combat.ai.as_ref() else {
+        let Some(ai) = self.ais.get(t.id) else {
             return Ok(NearestAttacker::NoUnitAi);
         };
         let mut best: Option<(f32, ObjectId)> = None;
@@ -295,7 +325,7 @@ impl WorldPicker<'_> {
             master: t.life.master_id,
             combat_level: m.combat_level,
             capture,
-            has_ai: t.combat.ai.is_some(),
+            has_ai: self.ais.contains(t.id),
             inside: t.life.inside.is_some(),
             targeting: !t.untargetable,
             attackable: t.attackable,
@@ -371,7 +401,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             owner,
             allied: crate::unit_ai::task_finder::allied(self.relations, self.player, owner, true),
             state: t.life.state,
-            has_ai: t.combat.ai.is_some(),
+            has_ai: self.ais.contains(t.id),
             inside: t.life.inside.is_some(),
             master: t.life.master_id,
             class: m.class,

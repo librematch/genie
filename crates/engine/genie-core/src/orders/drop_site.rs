@@ -232,7 +232,7 @@ impl World {
     pub(super) fn other_load(&mut self, p: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let n = crate::unit_ai::Notify::own(id, crate::unit_ai::NotifyKind::OTHER_LOAD, [0; 3]);
             let _ = ai.accept(n, state);
         }
@@ -279,7 +279,7 @@ impl World {
         };
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let order = crate::unit_ai::QueuedOrder {
                 issuer: Some(Issuer::Object(id)),
                 order: OrderKind::OnTarget,
@@ -344,7 +344,7 @@ impl World {
         };
         let unit = self.players.live_mut(p, idx)?;
         self.parts.set_town_bell(unit.id, bell);
-        let Some(ai) = unit.combat.ai.as_mut() else {
+        let Some(ai) = self.parts.unit_ai.get_mut(unit.id) else {
             return Ok(());
         };
         let (id, target_type, owner, at) = target;

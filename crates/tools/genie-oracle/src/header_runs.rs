@@ -158,7 +158,7 @@ pub(super) fn lane_block(
             state: unit.life.state,
             amount_held: unit.life.amount,
             position: unit.position(),
-            retarget_timer: unit.combat.ai.as_ref().map(|ai| ai.retarget_timer),
+            retarget_timer: parts.unit_ai.get(unit.id).map(|ai| ai.retarget_timer),
             top_action: checkpoint_action(unit, parts.production.get(unit.id)),
         })
         .collect();
@@ -223,6 +223,7 @@ pub fn word9_terms(
         &mut Decoder::default(),
         &frames(&chapter, ticks)?,
     );
+    let ais = &turns.parts.unit_ai;
     Ok(turns.players[id as usize]
         .objects
         .iter()
@@ -234,10 +235,8 @@ pub fn word9_terms(
                 .artifact()
                 .map_or(-1, |_| i32::from(ARTIFACT_TYPE.get())),
             state: unit.actions.list.artifact().map_or(0, |a| a.state.get()),
-            retarget: unit
-                .combat
-                .ai
-                .as_ref()
+            retarget: ais
+                .get(unit.id)
                 .map_or(0, |ai| ai.retarget_timer.get() as i32),
         })
         .collect())

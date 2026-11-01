@@ -51,12 +51,12 @@ fn a_static_object_flagged_to_sleep_ends_its_update() {
         ..Unit::default()
     };
     let mut u = flagged(Class::Static);
-    assert_eq!(u.go_to_sleep(), Ok(true));
+    assert_eq!(u.go_to_sleep(false), Ok(true));
     assert!(!u.life.goto_sleep);
-    assert_eq!(u.go_to_sleep(), Ok(false));
+    assert_eq!(u.go_to_sleep(false), Ok(false));
     let mut animated = flagged(Class::Animated);
     assert_eq!(
-        animated.go_to_sleep().unwrap_err().reason(),
+        animated.go_to_sleep(false).unwrap_err().reason(),
         "an object above the static type goes to sleep"
     );
 }

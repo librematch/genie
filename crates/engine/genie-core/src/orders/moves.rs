@@ -98,14 +98,14 @@ impl World {
             ignore_unit(&mut mover.ignore_units, other);
         }
         let takes_it = !order.queued
-            && unit
-                .combat
-                .ai
-                .as_ref()
+            && self
+                .parts
+                .unit_ai
+                .get(unit.id)
                 .is_none_or(|ai| order.direct || !ai.has_unready_order());
         if !takes_it {
             let state = unit.life.state;
-            let Some(ai) = unit.combat.ai.as_mut() else {
+            let Some(ai) = self.parts.unit_ai.get_mut(unit.id) else {
                 return Ok(());
             };
             let (target_type, target_owner) = target.map_or((None, None), |(m, o)| {
@@ -133,7 +133,7 @@ impl World {
         }
         // slot 0x138 (FUN_141216f10): a villager's town-bell flag (not held) and, `+0xa14` being
         // 1, the unit AI's order queue empties (FUN_140c5e010); then FUN_14106d340
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
         }
         if order.target == Some(id) {
@@ -152,7 +152,7 @@ impl World {
         // (FUN_140c64be0); in a grid every unit gets the order, the action and its cell, its
         // target kept; slot 0x2d8's walk and show targets are not held
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let ai_stream = self.streams.get(Stream::Ai);
             match cell {
                 None => ai.notify_move(!taken, None, order.point, ai_stream),
@@ -182,15 +182,19 @@ impl World {
             .class;
         let unit = self.players.live_mut(player, idx)?;
         let place = (unit.position().ground(), Some(class));
-        if unit.combat.ai.is_some() {
+        if self.parts.unit_ai.contains(unit.id) {
             // a completion's stop (slot 0xb0 with 1): the unit's stopAction at once
             self.run_ai_calls((player, idx), |ai, side, rng| {
                 ai.clear_notifies_at(world_time.since_start(), place, side, rng)
             })?;
         }
         let unit = self.players.live_mut(player, idx)?;
-        let stop_after_kill = unit.combat.ai.as_ref().is_some_and(|ai| ai.stop_after_kill);
-        let taken = unit.combat.ai.is_some()
+        let stop_after_kill = self
+            .parts
+            .unit_ai
+            .get(unit.id)
+            .is_some_and(|ai| ai.stop_after_kill);
+        let taken = self.parts.unit_ai.contains(unit.id)
             && !stop_after_kill
             && self.head_takes_move(player, idx, None, point)?;
         if !taken {
@@ -322,6 +326,7 @@ impl World {
         if reach.is_some_and(|(_, too_close)| too_close) {
             let unit = self.players.live_mut(player, idx)?;
             unit.post_own(
+                &mut self.parts.unit_ai,
                 NotifyKind::TOO_CLOSE,
                 [ObjectId::field(order.target), -1, -1],
             )?;
@@ -457,7 +462,7 @@ impl World {
         // from and to the unit)
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let search = crate::unit_ai::Notify::own(
                 id,
                 NotifyKind::REQUIRES_SEARCH,
@@ -501,7 +506,7 @@ impl World {
         if villager {
             self.parts.set_town_bell_flag(unit.id, false);
         }
-        if a14 && let Some(ai) = unit.combat.ai.as_mut() {
+        if a14 && let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
         }
         let _ = self.move_to_point(player, idx, point)?;

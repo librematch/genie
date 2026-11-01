@@ -43,6 +43,7 @@ use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::parts::Object;
 
 /// The walking and the running sprite's top speeds of the hunt tests' walker (speed 0.8): its
 /// factors 1.125 and 1.875.
@@ -65,22 +66,13 @@ const fn graphic(id: i16, factor: f32) -> Graphic {
 /// The update's seconds (69 ms).
 const DT: f32 = 0.069;
 
-/// A unit of master 4 at (`x`, `y`), where it last moved to, with a free unit AI and the
-/// hunt tests' walker (top speed 0.8, radius 0.2, turn rate the largest).
+/// A unit of master 4 at (`x`, `y`), where it last moved to, with the hunt tests' walker (top
+/// speed 0.8, radius 0.2, turn rate the largest); its unit AI [`free_ai`].
 fn member(id: i32, x: f32, y: f32) -> Unit {
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.moved_at = Position::new(x, y, 0.0);
     let mut u = Unit {
         id: object_id(id),
-        combat: crate::objects::layers::Combat {
-            ai: Some(UnitAi {
-                current_order: None,
-                current_action: None,
-                current_target: None,
-                ..UnitAi::default()
-            }),
-            ..Default::default()
-        },
         body: crate::objects::layers::Body::new(Position::new(x, y, 0.0), None, Some(mover)),
         ..Unit::default()
     };
@@ -89,6 +81,16 @@ fn member(id: i32, x: f32, y: f32) -> Unit {
     u.life.hp = HitPoints::new(50.0);
     u.group.id = Some(group_id(1));
     u
+}
+
+/// A member's free unit AI: no order, action or target.
+fn free_ai() -> UnitAi {
+    UnitAi {
+        current_order: None,
+        current_action: None,
+        current_target: None,
+        ..UnitAi::default()
+    }
 }
 
 /// A slot of `unit` at (`x`, `y`) on the map, made at the world's time 100.
@@ -120,7 +122,8 @@ fn world() -> World {
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         players,
-    );
+    )
+    .with_ais([(object_id(10), free_ai()), (object_id(11), free_ai())]);
     t.world_time = WorldTime::from_millis(100);
     t.dt_seconds = Seconds::new(DT);
     let master = Master {
@@ -307,7 +310,7 @@ fn a_member_in_place_or_failing_too_often() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.members[0].specific_move.consecutive_move_failures, 0);
     assert_eq!(
-        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
+        t.parts.unit_ai.get(unit(&t, 10).id).unwrap().state_position,
         Point::new(5.0, 5.0)
     );
     let mut t = world();
@@ -333,7 +336,7 @@ fn a_member_in_place_or_failing_too_often() {
     assert_eq!(g.flags & GroupFlags::CATCHING_UP, GroupFlags::CATCHING_UP);
     assert_eq!(mover(&t, 10).animated.speed, Speed::new(0.0));
     assert_eq!(
-        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
+        t.parts.unit_ai.get(unit(&t, 10).id).unwrap().state_position,
         Point::ORIGIN
     );
     // a NaN gap is not in place
@@ -367,10 +370,9 @@ fn a_busy_member_stops_and_its_slot_counts_it_there() {
         (SlotState::InPlace, SlotState::InPlace),
     ] {
         let mut t = world();
-        t.players[1].objects[ListIndex::new(0)]
-            .combat
-            .ai
-            .as_mut()
+        t.parts
+            .unit_ai
+            .get_mut(t.players[1].objects[ListIndex::new(0)].id)
             .unwrap()
             .current_action = Some(ActionKind::Attack);
         let g = t.groups.get_mut(group_id(1)).unwrap();
@@ -405,7 +407,7 @@ fn a_far_member_turns_and_walks_to_its_slot() {
     );
     assert_eq!(state(&t, 0), SlotState::Steering);
     assert_eq!(
-        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
+        t.parts.unit_ai.get(unit(&t, 10).id).unwrap().state_position,
         Point::new(10.0, 5.0)
     );
 }
@@ -538,7 +540,7 @@ fn a_due_slot_takes_its_member() {
     t.steer_to_slot(group_id(1), 0, 0, &[]).unwrap();
     assert_eq!(mover(&t, 10).stats.speed, Speed::new(0.8));
     assert_eq!(
-        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
+        t.parts.unit_ai.get(unit(&t, 10).id).unwrap().state_position,
         Point::ORIGIN
     );
 }
@@ -632,7 +634,9 @@ fn the_members_moves_end_wait_or_stop() {
         velocity: BVector::new(0.0, 0.0, 0.5),
         acceleration: BVector::ZERO,
     });
-    let _ = t.push_live(PlayerId::new(1), stray).unwrap();
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(stray, free_ai()))
+        .unwrap();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.members.push(Member {
         id: object_id(12),
@@ -659,13 +663,13 @@ fn the_members_moves_end_wait_or_stop() {
         }
     );
     assert_eq!(
-        unit(&t, 10).combat.ai.as_ref().unwrap().state_position,
+        t.parts.unit_ai.get(unit(&t, 10).id).unwrap().state_position,
         Point::new(10.0, 5.0)
     );
     assert_eq!(g.members[1].specific_move.timer, Seconds::new(1.0 - DT));
     assert_eq!(g.members[1].specific_move.reason, MoveReason::DETOUR);
     assert_eq!(
-        unit(&t, 11).combat.ai.as_ref().unwrap().state_position,
+        t.parts.unit_ai.get(unit(&t, 11).id).unwrap().state_position,
         Point::ORIGIN
     );
     assert_eq!(mover(&t, 12).animated.speed, Speed::new(0.0));
@@ -688,7 +692,11 @@ fn the_members_moves_end_wait_or_stop() {
     );
     assert_eq!(mover(&t2, 11).animated.speed, Speed::new(0.0));
     assert_eq!(
-        unit(&t2, 11).combat.ai.as_ref().unwrap().state_position,
+        t2.parts
+            .unit_ai
+            .get(unit(&t2, 11).id)
+            .unwrap()
+            .state_position,
         Point::new(6.0, 9.0)
     );
 }

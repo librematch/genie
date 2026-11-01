@@ -346,7 +346,7 @@ impl Artifact {
                 let code =
                     update_sub_actions(&mut self.move_to, c, unit, me, ListUpdate::default())?;
                 if state != MoveTo::Waiting {
-                    unit.post_in_the_way()?;
+                    unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
                 }
                 // its target let go (4, 5): it ends now, as at 1 to 3, its notify posted by the
                 // check
@@ -364,7 +364,11 @@ impl Artifact {
             crate::world::lets::release(c, unit, t, r.by)?;
         }
         if let Some(notify) = notify.filter(|_| !quiet) {
-            unit.post_own(notify, [ActionKind::Move.value(), 0, 0])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                notify,
+                [ActionKind::Move.value(), 0, 0],
+            )?;
         }
         Ok(())
     }

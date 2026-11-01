@@ -74,10 +74,10 @@ impl World {
             if !moves && !queued {
                 continue;
             }
-            let to_queue = unit
-                .combat
-                .ai
-                .as_ref()
+            let to_queue = self
+                .parts
+                .unit_ai
+                .get(unit.id)
                 .is_some_and(|ai| queued || (commits && ai.has_unready_order()));
             let Some(crate::world::index::Place::Live(q, idx)) = self.place(id) else {
                 // a sleeping object is a static one without a unit AI: its slot 0x128 does
@@ -134,7 +134,7 @@ impl World {
         commits: bool,
     ) -> Result<(), GenieError> {
         self.queue_build(q, idx, site, position)?;
-        if commits && let Some(ai) = self.players.live_mut(q, idx)?.combat.ai.as_mut() {
+        if commits && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id) {
             crate::orders::readiness(&mut ai.orders, false);
         }
         Ok(())
@@ -151,7 +151,7 @@ impl World {
         kind: MasterKind,
     ) -> Result<(), GenieError> {
         if crate::objects::masters::master_type::COMBAT <= kind
-            && let Some(ai) = self.players.live_mut(q, idx)?.combat.ai.as_mut()
+            && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
         {
             ai.orders.clear();
         }
@@ -282,9 +282,13 @@ impl World {
             ready: true,
             target_type: Some(crate::unit_ai::OrderTargetType::of_master(master)),
         };
-        let ai = unit.combat.ai.as_mut().ok_or(GenieError::unsupported(
-            "a queued build order without a unit AI",
-        ))?;
+        let ai = self
+            .parts
+            .unit_ai
+            .get_mut(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a queued build order without a unit AI",
+            ))?;
         let _ = ai.queue_order(state, order, false, false)?;
         Ok(())
     }
@@ -318,7 +322,7 @@ impl World {
         // the work command's notify (slot 0x828): the build order and the foundation, with
         // the point slot 0x128 passes (BUILD's x and y, on the ground)
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Build),
                 Some(ActionKind::Build),

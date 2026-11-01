@@ -115,7 +115,7 @@ impl World {
             self.set_part(id, Part::GatherPoint(gather))?;
             let unit = self.players.live_mut(player, i)?;
             // the unit AI's slot 0x210 (FUN_140c16790): its command queue empties
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.building_orders.clear();
             }
         }
@@ -218,7 +218,7 @@ impl World {
                 continue;
             };
             let unit = &self.players.live(p, i)?;
-            let Some(ai) = unit.combat.ai.as_ref() else {
+            let Some(ai) = self.parts.unit_ai.get(unit.id) else {
                 continue;
             };
             let building = unit.master(self.master_tables(), p)?.kind == BUILDING;
@@ -242,7 +242,7 @@ impl World {
                 self.set_part(id, Part::GatherPoint(None))?;
             }
             let unit = self.players.live_mut(p, i)?;
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.building_orders.extend(queued);
             }
         }
@@ -356,7 +356,7 @@ impl World {
                 ));
             }
             let building = self.players.live_mut(player, i)?;
-            if let Some(ai) = building.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
                 ai.set_action(Some(ActionKind::Research));
             }
         }

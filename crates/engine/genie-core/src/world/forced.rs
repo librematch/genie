@@ -280,6 +280,9 @@ impl World {
         )?;
         self.set_part(id, crate::world::parts::Part::Missile(g.parts.missile))?;
         self.set_part(id, crate::world::parts::Part::TownBell(g.parts.town_bell))?;
+        let mut ai = g.parts.unit_ai.clone();
+        keep_unsaved_ai(self.parts.unit_ai.get(id), ai.as_mut());
+        self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
@@ -347,13 +350,20 @@ fn sight_follows(
 }
 
 /// What the game's object `forced` takes from the slice's `unit` that the save does not hold:
-/// the order of the objects inside it while they are the same (the game's history), a hunted
-/// animal's origin and a boar's flag.
+/// the order of the objects inside it while they are the same (the game's history).
 fn keep_unsaved(unit: &Unit, forced: &mut Unit) {
     if same_members(&unit.garrison, &forced.garrison) {
         forced.garrison.clone_from(&unit.garrison);
     }
-    if let (Some(old), Some(new)) = (unit.combat.ai.as_ref(), forced.combat.ai.as_mut()) {
+}
+
+/// What the game's unit AI `forced` takes from the slice's `old` that the save does not hold: a
+/// hunted animal's origin and a boar's flag.
+const fn keep_unsaved_ai(
+    old: Option<&crate::unit_ai::UnitAi>,
+    forced: Option<&mut crate::unit_ai::UnitAi>,
+) {
+    if let (Some(old), Some(new)) = (old, forced) {
         new.hunted = old.hunted;
         if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
             n.go_home = o.go_home;
@@ -369,6 +379,7 @@ mod tests {
     use crate::players::game_status::GameStatus;
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
+    use crate::world::parts::Object;
     use crate::world::tests::forage_world;
 
     /// A forced object's sight follows its state ([`sight_follows`]): from 2 to 3 it dies; from
@@ -485,13 +496,20 @@ mod tests {
         let hunted = Some(crate::unit_ai::Hunted::default());
         let forager = &mut t.players[1].objects[ListIndex::new(0)];
         forager.stopped = true;
-        forager.combat.ai.as_mut().unwrap().hunted = hunted;
-        let mut theirs = t.players[1].objects.clone();
-        theirs[ListIndex::new(0)].place_for_test(Position::new(29.5, 88.5, 0.0));
-        theirs[ListIndex::new(0)].stopped = false;
-        theirs[ListIndex::new(0)].combat.ai.as_mut().unwrap().hunted = None;
+        t.parts.unit_ai.get_mut(forager.id).unwrap().hunted = hunted;
+        // the game's objects with their unit AIs; the save holds no hunted origin
+        let mut theirs: Vec<Object> = t.players[1]
+            .objects
+            .iter()
+            .map(|u| Object::with_ai(u.clone(), t.parts.unit_ai.get(u.id).cloned()))
+            .collect();
+        theirs[0]
+            .unit
+            .place_for_test(Position::new(29.5, 88.5, 0.0));
+        theirs[0].unit.stopped = false;
+        theirs[0].parts.unit_ai.as_mut().unwrap().hunted = None;
         let mut game = GameState {
-            players: vec![vec![], theirs.iter().cloned().map(Into::into).collect()],
+            players: vec![vec![], theirs],
             ..GameState::default()
         };
         let gather = crate::commands::GatherPoint {
@@ -517,7 +535,7 @@ mod tests {
             (forager.position(), forager.stopped),
             (Position::new(29.5, 88.5, 0.0), false)
         );
-        assert_eq!(forager.combat.ai.as_ref().unwrap().hunted, hunted);
+        assert_eq!(t.parts.unit_ai.get(forager.id).unwrap().hunted, hunted);
         assert_eq!(
             t.spatial.get(object_id(9175)).map(|p| p.position),
             Some(Position::new(29.5, 88.5, 0.0))

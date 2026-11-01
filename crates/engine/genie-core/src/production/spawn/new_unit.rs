@@ -29,6 +29,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::IN_PRODUCTION;
 use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
+use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 
 use crate::unit_ai::ActionKind;
@@ -80,10 +81,10 @@ impl World {
         }
         // the building unit AI's command queue (`+0x1f0`, saved as `savedOrder`): without a
         // gather point its first location is the spot's goal (FUN_1411d12d0, slot 0x220)
-        let queue = building
-            .combat
-            .ai
-            .as_ref()
+        let queue = self
+            .parts
+            .unit_ai
+            .get(building.id)
             .map(|a| a.building_orders.clone())
             .unwrap_or_default();
         let gather = self.parts.gather_point.get(building.id).copied();
@@ -109,7 +110,7 @@ impl World {
         owner.tracker.unplace(Some(master), class);
         let building = owner.objects.checked_mut(i)?;
         let (building_id, state) = (building.id, building.life.state);
-        if let Some(ai) = building.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
                 Notify::own(
                     building_id,
@@ -165,7 +166,7 @@ impl World {
                 .flatten()
                 .map(|(tp, t)| (tp, t.life.master_id));
             if let Some((tp, tm)) = target {
-                let ai = self.players.live(p, new)?.combat.ai.as_ref();
+                let ai = self.parts.unit_ai.get(self.players.live(p, new)?.id);
                 // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`):
                 // an order whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
                 let relic_order = |q: &crate::unit_ai::QueuedOrder| {
@@ -188,7 +189,7 @@ impl World {
             }
             let unit = self.players.live_mut(p, new)?;
             let state = unit.life.state;
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 let order = crate::unit_ai::QueuedOrder {
                     priority: crate::unit_ai::OrderPriority::COMMAND,
                     point: o.point.with_z(z),
@@ -402,7 +403,6 @@ impl World {
                 master: made.life,
             },
             combat: crate::objects::layers::Combat {
-                ai,
                 // the TRIBE combat setup (FUN_14121df60): the master's volley fire
                 firepower: made.volley_fire,
                 ..Default::default()
@@ -430,7 +430,11 @@ impl World {
             },
             ..Unit::default()
         };
-        let idx = self.push_live(p, unit)?;
+        let parts = ObjectParts {
+            unit_ai: ai,
+            ..ObjectParts::default()
+        };
+        let idx = self.push_live(p, Object { unit, parts })?;
         // the static init's add to its player (slot 0x2d0) files it in the tracker
         self.track_add(p, id, master)?;
         Ok(idx)

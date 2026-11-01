@@ -21,13 +21,20 @@ use crate::unit_ai::task_finder::Diplomacy;
 /// `spatial` holds it as unknown, or not at all), its place in its tile's list and a building's
 /// annexes (the world's links).
 pub(crate) fn victim_in(
-    u: &Unit,
+    (u, unit_ai): (&Unit, bool),
     (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: crate::world::Mode680,
 ) -> Victim {
-    let mut v = victim_of(u, master, attributes, p, spatial.terrain.as_ref(), mode_680);
+    let mut v = victim_of(
+        (u, unit_ai),
+        master,
+        attributes,
+        p,
+        spatial.terrain.as_ref(),
+        mode_680,
+    );
     v.allied = Allied::new(dip.allied(attacker, p, true), dip.allied(p, attacker, true));
     v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
     v.tile_place = spatial.tile_place(u.id);
@@ -43,7 +50,7 @@ pub(crate) fn victim_in(
 /// relations to an attacker (`allied`) and whether its place is a guess (`uncertain`) are the
 /// caller's. The slice holds neither its unit AI's alert mode and attackers nor its facing.
 pub(crate) fn victim_of(
-    u: &Unit,
+    (u, unit_ai): (&Unit, bool),
     master: &Master,
     attributes: &[Amount],
     p: PlayerId,
@@ -153,7 +160,7 @@ pub(crate) fn victim_of(
                     && 1e-7 < t.work_val1.get()
             }),
             busy: u.top_action_kind().is_some() || u.actions.unmodelled_action.is_some(),
-            unit_ai: u.combat.ai.is_some(),
+            unit_ai,
             alert_idle: None,
             facing: None,
         }),

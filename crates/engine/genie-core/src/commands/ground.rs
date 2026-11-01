@@ -82,7 +82,7 @@ impl World {
                 && matches!(master.class, class::PREY | class::PREDATOR))
                 || (!walking
                     && level.is_none_or(|s| matches!(s, PathState::Idle | PathState::GaveUp)));
-            let busy = u.combat.ai.as_ref().is_none_or(|ai| {
+            let busy = self.parts.unit_ai.get(u.id).is_none_or(|ai| {
                 matches!(
                     ai.current_action,
                     Some(ActionKind::MoveAside | ActionKind::GroupAside)
@@ -101,7 +101,7 @@ impl World {
                     "a sleeping unit sent off a footprint",
                 ));
             };
-            if let Some(ai) = self.players.live_mut(q, i)?.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, i)?.id) {
                 ai.post(
                     Notify::own(id, crate::unit_ai::NotifyKind::SENT_OFF, p),
                     state,
@@ -166,7 +166,7 @@ impl World {
                 continue;
             };
             let z = self.players.live(q, i)?.position().z();
-            if let Some(ai) = self.players.live_mut(q, i)?.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, i)?.id) {
                 ai.set_action(Some(ActionKind::MoveAside));
             }
             self.move_point_order(q, i, Position::new(x, y, z))?;
@@ -177,7 +177,7 @@ impl World {
             };
             let unit = self.players.live_mut(q, i)?;
             let state = unit.life.state;
-            if let Some(ai) = unit.combat.ai.as_mut()
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
                 && ai.current_action != Some(ActionKind::MoveAside)
             {
                 ai.post(

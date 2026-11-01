@@ -60,11 +60,11 @@ impl World {
                 ),
                 &self.graphics,
             ),
-            u.combat.ai.as_ref(),
+            self.parts.unit_ai.get(u.id),
             (held.computer, world_time),
         );
         let own = crate::combat::victims::victim_of(
-            u,
+            (u, self.parts.unit_ai.contains(u.id)),
             master,
             &held.attributes,
             player,
@@ -138,7 +138,7 @@ impl World {
             .mover()
             .map_or(Speed::ZERO, |m| m.stats.speed);
         let e = crate::combat::attack::engagement(
-            self.players.live(player, idx)?.combat.ai.as_ref(),
+            self.parts.unit_ai.get(self.players.live(player, idx)?.id),
             speed,
             master,
             &me_at,
@@ -174,7 +174,7 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         for (kind, p) in posted {
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.post(crate::unit_ai::Notify::own(id, kind, p), state)?;
             }
         }
@@ -226,13 +226,13 @@ impl World {
     ) -> Result<(), GenieError> {
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.set_action(Some(ActionKind::Attack));
             ai.set_target(Some(aim.aimed), aim.aimed_class.or_none(), aim.at);
         }
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.last_retarget_time = world_time;
             ai.notify_work(
                 Some(OrderKind::Attack),

@@ -30,6 +30,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
 use crate::vision::VisionBits;
@@ -128,10 +129,11 @@ impl Unit {
             target,
             start,
             waits: villager && !c.w.players.player(c.player)?.computer,
-            stance: self
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
             defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
         })
@@ -162,25 +164,19 @@ impl Unit {
 
     /// `FUN_140a867b0` on a unit inside its target already (the update's walk again put it in):
     /// notify 0x1fa with the enter action value and its `set_state(1)`, then the update's own
-    /// `set_state(1)` ([`Unit::set_entered`] twice).
+    /// `set_state(1)` ([`Unit::entered`] twice).
     ///
     /// # Errors
     ///
     /// The notify's and the `set_state(1)`'s.
     pub(crate) fn entered_again(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         self.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_COMPLETED,
             [ActionKind::Enter.value(), 0, 0],
         )?;
         for _ in 0..2 {
-            self.set_entered(
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
-                &c.w.graphics,
-                c.w.streams.get(Stream::Sprite),
-            )?;
+            self.entered(c)?;
         }
         Ok(())
     }
@@ -282,29 +278,11 @@ impl Unit {
     /// `MoveTo`'s teardown stops the unit, slot 0x5d0), the unit shows its master's standing
     /// sprite ([`Unit::shows_standing_sprite`]) and, the Enter not being quiet, its unit AI gets
     /// notify 0x1f9 with the enter action value.
-    pub(crate) fn entered(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        self.set_entered(
-            crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
-            &c.w.graphics,
-            c.w.streams.get(Stream::Sprite),
-        )
-    }
-
-    /// [`Unit::entered`] with the owner's masters, the sprites' table and the Sprite stream its
-    /// standing sprite reads.
     ///
     /// # Errors
     ///
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
-    pub(crate) fn set_entered(
-        &mut self,
-        masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: &crate::objects::Graphics,
-        sprite_rng: &mut Well512,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn entered(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let enter = self
             .actions
             .list
@@ -316,8 +294,16 @@ impl Unit {
             m.stop()?;
         }
         enter.state = EnterState::Done;
-        self.shows_standing_sprite(masters, graphics, sprite_rng)?;
+        self.shows_standing_sprite(
+            crate::objects::masters::OwnerMasters::new(
+                &c.w.parts.own_master,
+                c.w.masters.of(c.player),
+            ),
+            &c.w.graphics,
+            c.w.streams.get(Stream::Sprite),
+        )?;
         self.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_FAILED,
             [ActionKind::Enter.value(), 0, 0],
         )
@@ -436,6 +422,7 @@ impl Unit {
         }
         self.go_inside(c, target, &me, &bm)?;
         self.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_COMPLETED,
             [ActionKind::Enter.value(), 0, 0],
         )?;
@@ -505,7 +492,8 @@ impl Unit {
         self.join_building(c, Some(target), bp, reload, me, bm)?;
         self.enter_sight(c, target, at, building_radius, placed, bm)?;
         let mut bell = c.w.parts.town_bell_of(id);
-        self.enter_town_bell(&mut bell, Some(target), at, state, (me, bm))?;
+        let ai = c.w.parts.unit_ai.get(id);
+        self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm))?;
         c.w.parts.set_town_bell(id, bell);
         Ok(())
     }
@@ -594,7 +582,7 @@ impl Unit {
     /// villagers; with 3 it is never cleared.
     fn enter_town_bell(
         &self,
-        bell: &mut crate::orders::town_bell::TownBell,
+        (bell, ai): (&mut crate::orders::town_bell::TownBell, Option<&UnitAi>),
         target: Option<ContainerId>,
         at: Position,
         state: ObjectState,
@@ -604,9 +592,11 @@ impl Unit {
             return Ok(());
         }
         if !bell.flag {
-            let action = self.combat.ai.as_ref().map(|ai| ai.current_action).ok_or(
-                GenieError::unsupported("a town-bell record of a unit without a unit AI"),
-            )?;
+            let action = ai
+                .map(|ai| ai.current_action)
+                .ok_or(GenieError::unsupported(
+                    "a town-bell record of a unit without a unit AI",
+                ))?;
             bell.record(crate::orders::town_bell::BackToWork {
                 target: target.map(ContainerId::id),
                 target_class: None,

@@ -38,6 +38,7 @@ use crate::unit_ai::{OrderKind, UnitAi};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::parts::PartTable;
 use genie_diff::Diff;
 
 mod attack_state;
@@ -394,34 +395,42 @@ pub(crate) struct Ground<'a> {
     pub(crate) sprite_rng: &'a mut Well512,
     /// The Object stream, which a swing's second sprite draws from.
     pub(crate) object_rng: Option<&'a mut Well512>,
-    /// The notifies' list while the unit AI is out of the unit.
-    pub(crate) buffer: Option<&'a mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>>,
+    /// Where the unit's notifies go.
+    pub(crate) posts: Posts<'a>,
     /// The sprites' table, which a `MoveTo` the Attack makes takes its sprite from.
     pub(crate) graphics: &'a crate::objects::Graphics,
     /// The objects by id: a gate's annexes, which its reach measures.
     pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
 }
 
+/// Where [`Ground::post`] sends the unit's notifies.
+pub(crate) enum Posts<'a> {
+    /// The list the unit AI posts itself while it is out of the world's table.
+    Held(&'a mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>),
+    /// The world's unit AIs: each notify goes to the unit's at once.
+    Ais(&'a mut PartTable<UnitAi>),
+}
+
 impl Ground<'_> {
     /// The unit's notify of `kind` with `p` (slot 0x328): to the list while its unit AI is out
-    /// of it, else to its unit AI at once.
+    /// of the world's table, else to its unit AI at once.
     ///
     /// # Errors
     ///
     /// The notify's.
     pub(crate) fn post(
         &mut self,
-        unit: &mut Unit,
+        unit: &Unit,
         kind: crate::unit_ai::NotifyKind,
         p: [i32; 3],
     ) -> Result<(), GenieError> {
-        self.buffer.as_mut().map_or_else(
-            || unit.post_own(kind, p),
-            |b| {
-                b.push((kind, p));
+        match &mut self.posts {
+            Posts::Held(list) => {
+                list.push((kind, p));
                 Ok(())
-            },
-        )
+            }
+            Posts::Ais(ais) => unit.post_own(ais, kind, p),
+        }
     }
 }
 
@@ -444,7 +453,7 @@ impl World {
             map: spatial,
             sprite_rng: sprite,
             object_rng: Some(object),
-            buffer: None,
+            posts: Posts::Ais(&mut parts.unit_ai),
             graphics,
             by_id: crate::world::index::ObjectsRef::new(
                 players,

@@ -368,11 +368,9 @@ impl World {
             ));
         };
         let direct = self
-            .players
-            .live(q, idx)?
-            .combat
-            .ai
-            .as_ref()
+            .parts
+            .unit_ai
+            .get(self.players.live(q, idx)?.id)
             .is_none_or(|ai| !w.queued && (!w.commits || !ai.has_unready_order()));
         if direct {
             let task: (MasterId, BuildAction) =
@@ -383,7 +381,7 @@ impl World {
                 self.queue_build(q, idx, (player, f, master), p)?;
             }
             if w.commits
-                && let Some(ai) = self.players.live_mut(q, idx)?.combat.ai.as_mut()
+                && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
             {
                 // the readiness pass with 0: every queued order is ready
                 crate::orders::readiness(&mut ai.orders, false);

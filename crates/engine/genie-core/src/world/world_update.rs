@@ -284,7 +284,7 @@ impl World {
         let slot = self.live_index(p, id);
         let player = self.players.player_mut(p)?;
         let e = match slot {
-            Some(k) => player.live(k)?.in_context(e),
+            Some(k) => player.live(k)?.in_context(self.parts.unit_ai.get(id), e),
             None => e.with("object", id),
         };
         crate::trace::object_freezes(self.ticks, p, id, &e);

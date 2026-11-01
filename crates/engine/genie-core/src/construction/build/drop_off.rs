@@ -183,6 +183,7 @@ impl BuildAction {
         }
         let Some((id, range, sprite)) = found else {
             builder.post_own(
+                &mut c.w.parts.unit_ai,
                 crate::unit_ai::NotifyKind::NO_DROP_SITE,
                 [ActionKind::Build.value(), 0, 0],
             )?;
@@ -282,7 +283,7 @@ impl BuildAction {
             self.restart(c, builder)?;
             return Ok(HeadCode::Keeps);
         }
-        if let Some(ai) = builder.combat.ai.as_mut() {
+        if let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) {
             let gone = &reads.gone_orders;
             ai.orders
                 .retain(|o| !(DROPPED_ORDERS.contains(&o.order) && gone.contains(&o.target)));

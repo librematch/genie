@@ -311,14 +311,14 @@ impl Unit {
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let current = self
-            .combat
-            .ai
-            .as_ref()
-            .ok_or(GenieError::unsupported(
-                "a resource search without a unit AI",
-            ))?
-            .current_target;
+        let current =
+            c.w.parts
+                .unit_ai
+                .get(self.id)
+                .ok_or(GenieError::unsupported(
+                    "a resource search without a unit AI",
+                ))?
+                .current_target;
         let mut w = ResourceWorld {
             player: c.player,
             spatial: &mut c.w.spatial,

@@ -39,6 +39,7 @@ use crate::unit_ai::UnitAiType;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
+use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 use crate::world::{Gate, World};
 
@@ -273,7 +274,6 @@ impl World {
                 ..Lifecycle::default()
             },
             combat: crate::objects::layers::Combat {
-                ai,
                 builders: crate::construction::BuilderCount::of_data(0),
                 work_rate_powerup: WorkRate::ZERO,
                 capture_flag: CaptureKind::NONE,
@@ -361,7 +361,11 @@ impl World {
             idle_variant: 0,
             roo_called: false,
         };
-        let _ = self.push_live(player, unit)?;
+        let parts = ObjectParts {
+            unit_ai: ai,
+            ..ObjectParts::default()
+        };
+        let _ = self.push_live(player, Object { unit, parts })?;
         self.settle_building(player, id, &made, (position, desolid), foundation)?;
         for (slot, (&annex, &off)) in building
             .annexes

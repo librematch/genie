@@ -146,7 +146,7 @@ impl Attack {
         };
         let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way()?;
+            unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
         }
         Ok(code)
     }

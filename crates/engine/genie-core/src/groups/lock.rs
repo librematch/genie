@@ -35,8 +35,9 @@ impl World {
         let mut counts = [0i32; 9];
         for &id in &ids {
             if let Some(vote) = self
-                .object(id)
-                .and_then(|(_, u)| u.combat.ai.as_ref())
+                .parts
+                .unit_ai
+                .get(id)
                 .and_then(|ai| ai.formation_type.vote())
             {
                 *counts.checked_mut(vote)? += 1;
@@ -58,7 +59,7 @@ impl World {
         self.stances_state(group, FormationKind::HORDE)?;
         // FUN_1415417a0 finds sleeping members too
         for &id in &ids {
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
+            if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.formation_type = FormationKind::HORDE;
             }
         }
@@ -130,8 +131,9 @@ impl World {
         let mut n = [0i32; 4];
         for &id in &ids {
             if let Some(at) = self
-                .object(id)
-                .and_then(|(_, u)| u.combat.ai.as_ref())
+                .parts
+                .unit_ai
+                .get(id)
                 .and_then(|ai| ai.stance.counted())
             {
                 *n.checked_mut(at)? += 1;
@@ -151,7 +153,7 @@ impl World {
         }
         // FUN_1415417a0 finds sleeping members too
         for &id in &ids {
-            if let Some(ai) = self.object_mut(id).and_then(|(_, u)| u.combat.ai.as_mut()) {
+            if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.formation_type = formation_type.unit_byte();
             }
         }

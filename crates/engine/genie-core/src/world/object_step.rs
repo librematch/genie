@@ -25,7 +25,7 @@ impl World {
         f: impl FnOnce(&mut Unit, &mut Step<'_>) -> Result<Outcome, GenieError>,
     ) -> Result<Outcome, GenieError> {
         let mut unit = self.take_out(p, i)?;
-        let watch = crate::trace::Watch::of(&unit);
+        let watch = crate::trace::Watch::of(&unit, self.parts.unit_ai.get(unit.id));
         // the objects a hit's blast may reach about its target (one a hit can read), or about
         // the unit for its blast at death (TRIBE_Combat_Object::update)
         let target = match unit.attack_target() {
@@ -53,7 +53,7 @@ impl World {
         };
         let mut result = f(&mut unit, &mut c);
         if let Some(w) = watch {
-            w.report(&unit, c.w.ticks, p);
+            w.report((&unit, c.w.parts.unit_ai.get(unit.id)), c.w.ticks, p);
         }
         if let Some(e) = self.take_sight_unsupported()
             && result.is_ok()

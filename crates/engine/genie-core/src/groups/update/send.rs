@@ -151,7 +151,7 @@ impl World {
         let rng = self.streams.get(Stream::Ai);
         if let Some(ai) = slot
             .and_then(|i| self.players.live_mut(player, i).ok())
-            .and_then(|u| u.combat.ai.as_mut())
+            .and_then(|u| self.parts.unit_ai.get_mut(u.id))
         {
             ai.set_randomized_retarget_timer(span, rng);
         }

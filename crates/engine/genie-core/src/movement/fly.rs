@@ -441,10 +441,6 @@ mod tests {
                 master_id: master_id(96),
                 ..Lifecycle::default()
             },
-            combat: crate::objects::layers::Combat {
-                ai: Some(UnitAi::default()),
-                ..Default::default()
-            },
             ..Unit::default()
         };
         bird.actions.list.set_fly(Some(fly));
@@ -458,7 +454,8 @@ mod tests {
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![gaia],
-        );
+        )
+        .with_ais([(object_id(9925), UnitAi::default())]);
         t.spatial = crate::map::spatial::Spatial::new(GridSize::new(120, 120));
         t.streams.get(Stream::Action).set_seed(seed);
         t.graphics = hawk_graphics();
@@ -521,10 +518,10 @@ mod tests {
 
     /// The notifies 0x1f9 the hawk's unit AI holds.
     fn failures(t: &World) -> usize {
-        let ai = t.players[0].objects[ListIndex::new(0)]
-            .combat
-            .ai
-            .as_ref()
+        let ai = t
+            .parts
+            .unit_ai
+            .get(t.players[0].objects[ListIndex::new(0)].id)
             .unwrap();
         let failed = ai.notifies.iter();
         failed

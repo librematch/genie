@@ -61,7 +61,7 @@ impl World {
         let Some((_, unit)) = self.object(id) else {
             return Ok(());
         };
-        if unit.combat.ai.is_none() {
+        if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
         }
         let top = self.top_target_object(unit);

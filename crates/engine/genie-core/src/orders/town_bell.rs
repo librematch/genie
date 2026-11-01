@@ -555,10 +555,10 @@ impl World {
             found = held(pasture.id()).map(|(_, p)| p);
         }
         if found.is_none() {
-            let own = unit
-                .combat
-                .ai
-                .as_ref()
+            let own = self
+                .parts
+                .unit_ai
+                .get(unit.id)
                 .and_then(|ai| own_order_target(ai, unit.id));
             found = own.and_then(held).map(|(_, t)| t);
         }
@@ -572,9 +572,13 @@ impl World {
             Some(GATHER) => actions.list.gather().and_then(|g| g.target_class),
             _ => None,
         };
-        let ai = unit.combat.ai.as_ref().ok_or(GenieError::unsupported(
-            "a town-bell record of a unit without a unit AI",
-        ))?;
+        let ai = self
+            .parts
+            .unit_ai
+            .get(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a town-bell record of a unit without a unit AI",
+            ))?;
         let target2 = unit.top_second_target().and_then(held).map(|(_, t)| t.id);
         let now = BackToWork {
             target,

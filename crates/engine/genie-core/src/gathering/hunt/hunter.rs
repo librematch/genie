@@ -94,7 +94,7 @@ impl Unit {
                             c.w.object_state(t).is_some_and(|s| ObjectState::Undead < s)
                         })
                 })
-        }) && self.combat.ai.as_ref().is_some_and(|ai| {
+        }) && c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
             let class = ai
                 .target_class
                 .or_else(|| self.actions.list.hunt().and_then(|h| h.target_class));
@@ -127,7 +127,7 @@ impl Unit {
             Some(HuntState::Drop) if timer < Seconds::ZERO => self.hunt_drop_wait(c)?,
             Some(HuntState::Drop) => return self.hunt_drop_walk(c, me),
             // State 13: the hunt failed; its next update tells its unit AI (notify 0x1f9) and ends it.
-            Some(HuntState::Failed) => return self.hunt_failed(),
+            Some(HuntState::Failed) => return self.hunt_failed(c),
             Some(HuntState::WalkPoint | HuntState::WalkSearch) => self.hunt_point_walk(c, me)?,
             Some(HuntState::Search) => self.hunt_search_wait(c)?,
             Some(HuntState::Idle) => self.hunt_idle()?,
@@ -215,10 +215,11 @@ impl Unit {
         let who = crate::gathering::hunt::PointWalker {
             computer: c.w.players.player(c.player)?.computer,
             villager: master.class == class::VILLAGER,
-            stance: self
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
         };
         let dropped = hunt.update_drop(c, self, me, site, who);
@@ -255,12 +256,13 @@ impl Unit {
     /// State 13 (`0x140ac7a00` case 0xc): notify 0x1f9 with the hunt's action value, and the
     /// update returns 3, whose deletion lets its target, then its second target go. One with a
     /// sub-action is not modelled.
-    pub(crate) fn hunt_failed(&mut self) -> Result<HeadCode, GenieError> {
+    pub(crate) fn hunt_failed(&self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
         let hunt = self.actions.list.hunt().ok_or(NO_HUNT)?;
         if hunt.attack.is_some() || hunt.move_to.is_some() {
             return Err(GenieError::unsupported("a failed hunt with a sub-action"));
         }
         self.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_FAILED,
             [ActionKind::Hunt.value(), 0, 0],
         )?;
@@ -282,10 +284,11 @@ impl Unit {
         let who = crate::gathering::hunt::PointWalker {
             computer: c.w.players.player(c.player)?.computer,
             villager: master.class == class::VILLAGER,
-            stance: self
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
         };
         let walked = hunt.update_point_walk(c, self, me, who);

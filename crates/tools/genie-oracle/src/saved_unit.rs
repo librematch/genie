@@ -51,8 +51,8 @@ use genie_core::world::parts::{Object, ObjectParts};
 use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
-/// point, the production lists, the missile's own fields, the town bell; the dead and own
-/// masters are the import's gaps, MISSING.md).
+/// point, the production lists, the missile's own fields, the town bell, the unit AI; the dead
+/// and own masters are the import's gaps, MISSING.md).
 pub(super) fn object(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -61,7 +61,7 @@ pub(super) fn object(
     masters: Option<&MasterTable>,
     players: usize,
 ) -> Object {
-    let (unit, town_bell) = row(object, objects, paths, civ, masters, players);
+    let (unit, (unit_ai, town_bell)) = row(object, objects, paths, civ, masters, players);
     Object {
         unit,
         parts: ObjectParts {
@@ -71,6 +71,7 @@ pub(super) fn object(
             missile: saved_missile(object),
             own_master: None,
             town_bell,
+            unit_ai,
         },
     }
 }
@@ -108,7 +109,7 @@ pub(super) fn saved_missile(
     })
 }
 
-/// The slice's view of one saved object's row: its lifecycle, its unit AI and its actions. A save
+/// The slice's view of one saved object's row: its lifecycle and its actions. A save
 /// from the start of a game holds no actions, so an object starts its master's default task in
 /// its first update ([`default_task`]); a save from later in the game holds them, and the slice
 /// imports the ones it models ([`saved_actions`]). A gather point or production lists the save
@@ -125,8 +126,8 @@ pub(super) fn unit(
     row(object, objects, paths, civ, masters, players).0
 }
 
-/// [`unit`]'s row with the town bell its unit AI's read gives (a new unit's where the read
-/// fails), which is the object's part.
+/// [`unit`]'s row with the unit AI and the town bell its unit AI's read gives (none and a new
+/// unit's where the read fails), which are the object's parts.
 fn row(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -134,7 +135,7 @@ fn row(
     civ: CivId,
     masters: Option<&MasterTable>,
     players: usize,
-) -> (Unit, TownBell) {
+) -> (Unit, (Option<UnitAi>, TownBell)) {
     let saved = object.static_part();
     let named = saved.and_then(|s| ObjectId::try_from(s.id).ok());
     let (Some(s), Some(id)) = (saved, named) else {
@@ -146,7 +147,7 @@ fn row(
             },
             ..Unit::default()
         };
-        return (unit, TownBell::default());
+        return (unit, (None, TownBell::default()));
     };
     let Ok(master) = MasterId::try_from(s.master_obj) else {
         let unit = Unit {
@@ -159,7 +160,7 @@ fn row(
             },
             ..Unit::default()
         };
-        return (unit, TownBell::default());
+        return (unit, (None, TownBell::default()));
     };
     let saved = object
         .actions()
@@ -182,7 +183,6 @@ fn row(
         id,
         life,
         combat: genie_core::objects::layers::Combat {
-            ai,
             work_rate_powerup: object
                 .combat()
                 .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
@@ -408,7 +408,7 @@ fn row(
         .and(production)
         .and(moving)
         .err();
-    (unit, town_bell)
+    (unit, (ai, town_bell))
 }
 
 /// A saved building's lists of objects (none for another object).

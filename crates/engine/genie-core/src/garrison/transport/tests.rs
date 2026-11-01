@@ -15,7 +15,9 @@ use crate::objects::masters::TaskSprites;
 use crate::pathing::zones::ZoneId;
 use crate::test_ids::object_id;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
+use crate::world::parts::PartTable;
 
 /// A map of zones by column (the tile's x over 10) and terrain flags by a closure; the shore
 /// point the planner gives, recorded.
@@ -80,8 +82,9 @@ const STANDING: Graphic = Graphic {
 };
 
 /// The transport's unit as the update's effects read it: a mover in motion (its animation at
-/// speed 1), a sprite ([`SHOWN`]) and a unit AI that takes its notifies (state 2).
-fn hull() -> crate::objects::unit::Unit {
+/// speed 1), a sprite ([`SHOWN`]); and the table of its unit AI, which takes its notifies (state
+/// 2).
+fn hull() -> (crate::objects::unit::Unit, PartTable<UnitAi>) {
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.animated.speed = Speed::new(1.0);
     let mut unit = crate::objects::unit::Unit {
@@ -91,14 +94,11 @@ fn hull() -> crate::objects::unit::Unit {
             SHOWN,
             &mut Well512::default(),
         )),
-        combat: crate::objects::layers::Combat {
-            ai: Some(crate::unit_ai::UnitAi::default()),
-            ..Default::default()
-        },
         ..crate::objects::unit::Unit::default()
     };
     unit.life.state = ObjectState::Alive;
-    unit
+    let ais = std::iter::once((unit.id, UnitAi::default())).collect();
+    (unit, ais)
 }
 
 /// What a state change left the hull ([`left`]).
@@ -112,12 +112,12 @@ struct Left {
     posted: Vec<(NotifyKind, [i32; 3])>,
 }
 
-/// What a state change left `unit`.
-fn left(unit: &crate::objects::unit::Unit) -> Left {
+/// What a state change left `unit` and its unit AI among `ais`.
+fn left((unit, ais): (&crate::objects::unit::Unit, &PartTable<UnitAi>)) -> Left {
     Left {
         stopped: unit.body.anim_speed() == Some(Speed::new(0.0)),
         stands: unit.sprite.map(|s| s.graphic.id) == Some(STANDING.id),
-        posted: unit.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
+        posted: ais.get(unit.id).map_or_else(Vec::new, |ai| {
             ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
         }),
     }
@@ -130,7 +130,7 @@ fn run_on(
     t: &mut TransportAction,
     s: &Ship<'_>,
     c: &mut Coast,
-    unit: &mut crate::objects::unit::Unit,
+    hull: (&mut crate::objects::unit::Unit, &mut PartTable<UnitAi>),
     computer: bool,
 ) -> Result<Updated, GenieError> {
     let walked = match t.move_to.map(|m| m.state) {
@@ -139,7 +139,7 @@ fn run_on(
         None | Some(MoveTo::Arrived) => UpdateCode::DONE,
     };
     let look = (Some(STANDING), &mut Well512::default());
-    t.state_update(walked, (s, c), unit, look, computer)
+    t.state_update(walked, (s, c), hull, look, computer)
 }
 
 /// [`run_on`] on a fresh [`hull`] of a human player: the update's answer and what it left.
@@ -148,15 +148,16 @@ fn run(
     s: &Ship<'_>,
     c: &mut Coast,
 ) -> (Result<Updated, GenieError>, Left) {
-    let mut unit = hull();
-    let r = run_on(t, s, c, &mut unit, false);
-    (r, left(&unit))
+    let (mut unit, mut ais) = hull();
+    let r = run_on(t, s, c, (&mut unit, &mut ais), false);
+    (r, left((&unit, &ais)))
 }
 
 /// The owner's alert, which a computer player's AI would hear ([`run_on`]).
 fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
     let mut t = *t;
-    run_on(&mut t, s, c, &mut hull(), true).is_err_and(|e| {
+    let (mut unit, mut ais) = hull();
+    run_on(&mut t, s, c, (&mut unit, &mut ais), true).is_err_and(|e| {
         e.reason()
             == "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)"
     })
@@ -518,11 +519,17 @@ fn a_sail_ends_with_its_move_to_and_a_failed_one_returns_3() {
         state: TransportState::Failed,
         ..TransportAction::new(s.position)
     };
-    let mut unit = hull();
+    let (mut unit, mut ais) = hull();
     let look = (None, &mut Well512::default());
     assert!(
-        t.state_update(UpdateCode::DONE, (&s, &mut c), &mut unit, look, false)
-            .is_err()
+        t.state_update(
+            UpdateCode::DONE,
+            (&s, &mut c),
+            (&mut unit, &mut ais),
+            look,
+            false
+        )
+        .is_err()
     );
 }
 

@@ -127,8 +127,8 @@ impl crate::world::World {
             Some((target, (tp, t))) => Some((target, t.master(self.master_tables(), tp)?.class)),
             None => None,
         };
-        let unit = self.players.live_mut(p, i)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        let id = self.players.live(p, i)?.id;
+        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
             ai.notify_work(
                 Some(OrderKind::Transport),
                 Some(ActionKind::Transport),

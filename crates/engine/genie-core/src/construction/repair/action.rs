@@ -51,9 +51,14 @@ pub fn work_amount(
     HitPoints::new(amount)
 }
 
-/// The repairer's slot 0x328: notify `kind` with the repair's action value to its unit AI.
-fn notify(repairer: &mut Unit, kind: NotifyKind) -> Result<(), GenieError> {
-    repairer.post_own(kind, [ActionKind::Repair.value(), 0, 0])
+/// The repairer's slot 0x328: notify `kind` with the repair's action value to its unit AI
+/// (the world's).
+fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), GenieError> {
+    repairer.post_own(
+        &mut c.w.parts.unit_ai,
+        kind,
+        [ActionKind::Repair.value(), 0, 0],
+    )
 }
 
 /// Slot 0x68 of the repairer: sprite `id` shows (the master's standing one for none, `standing`),
@@ -182,7 +187,7 @@ impl RepairAction {
             RepairState::Wait => self.waiting(c, repairer, reads)?,
             RepairState::WalkPoint => self.walking_to_point(c, repairer, me, reads)?,
             RepairState::Failed => {
-                notify(repairer, NotifyKind::ACTION_FAILED)?;
+                notify(c, repairer, NotifyKind::ACTION_FAILED)?;
                 self.set_state(c, repairer, RepairState::Halted, reads)?;
                 return Ok(HeadCode::Deletes);
             }
@@ -404,7 +409,7 @@ impl RepairAction {
                 self.set_state(c, repairer, RepairState::Done, reads)
             }
             RepairOutcome::Unpaid => {
-                notify(repairer, NotifyKind::ACTION_INVALIDATED)?;
+                notify(c, repairer, NotifyKind::ACTION_INVALIDATED)?;
                 self.set_state(c, repairer, RepairState::Done, reads)
             }
             RepairOutcome::Healed => Ok(()),
@@ -493,13 +498,13 @@ impl RepairAction {
             RepairState::Done => {
                 self.drop_target(c, repairer, reads)?;
                 if !self.quiet {
-                    notify(repairer, NotifyKind::ACTION_COMPLETED)?;
+                    notify(c, repairer, NotifyKind::ACTION_COMPLETED)?;
                 }
                 standing(c, repairer)?;
             }
             RepairState::Halted => standing(c, repairer)?,
             RepairState::Idle => {
-                notify(repairer, NotifyKind::REQUIRES_SEARCH)?;
+                notify(c, repairer, NotifyKind::REQUIRES_SEARCH)?;
                 standing(c, repairer)?;
             }
             RepairState::Move => self.enter_walk(c, repairer, reads)?,

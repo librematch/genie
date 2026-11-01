@@ -29,6 +29,7 @@ use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::UnitAiType;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
+use crate::world::parts::PartTable;
 
 /// Slot 0x228 (`FUN_141084070`): the attacks above 0 add up in their order from +0; none
 /// (or none above 0) is +0.
@@ -134,6 +135,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
             &every,
             crate::world::parts::no_own_masters(),
         ),
+        ais: &PartTable::default(),
         restriction: None,
         unit: &me,
         attributes: &[],
@@ -155,13 +157,9 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         radius,
         ..crate::objects::masters::Master::default()
     };
-    let unit = |id, x, master_id, ai: Option<UnitAi>| Unit {
+    let unit = |id, x, master_id| Unit {
         id,
         body: crate::objects::layers::Body::at(Position::new(x, 10.0, 0.0)),
-        combat: crate::objects::layers::Combat {
-            ai,
-            ..Default::default()
-        },
         life: crate::objects::lifecycle::Lifecycle {
             master_id,
             state: ObjectState::Alive,
@@ -173,28 +171,27 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         attackers,
         ..UnitAi::default()
     };
-    let me = unit(object_id(123), 10.0, master_id(4), None);
+    let me = unit(object_id(123), 10.0, master_id(4));
     let others = ObjectList::from(vec![
-        unit(
-            object_id(20),
-            12.0,
-            master_id(4),
-            Some(attacked(Attackers::of_saved(&[50, 51, 52, 53]))),
-        ),
-        unit(object_id(21), 12.0, master_id(4), None),
-        unit(
-            object_id(22),
-            12.0,
-            master_id(4),
-            Some(attacked(Attackers::of_saved(&[99]))),
-        ),
+        unit(object_id(20), 12.0, master_id(4)),
+        unit(object_id(21), 12.0, master_id(4)),
+        unit(object_id(22), 12.0, master_id(4)),
     ]);
+    let ais: PartTable<UnitAi> = [
+        (
+            object_id(20),
+            attacked(Attackers::of_saved(&[50, 51, 52, 53])),
+        ),
+        (object_id(22), attacked(Attackers::of_saved(&[99]))),
+    ]
+    .into_iter()
+    .collect();
     let enemy = Player {
         // 50 at a gap of 4.4, 51 of 2.4 (its radius 1), 53 of 2.4 too
         objects: vec![
-            unit(object_id(50), 17.0, master_id(5), None),
-            unit(object_id(51), 16.0, ids::ID_6, None),
-            unit(object_id(53), 16.0, ids::ID_6, None),
+            unit(object_id(50), 17.0, master_id(5)),
+            unit(object_id(51), 16.0, ids::ID_6),
+            unit(object_id(53), 16.0, ids::ID_6),
         ]
         .into(),
         ..Player::default()
@@ -256,6 +253,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
             &every,
             crate::world::parts::no_own_masters(),
         ),
+        ais: &ais,
         restriction: None,
         unit: &me,
         attributes: &[],
@@ -418,6 +416,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
             &every,
             crate::world::parts::no_own_masters(),
         ),
+        ais: &PartTable::default(),
         restriction: None,
         unit: &me,
         attributes: &[],

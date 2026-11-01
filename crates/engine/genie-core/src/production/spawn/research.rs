@@ -183,7 +183,7 @@ impl World {
         {
             r.state = MakeTechState::Done;
         }
-        if let Some(ai) = building.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
                 Notify::own(
                     id,
@@ -231,7 +231,7 @@ impl World {
         }
         let building = self.players.live_mut(p, i)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(ai) = building.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
                 Notify::own(
                     id,

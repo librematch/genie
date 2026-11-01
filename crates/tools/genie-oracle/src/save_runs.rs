@@ -377,13 +377,13 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
                 .map(|s| (s.id, genie_core::map::Position::new(s.t_x, s.t_y, s.t_z)))
         })
         .collect();
-    for (p, player) in turns.players.iter_mut().enumerate() {
+    for (p, player) in turns.players.iter().enumerate() {
         let masters = turns.masters.get(p);
-        for unit in player.objects.iter_mut().chain(player.sleeping.iter_mut()) {
-            let Some(ai) = unit
-                .combat
-                .ai
-                .as_mut()
+        for unit in player.objects.iter().chain(player.sleeping.iter()) {
+            let Some(ai) = turns
+                .parts
+                .unit_ai
+                .get_mut(unit.id)
                 .filter(|ai| ai.ai_type == genie_core::unit_ai::UnitAiType::HUNTED)
             else {
                 continue;

@@ -153,11 +153,12 @@ impl BuildAction {
         if computer || !pasture || !built {
             return Ok(false);
         }
-        let Some(ai) = builder.combat.ai.as_mut() else {
+        let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) else {
             return Ok(false);
         };
         ai.end_order_and_action()?;
         builder.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::PASTURE_BUILT,
             [
                 crate::unit_ai::ActionKind::Build.value(),
@@ -315,6 +316,7 @@ impl BuildAction {
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
         builder.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_FAILED,
             [crate::unit_ai::ActionKind::Build.value(), 0, 0],
         )?;
@@ -352,10 +354,11 @@ impl BuildAction {
         let computer = c.w.players.player(c.player)?.computer;
         Ok(GiveUp {
             waits: reads.class == Some(class::VILLAGER) && !computer,
-            stance: builder
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(builder.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
         })
     }

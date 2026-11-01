@@ -178,6 +178,7 @@ impl Unit {
             }
         };
         self.post_own(
+            &mut c.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
             [ActionKind::Hunt.value(), class, site],
         )
@@ -260,7 +261,7 @@ impl Unit {
         );
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.combat.ai.as_ref(),
+            c.w.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,
@@ -308,10 +309,14 @@ impl Unit {
     /// (`FUN_140c5de60`); with orders left the AI's order and action clear (`FUN_140c64b60`,
     /// `FUN_140c64b50`) and the hunt ends (`set_state(1)`; its update returns 1, whose deletion
     /// lets the drop site go): its unit AI runs the queued order. True when it ends.
-    fn hunt_drop_orders(&mut self, c: &Step<'_>) -> Result<bool, GenieError> {
-        let ai = self.combat.ai.as_mut().ok_or(GenieError::unsupported(
-            "a hunt without a unit AI after its drop-off",
-        ))?;
+    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> Result<bool, GenieError> {
+        let ai =
+            c.w.parts
+                .unit_ai
+                .get_mut(self.id)
+                .ok_or(GenieError::unsupported(
+                    "a hunt without a unit AI after its drop-off",
+                ))?;
         let spatial: &Spatial = &c.w.spatial;
         let gone = |id: Option<ObjectId>| {
             let Some(id) = id.filter(|&id| spatial.get(id).is_some()) else {
@@ -343,7 +348,7 @@ impl Unit {
     /// `ClosestObject` ([`Unit::hunt_closest_object`]). The object found, if any, and the
     /// kind.
     fn hunt_next_search(
-        &mut self,
+        &self,
         c: &mut Step<'_>,
     ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
         let hunt = self
@@ -351,9 +356,13 @@ impl Unit {
             .list
             .hunt()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
-        let ai = self.combat.ai.as_ref().ok_or(GenieError::unsupported(
-            "a hunt without a unit AI after its drop-off",
-        ))?;
+        let ai =
+            c.w.parts
+                .unit_ai
+                .get(self.id)
+                .ok_or(GenieError::unsupported(
+                    "a hunt without a unit AI after its drop-off",
+                ))?;
         let class = ai.target_class.or(hunt.target_class);
         if ai.ai_type != crate::unit_ai::CIVILIAN {
             return Err(GenieError::unsupported(
@@ -382,7 +391,7 @@ impl Unit {
     /// follows the enemies found. A unit in a pasture (`FUN_1411c7670`) and a class-10 searcher
     /// are not modelled. The object found, -1 for none.
     fn hunt_closest_object(
-        &mut self,
+        &self,
         c: &mut Step<'_>,
         class: Option<ClassId>,
     ) -> Result<Option<ObjectId>, GenieError> {
@@ -462,9 +471,13 @@ impl Unit {
             farm: &farm,
         })?;
         // FUN_140c63e20's alert: enemies found set the alert mode and its time again
-        let ai = self.combat.ai.as_mut().ok_or(GenieError::unsupported(
-            "a hunt without a unit AI after its drop-off",
-        ))?;
+        let ai =
+            c.w.parts
+                .unit_ai
+                .get_mut(self.id)
+                .ok_or(GenieError::unsupported(
+                    "a hunt without a unit AI after its drop-off",
+                ))?;
         ai.alert(result, c.dt.seconds());
         Ok(result.id)
     }
@@ -552,7 +565,7 @@ impl Unit {
         );
         let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
-            self.combat.ai.as_ref(),
+            c.w.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,

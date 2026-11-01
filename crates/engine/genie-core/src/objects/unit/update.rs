@@ -40,7 +40,7 @@ impl Unit {
         c: &mut Step<'_>,
     ) -> Result<Option<Outcome>, GenieError> {
         self.death_blast(c)?;
-        if self.go_to_sleep()? {
+        if self.go_to_sleep(c.w.parts.unit_ai.contains(self.id))? {
             return Ok(None);
         }
         self.take_sprite_facets();
@@ -173,14 +173,11 @@ impl Unit {
     /// the flag, is marked asleep (`+0x641`) and moves to its player's sleeping list (player
     /// slots 0x2d8 and 0x2d0), and its update ends (true); only static objects (type 10) are
     /// flagged, so one with movement state or a unit AI is not modelled.
-    pub(crate) fn go_to_sleep(&mut self) -> Result<bool, GenieError> {
+    pub(crate) fn go_to_sleep(&mut self, has_ai: bool) -> Result<bool, GenieError> {
         if !self.life.goto_sleep {
             return Ok(false);
         }
-        if self.life.class != Class::Static
-            || self.body.mover().is_some()
-            || self.combat.ai.is_some()
-        {
+        if self.life.class != Class::Static || self.body.mover().is_some() || has_ai {
             return Err(GenieError::unsupported(
                 "an object above the static type goes to sleep",
             ));

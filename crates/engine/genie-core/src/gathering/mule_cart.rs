@@ -37,11 +37,9 @@ impl World {
             return Ok(());
         };
         let Some(current) = self
-            .players
-            .live(p, idx)?
-            .combat
-            .ai
-            .as_ref()
+            .parts
+            .unit_ai
+            .get(self.players.live(p, idx)?.id)
             .map(|ai| ai.current_target)
         else {
             return Ok(());
@@ -60,11 +58,9 @@ impl World {
             // with a target (the one the work command gave the unit AI) the cart moves to it
             // (slot 0x138 at its place)
             let target = self
-                .players
-                .live(p, idx)?
-                .combat
-                .ai
-                .as_ref()
+                .parts
+                .unit_ai
+                .get(self.players.live(p, idx)?.id)
                 .and_then(|ai| ai.current_target);
             if let Some(target) = target
                 && let Some(at) = self.spatial.get(target).map(|o| o.position)
@@ -105,11 +101,9 @@ impl World {
             DistanceSquared::new(crate::math::image::turn::CART_REACH);
         let id = self.players.live(p, idx)?.id;
         let current = self
-            .players
-            .live(p, idx)?
-            .combat
-            .ai
-            .as_ref()
+            .parts
+            .unit_ai
+            .get(self.players.live(p, idx)?.id)
             .and_then(|ai| ai.current_target);
         if self.players.live(p, idx)?.body.mover().is_none() {
             return Err(GenieError::unsupported(

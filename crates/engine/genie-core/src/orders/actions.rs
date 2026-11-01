@@ -90,10 +90,10 @@ impl World {
         (order, action): (Option<OrderKind>, Option<ActionKind>),
     ) -> Result<(), GenieError> {
         let u = &self.players.live(player, idx)?;
-        let Some(target) = u
-            .combat
-            .ai
-            .as_ref()
+        let Some(target) = self
+            .parts
+            .unit_ai
+            .get(u.id)
             .and_then(|a| a.current_target)
             .filter(|t| !t.is_recyclable())
         else {
@@ -113,7 +113,11 @@ impl World {
             category: crate::unit_ai::best_target::category(t.life.master_id, class),
             target_position: t.moved_vector(),
         };
-        if let Some(ai) = self.players.live_mut(player, idx)?.combat.ai.as_mut() {
+        if let Some(ai) = self
+            .parts
+            .unit_ai
+            .get_mut(self.players.live(player, idx)?.id)
+        {
             ai.remember_order(record);
         }
         Ok(())

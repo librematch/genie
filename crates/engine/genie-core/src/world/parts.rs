@@ -20,6 +20,7 @@ use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::orders::town_bell::TownBell;
 use crate::production::Production;
+use crate::unit_ai::UnitAi;
 use crate::world::World;
 use genie_diff::{Diff, Differ};
 use std::borrow::Cow;
@@ -115,6 +116,65 @@ pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
     &NONE
 }
 
+#[cfg(test)]
+impl Parts {
+    /// A test's unit AI `ai` of object `id` (none removes it), a borrow apart from the lists.
+    pub(crate) fn set_unit_ai(&mut self, id: ObjectId, ai: Option<UnitAi>) {
+        match ai {
+            Some(ai) => {
+                let _ = self.unit_ai.insert(id, ai);
+            }
+            None => {
+                let _ = self.unit_ai.remove(id);
+            }
+        }
+    }
+}
+
+impl PartTable<UnitAi> {
+    /// The notifies object `id` in `state` posts to its own unit AI ([`crate::unit_ai::Inbox`]),
+    /// none for an object without one.
+    pub(crate) fn inbox(
+        &mut self,
+        id: ObjectId,
+        state: crate::objects::ObjectState,
+    ) -> crate::unit_ai::Inbox<'_> {
+        crate::unit_ai::Inbox {
+            ai: self.get_mut(id),
+            id,
+            state,
+        }
+    }
+}
+
+impl World {
+    /// Object `id`'s unit AI lent out of the world's table: the unit AI's side holds it while
+    /// it runs ([`crate::objects::unit::Unit::with_side`]); none for an object without one.
+    pub(crate) fn lend_unit_ai(&mut self, id: ObjectId) -> Option<UnitAi> {
+        self.parts.unit_ai.remove(id)
+    }
+
+    /// Object `id`'s lent unit AI `ai` back in the world's table.
+    pub(crate) fn return_unit_ai(&mut self, id: ObjectId, ai: UnitAi) {
+        let _ = self.parts.unit_ai.insert(id, ai);
+    }
+
+    /// A test's world with the unit AIs `ais` of the objects it holds ([`World::set_part`]).
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn with_ais(mut self, ais: impl IntoIterator<Item = (ObjectId, UnitAi)>) -> Self {
+        for (id, ai) in ais {
+            self.set_part(id, Part::UnitAi(Some(Box::new(ai))))
+                .expect("a unit AI of an object the world holds");
+        }
+        self
+    }
+}
+
 /// A test's table of the parts it lists, in their order.
 #[cfg(test)]
 impl<T> FromIterator<(ObjectId, T)> for PartTable<T> {
@@ -158,6 +218,8 @@ pub struct Parts {
     /// where they differ from a new unit's ([`TownBell::default`]): a villager that worked or
     /// sheltered, a building that sheltered.
     pub town_bell: PartTable<TownBell>,
+    /// A unit's AI (`+0x9e0`, `TRIBE_Unit_AI`): its orders, its notifies and its targets.
+    pub unit_ai: PartTable<UnitAi>,
 }
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
@@ -184,6 +246,9 @@ pub struct ObjectParts {
     /// Its town bell ([`Parts::town_bell`]), a new unit's where the table holds none.
     #[diff(path = "combat.town_bell")]
     pub town_bell: TownBell,
+    /// Its unit AI ([`Parts::unit_ai`]).
+    #[diff(path = "combat.ai")]
+    pub unit_ai: Option<UnitAi>,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -238,6 +303,20 @@ impl<'a> From<&'a Object> for ObjectView<'a> {
     }
 }
 
+#[cfg(test)]
+impl Object {
+    /// A test's object: row `unit` with the unit AI `ai` (a unit AI, or an `Option` of one).
+    pub(crate) fn with_ai(unit: Unit, ai: impl Into<Option<UnitAi>>) -> Self {
+        Self {
+            unit,
+            parts: ObjectParts {
+                unit_ai: ai.into(),
+                ..ObjectParts::default()
+            },
+        }
+    }
+}
+
 impl From<Unit> for Object {
     fn from(unit: Unit) -> Self {
         Self {
@@ -257,6 +336,7 @@ impl Parts {
             missile,
             own_master,
             town_bell,
+            unit_ai,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -276,6 +356,9 @@ impl Parts {
         if town_bell != TownBell::default() {
             let _ = self.town_bell.insert(id, town_bell);
         }
+        if let Some(ai) = unit_ai {
+            let _ = self.unit_ai.insert(id, ai);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -287,6 +370,7 @@ impl Parts {
             missile: self.missile.remove(id),
             own_master: self.own_master.remove(id),
             town_bell: self.town_bell.remove(id).unwrap_or_default(),
+            unit_ai: self.unit_ai.remove(id),
         }
     }
 
@@ -300,6 +384,7 @@ impl Parts {
             missile: self.missile.get(id).copied(),
             own_master: self.own_master.get(id).cloned(),
             town_bell: self.town_bell.get(id).copied().unwrap_or_default(),
+            unit_ai: self.unit_ai.get(id).cloned(),
         }
     }
 
@@ -339,6 +424,7 @@ impl Parts {
             .chain(self.missile.iter().map(|(id, _)| id))
             .chain(self.own_master.iter().map(|(id, _)| id))
             .chain(self.town_bell.iter().map(|(id, _)| id))
+            .chain(self.unit_ai.iter().map(|(id, _)| id))
     }
 }
 
@@ -357,6 +443,8 @@ pub enum Part {
     OwnMaster(Box<Master>),
     /// The town bell ([`Parts::town_bell`]); a new unit's leaves the table.
     TownBell(TownBell),
+    /// The unit AI ([`Parts::unit_ai`]), boxed, none clearing it.
+    UnitAi(Option<Box<UnitAi>>),
 }
 
 impl World {
@@ -399,6 +487,12 @@ impl World {
                 let _ = self.parts.own_master.insert(id, *m);
             }
             Part::TownBell(b) => self.parts.set_town_bell(id, b),
+            Part::UnitAi(Some(ai)) => {
+                let _ = self.parts.unit_ai.insert(id, *ai);
+            }
+            Part::UnitAi(None) => {
+                let _ = self.parts.unit_ai.remove(id);
+            }
         }
         Ok(())
     }
@@ -632,6 +726,52 @@ mod tests {
         assert!(t.parts.gather_point.is_empty() && t.parts.missile.is_empty());
     }
 
+    /// The unit AI goes into the table with its object and leaves with it. Its unit's notifies
+    /// go to it by id; while the AI's side lends it out of the table they go nowhere, and it
+    /// comes back as the side left it.
+    #[test]
+    fn the_unit_ai_is_lent_out_of_the_table_and_given_back() {
+        use crate::objects::{ListIndex, ObjectState};
+        use crate::players::PlayerId;
+        use crate::unit_ai::NotifyKind;
+        let id = object_id(5);
+        let mut t = World::new(
+            crate::world::WorldTime::ZERO,
+            crate::world::FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![crate::world::Millis::ZERO],
+            vec![crate::world::player::Player::default()],
+        );
+        let unit = Unit {
+            id,
+            ..Unit::default()
+        };
+        let _ = t
+            .push_live(PlayerId::new(0), Object::with_ai(unit, UnitAi::default()))
+            .unwrap();
+        t.check_parts().unwrap();
+        let post = |t: &mut World| {
+            t.parts
+                .unit_ai
+                .inbox(id, ObjectState::Alive)
+                .post(NotifyKind::DAMAGED, [1, 2, 3])
+                .unwrap();
+        };
+        let heard = |t: &World| t.parts.unit_ai.get(id).map(|ai| ai.notifies.len());
+        post(&mut t);
+        assert_eq!(heard(&t), Some(1));
+        let ai = t.lend_unit_ai(id).unwrap();
+        post(&mut t);
+        assert_eq!(heard(&t), None);
+        t.return_unit_ai(id, ai);
+        assert_eq!(heard(&t), Some(1));
+        let gone = t
+            .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
+            .unwrap();
+        assert_eq!(gone.parts.unit_ai.map(|ai| ai.notifies.len()), Some(1));
+        assert!(t.parts.unit_ai.is_empty());
+    }
+
     /// A building's production lists are made empty at their first use and found again after;
     /// an object the world does not hold gets none.
     #[test]
@@ -773,8 +913,9 @@ mod tests {
 
     /// A whole object compares its row's fields and its parts' at the paths they had on the
     /// object: the dead and own masters are known gaps (left out of the saved scope), the
-    /// gather point and the production compare at the building layer's paths, the town bell at
-    /// the combat layer's, the missile at its own, a row's field keeps its own path.
+    /// gather point and the production compare at the building layer's paths, the town bell and
+    /// the unit AI at the combat layer's, the missile at its own, a row's field keeps its own
+    /// path.
     #[test]
     fn a_whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
@@ -789,6 +930,7 @@ mod tests {
         b.parts.production = Some(Production::default());
         b.parts.own_master = Some(Master::default());
         b.parts.town_bell.flag = true;
+        b.parts.unit_ai = Some(UnitAi::default());
         b.parts.missile = Some(Missile {
             max_range: crate::map::Distance::ZERO,
             fired_from: None,
@@ -809,7 +951,8 @@ mod tests {
                 "building.gather_point",
                 "building.production",
                 "missile",
-                "combat.town_bell.flag"
+                "combat.town_bell.flag",
+                "combat.ai"
             ]
         );
         assert_eq!(
@@ -821,7 +964,8 @@ mod tests {
                 "building.production",
                 "missile",
                 "own_master",
-                "combat.town_bell.flag"
+                "combat.town_bell.flag",
+                "combat.ai"
             ]
         );
     }

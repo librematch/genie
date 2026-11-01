@@ -73,10 +73,10 @@ impl World {
         // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
         // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
         // point that is not on the building, else none
-        let queue_first = b
-            .combat
-            .ai
-            .as_ref()
+        let queue_first = self
+            .parts
+            .unit_ai
+            .get(b.id)
             .and_then(|a| a.building_orders.first())
             .map(|o| o.point.ground());
         let toward = if point.x() == NO_POINT {
@@ -267,7 +267,7 @@ impl World {
         let to = match let_out_aim(gather, point, bid) {
             LetOutAim::Target(g) => {
                 if self.object(g.target).is_some() {
-                    if let Some(ai) = self.players.live_mut(up, ui)?.combat.ai.as_mut() {
+                    if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(up, ui)?.id) {
                         ai.remove_target();
                     }
                     // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
@@ -285,7 +285,7 @@ impl World {
             // without a unit AI stays where it came out
             let unit = self.players.live_mut(up, ui)?;
             let place = (unit.position().ground(), Some(class));
-            if unit.combat.ai.is_some() {
+            if self.parts.unit_ai.contains(unit.id) {
                 self.run_ai_calls((up, ui), |ai, side, rng| {
                     ai.stop_with(true, Some(place), side, rng)?;
                     ai.remove_target();
@@ -297,7 +297,7 @@ impl World {
         }
         // a move to the point: the unit AI forgets its target (`FUN_140c5e1e0`), then slot 0x2a0
         // and slot 0x128 with no target, `+0xa14` 0
-        if let Some(ai) = self.players.live_mut(up, ui)?.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(up, ui)?.id) {
             ai.remove_target();
         }
         self.gather_move(up, ui, to.with_height(0.0), false)?;

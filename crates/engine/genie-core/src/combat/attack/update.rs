@@ -86,7 +86,11 @@ impl Attack {
             1 | 2 => {
                 self.delete_move_to(unit)?;
                 if !self.sub_action {
-                    unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
+                    unit.post_own(
+                        &mut c.w.parts.unit_ai,
+                        NotifyKind::ACTION_INVALIDATED,
+                        [600, 0, 0x202],
+                    )?;
                 }
                 self.finish(unit, c.w.streams.get(Stream::Sprite))?;
                 Ok(UpdateCode::DONE)
@@ -174,7 +178,11 @@ impl Attack {
             // case 0xc: a failed attack posts 0x1f9 with 600 every update (quiet or not), the
             // unit's animation stops and the update returns 3
             AttackState::Failed => {
-                unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
+                unit.post_own(
+                    &mut c.w.parts.unit_ai,
+                    NotifyKind::ACTION_FAILED,
+                    [600, 0, 0],
+                )?;
                 set_walker_anim(&mut unit.body, Speed::new(0.0));
                 Ok(UpdateCode::FAILED)
             }
@@ -286,6 +294,7 @@ impl Attack {
             self.finish(unit, rng)?;
             if !self.sub_action {
                 unit.post_own(
+                    &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
                     [600, ObjectId::field(self.target), 0],
                 )?;
@@ -299,6 +308,7 @@ impl Attack {
             self.finish(unit, rng)?;
             if !self.sub_action && r.queue_empty {
                 unit.post_own(
+                    &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
                     [600, ObjectId::field(self.target), 0],
                 )?;
@@ -311,6 +321,7 @@ impl Attack {
             self.finish(unit, rng)?;
             if !self.sub_action {
                 unit.post_own(
+                    &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
                     [600, ObjectId::field(self.target), 0],
                 )?;
@@ -366,7 +377,11 @@ impl Attack {
         if self.sub_action {
             self.target = None;
             self.finish(unit, c.w.streams.get(Stream::Sprite))?;
-            unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_INVALIDATED,
+                [600, 0, 0x202],
+            )?;
             return Ok(UpdateCode::CODE_5);
         }
         // a unit's own Attack (not quiet, `+0x60` 0): the target goes (slot 0x68 with
@@ -374,7 +389,11 @@ impl Attack {
         // which keeps it in the list
         let target = self.target.take();
         let_go(c, unit, target)?;
-        unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
+        unit.post_own(
+            &mut c.w.parts.unit_ai,
+            NotifyKind::ACTION_INVALIDATED,
+            [600, 0, 0x202],
+        )?;
         self.finish(unit, c.w.streams.get(Stream::Sprite))?;
         Ok(UpdateCode::CODE_2)
     }
@@ -445,7 +464,11 @@ impl Attack {
         }
         self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
         if !self.sub_action {
-            unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_FAILED,
+                [600, 0, 0],
+            )?;
         }
         Ok(UpdateCode::FAILED)
     }

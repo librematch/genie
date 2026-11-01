@@ -105,7 +105,7 @@ impl World {
         let class = t.master(self.master_tables(), tp)?.class;
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.last_retarget_time = world_time;
             ai.notify_work(
                 Some(OrderKind::Attack),
@@ -202,7 +202,7 @@ impl World {
             task.action_type,
             ATTACK_TASK | crate::combat::attack::ATTACK
         ) && class != class::VILLAGER
-            && let Some(ai) = unit.combat.ai.as_mut()
+            && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
         {
             ai.retarget_disabled = 1;
         }
@@ -425,7 +425,7 @@ impl World {
         let class = t.master.class;
         self.retarget_hunt(player, idx, target)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Hunt),
                 Some(ActionKind::Hunt),
@@ -458,7 +458,7 @@ impl World {
         let took = self.retarget_gather(player, idx, target)?;
         if took {
             let unit = self.players.live_mut(player, idx)?;
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.notify_work(
                     Some(OrderKind::Gather),
                     Some(ActionKind::Gather),
@@ -585,7 +585,7 @@ impl World {
             (None, None)
         };
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 order,
                 action,

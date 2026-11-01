@@ -163,7 +163,7 @@ impl World {
                     }
                     return Ok(false);
                 }
-                if let Some(ai) = self.players.live_mut(p, i)?.combat.ai.as_mut() {
+                if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, i)?.id) {
                     ai.set_action(Some(ActionKind::Make));
                 }
                 Making::Unit(MakeObj::for_entry(&first))
@@ -401,7 +401,7 @@ impl World {
         }
         let building = self.players.live_mut(p, i)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(ai) = building.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
                 Notify::own(
                     id,

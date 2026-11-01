@@ -148,3 +148,40 @@ fn a_value_none_names_fails_the_import() {
         );
     }
 }
+
+/// The saved unit AI is the imported object's part, not its row's; a value none names leaves the
+/// object without one, and the row holds the failure as its unmodelled part.
+#[test]
+fn the_saved_unit_ai_is_the_object_s_part() {
+    use genie_core::players::CivId;
+    use genie_save::generated::world::PlayerObjects;
+    let whole = |object: &genie_save::Object| {
+        crate::saved_unit::object(
+            object,
+            &PlayerObjects::default(),
+            &[],
+            CivId::GAIA,
+            None,
+            PLAYERS,
+        )
+    };
+    let object = with_ai(UnitAiModule {
+        current_order_value: 0x2c9,
+        ..idle()
+    });
+    let o = whole(&object);
+    assert_eq!(
+        o.parts.unit_ai,
+        unit_ai(&object, object_id(5), PLAYERS).unwrap()
+    );
+    assert!(o.parts.unit_ai.is_some());
+    let odd = whole(&with_ai(UnitAiModule {
+        current_order_value: 0x262,
+        ..idle()
+    }));
+    assert_eq!(odd.parts.unit_ai, None);
+    assert_eq!(
+        odd.unit.actions.unmodelled_action.map(|e| e.kind()),
+        Some(ErrorKind::InvalidInput)
+    );
+}

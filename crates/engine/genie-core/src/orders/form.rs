@@ -127,10 +127,7 @@ impl World {
         let Some(Place::Live(p, idx)) = self.place(id) else {
             return Ok(());
         };
-        let Some(unit) = self.live_object_mut(p, id) else {
-            return Ok(());
-        };
-        let marching = unit.combat.ai.as_ref().is_some_and(|ai| {
+        let marching = self.parts.unit_ai.get(id).is_some_and(|ai| {
             matches!(
                 ai.current_order,
                 Some(OrderKind::Defend | OrderKind::Follow)
@@ -139,7 +136,7 @@ impl World {
         if !marching {
             return Ok(());
         }
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.live_object_mut(p, id).and_then(|u| u.body.mover_mut()) {
             m.ignore_units.clear();
         }
         self.object_stop(p, idx)?;

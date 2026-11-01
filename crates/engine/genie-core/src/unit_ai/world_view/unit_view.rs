@@ -44,6 +44,7 @@ impl UnitView<'_, '_> {
                 &self.c.w.masters,
                 &self.c.w.parts.own_master,
             ),
+            ais: &self.c.w.parts.unit_ai,
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
@@ -113,7 +114,7 @@ impl UnitView<'_, '_> {
             self.new_owner,
         )?;
         let find = |id: ObjectId| others.find(id);
-        let Some(ai) = u.combat.ai.as_ref() else {
+        let Some(ai) = self.c.w.parts.unit_ai.get(u.id) else {
             return Ok(false);
         };
         let patrolling = match u.group.id.and_then(|id| self.c.w.groups.get(id)) {

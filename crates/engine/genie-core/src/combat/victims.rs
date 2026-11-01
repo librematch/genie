@@ -46,7 +46,7 @@ impl World {
             drop_sites: &self.drop_sites,
         };
         Ok(Some(victim_in(
-            u,
+            (u, self.parts.unit_ai.contains(u.id)),
             (p, master, &self.players.player(p)?.attributes),
             (attacker, &world),
             &self.spatial,
@@ -224,7 +224,7 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
         drop_sites: &c.w.drop_sites,
     };
     Ok(Some(victim_in(
-        u,
+        (u, c.w.parts.unit_ai.contains(u.id)),
         (p, master, attributes),
         (c.player, &sides),
         &c.w.spatial,
@@ -284,7 +284,8 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
         u.damaged_lately = b.damaged_lately;
     }
     // the damage notify (500) to its unit AI
-    if let Some(ai) = u.combat.ai.as_mut() {
+    let state = u.life.state;
+    if let Some(ai) = c.w.parts.unit_ai.get_mut(v.id) {
         for &(attacker, p) in &damaged {
             let n = Notify {
                 caller: attacker,
@@ -292,7 +293,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
                 kind: crate::unit_ai::NotifyKind::DAMAGED,
                 p,
             };
-            ai.post(n, u.life.state)?;
+            ai.post(n, state)?;
         }
     }
     for &a in struck.map_or(&[][..], |b| &b.annexes) {

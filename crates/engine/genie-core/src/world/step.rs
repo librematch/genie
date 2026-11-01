@@ -17,6 +17,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 
 pub(crate) struct Step<'a> {
@@ -65,6 +66,8 @@ pub(crate) struct Pace {
 pub(crate) struct Beside<'b> {
     /// The Sprite stream, which a sprite the walk shows draws from.
     pub(crate) sprite_rng: &'b mut Well512,
+    /// The unit AIs, which the walk's notifies go to.
+    pub(crate) ais: &'b mut PartTable<UnitAi>,
 }
 
 impl World {
@@ -106,7 +109,10 @@ impl World {
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
             ),
         };
-        let beside = Beside { sprite_rng };
+        let beside = Beside {
+            sprite_rng,
+            ais: &mut parts.unit_ai,
+        };
         (walk, beside)
     }
 }
@@ -132,7 +138,7 @@ impl Step<'_> {
         // which no routine on the lent unit may reach
         let side = self.side_notifies.is_some();
         if side {
-            me.combat.ai = Some(UnitAi::default());
+            self.w.return_unit_ai(me.id, UnitAi::default());
         }
         let lent = std::mem::replace(me, Unit::taken_out());
         let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
@@ -140,7 +146,11 @@ impl Step<'_> {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
         })?;
         *me = self.w.take_out(p, i)?;
-        let stand_in = if side { me.combat.ai.take() } else { None };
+        let stand_in = if side {
+            self.w.lend_unit_ai(me.id)
+        } else {
+            None
+        };
         let answer = answer?;
         if side && stand_in != Some(UnitAi::default()) {
             return Err(GenieError::unreachable(
@@ -180,11 +190,11 @@ impl Step<'_> {
     /// A notify the unit AI's queue does not take.
     pub(crate) fn notify_own(
         &mut self,
-        me: &mut Unit,
+        me: &Unit,
         n: crate::unit_ai::Notify,
     ) -> Result<(), GenieError> {
         let state = me.life.state;
-        if let Some(ai) = me.combat.ai.as_mut() {
+        if let Some(ai) = self.w.parts.unit_ai.get_mut(me.id) {
             return ai.post(n, state);
         }
         if let Some(own) = self.side_notifies.as_mut() {

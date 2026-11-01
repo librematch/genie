@@ -262,9 +262,7 @@ impl World {
     /// The unit AI's `state_position` (`+0x1ac`, `+0x1b0`) of unit `id` takes the slot place
     /// `to`'s x and y (`LAB_141027c88`).
     pub(super) fn set_state_position(&mut self, id: ObjectId, to: BVector) {
-        if let Some((_, u)) = self.object_mut(id)
-            && let Some(ai) = u.combat.ai.as_mut()
-        {
+        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
             ai.state_position = to.ground();
         }
     }

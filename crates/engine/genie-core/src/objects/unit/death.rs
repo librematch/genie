@@ -167,7 +167,7 @@ impl Unit {
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
             masters: c.w.masters.of(c.player),
             computer: c.w.players.player(c.player)?.computer,
-            ai: self.combat.ai.is_some(),
+            ai: c.w.parts.unit_ai.contains(self.id),
         };
         let part = completion.first_part(construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists

@@ -379,7 +379,14 @@ impl Unit {
             ));
         }
         let terrain = spatial.terrain.as_ref();
-        let mut own = victim_of(shooter, master, attributes, p, terrain, mode_680);
+        let mut own = victim_of(
+            (shooter, parts.unit_ai.contains(shooter.id)),
+            master,
+            attributes,
+            p,
+            terrain,
+            mode_680,
+        );
         let victim = victim.as_mut().ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
@@ -392,9 +399,16 @@ impl Unit {
         let object = streams.get(Stream::Object);
         let struck = crate::combat::attack::strike(&mut own, victim, &mut c.blasted, hit, object)?;
         if let Some(target) = struck.executed {
-            shooter.post_own(NotifyKind::ACTION_EXECUTED, [600, target.get(), 0])?;
+            shooter.post_own(
+                &mut parts.unit_ai,
+                NotifyKind::ACTION_EXECUTED,
+                [600, target.get(), 0],
+            )?;
         }
-        if shooter.hit_back(own)?.is_some() {
+        if shooter
+            .hit_back(own, parts.unit_ai.get_mut(shooter.id))?
+            .is_some()
+        {
             return Err(GenieError::unsupported(
                 "a retaliation killing a missile's shooter",
             ));
@@ -430,7 +444,7 @@ impl Unit {
         }
         let terrain = c.w.spatial.terrain.as_ref();
         let mut own = victim_of(
-            self,
+            (self, c.w.parts.unit_ai.contains(self.id)),
             master,
             &c.w.players.player(c.player)?.attributes,
             c.player,
@@ -451,7 +465,10 @@ impl Unit {
         };
         let object = c.w.streams.get(Stream::Object);
         let struck = crate::combat::attack::strike(&mut own, victim, &mut c.blasted, hit, object)?;
-        if self.hit_back(own)?.is_some() {
+        if self
+            .hit_back(own, c.w.parts.unit_ai.get_mut(self.id))?
+            .is_some()
+        {
             return Err(GenieError::unsupported("a retaliation killing a missile"));
         }
         write_strike_back(c, self, victim)?;

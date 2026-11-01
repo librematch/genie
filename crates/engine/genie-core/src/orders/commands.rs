@@ -48,7 +48,11 @@ impl World {
                 Place::Live(p, i) => (p, i),
                 // only slot 0x180 puts an object to sleep, one of a type below 30, which has no
                 // unit AI: the handler passes it over
-                Place::Sleeping(p, i) if self.players.asleep(p, i)?.combat.ai.is_none() => continue,
+                Place::Sleeping(p, i)
+                    if !self.parts.unit_ai.contains(self.players.asleep(p, i)?.id) =>
+                {
+                    continue;
+                }
                 Place::Sleeping(..) => {
                     return Err(GenieError::unsupported(
                         "a UNIT_AI_STATE of a sleeping object with a unit AI",
@@ -56,7 +60,7 @@ impl World {
                 }
             };
             let unit = &self.players.live(p, idx)?;
-            if unit.combat.ai.is_none() {
+            if !self.parts.unit_ai.contains(unit.id) {
                 continue;
             }
             let master = unit.master(self.master_tables(), p)?;
@@ -129,7 +133,11 @@ impl World {
                 Place::Live(p, i) => (p, i),
                 // only slot 0x180 puts an object to sleep, one of a type below 30, which has no
                 // unit AI: the handler passes it over
-                Place::Sleeping(p, i) if self.players.asleep(p, i)?.combat.ai.is_none() => continue,
+                Place::Sleeping(p, i)
+                    if !self.parts.unit_ai.contains(self.players.asleep(p, i)?.id) =>
+                {
+                    continue;
+                }
                 Place::Sleeping(..) => {
                     return Err(GenieError::unsupported(
                         "an AUTO_SCOUT of a sleeping object with a unit AI",
@@ -137,7 +145,7 @@ impl World {
                 }
             };
             let unit = &self.players.live(p, idx)?;
-            if unit.combat.ai.is_none() {
+            if !self.parts.unit_ai.contains(unit.id) {
                 continue;
             }
             let master = unit.master(self.master_tables(), p)?;
@@ -151,10 +159,10 @@ impl World {
             }
             let class = master.class;
             let (state, position) = (unit.life.state, unit.position());
-            let scouts = unit
-                .combat
-                .ai
-                .as_ref()
+            let scouts = self
+                .parts
+                .unit_ai
+                .get(unit.id)
                 .is_some_and(|ai| ai.current_action == Some(ActionKind::AutoScout));
             let order = QueuedOrder {
                 issuer: Some(crate::unit_ai::Issuer::Player(p)),
@@ -214,7 +222,7 @@ impl World {
                 Some(Place::Sleeping(p, i)) => self.players.asleep_mut(p, i)?,
                 None => continue,
             };
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.reset_for_order(self.streams.get(Stream::Ai));
             }
         }
@@ -234,13 +242,13 @@ impl World {
             if let Some(link) = self.object(id).and_then(|(_, u)| u.group.id) {
                 let _ = self.remove_unit(link, id, None, false)?;
             }
-            let Some((_, u)) = self.object_mut(id) else {
-                continue;
-            };
-            if let Some(ai) = u.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.orders.clear();
                 ai.idle_timer = ai.adjusted_idle_timeout;
             }
+            let Some((_, u)) = self.object_mut(id) else {
+                continue;
+            };
             if let Some(m) = u.body.mover_mut() {
                 m.ignore_units.clear();
             }

@@ -175,12 +175,13 @@ pub(crate) struct Watch {
 }
 
 impl Watch {
-    /// The watch of `u`, taken only while a subscriber listens to the state events.
-    pub(crate) fn of(u: &Unit) -> Option<Self> {
+    /// The watch of `u` and its unit AI `ai`, taken only while a subscriber listens to the
+    /// state events.
+    pub(crate) fn of(u: &Unit, ai: Option<&crate::unit_ai::UnitAi>) -> Option<Self> {
         tracing::enabled!(target: STATE, tracing::Level::DEBUG).then(|| Self {
             object_state: u.life.state,
             action: u.top_action().map(|a| (a.kind.get(), a.state.get())),
-            order: u.combat.ai.as_ref().map(|ai| {
+            order: ai.map(|ai| {
                 [
                     crate::unit_ai::OrderKind::field(ai.current_order),
                     crate::unit_ai::ActionKind::field(ai.current_action),
@@ -190,9 +191,15 @@ impl Watch {
         })
     }
 
-    /// Tell the subscriber what changed from `self` to `u` in the update `tick` of `player`.
-    pub(crate) fn report(self, u: &Unit, tick: crate::world::Tick, player: PlayerId) {
-        let Some(now) = Self::of(u) else {
+    /// Tell the subscriber what changed from `self` to `u` (its unit AI `ai`) in the update
+    /// `tick` of `player`.
+    pub(crate) fn report(
+        self,
+        (u, ai): (&Unit, Option<&crate::unit_ai::UnitAi>),
+        tick: crate::world::Tick,
+        player: PlayerId,
+    ) {
+        let Some(now) = Self::of(u, ai) else {
             return;
         };
         let object = u.id.get();
@@ -388,7 +395,7 @@ mod tests {
 
     #[test]
     fn without_a_subscriber_no_watch_is_taken() {
-        assert_eq!(Watch::of(&Unit::default()), None);
+        assert_eq!(Watch::of(&Unit::default(), None), None);
     }
 
     #[test]

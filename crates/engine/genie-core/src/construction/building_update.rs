@@ -434,7 +434,7 @@ impl Unit {
         }
         let terrain = c.w.spatial.terrain.as_ref();
         let mut own = victim_of(
-            self,
+            (self, c.w.parts.unit_ai.contains(self.id)),
             master,
             &c.w.players.player(c.player)?.attributes,
             c.player,
@@ -457,7 +457,7 @@ impl Unit {
             }
         }
         c.blasted = blasted;
-        let _ = self.hit_back(own)?;
+        let _ = self.hit_back(own, c.w.parts.unit_ai.get_mut(self.id))?;
         Ok(())
     }
 

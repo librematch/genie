@@ -41,14 +41,14 @@ impl World {
         let had = self.parts.dead_master.contains(unit.id);
         let tables = MasterTables::new(&self.masters, &self.parts.own_master);
         let dead = dead_master_of(&unit, q.index(), tables, had);
+        let id = unit.id;
         let changed = change_hands(
-            &mut unit,
+            (&mut unit, self.parts.unit_ai.get_mut(id)),
             (q.index(), PlayerId::GAIA),
             tables,
             &mut self.spatial,
             self.world_time,
         );
-        let id = unit.id;
         let j = self.put_back_own(q, unit)?;
         let Some(own) = changed? else {
             return Ok(());
@@ -303,7 +303,7 @@ impl World {
         let tables = MasterTables::new(&self.masters, &self.parts.own_master);
         let dead = dead_master_of(&unit, old.index(), tables, had);
         let changed = change_hands(
-            &mut unit,
+            (&mut unit, self.parts.unit_ai.get_mut(id)),
             (old.index(), new),
             tables,
             &mut self.spatial,
@@ -495,7 +495,7 @@ pub(crate) fn dead_master_of(
 /// the message of game mode 12 for master 1377; nor are the slot 0xa8 calls on the copies (the
 /// masters' graphics).
 pub(crate) fn change_hands(
-    u: &mut Unit,
+    (u, ai): (&mut Unit, Option<&mut crate::unit_ai::UnitAi>),
     (old, new): (usize, PlayerId),
     masters: MasterTables<'_>,
     spatial: &mut Spatial,
@@ -526,10 +526,15 @@ pub(crate) fn change_hands(
     if let Some(a) = u.actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }
-    if let Some(ai) = u.combat.ai.as_mut() {
+    let mut inbox = crate::unit_ai::Inbox {
+        ai,
+        id: u.id,
+        state: u.life.state,
+    };
+    if let Some(ai) = inbox.ai.as_deref_mut() {
         ai.clear_notifies(world_time.since_start())?;
     }
-    u.post_own(NotifyKind::OWNER_CHANGED, [new.index() as i32, 0, 0])?;
+    inbox.post(NotifyKind::OWNER_CHANGED, [new.index() as i32, 0, 0])?;
     Ok(Some(own))
 }
 

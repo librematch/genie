@@ -29,6 +29,7 @@ use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::UnitAi;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -67,9 +68,10 @@ impl World {
                 continue;
             }
             if let WorldObject::Unit(p, u) = object
-                && u.combat
-                    .ai
-                    .as_ref()
+                && self
+                    .parts
+                    .unit_ai
+                    .get(u.id)
                     .is_some_and(|ai| ai.current_action == Some(ActionKind::Attack))
             {
                 let master = u.master(self.master_tables(), p)?;
@@ -142,7 +144,12 @@ impl World {
         {
             return Ok(false);
         }
-        if u.combat.ai.as_ref().is_some_and(|ai| !ai.orders.is_empty()) {
+        if self
+            .parts
+            .unit_ai
+            .get(u.id)
+            .is_some_and(|ai| !ai.orders.is_empty())
+        {
             return Ok(false);
         }
         u.interruptible()
@@ -287,7 +294,7 @@ impl World {
             let Some(WorldObject::Unit(_, u)) = self.world_object(m.id) else {
                 continue;
             };
-            let Some(ai) = u.combat.ai.as_ref() else {
+            let Some(ai) = self.parts.unit_ai.get(u.id) else {
                 continue;
             };
             let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
@@ -317,7 +324,7 @@ impl World {
             let Some(WorldObject::Unit(_, u)) = self.world_object(m.id) else {
                 continue;
             };
-            let Some(ai) = u.combat.ai.as_ref() else {
+            let Some(ai) = self.parts.unit_ai.get(u.id) else {
                 continue;
             };
             let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
@@ -403,7 +410,10 @@ impl World {
         let WorldObject::Unit(p, u) = object else {
             return Ok(true);
         };
-        u.free_for_group(u.master(self.master_tables(), p)?)
+        u.free_for_group(
+            u.master(self.master_tables(), p)?,
+            self.parts.unit_ai.get(u.id),
+        )
     }
 
     /// Slot 0x660 of object `id`: it shows its standing sprite. Nothing for an object below type
@@ -544,13 +554,17 @@ impl World {
 }
 
 impl Unit {
-    /// [`World::member_idle`] of the unit itself (`FUN_141017f00`), of master `master`, as its
-    /// own update asks it (slot 0x5e0, [`crate::movement::GroupSpeed`]).
+    /// [`World::member_idle`] of the unit itself (`FUN_141017f00`), of master `master` and unit
+    /// AI `ai`, as its own update asks it (slot 0x5e0, [`crate::movement::GroupSpeed`]).
     ///
     /// # Errors
     ///
     /// A unit with an action the slice does not model.
-    pub(crate) fn free_for_group(&self, master: &Master) -> Result<bool, GenieError> {
+    pub(crate) fn free_for_group(
+        &self,
+        master: &Master,
+        ai: Option<&UnitAi>,
+    ) -> Result<bool, GenieError> {
         let u = self;
         let state = if master.kind < ACTION {
             ActionState::NO_ACTION
@@ -573,7 +587,7 @@ impl Unit {
                 return Ok(false);
             }
         }
-        if let Some(ai) = u.combat.ai.as_ref() {
+        if let Some(ai) = ai {
             let action = ai.current_action;
             if action != Some(ActionKind::GroupAside) {
                 // on the chosen action the order decides

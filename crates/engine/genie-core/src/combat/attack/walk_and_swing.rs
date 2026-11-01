@@ -112,7 +112,11 @@ impl Attack {
         self.move_to = None;
         self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
         if !self.sub_action {
-            unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_FAILED,
+                [600, 0, 0],
+            )?;
         }
         Ok(UpdateCode::FAILED)
     }
@@ -229,7 +233,11 @@ impl Attack {
                 Self::hit(f, &mut c.blasted, r.hit_chance, object)?
             };
             if let Some(target) = executed {
-                unit.post_own(NotifyKind::ACTION_EXECUTED, [600, target.get(), 0])?;
+                unit.post_own(
+                    &mut c.w.parts.unit_ai,
+                    NotifyKind::ACTION_EXECUTED,
+                    [600, target.get(), 0],
+                )?;
             }
             write_strike_back(c, unit, &mut f.victim)?;
         }

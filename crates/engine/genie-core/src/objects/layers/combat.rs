@@ -10,7 +10,6 @@ use crate::objects::WorkRate;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
-use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
@@ -40,8 +39,6 @@ pub struct Combat {
     /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
     /// building.
     pub raider_countdown: crate::garrison::RaiderCountdown,
-    /// Its unit AI, when it has one.
-    pub ai: Option<UnitAi>,
     /// `berserker_timer` (`+0xa10`): the seconds the regeneration holds back toward its next
     /// whole hit point ([`crate::objects::unit::Unit::regenerate`]).
     pub regen_timer: Seconds,

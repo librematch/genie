@@ -314,7 +314,7 @@ impl UnitView<'_, '_> {
             drop_sites: &self.c.w.drop_sites,
         };
         Ok(Some(victim_in(
-            t,
+            (t, self.c.w.parts.unit_ai.contains(t.id)),
             (q, master, attributes),
             (self.player, &dip),
             &self.c.w.spatial,
@@ -338,7 +338,7 @@ impl UnitView<'_, '_> {
         };
         let unit = &*self.unit;
         let own = victim_of(
-            unit,
+            (unit, self.c.w.parts.unit_ai.contains(unit.id)),
             master,
             &self.c.w.players.player(self.player)?.attributes,
             self.player,

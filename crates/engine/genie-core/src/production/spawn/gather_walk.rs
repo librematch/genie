@@ -77,7 +77,7 @@ impl World {
                 "a gather point's move of a unit not in state 2",
             ));
         }
-        if let Some(ai) = unit.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             if notified {
                 ai.orders.clear();
             }

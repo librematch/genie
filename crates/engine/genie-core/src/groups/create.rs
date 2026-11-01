@@ -383,7 +383,7 @@ impl World {
             crate::world::index::Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
         u.group.id = Some(group);
-        if let Some(ai) = u.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
             if ai
                 .current_action
                 .is_some_and(|a| CLEARED_ACTIONS.contains(&a))
@@ -701,10 +701,13 @@ mod tests {
     fn the_statistics_call_for_the_formation_type_by_the_motion_flags() {
         let mut t = three();
         for u in &mut t.players[1].objects {
-            u.combat.ai = Some(crate::unit_ai::UnitAi {
-                ai_type: crate::unit_ai::SOLDIER_AI,
-                ..crate::unit_ai::UnitAi::default()
-            });
+            t.parts.set_unit_ai(
+                u.id,
+                Some(crate::unit_ai::UnitAi {
+                    ai_type: crate::unit_ai::SOLDIER_AI,
+                    ..crate::unit_ai::UnitAi::default()
+                }),
+            );
         }
         // the members' searches find nothing: an empty registry, no relations
         let mut v = crate::vision::visibility::Visibility::new(
@@ -737,26 +740,25 @@ mod tests {
     fn the_stances_reach_a_sleeping_member() {
         let mut t = three();
         for u in &mut t.players[1].objects {
-            u.combat.ai = Some(crate::unit_ai::UnitAi::default());
+            t.parts
+                .set_unit_ai(u.id, Some(crate::unit_ai::UnitAi::default()));
         }
         let asleep = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
         let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
         t.stances_state(group_id(1), FormationKind::USER_DEFINED)
             .unwrap();
         assert_eq!(
-            t.players[1].sleeping[ListIndex::new(0)]
-                .combat
-                .ai
-                .as_ref()
+            t.parts
+                .unit_ai
+                .get(t.players[1].sleeping[ListIndex::new(0)].id)
                 .unwrap()
                 .formation_type,
             FormationKind::USER_DEFINED
         );
         assert_eq!(
-            t.players[1].objects[ListIndex::new(0)]
-                .combat
-                .ai
-                .as_ref()
+            t.parts
+                .unit_ai
+                .get(t.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
                 .formation_type,
             FormationKind::USER_DEFINED
@@ -771,10 +773,13 @@ mod tests {
         let with = |stances: [UnitStance; 3]| {
             let mut t = three();
             for (u, stance) in t.players[1].objects.iter_mut().zip(stances) {
-                u.combat.ai = Some(crate::unit_ai::UnitAi {
-                    stance,
-                    ..crate::unit_ai::UnitAi::default()
-                });
+                t.parts.set_unit_ai(
+                    u.id,
+                    Some(crate::unit_ai::UnitAi {
+                        stance,
+                        ..crate::unit_ai::UnitAi::default()
+                    }),
+                );
             }
             t.stances_state(group_id(1), FormationKind::USER_DEFINED)
                 .unwrap();

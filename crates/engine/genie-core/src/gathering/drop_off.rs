@@ -56,7 +56,7 @@ impl Unit {
     /// does not hold, or one its sight sees past state 5) leave (`FUN_140c5de60`); with orders
     /// left the AI ends its order and action and the Gather is done (its deletion lets the drop
     /// site go). True when it is.
-    fn after_drop_orders(&mut self, c: &Step<'_>) -> Result<bool, GenieError> {
+    fn after_drop_orders(&self, c: &mut Step<'_>) -> Result<bool, GenieError> {
         let spatial: &Spatial = &c.w.spatial;
         let gone = |id: Option<ObjectId>| match spatial.get(id) {
             None => true,
@@ -66,7 +66,7 @@ impl Unit {
                 .and_then(|v| v.seer(id))
                 .is_some_and(|s| ObjectState::Dead < s.state),
         };
-        let Some(ai) = self.combat.ai.as_mut() else {
+        let Some(ai) = c.w.parts.unit_ai.get_mut(self.id) else {
             return Ok(false);
         };
         ai.orders.retain(|o| {
@@ -92,7 +92,7 @@ impl Unit {
             .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
-        let Some(ai) = self.combat.ai.as_ref() else {
+        let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
             return Ok(None);
         };
         let class = ai.target_class.or(gather.target_class);

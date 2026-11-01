@@ -131,7 +131,7 @@ impl Attack {
         if r.ai_order.has_ai()
             && (f.victim.player != PlayerId::new(0) || f.own.class != class::VILLAGER)
         {
-            forget_target(unit);
+            forget_target(c.w.parts.unit_ai.get_mut(unit.id));
         }
         let target = self.target.take();
         let_go(c, unit, target)?;
@@ -151,14 +151,26 @@ impl Attack {
                 // a mover of stance 0 that is not a villager waits where it saw the target:
                 // 0x1fb with 600 and 0x202 for a unit's own Attack, then `set_state(5)`
                 if !self.sub_action {
-                    unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
+                    unit.post_own(
+                        &mut c.w.parts.unit_ai,
+                        NotifyKind::ACTION_INVALIDATED,
+                        [600, 0, 0x202],
+                    )?;
                 }
                 self.wait_at_seen(unit, f, r, &c.w.graphics)?;
                 return Ok(UpdateCode::CODE_5);
             }
-            unit.post_own(NotifyKind::ACTION_COMPLETED, [600, 0, 0])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_COMPLETED,
+                [600, 0, 0],
+            )?;
         } else if r.ai_order.has_ai() && r.queue_empty {
-            unit.post_own(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_INVALIDATED,
+                [600, 0, 0x202],
+            )?;
         }
         self.finish(unit, c.w.streams.get(Stream::Sprite))?;
         Ok(UpdateCode::CODE_5)
@@ -193,16 +205,24 @@ impl Attack {
         }
         let_go(c, unit, target)?;
         if r.ai_order.has_ai() {
-            forget_target(unit);
+            forget_target(c.w.parts.unit_ai.get_mut(unit.id));
         }
         if f.own.class == class::PREDATOR
             && r.ai_type == Some(BOAR_AI)
-            && let Some(home) = unit.combat.ai.as_mut().and_then(|ai| ai.home.as_mut())
+            && let Some(home) =
+                c.w.parts
+                    .unit_ai
+                    .get_mut(unit.id)
+                    .and_then(|ai| ai.home.as_mut())
         {
             home.go_home = true;
         }
         if r.queue_empty {
-            unit.post_own(NotifyKind::ACTION_FAILED, [600, 0, 0])?;
+            unit.post_own(
+                &mut c.w.parts.unit_ai,
+                NotifyKind::ACTION_FAILED,
+                [600, 0, 0],
+            )?;
         }
         Ok(UpdateCode::FAILED)
     }
@@ -270,8 +290,8 @@ impl Attack {
 }
 
 /// `FUN_140c5e1e0` at once: the unit AI forgets its target ([`crate::unit_ai::UnitAi::remove_target`]).
-fn forget_target(unit: &mut Unit) {
-    if let Some(ai) = unit.combat.ai.as_mut() {
+fn forget_target(ai: Option<&mut crate::unit_ai::UnitAi>) {
+    if let Some(ai) = ai {
         ai.remove_target();
     }
 }

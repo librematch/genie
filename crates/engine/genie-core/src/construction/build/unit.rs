@@ -25,6 +25,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::state_of;
 use crate::world::others::OthersRef;
@@ -108,7 +109,7 @@ impl Unit {
         let built = foundation.map(|u| u.life.master_id);
         let stack_made = foundation.and_then(|u| u.building.stack_made);
         let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> =
-            self.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
+            c.w.parts.unit_ai.get(self.id).map_or_else(Vec::new, |ai| {
                 ai.orders
                     .iter()
                     .filter(|o| o.order == OrderKind::Build)
@@ -121,7 +122,7 @@ impl Unit {
         let (deposit, gone_orders) = if action.state == BuildState::Drop {
             (
                 self.build_deposit(c, others, action.site)?,
-                self.gone_drop_orders(&c.w.spatial),
+                Self::gone_drop_orders(&c.w.spatial, c.w.parts.unit_ai.get(self.id)),
             )
         } else {
             (None, Vec::new())
@@ -189,9 +190,9 @@ impl Unit {
         }))
     }
 
-    /// State 8: the targets of the unit AI's orders that a drop-off drops, gone from the world
-    /// or past state 5 as the player sees them.
-    fn gone_drop_orders(&self, spatial: &Spatial) -> Vec<Option<ObjectId>> {
+    /// State 8: the targets of the unit AI `ai`'s orders that a drop-off drops, gone from the
+    /// world or past state 5 as the player sees them.
+    fn gone_drop_orders(spatial: &Spatial, ai: Option<&UnitAi>) -> Vec<Option<ObjectId>> {
         let gone = |t: Option<ObjectId>| match spatial.get(t) {
             None => true,
             Some(_) => spatial
@@ -200,7 +201,7 @@ impl Unit {
                 .and_then(|v| v.seer(t))
                 .is_some_and(|s| ObjectState::Dead < s.state),
         };
-        self.combat.ai.as_ref().map_or_else(Vec::new, |ai| {
+        ai.map_or_else(Vec::new, |ai| {
             ai.orders
                 .iter()
                 .filter(|o| DROPPED_ORDERS.contains(&o.order))

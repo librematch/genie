@@ -68,7 +68,7 @@ impl Unit {
                 c.w.streams.get(Stream::Sprite),
             )?;
             if let Some((kind, p)) = posted {
-                self.post_own(kind, p)?;
+                self.post_own(&mut c.w.parts.unit_ai, kind, p)?;
             }
         }
         Ok(HeadCode::of(code))
@@ -98,7 +98,7 @@ impl Unit {
                 ),
                 &c.w.graphics,
             ),
-            self.combat.ai.as_ref(),
+            c.w.parts.unit_ai.get(self.id),
             (computer, c.w.world_time),
         );
         let code = attack.update_gone(c, self, me, &r, master_class);
@@ -138,7 +138,7 @@ impl Unit {
                 ),
                 &c.w.graphics,
             ),
-            self.combat.ai.as_ref(),
+            c.w.parts.unit_ai.get(self.id),
             (computer, c.w.world_time),
         );
         let victim = victim(c, attack.target)?.ok_or(GenieError::unsupported(
@@ -153,7 +153,7 @@ impl Unit {
         }
         let code = code?;
         // the retaliation's kill of the unit itself, which follows its step
-        if let Some(k) = self.hit_back(f.own)? {
+        if let Some(k) = self.hit_back(f.own, c.w.parts.unit_ai.get_mut(self.id))? {
             file_kill(c, self, KillLeft::own(self.id, k))?;
         }
         Ok(HeadCode::of(code))
@@ -190,7 +190,7 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player)?;
         let terrain = c.w.spatial.terrain.as_ref();
         Ok(Some(victim_of(
-            self,
+            (self, c.w.parts.unit_ai.contains(self.id)),
             master,
             &c.w.players.player(c.player)?.attributes,
             c.player,

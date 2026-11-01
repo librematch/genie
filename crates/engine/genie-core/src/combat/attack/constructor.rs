@@ -5,7 +5,7 @@ use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{
     Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, LEASH_SLACK,
-    MASTER_1704, MASTER_1706, NONE, Posted, face_target,
+    MASTER_1704, MASTER_1706, NONE, Posted, Posts, face_target,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -211,7 +211,7 @@ impl Attack {
                 map: &c.w.spatial,
                 sprite_rng: c.w.streams.get(Stream::Sprite),
                 object_rng: None,
-                buffer: Some(&mut posted),
+                posts: Posts::Held(&mut posted),
                 graphics: &c.w.graphics,
                 by_id: crate::world::index::ObjectsRef::new(
                     &c.w.players,

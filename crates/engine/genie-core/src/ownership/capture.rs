@@ -111,10 +111,10 @@ impl Unit {
             && self.life.attribute_type.is_some();
         if class != class::LIVESTOCK
             && !trading
-            && self
-                .combat
-                .ai
-                .as_ref()
+            && c.w
+                .parts
+                .unit_ai
+                .get(self.id)
                 .is_some_and(|ai| ai.current_action != Some(ActionKind::HeroPower))
         {
             let place = (self.body.position().ground(), Some(class));
@@ -194,8 +194,9 @@ impl Unit {
         let tables =
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master);
         let dead = crate::ownership::change::dead_master_of(self, c.player.index(), tables, had);
+        let id = self.id;
         let changed = change_hands(
-            self,
+            (self, c.w.parts.unit_ai.get_mut(id)),
             (c.player.index(), new),
             tables,
             &mut c.w.spatial,

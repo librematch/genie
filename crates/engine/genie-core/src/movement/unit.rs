@@ -16,7 +16,6 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::unit_ai::ActionKind;
-use crate::unit_ai::Inbox;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
@@ -47,6 +46,7 @@ impl Unit {
                     &c.w.parts.own_master,
                     c.w.masters.of(c.player),
                 ),
+                c.w.parts.unit_ai.get(self.id),
             )?,
             None => None,
         };
@@ -75,7 +75,7 @@ impl Unit {
     }
 
     /// What slot 0x5e0 (`FUN_14114f300`) reads of the unit's group ([`GroupSpeed`]) among the
-    /// world's `groups`, the unit's master among `masters`: none outside a group the world holds (`+0x6d0`, `FUN_14152ff40`: none for −1), nor when the
+    /// world's `groups`, the unit's master among `masters` and its unit AI `ai`: none outside a group the world holds (`+0x6d0`, `FUN_14152ff40`: none for −1), nor when the
     /// group's motion stands (`FUN_141046600`) and the unit is in its place
     /// ([`UnitGroup::slot_in_place`]), nor for a unit not free for the group's moves
     /// ([`Unit::free_for_group`]). Else its own move's reason (`FUN_141017590`): 2 moved aside,
@@ -90,6 +90,7 @@ impl Unit {
         &self,
         groups: &crate::groups::UnitGroups,
         masters: crate::objects::masters::OwnerMasters<'_>,
+        ai: Option<&UnitAi>,
     ) -> Result<Option<GroupSpeed>, GenieError> {
         let Some(g) = self.group.id.and_then(|id| groups.get(id)) else {
             return Ok(None);
@@ -98,7 +99,7 @@ impl Unit {
             return Ok(None);
         }
         let master = self.master_in(masters)?;
-        if !self.free_for_group(master)? {
+        if !self.free_for_group(master, ai)? {
             return Ok(None);
         }
         Ok(Some(match g.member_reason(self.id) {
@@ -126,11 +127,11 @@ impl Unit {
             self.own_move_give_up(c)?;
         }
         if step.target_moved {
-            self.post_own(NotifyKind::TARGET_MOVED, [0, 0, 0])?;
+            self.post_own(&mut c.w.parts.unit_ai, NotifyKind::TARGET_MOVED, [0, 0, 0])?;
         }
         let ended = step.done || step.failed;
         if ended {
-            self.own_move_end(step.failed)?;
+            self.own_move_end(c, step.failed)?;
         }
         Ok(HeadCode::ended(ended))
     }
@@ -139,11 +140,11 @@ impl Unit {
     /// waits, with its unit AI's stance (aggressive without one).
     fn own_move_give_up(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let villager = self.master(c.w.master_tables(), c.player)?.class == class::VILLAGER;
-        let stance = self
-            .combat
-            .ai
-            .as_ref()
-            .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
+        let stance =
+            c.w.parts
+                .unit_ai
+                .get(self.id)
+                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
         self.own_move_gave_up(
             villager && !c.w.players.player(c.player)?.computer,
             stance,
@@ -170,7 +171,7 @@ impl Unit {
         };
         let target = move_to.target;
         let state = c.w.object_state(target);
-        let mut inbox = Inbox::of(&mut self.combat.ai, self.id, self.life.state);
+        let mut inbox = c.w.parts.unit_ai.inbox(self.id, self.life.state);
         let code = move_to.check_held(state, &mut inbox)?;
         let releases = code.is_some() && !move_to.quiet;
         if releases && let Some(target) = target {
@@ -196,9 +197,11 @@ impl Unit {
                     Some(id) => c.w.spatial.get(id).map(|t| t.position.ground()),
                 };
                 let ask = match point {
-                    Some(p) if move_to.state == MoveTo::Start => {
-                        UnitAi::path_ask(self.combat.ai.as_mut(), self.body.position().ground(), p)
-                    }
+                    Some(p) if move_to.state == MoveTo::Start => UnitAi::path_ask(
+                        c.w.parts.unit_ai.get_mut(self.id),
+                        self.body.position().ground(),
+                        p,
+                    ),
                     _ => crate::movement::PathAsk::default(),
                 };
                 // its set_state 1 and 13 show slot 0x798's sprite; slot 0x68 takes the master's
@@ -230,13 +233,17 @@ impl Unit {
     /// The own `MoveTo`'s end, done or `failed`: its update in state 1 posts its completion
     /// (0x1fa with the move action value; an own `MoveTo` is never quiet), in state 13 its
     /// failure (0x1f9) and returns 3.
-    fn own_move_end(&mut self, failed: bool) -> Result<(), GenieError> {
+    fn own_move_end(&self, c: &mut Step<'_>, failed: bool) -> Result<(), GenieError> {
         let notify = if failed {
             NotifyKind::ACTION_FAILED
         } else {
             NotifyKind::ACTION_COMPLETED
         };
-        self.post_own(notify, [ActionKind::Move.value(), 0, 0])
+        self.post_own(
+            &mut c.w.parts.unit_ai,
+            notify,
+            [ActionKind::Move.value(), 0, 0],
+        )
     }
 
     /// The unit's Explore in its update ([`crate::movement::explore::ExploreAction::update`]): nothing without one.

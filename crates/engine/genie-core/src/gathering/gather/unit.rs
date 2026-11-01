@@ -165,10 +165,11 @@ impl Unit {
             class: master.class,
             defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
             master: self.life.master_id,
-            stance: self
-                .combat
-                .ai
-                .as_ref()
+            stance: c
+                .w
+                .parts
+                .unit_ai
+                .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
             farm_stops: c.w.settings.walkable_farms,
             computer: c.w.players.player(c.player)?.computer,
@@ -385,7 +386,7 @@ impl Unit {
     /// the Gather's target type (`+0x68`) and a drop site: the second target's, else for a master
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
     /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
-    pub(crate) fn gather_search(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn gather_search(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -418,6 +419,7 @@ impl Unit {
             -1
         };
         self.post_own(
+            &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::REQUIRES_SEARCH,
             [
                 ActionKind::Gather.value(),

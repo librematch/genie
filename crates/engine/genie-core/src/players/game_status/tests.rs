@@ -55,6 +55,7 @@ use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
+use crate::world::parts::Object;
 use crate::world::parts::Part;
 
 /// An entry of `count` villagers of master `master` that paid `food` each.
@@ -94,15 +95,6 @@ fn game() -> World {
     (attributes[80], attributes[81]) = (Amount::new(1.0), Amount::new(1.0));
     let tc = Unit {
         id: object_id(9),
-        combat: crate::objects::layers::Combat {
-            ai: Some(UnitAi {
-                current_order: None,
-                current_action: Some(ActionKind::Make),
-                current_target: None,
-                ..UnitAi::default()
-            }),
-            ..Default::default()
-        },
         ..Unit::default()
     };
     let production = Production {
@@ -130,7 +122,16 @@ fn game() -> World {
             player(vec![tc].into()),
             player(vec![].into()),
         ],
-    );
+    )
+    .with_ais([(
+        object_id(9),
+        UnitAi {
+            current_order: None,
+            current_action: Some(ActionKind::Make),
+            current_target: None,
+            ..UnitAi::default()
+        },
+    )]);
     let masters = Masters::new([
         Master {
             id: ids::TOWN_CENTRE,
@@ -401,15 +402,6 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
     use crate::gathering::hunt::{HuntAction, HuntTask, Lead};
     let hunter = Unit {
         id: object_id(20),
-        combat: crate::objects::layers::Combat {
-            ai: Some(UnitAi {
-                current_order: Some(OrderKind::Hunt),
-                current_action: Some(ActionKind::Hunt),
-                current_target: None,
-                ..UnitAi::default()
-            }),
-            ..Default::default()
-        },
         actions: crate::objects::layers::ActionLayer {
             list: ActionList::default().with_hunt(Some(HuntAction {
                 target: None,
@@ -445,16 +437,26 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
     // game()'s villager master
     hunter.life.master_id = ids::TOWN_CENTRE;
     hunter.my_pasture = None;
-    let _ = t.push_live(PlayerId::new(1), hunter).unwrap();
+    let ai = UnitAi {
+        current_order: Some(OrderKind::Hunt),
+        current_action: Some(ActionKind::Hunt),
+        current_target: None,
+        ..UnitAi::default()
+    };
+    let _ = t
+        .push_live(PlayerId::new(1), Object::with_ai(hunter, ai))
+        .unwrap();
     let idx = t.players[1].objects.last_place().unwrap();
     let mut without_ai = t.clone();
     // the unit AI's stopAction (slot 0x3c0) then empties the list
     t.object_stop(PlayerId::new(1), idx).unwrap();
     let u = &t.players[1].objects[idx];
     assert_eq!(u.actions.list.hunt().copied(), None);
-    assert_eq!(u.combat.ai.as_ref().unwrap().current_action, None);
+    assert_eq!(t.parts.unit_ai.get(u.id).unwrap().current_action, None);
     // without a unit AI the halted Hunt stays
-    without_ai.players[1].objects[idx].combat.ai = None;
+    without_ai
+        .parts
+        .set_unit_ai(without_ai.players[1].objects[idx].id, None);
     without_ai.object_stop(PlayerId::new(1), idx).unwrap();
     let u = &without_ai.players[1].objects[idx];
     assert_eq!(
@@ -913,7 +915,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
         (0, 0)
     );
     assert!(production.action.is_none());
-    assert_eq!(tc.combat.ai.as_ref().unwrap().notifies.len(), 1);
+    assert_eq!(t.parts.unit_ai.get(tc.id).unwrap().notifies.len(), 1);
     // one research of the second unit: 50 gold, the technology in state 1 though two stay
     // queued, the research going on
     let mut t = researching(10.0);
@@ -1065,7 +1067,7 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
         (production.queue.total.get(), production.queue.changes.get()),
         (0, 1)
     );
-    let ai = tc.combat.ai.as_ref().unwrap();
+    let ai = t.parts.unit_ai.get(tc.id).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (None, Some(ActionKind::Make))

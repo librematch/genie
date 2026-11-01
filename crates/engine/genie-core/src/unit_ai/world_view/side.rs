@@ -137,7 +137,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             let Some((owner, u)) = find(r.id) else {
                 continue;
             };
-            if u.combat.ai.is_none() || ObjectState::Dying <= u.life.state {
+            if !self.c.w.parts.unit_ai.contains(u.id) || ObjectState::Dying <= u.life.state {
                 continue;
             }
             let m = u.master(self.c.w.master_tables(), owner)?;
@@ -195,7 +195,13 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             owner,
             combat_level: m.combat_level,
             state: u.life.state,
-            target: u.combat.ai.as_ref().and_then(|a| a.current_target),
+            target: self
+                .c
+                .w
+                .parts
+                .unit_ai
+                .get(u.id)
+                .and_then(|a| a.current_target),
             gap_squared: footprint_gap_squared(
                 self.unit.position(),
                 me.radius,
@@ -298,6 +304,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 &self.c.w.masters,
                 &self.c.w.parts.own_master,
             ),
+            ais: &self.c.w.parts.unit_ai,
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
@@ -412,7 +419,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let posted = held
             .into_iter()
             .try_for_each(|(n, state)| ai.post(n, state));
-        self.unit.combat.ai = Some(std::mem::take(ai));
+        self.c.w.return_unit_ai(self.unit.id, std::mem::take(ai));
         std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
         let class = self
             .unit
@@ -422,7 +429,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             .and_then(|class| posted.and_then(|()| self.unit.run_effect(e, Some(class), self.c)));
         std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
         self.c.side_notifies = Some(Vec::new());
-        *ai = self.unit.combat.ai.take().ok_or_else(|| {
+        *ai = self.c.w.lend_unit_ai(self.unit.id).ok_or_else(|| {
             GenieError::unreachable("a call of the unit AI took the unit's AI")
                 .with("object", self.unit.id)
         })?;

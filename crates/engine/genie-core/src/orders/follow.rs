@@ -133,14 +133,18 @@ impl World {
                 Place::Live(p, i) => (p, i),
                 // only slot 0x180 puts an object to sleep, one of a type below 30 without a
                 // unit AI
-                Place::Sleeping(p, i) if self.players.asleep(p, i)?.combat.ai.is_none() => continue,
+                Place::Sleeping(p, i)
+                    if !self.parts.unit_ai.contains(self.players.asleep(p, i)?.id) =>
+                {
+                    continue;
+                }
                 Place::Sleeping(..) => {
                     return Err(GenieError::unsupported(
                         "a GUARD of a sleeping object with a unit AI",
                     ));
                 }
             };
-            if self.players.live(p, idx)?.combat.ai.is_none() {
+            if !self.parts.unit_ai.contains(self.players.live(p, idx)?.id) {
                 continue;
             }
             let order = crate::unit_ai::QueuedOrder {
@@ -236,7 +240,7 @@ impl World {
         let taken =
             self.move_to_object_with(p, idx, followed.id, Position::new(x, y, 0.0), true)?;
         let rng = self.streams.get(Stream::Ai);
-        if let Some(ai) = self.players.live_mut(p, idx)?.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
             if !taken {
                 ai.set_order(Some(OrderKind::Follow), rng);
                 ai.set_action(Some(ActionKind::Follow));
@@ -281,7 +285,7 @@ impl World {
             None => self.move_point_order_with(p, idx, at, true)?,
         }
         let rng = self.streams.get(Stream::Ai);
-        if let Some(ai) = self.players.live_mut(p, idx)?.combat.ai.as_mut() {
+        if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
             ai.set_order(Some(OrderKind::Move), rng);
             ai.set_action(Some(ActionKind::Move));
             let (t, class) = followed
@@ -338,22 +342,26 @@ impl World {
         if villager {
             self.parts.set_town_bell_flag(unit.id, false);
         }
-        if a14 && let Some(ai) = unit.combat.ai.as_mut() {
+        if a14 && let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
         }
         if target == unit.id {
             return Ok(false);
         }
         let place = (unit.position().ground(), Some(class));
-        if unit.combat.ai.is_some() {
+        if self.parts.unit_ai.contains(unit.id) {
             // a completion's stop (slot 0xb0 with 1): the unit's stopAction at once
             self.run_ai_calls((player, idx), |ai, side, rng| {
                 ai.clear_notifies_at(world_time.since_start(), place, side, rng)
             })?;
         }
         let unit = self.players.live_mut(player, idx)?;
-        let stop_after_kill = unit.combat.ai.as_ref().is_some_and(|ai| ai.stop_after_kill);
-        if unit.combat.ai.is_some()
+        let stop_after_kill = self
+            .parts
+            .unit_ai
+            .get(unit.id)
+            .is_some_and(|ai| ai.stop_after_kill);
+        if self.parts.unit_ai.contains(unit.id)
             && !stop_after_kill
             && self.head_takes_move(player, idx, Some(target), point)?
         {

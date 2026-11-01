@@ -28,7 +28,7 @@ impl World {
                 .iter_mut()
                 .flat_map(|p| p.objects.iter_mut())
                 .find(|o| o.id == id)
-                .filter(|o| o.combat.ai.is_some());
+                .filter(|o| self.parts.unit_ai.contains(o.id));
             if let Some(u) = unit {
                 u.last_human_order = self.world_time;
             }
@@ -59,7 +59,7 @@ impl World {
                 crate::world::index::Place::Live(..) => player.objects.checked_mut(i)?,
                 crate::world::index::Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
             };
-            if let Some(ai) = unit.combat.ai.as_mut() {
+            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.reset_for_order(self.streams.get(Stream::Ai));
             }
         }
