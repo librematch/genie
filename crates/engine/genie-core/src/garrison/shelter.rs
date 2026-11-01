@@ -28,6 +28,7 @@ use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
 /// A shelter index that the count list of the callers does not cover.
@@ -144,7 +145,7 @@ impl World {
         } else {
             HUMAN_IDS
         };
-        let checked = self.checked_units(player, &ids[..ids.len().min(cap)]);
+        let checked = self.checked_units(player, ids.get(..cap).unwrap_or(ids));
         // a human's command whose ids all dropped is refused; run (the cheat +0xb12) on no
         // units it would only read the buildings' counts
         if checked.iter().all(Option::is_none) {
@@ -288,8 +289,9 @@ impl World {
                 let (sat, sr) = self.ground(shelter)?;
                 Ok(footprint_gap_squared(at, r, sat, sr).get())
             };
-            for (j, &building) in shelters.buildings.iter().enumerate() {
-                let (is_building, capacity, _) = capacities[j];
+            for (j, (&building, &(is_building, capacity, _))) in
+                shelters.buildings.iter().zip(&capacities).enumerate()
+            {
                 if is_building && capacity.holds() && self.takes_in(building, player, copy)? {
                     let gap = gap_to(building.id())?;
                     if gap < reach {
@@ -303,7 +305,7 @@ impl World {
             for (k, &transport) in shelters.transports.iter().enumerate() {
                 // FUN_1415c9240 reads the commanding player's master of the unit's master id
                 // (its slot unchecked: one the player lacks would crash the game)
-                let (_, _, transport_class) = capacities[first_transport + k];
+                let (_, _, transport_class) = *capacities.checked(first_transport + k)?;
                 let list = self.master(player, master)?;
                 if has_garrison_task(&list.tasks, GARRISON, transport_class) {
                     let gap = gap_to(transport.id())?;
@@ -324,7 +326,7 @@ impl World {
                 .iter()
                 .position(|&b| b == building)
                 .ok_or(NO_LISTED_BUILDING)?;
-            self.shelter_in(building, &going[j], through_ai)?;
+            self.shelter_in(building, going.checked(j)?, through_ai)?;
         }
         Ok(())
     }
@@ -385,7 +387,7 @@ impl World {
                     "a garrison of a unit the slice does not hold live",
                 ));
             };
-            let unit = &self.players.player(p)?.objects[idx];
+            let unit = self.players.live(p, idx)?;
             let kind = unit.master(&self.masters, p)?.kind;
             if (ObjectState::Alive < unit.life.state && unit.life.state != ObjectState::Undead)
                 || kind < COMBAT
@@ -406,7 +408,9 @@ impl World {
                     ready: true,
                     target_type: Some(crate::unit_ai::OrderTargetType::of_master(master)),
                 };
-                let ai = self.players.player_mut(p)?.objects[idx]
+                let ai = self
+                    .players
+                    .live_mut(p, idx)?
                     .ai
                     .as_mut()
                     .ok_or(NO_UNIT_AI)?;
@@ -443,18 +447,18 @@ fn assign_shelters(
         // the count list is at least as long as the shelters: its callers push a count for
         // each shelter, and FUN_14161e370 one for each gate and annex beside
         let count = counts.get_mut(j).ok_or(NO_COUNT)?;
-        if !taken[i] && count.below(capacities[j].1) {
-            going[j].push(units[i]);
-            first_taken.push(all[j]);
+        if !*taken.checked(i)? && count.below(capacities.checked(j)?.1) {
+            going.checked_mut(j)?.push(*units.checked(i)?);
+            first_taken.push(*all.checked(j)?);
             *count = count.plus(InsideCount::ONE);
-            taken[i] = true;
+            *taken.checked_mut(i)? = true;
         }
     }
     for &(i, j, _) in pairs {
-        if !taken[i] {
-            going[j].push(units[i]);
-            first_taken.push(all[j]);
-            taken[i] = true;
+        if !*taken.checked(i)? {
+            going.checked_mut(j)?.push(*units.checked(i)?);
+            first_taken.push(*all.checked(j)?);
+            *taken.checked_mut(i)? = true;
         }
     }
     Ok((going, first_taken))

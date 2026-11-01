@@ -40,9 +40,7 @@ impl crate::world::World {
         self.clear_actions(p, i)?;
         let mut t = TransportAction::on_task(Some(task.id), point);
         let changed = self.with_shore(p, i, t.task, |ship, shore| t.start(true, ship, shore))?;
-        self.players.player_mut(p)?.objects[i]
-            .actions
-            .set_transport(Some(t));
+        self.players.live_mut(p, i)?.actions.set_transport(Some(t));
         self.transport_changed(p, i, changed)
     }
 
@@ -64,7 +62,7 @@ impl crate::world::World {
         task: &Task,
         clears: bool,
     ) -> Result<bool, GenieError> {
-        let unit = &self.players.player(p)?.objects[i];
+        let unit = self.players.live(p, i)?;
         let on_task = unit.top_action_kind() == Some(TRANSPORT)
             && unit.actions.transport().copied().and_then(|t| t.task) == Some(task.id);
         if !on_task || self.trade_at_own_market((p, i), target)? {
@@ -81,9 +79,7 @@ impl crate::world::World {
         let changed = self.with_shore(p, i, t.task, |ship, shore| {
             t.work(point, by_self, ship, shore)
         })?;
-        self.players.player_mut(p)?.objects[i]
-            .actions
-            .set_transport(Some(t));
+        self.players.live_mut(p, i)?.actions.set_transport(Some(t));
         self.transport_changed(p, i, changed)?;
         self.notify_transport((p, i), (target, point), clears)?;
         Ok(true)
@@ -101,9 +97,7 @@ impl crate::world::World {
         };
         // The market (`0x60f0` raw), whose own trade units the work command never retakes.
         let market = tp == p && t.master(&self.masters, tp)?.id == MARKET;
-        let class = self.players.player(p)?.objects[i]
-            .master(&self.masters, p)?
-            .class;
+        let class = self.players.live(p, i)?.master(&self.masters, p)?.class;
         Ok(market && TRADE_CLASSES.contains(&class))
     }
 
@@ -120,7 +114,7 @@ impl crate::world::World {
             Some((target, (tp, t))) => Some((target, t.master(&self.masters, tp)?.class)),
             None => None,
         };
-        let unit = &mut self.players.player_mut(p)?.objects[i];
+        let unit = self.players.live_mut(p, i)?;
         if let Some(ai) = unit.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Transport),
@@ -151,11 +145,13 @@ impl crate::world::World {
         f: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> Result<Changed, GenieError>,
     ) -> Result<Changed, GenieError> {
         let ship = {
-            let unit = &self.players.player(p)?.objects[i];
+            let unit = self.players.live(p, i)?;
             let master = unit.master(&self.masters, p)?;
             Ship::of_unit(unit, master, self.spatial.map, &self.graphics, task)?
         };
-        let restriction = self.players.player(p)?.objects[i]
+        let restriction = self
+            .players
+            .live(p, i)?
             .master(&self.masters, p)?
             .terrain_restriction;
         let mut shore = MapShore::new(

@@ -42,7 +42,7 @@ impl World {
         clears: bool,
     ) -> Result<(), GenieError> {
         let (action, target, class) = self.new_enter(player, idx, target, task)?;
-        if let Some(ai) = self.players.player_mut(player)?.objects[idx].ai.as_mut() {
+        if let Some(ai) = self.players.live_mut(player, idx)?.ai.as_mut() {
             ai.notify_work(
                 Some(OrderKind::Enter),
                 Some(ActionKind::Enter),
@@ -81,7 +81,7 @@ impl World {
         if self.object(target).is_none() {
             return Ok(false);
         }
-        let unit = &self.players.player(player)?.objects[idx];
+        let unit = self.players.live(player, idx)?;
         let top = unit.top_action_kind();
         if !forced && top == Some(ENTER) && unit.top_target() == Some(target) {
             return Ok(true);
@@ -103,7 +103,7 @@ impl World {
         idx: ListIndex,
         failed: Option<crate::unit_ai::Notify>,
     ) -> Result<(), GenieError> {
-        let unit = &mut self.players.player_mut(player)?.objects[idx];
+        let unit = self.players.live_mut(player, idx)?;
         let state = unit.life.state;
         match (failed, unit.ai.as_mut()) {
             (Some(n), Some(ai)) => ai.post(n, state),
@@ -216,10 +216,10 @@ impl World {
         task: &Task,
         sub: bool,
     ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
-        let id = self.players.player(player)?.objects[idx].id;
+        let id = self.players.live(player, idx)?.id;
         if sub {
             let by = self.releaser(player, idx)?;
-            let unit = &mut self.players.player_mut(player)?.objects[idx];
+            let unit = self.players.live_mut(player, idx)?;
             let art = unit.actions.artifact_mut().ok_or(GenieError::unreachable(
                 "an Artifact on top without its action",
             ))?;
@@ -228,7 +228,7 @@ impl World {
             if let Some(t) = gone.released {
                 self.release(t, by)?;
             }
-            let unit = &mut self.players.player_mut(player)?.objects[idx];
+            let unit = self.players.live_mut(player, idx)?;
             if gone.stops
                 && let Some(m) = unit.body.mover_mut()
             {
@@ -237,14 +237,14 @@ impl World {
         } else {
             self.clear_actions(player, idx)?;
         }
-        let unit = &self.players.player(player)?.objects[idx];
+        let unit = self.players.live(player, idx)?;
         if unit.life.inside.is_some() {
             // set_state(13): the unit takes its master's standing sprite (slot 0x68 with
             // `+0x470`) and, its `+0x60` 0 in a new Enter, posts notify 0x1f9 with the enter's
             // action value to its unit AI; the update returns 3 then
             action.state = EnterState::Failed;
             let masters = self.masters.of(player);
-            let unit = &mut self.players.player_mut(player)?.objects[idx];
+            let unit = self.players.live_mut(player, idx)?;
             unit.place_enter(action, sub);
             unit.shows_standing_sprite(
                 masters,
@@ -268,12 +268,13 @@ impl World {
         match walking {
             // the enter's set_state(1) reads the Enter as the unit's; a sub-action goes back
             Walking::Enter => {
-                self.players.player_mut(player)?.objects[idx]
+                self.players
+                    .live_mut(player, idx)?
                     .actions
                     .set_enter(Some(action));
                 let entered = self.enter_now(player, idx, target);
                 if sub {
-                    let unit = &mut self.players.player_mut(player)?.objects[idx];
+                    let unit = self.players.live_mut(player, idx)?;
                     let e = unit.actions.take_enter();
                     if let (Some(e), Some(art)) = (e, unit.actions.artifact_mut()) {
                         art.enter = Some(e);
@@ -282,7 +283,7 @@ impl World {
                 entered.map(|()| None)
             }
             Walking::Walk(to) => {
-                self.players.player_mut(player)?.objects[idx].place_enter(action, sub);
+                self.players.live_mut(player, idx)?.place_enter(action, sub);
                 to.map_or(Ok(()), |to| self.move_transport(Some(target), to))
                     .map(|()| None)
             }
@@ -302,7 +303,7 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
-        let id = self.players.player(player)?.objects[idx].id;
+        let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let tm = t.master(&self.masters, tp)?.clone();
         let room = self.has_room(tp, t, Some(id))?;
@@ -310,7 +311,7 @@ impl World {
         enter_view(
             &mut self.spatial,
             &self.masters,
-            &self.players.player(player)?.objects[idx],
+            self.players.live(player, idx)?,
             (t, &tm, room),
             range,
         )
@@ -335,7 +336,7 @@ impl World {
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(&self.masters, tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
-        let unit = &self.players.player(player)?.objects[idx];
+        let unit = self.players.live(player, idx)?;
         let reads = MoveToReads::of(unit, unit.master(&self.masters, player)?, &self.graphics);
         let meeting = Meeting {
             spatial: &mut self.spatial,
@@ -362,7 +363,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
-        let id = self.players.player(player)?.objects[idx].id;
+        let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let master = t.master(&self.masters, tp)?.clone();
         let room = self.has_room(tp, t, Some(id))?;
@@ -373,7 +374,7 @@ impl World {
             target,
             master: &master,
             room,
-            unit: &self.players.player(player)?.objects[idx],
+            unit: self.players.live(player, idx)?,
         }
         .point()
     }
@@ -391,7 +392,7 @@ impl World {
         let Some(crate::orders::Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };
-        let ship = &self.players.player(tp)?.objects[ti];
+        let ship = self.players.live(tp, ti)?;
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -465,10 +466,14 @@ impl World {
         let Some(crate::orders::Place::Live(tp, ti)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
-        let me = self.players.player(player)?.objects[idx]
+        let me = self
+            .players
+            .live(player, idx)?
             .master(&self.masters, player)?
             .clone();
-        let bm = self.players.player(tp)?.objects[ti]
+        let bm = self
+            .players
+            .live(tp, ti)?
             .master(&self.masters, tp)?
             .clone();
         self.run_on_step(player, idx, |unit, c| unit.go_inside(c, target, &me, &bm))
@@ -485,8 +490,8 @@ fn placed_object(
     place: Option<crate::orders::Place>,
 ) -> Result<&crate::objects::unit::Unit, GenieError> {
     match place {
-        Some(crate::orders::Place::Live(p, i)) => Ok(&players[p.index()].objects[i]),
-        Some(crate::orders::Place::Sleeping(p, i)) => Ok(&players[p.index()].sleeping[i]),
+        Some(crate::orders::Place::Live(p, i)) => players.live(p, i),
+        Some(crate::orders::Place::Sleeping(p, i)) => players.asleep(p, i),
         None => Err(UNPLACED),
     }
 }
