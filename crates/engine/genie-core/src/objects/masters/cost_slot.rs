@@ -51,6 +51,7 @@ pub fn entries(slots: &[CostSlot]) -> impl Iterator<Item = (AttributeId, CostAmo
 
 #[cfg(test)]
 mod tests {
+    use crate::objects::masters::CostAmount;
     use crate::objects::masters::cost_slot::{CostSlot, entries};
     use crate::players::attribute;
     use crate::test_ids::costs;
@@ -59,17 +60,9 @@ mod tests {
     #[test]
     fn an_empty_slot_keeps_its_place_and_the_entries_pass_over_it() {
         let villager = [
-            CostSlot::new(
-                attribute::FOOD,
-                crate::objects::masters::CostAmount::of_data(50),
-                true,
-            ),
+            CostSlot::new(attribute::FOOD, CostAmount::of_data(50), true),
             CostSlot::default(),
-            CostSlot::new(
-                attribute::HEADROOM,
-                crate::objects::masters::CostAmount::of_data(1),
-                false,
-            ),
+            CostSlot::new(attribute::HEADROOM, CostAmount::of_data(1), false),
         ];
         assert_eq!(villager[1].entry(), None);
         assert_eq!(
@@ -81,11 +74,7 @@ mod tests {
         assert_eq!(
             costs(&[(attribute::WOOD, 25, true)]),
             [
-                CostSlot::new(
-                    attribute::WOOD,
-                    crate::objects::masters::CostAmount::of_data(25),
-                    true
-                ),
+                CostSlot::new(attribute::WOOD, CostAmount::of_data(25), true),
                 CostSlot::default(),
                 CostSlot::default()
             ]

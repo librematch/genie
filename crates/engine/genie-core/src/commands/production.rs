@@ -22,6 +22,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::QUEUED;
+use crate::production::CostCount;
 use crate::production::Production;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
@@ -341,11 +342,11 @@ impl World {
         if 14 < total {
             return Ok(false);
         }
-        let n = if i32::from(count as i16) + i32::from(total) < 16 {
+        let n = QueuedUnits::of_data(if i32::from(count as i16) + i32::from(total) < 16 {
             count as i16
         } else {
             crate::production::ROOM.get() - total
-        };
+        });
         if let Some(tech) = tech {
             self.queue_techs(player, i, (master, tech), n, button)
         } else {
@@ -371,18 +372,18 @@ impl World {
         player: PlayerId,
         i: ListIndex,
         master: MasterId,
-        count: i16,
+        count: QueuedUnits,
         button: QueueButton,
     ) -> Result<bool, GenieError> {
         use crate::production::{as_entry_costs, master_costs, pay, population};
         let empty = Masters::default();
-        let mut n = count;
+        let mut n = count.get();
         loop {
             let masters = self.masters.of(player).unwrap_or(&empty);
             if pay(
                 masters,
                 master,
-                f32::from(n),
+                CostCount::new(f32::from(n)),
                 self.players.player_mut(player)?,
             )? {
                 break;
@@ -446,7 +447,7 @@ impl World {
         player: PlayerId,
         i: ListIndex,
         (master, tech): (Option<MasterId>, TechId),
-        count: i16,
+        count: QueuedUnits,
         button: QueueButton,
     ) -> Result<bool, GenieError> {
         let t = tech.index();
@@ -460,7 +461,7 @@ impl World {
             .get()
             .wrapping_add(state.times_researched.get());
         let cap = state.research_cap.limit();
-        let mut n = count;
+        let mut n = count.get();
         if state.stack && i32::from(cap) - i32::from(done) < i32::from(n) {
             n = cap.wrapping_sub(done);
         }
@@ -578,7 +579,7 @@ impl World {
         player: PlayerId,
         tech: Option<TechId>,
         master: Option<MasterId>,
-    ) -> Result<[(Option<AttributeId>, f32); 3], GenieError> {
+    ) -> Result<[(Option<AttributeId>, Amount); 3], GenieError> {
         use crate::production::{NO_COSTS, as_entry_costs, master_costs};
         let owner = self.players.player(player)?;
         if let Some(master) = master {

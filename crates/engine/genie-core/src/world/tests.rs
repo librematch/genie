@@ -8715,7 +8715,7 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
             1,
             1,
             WholeSeconds::of_data(25),
-            (Some(attribute::FOOD), 46.0)
+            (Some(attribute::FOOD), Amount::new(46.0))
         )
     );
     assert!(p.unsupported.is_none());

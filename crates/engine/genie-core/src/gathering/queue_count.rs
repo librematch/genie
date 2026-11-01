@@ -1,5 +1,7 @@
 //! The count of farms or fish traps a queue paid for.
 
+use crate::production::CostCount;
+
 /// The farms (`farm_queue_count`, `+0x141c`) or fish traps (`fishTrapQueueCount`, `+0x1420`) a
 /// player's queue paid for (saved), and the count a GAME command buys or takes back.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -25,8 +27,8 @@ impl QueueCount {
 
     /// The count as the cost test's and the payment's multiplier.
     #[must_use]
-    pub const fn factor(self) -> f32 {
-        self.0 as f32
+    pub const fn factor(self) -> CostCount {
+        CostCount::new(self.0 as f32)
     }
 
     /// The int, as the save holds it.
@@ -85,7 +87,7 @@ mod tests {
         );
         assert_eq!(
             (QueueCount::of_data(7).factor(), QueueCount::ONE.get()),
-            (7.0, 1)
+            (CostCount::new(7.0), 1)
         );
     }
 }

@@ -26,7 +26,8 @@ fn load() -> (PlayerState, [Option<u32>; 11]) {
             }
             "object" => player.live.push(CheckpointObject {
                 id: ObjectId::try_from(v[0].parse::<i32>().unwrap()).unwrap(),
-                main_id: v[1].parse().unwrap(),
+                main_id: genie_core::objects::masters::MasterId::of_data(v[1].parse().unwrap())
+                    .unwrap(),
                 state: genie_core::objects::ObjectState::of_byte(v[2].parse().unwrap()).unwrap(),
                 amount_held: Amount::new(num(3)),
                 position: Position::new(num(4), num(5), num(6)),

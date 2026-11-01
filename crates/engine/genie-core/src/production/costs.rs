@@ -10,6 +10,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::production::CostCount;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::world::Seconds;
@@ -20,7 +21,7 @@ use crate::world::Seconds;
 /// player's attribute (no side effects).
 pub fn refund(
     master: &Master,
-    costs: &[(Option<AttributeId>, f32); 3],
+    costs: &[(Option<AttributeId>, Amount); 3],
     attributes: &mut dyn crate::technology::Attributes,
 ) -> Result<(), GenieError> {
     if master.kind < COMBAT {
@@ -34,9 +35,9 @@ pub fn refund(
             .iter()
             .rev()
             .find(|c| c.0 == Some(attribute))
-            .map_or(0.0, |c| c.1);
+            .map_or(Amount::ZERO, |c| c.1);
         let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + Amount::new(back))?;
+        attributes.set(attribute, held + back)?;
     }
     Ok(())
 }
@@ -45,7 +46,7 @@ pub fn refund(
 /// pair with an attribute gives back the count times its amount, straight into the player's
 /// attribute. (Its technology's state 1 and work done 0 are the caller's.)
 pub fn refund_research(
-    costs: &[(Option<AttributeId>, f32); 3],
+    costs: &[(Option<AttributeId>, Amount); 3],
     count: i16,
     attributes: &mut dyn crate::technology::Attributes,
 ) -> Result<(), GenieError> {
@@ -54,7 +55,10 @@ pub fn refund_research(
             continue;
         };
         let held = attributes.get(attribute)?;
-        attributes.set(attribute, held + Amount::new(f32::from(count) * amount))?;
+        attributes.set(
+            attribute,
+            held + Amount::new(f32::from(count) * amount.get()),
+        )?;
     }
     Ok(())
 }
@@ -125,7 +129,7 @@ pub fn refund_tech(
 }
 
 /// The cost multiplier `FUN_14162ef60`'s callers pass (`DAT_14330eb8c`, 1.0).
-const ONE: f32 = 1.0;
+const ONE: CostCount = CostCount::ONE;
 
 /// A master's cost entry `j` `(attribute, amount, paid)`, none for an entry it lacks.
 fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, bool)> {
@@ -168,7 +172,7 @@ pub fn costed<'m>(masters: &'m Masters, m: &'m Master) -> (&'m Master, bool) {
 pub fn cost_test(
     masters: &Masters,
     master: MasterId,
-    count: f32,
+    count: CostCount,
     population: bool,
     attributes: &dyn crate::technology::Attributes,
 ) -> Result<bool, GenieError> {
@@ -183,7 +187,7 @@ pub fn cost_test(
         if annex && !paid {
             continue;
         }
-        let need = amount.as_f32() * count;
+        let need = amount.as_f32() * count.get();
         if attribute == attribute::HEADROOM {
             if !population {
                 continue;
@@ -217,7 +221,7 @@ pub fn cost_test(
 pub fn pay(
     masters: &Masters,
     master: MasterId,
-    count: f32,
+    count: CostCount,
     attributes: &mut dyn crate::technology::Attributes,
 ) -> Result<bool, GenieError> {
     if !cost_test(masters, master, count, false, &*attributes)? {
@@ -231,7 +235,7 @@ pub fn pay(
         let Some((attribute, amount, true)) = cost_entry(m, j) else {
             continue;
         };
-        attributes.subtract(attribute, Amount::new(amount.as_f32() * count))?;
+        attributes.subtract(attribute, Amount::new(amount.as_f32() * count.get()))?;
     }
     Ok(true)
 }
@@ -247,12 +251,12 @@ pub fn master_costs(
     masters: &Masters,
     master: MasterId,
     attributes: &dyn crate::technology::Attributes,
-) -> Result<[(Option<AttributeId>, i16); 3], GenieError> {
+) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
     use crate::math::conversions::cvttss2si;
     let mut out = [(None, 0i16); 3];
     let can = cost_test(masters, master, ONE, true, attributes)?;
     let Some(m) = masters.get(master).filter(|m| COMBAT <= m.kind) else {
-        return Ok(out);
+        return Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))));
     };
     let mut extra = 0i16;
     for (j, slot) in out.iter_mut().enumerate() {
@@ -260,7 +264,7 @@ pub fn master_costs(
             continue;
         };
         slot.0 = Some(attribute);
-        slot.1 = cvttss2si(amount.as_f32() * ONE) as i16;
+        slot.1 = cvttss2si(amount.as_f32() * ONE.get()) as i16;
         let held = attributes.get(attribute)?;
         if held < Amount::new(f32::from(slot.1)) && can {
             let have = cvttss2si(held.get()) as i16;
@@ -283,12 +287,14 @@ pub fn master_costs(
             slot.0 = None;
         }
     }
-    Ok(out)
+    Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))))
 }
 
 /// The costs a queue entry records from listed ones (`FUN_1411c3190`, `FUN_1411c81a0`): each
 /// pair's attribute and its amount as a float, added to the slot's cleared 0.
 #[must_use]
-pub fn as_entry_costs(listed: [(Option<AttributeId>, i16); 3]) -> [(Option<AttributeId>, f32); 3] {
-    listed.map(|(a, n)| (a, f32::from(n) + 0.0))
+pub fn as_entry_costs(
+    listed: [(Option<AttributeId>, CostAmount); 3],
+) -> [(Option<AttributeId>, Amount); 3] {
+    listed.map(|(a, n)| (a, Amount::new(f32::from(n.get()) + 0.0)))
 }

@@ -21,6 +21,7 @@ use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
+use crate::production::CostCount;
 use crate::production::{cost_test, pay, refund_master};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -34,7 +35,7 @@ pub const PASTURE: MasterId = MasterId::named(0x761);
 const NO_FARM: f32 = crate::math::image::farm_queue::NO_FARM;
 /// The one farm or fish trap a reseed pays (`DAT_14330eb8c`, 1.0, read at `0x140a8ac75` and
 /// `0x140a8b025`).
-const ONE_FARM: f32 = crate::math::image::farm_queue::ONE_FARM;
+const ONE_FARM: CostCount = CostCount::new(crate::math::image::farm_queue::ONE_FARM);
 
 /// Which of a player's queues.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

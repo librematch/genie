@@ -30,6 +30,7 @@ use crate::world::WholeSeconds;
 use genie_diff::Diff;
 
 mod button;
+mod cost_count;
 mod costs;
 mod hotkey;
 mod make_obj_state;
@@ -39,6 +40,7 @@ pub mod spawn;
 mod unit_index;
 
 pub use self::button::{LocationButton, QueueButton};
+pub use self::cost_count::CostCount;
 pub use self::costs::{
     as_entry_costs, cost_test, costed, master_costs, pay, refund, refund_master, refund_research,
     refund_tech,
@@ -61,7 +63,7 @@ pub struct Entry {
     pub tech: Option<TechId>,
     /// `+0x8`, `mCosts`: what each of its units or researches paid, three (attribute, amount)
     /// pairs (`FUN_1411c3190`), which a cancel gives back.
-    pub costs: [(Option<AttributeId>, f32); 3],
+    pub costs: [(Option<AttributeId>, Amount); 3],
     /// `+0x20`: the building's serial (`+0xcd8`) when the entry came; not saved (a load numbers
     /// the slots it reads from 0).
     #[diff(unsaved)]
@@ -82,7 +84,7 @@ impl Default for Entry {
             count: QueuedUnits::ZERO,
             tech: Some(TechId::default()),
             // the zeroed field's attribute 0, food
-            costs: [(Some(attribute::FOOD), 0.0); 3],
+            costs: [(Some(attribute::FOOD), Amount::ZERO); 3],
             serial: EntrySerial::FIRST,
             button: QueueButton::default(),
             train_time: WholeSeconds::ZERO,
@@ -92,7 +94,7 @@ impl Default for Entry {
 
 /// A queue entry's costs before `FUN_1411c3190` fills them: no attribute, nothing (`0xffffffff`
 /// in each pair's eight bytes).
-pub const NO_COSTS: [(Option<AttributeId>, f32); 3] = [(None, 0.0); 3];
+pub const NO_COSTS: [(Option<AttributeId>, Amount); 3] = [(None, Amount::ZERO); 3];
 
 /// How many slots the buffer grows by when it is full (`FUN_1411cbc40`).
 pub const GROWTH: i16 = 10;
@@ -146,8 +148,8 @@ impl Default for Queue {
 /// integer and its amount as a float (`UCOMISS`, `JP`: a NaN differs).
 #[must_use]
 pub fn same_costs(
-    a: &[(Option<AttributeId>, f32); 3],
-    b: &[(Option<AttributeId>, f32); 3],
+    a: &[(Option<AttributeId>, Amount); 3],
+    b: &[(Option<AttributeId>, Amount); 3],
 ) -> bool {
     a.iter().zip(b).all(|(x, y)| x.0 == y.0 && x.1 == y.1)
 }
@@ -220,7 +222,7 @@ impl Queue {
     /// more; each old slot keeps its master, count, technology, button, train time and serial,
     /// and takes its costs from `costs`, one per old slot (`FUN_1411c3190` filled them anew from
     /// (−1, 0) with the slot's technology and master, as they stand now: [`Queue::full`]).
-    pub fn grow(&mut self, costs: &[[(Option<AttributeId>, f32); 3]]) {
+    pub fn grow(&mut self, costs: &[[(Option<AttributeId>, Amount); 3]]) {
         let old = self.slots.len();
         let mut slots = vec![Entry::default(); old + GROWTH as usize];
         for ((new, slot), &costs) in slots.iter_mut().zip(&self.slots).zip(costs) {
@@ -464,6 +466,7 @@ pub fn housed(attributes: &[Amount], pop: Amount) -> Result<bool, GenieError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::masters::CostAmount;
     use crate::objects::masters::CostSlot;
     use crate::objects::masters::Masters;
     use crate::objects::masters::ids;
@@ -482,7 +485,11 @@ mod tests {
             master: Some(master),
             count: QueuedUnits::of_data(count),
             tech: None,
-            costs: [(Some(attribute::FOOD), food), (None, 0.0), (None, 0.0)],
+            costs: [
+                (Some(attribute::FOOD), Amount::new(food)),
+                (None, Amount::ZERO),
+                (None, Amount::ZERO),
+            ],
             serial: EntrySerial::new(0),
             button: QueueButton::NONE,
             train_time: WholeSeconds::of_data(25),
@@ -505,7 +512,7 @@ mod tests {
         assert_eq!(
             (e.costs, e.button, e.train_time),
             (
-                [(Some(attribute::FOOD), 0.0); 3],
+                [(Some(attribute::FOOD), Amount::ZERO); 3],
                 QueueButton::default(),
                 WholeSeconds::ZERO
             )
@@ -588,7 +595,7 @@ mod tests {
         let refill: Vec<_> = (0..q.slots.len())
             .map(|i| {
                 [
-                    (AttributeId::of_index(i), i as f32),
+                    (AttributeId::of_index(i), Amount::new(i as f32)),
                     NO_COSTS[1],
                     NO_COSTS[2],
                 ]
@@ -596,10 +603,10 @@ mod tests {
             .collect();
         q.grow(&refill);
         assert_eq!(q.slots.len(), 20);
-        assert_eq!(q.slots[0].costs[0], (Some(attribute::FOOD), 0.0));
+        assert_eq!(q.slots[0].costs[0], (Some(attribute::FOOD), Amount::ZERO));
         assert_eq!(
             (q.slots[3].master, q.slots[3].costs[0]),
-            (Some(ids::ID_7), (Some(attribute::GOLD), 3.0))
+            (Some(ids::ID_7), (Some(attribute::GOLD), Amount::new(3.0)))
         );
         assert_eq!(q.slots[15], Entry::default());
         // a new entry takes the next serial and no costs
@@ -647,13 +654,25 @@ mod tests {
     /// `FUN_1411cbc40`'s join compares the amounts as floats: a NaN never joins.
     #[test]
     fn costs_join_only_when_equal_and_not_nan() {
-        let a = [(Some(attribute::FOOD), 50.0), (None, 0.0), (None, 0.0)];
+        let a = [
+            (Some(attribute::FOOD), Amount::new(50.0)),
+            (None, Amount::ZERO),
+            (None, Amount::ZERO),
+        ];
         assert!(same_costs(&a, &a));
         assert!(!same_costs(
             &a,
-            &[(Some(attribute::WOOD), 50.0), (None, 0.0), (None, 0.0)]
+            &[
+                (Some(attribute::WOOD), Amount::new(50.0)),
+                (None, Amount::ZERO),
+                (None, Amount::ZERO)
+            ]
         ));
-        let nan = [(Some(attribute::FOOD), f32::NAN), (None, 0.0), (None, 0.0)];
+        let nan = [
+            (Some(attribute::FOOD), Amount::new(f32::NAN)),
+            (None, Amount::ZERO),
+            (None, Amount::ZERO),
+        ];
         assert!(!same_costs(&nan, &nan));
     }
 
@@ -777,17 +796,17 @@ mod tests {
             costs: [
                 Cost {
                     attribute: Some(attribute::FOOD),
-                    amount: crate::objects::masters::CostAmount::of_data(100),
+                    amount: CostAmount::of_data(100),
                     paid: CostPaid::PLAYER,
                 },
                 Cost {
                     attribute: Some(attribute::WOOD),
-                    amount: crate::objects::masters::CostAmount::of_data(50),
+                    amount: CostAmount::of_data(50),
                     paid: CostPaid::UNPAID,
                 },
                 Cost {
                     attribute: None,
-                    amount: crate::objects::masters::CostAmount::of_data(5),
+                    amount: CostAmount::of_data(5),
                     paid: CostPaid::PLAYER,
                 },
             ],
@@ -796,11 +815,7 @@ mod tests {
         let state = |state| TechState {
             state,
             research_done: Seconds::new(7.5),
-            cost_adj: [
-                crate::objects::masters::CostAmount::of_data(-10),
-                crate::objects::masters::CostAmount::ZERO,
-                crate::objects::masters::CostAmount::ZERO,
-            ],
+            cost_adj: [CostAmount::of_data(-10), CostAmount::ZERO, CostAmount::ZERO],
             ..TechState::default()
         };
         let refunded = |state: &mut TechState, tech, modifier| {
@@ -831,9 +846,9 @@ mod tests {
         // the scaled amount wraps at 16 bits: 40000 is -25536
         let mut s = TechState {
             cost_adj: [
-                crate::objects::masters::CostAmount::of_data(19_900),
-                crate::objects::masters::CostAmount::ZERO,
-                crate::objects::masters::CostAmount::ZERO,
+                CostAmount::of_data(19_900),
+                CostAmount::ZERO,
+                CostAmount::ZERO,
             ],
             ..state(ResearchState::Researching)
         };
@@ -870,9 +885,9 @@ mod tests {
         refund(
             &m,
             &[
-                (Some(attribute::FOOD), 50.0),
-                (Some(attribute::FOOD), 45.0),
-                (Some(attribute::HEADROOM), 1.0),
+                (Some(attribute::FOOD), Amount::new(50.0)),
+                (Some(attribute::FOOD), Amount::new(45.0)),
+                (Some(attribute::HEADROOM), Amount::new(1.0)),
             ],
             &mut held,
         )
@@ -884,16 +899,20 @@ mod tests {
         };
         refund(
             &low,
-            &[(Some(attribute::FOOD), 50.0), (None, 0.0), (None, 0.0)],
+            &[
+                (Some(attribute::FOOD), Amount::new(50.0)),
+                (None, Amount::ZERO),
+                (None, Amount::ZERO),
+            ],
             &mut held,
         )
         .unwrap();
         assert_eq!(held.0[0], Amount::new(46.0));
         refund_research(
             &[
-                (Some(attribute::GOLD), 50.0),
-                (None, 0.0),
-                (Some(attribute::FOOD), 0.5),
+                (Some(attribute::GOLD), Amount::new(50.0)),
+                (None, Amount::ZERO),
+                (Some(attribute::FOOD), Amount::new(0.5)),
             ],
             3,
             &mut held,
@@ -938,21 +957,15 @@ mod tests {
     fn a_queue_entry_keeps_the_empty_cost_slot_in_its_place() {
         let mut m = villager(&[]);
         m.cost = [
-            CostSlot::new(
-                attribute::FOOD,
-                crate::objects::masters::CostAmount::of_data(50),
-                true,
-            ),
+            CostSlot::new(attribute::FOOD, CostAmount::of_data(50), true),
             CostSlot::default(),
-            CostSlot::new(
-                attribute::HEADROOM,
-                crate::objects::masters::CostAmount::of_data(1),
-                false,
-            ),
+            CostSlot::new(attribute::HEADROOM, CostAmount::of_data(1), false),
         ];
         let ms = Masters::new([m]);
         assert_eq!(
-            master_costs(&ms, ids::VILLAGER_MALE, &held()).unwrap(),
+            master_costs(&ms, ids::VILLAGER_MALE, &held())
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
             [
                 (Some(attribute::FOOD), 50),
                 (None, 0),
@@ -971,26 +984,26 @@ mod tests {
             (attribute::HEADROOM, 1, false),
         ])]);
         let mut h = held();
-        assert!(cost_test(&ms, ids::VILLAGER_MALE, 2.0, true, &h).unwrap());
-        assert!(!cost_test(&ms, ids::VILLAGER_MALE, 3.0, true, &h).unwrap());
+        assert!(cost_test(&ms, ids::VILLAGER_MALE, CostCount::new(2.0), true, &h).unwrap());
+        assert!(!cost_test(&ms, ids::VILLAGER_MALE, CostCount::new(3.0), true, &h).unwrap());
         // 4 queued: 4 + 4 + 1 is the headroom's 9; one more queued is not
         h.0[80] = Amount::new(4.0);
-        assert!(cost_test(&ms, ids::VILLAGER_MALE, 1.0, true, &h).unwrap());
+        assert!(cost_test(&ms, ids::VILLAGER_MALE, CostCount::ONE, true, &h).unwrap());
         h.0[80] = Amount::new(5.0);
-        assert!(!cost_test(&ms, ids::VILLAGER_MALE, 1.0, true, &h).unwrap());
-        assert!(cost_test(&ms, ids::VILLAGER_MALE, 1.0, false, &h).unwrap());
+        assert!(!cost_test(&ms, ids::VILLAGER_MALE, CostCount::ONE, true, &h).unwrap());
+        assert!(cost_test(&ms, ids::VILLAGER_MALE, CostCount::ONE, false, &h).unwrap());
         // a population at the cap
         let mut h = held();
         h.0[32] = Amount::new(4.0);
-        assert!(!cost_test(&ms, ids::VILLAGER_MALE, 1.0, true, &h).unwrap());
+        assert!(!cost_test(&ms, ids::VILLAGER_MALE, CostCount::ONE, true, &h).unwrap());
         // a NaN need passes, a master the player lacks or below type 70 fails
-        assert!(cost_test(&ms, ids::VILLAGER_MALE, f32::NAN, false, &h).unwrap());
-        assert!(!cost_test(&ms, ids::MARKET, 1.0, false, &h).unwrap());
+        assert!(cost_test(&ms, ids::VILLAGER_MALE, CostCount::new(f32::NAN), false, &h).unwrap());
+        assert!(!cost_test(&ms, ids::MARKET, CostCount::ONE, false, &h).unwrap());
         let low = Masters::new([Master {
             kind: master_type::MISSILE,
             ..villager(&[])
         }]);
-        assert!(!cost_test(&low, ids::VILLAGER_MALE, 1.0, false, &h).unwrap());
+        assert!(!cost_test(&low, ids::VILLAGER_MALE, CostCount::ONE, false, &h).unwrap());
     }
 
     /// `FUN_14162fb60` pays the paid entries times the count in one subtraction.
@@ -1003,12 +1016,12 @@ mod tests {
         ])]);
         let mut h = held();
         h.0[1] = Amount::new(30.0);
-        assert!(pay(&ms, ids::VILLAGER_MALE, 2.0, &mut h).unwrap());
+        assert!(pay(&ms, ids::VILLAGER_MALE, CostCount::new(2.0), &mut h).unwrap());
         assert_eq!(
             (h.0[0], h.0[1], h.0[4]),
             (Amount::ZERO, Amount::new(16.0), Amount::new(5.0))
         );
-        assert!(!pay(&ms, ids::VILLAGER_MALE, 1.0, &mut h).unwrap());
+        assert!(!pay(&ms, ids::VILLAGER_MALE, CostCount::ONE, &mut h).unwrap());
         assert_eq!(h.0[0], Amount::ZERO);
     }
 
@@ -1052,7 +1065,9 @@ mod tests {
             master_id(4)
         );
         assert_eq!(
-            master_costs(&ms, master_id(2), &h).unwrap(),
+            master_costs(&ms, master_id(2), &h)
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
             [
                 (Some(attribute::FOOD), 20),
                 (Some(attribute::STONE), 5),
@@ -1076,7 +1091,9 @@ mod tests {
         ]);
         (h.0[3], h.0[0]) = (Amount::new(20.0), Amount::new(10.0));
         assert_eq!(
-            master_costs(&ms, master_id(2), &h).unwrap(),
+            master_costs(&ms, master_id(2), &h)
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
             [
                 (Some(attribute::GOLD), 70),
                 (Some(attribute::FOOD), 10),
@@ -1086,12 +1103,24 @@ mod tests {
         // a unit the player cannot pay for one more of moves nothing
         let ms = Masters::new([villager(&[(attribute::GOLD, 50, true)])]);
         assert_eq!(
-            master_costs(&ms, ids::VILLAGER_MALE, &h).unwrap(),
+            master_costs(&ms, ids::VILLAGER_MALE, &h)
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
-        assert_eq!(master_costs(&ms, ids::ID_7, &h).unwrap(), [(None, 0); 3]);
         assert_eq!(
-            as_entry_costs([(Some(attribute::GOLD), 50), (None, 0), (None, -2)]),
+            master_costs(&ms, ids::ID_7, &h)
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
+            [(None, 0); 3]
+        );
+        assert_eq!(
+            as_entry_costs([
+                (Some(attribute::GOLD), CostAmount::of_data(50)),
+                (None, CostAmount::of_data(0)),
+                (None, CostAmount::of_data(-2))
+            ])
+            .map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, -2.0)]
         );
     }

@@ -7,6 +7,7 @@ use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
@@ -367,11 +368,7 @@ impl World {
             if let Some(slot) = m.cost.iter_mut().find(|c| c.attribute == wanted) {
                 *slot = match edit {
                     CostEdit::Remove => CostSlot::default(),
-                    CostEdit::Add => CostSlot::new(
-                        resource,
-                        crate::objects::masters::CostAmount::of_data(-1),
-                        true,
-                    ),
+                    CostEdit::Add => CostSlot::new(resource, CostAmount::of_data(-1), true),
                 };
             }
         }

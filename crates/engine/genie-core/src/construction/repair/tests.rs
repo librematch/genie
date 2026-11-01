@@ -175,8 +175,8 @@ fn house(id: i32, hp: HitPoints) -> Repaired {
         hp_powerup: HpPowerup::default(),
         main: None,
         annexes: Vec::new(),
-        unit_repair_cost: 0.5,
-        building_repair_cost: 0.15,
+        unit_repair_cost: Amount::new(0.5),
+        building_repair_cost: Amount::new(0.15),
     }
 }
 
@@ -199,7 +199,7 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
     };
     assert_eq!(
         repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
-        Ok(0)
+        Ok(RepairOutcome::Healed)
     );
     assert_eq!(set[0].hp, HitPoints::new(510.0));
     let share = 0.15f32 * 10.0 / 550.0;
@@ -210,7 +210,7 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
     };
     assert_eq!(
         repair_building(&mut set, 0, HitPoints::new(50.0), true, &mut payer),
-        Ok(1)
+        Ok(RepairOutcome::Full)
     );
     assert_eq!(set[0].hp, HitPoints::new(550.0));
     let mut broke = Held(vec![Amount::ZERO; 4]);
@@ -221,13 +221,13 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
     };
     assert_eq!(
         repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
-        Ok(2)
+        Ok(RepairOutcome::Unpaid)
     );
     assert_eq!(set[0].hp, HitPoints::new(500.0));
     let mut set = vec![house(1, HitPoints::new(0.5))];
     assert_eq!(
         repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
-        Ok(2)
+        Ok(RepairOutcome::Unpaid)
     );
 }
 
@@ -258,7 +258,7 @@ fn an_annex_s_repair_goes_to_its_main_building_and_its_annexes() {
     };
     assert_eq!(
         repair_building(&mut set, 0, HitPoints::new(20.0), true, &mut payer),
-        Ok(1)
+        Ok(RepairOutcome::Full)
     );
     assert_eq!(
         (set[0].hp, set[1].hp),
@@ -290,7 +290,7 @@ fn a_siege_unit_s_repair_pays_its_unit_share() {
     };
     assert_eq!(
         repair_unit(&mut set, 0, HitPoints::new(10.0), &mut payer),
-        Ok(0)
+        Ok(RepairOutcome::Healed)
     );
     let share = 0.5f32 * 10.0 / 175.0;
     assert_eq!(set[0].hp, HitPoints::new(110.0));

@@ -17,6 +17,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::action_type;
@@ -61,9 +62,9 @@ fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
         count: QueuedUnits::of_data(count),
         tech: None,
         costs: [
-            (Some(attribute::FOOD), food),
-            (None, 0.0),
-            (Some(attribute::HEADROOM), 1.0),
+            (Some(attribute::FOOD), Amount::new(food)),
+            (None, Amount::new(0.0)),
+            (Some(attribute::HEADROOM), Amount::new(1.0)),
         ],
         serial: crate::production::EntrySerial::new(0),
         button: QueueButton::NONE,
@@ -662,9 +663,9 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
     let archer = |count| Entry {
         master: Some(master_id(4)),
         costs: [
-            (Some(attribute::WOOD), 25.0),
-            (Some(attribute::GOLD), 45.0),
-            (Some(attribute::HEADROOM), 1.0),
+            (Some(attribute::WOOD), Amount::new(25.0)),
+            (Some(attribute::GOLD), Amount::new(45.0)),
+            (Some(attribute::HEADROOM), Amount::new(1.0)),
         ],
         ..villager(Some(master_id(4)), count, 0.0)
     };
@@ -714,7 +715,11 @@ fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
     let research = Entry {
         master: None,
         tech: Some(tech_id(22)),
-        costs: [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, 0.0)],
+        costs: [
+            (Some(attribute::GOLD), Amount::new(50.0)),
+            (None, Amount::new(0.0)),
+            (None, Amount::new(0.0)),
+        ],
         ..villager(None, 1, 0.0)
     };
     let tc = t.players[1].objects[ListIndex::new(0)]
@@ -750,7 +755,11 @@ fn researching(progress: f32) -> World {
     let entry = Entry {
         master: None,
         tech: Some(tech_id(22)),
-        costs: [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, 0.0)],
+        costs: [
+            (Some(attribute::GOLD), Amount::new(50.0)),
+            (None, Amount::new(0.0)),
+            (None, Amount::new(0.0)),
+        ],
         ..villager(None, 3, 0.0)
     };
     let tc = t.players[1].objects[ListIndex::new(0)]
@@ -793,19 +802,15 @@ fn researching(progress: f32) -> World {
         costs: [
             cost(
                 Some(attribute::GOLD),
-                crate::objects::masters::CostAmount::of_data(50),
+                CostAmount::of_data(50),
                 CostPaid::PLAYER,
             ),
             cost(
                 Some(attribute::WOOD),
-                crate::objects::masters::CostAmount::of_data(20),
+                CostAmount::of_data(20),
                 CostPaid::BUILDING,
             ),
-            cost(
-                None,
-                crate::objects::masters::CostAmount::of_data(0),
-                CostPaid::UNPAID,
-            ),
+            cost(None, CostAmount::of_data(0), CostPaid::UNPAID),
         ],
         locations: vec![(MasterId::of_data(109), WholeSeconds::of_data(25))],
         ..TechDef::default()

@@ -16,6 +16,7 @@ use genie_core::objects::WorkRate;
 use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::players::Amount;
 use genie_core::players::attribute::AttributeId;
 use genie_core::production::EntrySerial;
 use genie_core::production::QueueButton;
@@ -271,7 +272,7 @@ pub(super) fn production(
             let c = &e.production_queue_costs;
             let word = |k: usize| [c[k], c[k + 1], c[k + 2], c[k + 3]];
             // an entry's attribute (an `int`, −1 for none) and amount
-            let cost = |j: usize| -> Result<(Option<AttributeId>, f32), GenieError> {
+            let cost = |j: usize| -> Result<(Option<AttributeId>, Amount), GenieError> {
                 let kind = i32::from_le_bytes(word(8 * j));
                 let kind = i16::try_from(kind).map_err(|_| {
                     GenieError::invalid_input("a queue cost's attribute past the attributes")
@@ -279,7 +280,7 @@ pub(super) fn production(
                 })?;
                 Ok((
                     AttributeId::of_field(kind)?,
-                    f32::from_le_bytes(word(8 * j + 4)),
+                    Amount::new(f32::from_le_bytes(word(8 * j + 4))),
                 ))
             };
             Ok(Entry {

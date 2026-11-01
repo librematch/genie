@@ -148,11 +148,11 @@ pub(super) fn lane_block(section: &PlayerSection<'_>, id: u32, simulated: &Playe
         .filter(|unit| listed(unit))
         .map(|unit| CheckpointObject {
             id: unit.id,
-            main_id: unit.life.master_id.get(),
+            main_id: unit.life.master_id,
             state: unit.life.state,
             amount_held: unit.life.amount,
             position: unit.position(),
-            retarget_timer: unit.ai.as_ref().map(|ai| ai.retarget_timer.get() as i32),
+            retarget_timer: unit.ai.as_ref().map(|ai| ai.retarget_timer),
             top_action: checkpoint_action(unit),
         })
         .collect();

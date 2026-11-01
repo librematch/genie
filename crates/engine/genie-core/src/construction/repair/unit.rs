@@ -1,6 +1,7 @@
 //! The repair part of the update and the unit's attackers and seen target.
 
 use crate::GenieError;
+use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::payment::PaidAttributes;
 use crate::construction::repair::{CountedIn, RepairReads, Repairee};
 use crate::map::Distance;
@@ -234,8 +235,11 @@ fn repairee_of(
 /// The repair of `target` by `amount` (a building's or a combat unit's slot 0x8c8, any other's
 /// slot 0x110) over the objects it reaches ([`reached_ids`]) as they stand, paid from what the
 /// repairer's player holds now: each object it changed takes its hit points at once, the
-/// payment joins the player's attributes. Returns the code (0 to go on, 1 once the target
-/// holds its most hit points, 2 when the player cannot pay) and the target's master's type.
+/// payment joins the player's attributes. Returns the outcome ([`RepairOutcome`]: healed, full
+/// once the target holds its most hit points, unpaid when the player cannot pay) and the
+/// target's master's type.
+///
+/// [`RepairOutcome`]: RepairOutcome
 ///
 /// # Errors
 ///
@@ -245,7 +249,7 @@ pub(crate) fn repair_target(
     c: &mut Step<'_>,
     target: Option<ObjectId>,
     amount: HitPoints,
-) -> Result<(u8, MasterKind), GenieError> {
+) -> Result<(RepairOutcome, MasterKind), GenieError> {
     let player = c.player;
     let mut set = Vec::new();
     let others = OthersRef::of(&c.w.players, player)?;
@@ -329,7 +333,7 @@ fn repaired(
             .player(oq)
             .map_or(&[][..], |p| &p.attributes[..])
     };
-    let rate = |k: usize| attributes.get(k).copied().map_or(0.0, Amount::get);
+    let rate = |k: usize| attributes.get(k).copied().unwrap_or(Amount::ZERO);
     let annexes = if om.kind == BUILDING && o.annex_of.is_none() {
         let mut a = c.w.spatial.annexes_of(id);
         a.sort_unstable();

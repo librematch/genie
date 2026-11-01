@@ -8,6 +8,7 @@
 //! `FUN_14162fd90`), the repeat test `FUN_1413d1050`.
 
 use crate::GenieError;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::attribute;
@@ -86,7 +87,7 @@ pub struct Cost {
     /// The attribute it takes, none for −1.
     pub attribute: Option<AttributeId>,
     /// How much.
-    pub amount: crate::objects::masters::CostAmount,
+    pub amount: CostAmount,
     /// 0 not paid, 1 paid from the player's attribute, 2 from the building (`FUN_141204310`).
     pub paid: CostPaid,
 }
@@ -164,7 +165,7 @@ pub struct TechState {
     /// `+0x4`: its state.
     pub state: ResearchState,
     /// `+0x6`: added to the `.dat`'s amounts.
-    pub cost_adj: [crate::objects::masters::CostAmount; 3],
+    pub cost_adj: [CostAmount; 3],
     /// `+0xc`.
     pub times_researched: ResearchCount,
     /// `+0xe`.
@@ -231,8 +232,8 @@ impl TechState {
         &self,
         def: &TechDef,
         (modifier, scale): (f32, i16),
-    ) -> Result<[(Option<AttributeId>, f32); 3], GenieError> {
-        let mut out = [(None, 0.0); 3];
+    ) -> Result<[(Option<AttributeId>, Amount); 3], GenieError> {
+        let mut out = [(None, Amount::ZERO); 3];
         if !matches!(
             self.state,
             ResearchState::Researching | ResearchState::Queued
@@ -255,7 +256,7 @@ impl TechState {
             if 0.0 < modifier {
                 v *= modifier;
             }
-            *slot = (Some(attribute), v);
+            *slot = (Some(attribute), Amount::new(v));
         }
         Ok(out)
     }
@@ -268,7 +269,7 @@ impl TechState {
         &self,
         def: &TechDef,
         factors: (f32, i16),
-        paid: &[(Option<AttributeId>, f32); 3],
+        paid: &[(Option<AttributeId>, Amount); 3],
         attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
     ) -> Result<bool, GenieError> {
         let (modifier, scale) = factors;
@@ -295,7 +296,7 @@ impl TechState {
             let before: f32 = paid
                 .iter()
                 .filter(|&&(k, _)| k == Some(attr))
-                .map(|&(_, a)| a)
+                .map(|&(_, a)| a.get())
                 .fold(0.0, |s, a| s + a);
             if c.paid == CostPaid::BUILDING {
                 return Err(GenieError::unsupported(
@@ -323,8 +324,8 @@ impl TechState {
         &self,
         def: &TechDef,
         (modifier, scale): (f32, i16),
-    ) -> Result<[(Option<AttributeId>, i16); 3], GenieError> {
-        let mut out = [(None, 0); 3];
+    ) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
+        let mut out = [(None, 0i16); 3];
         for (j, slot) in out.iter_mut().enumerate() {
             let o = *self.overrides.checked(j)?;
             let c = *def.costs.checked(j)?;
@@ -353,7 +354,7 @@ impl TechState {
                 slot.0 = None;
             }
         }
-        Ok(out)
+        Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))))
     }
 
     /// A cost entry as the research test and the payment read it: the attribute (the
@@ -528,12 +529,12 @@ mod tests {
         };
         let none = Cost {
             attribute: None,
-            amount: crate::objects::masters::CostAmount::of_data(0),
+            amount: CostAmount::of_data(0),
             paid: CostPaid::UNPAID,
         };
         let gold = Cost {
             attribute: Some(attribute::GOLD),
-            amount: crate::objects::masters::CostAmount::of_data(50),
+            amount: CostAmount::of_data(50),
             paid: CostPaid::PLAYER,
         };
         let def = TechDef {
@@ -559,7 +560,9 @@ mod tests {
     fn loom_lists_its_gold_and_pays_it_once_queued() {
         let (mut s, d) = loom();
         assert_eq!(
-            s.listed_costs(&d, (0.0, 1)).unwrap(),
+            s.listed_costs(&d, (0.0, 1))
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
         assert!(!s.repeatable(&d, false));
@@ -590,14 +593,17 @@ mod tests {
         // its queue entry records the 50 gold, which its start finds paid
         let paid = s.entry_costs(&d, (0.0, 1)).unwrap();
         assert_eq!(
-            paid,
+            paid.map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, 0.0)]
         );
         let get = |i: AttributeId| held.get(i);
         assert_eq!(s.start_test(&d, (0.0, 1), &paid, &get), Ok(true));
         // without the entry's payment the 50 gold left would do too, but that difference is
         // the game's FUN_1411c68b0
-        assert!(s.start_test(&d, (0.0, 1), &[(None, 0.0); 3], &get).is_err());
+        assert!(
+            s.start_test(&d, (0.0, 1), &[(None, Amount::new(0.0)); 3], &get)
+                .is_err()
+        );
         assert_eq!(
             s.location(ids::TOWN_CENTRE).map(|l| l.time),
             Some(WholeSeconds::of_data(25))
@@ -626,7 +632,9 @@ mod tests {
         );
         assert_eq!(held.0, crate::test_ids::amounts([0.0, 5.0, 0.0, 100.0]));
         assert_eq!(
-            s.listed_costs(&d, (0.5, 1)).unwrap(),
+            s.listed_costs(&d, (0.5, 1))
+                .unwrap()
+                .map(|(a, n)| (a, n.get())),
             [(Some(attribute::WOOD), 25), (None, 0), (None, 0)]
         );
     }

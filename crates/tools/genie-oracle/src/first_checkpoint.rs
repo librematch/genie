@@ -5,6 +5,7 @@ use crate::Error;
 use genie_core::GenieError;
 use genie_core::map::Position;
 use genie_core::objects::ObjectId;
+use genie_core::objects::masters::MasterId;
 use genie_core::objects::unit::Unit;
 use genie_core::players::Amount;
 use genie_core::world::checkpoint::{CheckpointObject, PlayerState, player_block};
@@ -57,7 +58,8 @@ pub(super) fn dies_at_start(s: &RgeStaticObject) -> bool {
 pub(super) fn object_state(s: &RgeStaticObject) -> Result<CheckpointObject, GenieError> {
     Ok(CheckpointObject {
         id: ObjectId::try_from(s.id)?,
-        main_id: s.master_obj,
+        main_id: MasterId::of_data(s.master_obj)
+            .ok_or(GenieError::invalid_input("a live object of no master"))?,
         state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
         amount_held: Amount::new(s.attribute_amount_held),
         position: Position::new(s.t_x, s.t_y, s.t_z),

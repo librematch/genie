@@ -2,7 +2,7 @@
 
 /// A master's carry capacity (`attribute_max_amount`, `+0x61c`): the whole amount an object of it
 /// carries, a short the effects set, add to and scale (capped where the game caps them). Every
-/// short is kept; [`crate::players::Amount::of_master`] is the game's conversion.
+/// short is kept; [`Amount::of_master`] is the game's conversion.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CarryCapacity(i16);
 

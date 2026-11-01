@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::damage::ArmorPair;
+use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::{
     EXTRA_REPAIRER, LEAST_HP, MOVING_REACH, ONE, REACH, RepairAction, RepairReads, RepairTask,
@@ -388,7 +389,7 @@ impl RepairAction {
         let amount = work_amount(reads.rate, self.task.work_value, c.dt.seconds(), repairers);
         let (answer, kind) = crate::construction::repair::repair_target(c, self.target, amount)?;
         match answer {
-            1 => {
+            RepairOutcome::Full => {
                 if COMBAT <= kind
                     && let Some((_, u)) = c.w.object_mut(self.target)
                 {
@@ -396,11 +397,11 @@ impl RepairAction {
                 }
                 self.set_state(c, repairer, RepairState::Done, reads)
             }
-            2 => {
+            RepairOutcome::Unpaid => {
                 notify(repairer, NotifyKind::ACTION_INVALIDATED)?;
                 self.set_state(c, repairer, RepairState::Done, reads)
             }
-            _ => Ok(()),
+            RepairOutcome::Healed => Ok(()),
         }
     }
 

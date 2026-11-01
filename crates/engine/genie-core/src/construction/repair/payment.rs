@@ -14,6 +14,18 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
+use crate::production::CostCount;
+
+/// What a repair's slot 0x8c8 answers (the game's 0, 1 and 2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepairOutcome {
+    /// 0: it healed, the target short of its most hit points.
+    Healed,
+    /// 1: the target holds its most hit points.
+    Full,
+    /// 2: it took nothing (the player cannot pay, or a building below 1 hit point).
+    Unpaid,
+}
 
 /// The classes whose repair pays its unit share (`FUN_1412143b0`: the ships 20, 21, 22, 2 and
 /// 53, the siege 13 and the classes 51, 54 and 55).
@@ -59,9 +71,9 @@ pub struct Repaired {
     /// A main building's annexes (`+0xbc0`, its four slots in their order).
     pub annexes: Vec<ObjectId>,
     /// Its owner's attribute 270 ([`UNIT_REPAIR_COST`]): a unit's repair cost rate.
-    pub unit_repair_cost: f32,
+    pub unit_repair_cost: Amount,
     /// Its owner's attribute 271 ([`BUILDING_REPAIR_COST`]): a building's repair cost rate.
-    pub building_repair_cost: f32,
+    pub building_repair_cost: Amount,
 }
 
 /// What a repair pays with: the repairer's player's masters and attributes (`FUN_14162fb60`
@@ -88,11 +100,12 @@ pub(super) fn find(set: &[Repaired], id: ObjectId) -> Result<usize, GenieError> 
 
 /// A building's slot 0x8c8 (`FUN_1411d37d0`) by `amount` for the repairer (`payer`): a
 /// trebuchet's class repairs as a unit ([`repair_unit`]); one below 1 hit point (`COMISS`: a NaN
-/// is) takes nothing (2). From its repairer (`top`) an annex's repair is its main building's.
+/// is) takes nothing ([`RepairOutcome::Unpaid`]). From its repairer (`top`) an annex's repair is its main building's.
 /// Else each of its annexes (a combat unit's or a building's type) is repaired by the amount
 /// first (not `top`); then the amount, at most what its hit points lack of its master's, costs
 /// its owner's building repair rate times the amount over its master's hit points of its
-/// master's costs ([`crate::production::pay`]); paid, it heals as a unit's does, else 2.
+/// master's costs ([`crate::production::pay`]); paid, it heals as a unit's does, else
+/// [`RepairOutcome::Unpaid`].
 ///
 /// # Errors
 ///
@@ -103,12 +116,12 @@ pub fn repair_building(
     amount: HitPoints,
     top: bool,
     payer: &mut Payer<'_>,
-) -> Result<u8, GenieError> {
+) -> Result<RepairOutcome, GenieError> {
     if TREBUCHETS.contains(&set[idx].class) {
         return repair_unit(set, idx, amount, payer);
     }
     if crate::math::fmath::below_or_unordered(set[idx].hp.get(), ONE) {
-        return Ok(2);
+        return Ok(RepairOutcome::Unpaid);
     }
     if top && let Some(main) = set[idx].main {
         let m = find(set, main)?;
@@ -132,18 +145,19 @@ pub fn repair_building(
     if most < o.hp + amount {
         amount = most - o.hp;
     }
-    let share = (o.building_repair_cost * amount) / most;
+    let share = CostCount::new((o.building_repair_cost.get() * amount) / most);
     if crate::production::pay(payer.masters, o.master, share, &mut *payer.attributes)? {
         return repair_unit(set, idx, amount, payer);
     }
-    Ok(2)
+    Ok(RepairOutcome::Unpaid)
 }
 
 /// A combat unit's slot 0x8c8 (`FUN_1412143b0`, also a building's last step) by `amount`: a
 /// class of [`COSTED`] first takes at most what its hit points lack of its most (slots 0xc0 and
 /// 200) and pays its owner's unit repair rate times the amount over its most of its master's
-/// costs (unpaid: 2); then it heals (`FUN_141193b30`, [`crate::combat::damage::heal_hp`]): 1 once full,
-/// else 0.
+/// costs (unpaid: [`RepairOutcome::Unpaid`]); then it heals (`FUN_141193b30`,
+/// [`crate::combat::damage::heal_hp`]): [`RepairOutcome::Full`] once full, else
+/// [`RepairOutcome::Healed`].
 ///
 /// # Errors
 ///
@@ -153,7 +167,7 @@ pub fn repair_unit(
     idx: usize,
     amount: HitPoints,
     payer: &mut Payer<'_>,
-) -> Result<u8, GenieError> {
+) -> Result<RepairOutcome, GenieError> {
     let o = &mut set[idx];
     let mut amount = amount;
     if COSTED.contains(&o.class) {
@@ -162,13 +176,17 @@ pub fn repair_unit(
         if most < now + amount {
             amount = most - now;
         }
-        let share = (o.unit_repair_cost * amount) / most;
+        let share = CostCount::new((o.unit_repair_cost.get() * amount) / most);
         if !crate::production::pay(payer.masters, o.master, share, &mut *payer.attributes)? {
-            return Ok(2);
+            return Ok(RepairOutcome::Unpaid);
         }
     }
     let full = crate::combat::damage::heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount);
-    Ok(u8::from(full))
+    Ok(if full {
+        RepairOutcome::Full
+    } else {
+        RepairOutcome::Healed
+    })
 }
 
 /// A repairer's player's attributes as its repair pays from them ([`crate::construction::repair::Payer`]):

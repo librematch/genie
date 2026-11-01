@@ -8,6 +8,7 @@ use crate::movement::{Me, Planning};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::unit::Unit;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::UnitAi;
@@ -201,7 +202,7 @@ impl Step<'_> {
     pub(crate) fn give_load(
         &mut self,
         kind: AttributeId,
-        amount: crate::players::Amount,
+        amount: Amount,
     ) -> Result<(), GenieError> {
         let mut adds = Vec::new();
         crate::gathering::gather::unit::give_load(

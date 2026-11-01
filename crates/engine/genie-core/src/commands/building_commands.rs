@@ -11,6 +11,7 @@ use crate::map::Position;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::CostAmount;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -413,11 +414,14 @@ impl World {
 
 /// A research's listed costs go to the pending debit: each attribute 0 to 3 sums its amounts (in
 /// 16 bits) and the player's debit of it falls by the sum.
-fn debit_listed(owner: &mut crate::world::player::Player, listed: [(Option<AttributeId>, i16); 3]) {
+fn debit_listed(
+    owner: &mut crate::world::player::Player,
+    listed: [(Option<AttributeId>, CostAmount); 3],
+) {
     let mut sums = [0i16; 4];
     for (attribute, amount) in listed {
         if let Some(sum) = attribute.and_then(|k| sums.get_mut(k.index())) {
-            *sum = sum.wrapping_add(amount);
+            *sum = sum.wrapping_add(amount.get());
         }
     }
     for (debit, amount) in owner.pending_debit.iter_mut().zip(sums) {
