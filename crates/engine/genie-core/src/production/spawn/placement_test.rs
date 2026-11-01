@@ -27,6 +27,7 @@ use crate::objects::masters::ids::RELIC;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::{BUILDING, COMBAT};
 use crate::players::PlayerId;
+use crate::production::spawn::PlacementCode;
 use crate::production::spawn::{
     BuildSite, INSIDE, PASSABLE, REACH, Tested, hill_fails, placement_terrains,
 };
@@ -240,12 +241,12 @@ pub fn build_placement(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
     p: Point,
-) -> Result<u8, GenieError> {
+) -> Result<PlacementCode, GenieError> {
     if let Some(code) = build_static_test(site, map, p)? {
         return Ok(code);
     }
     if site.scans && static_scans_find(site, map, p)? {
-        return Ok(6);
+        return Ok(PlacementCode::Blocked);
     }
     // FUN_14123aee0's scan
     let size = map.size();
@@ -261,12 +262,12 @@ pub fn build_placement(
                     continue;
                 }
                 if build_sees(site, map, &o, sight)? && blocks_build(site, map, &o, p) {
-                    return Ok(6);
+                    return Ok(PlacementCode::Blocked);
                 }
             }
         }
     }
-    Ok(0)
+    Ok(PlacementCode::Allowed)
 }
 
 /// The static scans of the Build's test (`p11` and `p13` 1, [`BuildSite::scans`]), for a master with
@@ -322,19 +323,19 @@ pub(super) fn build_static_test(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
     p: Point,
-) -> Result<Option<u8>, GenieError> {
+) -> Result<Option<PlacementCode>, GenieError> {
     let (x, y) = (p.x(), p.y());
     let (rx, ry) = (site.radius.x(), site.radius.y());
     let size = map.size();
     let (w, h) = (size.width(), size.height());
     let (far_x, far_y) = ((x + rx) - INSIDE, (y + ry) - INSIDE);
     if x - rx < 0.0 || w as f32 <= far_x || y - ry < 0.0 || h as f32 <= far_y {
-        return Ok(Some(7));
+        return Ok(Some(PlacementCode::OffMap));
     }
     let mut explored = false;
     let (x0, x1, y0, y1) = ((x - rx) as i32, far_x as i32, (y - ry) as i32, far_y as i32);
     if !placement_terrains(site.placement, map, p, TileRect::new(x0, y0, x1, y1))? {
-        return Ok(Some(1));
+        return Ok(Some(PlacementCode::PlacementTerrain));
     }
     // hill mode 3 measures the box's edge against the elevation of its first column's last row
     let base = if site.hill_mode == HillMode::ONE_STEP {
@@ -355,16 +356,16 @@ pub(super) fn build_static_test(
                 "a terrain its restriction does not list",
             ))?;
             if value <= PASSABLE {
-                return Ok(Some(2));
+                return Ok(Some(PlacementCode::Terrain));
             }
             explored = explored || (site.human && map.explored(site.player, tile));
             if hill_fails(site.hill_mode, map, tile, Tile::new(x0, y1), base)? {
-                return Ok(Some(3));
+                return Ok(Some(PlacementCode::Hill));
             }
         }
     }
     if site.human && !explored {
-        return Ok(Some(5));
+        return Ok(Some(PlacementCode::Unexplored));
     }
     if (0.0 < rx || 0.0 < ry) && site.zones {
         return Err(GenieError::unsupported(

@@ -25,6 +25,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
+use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::TileOffset;
@@ -136,10 +137,8 @@ pub struct VisibleResource {
     pub distance: Distance,
     /// `+0x14`, HD's `zone`: 0 when added.
     pub zone: u8,
-    /// The object's x when added (`+0x18`).
-    pub x: f32,
-    /// Its y when added (`+0x1c`).
-    pub y: f32,
+    /// The object's place when added (`+0x18`, `+0x1c`).
+    pub at: Point,
 }
 
 /// A player's `Visible_Resource_Manager` (player `+0x2f0`, saved): per resource group (a master's
@@ -158,7 +157,7 @@ impl VisibleResources {
     /// puts its record last in list `group`, doubling a full list's capacity. The masters' groups
     /// are 0 to 4 and every manager holds 5 lists; the game writes past its lists for a group out
     /// of range.
-    pub fn add(&mut self, id: ObjectId, group: GatherGroup, x: f32, y: f32) {
+    pub fn add(&mut self, id: ObjectId, group: GatherGroup, at: Point) {
         let g = group.index();
         let (Some(list), Some(capacity)) = (self.lists.get_mut(g), self.capacities.get_mut(g))
         else {
@@ -171,8 +170,7 @@ impl VisibleResources {
             id,
             distance: Distance::ZERO,
             zone: 0,
-            x,
-            y,
+            at,
         });
     }
 
@@ -196,10 +194,9 @@ impl VisibleResources {
     /// `Get_Closest_Resource` (`FUN_141289000`): the record of list `group` nearest (`x`, `y`)
     /// (squared, the first of equals) whose object is not in `skip`; its distance becomes the
     /// root. None for a group out of range or an empty list.
-    pub fn closest(&mut self, x: f32, y: f32, group: i32, skip: &[ObjectId]) -> Option<usize> {
-        let list = usize::try_from(group)
-            .ok()
-            .and_then(|g| self.lists.get_mut(g))?;
+    pub fn closest(&mut self, at: Point, group: GatherGroup, skip: &[ObjectId]) -> Option<usize> {
+        let list = self.lists.get_mut(group.index())?;
+        let (x, y) = (at.x(), at.y());
         // COMISS r, p; JBE: a record at or below the point (or NaN) measures p - r
         let gap = |r: f32, p: f32| {
             if crate::math::fmath::at_most_or_unordered(r, p) {
@@ -211,7 +208,7 @@ impl VisibleResources {
         let mut best = None;
         let mut nearest = f32::MAX;
         for (i, r) in list.iter().enumerate() {
-            let (dx, dy) = (gap(r.x, x), gap(r.y, y));
+            let (dx, dy) = (gap(r.at.x(), x), gap(r.at.y(), y));
             let d = dy * dy + dx * dx;
             if d < nearest && !skip.contains(&r.id) {
                 best = Some(i);

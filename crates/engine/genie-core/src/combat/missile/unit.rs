@@ -149,7 +149,7 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a missile without the map's terrain",
                 ))?
-                .ground(at.x(), at.y())?;
+                .ground(at.ground())?;
         at = at.with_z(crate::combat::missile::grounded(
             at.z(),
             ground,

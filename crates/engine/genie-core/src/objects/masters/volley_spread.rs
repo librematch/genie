@@ -1,5 +1,6 @@
 //! How far a volley's missiles scatter ([`VolleySpread`]).
 
+use crate::map::Distance;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::attribute as a;
 use genie_diff::Diff;
@@ -10,19 +11,16 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct VolleySpread {
     /// `volley_x_spread` (`+0x8c8`, the attribute "Spawning Area Width").
-    pub x: crate::map::Distance,
+    pub x: Distance,
     /// `volley_y_spread` (`+0x8cc`, "Spawning Area Length").
-    pub y: crate::map::Distance,
+    pub y: Distance,
     /// `volley_start_spread_adjustment` (`+0x8d0`, "Spawning Area Randomness").
-    pub start: crate::map::Distance,
+    pub start: Distance,
 }
 
 impl VolleySpread {
     /// The value an effect's attribute changes: its width, its length, else its randomness.
-    pub(crate) const fn lane_mut(
-        &mut self,
-        attribute: MasterAttribute,
-    ) -> &mut crate::map::Distance {
+    pub(crate) const fn lane_mut(&mut self, attribute: MasterAttribute) -> &mut Distance {
         match attribute {
             a::SPAWNING_AREA_WIDTH => &mut self.x,
             a::SPAWNING_AREA_LENGTH => &mut self.y,
@@ -33,6 +31,7 @@ impl VolleySpread {
 
 #[cfg(test)]
 mod tests {
+    use crate::map::Distance;
     use crate::objects::masters::VolleySpread;
     use crate::objects::masters::attribute as a;
 
@@ -40,15 +39,15 @@ mod tests {
     #[test]
     fn each_spawning_area_attribute_changes_its_value() {
         let mut s = VolleySpread::default();
-        *s.lane_mut(a::SPAWNING_AREA_LENGTH) = crate::map::Distance::new(2.0);
-        *s.lane_mut(a::SPAWNING_AREA_RANDOMNESS) = crate::map::Distance::new(3.0);
-        *s.lane_mut(a::SPAWNING_AREA_WIDTH) = crate::map::Distance::new(1.0);
+        *s.lane_mut(a::SPAWNING_AREA_LENGTH) = Distance::new(2.0);
+        *s.lane_mut(a::SPAWNING_AREA_RANDOMNESS) = Distance::new(3.0);
+        *s.lane_mut(a::SPAWNING_AREA_WIDTH) = Distance::new(1.0);
         assert_eq!(
             s,
             VolleySpread {
-                x: crate::map::Distance::new(1.0),
-                y: crate::map::Distance::new(2.0),
-                start: crate::map::Distance::new(3.0)
+                x: Distance::new(1.0),
+                y: Distance::new(2.0),
+                start: Distance::new(3.0)
             }
         );
     }

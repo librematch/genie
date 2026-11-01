@@ -2248,7 +2248,7 @@ fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_ga
     t.players[1].objects.push(inside);
     tracked(&mut t, TC, &[104, 102, 101, 100]);
     assert_eq!(
-        t.shelters_near(1, object_id(100), TC).unwrap(),
+        t.shelters_near(player_id(1), object_id(100), TC).unwrap(),
         Shelters {
             buildings: object_id_list([101, 100]),
             transports: Vec::new(),
@@ -2261,7 +2261,7 @@ fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_ga
         .insert(object_id(300), *t.spatial.get(object_id(301)).unwrap());
     tracked(&mut t, GATE, &[300, 301]);
     assert_eq!(
-        t.shelters_near(1, object_id(301), GATE).unwrap(),
+        t.shelters_near(player_id(1), object_id(301), GATE).unwrap(),
         Shelters {
             buildings: Vec::new(),
             transports: Vec::new(),

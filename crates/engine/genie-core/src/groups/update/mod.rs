@@ -7,6 +7,7 @@ use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
 use crate::groups::UnitGroup;
+use crate::map::Distance;
 use crate::movement::PathFlags;
 use crate::objects::masters::ActionType;
 use crate::world::Millis;
@@ -42,7 +43,7 @@ const FOLLOW: GroupCommandKind = GroupCommandKind::FOLLOW;
 /// A turn of the motion above this lays the formation out anew (`DAT_142eb6e44`, π/4).
 const TURN_LIMIT: f32 = crate::math::image::facing::QUARTER_PI;
 /// How far ahead of the group its front is looked for (`DAT_14330ebcc`).
-const FRONT_AHEAD: f32 = crate::math::image::movement::LOOK_AHEAD;
+const FRONT_AHEAD: Distance = Distance::new(crate::math::image::movement::LOOK_AHEAD);
 /// A total spacing above this lays the formation out anew on a changed count
 /// (`DAT_142ec9eb4`).
 const RELAYOUT_SPACING: f32 = crate::math::image::missile::VOLLEY_REACH_MARGIN;

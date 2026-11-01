@@ -345,7 +345,9 @@ fn a_fogged_building_blocks_a_build_by_its_visibility_mask() {
         own: &[],
     };
     let test = |o: Near, masks: [u64; 2]| {
-        build_placement(&site, &Fogged(vec![o], masks), Point::new(21.0, 21.0)).unwrap()
+        build_placement(&site, &Fogged(vec![o], masks), Point::new(21.0, 21.0))
+            .unwrap()
+            .code()
     };
     // the house's mask meets what player 1 sees and explored: it blocks
     assert_eq!(test(house, [1 << 1, 1 << 33]), 6);
@@ -1092,31 +1094,34 @@ fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
     let open = house_site(&open_values, true);
     let flat = Flat(Vec::new());
     assert_eq!(
-        build_static_test(&open, &flat, Point::new(50.0, 50.0)),
+        build_static_test(&open, &flat, Point::new(50.0, 50.0)).map(|c| c.map(PlacementCode::code)),
         Ok(None)
     );
     assert_eq!(
-        build_static_test(&open, &flat, Point::new(0.5, 50.0)),
+        build_static_test(&open, &flat, Point::new(0.5, 50.0)).map(|c| c.map(PlacementCode::code)),
         Ok(Some(7))
     );
     assert_eq!(
-        build_static_test(&open, &flat, Point::new(119.5, 50.0)),
+        build_static_test(&open, &flat, Point::new(119.5, 50.0))
+            .map(|c| c.map(PlacementCode::code)),
         Ok(Some(7))
     );
     let forbidden_values = Restriction::new(vec![0.0]);
     let forbidden = house_site(&forbidden_values, true);
     assert_eq!(
-        build_static_test(&forbidden, &flat, Point::new(50.0, 50.0)),
+        build_static_test(&forbidden, &flat, Point::new(50.0, 50.0))
+            .map(|c| c.map(PlacementCode::code)),
         Ok(Some(2))
     );
     assert_eq!(
-        build_static_test(&open, &Dark, Point::new(50.0, 50.0)),
+        build_static_test(&open, &Dark, Point::new(50.0, 50.0)).map(|c| c.map(PlacementCode::code)),
         Ok(Some(5))
     );
     let computer_values = Restriction::new(vec![1.0]);
     let computer = house_site(&computer_values, false);
     assert_eq!(
-        build_static_test(&computer, &Dark, Point::new(50.0, 50.0)),
+        build_static_test(&computer, &Dark, Point::new(50.0, 50.0))
+            .map(|c| c.map(PlacementCode::code)),
         Ok(None)
     );
     let zoned = BuildSite {
@@ -1125,6 +1130,7 @@ fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
     };
     assert_eq!(
         build_static_test(&zoned, &flat, Point::new(50.0, 50.0))
+            .map(|c| c.map(PlacementCode::code))
             .unwrap_err()
             .reason(),
         "BUILD's placement test in a zone mode"
@@ -1458,7 +1464,9 @@ fn the_build_s_static_scans_find_a_dying_house_build_passes_over() {
     let build_values = Restriction::new(vec![1.0]);
     let build = house_site(&build_values, false);
     let test = |site: &BuildSite<'_>, o: Near| {
-        build_placement(site, &Flat(vec![o]), Point::new(21.0, 21.0)).unwrap()
+        build_placement(site, &Flat(vec![o]), Point::new(21.0, 21.0))
+            .unwrap()
+            .code()
     };
     assert_eq!(test(&build, house), 0);
     let scans = BuildSite {

@@ -1,5 +1,5 @@
 //! A box on the map's ground as one type ([`Rect`]): two corners, x0 and y0 then x1 and y1, apart
-//! from a point ([`crate::map::Point`]) and a walk between two points ([`Segment`]).
+//! from a point ([`Point`]) and a walk between two points ([`Segment`]).
 
 use crate::map::Distance;
 use crate::map::GridSize;

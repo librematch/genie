@@ -52,8 +52,7 @@ fn resources(lists: usize) -> VisibleResources {
 fn rec(id: i32, x: f32, y: f32) -> VisibleResource {
     VisibleResource {
         id: object_id(id),
-        x,
-        y,
+        at: Point::new(x, y),
         ..VisibleResource::default()
     }
 }
@@ -285,10 +284,10 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
 #[test]
 fn a_resource_goes_last_in_its_group_s_list_and_a_full_list_doubles() {
     let mut r = resources(5);
-    r.add(object_id(10), GatherGroup::GOLD, 3.5, 7.5);
-    r.add(object_id(11), GatherGroup::GOLD, 1.5, 2.5);
+    r.add(object_id(10), GatherGroup::GOLD, Point::new(3.5, 7.5));
+    r.add(object_id(11), GatherGroup::GOLD, Point::new(1.5, 2.5));
     assert_eq!(r.capacities[4], 2);
-    r.add(object_id(12), GatherGroup::GOLD, 0.5, 0.5);
+    r.add(object_id(12), GatherGroup::GOLD, Point::new(0.5, 0.5));
     assert_eq!(r.capacities, [2, 2, 2, 2, 4]);
     assert_eq!(
         r.lists[4],
@@ -296,7 +295,7 @@ fn a_resource_goes_last_in_its_group_s_list_and_a_full_list_doubles() {
     );
     assert!(r.lists[..4].iter().all(Vec::is_empty));
     let mut none = VisibleResources::default();
-    none.add(object_id(10), GatherGroup::WOOD, 1.0, 1.0);
+    none.add(object_id(10), GatherGroup::WOOD, Point::new(1.0, 1.0));
     assert_eq!(none, VisibleResources::default());
 }
 
@@ -306,7 +305,7 @@ fn a_resource_goes_last_in_its_group_s_list_and_a_full_list_doubles() {
 fn a_removed_resource_s_place_takes_the_last_record() {
     let mut r = resources(5);
     for id in [1, 2, 3] {
-        r.add(object_id(id), GatherGroup::WOOD, id as f32, 0.0);
+        r.add(object_id(id), GatherGroup::WOOD, Point::new(id as f32, 0.0));
     }
     assert_eq!(r.remove(object_id(1), GatherGroup::WOOD), 0);
     assert_eq!(r.lists[0], [rec(3, 3.0, 0.0), rec(2, 2.0, 0.0)]);
@@ -326,24 +325,39 @@ fn a_removed_resource_s_place_takes_the_last_record() {
 #[test]
 fn the_closest_resource_skips_the_ids_given_and_keeps_its_distance() {
     let mut r = resources(5);
-    r.add(object_id(1), GatherGroup::FISH, 13.0, 10.0);
-    r.add(object_id(2), GatherGroup::FISH, 10.0, 12.0);
-    r.add(object_id(3), GatherGroup::FISH, 7.0, 10.0);
-    assert_eq!(r.closest(10.0, 10.0, 2, &[]), Some(1));
+    r.add(object_id(1), GatherGroup::FISH, Point::new(13.0, 10.0));
+    r.add(object_id(2), GatherGroup::FISH, Point::new(10.0, 12.0));
+    r.add(object_id(3), GatherGroup::FISH, Point::new(7.0, 10.0));
+    assert_eq!(
+        r.closest(Point::new(10.0, 10.0), GatherGroup::FISH, &[]),
+        Some(1)
+    );
     assert_eq!(r.lists[2][1].distance, Distance::new(2.0));
-    assert_eq!(r.closest(10.0, 10.0, 2, &[object_id(2)]), Some(0));
+    assert_eq!(
+        r.closest(Point::new(10.0, 10.0), GatherGroup::FISH, &[object_id(2)]),
+        Some(0)
+    );
     assert_eq!(r.lists[2][0].distance, Distance::new(3.0));
     assert_eq!(
-        r.closest(10.0, 10.0, 2, &[object_id(2), object_id(1)]),
+        r.closest(
+            Point::new(10.0, 10.0),
+            GatherGroup::FISH,
+            &[object_id(2), object_id(1)]
+        ),
         Some(2)
     );
     assert_eq!(
-        r.closest(10.0, 10.0, 2, &[object_id(1), object_id(2), object_id(3)]),
+        r.closest(
+            Point::new(10.0, 10.0),
+            GatherGroup::FISH,
+            &[object_id(1), object_id(2), object_id(3)]
+        ),
         None
     );
-    assert_eq!(r.closest(10.0, 10.0, 1, &[]), None);
-    assert_eq!(r.closest(10.0, 10.0, 5, &[]), None);
-    assert_eq!(r.closest(10.0, 10.0, -1, &[]), None);
+    assert_eq!(
+        r.closest(Point::new(10.0, 10.0), GatherGroup::FORAGE, &[]),
+        None
+    );
 }
 
 /// The tiles a player's map explores go to its tile list (player `+0x180`, `FUN_14165d500`)
@@ -405,7 +419,7 @@ fn a_resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
     let mut v = world(PlayerId::new(3));
     v.resources = vec![resources(5), resources(5), resources(5)];
     for r in &mut v.resources {
-        r.add(object_id(7), GatherGroup::FORAGE, 20.5, 30.5);
+        r.add(object_id(7), GatherGroup::FORAGE, Point::new(20.5, 30.5));
     }
     let _ = v
         .explore(

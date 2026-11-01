@@ -4,6 +4,7 @@
 //! foundation's work, its starts and its completion.
 
 use crate::construction::build::BuildState;
+use crate::map::Rect;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -64,10 +65,12 @@ impl Unit {
         {
             let (fx, fy) = (f.position().x(), f.position().y());
             let reach = crate::construction::build::CLEARING_REACH + 1.0;
-            for (id, _) in
-                c.w.spatial
-                    .objects_within(fx - reach, fy - reach, fx + reach, fy + reach)
-            {
+            for (id, _) in c.w.spatial.objects_within(Rect::new(
+                fx - reach,
+                fy - reach,
+                fx + reach,
+                fy + reach,
+            )) {
                 let (owner, u) = if id == self.id {
                     (c.player, self)
                 } else if let Some(found) = others.find(id) {

@@ -94,7 +94,7 @@ impl World {
             }
         }
         let shelters = if nearby {
-            self.shelters_near(tp.index(), target, target_master)?
+            self.shelters_near(tp, target, target_master)?
         } else {
             let tm = self.master(tp, target_master)?;
             if tm.kind < BUILDING {
@@ -192,14 +192,14 @@ impl World {
     /// the tracker's order ([`World::garrison_order`]).
     pub(crate) fn shelters_near(
         &self,
-        tp: usize,
+        tp: PlayerId,
         target: ObjectId,
         master: MasterId,
     ) -> Result<Shelters, GenieError> {
         let mut shelters = Shelters::default();
         let key = ListKey::of_master(self.lines.base(master));
         let (at, radius) = self.ground(target)?;
-        for &id in self.players[tp].tracker.list(key) {
+        for &id in self.players.player(tp)?.tracker.list(key) {
             // the tracker's keepers follow every object its player gains and loses, so the
             // world holds each (the game reads a null one's place)
             let Some((op, o)) = self.object(id) else {

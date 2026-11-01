@@ -90,7 +90,7 @@ impl BuildAction {
         let own = with_annexes(c, site);
         // the builder lent to its slot, where the tests' scans meet it (FD-045-D32)
         let code = self.lend(c, builder, |w, _, _| w.foundation_code(&placed, true, &own))?;
-        let stays = parts.stay && code == 0;
+        let stays = parts.stay && code.is_allowed();
         let others: Vec<ObjectId> = occupants
             .iter()
             .copied()
@@ -172,7 +172,7 @@ impl BuildAction {
             let code = self.lend(c, builder, |w, _, _| {
                 w.foundation_code(&placed, desolid, &own)
             })?;
-            if code != 0 {
+            if !code.is_allowed() {
                 tests.stay = false;
             } else if tests.stay {
                 let others: Vec<ObjectId> = site_occupants(c, part, &placed, cleared, reads)?

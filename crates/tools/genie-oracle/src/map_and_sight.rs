@@ -378,8 +378,7 @@ pub(super) fn saved_resources(
                             id: ObjectId::try_from(r.object_id)?,
                             distance: Distance::new(r.distance),
                             zone: r.zone,
-                            x: r.pos_x,
-                            y: r.pos_y,
+                            at: genie_core::map::Point::new(r.pos_x, r.pos_y),
                         })
                     })
                     .collect::<Result<Vec<_>, genie_core::GenieError>>()
@@ -475,8 +474,8 @@ pub(super) fn resource_differences(
             r.id,
             r.distance.get().to_bits(),
             r.zone,
-            r.x.to_bits(),
-            r.y.to_bits(),
+            r.at.x().to_bits(),
+            r.at.y().to_bits(),
         )
     };
     for (g, (x, y)) in a.lists.iter().zip(&b.lists).enumerate() {

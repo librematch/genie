@@ -1,6 +1,7 @@
 //! The game's 3-vectors (`BVector`): sums, products, length, angle, line distance and
 //! rotation.
 
+use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::{acos, cos, sin, sqrt};
 
@@ -56,8 +57,8 @@ impl BVector {
 
     /// Its place on the ground: x and y.
     #[must_use]
-    pub const fn ground(self) -> crate::map::Point {
-        crate::map::Point::new(self.0[0], self.0[2])
+    pub const fn ground(self) -> Point {
+        Point::new(self.0[0], self.0[2])
     }
 
     /// The vector with x `x`.

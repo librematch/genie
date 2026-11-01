@@ -277,7 +277,10 @@ impl World {
                 }
             }
         }
-        if self.placement_code_beside(p, master, farm, true, &own)? != 0 {
+        if !self
+            .placement_code_beside(p, master, farm, true, &own)?
+            .is_allowed()
+        {
             return Ok(false);
         }
         let Some(from_queue) = self.pay_for_reseed(p, (master, auto, queue))? else {

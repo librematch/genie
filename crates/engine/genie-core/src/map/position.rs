@@ -1,6 +1,8 @@
 //! A place on the map as one type ([`Position`]): x, y and z, apart from the game's vectors
 //! (x, height, y, [`crate::math::fmath::BVector`]).
 
+use crate::map::Point;
+
 /// A place on the map: x and y in tiles, z its height. An object holds its place so (`+0x3c8`,
 /// `+0x4c8`, `+0x5a8`), and so do the places the systems pass on; the game's vector routines
 /// take it in their own order ([`Position::vector`]).
@@ -46,11 +48,11 @@ impl Position {
 
     /// Its x and y: the place on the ground.
     #[must_use]
-    pub const fn ground(self) -> crate::map::Point {
-        crate::map::Point::new(self.0[0], self.0[1])
+    pub const fn ground(self) -> Point {
+        Point::new(self.0[0], self.0[1])
     }
 
-    /// The tile its x and y lie in, each cut by `CVTTSS2SI` ([`crate::map::Point::tile`]).
+    /// The tile its x and y lie in, each cut by `CVTTSS2SI` ([`Point::tile`]).
     #[must_use]
     pub fn tile(self) -> crate::map::Tile {
         self.ground().tile()

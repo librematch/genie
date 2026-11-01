@@ -295,7 +295,7 @@ impl World {
         // the constructor's new_position: the ground's height by the master's fly mode (slot
         // 0x60, FUN_141193a10)
         let position = self.spatial.terrain.as_ref().map_or(position, |t| {
-            t.ground(position.x(), position.y()).map_or(position, |g| {
+            t.ground(position.ground()).map_or(position, |g| {
                 Position::new(
                     position.x(),
                     position.y(),

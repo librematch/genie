@@ -147,7 +147,7 @@ impl Mover {
     ) -> Position {
         let height = at.z();
         let z = terrain
-            .and_then(|t| t.ground(at.x(), at.y()).ok())
+            .and_then(|t| t.ground(at.ground()).ok())
             .map_or(height, |ground| {
                 crate::combat::missile::grounded(at.z(), ground, false, self.stats.fly_mode)
             });

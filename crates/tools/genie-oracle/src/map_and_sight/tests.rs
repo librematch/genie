@@ -17,8 +17,7 @@ fn sight() -> Visibility {
             id: object_id(7),
             distance: Distance::ZERO,
             zone: 0,
-            x: 1.5,
-            y: 2.5,
+            at: genie_core::map::Point::new(1.5, 2.5),
         }]],
     };
     let mut sight = Visibility::default();
@@ -79,7 +78,7 @@ fn a_player_without_a_map_or_lists_says_so() {
 fn the_resource_lists_differ_by_count_capacity_record_or_length() {
     let mut slice = sight();
     slice.resources[1].capacities = vec![8];
-    slice.resources[1].lists[0][0].x = 1.75;
+    slice.resources[1].lists[0][0].at = genie_core::map::Point::new(1.75, 2.5);
     let lines = resource_differences(&slice, &sight(), 1);
     assert_eq!(
         lines[0],

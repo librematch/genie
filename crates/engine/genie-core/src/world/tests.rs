@@ -1414,8 +1414,7 @@ fn a_player_s_new_tiles_give_their_resources_to_its_lists() {
     t.process_new_tiles(PlayerId::new(1)).unwrap();
     let rec = |id, x, y| VisibleResource {
         id,
-        x,
-        y,
+        at: Point::new(x, y),
         ..VisibleResource::default()
     };
     let v = t.spatial.sight.as_ref().unwrap();
@@ -1496,8 +1495,8 @@ fn a_resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
             capacities: vec![32; 5],
             lists: vec![Vec::new(); 5],
         };
-        v.resources[p].add(object_id(501), GatherGroup::WOOD, 10.5, 10.5);
-        v.resources[p].add(object_id(502), GatherGroup::FORAGE, 10.5, 10.5);
+        v.resources[p].add(object_id(501), GatherGroup::WOOD, Point::new(10.5, 10.5));
+        v.resources[p].add(object_id(502), GatherGroup::FORAGE, Point::new(10.5, 10.5));
     }
     let held = |t: &World| -> Vec<(usize, usize)> {
         let v = t.spatial.sight.as_ref().unwrap();
@@ -1569,8 +1568,7 @@ fn a_new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
     t.made_new_object(PlayerId::new(0)).unwrap();
     let fish = VisibleResource {
         id: object_id(700),
-        x: 20.75,
-        y: 30.25,
+        at: Point::new(20.75, 30.25),
         ..VisibleResource::default()
     };
     let v = t.spatial.sight.as_ref().unwrap();
@@ -8327,9 +8325,9 @@ fn gate_world() -> World {
     t.masters = vec![
         Masters::default(),
         Masters::new([
-            gate_master(88, 91, crate::map::Distance::new(0.0)),
-            gate_master(91, 88, crate::map::Distance::new(2.0)),
-            gate_master(92, -1, crate::map::Distance::new(0.0)),
+            gate_master(88, 91, Distance::new(0.0)),
+            gate_master(91, 88, Distance::new(2.0)),
+            gate_master(92, -1, Distance::new(0.0)),
             soldier,
         ]),
     ];
@@ -16140,7 +16138,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         class: class::PREDATOR,
         hit_points: MasterHitPoints::of_data(5),
         radius: Footprint::new(0.2, 0.2),
-        height: crate::map::Distance::new(1.5),
+        height: Distance::new(1.5),
         terrain_bonus: RestrictionField::NONE,
         ..Master::default()
     };

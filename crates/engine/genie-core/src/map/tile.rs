@@ -1,5 +1,7 @@
 //! A tile of the map as one type ([`Tile`]): x and y in whole tiles, apart from a point on the
-//! ground ([`crate::map::Point`]) and a step from one tile to another ([`TileOffset`]).
+//! ground ([`Point`]) and a step from one tile to another ([`TileOffset`]).
+
+use crate::map::Point;
 
 /// A tile of the map, x and y in whole tiles: the tile a place's x and y fall in (each cut to a
 /// whole number the way its routine cuts it), a search's or a path's tile, a landing's.
@@ -55,8 +57,8 @@ impl Tile {
 
     /// The point at its low corner: x and y as floats.
     #[must_use]
-    pub const fn corner(self) -> crate::map::Point {
-        crate::map::Point::new(self.0[0] as f32, self.0[1] as f32)
+    pub const fn corner(self) -> Point {
+        Point::new(self.0[0] as f32, self.0[1] as f32)
     }
 
     /// The tile a routine on shorts reads (`FUN_140f690e0`'s): x and y cut to their low 16 bits,
@@ -193,6 +195,7 @@ impl TileOffset {
 
 #[cfg(test)]
 mod tests {
+    use crate::map::Point;
     use crate::map::{Tile, TileOffset, TileRect};
 
     /// A tile keeps its x and y, orders by x then y, and steps by an offset.
@@ -221,7 +224,7 @@ mod tests {
         assert_eq!((o.dx(), o.dy()), (5, 6));
         // a routine on shorts reads the low 16 bits, signed
         assert_eq!(t.short(), t);
-        assert_eq!(t.corner(), crate::map::Point::new(3.0, -4.0));
+        assert_eq!(t.corner(), Point::new(3.0, -4.0));
         assert_eq!(Tile::new(0x1_0005, 0x8000).short(), Tile::new(5, -0x8000));
     }
 

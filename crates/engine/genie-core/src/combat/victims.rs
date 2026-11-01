@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::combat::damage::{Kill, Razed, Victim};
 use crate::map::Distance;
+use crate::map::Rect;
 use crate::map::Tile;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -140,12 +141,12 @@ impl World {
             let (x, y) = (unit.position().x(), unit.position().y());
             for (id, o) in self
                 .spatial
-                .objects_within(
+                .objects_within(Rect::new(
                     x - reach.get(),
                     y - reach.get(),
                     x + reach.get(),
                     y + reach.get(),
-                )
+                ))
                 .filter(|&(id, _)| id != unit.id && Some(id) != target)
             {
                 let seen = self.victim(id, p)?;

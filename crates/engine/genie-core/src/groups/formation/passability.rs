@@ -96,8 +96,8 @@ impl World {
         let old = g
             .motion
             .calculate_yaw_angle(canon, formation.transform_orientation, dt, false);
-        let flips = RIGHT_ANGLE < (yaw - old).abs() && g.unit_types.len() < 2;
-        let rotation = crate::math::fmath::rotation(yaw, up);
+        let flips = RIGHT_ANGLE < (yaw - old).get().abs() && g.unit_types.len() < 2;
+        let rotation = crate::math::fmath::rotation(yaw.get(), up);
         formation.transform_orientation = forward;
         for s in formation.every_slot_mut() {
             s.transformed = 0;

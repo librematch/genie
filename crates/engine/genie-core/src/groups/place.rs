@@ -245,13 +245,17 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn move_position_to_front(&mut self, group: GroupId, ahead: f32) -> Result<(), GenieError> {
+    pub fn move_position_to_front(
+        &mut self,
+        group: GroupId,
+        ahead: Distance,
+    ) -> Result<(), GenieError> {
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
         let m = &g.motion;
         let forward = m.position[1];
-        let front = fmath::add(fmath::scale(ahead, forward), m.position[0]);
+        let front = fmath::add(fmath::scale(ahead.get(), forward), m.position[0]);
         let held: Vec<(ObjectId, BVector)> = g
             .members
             .iter()
@@ -547,7 +551,8 @@ mod tests {
             unit(11, 13.0, 9.2),
             unit(12, 19.0, 15.0),
         ]);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (
@@ -567,7 +572,8 @@ mod tests {
     #[test]
     fn without_a_member_in_front_the_group_moves_onto_the_nearest() {
         let mut t = front_world(vec![unit(11, 13.0, 12.0), unit(12, 19.0, 15.0)]);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (
@@ -581,13 +587,15 @@ mod tests {
             id: object_id(99),
             ..crate::groups::Member::default()
         }];
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (BVector::new(10.0, 0.0, 10.0), BVector::ZERO, 2)
         );
         // a group the world does not hold is left alone
-        t.move_position_to_front(group_id(2), 100.0).unwrap();
+        t.move_position_to_front(group_id(2), Distance::new(100.0))
+            .unwrap();
     }
 
     /// A staggered lock (7) takes the whole spacing: 11 at 1.5 from the line is in front of it
@@ -597,10 +605,12 @@ mod tests {
         let units = vec![unit(11, 13.0, 11.5), unit(12, 19.0, 13.0)];
         let mut t = front_world(units.clone());
         t.groups.groups[0].formation_locked_type = Some(FormationKind::STAGGERED);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(placed(&t).0, BVector::new(13.0, 0.0, 11.5));
         let mut t = front_world(units);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(placed(&t).0, BVector::new(19.0, 0.0, 13.0));
     }
 
@@ -615,10 +625,12 @@ mod tests {
         ];
         let mut t = front_world(units.clone());
         t.groups.groups[0].motion.flags = MotionFlags::NEW;
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(placed(&t).0, BVector::new(13.0, 0.0, 12.2));
         let mut t = front_world(units);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(placed(&t).0, BVector::new(6.0, 0.0, 10.1));
     }
 
@@ -640,7 +652,8 @@ mod tests {
         };
         let mut t = front_world(units.clone());
         flanked(&mut t);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (
@@ -654,7 +667,8 @@ mod tests {
         let mut t = front_world(vec![units[0].clone(), units[1].clone(), other]);
         flanked(&mut t);
         t.groups.groups[0].members.truncate(2);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (
@@ -682,7 +696,8 @@ mod tests {
             .put_mover(Some(crate::gathering::hunt::tests::walker()));
         let mut t = front_world(vec![units[0].clone(), units[1].clone(), missile]);
         flanked(&mut t);
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (
@@ -694,7 +709,8 @@ mod tests {
         let mut t = front_world(units);
         flanked(&mut t);
         t.players[0].ghosts = vec![crate::groups::formation::tests::ghost_at(-2, 3.0, 3.0)];
-        t.move_position_to_front(group_id(1), 100.0).unwrap();
+        t.move_position_to_front(group_id(1), Distance::new(100.0))
+            .unwrap();
         assert_eq!(
             placed(&t),
             (

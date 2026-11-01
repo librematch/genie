@@ -1,7 +1,7 @@
 //! A displacement on the map as one type ([`Offset`]): x, y and z, apart from a place
 //! ([`crate::map::Position`]) and the game's vectors (x, height, y,
 //! [`crate::math::fmath::BVector`]); and one on the ground ([`GroundOffset`]): x and y, apart
-//! from a point ([`crate::map::Point`]).
+//! from a point ([`Point`]).
 
 use crate::map::{Point, Position};
 

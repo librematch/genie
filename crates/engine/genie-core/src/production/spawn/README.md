@@ -28,6 +28,7 @@ test: the map's edge, the terrain, the explored tiles and the objects in the way
 | [`mod.rs`](mod.rs) | A trained unit's spawn: where the make action (`TRIBE_Action_Make_Obj`, `FUN_140ad0240`) puts the unit its building made. |
 | [`new_unit.rs`](new_unit.rs) | A made unit's spawn, the command queue it takes, its unit AI and the combat unit's constructor. |
 | [`objects.rs`](objects.rs) | A spot beside a building, the remains a death leaves, a plain object, the flares and a building a death makes. |
+| [`placement_code.rs`](placement_code.rs) | What a building's placement test answers. |
 | [`placement_test.rs`](placement_test.rs) | The master's placement test (slot 0x50): the objects near a candidate, BUILD's placement test and the spawn's. |
 | [`research.rs`](research.rs) | The research action (`TRIBE_Action_Make_Tech`): its technology, its update, its end and its destructor. |
 | [`search.rs`](search.rs) | The spawn point search (`FUN_1411d12d0`): the building's sides in segments, each spot's candidates (`FUN_1411c5b60`) and the corners' wall checks. |

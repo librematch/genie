@@ -25,6 +25,12 @@ impl TerrainMask {
         self.0
     }
 
+    /// The mask with `other`'s classes too (`OR`).
+    #[must_use]
+    pub const fn with(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
     /// The tile word's class bits that block an object of the mask: the classes outside it
     /// (`mask ^ 0xff`).
     #[must_use]

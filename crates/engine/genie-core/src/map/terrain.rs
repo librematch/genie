@@ -10,6 +10,7 @@
 use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::Point;
 use crate::map::Position;
 use crate::map::Restriction;
 use crate::map::TerrainFlags;
@@ -227,8 +228,8 @@ pub struct Foundation {
 /// ([`TerrainFlags::ANY_WATER`]), 2 for the shore ([`TerrainFlags::SHORE`]), else land
 /// ([`TerrainFlags::LAND`]) as 4.
 #[must_use]
-pub const fn terrain_class(flags: TerrainFlags) -> u8 {
-    if flags.is_empty() {
+pub const fn terrain_class(flags: TerrainFlags) -> TerrainMask {
+    TerrainMask::of_bits(if flags.is_empty() {
         0
     } else if flags.intersects(TerrainFlags::ANY_WATER) {
         1
@@ -236,7 +237,7 @@ pub const fn terrain_class(flags: TerrainFlags) -> u8 {
         2
     } else {
         (flags.bits() >> 3) & 4
-    }
+    })
 }
 
 impl Terrain {
@@ -254,16 +255,18 @@ impl Terrain {
         self.restrictions
             .get(restriction.index())
             .map_or(TerrainMask::NONE, |values| {
-                TerrainMask::of_bits(
-                    values
-                        .values()
-                        .iter()
-                        .enumerate()
-                        .filter(|&(_, &v)| 0.0 < v)
-                        .fold(0, |m, (t, _)| {
-                            m | self.terrains.get(t).map_or(0, |k| terrain_class(k.flags))
-                        }),
-                )
+                values
+                    .values()
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, &v)| 0.0 < v)
+                    .fold(TerrainMask::NONE, |m, (t, _)| {
+                        m.with(
+                            self.terrains
+                                .get(t)
+                                .map_or(TerrainMask::NONE, |k| terrain_class(k.flags)),
+                        )
+                    })
             })
     }
 
@@ -357,7 +360,8 @@ impl Terrain {
     /// The ground's height under (`x`, `y`) on the map (the static `new_position`'s,
     /// `0x1411a58b0`, which slot 0x60 takes): the tile's elevation plus its slope's share by the
     /// tile's shape ([`slope_share`] of the place within the tile).
-    pub fn ground(&self, x: f32, y: f32) -> Result<f32, GenieError> {
+    pub fn ground(&self, at: Point) -> Result<f32, GenieError> {
+        let (x, y) = (at.x(), at.y());
         let (tx, ty) = (x as i32, y as i32);
         let i = self
             .size
@@ -440,7 +444,8 @@ impl Terrain {
     /// truncated to 16 bits; none for a tile off the map, else the terrain a map read sees there
     /// ([`Terrain::read`]).
     #[must_use]
-    pub fn at_task_point(&self, x: f32, y: f32) -> Option<TerrainId> {
+    pub fn at_task_point(&self, at: Point) -> Option<TerrainId> {
+        let (x, y) = (at.x(), at.y());
         #[allow(clippy::float_cmp)]
         if x == -1.0 || y == -1.0 {
             return None;
@@ -658,17 +663,32 @@ mod tests {
     #[test]
     fn the_task_search_reads_the_terrain_at_a_point_on_the_map() {
         let t = map(vec![0, 1, 2, 3], vec![0; 4]);
-        assert_eq!(t.at_task_point(1.5, 1.25), Some(TerrainId::named(3)));
-        assert_eq!(t.at_task_point(0.0, 0.99), Some(TerrainId::named(0)));
-        assert_eq!(t.at_task_point(-1.0, 1.0), None);
-        assert_eq!(t.at_task_point(1.0, -1.0), None);
-        assert_eq!(t.at_task_point(-0.5, 1.0), Some(TerrainId::named(2)));
-        assert_eq!(t.at_task_point(f32::NAN, 1.0), Some(TerrainId::named(2)));
-        assert_eq!(t.at_task_point(2.0, 0.0), None);
-        assert_eq!(t.at_task_point(0.0, 2.0), None);
-        assert_eq!(t.at_task_point(-1.5, 0.0), None);
+        assert_eq!(
+            t.at_task_point(Point::new(1.5, 1.25)),
+            Some(TerrainId::named(3))
+        );
+        assert_eq!(
+            t.at_task_point(Point::new(0.0, 0.99)),
+            Some(TerrainId::named(0))
+        );
+        assert_eq!(t.at_task_point(Point::new(-1.0, 1.0)), None);
+        assert_eq!(t.at_task_point(Point::new(1.0, -1.0)), None);
+        assert_eq!(
+            t.at_task_point(Point::new(-0.5, 1.0)),
+            Some(TerrainId::named(2))
+        );
+        assert_eq!(
+            t.at_task_point(Point::new(f32::NAN, 1.0)),
+            Some(TerrainId::named(2))
+        );
+        assert_eq!(t.at_task_point(Point::new(2.0, 0.0)), None);
+        assert_eq!(t.at_task_point(Point::new(0.0, 2.0)), None);
+        assert_eq!(t.at_task_point(Point::new(-1.5, 0.0)), None);
         // 65536.5 truncates to tile 0 in 16 bits
-        assert_eq!(t.at_task_point(65_536.5, 1.0), Some(TerrainId::named(2)));
+        assert_eq!(
+            t.at_task_point(Point::new(65_536.5, 1.0)),
+            Some(TerrainId::named(2))
+        );
     }
 
     #[test]
@@ -678,13 +698,13 @@ mod tests {
         let mut t = map(vec![0; 8], vec![-1; 8]);
         t.set_elevations(vec![1, 1, 1, 1, 1, 1, 2, 1]);
         assert_eq!(t.shapes, [0, 0, 0, 0, 7, 9, 0, 5]);
-        assert_eq!(t.ground(0.5, 0.5), Ok(1.0));
-        assert_eq!(t.ground(0.5, 2.25), Ok(1.25));
-        assert_eq!(t.ground(1.25, 2.75), Ok(1.5));
-        assert_eq!(t.ground(1.75, 2.25), Ok(1.0));
+        assert_eq!(t.ground(Point::new(0.5, 0.5)), Ok(1.0));
+        assert_eq!(t.ground(Point::new(0.5, 2.25)), Ok(1.25));
+        assert_eq!(t.ground(Point::new(1.25, 2.75)), Ok(1.5));
+        assert_eq!(t.ground(Point::new(1.75, 2.25)), Ok(1.0));
         let mut unknown = map(vec![0; 8], vec![-1; 8]);
         unknown.elevations.clear();
-        assert!(unknown.ground(0.5, 0.5).is_err());
+        assert!(unknown.ground(Point::new(0.5, 0.5)).is_err());
     }
 
     #[test]

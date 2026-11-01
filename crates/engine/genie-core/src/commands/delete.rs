@@ -791,6 +791,7 @@ mod tests {
 #[cfg(test)]
 mod clearing_tests {
     use super::*;
+    use crate::map::Distance;
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Point;
@@ -883,7 +884,7 @@ mod clearing_tests {
                 kind: COMBAT,
                 class: class::CLASS_40,
                 radius: Footprint::new(0.5, 0.5),
-                height: crate::map::Distance::new(1.0),
+                height: Distance::new(1.0),
                 tall: true,
                 obstruction_type: ObstructionType::TYPE_2,
                 buildable_on: BuildableOn::YES,

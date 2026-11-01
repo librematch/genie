@@ -23,7 +23,7 @@ use crate::world::slots::PlayerSlots;
 /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
 /// [`Terrain::at_task_point`]); none on a world without its map's terrain.
 pub(crate) fn point_terrain(map: Option<&Terrain>, point: Position) -> Option<TerrainId> {
-    map.and_then(|t| t.at_task_point(point.x(), point.y()))
+    map.and_then(|t| t.at_task_point(point.ground()))
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.

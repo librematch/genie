@@ -180,13 +180,8 @@ impl Spatial {
     }
 
     /// The objects whose place lies within `x0`..`x1` and `y0`..`y1`, by id.
-    pub fn objects_within(
-        &self,
-        x0: f32,
-        y0: f32,
-        x1: f32,
-        y1: f32,
-    ) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
+    pub fn objects_within(&self, area: Rect) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
+        let (x0, y0, x1, y1) = (area.x0(), area.y0(), area.x1(), area.y1());
         self.objects
             .iter()
             .filter(move |(_, o)| {

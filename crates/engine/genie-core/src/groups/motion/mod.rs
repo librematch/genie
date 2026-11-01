@@ -9,6 +9,7 @@ use crate::groups::MotionFlags;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::math::Angle;
 use crate::math::fmath::{self, BVector};
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -191,27 +192,27 @@ impl Motion {
         direction: BVector,
         dt: Seconds,
         clamp: bool,
-    ) -> f32 {
+    ) -> Angle {
         let mut angle = fmath::angle_between(direction, forward);
         if clamp {
             angle = fmath::minss((self.maximum_yaw_per_second_moving * dt).get(), angle);
         }
-        if 0.0 < fmath::cross(direction, forward).height() {
+        Angle::new(if 0.0 < fmath::cross(direction, forward).height() {
             -angle
         } else {
             angle
-        }
+        })
     }
 
     /// `FUN_14104c150`: a turn of `yaw` (above 1e-7 in size) about the new position's up: its
     /// forward and right turn (`FUN_14087e350`, `FUN_14087e2c0`) and are normalized
     /// (`FUN_141027d00`); [`MotionFlags::MOVED`].
-    pub fn turn(&mut self, yaw: f32) {
+    pub fn turn(&mut self, yaw: Angle) {
         // only an ordered 1e-7 below the yaw's size turns: a NaN yaw does not
-        if fmath::at_most_or_unordered(yaw.abs(), EPSILON) {
+        if fmath::at_most_or_unordered(yaw.get().abs(), EPSILON) {
             return;
         }
-        let r = fmath::rotation(yaw, self.new_position[2]);
+        let r = fmath::rotation(yaw.get(), self.new_position[2]);
         self.new_position[1] = fmath::normalize(fmath::rotate(&r, self.new_position[1]));
         self.new_position[3] = fmath::normalize(fmath::rotate(&r, self.new_position[3]));
         self.flags |= MotionFlags::MOVED;

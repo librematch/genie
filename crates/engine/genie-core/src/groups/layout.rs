@@ -287,7 +287,7 @@ pub fn place_box_perimeter(
     out: &mut [BVector; BOX_POSITIONS],
     min: &mut BVector,
     max: &mut BVector,
-    spacing: f32,
+    spacing: Distance,
 ) -> Result<bool, GenieError> {
     if !(1..=BOX_POSITIONS).contains(&count) {
         return Ok(false);
@@ -295,7 +295,7 @@ pub fn place_box_perimeter(
     let side = max.x() - min.x();
     let total = side * BOX_SIDES;
     let n = count as f32;
-    let units = n * spacing;
+    let units = n * spacing.get();
     let mut step = total / n;
     if total < units {
         step = units / n;
@@ -512,7 +512,8 @@ pub(crate) fn box_slots(
                 )
             };
             // the game ignores its result: false only for a count refused above
-            let _ = place_box_perimeter(count, &mut positions, &mut min, &mut max, s);
+            let _ =
+                place_box_perimeter(count, &mut positions, &mut min, &mut max, Distance::new(s));
             (min_x, min_z, max_x, max_z) = (min.x(), min.y(), max.x(), max.y());
         }
         for (j, &p) in positions.iter().enumerate().take(count) {
@@ -778,7 +779,16 @@ mod tests {
     fn a_box_walk_on_a_nan_place_stays_on_its_side() {
         let mut out = [BVector::ZERO; BOX_POSITIONS];
         let (mut min, mut max) = (BVector::new(-1.0, 0.0, -1.0), BVector::new(1.0, 0.0, 1.0));
-        assert!(place_box_perimeter(9, &mut out, &mut min, &mut max, f32::INFINITY).unwrap());
+        assert!(
+            place_box_perimeter(
+                9,
+                &mut out,
+                &mut min,
+                &mut max,
+                Distance::new(f32::INFINITY)
+            )
+            .unwrap()
+        );
         for p in &out[1..9] {
             assert_eq!(p.x(), f32::INFINITY, "{out:?}");
             assert!(p.y().is_nan(), "{out:?}");
@@ -1020,7 +1030,7 @@ mod tests {
     fn the_box_perimeter_places_its_units_as_the_game_walks_it() {
         let mut out = [BVector::ZERO; BOX_POSITIONS];
         let (mut min, mut max) = (BVector::new(-1.0, 0.0, -1.0), BVector::new(1.0, 0.0, 1.0));
-        assert!(place_box_perimeter(3, &mut out, &mut min, &mut max, 1.0).unwrap());
+        assert!(place_box_perimeter(3, &mut out, &mut min, &mut max, Distance::new(1.0)).unwrap());
         assert_eq!(
             out[..3],
             [
@@ -1029,7 +1039,7 @@ mod tests {
                 BVector::new(-1.0, 0.0, 0.0)
             ]
         );
-        assert!(place_box_perimeter(2, &mut out, &mut min, &mut max, 10.0).unwrap());
+        assert!(place_box_perimeter(2, &mut out, &mut min, &mut max, Distance::new(10.0)).unwrap());
         assert_eq!(
             (min, max),
             (BVector::new(-2.5, 0.0, -2.5), BVector::new(2.5, 0.0, 2.5))
@@ -1039,7 +1049,7 @@ mod tests {
             [BVector::new(2.5, 0.0, 0.0), BVector::new(-2.5, 0.0, 0.0)]
         );
         let (mut min, mut max) = (BVector::new(-2.0, 0.0, -1.0), BVector::new(2.0, 0.0, 1.0));
-        assert!(place_box_perimeter(16, &mut out, &mut min, &mut max, 0.5).unwrap());
+        assert!(place_box_perimeter(16, &mut out, &mut min, &mut max, Distance::new(0.5)).unwrap());
         let walked: Vec<(f32, f32)> = out[..16].iter().map(|p| (p.x(), p.y())).collect();
         assert_eq!(
             walked,
@@ -1093,13 +1103,17 @@ mod tests {
         for places in fixed {
             let n = places.len();
             let (mut min, mut max) = (BVector::new(lo, 0.0, lo), BVector::new(hi, 0.0, hi));
-            assert!(place_box_perimeter(n, &mut out, &mut min, &mut max, 0.1).unwrap());
+            assert!(
+                place_box_perimeter(n, &mut out, &mut min, &mut max, Distance::new(0.1)).unwrap()
+            );
             let got: Vec<(f32, f32)> = out[..n].iter().map(|p| (p.x(), p.y())).collect();
             assert_eq!(got, places, "{n}");
         }
         // none, or more than the buffer holds, writes nothing
-        assert!(!place_box_perimeter(0, &mut out, &mut min, &mut max, 1.0).unwrap());
-        assert!(!place_box_perimeter(61, &mut out, &mut min, &mut max, 1.0).unwrap());
+        assert!(!place_box_perimeter(0, &mut out, &mut min, &mut max, Distance::new(1.0)).unwrap());
+        assert!(
+            !place_box_perimeter(61, &mut out, &mut min, &mut max, Distance::new(1.0)).unwrap()
+        );
     }
 
     /// `FUN_1410143a0`: slots within 1e-7 on x share a line; a line of an array large enough

@@ -172,6 +172,7 @@ impl TerrainTable {
             .iter()
             .map(|t| {
                 genie_core::map::terrain::terrain_class(TerrainFlags::from_bits_retain(t.is_water))
+                    .bits()
             })
             .collect();
         let masks = dat

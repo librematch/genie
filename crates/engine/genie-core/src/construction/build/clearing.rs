@@ -1,5 +1,6 @@
 //! The footprint clearing (`FUN_1415c3620`) of a building: the objects on its tiles that go.
 
+use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -50,7 +51,7 @@ pub struct ClearLook {
     /// `+0x278`.
     pub hp: HitPoints,
     /// Its master's `radius_z` (`+0x5e0`).
-    pub height: crate::map::Distance,
+    pub height: Distance,
     /// `+0x686`.
     pub roo_called: bool,
     /// Its master's type.
@@ -232,8 +233,8 @@ pub(super) fn clearing_takes(
     // first; then FUN_141189670: COMISS 0 against the height, JC drops the record (a NaN too),
     // else the record held (`+0x658`) does
     let dies = COMBAT <= seen.kind && seen.state < ObjectState::Dying && !seen.roo_called;
-    let destroy_drops = dies
-        && (seen.kind < BUILDING || (!seen.desolid && crate::map::Distance::ZERO < seen.height));
+    let destroy_drops =
+        dies && (seen.kind < BUILDING || (!seen.desolid && Distance::ZERO < seen.height));
     let roo_drops = site.trees
         && !seen.roo_called
         && !dies

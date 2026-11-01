@@ -294,7 +294,7 @@ impl World {
                     self.spatial.map,
                     Point::new(t.x() as f32, t.y() as f32),
                 );
-                if self.placement_code(player, master, at, true)? != 0 {
+                if !self.placement_code(player, master, at, true)?.is_allowed() {
                     continue;
                 }
                 if !self.affords(player, master)? {

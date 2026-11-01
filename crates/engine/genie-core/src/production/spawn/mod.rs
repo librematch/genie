@@ -13,12 +13,14 @@ mod gather_walk;
 mod make_action;
 mod new_unit;
 mod objects;
+mod placement_code;
 mod placement_test;
 mod research;
 mod search;
 mod terrains;
 mod world_map;
 
+pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
 pub use self::placement_test::{Near, PlaceMap, Placing, build_placement, placement};
 use self::search::corner_tiles;
@@ -108,7 +110,7 @@ impl World {
         self.spatial
             .terrain
             .as_ref()
-            .and_then(|t| t.ground(at.x(), at.y()).ok())
+            .and_then(|t| t.ground(at.ground()).ok())
             .map_or(at, |g| {
                 Position::new(
                     at.x(),

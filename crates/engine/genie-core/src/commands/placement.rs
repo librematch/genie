@@ -14,6 +14,7 @@ use crate::objects::masters::ids::FARM;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::production::spawn::PlacementCode;
 use crate::world::slots::PlayerSlots;
 use crate::world::{RICE_FARM, World};
 
@@ -95,7 +96,7 @@ impl World {
         at: Point,
     ) -> Result<bool, GenieError> {
         let human = !self.players.player(player)?.computer;
-        if self.placement_code(player, master, at, human)? != 0 {
+        if !self.placement_code(player, master, at, human)?.is_allowed() {
             return Ok(false);
         }
         self.affords(player, master)
@@ -110,7 +111,7 @@ impl World {
         master: MasterId,
         at: Point,
         human: bool,
-    ) -> Result<u8, GenieError> {
+    ) -> Result<PlacementCode, GenieError> {
         self.placement_code_beside(player, master, at, human, &[])
     }
 
@@ -123,7 +124,7 @@ impl World {
         at: Point,
         human: bool,
         own: &[ObjectId],
-    ) -> Result<u8, GenieError> {
+    ) -> Result<PlacementCode, GenieError> {
         let site = self.master(player, master)?;
         let build = crate::production::spawn::BuildSite {
             player,
@@ -160,7 +161,7 @@ impl World {
         placed: &crate::map::spatial::Placed,
         desolid: bool,
         own: &[ObjectId],
-    ) -> Result<u8, GenieError> {
+    ) -> Result<PlacementCode, GenieError> {
         let player = placed.player;
         let site = self.master(player, placed.master)?;
         let test = crate::production::spawn::BuildSite {

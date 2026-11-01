@@ -7,6 +7,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
+use crate::math::Angle;
 use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
@@ -64,7 +65,7 @@ fn a_top_target_below_minus_one_is_none() {
 fn a_nan_yaw_does_not_turn() {
     let mut m = Motion::new();
     let before = m.clone();
-    m.turn(f32::NAN);
+    m.turn(Angle::new(f32::NAN));
     assert_eq!(m.flags, before.flags);
     assert_eq!(
         format!("{:?}", m.new_position),
@@ -341,13 +342,19 @@ fn a_turn_is_limited_by_the_yaw_per_second() {
     let mut m = Motion::new();
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     let free = m.calculate_yaw_angle(x, z, Seconds::new(0.1), true);
-    assert_eq!(free, -std::f32::consts::FRAC_PI_2);
+    assert_eq!(free, Angle::new(-std::f32::consts::FRAC_PI_2));
     m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
-    assert_eq!(m.calculate_yaw_angle(x, z, Seconds::new(0.1), true), -0.1);
-    assert_eq!(m.calculate_yaw_angle(z, x, Seconds::new(0.1), true), 0.1);
+    assert_eq!(
+        m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
+        Angle::new(-0.1)
+    );
+    assert_eq!(
+        m.calculate_yaw_angle(z, x, Seconds::new(0.1), true),
+        Angle::new(0.1)
+    );
     assert_eq!(
         m.calculate_yaw_angle(z, x, Seconds::new(0.1), false),
-        std::f32::consts::FRAC_PI_2
+        Angle::new(std::f32::consts::FRAC_PI_2)
     );
 }
 
@@ -361,11 +368,11 @@ fn the_yaw_clamp_keeps_the_angle_for_a_nan_operand() {
     m.maximum_yaw_per_second_moving = TurnRate::new(f32::NAN);
     assert_eq!(
         m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
-        -std::f32::consts::FRAC_PI_2
+        Angle::new(-std::f32::consts::FRAC_PI_2)
     );
     m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
     let nan = m.calculate_yaw_angle(BVector::new(f32::NAN, 0.0, 0.0), z, Seconds::new(0.1), true);
-    assert!(nan.is_nan(), "{nan}");
+    assert!(nan.get().is_nan(), "{nan}");
 }
 
 /// `FUN_14104c150` turns the new position's forward and right about its up; a turn of 1e-7
@@ -375,9 +382,9 @@ fn the_yaw_clamp_keeps_the_angle_for_a_nan_operand() {
 fn the_motion_turns_then_moves_along_its_forward() {
     let mut m = Motion::new();
     m.flags = MotionFlags::NONE;
-    m.turn(1e-8);
+    m.turn(Angle::new(1e-8));
     assert_eq!((m.new_position, m.flags), (m.position, MotionFlags::NONE));
-    m.turn(-std::f32::consts::FRAC_PI_2);
+    m.turn(Angle::new(-std::f32::consts::FRAC_PI_2));
     assert_eq!(m.flags, MotionFlags::MOVED);
     let f = m.new_position[1];
     assert!((f.y() - 1.0).abs() < 1e-6 && f.x().abs() < 1e-6, "{f:?}");

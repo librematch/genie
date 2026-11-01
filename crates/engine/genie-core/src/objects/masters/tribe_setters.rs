@@ -3,6 +3,7 @@
 
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
+use crate::map::Distance;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
 use crate::objects::Regeneration;
@@ -118,7 +119,7 @@ impl Master {
             a::ATTACK_PRIORITY => self.attack_priority = AttackPriority::of_byte(low8(v)),
             a::INVULNERABILITY_LEVEL => self.invulnerability = InvulnerabilityLevel::new(v),
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
-                *self.volley_spread.lane_mut(attribute) = crate::map::Distance::new(v);
+                *self.volley_spread.lane_mut(attribute) = Distance::new(v);
             }
             // the ability's button, tooltips and hotkey action are the interface's
             a::ABILITY_BUTTON_ICON_ID
@@ -264,7 +265,7 @@ impl Master {
             // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             a::ATTACK_GRAPHIC_2 => add_sprite(&mut self.attack_sprite2, v, world),
             a::SPAWNING_AREA_WIDTH | a::SPAWNING_AREA_LENGTH | a::SPAWNING_AREA_RANDOMNESS => {
-                *self.volley_spread.lane_mut(attribute) += crate::map::Distance::new(v);
+                *self.volley_spread.lane_mut(attribute) += Distance::new(v);
             }
             a::TRAIN_LOCATIONS_ENTRY_MOD => {
                 let n = cvttss2si(f32::from(self.train_location_entry.get()) + v);

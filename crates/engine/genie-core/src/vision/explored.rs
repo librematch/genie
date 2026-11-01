@@ -1,6 +1,7 @@
 //! `Process_New_Tiles` at the end of a player's update and a new object's visible resources.
 
 use crate::GenieError;
+use crate::map::Point;
 use crate::map::Tile;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -52,7 +53,7 @@ impl World {
             .and_then(|v| v.resources.get_mut(p.index()))
         {
             for (id, group, at) in found {
-                r.add(id, group, at.x(), at.y());
+                r.add(id, group, at.ground());
             }
         }
         Ok(())
@@ -88,7 +89,7 @@ impl World {
         if let Some(v) = self.spatial.sight.as_mut() {
             for (q, _) in explored.iter().enumerate().filter(|&(_, &e)| e) {
                 if let Some(r) = v.resources.get_mut(q) {
-                    r.add(id, group, x, y);
+                    r.add(id, group, Point::new(x, y));
                 }
             }
         }
