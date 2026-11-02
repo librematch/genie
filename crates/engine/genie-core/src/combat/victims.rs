@@ -472,7 +472,7 @@ impl World {
         master: &Master,
         kill: Kill,
     ) -> Result<(), GenieError> {
-        if self.players.player(q)?.computer {
+        if self.players.player(q)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's killed object (its AI's slot 0x2f0)",
             ));

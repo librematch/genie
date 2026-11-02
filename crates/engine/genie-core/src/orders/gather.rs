@@ -83,7 +83,7 @@ impl World {
             state: t.life.state,
             radius: tm.radius,
         };
-        let computer = owner.computer;
+        let computer = owner.kind.is_computer();
         let farm_stops = self.settings.walkable_farms;
         let by = self.releaser(player, idx)?;
         // a stop farm's time per stop: the gatherer's work rate (its master's plus its powerup),
@@ -407,7 +407,7 @@ impl World {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
         self.clear_actions(player, idx)?;
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
@@ -632,7 +632,7 @@ impl World {
         let target = quarry.id;
         let engagement = self.engagement(player, idx, target)?;
         let arms = self.arms(player, idx, &task)?;
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(

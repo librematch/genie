@@ -172,7 +172,7 @@ impl BuildAction {
         actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
-        if c.w.players.player(c.player)?.computer {
+        if c.w.players.player(c.player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's builder after its work",
             ));

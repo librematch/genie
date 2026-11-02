@@ -155,7 +155,7 @@ impl UnitView<'_, '_> {
             )?
             .players()
             .player(owner)
-            .is_some_and(|q| q.computer)
+            .is_some_and(|q| q.kind.is_computer())
         };
         let capture = self
             .c

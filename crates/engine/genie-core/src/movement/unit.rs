@@ -173,7 +173,7 @@ impl Unit {
         self.own_move_gave_up(
             actions,
             c.w.parts.motion.layer_mut(self.id),
-            villager && !c.w.players.player(c.player)?.computer,
+            villager && !c.w.players.player(c.player)?.kind.is_computer(),
             stance,
             (
                 crate::objects::masters::OwnerMasters::new(

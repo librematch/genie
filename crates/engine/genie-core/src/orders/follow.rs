@@ -52,7 +52,7 @@ impl World {
             place: t.position().ground(),
             class: (0.0 < tm.radius.x() || 0.0 < tm.radius.y()).then_some(tm.class),
         };
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             500
         } else {
             60
@@ -119,7 +119,7 @@ impl World {
             ready: true,
             target_type: Some(crate::unit_ai::OrderTargetType::of_master(tm.id)),
         };
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             500
         } else {
             60

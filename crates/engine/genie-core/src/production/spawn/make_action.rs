@@ -91,7 +91,7 @@ impl World {
         {
             return Ok(());
         }
-        let busy = !self.players.player(p)?.computer
+        let busy = !self.players.player(p)?.kind.is_computer()
             && self
                 .parts
                 .actions_of(unit.id)
@@ -161,7 +161,7 @@ impl World {
                     .and_then(|m| player_master(&self.masters, p, m))
                     .map_or(Amount::ZERO, |m| population(&m.storage));
                 if housed(&self.players.player(p)?.attributes, pop)? {
-                    if self.players.player(p)?.computer {
+                    if self.players.player(p)?.kind.is_computer() {
                         self.cancel_queue(p, i)?;
                         return Ok(false);
                     }

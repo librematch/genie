@@ -218,7 +218,7 @@ impl Unit {
                         && c.w
                             .players
                             .get(p.player.index())
-                            .is_some_and(|q| q.computer)
+                            .is_some_and(|q| q.kind.is_computer())
                 })
             }),
         })
@@ -307,7 +307,7 @@ impl Unit {
         let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
         let master = Some(self.master(c.w.master_tables(), c.player)?);
         let class = master.map(|ms| ms.class);
-        let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
+        let (player, computer) = (c.player, c.w.players.player(c.player)?.kind.is_computer());
         let view = OwnerView::of(c, None)?;
         let interruptible = actions.interruptible(c.w.parts.unread.get(self.id))?;
         let at = self.surroundings(
@@ -365,7 +365,7 @@ impl Unit {
             ));
         };
         let master = Some(self.master(c.w.master_tables(), c.player)?);
-        let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
+        let (player, computer) = (c.player, c.w.players.player(c.player)?.kind.is_computer());
         let view = OwnerView::of(c, None)?;
         let attacker = self.attacker_of(
             actions,
@@ -433,9 +433,15 @@ impl Unit {
                     .then(|| c.w.player_time.get(k.new.index()).copied())
                     .flatten(),
                 k.new,
-                c.w.players.get(k.new.index()).is_some_and(|q| q.computer),
+                c.w.players
+                    .get(k.new.index())
+                    .is_some_and(|q| q.kind.is_computer()),
             ),
-            _ => (c.turn, c.player, c.w.players.player(c.player)?.computer),
+            _ => (
+                c.turn,
+                c.player,
+                c.w.players.player(c.player)?.kind.is_computer(),
+            ),
         };
         let view = OwnerView::of(c, captured.filter(|k| k.main).map(|k| k.new))?;
         // RGE_Combat_Object::update: on the owner's turn the full update (slot 4), else

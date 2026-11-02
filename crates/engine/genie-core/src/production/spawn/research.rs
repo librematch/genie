@@ -79,7 +79,7 @@ impl World {
         dt_seconds: Seconds,
     ) -> Result<UpdateCode, GenieError> {
         use crate::technology::Attributes;
-        if self.players.player(p)?.computer {
+        if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's research (its handicaps)",
             ));

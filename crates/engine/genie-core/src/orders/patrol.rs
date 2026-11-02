@@ -41,7 +41,7 @@ impl World {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             500
         } else {
             60
@@ -69,7 +69,7 @@ impl World {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             500
         } else {
             60

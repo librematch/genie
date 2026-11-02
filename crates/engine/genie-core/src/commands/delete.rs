@@ -538,7 +538,7 @@ impl World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let computer = self.players.player(owner)?.computer;
+        let computer = self.players.player(owner)?.kind.is_computer();
         let annex_of = self.parts.building_of(id).annex_of;
         let held = self
             .object_and_combat_mut(id)?

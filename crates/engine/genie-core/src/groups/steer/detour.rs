@@ -171,7 +171,10 @@ impl World {
                 radius: Distance::new(grow),
                 ..mover.walker(id)
             },
-            computer: self.players.get(p.index()).is_some_and(|q| q.computer),
+            computer: self
+                .players
+                .get(p.index())
+                .is_some_and(|q| q.kind.is_computer()),
             at: u.moved_vector(self.parts.mover_of(u.id)),
             here: u.position(),
             mask: mover.stats.restriction_mask,
@@ -402,7 +405,10 @@ impl World {
     ) -> Result<(bool, Path), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
-        let computer = self.players.get(p.index()).is_some_and(|q| q.computer);
+        let computer = self
+            .players
+            .get(p.index())
+            .is_some_and(|q| q.kind.is_computer());
         let walker = crate::movement::LongWalker {
             id,
             position: u.position(),

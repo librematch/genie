@@ -141,7 +141,7 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
     ) -> Result<(), GenieError> {
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             COMPUTER_IDS
         } else {
             HUMAN_IDS

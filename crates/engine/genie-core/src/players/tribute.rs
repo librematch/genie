@@ -114,7 +114,7 @@ impl World {
             let receiver = self.players.player_mut(to)?;
             receiver.add_attribute(attribute::TRIBUTE_RECEIVED, given)?;
             receiver.add_attribute(attribute::TRIBUTE_FROM.offset(from.index())?, given)?;
-            if receiver.computer {
+            if receiver.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's AI told of a tribute (0x20a, slot 0x3c8)",
                 ));
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn computer_player_receipt_is_not_modelled() {
         let mut t = world(true);
-        t.players[2].computer = true;
+        t.players[2].kind = crate::players::PlayerType::COMPUTER;
         assert!(
             t.tribute(player_id(1), player_id(2), &[gift(1, 10.0, 0.3); 4])
                 .is_err()

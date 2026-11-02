@@ -90,7 +90,7 @@ impl OrderCommand {
     fn any_human_unit(w: &World, units: &[Option<ObjectId>]) -> Result<bool, GenieError> {
         for &id in units {
             if let Some((p, _)) = w.object(id)
-                && !w.players.player(p)?.computer
+                && !w.players.player(p)?.kind.is_computer()
             {
                 return Ok(true);
             }
@@ -130,7 +130,7 @@ impl OrderCommand {
         if source.overruns() && !last {
             return Ok(None);
         }
-        let Some(computer) = w.players.get(player.index()).map(|p| p.computer) else {
+        let Some(computer) = w.players.get(player.index()).map(|p| p.kind.is_computer()) else {
             return Ok(None);
         };
         let checked = w.checked_units(player, &w.command_units(player, source));

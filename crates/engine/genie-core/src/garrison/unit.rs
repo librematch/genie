@@ -135,7 +135,7 @@ impl Unit {
         Ok(crate::garrison::EnterReads {
             target,
             start,
-            waits: villager && !c.w.players.player(c.player)?.computer,
+            waits: villager && !c.w.players.player(c.player)?.kind.is_computer(),
             stance: c
                 .w
                 .parts

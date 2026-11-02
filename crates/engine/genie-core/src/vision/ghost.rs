@@ -653,7 +653,7 @@ impl World {
                     for i in PlayerId::each(32).skip(1) {
                         if lost.intersects(VisionBits::visible(i)) && i != p {
                             self.make_ghost(i, at, original)?;
-                            if self.players.player(i).is_ok_and(|q| q.computer) {
+                            if self.players.player(i).is_ok_and(|q| q.kind.is_computer()) {
                                 return Err(GenieError::unsupported(
                                     "a computer player's notify of its ghost (0x20d)",
                                 ));
@@ -845,7 +845,7 @@ mod tests {
         // FUN_14118e990: player 1 explored and sees the mine's tile, player 2 explored it only;
         // Gaia gets none; the bit of a fourth player ends the walk
         let mut t = world(true);
-        t.players[2].computer = true;
+        t.players[2].kind = crate::players::PlayerType::COMPUTER;
         set_tile(&mut t, 1, 2, 0x0000_000f_0000_0002);
         t.recycling.ghosts = vec![object_id(-3)];
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
@@ -1236,7 +1236,7 @@ mod tests {
         );
         // a computer viewer gets its ghost, then its AI's notify is not modelled
         let mut t = world(true);
-        t.players[2].computer = true;
+        t.players[2].kind = crate::players::PlayerType::COMPUTER;
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0005);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),

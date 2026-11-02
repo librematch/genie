@@ -118,7 +118,7 @@ impl Unit {
                     &c.w.graphics,
                 ),
                 c.w.parts.unit_ai.get(self.id),
-                (owner.computer, c.w.world_time),
+                (owner.kind.is_computer(), c.w.world_time),
             ),
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
@@ -223,7 +223,7 @@ impl Unit {
                 (site_id, d)
             })
         } else {
-            if c.w.players.player(c.player)?.computer {
+            if c.w.players.player(c.player)?.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's hunt of its livestock (its drop-site search)",
                 ));

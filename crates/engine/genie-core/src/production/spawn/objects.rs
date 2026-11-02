@@ -401,7 +401,7 @@ impl World {
         made: &crate::objects::masters::Master,
         at: Position,
     ) -> Result<(), GenieError> {
-        if self.players.player(p)?.computer {
+        if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new building (its AI's slot 0x398)",
             ));

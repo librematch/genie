@@ -160,7 +160,6 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             Player {
                 objects: live.into(),
                 sleeping: sleeping.into(),
-                computer: false,
                 kind: genie_core::players::PlayerType::from(p.player.type_),
                 attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
                 // the second attribute array (+0x658), floats as their bits

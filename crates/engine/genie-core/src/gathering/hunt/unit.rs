@@ -68,7 +68,7 @@ impl Unit {
         let task = hunt.task;
         if hunt.target_class == Some(class::PREDATOR) {
             // a human player's hunt is done (set_state 2), a computer player's ends (1)
-            if c.w.players.player(c.player)?.computer {
+            if c.w.players.player(c.player)?.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's hunt of class 10's search (set_state 1)",
                 ));
@@ -161,7 +161,7 @@ impl Unit {
                 pathing: &mut c.w.pathing,
                 object: c.w.streams.get(Stream::Object),
                 world_time: c.w.world_time,
-                computer: c.w.players.player(c.player)?.computer,
+                computer: c.w.players.player(c.player)?.kind.is_computer(),
                 groups: &c.w.groups,
             };
             let (site, _) = self.drop_site(
@@ -462,7 +462,7 @@ impl Unit {
         let mut plan = Planning {
             pathing: &mut c.w.pathing,
             now: c.w.world_time,
-            computer: c.w.players.player(c.player)?.computer,
+            computer: c.w.players.player(c.player)?.kind.is_computer(),
             object: c.w.streams.get(Stream::Object),
             groups: &c.w.groups,
         };
@@ -517,7 +517,7 @@ impl Unit {
         c: &mut Step<'_>,
         kind: Option<GatherGroup>,
     ) -> Result<(), GenieError> {
-        if c.w.players.player(c.player)?.computer && kind != Some(GatherGroup::WOOD) {
+        if c.w.players.player(c.player)?.kind.is_computer() && kind != Some(GatherGroup::WOOD) {
             return Err(GenieError::unsupported(
                 "a computer player's hunt that found nothing after its drop-off (set_state 1)",
             ));

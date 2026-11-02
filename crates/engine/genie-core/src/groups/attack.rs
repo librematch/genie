@@ -236,7 +236,7 @@ impl World {
         let Some(computer) = g
             .owner
             .and_then(|o| self.players.get(o.index()))
-            .map(|p| p.computer)
+            .map(|p| p.kind.is_computer())
         else {
             return Ok(());
         };

@@ -4784,7 +4784,7 @@ fn built_castle_death_takes_its_headroom_and_its_count() {
         .unwrap();
     assert_eq!(t.players[1].attributes[134], Amount::ZERO);
     let mut t = world(1.0);
-    t.players[1].computer = true;
+    t.players[1].kind = PlayerType::COMPUTER;
     assert!(
         t.set_state(PlayerId::new(1), object_id(900), ObjectState::Dying)
             .is_err()
@@ -8036,7 +8036,7 @@ fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() 
             vec![
                 Player {
                     attributes: crate::test_ids::attributes(250, [0.0, 100.0, 0.0, 0.0]),
-                    computer: true,
+                    kind: PlayerType::COMPUTER,
                     ..Player::default()
                 },
                 Player {
@@ -10079,7 +10079,7 @@ fn research_check_refuses_another_player_buildings() {
         Some(object_ids([-1, 10]))
     );
     // a computer's list left without one still runs
-    t.players[1].computer = true;
+    t.players[1].kind = PlayerType::COMPUTER;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(77)), 2, vec![9, 10]))
             .unwrap(),
@@ -10087,7 +10087,7 @@ fn research_check_refuses_another_player_buildings() {
     );
     // while players may order each other's
     t.settings.cheats_enabled = true;
-    t.players[1].computer = false;
+    t.players[1].kind = PlayerType::HUMAN;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(9)), 1, vec![]))
             .unwrap(),
@@ -10316,7 +10316,7 @@ fn research_unmodelled_parts_fail() {
         "RESEARCH at another player's object"
     );
     assert_eq!(
-        fails(&|t| t.players[0].computer = true),
+        fails(&|t| t.players[0].kind = PlayerType::COMPUTER),
         "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)"
     );
     assert_eq!(
@@ -10375,7 +10375,7 @@ fn queue_takes_as_many_as_the_room_and_the_resources_allow() {
     assert_eq!(queued(&full), QueuedUnits::of_data(15));
     // a computer player fills to 2
     let mut computer = one_player(vec![centre(9)], [1000.0; 4]);
-    computer.players[0].computer = true;
+    computer.players[0].kind = PlayerType::COMPUTER;
     computer.tick_with(Millis::new(104), &[queue(9, 99, 5)]);
     assert_eq!(queued(&computer), QueuedUnits::of_data(2));
 }
@@ -10454,7 +10454,7 @@ fn queued_units_join_the_last_entry_and_full_buffer_grows() {
 #[test]
 fn computer_player_housed_building_cancels_its_queue() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.players[0].computer = true;
+    t.players[0].kind = PlayerType::COMPUTER;
     t.players[0].attributes[4] = Amount::new(0.5);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
@@ -11356,7 +11356,6 @@ fn gaia_archer_player_sees_goes_to_that_player() {
                 Player {
                     objects: vec![live(500)].into(),
                     attributes: vec![Amount::ZERO; 300],
-                    computer,
                     kind: if computer {
                         PlayerType::COMPUTER
                     } else {
@@ -13559,7 +13558,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
     )
     .unwrap();
     assert_eq!(counts(&t), crate::test_ids::amounts([0.0, 1.0, 0.0, 1.0]));
-    t.players[1].computer = true;
+    t.players[1].kind = PlayerType::COMPUTER;
     assert!(
         t.killed(
             PlayerId::new(1),
@@ -17152,7 +17151,7 @@ fn without_farm_to_make_the_farmer_idles() {
     let mut t = reseed_world();
     t.players[1].auto_farm_queue = true;
     t.players[1].attributes[1] = Amount::new(59.0);
-    t.players[1].computer = true;
+    t.players[1].kind = PlayerType::COMPUTER;
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
         .unwrap();
     let p = &t.players[1];
@@ -18312,7 +18311,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
             "a charged hit",
         ),
         (
-            |t| t.players[0].computer = true,
+            |t| t.players[0].kind = PlayerType::COMPUTER,
             "a hit on a computer player's object",
         ),
         (
@@ -18719,7 +18718,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
     );
     let t = dropped_without_bush(|t| {
         pointless(t);
-        t.players[1].computer = true;
+        t.players[1].kind = PlayerType::COMPUTER;
     });
     assert!(
         t.parts
@@ -22225,7 +22224,7 @@ fn an_order_units_are_capped_unless_its_comm_player_is_outside_the_world() {
         t.command_units(PlayerId::new(1), &UnitList::last_commanded()),
         Vec::<Option<ObjectId>>::new()
     );
-    t.players[1].computer = true;
+    t.players[1].kind = PlayerType::COMPUTER;
     assert_eq!(t.command_units(PlayerId::new(1), &listed), many[..500]);
     assert_eq!(t.most_units(outside), 0);
     t.set_last_commanded(PlayerId::new(0), object_ids([5]));
@@ -22445,7 +22444,7 @@ fn research_listed(t: &mut World, r: &ResearchCommand) -> Result<(), GenieError>
 fn explorer_world(open: &[[i32; 2]], slots: Vec<i32>) -> World {
     use crate::players::ai_module::{AiModule, InfoModule, TacticalModule};
     let mut t = forage_world();
-    t.players[1].computer = true;
+    t.players[1].kind = PlayerType::COMPUTER;
     let mut path_map = crate::movement::explore::InfluenceMap::new(GridSize::new(120, 120), 0);
     for &[x, y] in open {
         path_map.set(Tile::new(x, y), 0xff);
@@ -22517,7 +22516,7 @@ fn computer_players_ai_detasks_an_explorer_with_nothing_left_to_explore() {
 #[test]
 fn only_computer_players_explorer_notify_reaches_the_ai() {
     let mut human = explorer_world(&[[31, 89]], vec![]);
-    human.players[1].computer = false;
+    human.players[1].kind = PlayerType::HUMAN;
     let before = human.ai.clone();
     human
         .run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {

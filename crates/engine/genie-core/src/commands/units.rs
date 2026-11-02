@@ -108,8 +108,8 @@ mod tests {
 
     /// Gaia, a human player and a computer player.
     fn world() -> World {
-        let player = |computer| Player {
-            computer,
+        let player = |kind| Player {
+            kind,
             ..Player::default()
         };
         World::new(
@@ -117,7 +117,11 @@ mod tests {
             crate::world::FrameSeed::of_data(1),
             PlayerId::new(1),
             vec![Millis::ZERO; 3],
-            vec![player(false), player(false), player(true)],
+            vec![
+                player(crate::players::PlayerType::default()),
+                player(crate::players::PlayerType::HUMAN),
+                player(crate::players::PlayerType::COMPUTER),
+            ],
         )
     }
 

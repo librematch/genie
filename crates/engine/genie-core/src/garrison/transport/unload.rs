@@ -217,7 +217,7 @@ impl crate::world::World {
             Some(shore.zone(t.point.tile())?)
         };
         let count = self.unload_all(p, i, zone)?;
-        let computer = self.players.player(p)?.computer;
+        let computer = self.players.player(p)?.kind.is_computer();
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;

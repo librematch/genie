@@ -40,7 +40,7 @@ impl World {
         let loose = loose?;
         self.leave_groups(player, &loose, order.target)?;
         // FUN_140d61870: a player whose lobby entry is of type 4, which a human's is not
-        if 1 < loose.len() && self.players.player(player)?.computer {
+        if 1 < loose.len() && self.players.player(player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "an order to several units of a computer player (FUN_140d61870)",
             ));
@@ -299,7 +299,7 @@ impl World {
         loose: &[ObjectId],
         target: Option<ObjectId>,
     ) -> Result<(), GenieError> {
-        let target = if 1 < loose.len() && !self.players.player(player)?.computer {
+        let target = if 1 < loose.len() && !self.players.player(player)?.kind.is_computer() {
             None
         } else {
             self.world_object(target).map(|t| t.id())

@@ -294,7 +294,7 @@ impl World {
             computer: g
                 .owner
                 .and_then(|o| self.players.get(o.index()))
-                .is_some_and(|p| p.computer),
+                .is_some_and(|p| p.kind.is_computer()),
             members: g
                 .members
                 .iter()

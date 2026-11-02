@@ -316,7 +316,7 @@ impl World {
             }
         };
         // FUN_140d61870: a player whose lobby entry is of type 4, which a human's is not
-        if 1 < loose.len() && self.players.player(player)?.computer {
+        if 1 < loose.len() && self.players.player(player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a move of several units of a computer player (FUN_140d61870)",
             ));

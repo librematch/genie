@@ -144,7 +144,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<bool, GenieError> {
-        let computer = c.w.players.player(c.player)?.computer;
+        let computer = c.w.players.player(c.player)?.kind.is_computer();
         let site = Self::site_unit(c, reads)?;
         let pasture = match site {
             Some(u) => u.master(c.w.master_tables(), c.player)?.id == PASTURE_1889,
@@ -357,7 +357,7 @@ impl BuildAction {
         builder: &Unit,
         reads: &BuildReads,
     ) -> Result<GiveUp, GenieError> {
-        let computer = c.w.players.player(c.player)?.computer;
+        let computer = c.w.players.player(c.player)?.kind.is_computer();
         Ok(GiveUp {
             waits: reads.class == Some(class::VILLAGER) && !computer,
             stance: c

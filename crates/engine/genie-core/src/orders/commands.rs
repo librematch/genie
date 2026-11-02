@@ -34,7 +34,7 @@ impl World {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
         };
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             500
         } else {
             60
@@ -119,7 +119,7 @@ impl World {
         ids: &[Option<ObjectId>],
     ) -> Result<(), GenieError> {
         use crate::unit_ai::QueuedOrder;
-        let cap = if self.players.player(player)?.computer {
+        let cap = if self.players.player(player)?.kind.is_computer() {
             500
         } else {
             60
@@ -282,7 +282,7 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let checked = ids.len().min(if computer { 500 } else { 60 });
         let mut ids = ids.to_vec();
         let mut dropped = 0;
@@ -320,7 +320,7 @@ impl World {
         ids: &[Option<ObjectId>],
         pick: crate::commands::UnloadPick,
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let mut ids: Vec<Option<ObjectId>> = ids
             .iter()
             .take(if computer { 500 } else { 60 })

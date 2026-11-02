@@ -244,7 +244,7 @@ impl World {
             return Ok(());
         }
         let (radius, trained_at) = (site.radius, site.trained_at.clone());
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let builders: &[Option<ObjectId>] = if computer && builders.first() == Some(&None) {
             &[]
         } else {

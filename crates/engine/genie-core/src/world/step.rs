@@ -252,7 +252,7 @@ impl Step<'_> {
         Ok(Pace {
             dt: self.dt.seconds(),
             now: self.w.world_time,
-            computer: self.w.players.player(self.player)?.computer,
+            computer: self.w.players.player(self.player)?.kind.is_computer(),
         })
     }
 }
@@ -268,7 +268,7 @@ impl Step<'_> {
         place: &'b mut crate::objects::layers::Static,
         me: Me,
     ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
-        let computer = self.w.players.player(self.player)?.computer;
+        let computer = self.w.players.player(self.player)?.kind.is_computer();
         let (object, sprite) = self.w.streams.object_and_sprite();
         let parts = &mut self.w.parts;
         let (motion, motions) = parts.motion.lend(me.id);

@@ -71,7 +71,7 @@ impl World {
             return Ok(());
         };
         let owner = self.players.player(player)?;
-        let limit = if owner.computer { 500 } else { 60 };
+        let limit = if owner.kind.is_computer() { 500 } else { 60 };
         let empty = Masters::default();
         let masters = self.masters.of(player).unwrap_or(&empty);
         let Some(unit) = masters.get(unit_id) else {
@@ -81,7 +81,7 @@ impl World {
         if found.is_empty() {
             return Ok(());
         }
-        let per = if owner.computer {
+        let per = if owner.kind.is_computer() {
             COMPUTER_QUEUE_LIMIT
         } else {
             QUEUE_LIMIT
@@ -249,7 +249,7 @@ impl World {
             None
         };
         if 1 < r.count {
-            let limit = if self.players.player(r.player)?.computer {
+            let limit = if self.players.player(r.player)?.kind.is_computer() {
                 500
             } else {
                 60

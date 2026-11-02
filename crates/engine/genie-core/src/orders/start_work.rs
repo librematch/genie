@@ -295,7 +295,7 @@ impl World {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
-            computer: owner.computer,
+            computer: owner.kind.is_computer(),
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };

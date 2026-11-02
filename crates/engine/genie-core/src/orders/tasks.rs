@@ -355,7 +355,7 @@ impl World {
             tm.class,
             crate::construction::repair::SHIPS.contains(&tm.class),
         );
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let repair = self
             .parts
             .actions_of(self.players.live(player, idx)?.id)
@@ -522,7 +522,7 @@ impl World {
             build.retarget(foundation, target_at, walk, mover)?;
             return Ok(class);
         }
-        let computer = self.players.player(player)?.computer;
+        let computer = self.players.player(player)?.kind.is_computer();
         let Some(Place::Live(fp, fi)) = self.place(target) else {
             return Err(GenieError::unsupported("a Build's foundation that sleeps"));
         };

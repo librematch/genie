@@ -278,7 +278,10 @@ impl World {
             solid: mover.stats.radius.sized(),
             ignore_units: mover.ignore_units.clone(),
             player: p,
-            computer: self.players.get(p.index()).is_some_and(|q| q.computer),
+            computer: self
+                .players
+                .get(p.index())
+                .is_some_and(|q| q.kind.is_computer()),
             group,
         })
     }

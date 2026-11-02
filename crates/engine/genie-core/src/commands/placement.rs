@@ -74,7 +74,7 @@ impl World {
         master: MasterId,
         builders: &[Option<ObjectId>],
     ) -> Result<bool, GenieError> {
-        if self.players.player(player)?.computer {
+        if self.players.player(player)?.kind.is_computer() {
             return Ok(true);
         }
         let trained_at = self.master(player, master)?.trained_at.clone();
@@ -97,7 +97,7 @@ impl World {
         master: MasterId,
         at: Point,
     ) -> Result<bool, GenieError> {
-        let human = !self.players.player(player)?.computer;
+        let human = !self.players.player(player)?.kind.is_computer();
         if !self.placement_code(player, master, at, human)?.is_allowed() {
             return Ok(false);
         }

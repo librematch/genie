@@ -84,7 +84,8 @@ impl Unit {
             radius: own.radius,
             scenario: c.w.settings.game_mode.scenario(),
             rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.work_rate,
-            waits: own.class == class::VILLAGER && !c.w.players.player(c.player)?.computer,
+            waits: own.class == class::VILLAGER
+                && !c.w.players.player(c.player)?.kind.is_computer(),
             stance: c
                 .w
                 .parts

@@ -419,7 +419,7 @@ impl World {
         let crate::world::index::Place::Live(p, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
-        let computer = self.players.player(p)?.computer;
+        let computer = self.players.player(p)?.kind.is_computer();
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(p, idx)?;
         let me = unit.me(self.parts.actions_of(unit.id));

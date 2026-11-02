@@ -63,13 +63,17 @@ fn rec(id: i32, x: f32, y: f32) -> VisibleResource {
 #[test]
 fn the_first_other_player_that_sees_the_object_takes_it_over() {
     use crate::world::player::Player;
-    let players = |computers: [bool; 4]| {
-        computers.map(|computer| Player {
-            computer,
+    let (human, computer) = (
+        crate::players::PlayerType::HUMAN,
+        crate::players::PlayerType::COMPUTER,
+    );
+    let players = |kinds: [crate::players::PlayerType; 4]| {
+        kinds.map(|kind| Player {
+            kind,
             ..Player::default()
         })
     };
-    let humans = players([false; 4]);
+    let humans = players([human; 4]);
     let none = [false; 4];
     assert_eq!(
         sight_taker(
@@ -111,7 +115,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         ),
         None
     );
-    let ai = players([false, true, false, true]);
+    let ai = players([human, computer, human, computer]);
     let allows = [false, false, false, true];
     assert_eq!(
         sight_taker(

@@ -307,7 +307,7 @@ impl World {
             .get(u.id)
             .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
         let ai_type = ai.ai_type;
-        if self.players.player(p)?.computer {
+        if self.players.player(p)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's group member's search (its cared classes)",
             ));

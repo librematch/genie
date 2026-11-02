@@ -157,7 +157,7 @@ impl Unit {
             && c.w
                 .players
                 .get(aimed.player.index())
-                .is_some_and(|q| q.computer)
+                .is_some_and(|q| q.kind.is_computer())
         {
             return Err(GenieError::unsupported(
                 "a hit on a computer player's object (its notify 0x214)",
@@ -277,7 +277,7 @@ impl Unit {
             && c.w
                 .players
                 .get(aimed.player.index())
-                .is_some_and(|q| q.computer)
+                .is_some_and(|q| q.kind.is_computer())
         {
             return Err(GenieError::unsupported(
                 "a missile fired at a computer player's object (its notify 0x20f)",

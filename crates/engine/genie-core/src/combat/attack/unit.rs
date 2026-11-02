@@ -97,7 +97,7 @@ impl Unit {
         let computer =
             c.w.players
                 .get(c.player.index())
-                .is_some_and(|q| q.computer);
+                .is_some_and(|q| q.kind.is_computer());
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,
@@ -138,7 +138,7 @@ impl Unit {
         let computer =
             c.w.players
                 .get(c.player.index())
-                .is_some_and(|q| q.computer);
+                .is_some_and(|q| q.kind.is_computer());
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,

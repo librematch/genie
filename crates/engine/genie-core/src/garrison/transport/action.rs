@@ -219,7 +219,7 @@ impl TransportAction {
         r: &TransportReads,
     ) -> Result<UpdateCode, GenieError> {
         let walked = self.walk(c, unit, me)?;
-        let computer = c.w.players.player(c.player)?.computer;
+        let computer = c.w.players.player(c.player)?.kind.is_computer();
         let World {
             spatial,
             zones,

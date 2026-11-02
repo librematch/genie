@@ -234,11 +234,11 @@ impl World {
         q: PlayerId,
         position: Position,
     ) -> Result<(), GenieError> {
-        if self.players.player(p)?.computer
+        if self.players.player(p)?.kind.is_computer()
             // the game compares the other player's number with the market's id (`+0x8`,
             // FUN_1411d50e0's `param_2 != param_1[1]`): its slip, kept
             || i32::from(q.get()) == id.get()
-            || !self.players.player(q)?.computer
+            || !self.players.player(q)?.kind.is_computer()
         {
             return Ok(());
         }

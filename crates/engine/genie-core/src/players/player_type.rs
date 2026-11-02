@@ -20,6 +20,12 @@ impl PlayerType {
     pub const fn get(self) -> u8 {
         self.0
     }
+
+    /// `FUN_141659cf0`: a computer player's (`player+0x10 == 3`).
+    #[must_use]
+    pub const fn is_computer(self) -> bool {
+        self.0 == Self::COMPUTER.0
+    }
 }
 
 impl From<u8> for PlayerType {

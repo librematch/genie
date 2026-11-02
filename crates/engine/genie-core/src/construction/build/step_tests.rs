@@ -1038,12 +1038,15 @@ fn builder_set_state_7_clears_stump_and_joins() {
 /// point.
 #[test]
 fn another_player_marks_on_the_footprint_halt_the_build() {
-    for (computer, kept) in [
-        (false, ObjectState::Removed),
-        (true, ObjectState::Foundation),
+    for (kind, kept) in [
+        (crate::players::PlayerType::HUMAN, ObjectState::Removed),
+        (
+            crate::players::PlayerType::COMPUTER,
+            ObjectState::Foundation,
+        ),
     ] {
         let mut t = site_world(class::VILLAGER, Position::new(12.5, 10.5, 0.0), placing());
-        t.players[1].computer = computer;
+        t.players[1].kind = kind;
         stump(&mut t);
         sighted(&mut t);
         // player 3's mark on a tile of the footprint (10, 10)
@@ -1056,7 +1059,7 @@ fn another_player_marks_on_the_footprint_halt_the_build() {
             (b.state, b.target, b.point),
             (BuildState::Halted, None, Position::from([-1.0; 3]))
         );
-        assert_eq!((house(&t).1, house(&t).2), (0, kept), "{computer}");
+        assert_eq!((house(&t).1, house(&t).2), (0, kept), "{kind}");
         assert!(stands(&t));
     }
 }

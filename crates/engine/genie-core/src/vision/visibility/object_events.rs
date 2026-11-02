@@ -41,7 +41,9 @@ pub fn sight_taker(
         .zip(players)
         .skip(1)
         .filter(|&(q, player)| {
-            standard || !player.computer || allows.get(q.index()).copied().unwrap_or(false)
+            standard
+                || !player.kind.is_computer()
+                || allows.get(q.index()).copied().unwrap_or(false)
         })
         .map(|(q, _)| q)
         .find(|&q| q != owner && mask.intersects(VisionBits::visible(q)))

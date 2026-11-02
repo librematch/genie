@@ -91,7 +91,10 @@ impl World {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let g = self.groups.held(group)?;
-        let computer = self.players.get(p.index()).is_some_and(|q| q.computer);
+        let computer = self
+            .players
+            .get(p.index())
+            .is_some_and(|q| q.kind.is_computer());
         let solid = mover.stats.radius.sized();
         let found = if solid {
             let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();

@@ -156,7 +156,7 @@ impl Unit {
                 .walk_back(Distance::ZERO, mover, &walks)
                 .map(|()| HeadCode::Keeps);
         }
-        if c.w.players.player(c.player)?.computer {
+        if c.w.players.player(c.player)?.kind.is_computer() {
             return Ok(HeadCode::Deletes);
         }
         let carry_to = gather.carry_to;
@@ -231,7 +231,7 @@ impl Unit {
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
         let master = self.master(c.w.master_tables(), c.player)?;
         let (computer, farm_stops) = (
-            c.w.players.player(c.player)?.computer,
+            c.w.players.player(c.player)?.kind.is_computer(),
             c.w.settings.walkable_farms,
         );
         let walks = self.move_walks(
@@ -355,7 +355,7 @@ impl Unit {
             pathing: &mut c.w.pathing,
             object: c.w.streams.get(Stream::Object),
             world_time: c.w.world_time,
-            computer: c.w.players.player(c.player)?.computer,
+            computer: c.w.players.player(c.player)?.kind.is_computer(),
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;

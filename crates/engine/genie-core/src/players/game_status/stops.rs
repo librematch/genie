@@ -135,7 +135,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<bool, GenieError> {
-        let computer = self.players.player(p)?.computer;
+        let computer = self.players.player(p)?.kind.is_computer();
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;

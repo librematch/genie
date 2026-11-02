@@ -146,7 +146,7 @@ impl BuildAction {
     pub(super) fn remove_marked(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
         if let Some(target) = self.target
             && let Some((q, _)) = c.w.object(target)
-            && !c.w.players.player(q)?.computer
+            && !c.w.players.player(q)?.kind.is_computer()
         {
             c.w.remove_building(q, target.id())?;
         }

@@ -3998,7 +3998,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
     // a computer player's AI would hear it, which is not modelled
     let mut t = coast_world(Point::new(10.5, 10.5));
     t.build_mesh().unwrap();
-    t.players[1].computer = true;
+    t.players[1].kind = crate::players::PlayerType::COMPUTER;
     UnloadCommand {
         player: player_id(1),
         units: unit_list(object_ids([200])),
@@ -4282,7 +4282,7 @@ fn siege_tower_unload_on_new_relation_is_not_modelled() {
 /// computer's tile list); a computer's market, or a human ally, hears nothing.
 #[test]
 fn market_tells_computer_ally_of_its_tile() {
-    let market = |computer_ally: bool, own_computer: bool| {
+    let market = |ally: crate::players::PlayerType, own: crate::players::PlayerType| {
         let mut t = let_out_world();
         for m in &mut t.masters {
             let mut market = m.get(TC).unwrap().clone();
@@ -4291,8 +4291,8 @@ fn market_tells_computer_ally_of_its_tile() {
         }
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::MARKET;
         t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(10.5, 12.5, 0.0));
-        t.players[2].computer = computer_ally;
-        t.players[1].computer = own_computer;
+        t.players[2].kind = ally;
+        t.players[1].kind = own;
         let mut v = crate::vision::visibility::Visibility::new(
             GridSize::new(20, 20),
             Vec::new(),
@@ -4312,9 +4312,13 @@ fn market_tells_computer_ally_of_its_tile() {
         .unwrap();
         t.spatial.sight.unwrap().new_tiles[2].clone()
     };
-    assert_eq!(market(true, false), [Tile::new(10, 12)]);
-    assert_eq!(market(false, false), Vec::<Tile>::new());
-    assert_eq!(market(true, true), Vec::<Tile>::new());
+    let (human, computer) = (
+        crate::players::PlayerType::HUMAN,
+        crate::players::PlayerType::COMPUTER,
+    );
+    assert_eq!(market(computer, human), [Tile::new(10, 12)]);
+    assert_eq!(market(human, human), Vec::<Tile>::new());
+    assert_eq!(market(computer, computer), Vec::<Tile>::new());
 }
 
 #[test]

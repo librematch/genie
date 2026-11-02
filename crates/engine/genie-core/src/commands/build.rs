@@ -58,7 +58,7 @@ impl BuildCommand {
         let Some(builders) = w.command_check(player, listed)? else {
             return Ok(());
         };
-        if self.queue_id.is_queued() && !w.players.player(player)?.computer {
+        if self.queue_id.is_queued() && !w.players.player(player)?.kind.is_computer() {
             return Ok(());
         }
         let (x, y) = (self.position.x(), self.position.y());

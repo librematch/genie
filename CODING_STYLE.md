@@ -257,8 +257,19 @@ fn command(raw: i32) -> Result<(), GenieError> {
 - Make a closed set of values an enum and match it whole.
 - Give a public enum of a format crate `#[non_exhaustive]` or an `Unknown(…)` variant. A newer
   game can write a value that the enum does not know yet.
-- Make a two-way choice of genie's own an enum, not a `bool` parameter (C-CUSTOM-TYPE). A flag
-  that the game itself holds stays a `bool` field, with its offset in the doc.
+- Give `true` and `false` a meaning (C-CUSTOM-TYPE, T9b). A `bool` parameter, a literal
+  `true` or `false` argument and a field that chooses between two named states (a mode, a side,
+  a direction) become an enum whose variants name both choices: the call reads as the choice.
+  A tuple of flags becomes a struct of such enums. A `-> bool` whose name asks no question (an
+  update's "done" or "found") becomes an enum of its outcomes, or an `Option` or a `Result`
+  where it carries a value.
+- A `bool` that stands for a value genie types becomes that type, and is never a copy of it:
+  a player is a computer by its `PlayerType` (`PlayerType::is_computer`, the game's
+  `FUN_141659cf0`).
+- A predicate stays a `bool`: a function named `is_`, `has_` or `can_`, and a field whose name
+  answers yes or no at every use (`allied`, `tall`, `desolid`; a game flag with its offset in
+  the doc). A game flag of more than two values becomes its enum with all of them (the snow
+  flag `+0xc61`: 0, 1, 2).
 - Prefer existence to a flag. A state shows by the list or table that holds the object, not by
   a `bool` that every system tests.
 

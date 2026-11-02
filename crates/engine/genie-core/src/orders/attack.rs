@@ -61,7 +61,7 @@ impl World {
                 &self.graphics,
             ),
             self.parts.unit_ai.get(u.id),
-            (held.computer, world_time),
+            (held.kind.is_computer(), world_time),
         );
         let own = crate::combat::victims::victim_of(
             (

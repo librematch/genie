@@ -316,7 +316,7 @@ impl BuildAction {
         }
         // UCOMISS against −1 (DAT_14330ec20): a NaN is not
         if self.point.x() == -1.0 || self.point.y() == -1.0 {
-            if c.w.players.player(c.player)?.computer {
+            if c.w.players.player(c.player)?.kind.is_computer() {
                 self.end(c, builder, BuildState::Done)?;
             } else {
                 self.halt_in(c, builder, reads)?;

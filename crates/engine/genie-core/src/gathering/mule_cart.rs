@@ -44,7 +44,7 @@ impl World {
         else {
             return Ok(());
         };
-        let found = if current.is_none() && !self.players.player(p)?.computer {
+        let found = if current.is_none() && !self.players.player(p)?.kind.is_computer() {
             Some(self.cart_find(p, idx)?)
         } else {
             None
@@ -152,7 +152,7 @@ impl World {
                 plan: Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,
-                    computer: player.computer,
+                    computer: player.kind.is_computer(),
                     object: self.streams.get(Stream::Object),
                     groups: &self.groups,
                 },

@@ -397,7 +397,7 @@ impl World {
         if master.kind != BUILDING || building.life.state != ObjectState::Alive || !at {
             return Ok(None);
         }
-        if owner.computer {
+        if owner.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)",
             ));

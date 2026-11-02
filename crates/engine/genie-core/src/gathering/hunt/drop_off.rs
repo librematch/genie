@@ -225,7 +225,7 @@ impl Unit {
             pathing: &mut c.w.pathing,
             object: c.w.streams.get(Stream::Object),
             world_time: c.w.world_time,
-            computer: c.w.players.player(c.player)?.computer,
+            computer: c.w.players.player(c.player)?.kind.is_computer(),
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;

@@ -236,7 +236,7 @@ impl ExploreAction {
         .ok();
         let villager = master.is_some_and(|m| m.class == class::VILLAGER);
         let gives_up = GiveUp {
-            waits: villager && !c.w.players.player(c.player)?.computer,
+            waits: villager && !c.w.players.player(c.player)?.kind.is_computer(),
             stance: c
                 .w
                 .parts
