@@ -49,7 +49,7 @@ pub(super) fn map_terrain(
     t.set_elevations(
         map.rows
             .iter()
-            .flat_map(|r| r.tiles.iter().map(|t| t.t_m_elevation))
+            .flat_map(|r| r.tiles.iter().map(|t| t.elevation))
             .collect(),
     );
     t
@@ -195,7 +195,7 @@ pub(super) fn spatial(
             // foundation made desolid lost them (FUN_1411cf770); so do a combat unit's that does
             // not move and is more than a tile wide (FUN_14108c320). A building keeps its
             // footprint's UMV entry (+0x904)
-            let place = Position::new(s.t_x, s.t_y, s.t_z);
+            let place = Position::new(s.tx, s.ty, s.tz);
             let footprint = m.radius.ground();
             let speed = moving_speed(o, s, section.objects());
             let links = building.map_or_else(
@@ -262,7 +262,7 @@ pub(super) fn spatial(
             out.insert(
                 ObjectId::try_from(s.id)?,
                 Placed {
-                    position: Position::new(s.t_x, s.t_y, s.t_z),
+                    position: Position::new(s.tx, s.ty, s.tz),
                     radius: m.radius.ground(),
                     class: m.class,
                     player,
@@ -278,15 +278,12 @@ pub(super) fn spatial(
             // an object inside another left its tile's list and the obstruction manager
             // (FUN_1411921d0)
             if s.inside_obj != -1 {
-                out.go_inside(id, Position::new(s.t_x, s.t_y, s.t_z));
+                out.go_inside(id, Position::new(s.tx, s.ty, s.tz));
             }
         }
         for ghost in section.objects().doppleganger_objects.objects() {
             if let Some(s) = ghost.static_part() {
-                out.insert_ghost(
-                    ObjectId::try_from(s.id)?,
-                    Position::new(s.t_x, s.t_y, s.t_z),
-                );
+                out.insert_ghost(ObjectId::try_from(s.id)?, Position::new(s.tx, s.ty, s.tz));
             }
         }
     }

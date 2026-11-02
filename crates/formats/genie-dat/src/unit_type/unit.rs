@@ -56,9 +56,9 @@ impl UnitType {
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
     ///
     /// Also fails if the base class is not a known [`UnitBaseClass`], if the name is not valid
-    /// UTF-8, or if the garrison sprite ID does not fit a [`SpriteID`].
+    /// UTF-8, or if the garrison sprite ID does not fit a [`SpriteId`].
     ///
-    /// [`SpriteID`]: crate::sprite::SpriteID
+    /// [`SpriteId`]: crate::sprite::SpriteId
     pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
         let unit_base_class = input.read_u8()?.try_into().map_err(invalid_data)?;
         let static_ = StaticUnitTypeAttributes::read_from(&mut input, version)?;

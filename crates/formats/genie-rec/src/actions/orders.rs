@@ -1,19 +1,19 @@
 //! The orders: order, stop, work, move, create, add resource and the AI's order (`0x0a`).
 
 use crate::actions::{Location2, Location3, ObjectsList};
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, UnitTypeID, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitTypeId, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Task an object to a target object or a target location.
 #[derive(Debug, Default, Clone)]
 pub struct OrderCommand {
     /// The ID of the player executing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The target object of this order.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The target location of this order.
     pub location: Location2,
     /// The objects this command applies to.
@@ -96,7 +96,7 @@ impl StopCommand {
 #[derive(Debug, Default, Clone)]
 pub struct WorkCommand {
     /// The target object of this command.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The target location of this command.
     pub location: Location2,
     /// The objects being tasked.
@@ -143,9 +143,9 @@ impl WorkCommand {
 #[derive(Debug, Default, Clone)]
 pub struct MoveCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The target object of this command.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The target location of this command.
     pub location: Location2,
     /// The objects being tasked.
@@ -197,9 +197,9 @@ impl MoveCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CreateCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The type of unit to create.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// The location.
     pub location: Location3,
 }
@@ -247,7 +247,7 @@ impl CreateCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AddResourceCommand {
     /// The player this command applies to.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The resource to add.
     pub resource: u8,
     /// The amount to add to this resource. May be negative for subtracting.
@@ -288,11 +288,11 @@ impl AddResourceCommand {
 
 /// An order that an AI player gives to its objects (command `0x0a`).
 #[derive(Debug, Default, Clone)]
-pub struct AIOrderCommand {
+pub struct AiOrderCommand {
     /// The ID of the player the command belongs to (the first player byte).
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The second player byte, read as the player issuing the order; not verified.
-    pub issuer: PlayerID,
+    pub issuer: PlayerId,
     /// The objects receiving the order. A single object is stored in the fixed part of the
     /// command, more than one in a list after it.
     pub objects: ObjectsList,
@@ -301,9 +301,9 @@ pub struct AIOrderCommand {
     /// The priority of the order.
     pub order_priority: i8,
     /// The target object, if any.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The owner of the target, if any.
-    pub target_player_id: Option<PlayerID>,
+    pub target_player_id: Option<PlayerId>,
     /// The target location.
     pub target_location: Location3,
     /// The range of the order.
@@ -314,7 +314,7 @@ pub struct AIOrderCommand {
     pub add_to_front: bool,
 }
 
-impl AIOrderCommand {
+impl AiOrderCommand {
     /// Read an AI order command from an input stream.
     ///
     /// # Errors

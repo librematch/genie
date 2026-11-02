@@ -1,7 +1,7 @@
 //! The embeddable scenario data ([`TribeScen`]) and its reader.
 
 use crate::Result;
-use crate::format::RGEScen;
+use crate::format::RgeScen;
 use crate::player::PlayerStartResources;
 use crate::types::{DiplomaticStance, StartingAge};
 use crate::victory::{LegacyVictoryInfo, VictoryInfo};
@@ -23,7 +23,7 @@ pub struct TribeScen {
     /// This distinction doesn't make much sense as a user of this library, but
     /// it exists internally in `AoC` and affects the storage format (eg.  some
     /// things are duplicate).
-    pub(crate) base: RGEScen,
+    pub(crate) base: RgeScen,
     /// Starting resources for players.
     pub(super) player_start_resources: Vec<PlayerStartResources>,
     /// Victory settings.
@@ -112,7 +112,7 @@ impl TribeScen {
     /// Returns an error if reading fails, if a string cannot be decoded, or if a diplomatic
     /// stance or starting age is unknown.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
-        let mut base = RGEScen::read_from(&mut input)?;
+        let mut base = RgeScen::read_from(&mut input)?;
         let version = base.version;
         let player_start_resources = read_players(&mut input, &mut base)?;
         read_separator(&mut input, version)?;
@@ -185,7 +185,7 @@ pub(super) fn read_separator(mut input: impl Read, version: f32) -> Result<()> {
 
 /// The players' starting resources; up to 1.13 (before the base held them) each player's name,
 /// then its activity, resources, type, civilization and posture, into `base`.
-fn read_players(mut input: impl Read, base: &mut RGEScen) -> Result<Vec<PlayerStartResources>> {
+fn read_players(mut input: impl Read, base: &mut RgeScen) -> Result<Vec<PlayerStartResources>> {
     let version = base.version;
     let mut player_start_resources = vec![PlayerStartResources::default(); 16];
     // Moved to RGEScen in 1.13

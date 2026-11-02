@@ -7,31 +7,31 @@ use std::io::{Read, Result, Write};
 
 /// An ID identifying a sound.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct SoundID(u16);
-impl From<u16> for SoundID {
+pub struct SoundId(u16);
+impl From<u16> for SoundId {
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<SoundID> for u16 {
-    fn from(n: SoundID) -> Self {
+impl From<SoundId> for u16 {
+    fn from(n: SoundId) -> Self {
         n.0
     }
 }
 
-impl From<SoundID> for usize {
-    fn from(n: SoundID) -> Self {
+impl From<SoundId> for usize {
+    fn from(n: SoundId) -> Self {
         n.0.into()
     }
 }
 
-fallible_try_into!(SoundID, i16);
-infallible_try_into!(SoundID, i32);
-infallible_try_into!(SoundID, u32);
-fallible_try_from!(SoundID, i16);
-fallible_try_from!(SoundID, i32);
-fallible_try_from!(SoundID, u32);
+fallible_try_into!(SoundId, i16);
+infallible_try_into!(SoundId, i32);
+infallible_try_into!(SoundId, u32);
+fallible_try_from!(SoundId, i16);
+fallible_try_from!(SoundId, i32);
+fallible_try_from!(SoundId, u32);
 
 /// A "conceptual" sound, consisting of one or a group of sound files.
 ///
@@ -40,7 +40,7 @@ fallible_try_from!(SoundID, u32);
 #[derive(Debug, Default, Clone)]
 pub struct Sound {
     /// Unique ID for this sound.
-    pub id: SoundID,
+    pub id: SoundId,
     /// TODO document.
     pub play_delay: i16,
     /// TODO document.

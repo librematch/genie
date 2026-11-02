@@ -4,14 +4,14 @@ use crate::ai::read_id_list;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Waypoint;
-use crate::{ObjectID, Result};
+use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::ReadStringsExt;
 use std::io::{Read, Write};
 
 /// The diplomacy AI module: how the AI feels about each player.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct DiplomacyAI {
+pub struct DiplomacyAi {
     /// How much this AI dislikes each player, 0-100.
     pub dislike: [u32; 10],
     /// How much this AI likes each player, 0-100.
@@ -20,7 +20,7 @@ pub struct DiplomacyAI {
     pub changeable: [u8; 10],
 }
 
-impl ReadableHeaderElement for DiplomacyAI {
+impl ReadableHeaderElement for DiplomacyAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self::default();
         for i in 0..10 {
@@ -34,12 +34,12 @@ impl ReadableHeaderElement for DiplomacyAI {
 
 /// The emotional AI module.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct EmotionalAI {
+pub struct EmotionalAi {
     /// The AI's six emotional state values.
     pub state: [u32; 6],
 }
 
-impl ReadableHeaderElement for EmotionalAI {
+impl ReadableHeaderElement for EmotionalAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self::default();
         input.read_u32_into::<LE>(&mut ai.state)?;
@@ -49,19 +49,19 @@ impl ReadableHeaderElement for EmotionalAI {
 
 /// The resource AI module.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct ResourceAI {
+pub struct ResourceAi {
     /// The number of resources the module tracks.
     pub num_resources: u32,
 }
 
-impl ReadableHeaderElement for ResourceAI {
+impl ReadableHeaderElement for ResourceAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let num_resources = input.read_u32::<LE>()?;
         Ok(Self { num_resources })
     }
 }
 
-impl WritableHeaderElement for ResourceAI {
+impl WritableHeaderElement for ResourceAi {
     fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
         output.write_u32::<LE>(self.num_resources)?;
         Ok(())
@@ -70,7 +70,7 @@ impl WritableHeaderElement for ResourceAI {
 
 /// The strategy AI module: the AI's victory condition, targets and rules.
 #[derive(Debug, Default, Clone)]
-pub struct StrategyAI {
+pub struct StrategyAi {
     /// The victory condition the AI pursues now.
     pub current_victory_condition: u32,
     /// The ID of the current target.
@@ -101,7 +101,7 @@ pub struct StrategyAI {
     pub expert_list_id: Option<u32>,
 }
 
-impl ReadableHeaderElement for StrategyAI {
+impl ReadableHeaderElement for StrategyAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             current_victory_condition: input.read_u32::<LE>()?,
@@ -131,29 +131,29 @@ impl ReadableHeaderElement for StrategyAI {
 /// Reading it is not finished: the reader stops after `trade_carts`, so the later fields are
 /// never filled in.
 #[derive(Debug, Default, Clone)]
-pub struct TacticalAI {
+pub struct TacticalAi {
     /// The AI's civilian units.
-    pub civilians: Vec<ObjectID>,
+    pub civilians: Vec<ObjectId>,
     /// The civilians used as explorers.
-    pub civilian_explorers: Vec<ObjectID>,
+    pub civilian_explorers: Vec<ObjectId>,
     /// The AI's soldiers.
-    pub soldiers: Vec<ObjectID>,
+    pub soldiers: Vec<ObjectId>,
     /// The soldiers that are in no group.
-    pub ungrouped_soldiers: Vec<ObjectID>,
+    pub ungrouped_soldiers: Vec<ObjectId>,
     /// The AI's boats.
-    pub boats: Vec<ObjectID>,
+    pub boats: Vec<ObjectId>,
     /// The AI's war boats.
-    pub war_boats: Vec<ObjectID>,
+    pub war_boats: Vec<ObjectId>,
     /// The AI's fishing boats.
-    pub fishing_boats: Vec<ObjectID>,
+    pub fishing_boats: Vec<ObjectId>,
     /// The AI's trade boats.
-    pub trade_boats: Vec<ObjectID>,
+    pub trade_boats: Vec<ObjectId>,
     /// The AI's transport boats.
-    pub transport_boats: Vec<ObjectID>,
+    pub transport_boats: Vec<ObjectId>,
     /// The artifacts (such as relics) the AI knows of.
-    pub artifacts: Vec<ObjectID>,
+    pub artifacts: Vec<ObjectId>,
     /// The AI's trade carts.
-    pub trade_carts: Vec<ObjectID>,
+    pub trade_carts: Vec<ObjectId>,
     /// The AI's strategic numbers. Not read yet.
     pub strategic_numbers: Vec<i32>,
     /// The players the AI attacks. Not read yet.
@@ -163,7 +163,7 @@ pub struct TacticalAI {
     /// The AI's working area. Not read yet.
     pub working_area: Vec<u32>,
     /// The units the AI gave tasks in this update. Not read yet.
-    pub units_tasked_this_update: Vec<ObjectID>,
+    pub units_tasked_this_update: Vec<ObjectId>,
     /// How the AI's gatherers are spread over the four resources. Not read yet.
     pub gatherer_distribution: [u32; 4],
     /// How the AI wants its gatherers spread over the four resources. Not read yet.
@@ -176,7 +176,7 @@ pub struct TacticalAI {
     pub groups: Vec<()>,
 }
 
-impl ReadableHeaderElement for TacticalAI {
+impl ReadableHeaderElement for TacticalAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self {
             civilians: read_id_list(input)?,

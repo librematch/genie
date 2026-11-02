@@ -1,14 +1,14 @@
-use super::{DRSHeader, DRSResource, DRSTable, DRSTableIterator, ResourceType};
+use super::{DrsHeader, DrsResource, DrsTable, DrsTableIterator, ResourceType};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 
 /// A DRS archive reader.
 #[derive(Debug)]
-pub struct DRSReader {
-    header: DRSHeader,
-    tables: Vec<DRSTable>,
+pub struct DrsReader {
+    header: DrsHeader,
+    tables: Vec<DrsTable>,
 }
 
-impl DRSReader {
+impl DrsReader {
     /// Create a new DRS archive reader for the given handle.
     /// The handle must be `Read`able and `Seek`able.
     ///
@@ -19,7 +19,7 @@ impl DRSReader {
     where
         R: Read + Seek,
     {
-        let header = DRSHeader::from(handle)?;
+        let header = DrsHeader::from(handle)?;
         let mut drs = Self {
             header,
             tables: vec![],
@@ -32,7 +32,7 @@ impl DRSReader {
     /// Read the list of tables the header counts.
     fn read_tables<R: Read + Seek>(&mut self, handle: &mut R) -> Result<(), Error> {
         for _ in 0..self.header.num_resource_types {
-            let table = DRSTable::from(handle)?;
+            let table = DrsTable::from(handle)?;
             self.tables.push(table);
         }
         Ok(())
@@ -48,7 +48,7 @@ impl DRSReader {
 
     /// Get the table for the given resource type.
     #[must_use]
-    pub fn get_table(&self, resource_type: ResourceType) -> Option<&DRSTable> {
+    pub fn get_table(&self, resource_type: ResourceType) -> Option<&DrsTable> {
         self.tables
             .iter()
             .find(|table| table.resource_type == resource_type)
@@ -56,7 +56,7 @@ impl DRSReader {
 
     /// Get a resource of a given type and ID.
     #[must_use]
-    pub fn get_resource(&self, resource_type: ResourceType, id: u32) -> Option<&DRSResource> {
+    pub fn get_resource(&self, resource_type: ResourceType, id: u32) -> Option<&DrsResource> {
         self.get_table(resource_type)
             .and_then(|table| table.get_resource(id))
     }
@@ -85,7 +85,7 @@ impl DRSReader {
         resource_type: ResourceType,
         id: u32,
     ) -> Result<impl Read, Error> {
-        let &DRSResource { size, offset, .. } = self
+        let &DrsResource { size, offset, .. } = self
             .get_resource(resource_type, id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "Resource not found in this archive"))?;
 
@@ -118,7 +118,7 @@ impl DRSReader {
 
     /// Iterate over the tables in this DRS archive.
     #[inline]
-    pub fn tables(&self) -> DRSTableIterator<'_> {
+    pub fn tables(&self) -> DrsTableIterator<'_> {
         self.tables.iter()
     }
 }

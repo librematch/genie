@@ -2,9 +2,9 @@
 
 use crate::conv::invalid_data;
 use crate::tech_tree::{TechTreeDependencies, TechTreeStatus, TechTreeType};
-use crate::unit_type::UnitTypeID;
+use crate::unit_type::UnitTypeId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{TechID, read_opt_u32};
+use genie_support::{TechId, read_opt_u32};
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Result, Write};
 
@@ -15,11 +15,11 @@ pub struct TechTreeAge {
     pub(super) status: TechTreeStatus,
     pub(super) node_type: TechTreeType,
     /// The buildings that become available in this age.
-    pub dependent_buildings: Vec<UnitTypeID>,
+    pub dependent_buildings: Vec<UnitTypeId>,
     /// The units that become available in this age.
-    pub dependent_units: Vec<UnitTypeID>,
+    pub dependent_units: Vec<UnitTypeId>,
     /// The techs that become available in this age.
-    pub dependent_techs: Vec<TechID>,
+    pub dependent_techs: Vec<TechId>,
     pub(super) prerequisites: TechTreeDependencies,
     pub(super) building_levels: u8,
     pub(super) buildings_per_zone: [u8; 10],
@@ -30,18 +30,18 @@ pub struct TechTreeAge {
 /// A building node of the tech tree.
 #[derive(Debug, Default, Clone)]
 pub struct TechTreeBuilding {
-    pub(super) building_id: UnitTypeID,
+    pub(super) building_id: UnitTypeId,
     pub(super) status: TechTreeStatus,
     pub(super) node_type: TechTreeType,
     /// The tech ID that makes this building available. `None` if the building is available without
     /// requiring any techs.
-    pub depends_tech_id: Option<TechID>,
+    pub depends_tech_id: Option<TechId>,
     /// The buildings that become available by building this building.
-    pub dependent_buildings: Vec<UnitTypeID>,
+    pub dependent_buildings: Vec<UnitTypeId>,
     /// The units that become available by building this building.
-    pub dependent_units: Vec<UnitTypeID>,
+    pub dependent_units: Vec<UnitTypeId>,
     /// The techs that become available by building this building.
-    pub dependent_techs: Vec<TechID>,
+    pub dependent_techs: Vec<TechId>,
     pub(super) prerequisites: TechTreeDependencies,
     /// ?
     pub(super) level_no: u8,
@@ -56,13 +56,13 @@ pub struct TechTreeBuilding {
 /// A unit node of the tech tree.
 #[derive(Debug, Default, Clone)]
 pub struct TechTreeUnit {
-    pub(super) unit_id: UnitTypeID,
+    pub(super) unit_id: UnitTypeId,
     pub(super) status: TechTreeStatus,
     pub(super) node_type: TechTreeType,
-    pub(super) depends_tech_id: Option<TechID>,
-    pub(super) building: UnitTypeID,
-    pub(super) requires_tech_id: Option<TechID>,
-    pub(super) dependent_units: Vec<UnitTypeID>,
+    pub(super) depends_tech_id: Option<TechId>,
+    pub(super) building: UnitTypeId,
+    pub(super) requires_tech_id: Option<TechId>,
+    pub(super) dependent_units: Vec<UnitTypeId>,
     pub(super) prerequisites: TechTreeDependencies,
     pub(super) group_id: i32,
     pub(super) level_no: i32,
@@ -71,13 +71,13 @@ pub struct TechTreeUnit {
 /// A tech node of the tech tree.
 #[derive(Debug, Default, Clone)]
 pub struct TechTreeTech {
-    pub(super) tech_id: TechID,
+    pub(super) tech_id: TechId,
     pub(super) status: TechTreeStatus,
     pub(super) node_type: TechTreeType,
-    pub(super) building: UnitTypeID,
-    pub(super) dependent_buildings: Vec<UnitTypeID>,
-    pub(super) dependent_units: Vec<UnitTypeID>,
-    pub(super) dependent_techs: Vec<TechID>,
+    pub(super) building: UnitTypeId,
+    pub(super) dependent_buildings: Vec<UnitTypeId>,
+    pub(super) dependent_units: Vec<UnitTypeId>,
+    pub(super) dependent_techs: Vec<TechId>,
     pub(super) prerequisites: TechTreeDependencies,
     pub(super) group_id: i32,
     pub(super) level_no: i32,

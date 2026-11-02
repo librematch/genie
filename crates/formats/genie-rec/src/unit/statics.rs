@@ -4,10 +4,10 @@ use crate::element::{ReadableHeaderElement, WritableHeaderElement, read_xyz};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::SpriteList;
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_dat::sprite::SpriteID;
-use genie_support::{UnitTypeID, read_opt_u32};
+use genie_dat::sprite::SpriteId;
+use genie_support::{UnitTypeId, read_opt_u32};
 use std::io::{Read, Write};
 
 /// The attributes every object has.
@@ -16,13 +16,13 @@ use std::io::{Read, Write};
 #[derive(Debug, Default, Clone)]
 pub struct StaticUnitAttributes {
     /// The player who owns the object.
-    pub owner_id: PlayerID,
+    pub owner_id: PlayerId,
     /// The object's unit type.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// The sprite the object shows.
-    pub sprite_id: SpriteID,
+    pub sprite_id: SpriteId,
     /// The object it is garrisoned in, if any.
-    pub garrisoned_in_id: Option<ObjectID>,
+    pub garrisoned_in_id: Option<ObjectId>,
     /// The hit points.
     pub hit_points: f32,
     /// The object's life state (alive, dying, dead …).
@@ -34,7 +34,7 @@ pub struct StaticUnitAttributes {
     /// Whether the object falls asleep at its next update.
     pub go_to_sleep_flag: bool,
     /// The object's id.
-    pub id: ObjectID,
+    pub id: ObjectId,
     /// The facet (direction) the object faces.
     pub facet: u8,
     /// The position (x, y, z).
@@ -59,7 +59,7 @@ pub struct StaticUnitAttributes {
     /// Whether the object is under attack.
     pub under_attack: bool,
     /// The objects in the object's pathing group (units that move together).
-    pub pathing_group_members: Vec<ObjectID>,
+    pub pathing_group_members: Vec<ObjectId>,
     /// The object's group id, if any.
     pub group_id: Option<u32>,
     /// Not known yet.

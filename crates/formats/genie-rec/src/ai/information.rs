@@ -1,4 +1,4 @@
-//! The information AI module ([`InformationAI`]).
+//! The information AI module ([`InformationAi`]).
 
 use crate::ai::{
     AttackMemory, BuildingLot, ImportantObjectMemory, InfluenceMap, PerimeterWall, QuadrantLog,
@@ -6,14 +6,14 @@ use crate::ai::{
 };
 use crate::element::ReadableHeaderElement;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectID, Result};
+use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_support::{ReadSkipExt, ReadStringsExt};
 use std::io::Read;
 
 /// The information AI module: what the AI knows about the map, objects and other players.
 #[derive(Debug, Default, Clone)]
-pub struct InformationAI {
+pub struct InformationAi {
     /// Four lists of `u32` values, one per resource type; their meaning is not known yet.
     pub resource_types: Vec<Vec<u32>>,
     /// The AI's doctrine value.
@@ -35,17 +35,17 @@ pub struct InformationAI {
     /// What the AI remembers about important objects (empty slots are left out).
     pub important_objects: Vec<ImportantObjectMemory>,
     /// The IDs of the important objects.
-    pub important_object_ids: Vec<ObjectID>,
+    pub important_object_ids: Vec<ObjectId>,
     /// The IDs of the important units.
-    pub important_unit_ids: Vec<ObjectID>,
+    pub important_unit_ids: Vec<ObjectId>,
     /// The IDs of other important objects.
-    pub important_misc_ids: Vec<ObjectID>,
+    pub important_misc_ids: Vec<ObjectId>,
     /// The IDs of the objects the AI defends.
-    pub items_to_defend: Vec<ObjectID>,
+    pub items_to_defend: Vec<ObjectId>,
     /// The IDs of the AI player's buildings.
-    pub player_buildings: Vec<ObjectID>,
+    pub player_buildings: Vec<ObjectId>,
     /// The IDs of the AI player's objects.
-    pub player_objects: Vec<ObjectID>,
+    pub player_objects: Vec<ObjectId>,
     /// Object counts by unit type: 750, 850 or 900 entries, depending on the version.
     pub object_counts: Vec<u32>,
     /// The influence map the AI uses for pathing.
@@ -54,7 +54,7 @@ pub struct InformationAI {
     pub quadrant_log: [QuadrantLog; 4],
 }
 
-impl ReadableHeaderElement for InformationAI {
+impl ReadableHeaderElement for InformationAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self::default();
         ai.read_goals_and_resources(input)?;
@@ -79,7 +79,7 @@ impl ReadableHeaderElement for InformationAI {
     }
 }
 
-impl InformationAI {
+impl InformationAi {
     /// The unused words and resource type counts, the doctrine, the random number, the 40
     /// goals, the tribute memory (read past), the resource types and the map size.
     fn read_goals_and_resources<R: Read>(

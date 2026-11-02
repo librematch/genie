@@ -5,7 +5,7 @@
 //! not known, its docs say so.
 
 use crate::fits;
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{ReadSkipExt, ReadStringsExt};
 use std::io::{Read, Write};
@@ -22,16 +22,16 @@ pub use self::buildings::{
 pub use self::game::GameCommand;
 pub use self::groups::{
     FollowCommand, FormFormationCommand, GroupWaypointCommand, GuardCommand, PatrolCommand,
-    ResignCommand, UnitAIStateCommand, UserPatchAICommand,
+    ResignCommand, UnitAiStateCommand, UserPatchAiCommand,
 };
 pub use self::orders::{
-    AIOrderCommand, AddResourceCommand, CreateCommand, MoveCommand, OrderCommand, StopCommand,
+    AddResourceCommand, AiOrderCommand, CreateCommand, MoveCommand, OrderCommand, StopCommand,
     WorkCommand,
 };
 pub use self::tasks::{
     AttackGroundCommand, BackToWorkCommand, BuyResourceCommand, FlareCommand, QueueCommand,
     RepairCommand, SellResourceCommand, SetGatherPointCommand, UngarrisonCommand, UnitOrderCommand,
-    Unknown7FCommand,
+    Unknown7fCommand,
 };
 
 /// A location with an X and Y coordinate.
@@ -51,7 +51,7 @@ pub struct ViewLock {
     /// The Y coordinate the player is looking at.
     pub y: f32,
     /// The ID of the POV player.
-    pub player: PlayerID,
+    pub player: PlayerId,
 }
 
 impl ViewLock {
@@ -92,7 +92,7 @@ pub enum ObjectsList {
     /// Use the same objects as the previous command.
     SameAsLast,
     /// Use this list of objects.
-    List(Vec<ObjectID>),
+    List(Vec<ObjectId>),
 }
 
 impl Default for ObjectsList {
@@ -172,14 +172,14 @@ pub enum Command {
     Create(CreateCommand),
     /// Command `0x05`, see [`AddResourceCommand`].
     AddResource(AddResourceCommand),
-    /// Command `0x0a`, see [`AIOrderCommand`].
-    AIOrder(AIOrderCommand),
+    /// Command `0x0a`, see [`AiOrderCommand`].
+    AiOrder(AiOrderCommand),
     /// Command `0x0b`, see [`ResignCommand`].
     Resign(ResignCommand),
     /// Command `0x10`, see [`GroupWaypointCommand`].
     GroupWaypoint(GroupWaypointCommand),
-    /// Command `0x12`, see [`UnitAIStateCommand`].
-    UnitAIState(UnitAIStateCommand),
+    /// Command `0x12`, see [`UnitAiStateCommand`].
+    UnitAiState(UnitAiStateCommand),
     /// Command `0x13`, see [`GuardCommand`].
     Guard(GuardCommand),
     /// Command `0x14`, see [`FollowCommand`].
@@ -188,8 +188,8 @@ pub enum Command {
     Patrol(PatrolCommand),
     /// Command `0x17`, see [`FormFormationCommand`].
     FormFormation(FormFormationCommand),
-    /// Command `0x35`, see [`UserPatchAICommand`].
-    UserPatchAI(UserPatchAICommand),
+    /// Command `0x35`, see [`UserPatchAiCommand`].
+    UserPatchAi(UserPatchAiCommand),
     /// Command `0x64`, see [`MakeCommand`].
     Make(MakeCommand),
     /// Command `0x65`, see [`ResearchCommand`].
@@ -220,8 +220,8 @@ pub enum Command {
     SellResource(SellResourceCommand),
     /// Command `0x7b`, see [`BuyResourceCommand`].
     BuyResource(BuyResourceCommand),
-    /// Command `0x7f`, see [`Unknown7FCommand`].
-    Unknown7F(Unknown7FCommand),
+    /// Command `0x7f`, see [`Unknown7fCommand`].
+    Unknown7F(Unknown7fCommand),
     /// Command `0x80`, see [`BackToWorkCommand`].
     BackToWork(BackToWorkCommand),
 }
@@ -269,15 +269,15 @@ fn read_unit_command(id: u8, cursor: &mut impl Read, len: u32) -> Result<Command
         0x03 => MoveCommand::read_from(&mut *cursor).map(Command::Move),
         0x04 => CreateCommand::read_from(&mut *cursor).map(Command::Create),
         0x05 => AddResourceCommand::read_from(&mut *cursor).map(Command::AddResource),
-        0x0a => AIOrderCommand::read_from(&mut *cursor).map(Command::AIOrder),
+        0x0a => AiOrderCommand::read_from(&mut *cursor).map(Command::AiOrder),
         0x0b => ResignCommand::read_from(&mut *cursor).map(Command::Resign),
         0x10 => GroupWaypointCommand::read_from(&mut *cursor).map(Command::GroupWaypoint),
-        0x12 => UnitAIStateCommand::read_from(&mut *cursor).map(Command::UnitAIState),
+        0x12 => UnitAiStateCommand::read_from(&mut *cursor).map(Command::UnitAiState),
         0x13 => GuardCommand::read_from(&mut *cursor).map(Command::Guard),
         0x14 => FollowCommand::read_from(&mut *cursor).map(Command::Follow),
         0x15 => PatrolCommand::read_from(&mut *cursor).map(Command::Patrol),
         0x17 => FormFormationCommand::read_from(&mut *cursor).map(Command::FormFormation),
-        0x35 => UserPatchAICommand::read_from(&mut *cursor, len).map(Command::UserPatchAI),
+        0x35 => UserPatchAiCommand::read_from(&mut *cursor, len).map(Command::UserPatchAi),
         id => Err(crate::Error::UnsupportedCommand(id)),
     }
 }
@@ -304,7 +304,7 @@ fn read_building_command(id: u8, cursor: &mut impl Read) -> Result<Command> {
         0x78 => SetGatherPointCommand::read_from(&mut *cursor).map(Command::SetGatherPoint),
         0x7a => SellResourceCommand::read_from(&mut *cursor).map(Command::SellResource),
         0x7b => BuyResourceCommand::read_from(&mut *cursor).map(Command::BuyResource),
-        0x7f => Unknown7FCommand::read_from(&mut *cursor).map(Command::Unknown7F),
+        0x7f => Unknown7fCommand::read_from(&mut *cursor).map(Command::Unknown7F),
         0x80 => BackToWorkCommand::read_from(&mut *cursor).map(Command::BackToWork),
         id => Err(crate::Error::UnsupportedCommand(id)),
     }
@@ -394,7 +394,7 @@ pub struct Meta {
     /// Whether every body operation is preceded by a one-byte sequence number.
     pub use_sequence_numbers: bool,
     /// The ID of the player who recorded the game.
-    pub local_player_id: PlayerID,
+    pub local_player_id: PlayerId,
     /// The fourth `u32` of the metadata. genie-rs reads it as a header position, aoc-mgz as the
     /// reveal-map setting; not verified.
     pub header_position: u32,

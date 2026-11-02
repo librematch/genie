@@ -124,7 +124,7 @@ pub(super) fn path_level(
         id => Some(
             paths
                 .iter()
-                .find(|p| p.idvalue == id)
+                .find(|p| p.id_value == id)
                 .ok_or(GenieError::unsupported(
                     "path data whose path is not in the world's table",
                 ))?,
@@ -133,15 +133,15 @@ pub(super) fn path_level(
     Ok(genie_core::movement::PathData {
         level: genie_core::movement::WaypointLevel::of_byte(d.waypoint_level),
         linked_type: LinkedPathType::of_data(d.linked_path_type),
-        points: path.map_or_else(Vec::new, |p| p.m_waypoints.iter().map(vec3).collect()),
+        points: path.map_or_else(Vec::new, |p| p.waypoints.iter().map(vec3).collect()),
         has_path: path.is_some(),
-        path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_m_bits)),
+        path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_bits)),
         waypoint: WaypointIndex::of_data(d.waypoint),
         state: genie_core::movement::PathState::of_int(d.state)?,
         range: Distance::new(d.range),
         target: ObjectId::of_field(d.target_id),
         pause_time: Seconds::new(f32::from_bits(d.pause_time)),
-        flags: LevelFlags::from_bits_retain(d.flags_m_bits),
+        flags: LevelFlags::from_bits_retain(d.flags_bits),
         length: path.map_or(Distance::ZERO, |p| Distance::new(p.path_length_value)),
         created: path.map_or(WorldTime::ZERO, |p| {
             WorldTime::from_millis(p.creation_time_value)

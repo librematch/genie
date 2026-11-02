@@ -1,9 +1,9 @@
 //! An object placed in the scenario ([`ScenarioObject`]).
 
 use crate::Result;
-use crate::types::SCXVersion;
+use crate::types::ScxVersion;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::UnitTypeID;
+use genie_support::UnitTypeId;
 use std::io::{Read, Write};
 
 // pub enum LostInformation {
@@ -21,7 +21,7 @@ pub struct ScenarioObject {
     /// This object's unique ID.
     pub id: i32,
     /// The type ID of this object.
-    pub object_type: UnitTypeID,
+    pub object_type: UnitTypeId,
     /// State value.
     pub state: u8,
     /// Radian angle this unit is facing.
@@ -39,7 +39,7 @@ impl ScenarioObject {
     /// # Errors
     ///
     /// Returns an error if reading fails.
-    pub fn read_from(mut input: impl Read, version: SCXVersion) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, version: ScxVersion) -> Result<Self> {
         let position = (
             input.read_f32::<LE>()?,
             input.read_f32::<LE>()?,
@@ -49,12 +49,12 @@ impl ScenarioObject {
         let object_type = input.read_u16::<LE>()?.into();
         let state = input.read_u8()?;
         let angle = input.read_f32::<LE>()?;
-        let frame = if version < SCXVersion(*b"1.15") {
+        let frame = if version < ScxVersion(*b"1.15") {
             -1
         } else {
             input.read_i16::<LE>()?
         };
-        let garrisoned_in = if version < SCXVersion(*b"1.13") {
+        let garrisoned_in = if version < ScxVersion(*b"1.13") {
             None
         } else {
             Some(input.read_i32::<LE>()?)
@@ -65,7 +65,7 @@ impl ScenarioObject {
         })
         .and_then(|id| match id {
             // 0 means -1 in "recent" versions
-            0 if version > SCXVersion(*b"1.12") => None,
+            0 if version > ScxVersion(*b"1.12") => None,
             id => Some(id),
         });
 
@@ -85,7 +85,7 @@ impl ScenarioObject {
     /// # Errors
     ///
     /// Returns an error if writing fails.
-    pub fn write_to(&self, mut output: impl Write, version: SCXVersion) -> Result<()> {
+    pub fn write_to(&self, mut output: impl Write, version: ScxVersion) -> Result<()> {
         output.write_f32::<LE>(self.position.0)?;
         output.write_f32::<LE>(self.position.1)?;
         output.write_f32::<LE>(self.position.2)?;
@@ -93,10 +93,10 @@ impl ScenarioObject {
         output.write_u16::<LE>(self.object_type.into())?;
         output.write_u8(self.state)?;
         output.write_f32::<LE>(self.angle)?;
-        if version > SCXVersion(*b"1.14") {
+        if version > ScxVersion(*b"1.14") {
             output.write_i16::<LE>(self.frame)?;
         }
-        if version > SCXVersion(*b"1.12") {
+        if version > ScxVersion(*b"1.12") {
             match self.garrisoned_in {
                 Some(id) => output.write_i32::<LE>(id)?,
                 None => output.write_i32::<LE>(-1)?,

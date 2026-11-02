@@ -28,14 +28,14 @@ mod triggers;
 mod types;
 mod victory;
 
-use format::SCXFormat;
+use format::ScxFormat;
 use genie_support::{ReadStringError, WriteStringError};
 use std::io::{self, Read, Write};
 
 pub use format::{ScenarioObject, TribeScen};
 pub use genie_support::{DecodeStringError, EncodeStringError};
-pub use genie_support::{StringKey, UnitTypeID};
-pub use header::{DLCOptions, SCXHeader};
+pub use genie_support::{StringKey, UnitTypeId};
+pub use header::{DlcOptions, ScxHeader};
 pub use map::{Map, Tile};
 pub use player::{ScenarioPlayerData, WorldPlayerData};
 pub use triggers::{Trigger, TriggerCondition, TriggerEffect, TriggerSystem};
@@ -51,7 +51,7 @@ pub enum Error {
     MissingFileNameError,
     /// Attempted to read a scenario with an unsupported format version identifier.
     #[error("unsupported format version {:?}", .0)]
-    UnsupportedFormatVersionError(SCXVersion),
+    UnsupportedFormatVersionError(ScxVersion),
     /// Attempted to write a scenario with disabled technologies, to a version that doesn't support
     /// this many disabled technologies.
     #[error("too many disabled techs: got {}, but requested version supports up to 20", .0)]
@@ -86,13 +86,13 @@ pub enum Error {
     ParseDataSetError(#[from] ParseDataSetError),
     /// The given ID is not a known HD Edition DLC.
     #[error(transparent)]
-    ParseDLCPackageError(#[from] ParseDLCPackageError),
+    ParseDlcPackageError(#[from] ParseDlcPackageError),
     /// The given ID is not a known starting age in `AoE1` or `AoE2`.
     #[error(transparent)]
     ParseStartingAgeError(#[from] ParseStartingAgeError),
     /// The given ID is not a known error code.
     #[error(transparent)]
-    ParseAIErrorCodeError(#[from] num_enum::TryFromPrimitiveError<ai::AIErrorCode>),
+    ParseAiErrorCodeError(#[from] num_enum::TryFromPrimitiveError<ai::AiErrorCode>),
     /// The given ID is not a known victory condition state.
     #[error(transparent)]
     ParseVictoryConditionStateError(#[from] num_enum::TryFromPrimitiveError<VictoryState>),
@@ -101,10 +101,10 @@ pub enum Error {
     StringTooLongError,
     /// An embedded AI file lacks its file name.
     #[error("an embedded AI file has no file name")]
-    MissingAIFileNameError,
+    MissingAiFileNameError,
     /// An embedded AI file has no content.
     #[error("an embedded AI file is empty")]
-    EmptyAIFileError,
+    EmptyAiFileError,
     /// The scenario's description is longer than its length prefix allows.
     #[error("description too long for its length prefix")]
     DescriptionTooLongError,
@@ -144,7 +144,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// A Scenario file.
 #[derive(Debug, Clone)]
 pub struct Scenario {
-    format: SCXFormat,
+    format: ScxFormat,
     version: VersionBundle,
 }
 
@@ -156,7 +156,7 @@ impl Scenario {
     /// Returns an error if reading or decompressing fails, if the format version is not
     /// supported, or if the data is malformed (unknown IDs, strings that cannot be decoded).
     pub fn read_from(input: impl Read) -> Result<Self> {
-        let format = SCXFormat::load_scenario(input)?;
+        let format = ScxFormat::load_scenario(input)?;
         let version = format.version();
 
         Ok(Self { format, version })
@@ -196,7 +196,7 @@ impl Scenario {
     /// Get the format version of this SCX file.
     #[inline]
     #[must_use]
-    pub const fn format_version(&self) -> SCXVersion {
+    pub const fn format_version(&self) -> ScxVersion {
         self.version().format
     }
 
@@ -217,7 +217,7 @@ impl Scenario {
     /// Get the header.
     #[inline]
     #[must_use]
-    pub const fn header(&self) -> &SCXHeader {
+    pub const fn header(&self) -> &ScxHeader {
         &self.format.header
     }
 
@@ -245,7 +245,7 @@ impl Scenario {
     /// Check if this scenario requires the given DLC (for HD Edition scenarios only).
     #[inline]
     #[must_use]
-    pub fn requires_dlc(&self, dlc: DLCPackage) -> bool {
+    pub fn requires_dlc(&self, dlc: DlcPackage) -> bool {
         self.header()
             .dlc_options
             .as_ref()
@@ -347,19 +347,19 @@ impl From<Error> for genie_error::GenieError {
             Error::EncodeStringError(_) => Self::invalid_input("a string that does not encode"),
             Error::ParseDiplomaticStanceError(_)
             | Error::ParseDataSetError(_)
-            | Error::ParseDLCPackageError(_)
+            | Error::ParseDlcPackageError(_)
             | Error::ParseStartingAgeError(_)
-            | Error::ParseAIErrorCodeError(_)
+            | Error::ParseAiErrorCodeError(_)
             | Error::ParseVictoryConditionStateError(_) => {
                 Self::invalid_input("an id this reader does not know")
             }
             Error::StringTooLongError => {
                 Self::invalid_input("a string too long for its length prefix")
             }
-            Error::MissingAIFileNameError => {
+            Error::MissingAiFileNameError => {
                 Self::invalid_input("an embedded AI file without a file name")
             }
-            Error::EmptyAIFileError => Self::invalid_input("an embedded AI file without content"),
+            Error::EmptyAiFileError => Self::invalid_input("an embedded AI file without content"),
             Error::DescriptionTooLongError => {
                 Self::invalid_input("a description too long for its length prefix")
             }
@@ -416,7 +416,7 @@ mod genie_error_tests {
         let unknown_id = "an id this reader does not know";
         let cases: Vec<(Error, genie_error::ErrorKind, &str)> = vec![
             (
-                Error::UnsupportedFormatVersionError(SCXVersion(*b"9.99")),
+                Error::UnsupportedFormatVersionError(ScxVersion(*b"9.99")),
                 Unsupported,
                 "a scenario format version this reader does not take",
             ),
@@ -466,7 +466,7 @@ mod genie_error_tests {
                 unknown_id,
             ),
             (
-                ai::AIErrorCode::try_from(999).unwrap_err().into(),
+                ai::AiErrorCode::try_from(999).unwrap_err().into(),
                 InvalidInput,
                 unknown_id,
             ),

@@ -4,10 +4,10 @@ use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit_type::UnitBaseClass;
 use byteorder::ReadBytesExt;
-pub use genie_dat::sprite::SpriteID;
-pub use genie_dat::terrain::TerrainID;
+pub use genie_dat::sprite::SpriteId;
+pub use genie_dat::terrain::TerrainId;
 pub use genie_dat::unit_type::AttributeCost;
-pub use genie_support::{StringKey, UnitTypeID};
+pub use genie_support::{StringKey, UnitTypeId};
 use std::io::Read;
 
 mod building;
@@ -23,7 +23,7 @@ pub use self::movers::{ActionUnitAttributes, MovementData, MovingUnitAttributes,
 pub use self::sprites::{SpriteList, SpriteNode, SpriteNodeAnimation};
 pub use self::statics::{AnimatedUnitAttributes, StaticUnitAttributes};
 pub use self::unit_ai::{
-    PatrolPath, UnitAI, UnitAINotification, UnitAIOrder, UnitAIOrderHistory, UnitAIRetargetEntry,
+    PatrolPath, UnitAi, UnitAiNotification, UnitAiOrder, UnitAiOrderHistory, UnitAiRetargetEntry,
     Waypoint,
 };
 

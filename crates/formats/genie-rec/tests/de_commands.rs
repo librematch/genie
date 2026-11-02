@@ -38,7 +38,7 @@ fn a_built_command_decodes_its_fields() {
         (2, 1, 10.5, 20.5)
     );
     assert_eq!(
-        (build.o_id, build.q_id, build.ids.as_slice()),
+        (build.oid, build.qid, build.ids.as_slice()),
         (70, -1, &[1234][..])
     );
     assert_eq!(Command::Build(build).encode().unwrap(), packet);

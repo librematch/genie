@@ -9,7 +9,7 @@ use std::io::{Read, Write};
     Debug, Clone, Copy, PartialEq, Eq, num_enum::IntoPrimitive, num_enum::TryFromPrimitive,
 )]
 #[repr(u32)]
-pub enum AIErrorCode {
+pub enum AiErrorCode {
     /// A `defconst` redefines a constant that already exists.
     ConstantAlreadyDefined = 0,
     /// The AI file could not be opened.
@@ -39,13 +39,13 @@ pub enum AIErrorCode {
     /// A keyword is missing.
     MissingKeyword = 13,
     /// A rule lacks its left-hand side (the conditions).
-    MissingLHS = 14,
+    MissingLhs = 14,
     /// An opening parenthesis is missing.
     MissingOpeningParenthesis = 15,
     /// A preprocessor directive lacks its symbol.
     MissingPreprocessorSymbol = 16,
     /// A rule lacks its right-hand side (the actions).
-    MissingRHS = 17,
+    MissingRhs = 17,
     /// The script contains no rules.
     NoRules = 18,
     /// Conditional blocks are nested too deeply.
@@ -63,16 +63,16 @@ pub enum AIErrorCode {
     /// An unexpected internal error.
     UnexpectedError = 25,
     /// The file ends in the middle of a construct.
-    UnexpectedEOF = 26,
+    UnexpectedEof = 26,
 }
 
 /// The compile error the scenario's AI script had when the scenario was saved.
 #[derive(Debug, Clone)]
-pub struct AIErrorInfo {
+pub struct AiErrorInfo {
     filename: String,
     line_number: i32,
     description: String,
-    error_code: AIErrorCode,
+    error_code: AiErrorCode,
 }
 
 fn parse_bytes(bytes: &[u8]) -> std::result::Result<String, ReadStringError> {
@@ -87,7 +87,7 @@ fn parse_bytes(bytes: &[u8]) -> std::result::Result<String, ReadStringError> {
     }
 }
 
-impl AIErrorInfo {
+impl AiErrorInfo {
     /// Read AI error information from an input stream.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         // TODO support non UTF8 encoding
@@ -96,7 +96,7 @@ impl AIErrorInfo {
         let line_number = input.read_i32::<LE>()?;
         let mut description_bytes = [0; 128];
         input.read_exact(&mut description_bytes)?;
-        let error_code = AIErrorCode::try_from(input.read_u32::<LE>()?)?;
+        let error_code = AiErrorCode::try_from(input.read_u32::<LE>()?)?;
 
         let filename = parse_bytes(&filename_bytes)?;
         let description = parse_bytes(&description_bytes)?;
@@ -130,20 +130,20 @@ impl AIErrorInfo {
 
 /// An AI script embedded in the scenario: its file name and its source text.
 #[derive(Debug, Clone)]
-pub struct AIFile {
+pub struct AiFile {
     filename: String,
     content: String,
 }
 
-impl AIFile {
+impl AiFile {
     /// Read an embedded AI file from an input stream.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let filename = input
             .read_u32_length_prefixed_str()?
-            .ok_or(crate::Error::MissingAIFileNameError)?;
+            .ok_or(crate::Error::MissingAiFileNameError)?;
         let content = input
             .read_u32_length_prefixed_str()?
-            .ok_or(crate::Error::EmptyAIFileError)?;
+            .ok_or(crate::Error::EmptyAiFileError)?;
 
         Ok(Self { filename, content })
     }
@@ -158,12 +158,12 @@ impl AIFile {
 
 /// The scenario's embedded AI scripts and the last AI compile error.
 #[derive(Debug, Default, Clone)]
-pub struct AIInfo {
-    error: Option<AIErrorInfo>,
-    files: Vec<AIFile>,
+pub struct AiInfo {
+    error: Option<AiErrorInfo>,
+    files: Vec<AiFile>,
 }
 
-impl AIInfo {
+impl AiInfo {
     /// Read the AI scripts block; `None` if it holds neither scripts nor an error.
     pub fn read_from(mut input: impl Read) -> Result<Option<Self>> {
         let has_ai_files = input.read_u32::<LE>()? != 0;
@@ -174,7 +174,7 @@ impl AIInfo {
         }
 
         let error = if has_error {
-            Some(AIErrorInfo::read_from(&mut input)?)
+            Some(AiErrorInfo::read_from(&mut input)?)
         } else {
             None
         };
@@ -182,7 +182,7 @@ impl AIInfo {
         let num_ai_files = input.read_u32::<LE>()?;
         let mut files = vec![];
         for _ in 0..num_ai_files {
-            files.push(AIFile::read_from(&mut input)?);
+            files.push(AiFile::read_from(&mut input)?);
         }
 
         Ok(Some(Self { error, files }))
@@ -225,7 +225,7 @@ mod tests {
         bytes[257..261].copy_from_slice(&12i32.to_le_bytes());
         bytes[261..264].copy_from_slice(b"bad");
         bytes[389..].copy_from_slice(&7u32.to_le_bytes());
-        let info = AIErrorInfo::read_from(bytes.as_slice()).unwrap();
+        let info = AiErrorInfo::read_from(bytes.as_slice()).unwrap();
         assert_eq!(
             (
                 info.filename.as_str(),
@@ -233,15 +233,15 @@ mod tests {
                 info.description.as_str(),
                 info.error_code
             ),
-            ("a.per", 12, "bad", AIErrorCode::MissingArrow)
+            ("a.per", 12, "bad", AiErrorCode::MissingArrow)
         );
         let mut out = vec![];
         info.write_to(&mut out).unwrap();
         assert_eq!(out, bytes);
         bytes[..5].fill(0);
-        let unnamed = AIErrorInfo::read_from(bytes.as_slice()).unwrap();
+        let unnamed = AiErrorInfo::read_from(bytes.as_slice()).unwrap();
         assert_eq!(unnamed.filename, "<empty>");
         bytes[389..].copy_from_slice(&27u32.to_le_bytes());
-        assert!(AIErrorInfo::read_from(bytes.as_slice()).is_err());
+        assert!(AiErrorInfo::read_from(bytes.as_slice()).is_err());
     }
 }

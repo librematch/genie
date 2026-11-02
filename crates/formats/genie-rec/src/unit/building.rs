@@ -4,11 +4,11 @@ use crate::element::{ReadableHeaderElement, read_xyz};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
-use crate::{ObjectID, Result};
+use crate::{ObjectId, Result};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt};
-use genie_dat::terrain::TerrainID;
-use genie_support::{UnitTypeID, read_opt_u32};
+use genie_dat::terrain::TerrainId;
+use genie_support::{UnitTypeId, read_opt_u32};
 use std::io::Read;
 
 /// Where a building sends the units it trains.
@@ -26,9 +26,9 @@ pub enum GatherPoint {
     /// An object, with its unit type.
     Object {
         /// The object.
-        id: ObjectID,
+        id: ObjectId,
         /// The object's unit type.
-        unit_type: UnitTypeID,
+        unit_type: UnitTypeId,
     },
 }
 
@@ -36,7 +36,7 @@ pub enum GatherPoint {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProductionQueueEntry {
     /// The unit type to train.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// How many to train.
     pub count: u16,
 }
@@ -86,9 +86,9 @@ pub struct BuildingUnitAttributes {
     pub pending_order: u32,
     /// The "owner" building, if this building object is part of a larger building like a Town
     /// Center.
-    pub linked_owner: Option<ObjectID>,
+    pub linked_owner: Option<ObjectId>,
     /// The IDs of the children of this building object, also known as "annex buildings".
-    pub linked_children: ArrayVec<ObjectID, 4>,
+    pub linked_children: ArrayVec<ObjectId, 4>,
     /// Not known yet; the name suggests a count of captured units.
     pub captured_unit_count: u8,
     /// Further actions; not known yet what for.
@@ -113,7 +113,7 @@ pub struct BuildingUnitAttributes {
     /// The gate's close timer.
     pub close_timer: u32,
     /// A terrain, probably the one under the building; stored from save version 10.67 on.
-    pub terrain_type: Option<TerrainID>,
+    pub terrain_type: Option<TerrainId>,
     /// Whether the building is semi-asleep (updated less often); stored from save version
     /// 11.43 on.
     pub semi_asleep: bool,

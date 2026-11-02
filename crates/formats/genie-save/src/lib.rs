@@ -393,10 +393,10 @@ mod tests {
     /// A world with AI scripts: one string, one list with one rule and its elements, and the
     /// state a version-0.14 AI writes.
     fn save_with_ai_scripts() -> Header {
-        use crate::generated::world::{AIExpertEngine, AiGroupTable, AiList, AiRule, AiString};
+        use crate::generated::world::{AiExpertEngine, AiGroupTable, AiList, AiRule, AiString};
         let mut h = default_save();
-        h.world.load_airules = 1;
-        h.world.ai_scripts = Some(Box::new(AIExpertEngine {
+        h.world.load_ai_rules = 1;
+        h.world.ai_scripts = Some(Box::new(AiExpertEngine {
             max_strings: 2,
             num_strings: 1,
             strings: vec![AiString {
@@ -428,7 +428,7 @@ mod tests {
                 },
                 AiGroupTable::default(),
             ],
-            ..AIExpertEngine::default()
+            ..AiExpertEngine::default()
         }));
         h.world.ai_state = Some(Box::new(ai_state(0.14)));
         h

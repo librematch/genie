@@ -5,7 +5,7 @@ use crate::reader::RecordingHeaderReader;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 pub use genie_dat::unit_type::{AttributeCost, ParseUnitBaseClassError, UnitBaseClass};
-pub use genie_support::{StringKey, UnitTypeID};
+pub use genie_support::{StringKey, UnitTypeId};
 use std::io::{Read, Write};
 
 /// A player's copy of a unit type as the recording header stores it: only the attributes that can
@@ -78,13 +78,13 @@ impl ReadableHeaderElement for CompactUnitType {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
 pub struct StaticUnitAttributes {
-    id: UnitTypeID,
-    copy_id: UnitTypeID,
-    base_id: UnitTypeID,
+    id: UnitTypeId,
+    copy_id: UnitTypeId,
+    base_id: UnitTypeId,
     unit_class: u16,
     hotkey_id: u32,
     available: bool,
-    death_object_id: Option<UnitTypeID>,
+    death_object_id: Option<UnitTypeId>,
     string_id: Option<StringKey>,
     description_id: Option<StringKey>,
     flags: Option<u32>,
@@ -254,7 +254,7 @@ pub struct BaseCombatUnitAttributes {
     /// The chance to hit, in percent.
     pub base_hit_chance: u16,
     /// The unit type of the projectile it fires, if any.
-    pub projectile_object_id: Option<UnitTypeID>,
+    pub projectile_object_id: Option<UnitTypeId>,
     /// The terrain table that changes its armour by the terrain it stands on, if any.
     pub defense_terrain_bonus: Option<u16>,
     /// A second maximum attack range. Not known yet how it differs from `weapon_range_max`.
@@ -342,7 +342,7 @@ pub struct CombatUnitAttributes {
     /// `UserPatch` only: the delay of the attack within its animation.
     pub frame_delay: Option<u16>,
     /// `UserPatch` only: the building that trains the unit.
-    pub create_at_building: Option<UnitTypeID>,
+    pub create_at_building: Option<UnitTypeId>,
     /// `UserPatch` only: the unit's button position in that building's menu.
     pub create_button: Option<i8>,
     /// `UserPatch` only: the damage multiplier for attacks from behind.

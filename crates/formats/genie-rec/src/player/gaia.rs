@@ -2,7 +2,7 @@
 
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectID, Result};
+use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::read_opt_u32;
 use std::io::{Read, Write};
@@ -22,10 +22,10 @@ pub struct GaiaData {
     pub(super) tc_positions: [(f32, f32); 9],
     pub(super) wolf_current_player: u32,
     pub(super) wolf_current_villagers: [u32; 10],
-    pub(super) wolf_current_villager: Option<ObjectID>,
+    pub(super) wolf_current_villager: Option<ObjectId>,
     pub(super) wolf_villager_count: u32,
     pub(super) wolves: [GaiaWolfInfo; 25],
-    pub(super) current_wolf: Option<ObjectID>,
+    pub(super) current_wolf: Option<ObjectId>,
     pub(super) wolf_counts: [u32; 10],
 }
 

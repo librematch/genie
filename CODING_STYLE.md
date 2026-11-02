@@ -59,8 +59,27 @@ data-oriented architect makes it.
 
 ## 3. Naming
 
-- Follow RFC 430's casing. An acronym is one word: `ScxVersion`, `AiFile`, not `SCXVersion`
-  (C-CASE).
+- Follow RFC 430's casing to the letter (C-CASE), in every crate, the tests and the generated
+  code too:
+  - `UpperCamelCase` for types, traits and enum variants; `snake_case` for crates, modules,
+    functions, methods, fields and locals; `SCREAMING_SNAKE_CASE` for constants and statics;
+    a short `UpperCamelCase` type parameter (`T`, `K`) and a short lowercase lifetime (`'a`).
+  - An enum's values are its variants, in `UpperCamelCase`: `BuildState::Move { move_to:
+    None }`, never an alias constant on the enum (`BuildState::MOVE`). A newtype over a value
+    that the game holds as any integer (`GameMode`, `NotifyKind`) names its known values as
+    associated constants, and those are `SCREAMING_SNAKE_CASE`.
+  - An acronym or a contraction is one word: `ScxVersion`, `AiModule`, `UnitTypeId`,
+    `DrsReader`, `AocToWk`, not `SCXVersion`, `AIModule`, `UnitTypeID`, `AoCToWK`.
+  - In `snake_case` and `SCREAMING_SNAKE_CASE`, a single letter is a word only at the end:
+    `btree_map`, `PI_2`, `kernel_sin`, `target_master`, not `b_tree_map`, `k_sin`,
+    `t_master`. This holds for test names too: no article `a` and no possessive `s`
+    (`build_move_to_takes_its_task_moving_sprite`, not
+    `a_build_s_move_to_takes_its_task_s_moving_sprite`). A digit is no letter
+    (`state_6_goes_on`).
+  - A generator converts the game's names by these rules: `tPos` becomes `tpos` (a lone
+    letter joins the next word), `mWaypoints` and `kDefaultWaitTime` become `waypoints` and
+    `default_wait_time` (no member or constant prefix), `(int32_t*)mRules` becomes `rules` (no
+    cast), `TribeInformationAIModule` becomes `TribeInformationAiModule`.
 - Name a file, a folder and an item in plain English for what it does or holds:
   `pathing/short_path.rs`, not `mshortpather.rs` or `p2.rs`. Two names a letter apart
   (`reach.rs` beside `reached.rs`) are not allowed.

@@ -2,7 +2,7 @@
 
 use byteorder::{LE, WriteBytesExt};
 use genie_support::StringKey;
-pub use genie_support::UnitTypeID;
+pub use genie_support::UnitTypeId;
 use std::cmp::{Ordering, PartialOrd};
 use std::convert::{TryFrom, TryInto};
 use std::io;

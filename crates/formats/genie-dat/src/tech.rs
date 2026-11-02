@@ -1,10 +1,10 @@
-use crate::civ::CivilizationID;
+use crate::civ::CivilizationId;
 use crate::conv::invalid_data;
-use crate::unit_type::UnitTypeID;
+use crate::unit_type::UnitTypeId;
 use arrayvec::{ArrayString, ArrayVec};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
-pub use genie_support::TechID;
+pub use genie_support::TechId;
 use genie_support::{MapInto, StringKey, read_opt_u16, read_opt_u32};
 use std::io::{Read, Result, Write};
 
@@ -48,11 +48,11 @@ pub struct TechEffectRef {
 /// its strings and icon.
 #[derive(Debug, Default, Clone)]
 pub struct Tech {
-    required_techs: ArrayVec<TechID, 6>,
+    required_techs: ArrayVec<TechId, 6>,
     effects: ArrayVec<TechEffectRef, 3>,
-    civilization_id: Option<CivilizationID>,
+    civilization_id: Option<CivilizationId>,
     full_tech_mode: u16,
-    location: Option<UnitTypeID>,
+    location: Option<UnitTypeId>,
     language_dll_name: Option<StringKey>,
     language_dll_description: Option<StringKey>,
     time: u16,

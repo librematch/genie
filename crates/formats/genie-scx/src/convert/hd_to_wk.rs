@@ -1,17 +1,17 @@
 use super::ConvertError;
-use crate::{Scenario, ScenarioObject, Tile, Trigger, UnitTypeID};
+use crate::{Scenario, ScenarioObject, Tile, Trigger, UnitTypeId};
 use nohash_hasher::IntMap;
 
 /// Convert an HD Edition scenario to a WololoKingdoms-compatible one.
 ///
 /// Maps HD unit IDs and terrain IDs to their WK equivalents.
 #[derive(Debug)]
-pub struct HDToWK {
-    object_ids_map: IntMap<i32, UnitTypeID>,
+pub struct HdToWk {
+    object_ids_map: IntMap<i32, UnitTypeId>,
     terrain_ids_map: IntMap<u8, u8>,
 }
 
-impl Default for HDToWK {
+impl Default for HdToWk {
     fn default() -> Self {
         let object_ids_map = [
             // NOTE: These are special to make the tech tree work
@@ -52,7 +52,7 @@ impl Default for HDToWK {
             (1122, 891), // Elite Ballista Ele, SGTWR_D
         ]
         .iter()
-        .map(|(a, b)| (*a, UnitTypeID::from(*b)))
+        .map(|(a, b)| (*a, UnitTypeId::from(*b)))
         .collect();
 
         let terrain_ids_map = [
@@ -77,7 +77,7 @@ impl Default for HDToWK {
     }
 }
 
-impl HDToWK {
+impl HdToWk {
     /// Convert an object from HD Edition to WK.
     ///
     /// This updates the object type IDs.

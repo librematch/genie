@@ -95,14 +95,14 @@ fn building(command: &Command) -> Result<Packet, GenieError> {
             gap_0x06: [0; 2],
             x: c.point.x(),
             y: c.point.y(),
-            t_id: ObjectId::field(c.target),
+            tid: ObjectId::field(c.target),
             tm_id: i32::from(MasterId::field(c.target_master)),
             field_0x18: u8::from(c.own),
             ids: ids(&c.units.ids, packets::SetGatherPoint::FIXED)?,
         }),
         Command::CommandQueue(c) => Packet::BuildingCommandQueue(packets::BuildingCommandQueue {
             commp_id: c.player.get(),
-            t_id: ObjectId::field(c.target),
+            tid: ObjectId::field(c.target),
             x: c.point.x(),
             y: c.point.y(),
             num: c.units.count,
@@ -191,24 +191,24 @@ fn single(command: &Command) -> Result<Packet, GenieError> {
         }),
         Command::Delete(c) => Packet::CancelBuild(packets::CancelBuild {
             commp_id: c.player.get(),
-            u_id: c.id.get(),
+            uid: c.id.get(),
         }),
         Command::GoBackToWork(c) => Packet::GoBackToWork(packets::GoBackToWork {
             commp_id: c.player.get(),
-            u_id: c.id.get(),
+            uid: c.id.get(),
         }),
         Command::AllBackToWork(c) => Packet::AllBackToWork(packets::AllBackToWork {
             commp_id: c.player.get(),
-            u_id: c.id.get(),
+            uid: c.id.get(),
         }),
         Command::TownBell(c) => Packet::TownBell(packets::TownBell {
             commp_id: c.player.get(),
-            u_id: c.id.get(),
+            uid: c.id.get(),
             activate: u8::from(c.activate),
         }),
         Command::Gate(c) => Packet::Gate(packets::Gate {
             commp_id: c.player.get(),
-            u_id: c.id.get(),
+            uid: c.id.get(),
         }),
         Command::Tribute(c) => tribute(c),
         Command::Trade(c) => trade(c),
@@ -223,7 +223,7 @@ macro_rules! interact_packet {
     ($kind:ident, $player:expr, $units:expr, $o:expr) => {
         Packet::$kind(packets::$kind {
             commp_id: $player,
-            t_id: ObjectId::field($o.target),
+            tid: ObjectId::field($o.target),
             x: $o.point.x(),
             y: $o.point.y(),
             num: $units.count,
@@ -246,7 +246,7 @@ fn order(c: &OrderCommand) -> Result<Packet, GenieError> {
         Order::Retreat(o) => interact_packet!(Retreat, player, units, o),
         Order::Move(o) => Packet::Move(packets::Move {
             commp_id: player,
-            t_id: ObjectId::field(o.target),
+            tid: ObjectId::field(o.target),
             x: o.point.x(),
             y: o.point.y(),
             num: units.count,
@@ -282,8 +282,8 @@ fn build(c: &BuildCommand) -> Result<Packet, GenieError> {
         gap_0x06: [0; 2],
         x: c.position.x(),
         y: c.position.y(),
-        o_id: i32::from(c.master.get()),
-        q_id: c.q_id.get(),
+        oid: i32::from(c.master.get()),
+        qid: c.q_id.get(),
         field_0x18: c.sprite_override.get().cast_unsigned(),
         frame: c.frame.byte(),
         gap_0x1d: [0; 1],
@@ -314,8 +314,8 @@ fn build_wall(c: &BuildWallCommand) -> Result<Packet, GenieError> {
         y1: tile_word(c.from.y())?,
         x2: tile_word(c.to.x())?,
         y2: tile_word(c.to.y())?,
-        o_id: i32::from(c.master.get()),
-        q_id: c.q_id.get(),
+        oid: i32::from(c.master.get()),
+        qid: c.q_id.get(),
         gap_0x18: [0; 2],
         field_0x1a: u8::from(c.queued),
         field_0x1b: u8::from(!c.commits),
@@ -329,8 +329,8 @@ fn queue(c: &QueueCommand) -> Result<Packet, GenieError> {
         commp_id: c.player.get(),
         num: c.buildings.count,
         gap_0x06: [0; 4],
-        b_id: c.building_master.get(),
-        t_id: c.unit.get(),
+        bid: c.building_master.get(),
+        tid: c.unit.get(),
         count: c.amount.get(),
         button_location_id: c.button.get(),
         ids: ids(&c.buildings.ids, packets::MultiQueue::FIXED)?,
@@ -341,10 +341,10 @@ fn queue(c: &QueueCommand) -> Result<Packet, GenieError> {
 fn research(c: &ResearchCommand) -> Result<Packet, GenieError> {
     Ok(Packet::Research(packets::Research {
         commp_id: c.player.get(),
-        u_id: ObjectId::field(c.building),
+        uid: ObjectId::field(c.building),
         field_0x08: c.count.cast_unsigned(),
-        t_id: TechId::field(c.tech),
-        q_id: c.q_id.get(),
+        tid: TechId::field(c.tech),
+        qid: c.q_id.get(),
         field_0x10: u8::from(c.shift),
         ids: ids(&c.buildings, packets::Research::FIXED)?,
     }))
@@ -434,10 +434,10 @@ fn unit_order(c: &UnitOrderCommand) -> Result<Packet, GenieError> {
         commp_id: c.player.get(),
         num: c.units.count,
         gap_0x06: [0; 2],
-        t_id: ObjectId::field(c.target),
+        tid: ObjectId::field(c.target),
         x: c.point.x(),
         y: c.point.y(),
-        q_id: c.q_id.get(),
+        qid: c.q_id.get(),
         param: c.param.get().cast_signed(),
         action: c.action.byte(),
         field_0x1d: u8::from(c.through_ai),
@@ -487,14 +487,14 @@ fn trade(c: &TradeCommand) -> Packet {
             commp_id: player,
             attr: c.attribute.get(),
             amt: c.times.get(),
-            u_id: ObjectId::field(c.market),
+            uid: ObjectId::field(c.market),
         })
     } else {
         Packet::SellCommodity(packets::SellCommodity {
             commp_id: player,
             attr: c.attribute.get(),
             amt: c.times.get(),
-            u_id: ObjectId::field(c.market),
+            uid: ObjectId::field(c.market),
         })
     }
 }

@@ -3,7 +3,7 @@
 use crate::element::ReadableHeaderElement;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
 use std::io::Read;
 
@@ -17,7 +17,7 @@ pub struct VisibleMap {
     /// The number of tiles the player has explored; 0 before save version 6.70.
     pub explored_tiles_count: u32,
     /// The player the map belongs to.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The visibility of each tile, row by row.
     pub tiles: Vec<i8>,
 }
@@ -43,7 +43,7 @@ impl ReadableHeaderElement for VisibleMap {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct VisibleResource {
     /// The resource object.
-    pub object_id: ObjectID,
+    pub object_id: ObjectId,
     /// Its distance, in tiles; the point it is measured from is not known yet.
     pub distance: u8,
     /// The zone it is in.

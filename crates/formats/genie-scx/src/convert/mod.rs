@@ -6,8 +6,8 @@ mod hd_to_wk;
 
 use crate::{Scenario, ScenarioObject};
 
-pub use aoc_to_wk::AoCToWK;
-pub use hd_to_wk::HDToWK;
+pub use aoc_to_wk::AocToWk;
+pub use hd_to_wk::HdToWk;
 
 /// Error indicating scenario conversion failure.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -31,7 +31,7 @@ pub enum ConvertError {
 /// AutoToWK::default().convert(&mut scenario)?
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AutoToWK {}
+pub struct AutoToWk {}
 
 /// Check if a scenario object is likely a `WololoKingdoms` one.
 const fn is_wk_object(object: &ScenarioObject) -> bool {
@@ -40,7 +40,7 @@ const fn is_wk_object(object: &ScenarioObject) -> bool {
     object.id > STORMY_DOG
 }
 
-impl AutoToWK {
+impl AutoToWk {
     /// Convert a scenario to `WololoKingdoms` in place, choosing the converter by its version.
     ///
     /// # Errors
@@ -49,13 +49,13 @@ impl AutoToWK {
     /// `AoK`/`AoC` scenario.
     pub fn convert(&self, scen: &mut Scenario) -> Result<(), ConvertError> {
         if scen.version().is_hd_edition() {
-            HDToWK::default().convert(scen)
+            HdToWk::default().convert(scen)
         } else if scen.version().is_aok() || scen.version().is_aoc() {
             if scen.objects().any(is_wk_object) {
                 // No conversion necessary.
                 Ok(())
             } else {
-                AoCToWK::default().convert(scen)
+                AocToWk::default().convert(scen)
             }
         } else {
             Err(ConvertError::InvalidVersion)

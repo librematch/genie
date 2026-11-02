@@ -2,7 +2,7 @@ use crate::Result;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Unit;
 use crate::unit_type::CompactUnitType;
-use genie_dat::CivilizationID;
+use genie_dat::CivilizationId;
 use genie_dat::tech_tree::TechTree;
 use genie_scx::VictoryConditions;
 use std::io::Read;
@@ -38,7 +38,7 @@ pub struct Player {
     spawn_location: (u16, u16),
     culture_id: u8,
     /// The player's civilization.
-    pub civilization_id: CivilizationID,
+    pub civilization_id: CivilizationId,
     game_status: u8,
     resigned: bool,
     /// `UserPatch` 1.5's extra player data (save version 11.97 only).

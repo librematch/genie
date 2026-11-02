@@ -5,112 +5,112 @@ use std::num::TryFromIntError;
 
 /// An ID identifying a unit type.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq)]
-pub struct UnitTypeID(u16);
+pub struct UnitTypeId(u16);
 
-impl From<u16> for UnitTypeID {
+impl From<u16> for UnitTypeId {
     #[inline]
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<UnitTypeID> for u16 {
+impl From<UnitTypeId> for u16 {
     #[inline]
-    fn from(n: UnitTypeID) -> Self {
+    fn from(n: UnitTypeId) -> Self {
         n.0
     }
 }
 
-impl From<UnitTypeID> for i32 {
+impl From<UnitTypeId> for i32 {
     #[inline]
-    fn from(n: UnitTypeID) -> Self {
+    fn from(n: UnitTypeId) -> Self {
         n.0.into()
     }
 }
 
-impl From<UnitTypeID> for u32 {
+impl From<UnitTypeId> for u32 {
     #[inline]
-    fn from(n: UnitTypeID) -> Self {
+    fn from(n: UnitTypeId) -> Self {
         n.0.into()
     }
 }
 
-impl From<UnitTypeID> for usize {
+impl From<UnitTypeId> for usize {
     #[inline]
-    fn from(n: UnitTypeID) -> Self {
+    fn from(n: UnitTypeId) -> Self {
         n.0.into()
     }
 }
 
-fallible_try_into!(UnitTypeID, i16);
-fallible_try_from!(UnitTypeID, i16);
-fallible_try_from!(UnitTypeID, i32);
-fallible_try_from!(UnitTypeID, u32);
+fallible_try_into!(UnitTypeId, i16);
+fallible_try_from!(UnitTypeId, i16);
+fallible_try_from!(UnitTypeId, i32);
+fallible_try_from!(UnitTypeId, u32);
 
 /// An ID identifying a tech.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq)]
-pub struct TechID(u16);
+pub struct TechId(u16);
 
-impl From<u16> for TechID {
+impl From<u16> for TechId {
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<TechID> for u16 {
-    fn from(n: TechID) -> Self {
+impl From<TechId> for u16 {
+    fn from(n: TechId) -> Self {
         n.0
     }
 }
 
-impl From<TechID> for usize {
-    fn from(n: TechID) -> Self {
+impl From<TechId> for usize {
+    fn from(n: TechId) -> Self {
         n.0.into()
     }
 }
 
-fallible_try_into!(TechID, i16);
-infallible_try_into!(TechID, u32);
-fallible_try_from!(TechID, i32);
-fallible_try_from!(TechID, u32);
+fallible_try_into!(TechId, i16);
+infallible_try_into!(TechId, u32);
+fallible_try_from!(TechId, i32);
+fallible_try_from!(TechId, u32);
 
 /// An ID identifying a sprite.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct SpriteID(u16);
-impl From<u16> for SpriteID {
+pub struct SpriteId(u16);
+impl From<u16> for SpriteId {
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<SpriteID> for u16 {
-    fn from(n: SpriteID) -> Self {
+impl From<SpriteId> for u16 {
+    fn from(n: SpriteId) -> Self {
         n.0
     }
 }
 
-impl From<SpriteID> for i32 {
-    fn from(n: SpriteID) -> Self {
+impl From<SpriteId> for i32 {
+    fn from(n: SpriteId) -> Self {
         n.0.into()
     }
 }
 
-impl From<SpriteID> for u32 {
-    fn from(n: SpriteID) -> Self {
+impl From<SpriteId> for u32 {
+    fn from(n: SpriteId) -> Self {
         n.0.into()
     }
 }
 
-impl From<SpriteID> for usize {
-    fn from(n: SpriteID) -> Self {
+impl From<SpriteId> for usize {
+    fn from(n: SpriteId) -> Self {
         n.0.into()
     }
 }
 
-fallible_try_into!(SpriteID, i16);
-fallible_try_from!(SpriteID, i16);
-fallible_try_from!(SpriteID, i32);
-fallible_try_from!(SpriteID, u32);
+fallible_try_into!(SpriteId, i16);
+fallible_try_from!(SpriteId, i16);
+fallible_try_from!(SpriteId, i32);
+fallible_try_from!(SpriteId, u32);
 
 /// A key in a language file.
 ///

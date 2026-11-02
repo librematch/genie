@@ -1,12 +1,12 @@
-//! A whole scenario file ([`SCXFormat`]): its version, its load, its write and its hash.
+//! A whole scenario file ([`ScxFormat`]): its version, its load, its write and its hash.
 
-use crate::ai::AIInfo;
+use crate::ai::AiInfo;
 use crate::format::{ScenarioObject, TribeScen};
-use crate::header::SCXHeader;
+use crate::header::ScxHeader;
 use crate::map::Map;
 use crate::player::{ScenarioPlayerData, WorldPlayerData};
 use crate::triggers::TriggerSystem;
-use crate::types::SCXVersion;
+use crate::types::ScxVersion;
 use crate::{Error, Result, VersionBundle};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use flate2::Compression;
@@ -15,11 +15,11 @@ use flate2::write::DeflateEncoder;
 use std::io::{Read, Write};
 
 #[derive(Debug, Clone)]
-pub struct SCXFormat {
+pub struct ScxFormat {
     /// Version of the SCX format.
-    pub(crate) version: SCXVersion,
+    pub(crate) version: ScxVersion,
     /// Uncompressed header containing metadata for display.
-    pub(crate) header: SCXHeader,
+    pub(crate) header: ScxHeader,
     /// ID for the next-placed/created object.
     pub(crate) next_object_id: i32,
     /// Scenario data.
@@ -35,10 +35,10 @@ pub struct SCXFormat {
     /// Triggers (only in `AoK` and up).
     pub(crate) triggers: Option<TriggerSystem>,
     /// AI information (`AoK` and up).
-    pub(super) ai_info: Option<AIInfo>,
+    pub(super) ai_info: Option<AiInfo>,
 }
 
-impl SCXFormat {
+impl ScxFormat {
     /// Extract version bundle information from a parsed SCX file.
     pub fn version(&self) -> VersionBundle {
         VersionBundle {
@@ -52,7 +52,7 @@ impl SCXFormat {
     }
 
     pub(super) fn load_inner(
-        version: SCXVersion,
+        version: ScxVersion,
         player_version: f32,
         mut input: impl Read,
     ) -> Result<Self> {
@@ -72,7 +72,7 @@ impl SCXFormat {
         fn read_player_objects(
             mut input: impl Read,
             num_players: u32,
-            version: SCXVersion,
+            version: ScxVersion,
         ) -> Result<Vec<Vec<ScenarioObject>>> {
             let mut player_objects = Vec::with_capacity(num_players as usize);
             for _ in 0..num_players {
@@ -87,7 +87,7 @@ impl SCXFormat {
             Ok(player_objects)
         }
 
-        let header = SCXHeader::read_from(&mut input, version)?;
+        let header = ScxHeader::read_from(&mut input, version)?;
 
         let mut input = DeflateDecoder::new(&mut input);
         let next_object_id = input.read_i32::<LE>()?;
@@ -104,7 +104,7 @@ impl SCXFormat {
         }
 
         // The order is flipped … thanks DE
-        let (scenario_players, player_objects) = if version >= SCXVersion(*b"1.36") {
+        let (scenario_players, player_objects) = if version >= ScxVersion(*b"1.36") {
             let players = read_scenario_players(&mut input, player_version)?;
             let objects = read_player_objects(&mut input, num_players, version)?;
             (players, objects)
@@ -114,14 +114,14 @@ impl SCXFormat {
             (players, objects)
         };
 
-        let triggers = if version < SCXVersion(*b"1.14") {
+        let triggers = if version < ScxVersion(*b"1.14") {
             None
         } else {
             Some(TriggerSystem::read_from(&mut input)?)
         };
 
-        let ai_info = if version > SCXVersion(*b"1.17") && version < SCXVersion(*b"2.00") {
-            AIInfo::read_from(&mut input)?
+        let ai_info = if version > ScxVersion(*b"1.17") && version < ScxVersion(*b"2.00") {
+            AiInfo::read_from(&mut input)?
         } else {
             None
         };
@@ -143,7 +143,7 @@ impl SCXFormat {
     pub fn load_scenario(mut input: impl Read) -> Result<Self> {
         let mut format_version = [0; 4];
         input.read_exact(&mut format_version)?;
-        let format_version = SCXVersion(format_version);
+        let format_version = ScxVersion(format_version);
         let Some(player_version) = format_version.to_player_version() else {
             return Err(Error::UnsupportedFormatVersionError(format_version));
         };
@@ -155,7 +155,7 @@ impl SCXFormat {
     pub(super) fn write_player_objects(
         &self,
         mut output: impl Write,
-        format_version: SCXVersion,
+        format_version: ScxVersion,
     ) -> Result<()> {
         for objects in &self.player_objects {
             output.write_i32::<LE>(objects.len() as i32)?;
@@ -208,7 +208,7 @@ impl SCXFormat {
             player.write_to(&mut output, player_version)?;
         }
 
-        if version.format >= SCXVersion(*b"1.36") {
+        if version.format >= ScxVersion(*b"1.36") {
             self.write_scenario_players(&mut output, player_version, version.victory)?;
             self.write_player_objects(&mut output, version.format)?;
         } else {
@@ -216,14 +216,14 @@ impl SCXFormat {
             self.write_scenario_players(&mut output, player_version, version.victory)?;
         }
 
-        if version.format > SCXVersion(*b"1.13") {
+        if version.format > ScxVersion(*b"1.13") {
             let def = TriggerSystem::default();
             let triggers = self.triggers.as_ref().unwrap_or(&def);
             triggers.write_to(&mut output, version.triggers.unwrap_or(1.6))?;
         }
 
-        if version.format > SCXVersion(*b"1.17") && version.format < SCXVersion(*b"2.00") {
-            let def = AIInfo::default();
+        if version.format > ScxVersion(*b"1.17") && version.format < ScxVersion(*b"2.00") {
+            let def = AiInfo::default();
             let ai_info = self.ai_info.as_ref().unwrap_or(&def);
             ai_info.write_to(&mut output)?;
         }

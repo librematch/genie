@@ -1,11 +1,11 @@
 //! Types related to the tech tree data.
 
-use crate::civ::CivilizationID;
+use crate::civ::CivilizationId;
 use crate::conv::invalid_data;
-use crate::unit_type::UnitTypeID;
+use crate::unit_type::UnitTypeId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::TechID;
+use genie_support::TechId;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Result, Write};
 
@@ -31,7 +31,7 @@ pub enum TechTreeStatus {
     /// civilization.
     AvailableTeam {
         /// The civilization a team member must play (stored as the status minus 10).
-        civilization_id: CivilizationID,
+        civilization_id: CivilizationId,
     },
 }
 
@@ -152,11 +152,11 @@ pub enum TechTreeDependency {
     /// in the wild contain incorrect data with much higher "age" IDs, so we have to follow suit.
     Age(i32),
     /// A dependency on a building.
-    Building(UnitTypeID),
+    Building(UnitTypeId),
     /// A dependency on a unit.
-    Unit(UnitTypeID),
+    Unit(UnitTypeId),
     /// A dependency on a research/tech.
-    Research(TechID),
+    Research(TechId),
 }
 
 impl TechTreeDependency {

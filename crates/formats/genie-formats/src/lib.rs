@@ -105,7 +105,7 @@ pub use jascpal as pal;
 
 pub use genie_cpx::Campaign;
 pub use genie_dat::DatFile;
-pub use genie_drs::{DRSReader, DRSWriter};
+pub use genie_drs::{DrsReader, DrsWriter};
 pub use genie_hki::HotkeyInfo;
 pub use genie_lang::LangFile;
 pub use genie_rec::RecordedGame;

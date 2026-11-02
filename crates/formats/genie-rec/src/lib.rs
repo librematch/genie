@@ -57,7 +57,7 @@ use crate::element::ReadableHeaderElement;
 use crate::reader::{RecordingHeaderReader, SmallBufReader};
 use byteorder::{LE, ReadBytesExt};
 use flate2::bufread::DeflateDecoder;
-use genie_scx::DLCOptions;
+use genie_scx::DlcOptions;
 use genie_support::{fallible_try_from, fallible_try_into, infallible_try_into};
 pub use header::Header;
 use std::fmt::Debug;
@@ -66,66 +66,66 @@ pub use version::*;
 
 /// ID identifying a player (0-8).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PlayerID(u8);
+pub struct PlayerId(u8);
 
-impl PlayerID {
+impl PlayerId {
     /// Player ID for GAIA, the "nature" player.
     pub const GAIA: Self = Self(0);
 }
 
-impl From<u8> for PlayerID {
+impl From<u8> for PlayerId {
     #[inline]
     fn from(n: u8) -> Self {
         Self(n)
     }
 }
 
-impl From<PlayerID> for u8 {
+impl From<PlayerId> for u8 {
     #[inline]
-    fn from(player_id: PlayerID) -> Self {
+    fn from(player_id: PlayerId) -> Self {
         player_id.0
     }
 }
 
-fallible_try_from!(PlayerID, i32);
-fallible_try_from!(PlayerID, u32);
-fallible_try_from!(PlayerID, i16);
-fallible_try_from!(PlayerID, u16);
-fallible_try_from!(PlayerID, i8);
-infallible_try_into!(PlayerID, i16);
-infallible_try_into!(PlayerID, u16);
-infallible_try_into!(PlayerID, i32);
-infallible_try_into!(PlayerID, u32);
+fallible_try_from!(PlayerId, i32);
+fallible_try_from!(PlayerId, u32);
+fallible_try_from!(PlayerId, i16);
+fallible_try_from!(PlayerId, u16);
+fallible_try_from!(PlayerId, i8);
+infallible_try_into!(PlayerId, i16);
+infallible_try_into!(PlayerId, u16);
+infallible_try_into!(PlayerId, i32);
+infallible_try_into!(PlayerId, u32);
 
 /// ID identifying a game object (unit, building, resource …).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ObjectID(u32);
+pub struct ObjectId(u32);
 
-impl From<u32> for ObjectID {
+impl From<u32> for ObjectId {
     #[inline]
     fn from(n: u32) -> Self {
         Self(n)
     }
 }
 
-impl From<u16> for ObjectID {
+impl From<u16> for ObjectId {
     #[inline]
     fn from(n: u16) -> Self {
         Self(n.into())
     }
 }
 
-impl From<ObjectID> for u32 {
+impl From<ObjectId> for u32 {
     #[inline]
-    fn from(n: ObjectID) -> Self {
+    fn from(n: ObjectId) -> Self {
         n.0
     }
 }
 
-fallible_try_from!(ObjectID, i16);
-fallible_try_from!(ObjectID, i32);
-fallible_try_into!(ObjectID, i16);
-fallible_try_into!(ObjectID, i32);
+fallible_try_from!(ObjectId, i16);
+fallible_try_from!(ObjectId, i32);
+fallible_try_into!(ObjectId, i16);
+fallible_try_into!(ObjectId, i32);
 
 /// The body's sync (checksum) actions did not arrive at the interval the body's meta action set.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -345,9 +345,9 @@ pub enum GameSpeed {}
 // The bools mirror the settings' on/off flags.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
-pub struct HDGameOptions {
+pub struct HdGameOptions {
     /// The DLCs the game uses.
-    pub dlc_options: DLCOptions,
+    pub dlc_options: DlcOptions,
     /// The AI difficulty.
     pub difficulty: Difficulty,
     /// The map size.

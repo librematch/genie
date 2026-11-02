@@ -1,6 +1,6 @@
 //! Lists, extracts or adds resources in a .drs archive.
 
-use genie_drs::{DRSReader, DRSTable, DRSWriter, ReserveDirectoryStrategy};
+use genie_drs::{DrsReader, DrsTable, DrsWriter, ReserveDirectoryStrategy};
 use std::collections::HashSet;
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write, stdout};
@@ -81,7 +81,7 @@ struct Add {
 
 fn list(args: List) -> anyhow::Result<()> {
     let mut file = File::open(args.archive)?;
-    let drs = DRSReader::new(&mut file)?;
+    let drs = DrsReader::new(&mut file)?;
 
     for table in drs.tables() {
         for resource in table.resources() {
@@ -94,7 +94,7 @@ fn list(args: List) -> anyhow::Result<()> {
 
 fn get(args: Get) -> anyhow::Result<()> {
     let mut file = File::open(args.archive)?;
-    let drs = DRSReader::new(&mut file)?;
+    let drs = DrsReader::new(&mut file)?;
 
     for table in drs.tables() {
         if let Some(resource) = table.get_resource(args.resource_id) {
@@ -113,7 +113,7 @@ fn get(args: Get) -> anyhow::Result<()> {
 
 fn extract(args: Extract) -> anyhow::Result<()> {
     let mut file = File::open(args.archive)?;
-    let drs = DRSReader::new(&mut file)?;
+    let drs = DrsReader::new(&mut file)?;
 
     create_dir_all(&args.out)?;
 
@@ -149,10 +149,10 @@ fn add(args: Add) -> anyhow::Result<()> {
     );
 
     let mut input = File::open(&args.archive)?;
-    let drs_read = DRSReader::new(&mut input)?;
+    let drs_read = DrsReader::new(&mut input)?;
 
     let tables = u32::try_from(drs_read.tables().len())?;
-    let files = u32::try_from(drs_read.tables().map(DRSTable::len).sum::<usize>())?;
+    let files = u32::try_from(drs_read.tables().map(DrsTable::len).sum::<usize>())?;
     let new_tables = u32::try_from(args.table.iter().collect::<HashSet<_>>().len())?;
     let new_files = u32::try_from(args.id.len())?;
 
@@ -167,7 +167,7 @@ fn add(args: Add) -> anyhow::Result<()> {
     ));
 
     let output = File::create(&temp_out)?;
-    let mut drs_write = DRSWriter::new(
+    let mut drs_write = DrsWriter::new(
         output,
         ReserveDirectoryStrategy::new(tables + new_tables, files + new_files),
     )?;

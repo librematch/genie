@@ -110,7 +110,7 @@ fn move_to(state: u8, range: f32) -> Action {
             range,
             movement_wait_state: 2,
             timer: 0.25,
-            k_default_wait_time: 0.5_f32.to_bits(),
+            default_wait_time: 0.5_f32.to_bits(),
         }));
     })
 }

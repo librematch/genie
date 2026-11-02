@@ -87,7 +87,7 @@ fn a_research_is_a_production_action_too() {
     let research = Action {
         tribe_action_make_tech: Some(Box::new(TribeActionMakeTech {
             tech_id: 22,
-            m_research_progress: 0.25,
+            research_progress: 0.25,
             ..TribeActionMakeTech::default()
         })),
         ..Action::default()

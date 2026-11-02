@@ -1,10 +1,10 @@
-use crate::ObjectID;
+use crate::ObjectId;
 use crate::Result;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-pub use genie_dat::sprite::SpriteID;
-pub use genie_support::UnitTypeID;
+pub use genie_dat::sprite::SpriteId;
+pub use genie_support::UnitTypeId;
 use genie_support::{read_opt_u16, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -15,9 +15,9 @@ pub struct UnitAction {
     /// version 11.76.
     pub state: u32,
     /// The object the action targets, if any.
-    pub target_object_id: Option<ObjectID>,
+    pub target_object_id: Option<ObjectId>,
     /// A second target object, if any.
-    pub target_object_id_2: Option<ObjectID>,
+    pub target_object_id_2: Option<ObjectId>,
     /// The target position (x, y, z).
     pub target_position: (f32, f32, f32),
     /// The action's timer.
@@ -31,7 +31,7 @@ pub struct UnitAction {
     /// The sub-actions this action runs.
     pub sub_actions: Vec<Self>,
     /// The sprite the unit shows during the action, if any.
-    pub sprite_id: Option<SpriteID>,
+    pub sprite_id: Option<SpriteId>,
     /// The data specific to the action type.
     pub params: ActionType,
 }
@@ -208,14 +208,14 @@ impl WritableHeaderElement for ActionEnter {
 pub struct ActionAttack {
     range: f32,
     min_range: f32,
-    missile_id: UnitTypeID,
+    missile_id: UnitTypeId,
     frame_delay: u16,
     need_to_attack: u16,
     was_same_owner: u16,
     indirect_fire_flag: u8,
-    move_sprite_id: Option<SpriteID>,
-    fight_sprite_id: Option<SpriteID>,
-    wait_sprite_id: Option<SpriteID>,
+    move_sprite_id: Option<SpriteId>,
+    fight_sprite_id: Option<SpriteId>,
+    wait_sprite_id: Option<SpriteId>,
     last_target_position: (f32, f32, f32),
 }
 

@@ -1,7 +1,7 @@
 //! The game commands (`0x67`), one variant per sub-command.
 
 use crate::fits;
-use crate::{PlayerID, Result};
+use crate::{PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
 use std::io::Read;
 
@@ -11,14 +11,14 @@ pub enum GameCommand {
     /// Change the game speed (sub-command 1).
     SetGameSpeed {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// The new game speed.
         speed: f32,
     },
     /// Not used in game, but implemented.
     Inventory {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// The attribute (resource) to change.
         attribute_id: i16,
         /// The amount.
@@ -27,42 +27,42 @@ pub enum GameCommand {
     /// Not implemented in game.
     UpgradeTown {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
     },
     /// The quick build cheat (sub-command 4).
     QuickBuild {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
     },
     /// Set whether the player wants an allied victory (sub-command 5).
     AlliedVictory {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// Whether allied victory is turned on.
         status: bool,
     },
     /// A cheat code (sub-command 6).
     Cheat {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// The ID of the cheat.
         cheat_id: i16,
     },
     /// Not implemented in game.
     SharedLos {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
     },
     /// Spies, or Treason in later versions (sub-command 0x0a): the player pays to reveal other
     /// players' units.
     Spies {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
     },
     /// Set an AI strategic number (sub-command 0x0b), sent by AI players.
     SetStrategicNumber {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// The ID of the strategic number.
         strategic_number: i16,
         /// The new value of the strategic number.
@@ -71,26 +71,26 @@ pub enum GameCommand {
     /// Appears to be unused.
     Unknown0x0c {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
     },
     /// Queue farm reseeds at the mill (sub-command 0x0d).
     AddFarmReseedQueue {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// The number of reseeds to queue.
         amount: i16,
     },
     /// Remove queued farm reseeds (sub-command 0x0e).
     RemoveFarmReseedQueue {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         /// The number of reseeds to remove.
         amount: i16,
     },
     /// Toggle automatic farm reseeding (sub-command 0x10).
     FarmReseedAutoQueue {
         /// The player who sent the command.
-        player_id: PlayerID,
+        player_id: PlayerId,
         // TODO unknown vars
     },
 }

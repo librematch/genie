@@ -32,16 +32,16 @@ pub mod tech_tree;
 pub mod terrain;
 pub mod unit_type;
 
-pub use crate::civ::{Civilization, CivilizationID};
+pub use crate::civ::{Civilization, CivilizationId};
 pub use crate::color_table::{ColorTable, PaletteIndex};
 use crate::random_map::RandomMapInfo;
-pub use crate::sound::{Sound, SoundID, SoundItem};
-use crate::sprite::{Sprite, SpriteID};
+pub use crate::sound::{Sound, SoundId, SoundItem};
+use crate::sprite::{Sprite, SpriteId};
 pub use crate::task::{Task, TaskList};
 pub use crate::tech::{Tech, TechEffect};
 use crate::tech_tree::TechTree;
-use crate::terrain::{Terrain, TerrainBorder, TerrainID, TerrainRestriction, TileSize};
-use genie_support::TechID;
+use crate::terrain::{Terrain, TerrainBorder, TerrainId, TerrainRestriction, TileSize};
+use genie_support::TechId;
 use std::cmp::{Ordering, PartialOrd};
 use std::fmt;
 
@@ -49,21 +49,21 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameVersion {
     /// The original expansion-less Age of Empires 2: Age of Kings.
-    AoK,
+    Aok,
     /// Age of Empires 2 with the The Conquerors expansion.
-    AoC,
+    Aoc,
     /// Age of `EMpires` 2: HD Edition.
-    HD,
+    Hd,
 }
 
 impl GameVersion {
     /// Get the most likely internal game data version number for a given game version.
     const fn as_f32(self) -> f32 {
-        use GameVersion::{AoC, AoK, HD};
+        use GameVersion::{Aoc, Aok, Hd};
         match self {
-            AoK => 11.5,
-            AoC => 11.97,
-            HD => 12.0,
+            Aok => 11.5,
+            Aoc => 11.97,
+            Hd => 12.0,
         }
     }
 }
@@ -176,14 +176,14 @@ pub struct DatFile {
 
 impl DatFile {
     /// Get a tech by its ID.
-    pub fn get_tech(&self, id: impl Into<TechID>) -> Option<&Tech> {
-        let id: TechID = id.into();
+    pub fn get_tech(&self, id: impl Into<TechId>) -> Option<&Tech> {
+        let id: TechId = id.into();
         self.techs.get(usize::from(id))
     }
 
     /// Get a terrain type by its ID.
-    pub fn get_terrain(&self, id: impl Into<TerrainID>) -> Option<&Terrain> {
-        let id: TerrainID = id.into();
+    pub fn get_terrain(&self, id: impl Into<TerrainId>) -> Option<&Terrain> {
+        let id: TerrainId = id.into();
         self.terrains.get(usize::from(id))
     }
 
@@ -194,20 +194,20 @@ impl DatFile {
     }
 
     /// Get a civilization by its ID.
-    pub fn get_civilization(&self, id: impl Into<CivilizationID>) -> Option<&Civilization> {
-        let id: CivilizationID = id.into();
+    pub fn get_civilization(&self, id: impl Into<CivilizationId>) -> Option<&Civilization> {
+        let id: CivilizationId = id.into();
         self.civilizations.get(usize::from(id))
     }
 
     /// Get a sound by its ID.
-    pub fn get_sound(&self, id: impl Into<SoundID>) -> Option<&Sound> {
-        let id: SoundID = id.into();
+    pub fn get_sound(&self, id: impl Into<SoundId>) -> Option<&Sound> {
+        let id: SoundId = id.into();
         self.sounds.get(usize::from(id))
     }
 
     /// Get a sprite by its ID.
-    pub fn get_sprite(&self, id: impl Into<SpriteID>) -> Option<&Sprite> {
-        let id: SpriteID = id.into();
+    pub fn get_sprite(&self, id: impl Into<SpriteId>) -> Option<&Sprite> {
+        let id: SpriteId = id.into();
         self.sprites.get(usize::from(id)).and_then(Option::as_ref)
     }
 }

@@ -4,7 +4,7 @@
 use super::*;
 use crate::test_support::{floats, words};
 use arrayvec::ArrayVec;
-use genie_support::UnitTypeID;
+use genie_support::UnitTypeId;
 
 /// A command's frame: its length (the id and the body), the id, the body, a world time.
 fn framed(id: u8, body: &[u8]) -> Vec<u8> {
@@ -27,7 +27,7 @@ fn read(id: u8, body: &[u8]) -> Command {
 
 /// Two objects.
 fn two() -> ObjectsList {
-    ObjectsList::List(vec![ObjectID::from(500u32), ObjectID::from(501u32)])
+    ObjectsList::List(vec![ObjectId::from(500u32), ObjectId::from(501u32)])
 }
 
 /// Write `$command`, read it back as `Command::$variant` with `$id`, write that again: the
@@ -55,7 +55,7 @@ fn the_orders_write_back_what_they_read() {
         Order,
         OrderCommand {
             player_id: 2.into(),
-            target_id: Some(ObjectID::from(900u32)),
+            target_id: Some(ObjectId::from(900u32)),
             location: (10.5, 20.5),
             objects: two(),
         }
@@ -87,7 +87,7 @@ fn the_orders_write_back_what_they_read() {
         Create,
         CreateCommand {
             player_id: 1.into(),
-            unit_type_id: UnitTypeID::from(83u16),
+            unit_type_id: UnitTypeId::from(83u16),
             location: (1.0, 2.0, 3.0),
         }
     );
@@ -100,17 +100,17 @@ fn the_orders_write_back_what_they_read() {
             amount: 100.0,
         }
     );
-    for objects in [ObjectsList::List(vec![ObjectID::from(500u32)]), two()] {
+    for objects in [ObjectsList::List(vec![ObjectId::from(500u32)]), two()] {
         let ai = writes_back!(
             0x0a,
-            AIOrder,
-            AIOrderCommand {
+            AiOrder,
+            AiOrderCommand {
                 player_id: 4.into(),
                 issuer: 4.into(),
                 objects: objects.clone(),
                 order_type: 0x2d9,
                 order_priority: 100,
-                target_id: Some(ObjectID::from(77u32)),
+                target_id: Some(ObjectId::from(77u32)),
                 target_player_id: Some(2.into()),
                 target_location: (1.0, 2.0, 0.0),
                 range: 3.0,
@@ -147,8 +147,8 @@ fn the_group_commands_write_back_what_they_read() {
     );
     let _ = writes_back!(
         0x12,
-        UnitAIState,
-        UnitAIStateCommand {
+        UnitAiState,
+        UnitAiStateCommand {
             state: 2,
             objects: two(),
         }
@@ -157,7 +157,7 @@ fn the_group_commands_write_back_what_they_read() {
         0x13,
         Guard,
         GuardCommand {
-            target_id: Some(ObjectID::from(8u32)),
+            target_id: Some(ObjectId::from(8u32)),
             objects: two(),
         }
     );
@@ -194,8 +194,8 @@ fn the_group_commands_write_back_what_they_read() {
     params.extend([5, 6, 7]);
     let ai = writes_back!(
         0x35,
-        UserPatchAI,
-        UserPatchAICommand {
+        UserPatchAi,
+        UserPatchAiCommand {
             player_id: 2.into(),
             ai_action: 1,
             params,
@@ -213,8 +213,8 @@ fn the_building_commands_write_back_what_they_read() {
         Make,
         MakeCommand {
             player_id: 1.into(),
-            building_id: ObjectID::from(700u32),
-            unit_type_id: UnitTypeID::from(83u16),
+            building_id: ObjectId::from(700u32),
+            unit_type_id: UnitTypeId::from(83u16),
             target_id: None,
         }
     );
@@ -223,9 +223,9 @@ fn the_building_commands_write_back_what_they_read() {
         Research,
         ResearchCommand {
             player_id: 1.into(),
-            building_id: ObjectID::from(700u32),
-            tech_id: genie_support::TechID::from(101u16),
-            target_id: Some(ObjectID::from(3u32)),
+            building_id: ObjectId::from(700u32),
+            tech_id: genie_support::TechId::from(101u16),
+            target_id: Some(ObjectId::from(3u32)),
         }
     );
     let _ = writes_back!(
@@ -233,7 +233,7 @@ fn the_building_commands_write_back_what_they_read() {
         CancelBuild,
         CancelBuildCommand {
             player_id: 1.into(),
-            building_id: ObjectID::from(701u32),
+            building_id: ObjectId::from(701u32),
         }
     );
     let _ = writes_back!(
@@ -248,7 +248,7 @@ fn the_building_commands_write_back_what_they_read() {
         0x6e,
         Repair,
         RepairCommand {
-            target_id: Some(ObjectID::from(702u32)),
+            target_id: Some(ObjectId::from(702u32)),
             repairers: two(),
         }
     );
@@ -256,8 +256,8 @@ fn the_building_commands_write_back_what_they_read() {
         0x77,
         Queue,
         QueueCommand {
-            building_id: ObjectID::from(700u32),
-            unit_type_id: UnitTypeID::from(4u16),
+            building_id: ObjectId::from(700u32),
+            unit_type_id: UnitTypeId::from(4u16),
             amount: 5,
         }
     );
@@ -267,11 +267,11 @@ fn the_building_commands_write_back_what_they_read() {
         SetGatherPointCommand {
             buildings: two(),
             target_id: None,
-            target_type_id: Some(UnitTypeID::from(59u16)),
+            target_type_id: Some(UnitTypeId::from(59u16)),
             location: Some((7.0, 8.0)),
         }
     );
-    let market = ObjectID::from(800u32);
+    let market = ObjectId::from(800u32);
     let _ = writes_back!(
         0x7a,
         SellResource,

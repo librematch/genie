@@ -1,7 +1,7 @@
 use crate::conv::{fits, invalid_data, opt_fits};
-use crate::sound::SoundID;
-use crate::sprite::SpriteID;
-use crate::unit_type::UnitTypeID;
+use crate::sound::SoundId;
+use crate::sprite::SpriteId;
+use crate::unit_type::UnitTypeId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::read_opt_u16;
 use std::io::{Read, Result, Write};
@@ -19,7 +19,7 @@ pub struct Task {
     is_default: bool,
     action_type: u16,
     object_class: i16,
-    object_id: Option<UnitTypeID>,
+    object_id: Option<UnitTypeId>,
     terrain_id: i16,
     attribute_types: (i16, i16, i16, i16),
     work_values: (f32, f32),
@@ -32,12 +32,12 @@ pub struct Task {
     owner_type: u8,
     holding_attribute: u8,
     state_building: u8,
-    move_sprite: Option<SpriteID>,
-    work_sprite: Option<SpriteID>,
-    work_sprite2: Option<SpriteID>,
-    carry_sprite: Option<SpriteID>,
-    work_sound: Option<SoundID>,
-    work_sound2: Option<SoundID>,
+    move_sprite: Option<SpriteId>,
+    work_sprite: Option<SpriteId>,
+    work_sprite2: Option<SpriteId>,
+    carry_sprite: Option<SpriteId>,
+    work_sound: Option<SoundId>,
+    work_sound2: Option<SoundId>,
 }
 
 impl Deref for TaskList {

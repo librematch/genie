@@ -16,7 +16,7 @@ impl DatFile {
     /// Also fails if a list is too long for its count field, or if a member cannot be written (see
     /// the `write_to` methods of the member types).
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        let num_terrains = if self.game_version == GameVersion::AoC && self.terrains.len() == 42 {
+        let num_terrains = if self.game_version == GameVersion::Aoc && self.terrains.len() == 42 {
             41
         } else {
             self.terrains.len()

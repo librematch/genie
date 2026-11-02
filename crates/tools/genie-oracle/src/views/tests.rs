@@ -117,8 +117,8 @@ fn an_object_view_has_a_row_per_live_object() {
     let mut walker = with_actions(5, vec![(4, explore(3))]);
     let s = static_mut(&mut walker);
     s.hp = 25.0;
-    s.t_x = 1.0;
-    s.t_y = 2.0;
+    s.tx = 1.0;
+    s.ty = 2.0;
     s.sprite = -1;
     combat_mut(&mut walker).unit_ai_module = Some(Box::new(UnitAiModule {
         randomized_retarget_timer: 2500,
@@ -157,8 +157,8 @@ fn a_movement_view_shows_the_paths_of_the_objects_asked_for() {
     let other = combat_object(6, 83);
     let mut save = header(vec![gaia(vec![walker, other])]);
     save.world.base_world.path = vec![Path {
-        idvalue: 7,
-        m_waypoints: vec![vec3([3.0, 4.0, 0.0])],
+        id_value: 7,
+        waypoints: vec![vec3([3.0, 4.0, 0.0])],
         ..Path::default()
     }];
     let text = movement_of(&save, 0, &[5]).unwrap();

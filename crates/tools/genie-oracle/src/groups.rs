@@ -74,7 +74,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
             .rev()
             .map(|d| path_level(d, paths))
             .collect::<Result<_, _>>()?,
-        flags: MotionFlags::from_bits_retain(m.motion_flags_m_bits),
+        flags: MotionFlags::from_bits_retain(m.motion_flags_bits),
         maximum_velocity_forward: Speed::new(m.maximum_velocity_forward),
         number_wait_delays: genie_core::pathing::DelayCount::of_data(m.number_wait_delays),
         // not saved: the constructor's
@@ -172,7 +172,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
         current_formation: g.current_formation.as_deref().map(formation).transpose()?,
         garbage: g.garbage,
         formation_locked_type: FormationKind::of_field(g.formation_locked_type),
-        flags: GroupFlags::from_bits_retain(g.group_flags_m_bits),
+        flags: GroupFlags::from_bits_retain(g.group_flags_bits),
         centroid: vec3(&g.centroid),
         desired_height: g.desired_height,
         largest_unit_radius: Distance::new(g.largest_unit_radius),

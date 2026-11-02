@@ -83,7 +83,7 @@ impl ReadableHeaderElement for BuildItem {
 
 /// The build AI module: the build list and what the AI has queued.
 #[derive(Debug, Default, Clone)]
-pub struct BuildAI {
+pub struct BuildAi {
     /// The name of the build list.
     pub build_list_name: Option<String>,
     /// The name of the build item requested last.
@@ -102,7 +102,7 @@ pub struct BuildAI {
     pub queued_unit_count: u32,
 }
 
-impl ReadableHeaderElement for BuildAI {
+impl ReadableHeaderElement for BuildAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self::default();
         let build_list_len = input.read_u32::<LE>()?;
@@ -183,7 +183,7 @@ impl ReadableHeaderElement for ConstructionItem {
 
 /// The construction AI module: the construction plan and its lots.
 #[derive(Debug, Default, Clone)]
-pub struct ConstructionAI {
+pub struct ConstructionAi {
     /// The name of the construction plan.
     pub plan_name: Option<String>,
     /// The plan's reference point (x, y, z).
@@ -196,7 +196,7 @@ pub struct ConstructionAI {
     pub random_construction_lots: Vec<ConstructionItem>,
 }
 
-impl ReadableHeaderElement for ConstructionAI {
+impl ReadableHeaderElement for ConstructionAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self::default();
         let num_lots = input.read_u32::<LE>()?;

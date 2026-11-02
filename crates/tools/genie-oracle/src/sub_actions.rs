@@ -334,7 +334,7 @@ pub(super) fn production(
                 paid: base.sub_action_value != 0,
                 tech: genie_core::technology::TechId::try_from(tech.tech_id)?,
                 master: tech.unique_id,
-                progress: Seconds::new(tech.m_research_progress),
+                progress: Seconds::new(tech.research_progress),
             }))
         }
         Some(_) => {

@@ -143,7 +143,7 @@ mod spatial {
         } else {
             static_mut(&mut object)
         };
-        [s.t_x, s.t_y] = [x, y];
+        [s.tx, s.ty] = [x, y];
         s.inside_obj = -1;
         object
     }

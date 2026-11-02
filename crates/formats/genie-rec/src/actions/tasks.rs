@@ -2,10 +2,10 @@
 //! market's buy and sell, the town bell and back to work.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, UnitTypeID, f32_neq, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitTypeId, f32_neq, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Task an object to attack ground.
@@ -53,7 +53,7 @@ impl AttackGroundCommand {
 #[derive(Debug, Default, Clone)]
 pub struct RepairCommand {
     /// The target object of this order.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The objects this command applies to.
     pub repairers: ObjectsList,
 }
@@ -98,7 +98,7 @@ pub struct UngarrisonCommand {
     pub ungarrison_type: i8,
     /// The unit type to ungarrison, for the kinds that select by type; read as an optional ID
     /// (-1 for none).
-    pub unit_type_id: Option<ObjectID>,
+    pub unit_type_id: Option<ObjectId>,
     /// Where the ungarrisoned objects go, if a location was given (it is stored as -1, -1 if
     /// not).
     pub location: Option<Location2>,
@@ -130,9 +130,9 @@ impl UngarrisonCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FlareCommand {
     /// The ID of the player sending the flare.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The multiplayer ID of the player sending the flare.
-    pub comm_player_id: PlayerID,
+    pub comm_player_id: PlayerId,
     /// Which players see the flare, indexed by player ID.
     pub recipients: [bool; 9],
     /// The location of the flare.
@@ -169,7 +169,7 @@ impl FlareCommand {
 #[derive(Debug, Default, Clone)]
 pub struct UnitOrderCommand {
     /// The target object, if any.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The order. aoc-mgz names the values 1 (pack a trebuchet), 2 (unpack a trebuchet) and 5
     /// (garrison).
     pub action: i8,
@@ -213,9 +213,9 @@ impl UnitOrderCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct QueueCommand {
     /// The ID of the building where this unit is being queued.
-    pub building_id: ObjectID,
+    pub building_id: ObjectId,
     /// The ID of the unit type being queued.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// The amount of units to queue.
     pub amount: u16,
 }
@@ -255,9 +255,9 @@ pub struct SetGatherPointCommand {
     /// The IDs of the buildings whose gather points are being set.
     pub buildings: ObjectsList,
     /// The ID of the object being targeted, if the gather point is set to an object.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The type ID of the unit being targeted, if the gather point is set to an object.
-    pub target_type_id: Option<UnitTypeID>,
+    pub target_type_id: Option<UnitTypeId>,
     /// The location of the new gather point, if the gather point is not set to an object.
     pub location: Option<Location2>,
 }
@@ -347,14 +347,14 @@ macro_rules! buy_sell_impl {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SellResourceCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The resource being sold.
     pub resource: u8,
     /// The amount being sold, in 100s. Typically this is 1 for selling 100 of a resource, or 5 for
     /// selling 500 (with Shift-click).
     pub amount: i8,
     /// The ID of the building where this resource is being bought.
-    pub market_id: ObjectID,
+    pub market_id: ObjectId,
 }
 
 buy_sell_impl!(SellResourceCommand);
@@ -363,14 +363,14 @@ buy_sell_impl!(SellResourceCommand);
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BuyResourceCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The resource being bought.
     pub resource: u8,
     /// The amount being bought, in 100s. Typically this is 1 for buying 100 of a resource, or 5 for
     /// buying 500 (with Shift-click).
     pub amount: i8,
     /// The ID of the building where this resource is being bought.
-    pub market_id: ObjectID,
+    pub market_id: ObjectId,
 }
 
 buy_sell_impl!(BuyResourceCommand);
@@ -378,14 +378,14 @@ buy_sell_impl!(BuyResourceCommand);
 /// Command `0x7f`, which aoc-mgz and the DE engine name the town bell: ring or silence the town
 /// bell of a town center.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Unknown7FCommand {
+pub struct Unknown7fCommand {
     /// The town center whose bell is rung.
-    pub object_id: ObjectID,
+    pub object_id: ObjectId,
     /// Whether the bell is turned on (non-zero) or off, as aoc-mgz reads it.
     pub value: u32,
 }
 
-impl Unknown7FCommand {
+impl Unknown7fCommand {
     /// Read a `0x7f` (town bell) command from an input stream.
     ///
     /// # Errors
@@ -403,7 +403,7 @@ impl Unknown7FCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BackToWorkCommand {
     /// The building (typically a town center) the villagers leave.
-    pub building_id: ObjectID,
+    pub building_id: ObjectId,
 }
 
 impl BackToWorkCommand {

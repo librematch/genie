@@ -1,6 +1,6 @@
 //! A trigger condition ([`TriggerCondition`]): when a trigger can fire.
 
-use crate::{Result, UnitTypeID};
+use crate::{Result, UnitTypeId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use std::convert::TryInto;
 use std::io::{Read, Write};
@@ -124,12 +124,12 @@ impl TriggerCondition {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn unit_type(&self) -> Option<UnitTypeID> {
+    pub fn unit_type(&self) -> Option<UnitTypeId> {
         self.properties[4].try_into().ok()
     }
 
     /// Set the "unit type" value for this trigger condition.
-    pub fn set_unit_type(&mut self, unit_type: UnitTypeID) {
+    pub fn set_unit_type(&mut self, unit_type: UnitTypeId) {
         self.properties[4] = unit_type.into();
     }
 
@@ -215,12 +215,12 @@ impl TriggerCondition {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn object_type(&self) -> Option<UnitTypeID> {
+    pub fn object_type(&self) -> Option<UnitTypeId> {
         self.properties[14].try_into().ok()
     }
 
     /// Set the "Object Type" value for this trigger condition.
-    pub fn set_object_type(&mut self, object_type: UnitTypeID) {
+    pub fn set_object_type(&mut self, object_type: UnitTypeId) {
         self.properties[14] = i32::from(object_type);
     }
 

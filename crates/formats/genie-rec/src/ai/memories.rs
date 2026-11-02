@@ -4,24 +4,24 @@
 use crate::element::ReadableHeaderElement;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
-use genie_support::{ReadSkipExt, UnitTypeID, read_opt_u16, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitTypeId, read_opt_u16, read_opt_u32};
 use std::io::Read;
 
 /// What the information AI remembers about an important object.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ImportantObjectMemory {
     /// The object's ID; `None` marks an empty slot.
-    pub id: Option<ObjectID>,
+    pub id: Option<ObjectId>,
     /// The object's unit type.
-    pub unit_type_id: Option<UnitTypeID>,
+    pub unit_type_id: Option<UnitTypeId>,
     /// The object's unit class.
     pub unit_class: Option<u16>,
     /// The object's last known tile position (x, y, z).
     pub location: (u8, u8, u8),
     /// The object's owner.
-    pub owner: PlayerID,
+    pub owner: PlayerId,
     /// The object's last known hit points.
     pub hit_points: u16,
     /// How often the AI attacked the object.
@@ -64,7 +64,7 @@ impl ReadableHeaderElement for ImportantObjectMemory {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BuildingLot {
     /// The building type planned for the lot; `None` marks an empty slot.
-    pub unit_type_id: Option<UnitTypeID>,
+    pub unit_type_id: Option<UnitTypeId>,
     /// The lot's status.
     pub status: u8,
     /// The lot's tile position (x, y).
@@ -254,7 +254,7 @@ impl ReadableHeaderElement for AttackMemory {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ResourceMemory {
     /// The resource object's ID.
-    pub id: ObjectID,
+    pub id: ObjectId,
     /// The resource's tile position (x, y).
     pub location: (u8, u8),
     /// How often the AI tried to gather from it.
@@ -270,7 +270,7 @@ pub struct ResourceMemory {
     /// The resource type.
     pub resource_type: u8,
     /// The ID of the drop site used for the resource.
-    pub dropsite_id: ObjectID,
+    pub dropsite_id: ObjectId,
     /// The game time when gatherers at the resource were last attacked, if they were. Stored
     /// from version 10.91.
     pub attacked_time: Option<u32>,

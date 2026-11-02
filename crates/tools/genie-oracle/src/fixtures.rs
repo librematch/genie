@@ -121,7 +121,7 @@ pub(crate) fn header(players: Vec<Player>) -> Header {
             if let Some(wp) = world_player_mut(&mut val) {
                 wp.base.relation.resize(n, 0);
                 wp.base.unit_diplomacy.resize(n, 0);
-                wp.tcflared.resize(n, 0);
+                wp.tc_flared.resize(n, 0);
             }
             Positioned { pos: 0, val }
         })

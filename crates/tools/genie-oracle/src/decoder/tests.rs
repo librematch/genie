@@ -7,7 +7,7 @@ use genie_rec::de::command as packets;
 fn interact(num: u16, ids: Vec<i32>) -> Vec<u8> {
     packets::Interact {
         commp_id: 2,
-        t_id: 500,
+        tid: 500,
         x: 1.0,
         y: 2.0,
         num,

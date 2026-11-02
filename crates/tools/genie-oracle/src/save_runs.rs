@@ -374,7 +374,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
         })
         .filter_map(|o| {
             o.static_part()
-                .map(|s| (s.id, genie_core::map::Position::new(s.t_x, s.t_y, s.t_z)))
+                .map(|s| (s.id, genie_core::map::Position::new(s.tx, s.ty, s.tz)))
         })
         .collect();
     for (p, player) in turns.players.iter().enumerate() {

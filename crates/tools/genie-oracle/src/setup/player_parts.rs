@@ -110,9 +110,9 @@ pub fn ai_module(
     m: &genie_save::generated::world::TribeMainDecisionAi,
 ) -> genie_core::players::ai_module::AiModule {
     use genie_core::players::ai_module::{AiModule, InfoModule, TacticalModule};
-    let info = &m.tribe_information_aimodule;
-    let grid = &info.tribe_information_aimodule;
-    let width = grid.x_size_value.max(0) as usize;
+    let info = &m.tribe_information_ai_module;
+    let grid = &info.tribe_information_ai_module;
+    let width = grid.xsize_value.max(0) as usize;
     let cells = grid
         .row_value
         .iter()
@@ -125,8 +125,8 @@ pub fn ai_module(
         info: InfoModule {
             size: GridSize::new(info.map_width, info.map_height),
             path_map: genie_core::movement::explore::InfluenceMap {
-                size: GridSize::new(grid.x_size_value, grid.y_size_value),
-                origin: Tile::new(grid.x_reference_point_value, grid.y_reference_point_value),
+                size: GridSize::new(grid.xsize_value, grid.ysize_value),
+                origin: Tile::new(grid.xreference_point_value, grid.yreference_point_value),
                 limit: grid.unchangeable_limit_value,
                 cells,
             },
@@ -135,7 +135,7 @@ pub fn ai_module(
             search: Vec::new(),
         },
         tactical: TacticalModule {
-            slot_times: m.tribe_tactical_aimodule.slot_times.clone(),
+            slot_times: m.tribe_tactical_ai_module.slot_times.clone(),
         },
     }
 }

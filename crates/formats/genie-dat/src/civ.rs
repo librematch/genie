@@ -2,7 +2,7 @@
 
 use crate::GameVersion;
 use crate::conv::{fits, invalid_data};
-use crate::unit_type::{UnitType, UnitTypeID};
+use crate::unit_type::{UnitType, UnitTypeId};
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
@@ -11,45 +11,45 @@ use std::io::{Read, Result, Write};
 
 /// An ID identifying a civilization
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct CivilizationID(u8);
+pub struct CivilizationId(u8);
 
-impl From<u8> for CivilizationID {
+impl From<u8> for CivilizationId {
     fn from(n: u8) -> Self {
         Self(n)
     }
 }
 
-impl From<CivilizationID> for u8 {
-    fn from(n: CivilizationID) -> Self {
+impl From<CivilizationId> for u8 {
+    fn from(n: CivilizationId) -> Self {
         n.0
     }
 }
 
-impl From<CivilizationID> for u16 {
-    fn from(n: CivilizationID) -> Self {
+impl From<CivilizationId> for u16 {
+    fn from(n: CivilizationId) -> Self {
         n.0.into()
     }
 }
 
-impl From<CivilizationID> for u32 {
-    fn from(n: CivilizationID) -> Self {
+impl From<CivilizationId> for u32 {
+    fn from(n: CivilizationId) -> Self {
         n.0.into()
     }
 }
 
-impl From<CivilizationID> for usize {
-    fn from(n: CivilizationID) -> Self {
+impl From<CivilizationId> for usize {
+    fn from(n: CivilizationId) -> Self {
         n.0.into()
     }
 }
 
-infallible_try_into!(CivilizationID, i16);
-infallible_try_into!(CivilizationID, i32);
-fallible_try_from!(CivilizationID, i8);
-fallible_try_from!(CivilizationID, i16);
-fallible_try_from!(CivilizationID, u16);
-fallible_try_from!(CivilizationID, i32);
-fallible_try_from!(CivilizationID, u32);
+infallible_try_into!(CivilizationId, i16);
+infallible_try_into!(CivilizationId, i32);
+fallible_try_from!(CivilizationId, i8);
+fallible_try_from!(CivilizationId, i16);
+fallible_try_from!(CivilizationId, u16);
+fallible_try_from!(CivilizationId, i32);
+fallible_try_from!(CivilizationId, u32);
 
 type CivName = ArrayString<20>;
 
@@ -152,8 +152,8 @@ impl Civilization {
     }
 
     /// Get a unit type by its ID.
-    pub fn get_unit_type(&self, id: impl Into<UnitTypeID>) -> Option<&UnitType> {
-        let id: UnitTypeID = id.into();
+    pub fn get_unit_type(&self, id: impl Into<UnitTypeId>) -> Option<&UnitType> {
+        let id: UnitTypeId = id.into();
         self.unit_types
             .get(usize::from(id))
             .and_then(Option::as_ref)

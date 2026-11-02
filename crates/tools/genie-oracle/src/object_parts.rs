@@ -196,10 +196,10 @@ fn patrol_path(ai: &UnitAiModule) -> Option<genie_core::unit_ai::PatrolPath> {
         .as_deref()
         .map(|p| genie_core::unit_ai::PatrolPath {
             path: genie_core::pathing::tile_path::Path {
-                points: p.m_waypoints.iter().map(vec3).collect(),
+                points: p.waypoints.iter().map(vec3).collect(),
                 length: Distance::new(p.path_length_value),
             },
-            flags: PathFlags::from_bits_retain(p.flags_m_bits),
+            flags: PathFlags::from_bits_retain(p.flags_bits),
         })
 }
 

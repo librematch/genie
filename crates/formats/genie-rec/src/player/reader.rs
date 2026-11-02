@@ -1,6 +1,6 @@
 //! The reader of a player's state ([`Player`]) in the recording header.
 
-use crate::ai::PlayerAI;
+use crate::ai::PlayerAi;
 use crate::element::{OptionalReadableElement, ReadableHeaderElement};
 use crate::fits;
 use crate::player::{
@@ -10,7 +10,7 @@ use crate::player::{
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Unit;
 use crate::unit_type::CompactUnitType;
-use crate::{ObjectID, Result};
+use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::tech_tree::TechTree;
 use genie_support::ReadStringsExt;
@@ -143,7 +143,7 @@ impl Player {
         }
         expect_marker(input, 11)?;
         if self.kind == 3 && input.read_u32::<LE>()? == 1 {
-            let _player_ai = PlayerAI::read_from(input)?;
+            let _player_ai = PlayerAi::read_from(input)?;
         }
         expect_marker(input, 11)?;
         if self.kind == 2 {
@@ -274,12 +274,12 @@ fn skip_view_ai_and_selection<R: Read>(input: &mut RecordingHeaderReader<R>) -> 
 /// selected ids.
 fn read_selection<R: Read>(
     input: &mut RecordingHeaderReader<R>,
-) -> Result<Option<(ObjectID, u32, Vec<ObjectID>)>> {
+) -> Result<Option<(ObjectId, u32, Vec<ObjectId>)>> {
     let num_selections = input.read_u32::<LE>()?;
     if num_selections == 0 {
         return Ok(None);
     }
-    let object_id: ObjectID = input.read_u32::<LE>()?.into();
+    let object_id: ObjectId = input.read_u32::<LE>()?.into();
     let object_properties = input.read_u32::<LE>()?;
     let selected_ids = (0..num_selections)
         .map(|_| Ok(input.read_u32::<LE>()?.into()))

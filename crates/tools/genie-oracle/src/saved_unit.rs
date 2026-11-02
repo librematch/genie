@@ -345,10 +345,10 @@ fn row(
         workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
         damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
-        place: genie_core::objects::layers::Static::at(Position::new(s.t_x, s.t_y, s.t_z)),
+        place: genie_core::objects::layers::Static::at(Position::new(s.tx, s.ty, s.tz)),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
         sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
-        roo_called: s.rooalready_called != 0,
+        roo_called: s.roo_already_called != 0,
         ..Unit::default()
     };
     let mut actions = genie_core::objects::layers::Action::default();

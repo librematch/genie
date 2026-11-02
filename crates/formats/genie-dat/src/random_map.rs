@@ -1,7 +1,7 @@
 //! Types related to the random map data from Age of Empires 1.
 
 use crate::conv::fits;
-use crate::unit_type::UnitTypeID;
+use crate::unit_type::UnitTypeId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::ReadSkipExt;
 use std::io::{Read, Result, Write};
@@ -321,7 +321,7 @@ impl RandomMapTerrain {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RandomMapObject {
     /// The unit type placed.
-    pub unit_type: UnitTypeID,
+    pub unit_type: UnitTypeId,
     /// The terrain the objects are placed on (genieutils' `HostTerrain`).
     pub terrain_type: i32,
     /// How the group is placed (genieutils' `GroupPlacing`).
@@ -353,7 +353,7 @@ impl RandomMapObject {
     ///
     /// Returns an error if reading from `input` fails.
     ///
-    /// Also fails if the unit type ID does not fit a [`UnitTypeID`].
+    /// Also fails if the unit type ID does not fit a [`UnitTypeId`].
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let mut object = Self {
             unit_type: fits(input.read_u32::<LE>()?)?,

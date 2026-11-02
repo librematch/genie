@@ -1,8 +1,8 @@
-use crate::{AOE1_DE, AOE2_DE, CPXVersion, CampaignHeader, ScenarioMeta};
+use crate::{AOE1_DE, AOE2_DE, CampaignHeader, CpxVersion, ScenarioMeta};
 use byteorder::{LE, ReadBytesExt};
 use chardet::detect as detect_encoding;
 use encoding_rs::Encoding;
-use genie_scx::{self as scx, DLCPackage, Scenario};
+use genie_scx::{self as scx, DlcPackage, Scenario};
 use std::convert::TryFrom;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -23,7 +23,7 @@ pub enum ReadCampaignError {
     NotFoundError,
     /// A scenario file could not be parsed.
     #[error("{}", .0)]
-    ParseSCXError(#[from] scx::Error),
+    ParseScxError(#[from] scx::Error),
 }
 
 type Result<T> = std::result::Result<T, ReadCampaignError>;
@@ -87,10 +87,10 @@ fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
         // supports all packages.[citation needed]
         if version == AOE2_DE {
             let num_dependencies = input.read_u32::<LE>()?;
-            let mut dependencies = vec![DLCPackage::AgeOfKings; num_dependencies as usize];
+            let mut dependencies = vec![DlcPackage::AgeOfKings; num_dependencies as usize];
             for dependency in &mut dependencies {
                 *dependency =
-                    DLCPackage::try_from(input.read_i32::<LE>()?).map_err(scx::Error::from)?;
+                    DlcPackage::try_from(input.read_i32::<LE>()?).map_err(scx::Error::from)?;
             }
         }
 
@@ -204,7 +204,7 @@ where
     }
 
     /// Get the campaign file version.
-    pub const fn version(&self) -> CPXVersion {
+    pub const fn version(&self) -> CpxVersion {
         self.header.version
     }
 
@@ -254,7 +254,7 @@ where
     pub fn by_name(&mut self, filename: &str) -> Result<Scenario> {
         self.by_name_raw(filename)
             .map(Cursor::new)
-            .and_then(|buf| Scenario::read_from(buf).map_err(ReadCampaignError::ParseSCXError))
+            .and_then(|buf| Scenario::read_from(buf).map_err(ReadCampaignError::ParseScxError))
     }
 
     /// Get a scenario by its campaign index.
@@ -266,7 +266,7 @@ where
     pub fn by_index(&mut self, index: usize) -> Result<Scenario> {
         self.by_index_raw(index)
             .map(Cursor::new)
-            .and_then(|buf| Scenario::read_from(buf).map_err(ReadCampaignError::ParseSCXError))
+            .and_then(|buf| Scenario::read_from(buf).map_err(ReadCampaignError::ParseScxError))
     }
 
     /// Get a scenario file buffer by its file name.
@@ -322,7 +322,7 @@ impl From<ReadCampaignError> for genie_error::GenieError {
             ReadCampaignError::NotFoundError => {
                 Self::invalid_input("a scenario the campaign does not hold")
             }
-            ReadCampaignError::ParseSCXError(_) => {
+            ReadCampaignError::ParseScxError(_) => {
                 Self::invalid_input("a campaign scenario that does not read")
             }
         };

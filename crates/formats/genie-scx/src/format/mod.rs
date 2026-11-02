@@ -16,8 +16,8 @@ mod tribe_read;
 mod tribe_write;
 
 pub use self::object::ScenarioObject;
-pub(crate) use self::rge::RGEScen;
-pub use self::scx::SCXFormat;
+pub(crate) use self::rge::RgeScen;
+pub use self::scx::ScxFormat;
 pub use self::tribe_read::TribeScen;
 
 impl TribeScen {

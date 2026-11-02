@@ -20,20 +20,20 @@ pub use write::{CampaignWriter, WriteCampaignError};
 /// Version identifier for the campaign file format.
 ///
 /// Use one of the `AOE_AOK` or `AOE1_DE` constants rather than writing them out manually.
-pub type CPXVersion = [u8; 4];
+pub type CpxVersion = [u8; 4];
 
 /// Version identifier for `AoE1`, `AoE2`, and `AoE2`: HD campaign files.
-pub const AOE_AOK: CPXVersion = *b"1.00";
+pub const AOE_AOK: CpxVersion = *b"1.00";
 /// Version identifier for `AoE1`: Definitive Edition campaign files.
-pub const AOE1_DE: CPXVersion = *b"1.10";
+pub const AOE1_DE: CpxVersion = *b"1.10";
 /// Version identifier for `AoE2`: Definitive Edition campaign files.
-pub const AOE2_DE: CPXVersion = *b"2.00";
+pub const AOE2_DE: CpxVersion = *b"2.00";
 
 /// Campaign header.
 #[derive(Debug, Clone)]
 pub(crate) struct CampaignHeader {
     /// File format version.
-    pub(crate) version: CPXVersion,
+    pub(crate) version: CpxVersion,
     /// Name of the campaign.
     pub(crate) name: String,
     /// Amount of scenario files in this campaign.
@@ -96,7 +96,7 @@ where
     pub fn write_to_version<W: Write>(
         &mut self,
         output: &mut W,
-        version: CPXVersion,
+        version: CpxVersion,
     ) -> Result<(), WriteCampaignError> {
         let mut writer = CampaignWriter::new(self.name(), output).version(version);
 

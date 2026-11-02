@@ -1,9 +1,9 @@
-//! A unit's AI state ([`UnitAI`]): its orders, notifications, history, retargets and paths.
+//! A unit's AI state ([`UnitAi`]): its orders, notifications, history, retargets and paths.
 
 use crate::element::{ReadableHeaderElement, read_counted};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_support::{ReadSkipExt, read_opt_u32};
 use std::io::Read;
@@ -11,17 +11,17 @@ use std::io::Read;
 /// An order in a unit AI's order queue.
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone, Copy)]
-pub struct UnitAIOrder {
+pub struct UnitAiOrder {
     pub(super) issuer: u32,
     pub(super) order_type: u32,
     pub(super) priority: u32,
-    pub(super) target_id: ObjectID,
-    pub(super) target_player: PlayerID,
+    pub(super) target_id: ObjectId,
+    pub(super) target_player: PlayerId,
     pub(super) target_location: (f32, f32, f32),
     pub(super) range: f32,
 }
 
-impl ReadableHeaderElement for UnitAIOrder {
+impl ReadableHeaderElement for UnitAiOrder {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             issuer: input.read_u32::<LE>()?,
@@ -41,7 +41,7 @@ impl ReadableHeaderElement for UnitAIOrder {
 
 /// A notification one unit AI sends another.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct UnitAINotification {
+pub struct UnitAiNotification {
     /// The object that sent the notification.
     pub caller: u32,
     /// The object the notification is for.
@@ -52,7 +52,7 @@ pub struct UnitAINotification {
     pub params: (u32, u32, u32),
 }
 
-impl ReadableHeaderElement for UnitAINotification {
+impl ReadableHeaderElement for UnitAiNotification {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             caller: input.read_u32::<LE>()?,
@@ -70,17 +70,17 @@ impl ReadableHeaderElement for UnitAINotification {
 /// An entry of a unit AI's order history.
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone, Copy)]
-pub struct UnitAIOrderHistory {
+pub struct UnitAiOrderHistory {
     pub(super) order: u32,
     pub(super) action: u32,
     pub(super) time: u32,
     pub(super) position: (f32, f32, f32),
-    pub(super) target_id: ObjectID,
+    pub(super) target_id: ObjectId,
     pub(super) target_attack_category: Option<u32>,
     pub(super) target_position: (f32, f32, f32),
 }
 
-impl ReadableHeaderElement for UnitAIOrderHistory {
+impl ReadableHeaderElement for UnitAiOrderHistory {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             order: input.read_u32::<LE>()?,
@@ -108,14 +108,14 @@ impl ReadableHeaderElement for UnitAIOrderHistory {
 
 /// A target a unit AI keeps track of for retargeting, with a timeout.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct UnitAIRetargetEntry {
+pub struct UnitAiRetargetEntry {
     /// The target object.
-    pub target_id: ObjectID,
+    pub target_id: ObjectId,
     /// When the entry times out.
     pub retarget_timeout: u32,
 }
 
-impl ReadableHeaderElement for UnitAIRetargetEntry {
+impl ReadableHeaderElement for UnitAiRetargetEntry {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let target_id = input.read_u32::<LE>()?.into();
         let retarget_timeout = input.read_u32::<LE>()?;
@@ -165,7 +165,7 @@ impl ReadableHeaderElement for PatrolPath {
 /// A unit's AI state: orders, targets, timers and notifications.
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
-pub struct UnitAI {
+pub struct UnitAi {
     pub(super) mood: Option<u32>,
     pub(super) current_order: Option<u32>,
     pub(super) current_order_priority: Option<u32>,
@@ -185,29 +185,29 @@ pub struct UnitAI {
     pub(super) secondary_timer: u32,
     pub(super) lookaround_timer: u32,
     pub(super) lookaround_timeout: u32,
-    pub(super) defend_target: Option<ObjectID>,
+    pub(super) defend_target: Option<ObjectId>,
     pub(super) defense_buffer: f32,
     pub(super) last_world_position: Waypoint,
-    pub(super) orders: Vec<UnitAIOrder>,
-    pub(super) notifications: Vec<UnitAINotification>,
-    pub(super) attacking_units: Vec<ObjectID>,
+    pub(super) orders: Vec<UnitAiOrder>,
+    pub(super) notifications: Vec<UnitAiNotification>,
+    pub(super) attacking_units: Vec<ObjectId>,
     pub(super) stop_after_target_killed: bool,
     pub(super) state: u8,
     pub(super) state_position: (f32, f32),
     pub(super) time_since_enemy_sighting: u32,
     pub(super) alert_mode: u8,
-    pub(super) alert_mode_object_id: Option<ObjectID>,
+    pub(super) alert_mode_object_id: Option<ObjectId>,
     pub(super) patrol_path: Option<PatrolPath>,
     pub(super) patrol_current_waypoint: u32,
-    pub(super) order_history: Vec<UnitAIOrderHistory>,
+    pub(super) order_history: Vec<UnitAiOrderHistory>,
     pub(super) last_retarget_time: u32,
     pub(super) randomized_retarget_timer: u32,
-    pub(super) retarget_entries: Vec<UnitAIRetargetEntry>,
+    pub(super) retarget_entries: Vec<UnitAiRetargetEntry>,
     pub(super) best_unit_to_attack: Option<u32>,
     pub(super) formation_type: u8,
 }
 
-impl ReadableHeaderElement for UnitAI {
+impl ReadableHeaderElement for UnitAi {
     // Reads the unit AI's fields in file order, section by section.
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self::read_current(input)?;
@@ -219,7 +219,7 @@ impl ReadableHeaderElement for UnitAI {
     }
 }
 
-impl UnitAI {
+impl UnitAi {
     /// The mood and the current order, action and target: the AI's first fields.
     fn read_current<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut ai = Self {

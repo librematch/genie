@@ -2,7 +2,7 @@
 //! `UserPatch`'s AI commands.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
@@ -13,9 +13,9 @@ use std::io::{Read, Write};
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ResignCommand {
     /// The ID of the player that is resigning.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The multiplayer ID of the player that is resigning.
-    pub comm_player_id: PlayerID,
+    pub comm_player_id: PlayerId,
     /// Is this "resignation" because the player dropped from the game?
     pub dropped: bool,
 }
@@ -54,7 +54,7 @@ impl ResignCommand {
 #[derive(Debug, Default, Clone)]
 pub struct GroupWaypointCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The waypoint's tile coordinates (x, y).
     pub location: (u8, u8),
     /// The objects receiving the waypoint.
@@ -98,15 +98,15 @@ impl GroupWaypointCommand {
 
 /// Set a group of objects's "AI State" (usually known as "stance").
 #[derive(Debug, Default, Clone)]
-pub struct UnitAIStateCommand {
+pub struct UnitAiStateCommand {
     /// The new state. Aggressive/Defensive/No Attack/ etc.
     pub state: i8,
     /// The objects whose AI state is being changed.
     pub objects: ObjectsList,
 }
 
-impl UnitAIStateCommand {
-    /// Read a `UnitAIState` command from an input stream.
+impl UnitAiStateCommand {
+    /// Read a `UnitAiState` command from an input stream.
     ///
     /// # Errors
     ///
@@ -118,7 +118,7 @@ impl UnitAIStateCommand {
         Ok(Self { state, objects })
     }
 
-    /// Write this `UnitAIState` command to an output stream.
+    /// Write this `UnitAiState` command to an output stream.
     ///
     /// # Errors
     ///
@@ -137,7 +137,7 @@ impl UnitAIStateCommand {
 #[derive(Debug, Default, Clone)]
 pub struct GuardCommand {
     /// The target object of this order.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The objects this command applies to.
     pub objects: ObjectsList,
 }
@@ -178,7 +178,7 @@ impl GuardCommand {
 #[derive(Debug, Default, Clone)]
 pub struct FollowCommand {
     /// The target object of this order.
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
     /// The objects this command applies to.
     pub objects: ObjectsList,
 }
@@ -283,7 +283,7 @@ impl PatrolCommand {
 #[derive(Debug, Default, Clone)]
 pub struct FormFormationCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The type of formation to form.
     pub formation_type: i32,
     /// The objects to include in this formation.
@@ -325,9 +325,9 @@ impl FormFormationCommand {
 
 /// Meta-command for `UserPatch`'s new AI commands.
 #[derive(Debug, Default, Clone)]
-pub struct UserPatchAICommand {
+pub struct UserPatchAiCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// 0: move to object
     /// 1: set unit ai state
     /// 2: ?
@@ -350,7 +350,7 @@ pub struct UserPatchAICommand {
     pub params: ArrayVec<u32, 4>,
 }
 
-impl UserPatchAICommand {
+impl UserPatchAiCommand {
     /// Read a `UserPatch` AI command of `size` bytes from an input stream.
     ///
     /// # Errors

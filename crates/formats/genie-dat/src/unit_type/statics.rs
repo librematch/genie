@@ -2,12 +2,12 @@
 //! part ([`StaticUnitTypeAttributes`]).
 
 use crate::conv::{fits, invalid_data, opt_fits};
-use crate::sound::SoundID;
-use crate::sprite::{GraphicID, SpriteID};
+use crate::sound::SoundId;
+use crate::sprite::{GraphicId, SpriteId};
 use crate::unit_type::{UnitClass, write_opt_string_key};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{StringKey, UnitTypeID, read_opt_u16};
+use genie_support::{StringKey, UnitTypeId, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// A resource a unit stores (e.g. the food in a sheep), with how it is stored.
@@ -59,7 +59,7 @@ impl UnitAttribute {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DamageSprite {
     /// The sprite drawn.
-    pub sprite: SpriteID,
+    pub sprite: SpriteId,
     /// Damage, in percent of the unit's hit points, from which the sprite is drawn.
     pub damage_percent: u16,
     /// How the sprite is drawn over the unit (genieutils' `ApplyMode`); not decoded here.
@@ -100,21 +100,21 @@ impl DamageSprite {
 pub struct StaticUnitTypeAttributes {
     pub(super) name: String,
     /// ID of this unit type.
-    pub id: UnitTypeID,
+    pub id: UnitTypeId,
     /// Language string ID of the unit's name.
     pub string_id: StringKey,
     pub(super) string_id2: Option<StringKey>,
     /// The unit's class (archer, infantry, building, …).
     pub unit_class: UnitClass,
     /// Sprite shown while the unit stands still, or `None`.
-    pub standing_sprite_1: Option<SpriteID>,
+    pub standing_sprite_1: Option<SpriteId>,
     /// A second standing sprite (genieutils' second `StandingGraphic`), or `None`.
-    pub standing_sprite_2: Option<SpriteID>,
+    pub standing_sprite_2: Option<SpriteId>,
     /// Sprite played when the unit dies, or `None`.
-    pub dying_sprite: Option<SpriteID>,
+    pub dying_sprite: Option<SpriteId>,
     /// Sprite played after the dying sprite if `undead_flag` is set (genieutils' `UndeadGraphic`),
     /// or `None`.
-    pub undead_sprite: Option<SpriteID>,
+    pub undead_sprite: Option<SpriteId>,
     /// Whether the unit plays its undead sprite after dying (genieutils' `UndeadMode`).
     pub undead_flag: u8,
     /// Hit points.
@@ -126,21 +126,21 @@ pub struct StaticUnitTypeAttributes {
     /// Collision size (x, y, z), in tiles.
     pub radius: (f32, f32, f32),
     /// Sound played when the unit is created, or `None`.
-    pub train_sound: Option<SoundID>,
+    pub train_sound: Option<SoundId>,
     /// Sound played when the unit takes damage, or `None`.
-    pub damage_sound: Option<SoundID>,
+    pub damage_sound: Option<SoundId>,
     /// Unit type that replaces this unit when it dies (e.g. its corpse), or `None`.
-    pub death_spawn: Option<UnitTypeID>,
+    pub death_spawn: Option<UnitTypeId>,
     /// genieutils' `SortNumber`; its use is not known yet.
     pub sort_number: u8,
     /// Whether buildings can be placed over this unit.
     pub can_be_built_on: bool,
     /// Icon of the unit's button and selection panel, or `None`.
-    pub button_picture: Option<GraphicID>,
+    pub button_picture: Option<GraphicId>,
     /// Whether the scenario editor hides this unit type.
     pub hide_in_scenario_editor: bool,
     /// Old portrait picture ID (genieutils' `OldPortraitPict`), or `None`.
-    pub portrait_picture: Option<GraphicID>,
+    pub portrait_picture: Option<GraphicId>,
     /// Whether the unit type is available at the start of a game.
     pub enabled: bool,
     /// genieutils' `Disabled` flag; its effect is not known yet.
@@ -215,9 +215,9 @@ pub struct StaticUnitTypeAttributes {
     /// Sprites drawn on the unit as it takes damage.
     pub damage_sprites: Vec<DamageSprite>,
     /// Sound played when the unit is selected, or `None`.
-    pub selected_sound: Option<SoundID>,
+    pub selected_sound: Option<SoundId>,
     /// Sound played when the unit dies, or `None`.
-    pub death_sound: Option<SoundID>,
+    pub death_sound: Option<SoundId>,
     /// How the unit reacts to attacks (genieutils' `OldAttackReaction`).
     pub attack_reaction: u8,
     /// genieutils' `ConvertTerrain` flag; its effect is not known yet.
@@ -517,7 +517,7 @@ mod tests {
             hp: 30,
             los: 6.0,
             radius: (0.2, 0.2, 2.0),
-            train_sound: Some(SoundID::from(8u16)),
+            train_sound: Some(SoundId::from(8u16)),
             enabled: true,
             terrain_restriction_id: 7,
             attribute_rot: 0.5,
@@ -528,11 +528,11 @@ mod tests {
             object_flags: 0x40,
             outline_radius: (0.2, 0.2, 0.0),
             damage_sprites: vec![DamageSprite {
-                sprite: SpriteID::from(3u16),
+                sprite: SpriteId::from(3u16),
                 damage_percent: 25,
                 flag: 1,
             }],
-            selected_sound: Some(SoundID::from(9u16)),
+            selected_sound: Some(SoundId::from(9u16)),
             copy_id: 4,
             unit_group: 4,
             ..StaticUnitTypeAttributes::default()

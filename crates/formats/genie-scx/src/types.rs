@@ -7,9 +7,9 @@ use std::fmt::{self, Debug, Display};
 
 /// The SCX Format version string. In practice, this does not really reflect the game version.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct SCXVersion(pub(crate) [u8; 4]);
+pub struct ScxVersion(pub(crate) [u8; 4]);
 
-impl SCXVersion {
+impl ScxVersion {
     /// Get the raw bytes representing this scx format version.
     #[must_use]
     pub const fn as_bytes(&self) -> &[u8] {
@@ -28,37 +28,37 @@ impl SCXVersion {
     }
 }
 
-impl Default for SCXVersion {
+impl Default for ScxVersion {
     fn default() -> Self {
         Self(*b"1.21")
     }
 }
 
-impl Debug for SCXVersion {
+impl Debug for ScxVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", String::from_utf8_lossy(&self.0))
     }
 }
 
-impl Display for SCXVersion {
+impl Display for ScxVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", String::from_utf8_lossy(&self.0))
     }
 }
 
-impl PartialEq<[u8; 4]> for SCXVersion {
+impl PartialEq<[u8; 4]> for ScxVersion {
     fn eq(&self, other: &[u8; 4]) -> bool {
         other[0] == self.0[0] && other[1] == b'.' && other[2] == self.0[2] && other[3] == self.0[3]
     }
 }
 
-impl PartialEq<SCXVersion> for [u8; 4] {
-    fn eq(&self, other: &SCXVersion) -> bool {
+impl PartialEq<ScxVersion> for [u8; 4] {
+    fn eq(&self, other: &ScxVersion) -> bool {
         other == self
     }
 }
 
-impl Ord for SCXVersion {
+impl Ord for ScxVersion {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.0[0].cmp(&other.0[0]) {
             Ordering::Equal => {}
@@ -72,7 +72,7 @@ impl Ord for SCXVersion {
     }
 }
 
-impl PartialOrd for SCXVersion {
+impl PartialOrd for ScxVersion {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -154,11 +154,11 @@ impl From<DataSet> for i32 {
 /// Could not parse a DLC package identifier because given number is an unknown DLC ID.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("unknown dlc package {}", .0)]
-pub struct ParseDLCPackageError(i32);
+pub struct ParseDlcPackageError(i32);
 
 /// An HD Edition DLC identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DLCPackage {
+pub enum DlcPackage {
     /// The Age of Kings base game.
     AgeOfKings,
     /// The Age of Conquerors expansion.
@@ -173,8 +173,8 @@ pub enum DLCPackage {
     LastKhans,
 }
 
-impl TryFrom<i32> for DLCPackage {
-    type Error = ParseDLCPackageError;
+impl TryFrom<i32> for DlcPackage {
+    type Error = ParseDlcPackageError;
     fn try_from(n: i32) -> Result<Self, Self::Error> {
         match n {
             2 => Ok(Self::AgeOfKings),
@@ -183,20 +183,20 @@ impl TryFrom<i32> for DLCPackage {
             5 => Ok(Self::AfricanKingdoms),
             6 => Ok(Self::RiseOfTheRajas),
             7 => Ok(Self::LastKhans),
-            n => Err(ParseDLCPackageError(n)),
+            n => Err(ParseDlcPackageError(n)),
         }
     }
 }
 
-impl From<DLCPackage> for i32 {
-    fn from(dlc_id: DLCPackage) -> Self {
+impl From<DlcPackage> for i32 {
+    fn from(dlc_id: DlcPackage) -> Self {
         match dlc_id {
-            DLCPackage::AgeOfKings => 2,
-            DLCPackage::AgeOfConquerors => 3,
-            DLCPackage::TheForgotten => 4,
-            DLCPackage::AfricanKingdoms => 5,
-            DLCPackage::RiseOfTheRajas => 6,
-            DLCPackage::LastKhans => 7,
+            DlcPackage::AgeOfKings => 2,
+            DlcPackage::AgeOfConquerors => 3,
+            DlcPackage::TheForgotten => 4,
+            DlcPackage::AfricanKingdoms => 5,
+            DlcPackage::RiseOfTheRajas => 6,
+            DlcPackage::LastKhans => 7,
         }
     }
 }
@@ -366,7 +366,7 @@ impl From<VictoryCondition> for u8 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VersionBundle {
     /// The version of the 'container' file format.
-    pub format: SCXVersion,
+    pub format: ScxVersion,
     /// The version of the header.
     pub header: u32,
     /// The version of the HD Edition DLC Options, only if `header` >= 3.
@@ -397,7 +397,7 @@ impl VersionBundle {
     #[must_use]
     pub const fn ror() -> Self {
         Self {
-            format: SCXVersion(*b"1.11"),
+            format: ScxVersion(*b"1.11"),
             header: 2,
             dlc_options: None,
             data: 1.15,
@@ -412,7 +412,7 @@ impl VersionBundle {
     #[must_use]
     pub const fn aok() -> Self {
         Self {
-            format: SCXVersion(*b"1.18"),
+            format: ScxVersion(*b"1.18"),
             header: 2,
             dlc_options: None,
             data: 1.2,
@@ -427,7 +427,7 @@ impl VersionBundle {
     #[must_use]
     pub const fn aoc() -> Self {
         Self {
-            format: SCXVersion(*b"1.21"),
+            format: ScxVersion(*b"1.21"),
             header: 2,
             dlc_options: None,
             data: 1.22,
@@ -454,7 +454,7 @@ impl VersionBundle {
     #[must_use]
     pub const fn hd_edition() -> Self {
         Self {
-            format: SCXVersion(*b"1.21"),
+            format: ScxVersion(*b"1.21"),
             header: 3,
             dlc_options: Some(1000),
             data: 1.26,
@@ -471,7 +471,7 @@ impl VersionBundle {
     #[must_use]
     pub const fn aoe2_de() -> Self {
         Self {
-            format: SCXVersion(*b"1.37"),
+            format: ScxVersion(*b"1.37"),
             header: 5,
             dlc_options: Some(1000),
             data: 1.37,
@@ -525,11 +525,11 @@ impl From<ParseDataSetError> for genie_error::GenieError {
     }
 }
 
-impl From<ParseDLCPackageError> for genie_error::GenieError {
+impl From<ParseDlcPackageError> for genie_error::GenieError {
     /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
     /// source.
     #[track_caller]
-    fn from(e: ParseDLCPackageError) -> Self {
+    fn from(e: ParseDlcPackageError) -> Self {
         Self::invalid_input("a DLC package id this reader does not know").with_source(e)
     }
 }
@@ -569,7 +569,7 @@ mod genie_error_tests {
             )
         );
         assert!(std::error::Error::source(&e).is_some());
-        let e: genie_error::GenieError = ParseDLCPackageError(9).into();
+        let e: genie_error::GenieError = ParseDlcPackageError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
             (

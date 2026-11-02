@@ -2,8 +2,8 @@
 
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
-use crate::unit::UnitAI;
-use crate::{ObjectID, Result};
+use crate::unit::UnitAi;
+use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::unit_type::UnitType;
 use genie_support::read_opt_u32;
@@ -61,7 +61,7 @@ pub struct MissileUnitAttributes {
     /// The furthest the projectile flies.
     pub max_range: f32,
     /// The object that fired the projectile.
-    pub fired_from_id: ObjectID,
+    pub fired_from_id: ObjectId,
     /// The object's own copy of its unit type, if it has one.
     pub own_base: Option<UnitType>,
 }
@@ -108,15 +108,15 @@ pub struct CombatUnitAttributes {
     /// The number of units garrisoned inside; stored from save version 11.56 on.
     pub inside_garrison_count: u8,
     /// The unit's AI, if it has one.
-    pub unit_ai: Option<UnitAI>,
+    pub unit_ai: Option<UnitAi>,
     /// The town bell state; stored from save version 10.30 on.
     pub town_bell_flag: i8,
     /// The object the town bell sent the unit to, if any.
-    pub town_bell_target_id: Option<ObjectID>,
+    pub town_bell_target_id: Option<ObjectId>,
     /// The position the town bell sent the unit to, if any.
     pub town_bell_target_location: Option<(f32, f32)>,
     /// A second town bell target object; stored from save version 11.71 on.
-    pub town_bell_target_id_2: Option<ObjectID>,
+    pub town_bell_target_id_2: Option<ObjectId>,
     /// The town bell target's type; stored from save version 11.71 on.
     pub town_bell_target_type: u32,
     /// The town bell action; stored from save version 11.74 on.
@@ -142,7 +142,7 @@ impl ReadableHeaderElement for CombatUnitAttributes {
         attrs.read_amounts_and_counters(input)?;
         let has_ai = input.read_u32::<LE>()? != 0;
         if has_ai {
-            attrs.unit_ai = Some(UnitAI::read_from(input)?);
+            attrs.unit_ai = Some(UnitAi::read_from(input)?);
         }
         attrs.read_town_bell(input)?;
         attrs.read_last_counters(input)?;

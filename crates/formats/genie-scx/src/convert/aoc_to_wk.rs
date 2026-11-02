@@ -1,17 +1,17 @@
 use super::ConvertError;
-use crate::{Scenario, ScenarioObject, Tile, Trigger, UnitTypeID};
+use crate::{Scenario, ScenarioObject, Tile, Trigger, UnitTypeId};
 use nohash_hasher::IntMap;
 
 /// Convert an `AoC` scenario to a WololoKingdoms-compatible one.
 ///
 /// Swaps the unit IDs and terrain IDs that look different in WK.
 #[derive(Debug)]
-pub struct AoCToWK {
-    object_ids_map: IntMap<i32, UnitTypeID>,
+pub struct AocToWk {
+    object_ids_map: IntMap<i32, UnitTypeId>,
     terrain_ids_map: IntMap<u8, u8>,
 }
 
-impl Default for AoCToWK {
+impl Default for AocToWk {
     fn default() -> Self {
         let object_ids_map = [
             // NOTE: These are special to make the tech tree work
@@ -21,7 +21,7 @@ impl Default for AoCToWK {
             (527, 1104), // Demolition Ship, Demolition Raft
         ]
         .iter()
-        .map(|(a, b)| (*a, UnitTypeID::from(*b)))
+        .map(|(a, b)| (*a, UnitTypeId::from(*b)))
         .collect();
 
         let terrain_ids_map = [
@@ -40,7 +40,7 @@ impl Default for AoCToWK {
     }
 }
 
-impl AoCToWK {
+impl AocToWk {
     /// Convert an object from `AoC` to WK.
     ///
     /// This updates the object type IDs.

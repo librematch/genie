@@ -1,6 +1,6 @@
-use crate::{AOE_AOK, AOE1_DE, AOE2_DE, CPXVersion, CampaignHeader, ScenarioMeta};
+use crate::{AOE_AOK, AOE1_DE, AOE2_DE, CampaignHeader, CpxVersion, ScenarioMeta};
 use byteorder::{LE, WriteBytesExt};
-use genie_scx::{DLCPackage, Result as SCXResult, Scenario};
+use genie_scx::{DlcPackage, Result as ScxResult, Scenario};
 use std::io::{self, Write};
 
 /// Type for errors that could occur during writing.
@@ -57,12 +57,12 @@ fn write_campaign_header<W: Write>(header: &CampaignHeader, output: &mut W) -> i
     if header.version == AOE2_DE {
         // DE2 always supports all DLC, so we can just write them all out by default
         let dependencies = [
-            DLCPackage::AgeOfKings,
-            DLCPackage::AgeOfConquerors,
-            DLCPackage::TheForgotten,
-            DLCPackage::AfricanKingdoms,
-            DLCPackage::RiseOfTheRajas,
-            DLCPackage::LastKhans,
+            DlcPackage::AgeOfKings,
+            DlcPackage::AgeOfConquerors,
+            DlcPackage::TheForgotten,
+            DlcPackage::AfricanKingdoms,
+            DlcPackage::RiseOfTheRajas,
+            DlcPackage::LastKhans,
         ];
         output.write_u32::<LE>(below(dependencies.len(), 7, "the number of packages")?)?;
         for dep in &dependencies {
@@ -186,7 +186,7 @@ impl<W: Write> CampaignWriter<W> {
 
     /// Set the file version to output.
     #[must_use]
-    pub fn version(mut self, version: CPXVersion) -> Self {
+    pub fn version(mut self, version: CpxVersion) -> Self {
         debug_assert!(
             [AOE_AOK, AOE1_DE, AOE2_DE].contains(&version),
             "unknown or unsupported version"
@@ -212,7 +212,7 @@ impl<W: Write> CampaignWriter<W> {
     /// # Errors
     ///
     /// Returns an error if the scenario cannot be serialized.
-    pub fn add(&mut self, name: &str, scx: &Scenario) -> SCXResult<()> {
+    pub fn add(&mut self, name: &str, scx: &Scenario) -> ScxResult<()> {
         let mut bytes = vec![];
         scx.write_to(&mut bytes)?;
         self.scenarios.push(CampaignEntry {
@@ -237,7 +237,7 @@ impl<W: Write> CampaignWriter<W> {
     /// Get the size in bytes of all metadata.
     const fn get_meta_size(&self) -> usize {
         // version + number of scenarios + campaign name
-        let header_size = size_of::<CPXVersion>()
+        let header_size = size_of::<CpxVersion>()
             + size_of::<i32>() // number of scenarios
             + 256; // campaign name
         header_size + self.scenarios.len() * (2 * size_of::<i32>() + 255 + 255)
@@ -249,7 +249,7 @@ impl<W: Write> CampaignWriter<W> {
         const fn strlen(s: &str) -> usize {
             s.len() + 4
         }
-        let header_size = size_of::<CPXVersion>()
+        let header_size = size_of::<CpxVersion>()
             + size_of::<u32>() // number of scenarios
             + strlen(&self.header.name);
         self.scenarios.iter().fold(header_size, |acc, scen| {
@@ -263,7 +263,7 @@ impl<W: Write> CampaignWriter<W> {
         const fn strlen(s: &str) -> usize {
             s.len() + 4
         }
-        let header_size = size_of::<CPXVersion>()
+        let header_size = size_of::<CpxVersion>()
             + 7 * size_of::<i32>() // DLC dependencies
             + size_of::<u32>() // number of scenarios
             + 256; // campaign name

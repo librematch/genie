@@ -1,6 +1,6 @@
 use crate::test_support::{floats, read_all, words};
 use crate::unit::unit_ai::{
-    UnitAI, UnitAINotification, UnitAIOrder, UnitAIOrderHistory, UnitAIRetargetEntry,
+    UnitAi, UnitAiNotification, UnitAiOrder, UnitAiOrderHistory, UnitAiRetargetEntry,
 };
 
 /// An order: issuer, type, priority, target and its player, then the target location and
@@ -45,7 +45,7 @@ fn unit_ai_bytes() -> Vec<u8> {
 
 #[test]
 fn an_order_reads_its_target_and_range() {
-    let order = read_all::<UnitAIOrder>(&order_bytes(), 11.97);
+    let order = read_all::<UnitAiOrder>(&order_bytes(), 11.97);
     assert_eq!((order.issuer, order.order_type, order.priority), (1, 2, 3));
     assert_eq!(u32::from(order.target_id), 500);
     assert_eq!(u8::from(order.target_player), 2);
@@ -55,7 +55,7 @@ fn an_order_reads_its_target_and_range() {
 
 #[test]
 fn a_notification_reads_its_parameters() {
-    let note = read_all::<UnitAINotification>(&words(&[1, 2, 3, 4, 5, 6]), 11.97);
+    let note = read_all::<UnitAiNotification>(&words(&[1, 2, 3, 4, 5, 6]), 11.97);
     assert_eq!(
         (note.caller, note.recipient, note.notification_type),
         (1, 2, 3)
@@ -65,21 +65,21 @@ fn a_notification_reads_its_parameters() {
 
 #[test]
 fn an_order_history_entry_has_the_attack_category_from_10_50() {
-    let before = read_all::<UnitAIOrderHistory>(&history_bytes(None), 10.48);
+    let before = read_all::<UnitAiOrderHistory>(&history_bytes(None), 10.48);
     assert_eq!((before.order, before.action, before.time), (7, 8, 900));
     assert_eq!(before.position, (10.0, 11.0, 0.0));
     assert_eq!(u32::from(before.target_id), 501);
     assert_eq!(before.target_attack_category, None);
     assert_eq!(before.target_position, (12.0, 13.0, 1.0));
-    let with = read_all::<UnitAIOrderHistory>(&history_bytes(Some(3)), 10.50);
+    let with = read_all::<UnitAiOrderHistory>(&history_bytes(Some(3)), 10.50);
     assert_eq!(with.target_attack_category, Some(3));
-    let none = read_all::<UnitAIOrderHistory>(&history_bytes(Some(-1)), 10.50);
+    let none = read_all::<UnitAiOrderHistory>(&history_bytes(Some(-1)), 10.50);
     assert_eq!(none.target_attack_category, None);
 }
 
 #[test]
 fn a_retarget_entry_reads_its_target_and_timeout() {
-    let entry = read_all::<UnitAIRetargetEntry>(&words(&[507, 25]), 11.97);
+    let entry = read_all::<UnitAiRetargetEntry>(&words(&[507, 25]), 11.97);
     assert_eq!(u32::from(entry.target_id), 507);
     assert_eq!(entry.retarget_timeout, 25);
 }
@@ -87,7 +87,7 @@ fn a_retarget_entry_reads_its_target_and_timeout() {
 /// Before 10.48 the AI ends at the patrol waypoint.
 #[test]
 fn an_old_unit_ai_ends_at_its_patrol_waypoint() {
-    let ai = read_all::<UnitAI>(&unit_ai_bytes(), 10.0);
+    let ai = read_all::<UnitAi>(&unit_ai_bytes(), 10.0);
     assert_eq!(ai.mood, Some(1));
     assert_eq!(ai.current_order, None);
     assert_eq!(ai.current_order_priority, Some(5));
@@ -146,7 +146,7 @@ fn a_unit_ai_of_11_44_reads_every_later_field() {
     bytes.extend(history_bytes(Some(-1)));
     bytes.extend(words(&[80, 90, 1, 508, 30, 509]));
     bytes.push(6);
-    let ai = read_all::<UnitAI>(&bytes, 11.44);
+    let ai = read_all::<UnitAi>(&bytes, 11.44);
     assert_eq!(ai.order_history.len(), 1);
     assert_eq!(
         (ai.last_retarget_time, ai.randomized_retarget_timer),
@@ -164,7 +164,7 @@ fn a_unit_ai_of_11_44_reads_every_later_field() {
 fn a_unit_ai_of_11_05_stops_after_its_retarget_entries() {
     let mut bytes = unit_ai_bytes();
     bytes.extend(words(&[0, 80, 90, 0]));
-    let ai = read_all::<UnitAI>(&bytes, 11.05);
+    let ai = read_all::<UnitAi>(&bytes, 11.05);
     assert_eq!(
         (ai.last_retarget_time, ai.randomized_retarget_timer),
         (80, 90)
@@ -176,5 +176,5 @@ fn a_unit_ai_of_11_05_stops_after_its_retarget_entries() {
 fn a_short_unit_ai_is_an_error() {
     let bytes = unit_ai_bytes();
     let mut reader = crate::test_support::header_reader(&bytes[..bytes.len() - 1], 10.0);
-    assert!(<UnitAI as crate::element::ReadableHeaderElement>::read_from(&mut reader).is_err());
+    assert!(<UnitAi as crate::element::ReadableHeaderElement>::read_from(&mut reader).is_err());
 }

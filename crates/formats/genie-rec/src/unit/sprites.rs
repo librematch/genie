@@ -4,7 +4,7 @@ use crate::Result;
 use crate::element::{OptionalReadableElement, ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_dat::sprite::SpriteID;
+use genie_dat::sprite::SpriteId;
 use std::io::{Read, Write};
 
 /// The animation state of a sprite node.
@@ -58,7 +58,7 @@ impl WritableHeaderElement for SpriteNodeAnimation {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SpriteNode {
     /// The sprite.
-    pub id: SpriteID,
+    pub id: SpriteId,
     /// The sprite's horizontal offset.
     pub x: u32,
     /// The sprite's vertical offset.

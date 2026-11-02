@@ -2,7 +2,7 @@
 //! unit and terrain conversion.
 
 use genie_formats::Scenario;
-use genie_formats::scx::{VersionBundle, convert::AutoToWK};
+use genie_formats::scx::{VersionBundle, convert::AutoToWk};
 use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 
@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
 
     if version_arg == Some("wk".to_string()) {
         println!("Applying WololoKingdoms conversion...");
-        let converter = AutoToWK::default();
+        let converter = AutoToWk::default();
         converter.convert(&mut scen)?;
     }
 

@@ -257,8 +257,8 @@ pub(super) fn work_masters(
             work.volley_fire = Firepower::new(c.volley_fire_amount);
             work.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
             work.volley_spread = VolleySpread {
-                x: Distance::new(c.volley_x_spread),
-                y: Distance::new(c.volley_y_spread),
+                x: Distance::new(c.volley_xspread),
+                y: Distance::new(c.volley_yspread),
                 start: Distance::new(c.volley_start_spread_adjustment),
             };
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);

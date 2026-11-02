@@ -1,12 +1,12 @@
 //! The costs, the creatable part, the annexes and the building part.
 
 use crate::conv::fits;
-use crate::sound::SoundID;
-use crate::sprite::SpriteID;
-use crate::terrain::TerrainID;
+use crate::sound::SoundId;
+use crate::sprite::SpriteId;
+use crate::terrain::TerrainId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{MapInto, TechID, UnitTypeID, read_opt_u16, read_opt_u32};
+use genie_support::{MapInto, TechId, UnitTypeId, read_opt_u16, read_opt_u32};
 use std::io::{Read, Result, Write};
 
 /// Resource cost for a unit.
@@ -60,7 +60,7 @@ pub struct CombatUnitTypeAttributes {
     /// Time to create the unit.
     pub create_time: u16,
     /// Unit type ID of the building or unit where this unit can be created.
-    pub create_at_building: Option<UnitTypeID>,
+    pub create_at_building: Option<UnitTypeId>,
     /// Button location index where the button to create this unit should be shown when a
     /// `create_at_building` unit is selected.
     pub create_button: i8,
@@ -73,7 +73,7 @@ pub struct CombatUnitTypeAttributes {
     /// TODO what is special about hero units? Does it just opt into the healing behaviour?
     pub hero_flag: u8,
     /// Sprite shown while units are garrisoned, or `None`.
-    pub garrison_sprite: Option<SpriteID>,
+    pub garrison_sprite: Option<SpriteId>,
     /// Projectiles fired per attack (genieutils' `TotalProjectiles`).
     pub volley_fire_amount: f32,
     /// The most projectiles fired per attack (genieutils' `MaxTotalProjectiles`).
@@ -85,9 +85,9 @@ pub struct CombatUnitTypeAttributes {
     /// `ProjectileSpawningArea`).
     pub volley_start_spread_adjustment: f32,
     /// Unit type of the extra projectiles (genieutils' `SecondaryProjectileUnit`), or `None`.
-    pub volley_missile: Option<UnitTypeID>,
+    pub volley_missile: Option<UnitTypeId>,
     /// Sprite of the special attack (genieutils' `SpecialGraphic`), or `None`.
-    pub special_attack_sprite: Option<SpriteID>,
+    pub special_attack_sprite: Option<SpriteId>,
     /// Kind of special ability (genieutils' `SpecialAbility`).
     pub special_attack_flag: i8,
     /// Pierce armour shown in the interface.
@@ -101,7 +101,7 @@ impl CombatUnitTypeAttributes {
     ///
     /// Returns an error if reading from `input` fails, or if an ID is out of range.
     ///
-    /// Also fails if the garrison sprite ID does not fit a [`SpriteID`].
+    /// Also fails if the garrison sprite ID does not fit a [`SpriteId`].
     pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
         let mut attrs = Self::default();
         for _ in 0..3 {
@@ -176,7 +176,7 @@ impl CombatUnitTypeAttributes {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LinkedBuilding {
     /// Unit type ID for this linked building.
-    pub unit_id: UnitTypeID,
+    pub unit_id: UnitTypeId,
     /// X offset in tiles from the centre of the "owner" building.
     pub x_offset: f32,
     /// Y offset in tiles from the centre of the "owner" building.
@@ -220,9 +220,9 @@ impl LinkedBuilding {
 #[derive(Debug, Default, Clone)]
 pub struct BuildingUnitTypeAttributes {
     /// Sprite to use during construction.
-    pub construction_sprite: Option<SpriteID>,
+    pub construction_sprite: Option<SpriteId>,
     /// Sprite to use when this building is finished and built on snow.
-    pub snow_sprite: Option<SpriteID>,
+    pub snow_sprite: Option<SpriteId>,
     /// TODO document
     pub connect_flag: u8,
     /// TODO document
@@ -230,13 +230,13 @@ pub struct BuildingUnitTypeAttributes {
     /// Whether the building should be immediately destroyed on completion.
     pub destroy_on_build: bool,
     /// Unit to spawn at the build site on completion.
-    pub on_build_make_unit: Option<UnitTypeID>,
+    pub on_build_make_unit: Option<UnitTypeId>,
     /// Change the underlying terrain to this terrain ID on completion.
-    pub on_build_make_tile: Option<TerrainID>,
+    pub on_build_make_tile: Option<TerrainId>,
     /// TODO document
     pub on_build_make_overlay: i16,
     /// Research this tech on completion.
-    pub on_build_make_tech: Option<TechID>,
+    pub on_build_make_tech: Option<TechId>,
     /// Whether this building…can burn?
     ///
     /// TODO document the details
@@ -244,13 +244,13 @@ pub struct BuildingUnitTypeAttributes {
     /// Annex buildings, at most 4; unused slots are dropped when reading.
     pub linked_buildings: ArrayVec<LinkedBuilding, 4>,
     /// The head unit of a building made of several units (genieutils' `HeadUnit`), or `None`.
-    pub construction_unit: Option<UnitTypeID>,
+    pub construction_unit: Option<UnitTypeId>,
     /// Unit type the building transforms into (genieutils' `TransformUnit`), or `None`.
-    pub transform_unit: Option<UnitTypeID>,
+    pub transform_unit: Option<UnitTypeId>,
     /// Sound played when the building transforms, or `None`.
-    pub transform_sound: Option<SoundID>,
+    pub transform_sound: Option<SoundId>,
     /// Sound played while the building is built, or `None`.
-    pub construction_sound: Option<SoundID>,
+    pub construction_sound: Option<SoundId>,
     /// Which kinds of unit can garrison inside (genieutils' `GarrisonType`, a bit mask).
     pub garrison_type: i8,
     /// Rate at which garrisoned units heal.
@@ -259,7 +259,7 @@ pub struct BuildingUnitTypeAttributes {
     /// `GarrisonRepairRate`).
     pub garrison_repair_rate: f32,
     /// Unit type left behind when the building is destroyed (genieutils' `PileUnit`), or `None`.
-    pub salvage_unit: Option<UnitTypeID>,
+    pub salvage_unit: Option<UnitTypeId>,
     /// The six values of genieutils' `LootingTable`: what is looted from the building.
     pub salvage_attributes: ArrayVec<i8, 6>,
 }

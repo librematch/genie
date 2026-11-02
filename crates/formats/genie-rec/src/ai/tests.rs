@@ -18,13 +18,13 @@ fn size_of_zeros<T: ReadableHeaderElement>(version: f32) -> usize {
 #[test]
 fn the_modules_take_their_fixed_sizes() {
     for (version, build, strategy) in [(9.5, 2432, 76), (10.5, 2432, 80), (11.97, 2436, 80)] {
-        assert_eq!(size_of_zeros::<MainAI>(version), 4);
-        assert_eq!(size_of_zeros::<BuildAI>(version), build, "{version}");
-        assert_eq!(size_of_zeros::<ConstructionAI>(version), 32);
-        assert_eq!(size_of_zeros::<DiplomacyAI>(version), 90);
-        assert_eq!(size_of_zeros::<EmotionalAI>(version), 24);
-        assert_eq!(size_of_zeros::<ResourceAI>(version), 4);
-        assert_eq!(size_of_zeros::<StrategyAI>(version), strategy, "{version}");
+        assert_eq!(size_of_zeros::<MainAi>(version), 4);
+        assert_eq!(size_of_zeros::<BuildAi>(version), build, "{version}");
+        assert_eq!(size_of_zeros::<ConstructionAi>(version), 32);
+        assert_eq!(size_of_zeros::<DiplomacyAi>(version), 90);
+        assert_eq!(size_of_zeros::<EmotionalAi>(version), 24);
+        assert_eq!(size_of_zeros::<ResourceAi>(version), 4);
+        assert_eq!(size_of_zeros::<StrategyAi>(version), strategy, "{version}");
     }
 }
 
@@ -68,7 +68,7 @@ fn the_records_take_their_sizes_by_version() {
 #[test]
 fn an_id_list_is_its_count_and_ids() {
     let bytes = [2, 0, 0, 0, 7, 0, 0, 0, 9, 0, 0, 0];
-    let ids: Vec<ObjectID> = read_id_list(&mut bytes.as_slice()).unwrap();
+    let ids: Vec<ObjectId> = read_id_list(&mut bytes.as_slice()).unwrap();
     assert_eq!(
         ids.iter().map(|&id| u32::from(id)).collect::<Vec<_>>(),
         [7, 9]
@@ -78,7 +78,7 @@ fn an_id_list_is_its_count_and_ids() {
 /// The main module: its objects behind their count.
 #[test]
 fn the_main_module_reads_its_objects() {
-    let main: MainAI = read_all(&[1, 0, 0, 0, 5, 0, 0, 0], 11.97);
+    let main: MainAi = read_all(&[1, 0, 0, 0, 5, 0, 0, 0], 11.97);
     assert_eq!(main.objects.len(), 1);
 }
 
@@ -87,7 +87,7 @@ fn the_main_module_reads_its_objects() {
 #[test]
 fn the_information_module_of_10_5_ends_at_its_unknown_part() {
     let zeros = vec![0u8; 1 << 18];
-    let e = InformationAI::read_from(&mut header_reader(&zeros, 10.5)).unwrap_err();
+    let e = InformationAi::read_from(&mut header_reader(&zeros, 10.5)).unwrap_err();
     assert!(matches!(e, crate::Error::NotRead(_)));
 }
 
@@ -95,7 +95,7 @@ fn the_information_module_of_10_5_ends_at_its_unknown_part() {
 #[test]
 fn the_information_module_of_11_97_ends_at_its_unknown_part() {
     let zeros = vec![0u8; 1 << 18];
-    let e = InformationAI::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
+    let e = InformationAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
     assert!(matches!(e, crate::Error::NotRead(_)));
 }
 
@@ -103,7 +103,7 @@ fn the_information_module_of_11_97_ends_at_its_unknown_part() {
 #[test]
 fn the_tactical_module_ends_after_its_unit_lists() {
     let zeros = vec![0u8; 1 << 10];
-    let e = TacticalAI::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
+    let e = TacticalAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
     assert!(matches!(e, crate::Error::NotRead(_)));
 }
 
@@ -111,6 +111,6 @@ fn the_tactical_module_ends_after_its_unit_lists() {
 #[test]
 fn a_player_s_ai_stops_in_the_information_module() {
     let zeros = vec![0u8; 1 << 18];
-    let e = PlayerAI::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
+    let e = PlayerAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
     assert!(matches!(e, crate::Error::NotRead(_)));
 }

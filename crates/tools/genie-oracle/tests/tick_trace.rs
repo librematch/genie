@@ -51,7 +51,7 @@ fn a_trace_gives_each_ticks_world_time_and_lanes() {
 fn a_file_of_another_kind_is_refused() {
     assert!(matches!(
         TickTrace::decode(b"GRTRACE3\0\0\0\0"),
-        Err(TraceError::NotATrace)
+        Err(TraceError::NotTrace)
     ));
 }
 

@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::types::{DLCPackage, DataSet, SCXVersion};
+use crate::types::{DataSet, DlcPackage, ScxVersion};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{ReadStringsExt, write_opt_i32_str};
 use std::convert::TryFrom;
@@ -7,26 +7,26 @@ use std::io::{Read, Write};
 
 /// The data set and the DLC packages a scenario needs (HD Edition and later).
 #[derive(Debug, Clone)]
-pub struct DLCOptions {
+pub struct DlcOptions {
     /// Version of the DLC options structure.
     pub version: i32,
     /// The base data set.
     pub game_data_set: DataSet,
     /// The DLCs that are required by this scenario.
-    pub dependencies: Vec<DLCPackage>,
+    pub dependencies: Vec<DlcPackage>,
 }
 
-impl Default for DLCOptions {
+impl Default for DlcOptions {
     fn default() -> Self {
         Self {
             version: 1000,
             game_data_set: DataSet::BaseGame,
-            dependencies: vec![DLCPackage::AgeOfKings, DLCPackage::AgeOfConquerors],
+            dependencies: vec![DlcPackage::AgeOfKings, DlcPackage::AgeOfConquerors],
         }
     }
 }
 
-impl DLCOptions {
+impl DlcOptions {
     /// Read DLC options, including the unversioned form older files have.
     ///
     /// # Errors
@@ -51,9 +51,9 @@ impl DLCOptions {
         };
 
         let num_dependencies = input.read_u32::<LE>()?;
-        let mut dependencies = vec![DLCPackage::AgeOfKings; num_dependencies as usize];
+        let mut dependencies = vec![DlcPackage::AgeOfKings; num_dependencies as usize];
         for dependency in &mut dependencies {
-            *dependency = DLCPackage::try_from(input.read_i32::<LE>()?)?;
+            *dependency = DlcPackage::try_from(input.read_i32::<LE>()?)?;
         }
 
         Ok(Self {
@@ -83,7 +83,7 @@ impl DLCOptions {
 
 /// The scenario header: version, timestamp, description, player count and DLC needs.
 #[derive(Debug, Clone)]
-pub struct SCXHeader {
+pub struct ScxHeader {
     /// Version of the header.
     ///
     /// Versions 2 and up include a save timestamp.
@@ -100,17 +100,17 @@ pub struct SCXHeader {
     /// How many players are supported by this scenario.
     pub active_player_count: u32,
     /// HD Edition DLC information.
-    pub dlc_options: Option<DLCOptions>,
+    pub dlc_options: Option<DlcOptions>,
 }
 
-impl SCXHeader {
+impl ScxHeader {
     /// Parse an SCX header from a byte stream.
     ///
     /// # Errors
     ///
     /// Returns an error if reading fails, if a string cannot be decoded, or if the DLC options
     /// hold an unknown ID.
-    pub fn read_from(mut input: impl Read, format_version: SCXVersion) -> Result<Self> {
+    pub fn read_from(mut input: impl Read, format_version: ScxVersion) -> Result<Self> {
         let _header_size = input.read_u32::<LE>()?;
         let version = input.read_u32::<LE>()?;
         log::debug!("Header version {version}");
@@ -129,7 +129,7 @@ impl SCXHeader {
         let active_player_count = input.read_u32::<LE>()?;
 
         let dlc_options = if version > 2 && format_version != *b"3.13" {
-            Some(DLCOptions::read_from(&mut input)?)
+            Some(DlcOptions::read_from(&mut input)?)
         } else {
             None
         };
@@ -169,7 +169,7 @@ impl SCXHeader {
     pub fn write_to(
         &self,
         output: impl Write,
-        format_version: SCXVersion,
+        format_version: ScxVersion,
         version: u32,
     ) -> Result<()> {
         let mut intermediate = vec![];
@@ -200,7 +200,7 @@ impl SCXHeader {
         intermediate.write_u32::<LE>(self.active_player_count)?;
 
         if version > 2 && format_version != *b"3.13" {
-            let def = DLCOptions::default();
+            let def = DlcOptions::default();
             let dlc_options = self.dlc_options.as_ref().unwrap_or(&def);
             dlc_options.write_to(&mut intermediate)?;
         }

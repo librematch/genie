@@ -249,7 +249,7 @@ pub struct GameOptionsEntry2 {
     /// game: `&mCustomAIFiles[i]`
     /// read by 0x140d074c0
     #[br(args(ver))]
-    pub custom_aifiles: UniqueFile,
+    pub custom_ai_files: UniqueFile,
     /// game: `&rawData`
     /// read by 0x140d073b0, a routine of one read
     pub raw_data: u32,
@@ -263,7 +263,7 @@ pub struct GameOptionsEntry3 {
     /// game: `&mCustomXSFiles[i]`
     /// read by 0x140d074c0
     #[br(args(ver))]
-    pub custom_xsfiles: UniqueFile,
+    pub custom_xs_files: UniqueFile,
     /// game: `&rawData`
     /// read by 0x140d073b0, a routine of one read
     pub raw_data: u32,
@@ -470,13 +470,13 @@ pub struct GameOptions {
     pub capacity: u64,
     /// a loop of 2 reads; named after the member its entries index (`mCustomAIFiles`)
     #[br(count = capacity as usize, args { inner: (ver,) })]
-    pub custom_aifiles: Vec<GameOptionsEntry2>,
+    pub custom_ai_files: Vec<GameOptionsEntry2>,
     /// game: `&capacity`
     /// read by 0x1412dd700, a routine of one read
     pub capacity_2: u64,
     /// a loop of 2 reads; named after the member its entries index (`mCustomXSFiles`)
     #[br(count = capacity_2 as usize, args { inner: (ver,) })]
-    pub custom_xsfiles: Vec<GameOptionsEntry3>,
+    pub custom_xs_files: Vec<GameOptionsEntry3>,
     /// game: `&mGameId`
     /// read by 0x1412dca90, a routine of one read
     pub game_id: [u8; 16],
@@ -649,9 +649,9 @@ impl Default for GameOptions {
             custom_map_pool: vec![Default::default(); 10],
             standard_map_pool: Default::default(),
             capacity: Default::default(),
-            custom_aifiles: Default::default(),
+            custom_ai_files: Default::default(),
             capacity_2: Default::default(),
-            custom_xsfiles: Default::default(),
+            custom_xs_files: Default::default(),
             game_id: Default::default(),
             game_title: Default::default(),
             match_type: Default::default(),
@@ -1363,11 +1363,11 @@ pub struct TechTree {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(x_size_value: i32))]
+#[br(import(xsize_value: i32))]
 pub struct TribeInformationAIModuleEntry1 {
     /// game: `(rowValue[j][i])`
     /// read at 0x140f4c865 into the temporary `tempBYTE`; named by the save's write in the same place (0x140f4cb50, write at 0x140f4d3ce)
-    #[br(if(x_size_value > 0), count = x_size_value.max(0) as usize)]
+    #[br(if(xsize_value > 0), count = xsize_value.max(0) as usize)]
     pub row_value: Option<Vec<u8>>,
 }
 
@@ -1379,21 +1379,21 @@ pub struct TribeInformationAIModuleEntry1 {
 pub struct TribeInformationAIModule {
     /// game: `xSizeValue`
     /// read at 0x140f4c0ec
-    pub x_size_value: i32,
+    pub xsize_value: i32,
     /// game: `ySizeValue`
     /// read at 0x140f4c1ef
-    pub y_size_value: i32,
+    pub ysize_value: i32,
     /// game: `xReferencePointValue`
     /// read at 0x140f4c380
-    pub x_reference_point_value: i32,
+    pub xreference_point_value: i32,
     /// game: `yReferencePointValue`
     /// read at 0x140f4c512
-    pub y_reference_point_value: i32,
+    pub yreference_point_value: i32,
     /// game: `unchangeableLimitValue`
     /// read at 0x140f4c6a2
     pub unchangeable_limit_value: u8,
     /// a loop of 1 reads; named after the member its entries index (`rowValue`)
-    #[br(count = y_size_value.max(0) as usize, args { inner: (x_size_value,) })]
+    #[br(count = ysize_value.max(0) as usize, args { inner: (xsize_value,) })]
     pub row_value: Vec<TribeInformationAIModuleEntry1>,
 }
 
@@ -1402,7 +1402,7 @@ pub struct TribeInformationAIModule {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct MainDecisionAIModule {
+pub struct MainDecisionAiModule {
     /// unnamed in the binary
     /// read at 0x140b43817 into a local (local_50)
     #[brw(magic = b"\x10\x0a")]
@@ -1420,7 +1420,7 @@ pub struct MainDecisionAIModule {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-pub struct BuildAIModuleEntry1 {
+pub struct BuildAiModuleEntry1 {
     /// unnamed in the binary
     /// read at 0x140b27ea5 into a local (local_220)
     #[brw(magic = b"\xa0\x0a")]
@@ -1517,7 +1517,7 @@ pub struct BuildAIModuleEntry1 {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct BuildAIModule {
+pub struct BuildAiModule {
     /// unnamed in the binary
     /// read into piVar3
     #[brw(magic = b"\x10\x0a")]
@@ -1560,7 +1560,7 @@ pub struct BuildAIModule {
     /// unnamed in the binary
     /// a loop of 29 reads; unnamed in the binary
     #[br(count = ai_marker1 as usize)]
-    pub unnamed_list_at_0x140b27df1: Vec<BuildAIModuleEntry1>,
+    pub unnamed_list_at_0x140b27df1: Vec<BuildAiModuleEntry1>,
     /// unnamed in the binary
     /// the routine's closing marker
     #[brw(magic = b" \x0a")]
@@ -1572,10 +1572,10 @@ pub struct BuildAIModule {
 #[derive(Debug, Clone, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct TribeBuildAIModule {
+pub struct TribeBuildAiModule {
     /// read by 0x140b275c0
     #[br(args(ver))]
-    pub build_aimodule: BuildAIModule,
+    pub build_ai_module: BuildAiModule,
     /// unnamed in the binary
     /// read into (longlong)param_1+(longlong)iVar9*4+0x5c8
     #[brw(magic = b"\x10\x0a")]
@@ -1597,10 +1597,10 @@ pub struct TribeBuildAIModule {
     pub end_marker: (),
 }
 
-impl Default for TribeBuildAIModule {
+impl Default for TribeBuildAiModule {
     fn default() -> Self {
         Self {
-            build_aimodule: Default::default(),
+            build_ai_module: Default::default(),
             unnamed_at_0x140b45a99: vec![Default::default(); 9000],
             unnamed_at_0x140b45b68: vec![Default::default(); 9000],
             unnamed_0x9268: Default::default(),
@@ -1613,7 +1613,7 @@ impl Default for TribeBuildAIModule {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-pub struct ConstructionAIModuleEntry1 {
+pub struct ConstructionAiModuleEntry1 {
     /// unnamed in the binary
     /// read at 0x140b3423c into a local (local_2f8)
     pub unnamed_at_0x140b3423c: u32,
@@ -1665,7 +1665,7 @@ pub struct ConstructionAIModuleEntry1 {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-pub struct ConstructionAIModuleEntry2 {
+pub struct ConstructionAiModuleEntry2 {
     /// unnamed in the binary
     /// read at 0x140b34fcc into a local (local_2f8)
     pub unnamed_at_0x140b34fcc: u32,
@@ -1719,7 +1719,7 @@ pub struct ConstructionAIModuleEntry2 {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct ConstructionAIModule {
+pub struct ConstructionAiModule {
     /// unnamed in the binary
     /// read at 0x140b33d43
     #[brw(magic = b"\x10\x0a")]
@@ -1753,7 +1753,7 @@ pub struct ConstructionAIModule {
     /// unnamed in the binary
     /// a loop of 15 reads; unnamed in the binary
     #[br(count = unnamed_0xb0.max(0) as usize)]
-    pub unnamed_list_at_0x140b3423c: Vec<ConstructionAIModuleEntry1>,
+    pub unnamed_list_at_0x140b3423c: Vec<ConstructionAiModuleEntry1>,
     /// unnamed in the binary
     /// read at 0x140b34f08
     #[brw(magic = b"\xa0\x0a")]
@@ -1761,7 +1761,7 @@ pub struct ConstructionAIModule {
     /// unnamed in the binary
     /// a loop of 15 reads; unnamed in the binary
     #[br(count = unnamed_0x148.max(0) as usize)]
-    pub unnamed_list_at_0x140b34fcc: Vec<ConstructionAIModuleEntry2>,
+    pub unnamed_list_at_0x140b34fcc: Vec<ConstructionAiModuleEntry2>,
     /// unnamed in the binary
     /// the routine's closing marker
     #[brw(magic = b" \x0a")]
@@ -1771,7 +1771,7 @@ pub struct ConstructionAIModule {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-pub struct DiplomacyAIModuleEntry1 {
+pub struct DiplomacyAiModuleEntry1 {
     /// unnamed in the binary
     /// read into puVar7+-5
     pub unnamed_at_0x140b4096f: u32,
@@ -1788,18 +1788,18 @@ pub struct DiplomacyAIModuleEntry1 {
 #[derive(Debug, Clone, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct DiplomacyAIModule {
+pub struct DiplomacyAiModule {
     /// a loop of 3 reads; named after its entries' only member (`AiMarker3`)
     #[brw(magic = b"\x10\x0a")]
     #[br(count = 10)]
-    pub ai_marker3: Vec<DiplomacyAIModuleEntry1>,
+    pub ai_marker3: Vec<DiplomacyAiModuleEntry1>,
     /// unnamed in the binary
     /// the routine's closing marker
     #[brw(magic = b" \x0a")]
     pub end_marker: (),
 }
 
-impl Default for DiplomacyAIModule {
+impl Default for DiplomacyAiModule {
     fn default() -> Self {
         Self {
             ai_marker3: vec![Default::default(); 10],
@@ -1813,7 +1813,7 @@ impl Default for DiplomacyAIModule {
 #[derive(Debug, Clone, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct EmotionalAIModule {
+pub struct EmotionalAiModule {
     /// unnamed in the binary
     /// read into (longlong)param_1+((longlong)iVar7+0x2e)*4
     #[brw(magic = b"\x10\x0a")]
@@ -1825,7 +1825,7 @@ pub struct EmotionalAIModule {
     pub end_marker: (),
 }
 
-impl Default for EmotionalAIModule {
+impl Default for EmotionalAiModule {
     fn default() -> Self {
         Self {
             unnamed_at_0x140b42ad1: vec![Default::default(); 6],
@@ -2382,7 +2382,7 @@ pub struct TribeInformationAiState {
     /// unnamed in the binary
     /// read by 0x140f4c080
     #[br(args(ver))]
-    pub tribe_information_aimodule: TribeInformationAIModule,
+    pub tribe_information_ai_module: TribeInformationAIModule,
     /// unnamed in the binary
     /// read at 0x140b502e8 into a local (local_3408)
     pub unnamed_at_0x140b502e8: u64,
@@ -2539,7 +2539,7 @@ impl Default for TribeInformationAiState {
             unnamed_at_0x140b5001e: Default::default(),
             unnamed_at_0x140b5017a: vec![Default::default(); 9000],
             unnamed_at_0x140b5026b: Default::default(),
-            tribe_information_aimodule: Default::default(),
+            tribe_information_ai_module: Default::default(),
             unnamed_at_0x140b502e8: Default::default(),
             unnamed_at_0x140b50326: Default::default(),
             unnamed_at_0x140b504c6: Default::default(),
@@ -2586,7 +2586,7 @@ impl Default for TribeInformationAiState {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct TribeResourceAIModule {
+pub struct TribeResourceAiModule {
     /// unnamed in the binary
     /// read at 0x140ba5b48
     #[brw(magic = b"\x10\x0a")]
@@ -2691,14 +2691,14 @@ pub struct TribeStrategyAiState {
 pub struct Path {
     /// game: `mIDValue`
     /// read at 0x140f96244
-    pub idvalue: i32,
+    pub id_value: i32,
     /// game: `nWV`
     /// read at 0x140f963e0
-    pub n_wv: i32,
+    pub nwv: i32,
     /// game: `(m_waypoints[i])`
     /// read at 0x140f96586 into the temporary `temp`; named by the save's write in the same place (0x140f98f00, write at 0x140f99313)
-    #[br(count = n_wv.max(0) as usize)]
-    pub m_waypoints: Vec<[u8; 12]>,
+    #[br(count = nwv.max(0) as usize)]
+    pub waypoints: Vec<[u8; 12]>,
     /// game: `mPathLengthValue`
     /// read at 0x140f96640
     pub path_length_value: f32,
@@ -2707,7 +2707,7 @@ pub struct Path {
     pub creation_time_value: u32,
     /// game: `mFlags.m_bits`
     /// read at 0x140f96a72
-    pub flags_m_bits: u32,
+    pub flags_bits: u32,
     /// game: `mReferenceCount`
     /// read at 0x140f96c24
     pub reference_count: i32,
@@ -2765,7 +2765,7 @@ pub struct TribeTacticalRecord {
     pub priority_value: i32,
     /// game: `assistGroupIDValue`
     /// read at 0x140bd509a
-    pub assist_group_idvalue: i32,
+    pub assist_group_id_value: i32,
     /// game: `assistGroupTypeValue`
     /// read at 0x140bd51ed
     pub assist_group_type_value: i32,
@@ -2798,7 +2798,7 @@ pub struct TribeTacticalRecord {
     pub centroid: [u8; 12],
     /// game: `mFlags.m_bits`
     /// read at 0x140bd674f
-    pub flags_m_bits: u32,
+    pub flags_bits: u32,
     /// unnamed in the binary
     /// read at 0x140bd68bc
     #[br(count = max_units.max(0) as usize)]
@@ -2833,7 +2833,7 @@ impl Default for TribeTacticalRecord {
             target_location_value: Default::default(),
             gather_location_value: Default::default(),
             priority_value: Default::default(),
-            assist_group_idvalue: Default::default(),
+            assist_group_id_value: Default::default(),
             assist_group_type_value: Default::default(),
             type_value: Default::default(),
             sub_type_value: Default::default(),
@@ -2844,7 +2844,7 @@ impl Default for TribeTacticalRecord {
             objects_to_destroy_owner_value: Default::default(),
             last_added_unit_time_value: Default::default(),
             centroid: Default::default(),
-            flags_m_bits: Default::default(),
+            flags_bits: Default::default(),
             unnamed_0x714: Default::default(),
             random_move_point: Default::default(),
             random_move_time: Default::default(),
@@ -3266,7 +3266,7 @@ impl Default for TribeTacticalAiState {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct TradeAIModule {
+pub struct TradeAiModule {
     /// unnamed in the binary
     /// the routine's closing marker
     #[brw(magic = b"\x10\x0a \x0a")]
@@ -3281,34 +3281,34 @@ pub struct TradeAIModule {
 pub struct TribeMainDecisionAi {
     /// read by 0x140b43640
     #[br(args(ver))]
-    pub main_decision_aimodule: MainDecisionAIModule,
+    pub main_decision_ai_module: MainDecisionAiModule,
     /// read by 0x140b45890
     #[br(args(ver))]
-    pub tribe_build_aimodule: TribeBuildAIModule,
+    pub tribe_build_ai_module: TribeBuildAiModule,
     /// read by 0x140b49f10
     #[br(args(ver))]
-    pub tribe_construction_aimodule: ConstructionAIModule,
+    pub tribe_construction_ai_module: ConstructionAiModule,
     /// read by 0x140b40830
     #[br(args(ver))]
-    pub diplomacy_aimodule: DiplomacyAIModule,
+    pub diplomacy_ai_module: DiplomacyAiModule,
     /// read by 0x140b429b0
     #[br(args(ver))]
-    pub emotional_aimodule: EmotionalAIModule,
+    pub emotional_ai_module: EmotionalAiModule,
     /// read by 0x140b4c880
     #[br(args(ver, num_players))]
-    pub tribe_information_aimodule: TribeInformationAiState,
+    pub tribe_information_ai_module: TribeInformationAiState,
     /// read by 0x140ba5a40
     #[br(args(ver))]
-    pub tribe_resource_aimodule: TribeResourceAIModule,
+    pub tribe_resource_ai_module: TribeResourceAiModule,
     /// read by 0x140ba69b0
     #[br(args(ver))]
-    pub tribe_strategy_aimodule: TribeStrategyAiState,
+    pub tribe_strategy_ai_module: TribeStrategyAiState,
     /// read by 0x140bb1040
     #[br(args(ver, num_players))]
-    pub tribe_tactical_aimodule: TribeTacticalAiState,
+    pub tribe_tactical_ai_module: TribeTacticalAiState,
     /// read by 0x140b452e0
     #[br(args(ver))]
-    pub trade_aimodule: TradeAIModule,
+    pub trade_ai_module: TradeAiModule,
     /// unnamed in the binary
     /// read at 0x140b9cf3d
     #[brw(magic = b"\x10\x0a")]
@@ -3360,16 +3360,16 @@ pub struct TribeMainDecisionAi {
 impl Default for TribeMainDecisionAi {
     fn default() -> Self {
         Self {
-            main_decision_aimodule: Default::default(),
-            tribe_build_aimodule: Default::default(),
-            tribe_construction_aimodule: Default::default(),
-            diplomacy_aimodule: Default::default(),
-            emotional_aimodule: Default::default(),
-            tribe_information_aimodule: Default::default(),
-            tribe_resource_aimodule: Default::default(),
-            tribe_strategy_aimodule: Default::default(),
-            tribe_tactical_aimodule: Default::default(),
-            trade_aimodule: Default::default(),
+            main_decision_ai_module: Default::default(),
+            tribe_build_ai_module: Default::default(),
+            tribe_construction_ai_module: Default::default(),
+            diplomacy_ai_module: Default::default(),
+            emotional_ai_module: Default::default(),
+            tribe_information_ai_module: Default::default(),
+            tribe_resource_ai_module: Default::default(),
+            tribe_strategy_ai_module: Default::default(),
+            tribe_tactical_ai_module: Default::default(),
+            trade_ai_module: Default::default(),
             unnamed_0x28f48: Default::default(),
             unnamed_0x28f4c: Default::default(),
             unnamed_0x28f50: Default::default(),
@@ -3547,11 +3547,11 @@ pub struct XsVariableEntry {
     /// game: `(BYTE*)(mData+sizeof(int32_t))`
     /// helper 0x140c94660
     #[br(if((type_ == 16) || (type_ == 64)), count = data_length.max(0) as usize)]
-    pub bytem_datasizeofint32_t: Option<Vec<u8>>,
+    pub datasizeofint32_t: Option<Vec<u8>>,
     /// game: `(BYTE*)mData`
     /// helper 0x140c94660
     #[br(if(!((type_ == 16) || (type_ == 64))), count = data_length.max(0) as usize)]
-    pub bytem_data: Option<Vec<u8>>,
+    pub data: Option<Vec<u8>>,
 }
 
 /// Read by `FUN_141739d30` (`xssyscallentry.cpp`) of the build.
@@ -3746,7 +3746,7 @@ pub struct XsFileEntry {
     /// game: `(int32_t*)mSourceLines`
     /// helper 0x140c68f90
     #[br(count = number_source_lines.max(0) as usize)]
-    pub int32_tm_source_lines: Vec<i32>,
+    pub source_lines: Vec<i32>,
 }
 
 /// Read by `FUN_14172bb40` (`xssource.cpp`) of the build.
@@ -3844,7 +3844,7 @@ pub struct BxsRuleEntry {
     /// game: `(int32_t*)mGroups`
     /// helper 0x140c68f90
     #[br(count = number_groups as usize)]
-    pub int32_tm_groups: Vec<i32>,
+    pub groups: Vec<i32>,
 }
 
 /// Read by `FUN_14170bcb0` (`xsruleentry.cpp`) of the build.
@@ -3868,7 +3868,7 @@ pub struct BxsRuleGroupEntry {
     /// game: `(int32_t*)mRules`
     /// helper 0x140c68f90
     #[br(count = number_rules as usize)]
-    pub int32_tm_rules: Vec<i32>,
+    pub rules: Vec<i32>,
 }
 
 /// Read by `FUN_1417120a0` (`xsrulemodule.cpp`) of the build.
@@ -4190,7 +4190,7 @@ pub struct BxsData {
     /// game: `(int32_t*)mExportedVariables`
     /// helper 0x140c68f90
     #[br(count = number_exported_variables as usize)]
-    pub int32_tm_exported_variables: Vec<i32>,
+    pub exported_variables: Vec<i32>,
     /// game: `&numberUserClasses`
     /// helper 0x140a91060
     pub number_user_classes: i32,
@@ -4211,14 +4211,14 @@ pub struct BxsData {
     /// game: `(int32_t*)mStack`
     /// helper 0x140c68f90
     #[br(count = stack_size.max(0) as usize)]
-    pub int32_tm_stack: Vec<i32>,
+    pub stack: Vec<i32>,
     /// game: `&heapSize`
     /// helper 0x140a91060
     pub heap_size: i32,
     /// game: `(BYTE*)mHeap`
     /// helper 0x140c94660
     #[br(count = heap_size.max(0) as usize)]
-    pub bytem_heap: Vec<u8>,
+    pub heap: Vec<u8>,
     /// game: `&mInterpretCounter`
     /// helper 0x140a91060
     pub interpret_counter: i32,
@@ -4237,10 +4237,10 @@ pub struct BxsData {
     pub current_rule_id: i32,
     /// game: `&mInfiniteLoopPCJumpValue`
     /// helper 0x140a91060
-    pub infinite_loop_pcjump_value: i32,
+    pub infinite_loop_pc_jump_value: i32,
     /// game: `&mInfiniteLoopPCJumpCount`
     /// helper 0x140a91060
-    pub infinite_loop_pcjump_count: i32,
+    pub infinite_loop_pc_jump_count: i32,
     /// game: `&mInfiniteLoopLimit`
     /// helper 0x140a91060
     pub infinite_loop_limit: i32,
@@ -4626,7 +4626,7 @@ pub struct WorldPlayer {
     /// game: `mTCFlared[i]`
     /// read at 0x1415f358a; named by the save's write in the same place (0x141631420, write at 0x140ccd2d8)
     #[br(count = num_players)]
-    pub tcflared: Vec<u8>,
+    pub tc_flared: Vec<u8>,
     /// game: `old_kills`
     /// read at 0x1415f363f; named by the save's write of this member at 0x141634fa3
     pub old_kills: i32,
@@ -4676,7 +4676,7 @@ pub struct WorldPlayer {
     pub is_first_update: u8,
     /// game: `&mD3KTMilitaryUnitBuilt`
     /// helper 0x140ccd170
-    pub d3_ktmilitary_unit_built: u8,
+    pub d3_kt_military_unit_built: u8,
     /// unnamed in the binary
     /// a marker the game checks
     #[brw(magic = b"\x0b")]
@@ -4687,7 +4687,7 @@ pub struct WorldPlayer {
     pub temp: Option<i32>,
     /// read by 0x140b9cae0
     #[br(if(type_ == 3 && !(temp.unwrap_or_default() != 1)), args(ver, num_players))]
-    pub tribe_main_decision_aimodule: Option<Box<TribeMainDecisionAi>>,
+    pub tribe_main_decision_ai_module: Option<Box<TribeMainDecisionAi>>,
     /// game: `usingXS`
     /// read at 0x1415f3f03; named by the save's write in the same place (0x141631420, write at 0x141635c9a)
     #[br(if(type_ == 3 && !(temp.unwrap_or_default() != 1)))]
@@ -4750,7 +4750,7 @@ impl Default for WorldPlayer {
             auto_fish_trap_queue: Default::default(),
             cp_nomad_tc_build_lock: Default::default(),
             sudden_death_can_be_eliminated: Default::default(),
-            tcflared: Default::default(),
+            tc_flared: Default::default(),
             old_kills: Default::default(),
             old_razings: Default::default(),
             battle_flag: Default::default(),
@@ -4766,10 +4766,10 @@ impl Default for WorldPlayer {
             final_battle_royale_position: Default::default(),
             sharing_is_caring: Default::default(),
             is_first_update: Default::default(),
-            d3_ktmilitary_unit_built: Default::default(),
+            d3_kt_military_unit_built: Default::default(),
             marker: Default::default(),
             temp: Default::default(),
-            tribe_main_decision_aimodule: Default::default(),
+            tribe_main_decision_ai_module: Default::default(),
             using_xs: Default::default(),
             bxs_runtime: Default::default(),
             end_marker: Default::default(),
@@ -5490,10 +5490,10 @@ pub struct TribeMasterCombatObject {
     pub temp_id_3: i16,
     /// game: `&volley_x_spread`
     /// helper 0x140a91160
-    pub volley_x_spread: f32,
+    pub volley_xspread: f32,
     /// game: `&volley_y_spread`
     /// helper 0x140a91160
-    pub volley_y_spread: f32,
+    pub volley_yspread: f32,
     /// game: `&volley_start_spread_adjustment`
     /// helper 0x140a91160
     pub volley_start_spread_adjustment: f32,
@@ -5537,8 +5537,8 @@ impl Default for TribeMasterCombatObject {
             temp_id: Default::default(),
             temp_id_2: Default::default(),
             temp_id_3: Default::default(),
-            volley_x_spread: Default::default(),
-            volley_y_spread: Default::default(),
+            volley_xspread: Default::default(),
+            volley_yspread: Default::default(),
             volley_start_spread_adjustment: Default::default(),
             train_location_entry_mod: Some(Default::default()),
         }
@@ -6489,10 +6489,10 @@ pub struct OwnTribeMasterCombatObject {
     pub max_attacks_in_volley: u8,
     /// game: `volley_x_spread`
     /// read at 0x14126e76d
-    pub volley_x_spread: f32,
+    pub volley_xspread: f32,
     /// game: `volley_y_spread`
     /// read at 0x14126e8ac
-    pub volley_y_spread: f32,
+    pub volley_yspread: f32,
     /// game: `volley_start_spread_adjustment`
     /// read at 0x14126e9eb
     pub volley_start_spread_adjustment: f32,
@@ -6543,8 +6543,8 @@ impl Default for OwnTribeMasterCombatObject {
             conversion_chance_adj: Default::default(),
             volley_fire_amount: Default::default(),
             max_attacks_in_volley: Default::default(),
-            volley_x_spread: Default::default(),
-            volley_y_spread: Default::default(),
+            volley_xspread: Default::default(),
+            volley_yspread: Default::default(),
             volley_start_spread_adjustment: Default::default(),
             volley_missile_id: Default::default(),
             temp_sprite_id_6: Default::default(),
@@ -6844,11 +6844,11 @@ pub struct Particle {
     /// game: `offset2D.x`
     /// read at 0x1408cbc3e
     #[br(if(!effect.bytes.is_empty()))]
-    pub offset2_d_x: Option<f32>,
+    pub offset2_dx: Option<f32>,
     /// game: `offset2D.y`
     /// read at 0x1408cbde4
     #[br(if(!effect.bytes.is_empty()))]
-    pub offset2_d_y: Option<f32>,
+    pub offset2_dy: Option<f32>,
     /// game: `dirAngle`
     /// read at 0x1408cbf93
     #[br(if(!effect.bytes.is_empty()))]
@@ -6920,25 +6920,25 @@ pub struct RgeStaticObject {
     pub facet: u8,
     /// game: `tX`
     /// read at 0x14119f29a
-    pub t_x: f32,
+    pub tx: f32,
     /// game: `tY`
     /// read at 0x14119f3ea
-    pub t_y: f32,
+    pub ty: f32,
     /// game: `tZ`
     /// read at 0x14119f53a
-    pub t_z: f32,
+    pub tz: f32,
     /// game: `screen_x_offset`
     /// read at 0x14119f796
-    pub screen_x_offset: i16,
+    pub screen_xoffset: i16,
     /// game: `screen_y_offset`
     /// read at 0x14119f8eb
-    pub screen_y_offset: i16,
+    pub screen_yoffset: i16,
     /// game: `shadow_x_offset`
     /// read at 0x14119fa3d
-    pub shadow_x_offset: i16,
+    pub shadow_xoffset: i16,
     /// game: `shadow_y_offset`
     /// read at 0x14119fb8b
-    pub shadow_y_offset: i16,
+    pub shadow_yoffset: i16,
     /// game: `attribute_type_held`
     /// read at 0x14119fdfb
     pub attribute_type_held: i16,
@@ -6987,7 +6987,7 @@ pub struct RgeStaticObject {
     pub deletion_enabled: u8,
     /// game: `mROOAlreadyCalled`
     /// read at 0x1411a1feb
-    pub rooalready_called: u8,
+    pub roo_already_called: u8,
     /// game: `hasOwnMasterObject`
     /// read at 0x1411a20b6
     pub has_own_master_object: u8,
@@ -7123,7 +7123,7 @@ pub struct RgeStaticObject {
     /// game: `mCaption.c_str()`
     /// read at 0x1411a417a; named by the save's write in the same place (0x1411985d0, write at 0x14119cff1)
     #[br(count = caption_length.max(0) as usize)]
-    pub caption_c_str: Vec<u8>,
+    pub caption: Vec<u8>,
 }
 
 /// Read by `FUN_141072310` of the build.
@@ -7178,7 +7178,7 @@ pub struct PathData {
     pub continue_counter: i32,
     /// game: `mFlags.m_bits`
     /// read at 0x140f98841
-    pub flags_m_bits: u32,
+    pub flags_bits: u32,
     /// game: `mRepathTime`
     /// read at 0x140f98a01
     pub repath_time: f32,
@@ -7260,10 +7260,10 @@ pub struct RgeMovingObject {
     pub last_move_time_value: u32,
     /// game: `nUDWV`
     /// read at 0x14116017b
-    pub n_udwv: i32,
+    pub nudwv: i32,
     /// game: `userDefinedWaypoints[i]`
     /// read at 0x141160360 into the temporary `tempVector`; named by the save's write in the same place (0x141159ab0, write at 0x14115c132)
-    #[br(count = n_udwv.max(0) as usize)]
+    #[br(count = nudwv.max(0) as usize)]
     pub user_defined_waypoints: Vec<[u8; 12]>,
     /// game: `mHasSubstitutePosition`
     /// read at 0x14116040c
@@ -7378,7 +7378,7 @@ pub struct RgeActionMoveTo {
     pub timer: f32,
     /// game: `kDefaultWaitTime`
     /// read at 0x140aa1546; named by the save's write in the same place (0x140aa2180, write at 0x140aa2834)
-    pub k_default_wait_time: u32,
+    pub default_wait_time: u32,
 }
 
 /// Read by `FUN_140a88940` of the build.
@@ -7565,13 +7565,13 @@ pub struct ActionHeroPower {
     pub single_attack_transform: u8,
     /// game: `&mAIAction`
     /// helper 0x140a91060
-    pub aiaction: i32,
+    pub ai_action: i32,
     /// game: `&mAIOrder`
     /// helper 0x140a91060
-    pub aiorder: i32,
+    pub ai_order: i32,
     /// game: `&mAITargetId`
     /// helper 0x140a91060
-    pub aitarget_id: i32,
+    pub ai_target_id: i32,
     /// game: `&x`
     /// read at 0x140a91d92
     pub x: u32,
@@ -7678,7 +7678,7 @@ pub struct TribeActionMakeTech {
     pub unique_id: i32,
     /// game: `m_researchProgress`
     /// read at 0x140ad09ed; named by the save's write of this member at 0x140ad2662
-    pub m_research_progress: f32,
+    pub research_progress: f32,
     /// game: `actual_start_time`
     /// read at 0x140ad0b62; named by the save's write of this member at 0x140ad27f1
     pub actual_start_time: u32,
@@ -7887,7 +7887,7 @@ pub struct TribeActionPack {
     pub unique_id: i32,
     /// game: `m_packStatus`
     /// read at 0x140ad5217; named by the save's write of this member at 0x140ad65a2
-    pub m_pack_status: u8,
+    pub pack_status: u8,
     /// game: `mTimer`
     /// read at 0x140ad52be; named by the save's write of this member at 0x140ad672f
     pub timer: f32,
@@ -7907,7 +7907,7 @@ pub struct TribeActionUnpack {
     pub unique_id: i32,
     /// game: `m_unpackStatus`
     /// read at 0x140ae5b58; named by the save's write of this member at 0x140ae7105
-    pub m_unpack_status: u8,
+    pub unpack_status: u8,
     /// game: `range`
     /// read at 0x140ae5bff; named by the save's write of this member at 0x140ae7292
     pub range: f32,
@@ -8177,19 +8177,19 @@ pub struct RgeCombatObject {
     pub kill_reward: Vec<RgeCombatObjectEntry1>,
     /// game: `mObjectTriggerFlags.m_bits`
     /// read at 0x14108af38
-    pub object_trigger_flags_m_bits: u32,
+    pub object_trigger_flags_bits: u32,
     /// game: `&previousMasterId`
     /// read at 0x14108b4c3
     pub previous_master_id: u16,
     /// game: `&m_transformBackTimerMs`
     /// helper 0x140b4b760
-    pub m_transform_back_timer_ms: u32,
+    pub transform_back_timer_ms: u32,
     /// game: `&m_specialAbilityDurationMs`
     /// helper 0x140b4b760
-    pub m_special_ability_duration_ms: u32,
+    pub special_ability_duration_ms: u32,
     /// game: `&m_abilityActivatedTimeMs`
     /// helper 0x140b4b760
-    pub m_ability_activated_time_ms: u32,
+    pub ability_activated_time_ms: u32,
     /// game: `&mProcessedKill`
     /// helper 0x140ccd170
     pub processed_kill: u8,
@@ -8211,11 +8211,11 @@ impl Default for RgeCombatObject {
             hit_something_valid_for_charge_attack: Default::default(),
             num_kill_rewards: Default::default(),
             kill_reward: Default::default(),
-            object_trigger_flags_m_bits: Default::default(),
+            object_trigger_flags_bits: Default::default(),
             previous_master_id: Default::default(),
-            m_transform_back_timer_ms: Default::default(),
-            m_special_ability_duration_ms: Default::default(),
-            m_ability_activated_time_ms: Default::default(),
+            transform_back_timer_ms: Default::default(),
+            special_ability_duration_ms: Default::default(),
+            ability_activated_time_ms: Default::default(),
             processed_kill: Default::default(),
         }
     }
@@ -8379,7 +8379,7 @@ pub struct UnitAiModule {
     pub alert_mode_value: u8,
     /// game: `alertModeObjectIDValue`
     /// read at 0x140c529ec
-    pub alert_mode_object_idvalue: i32,
+    pub alert_mode_object_id_value: i32,
     /// game: `hasPatrolPath`
     /// read at 0x140c52a9d
     pub has_patrol_path: u32,
@@ -9768,7 +9768,7 @@ pub struct AiGroupTable {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct AIExpertEngine {
+pub struct AiExpertEngine {
     /// HD AIExpertEngine::AIStringTable::maxStrings (int16), first of the table
     pub max_strings: u16,
     /// HD AIStringTable::numStrings (int16)
@@ -10024,10 +10024,10 @@ pub struct RgeTile {
     pub terrain_type_2: u8,
     /// game: `t->m_elevation`
     /// read at 0x140f6b5e6
-    pub t_m_elevation: u8,
+    pub elevation: u8,
     /// game: `t->mask_type`
     /// read at 0x140f6b8a1
-    pub t_mask_type: i16,
+    pub mask_type: i16,
     /// game: `layer`
     /// read at 0x140f6b902
     pub layer: i16,
@@ -10752,7 +10752,7 @@ pub struct TribeScenario {
     pub color_correction_type: SigString,
     /// game: `mXSFilename`
     /// helper 0x140932010
-    pub xsfilename: SigString,
+    pub xs_filename: SigString,
     /// game: `&mCollideAndCorrecting`
     /// helper 0x140ccd170
     pub collide_and_correcting: u8,
@@ -10810,7 +10810,7 @@ impl Default for TribeScenario {
             trigger_count: Default::default(),
             water_def_type: Default::default(),
             color_correction_type: Default::default(),
-            xsfilename: Default::default(),
+            xs_filename: Default::default(),
             collide_and_correcting: Default::default(),
             villager_force_drop: Default::default(),
             player_views: Default::default(),
@@ -10913,7 +10913,7 @@ pub struct Motion {
     pub temp_path_data: Vec<PathData>,
     /// game: `mMotionFlags.m_bits`
     /// read at 0x141047c25
-    pub motion_flags_m_bits: u32,
+    pub motion_flags_bits: u32,
     /// game: `mMaximumVelocityForward`
     /// read at 0x141047de6
     pub maximum_velocity_forward: f32,
@@ -10938,7 +10938,7 @@ impl Default for Motion {
             maximum_yaw_per_second_stationary: Default::default(),
             num_path_datas: Default::default(),
             temp_path_data: Default::default(),
-            motion_flags_m_bits: Default::default(),
+            motion_flags_bits: Default::default(),
             maximum_velocity_forward: Default::default(),
             number_wait_delays: Default::default(),
         }
@@ -11323,7 +11323,7 @@ pub struct UnitGroup {
     pub formation_locked_type: i32,
     /// game: `mGroupFlags.m_bits`
     /// read at 0x14101faa7
-    pub group_flags_m_bits: u32,
+    pub group_flags_bits: u32,
     /// game: `mCentroid`
     /// read at 0x14101fbfb
     pub centroid: [u8; 12],
@@ -11633,7 +11633,7 @@ pub struct BaseWorld {
     /// game: `mMultiplayerAITriggerSignals[i]`
     /// helper 0x140a91060; read into the temporary `&value`; named by the save's write in the same place (0x141546db0, write at 0x140a913c7)
     #[br(count = signal_count.max(0) as usize)]
-    pub multiplayer_aitrigger_signals: Vec<i32>,
+    pub multiplayer_ai_trigger_signals: Vec<i32>,
     /// game: `&targetColorCorrection`
     /// helper 0x140a91060
     pub target_color_correction: i32,
@@ -11698,7 +11698,7 @@ impl Default for BaseWorld {
             trigger_count: Default::default(),
             trigger_id: Default::default(),
             signal_count: Default::default(),
-            multiplayer_aitrigger_signals: Default::default(),
+            multiplayer_ai_trigger_signals: Default::default(),
             target_color_correction: Default::default(),
             color_correction_fade_interval: Default::default(),
             fade_interval_start: Default::default(),
@@ -11859,10 +11859,10 @@ pub struct TriggerSystemEntry1 {
 pub struct TriggerSystemEntry2 {
     /// game: `goal.m_stringId`
     /// read at 0x14156ef40; named by the save's write in the same place (0x141587990, write at 0x14158949b)
-    pub goal_m_string_id: u32,
+    pub goal_string_id: u32,
     /// game: `goal.m_goalStatus`
     /// read at 0x14156efe3; named by the save's write in the same place (0x141587990, write at 0x141589526)
-    pub goal_m_goal_status: u8,
+    pub goal_goal_status: u8,
 }
 
 #[binrw]
@@ -11985,7 +11985,7 @@ pub struct TriggerSystem {
     pub attacked_object: Vec<TriggerSystemEntry5>,
     /// game: `m_isLegacyExecutionOrder`
     /// read at 0x14156fa3b; named by the save's write in the same place (0x141587990, write at 0x14158a237)
-    pub m_is_legacy_execution_order: u8,
+    pub is_legacy_execution_order: u8,
 }
 
 impl Default for TriggerSystem {
@@ -12010,7 +12010,7 @@ impl Default for TriggerSystem {
             decisions: Default::default(),
             attacked_object_size: Default::default(),
             attacked_object: Default::default(),
-            m_is_legacy_execution_order: Default::default(),
+            is_legacy_execution_order: Default::default(),
         }
     }
 }
@@ -12101,12 +12101,12 @@ pub struct WorldEntry3 {
 pub struct World {
     /// game: `loadAIRules`
     /// read at 0x1415d0549
-    pub load_airules: u32,
-    /// the world's AI scripts: `FUN_140aed180` builds an AIExpert from the save ("Creating AIExpert system via load game"), when `load_airules` is not 0
-    #[br(if(!(load_airules == 0)), args(ver))]
-    pub ai_scripts: Option<Box<AIExpertEngine>>,
+    pub load_ai_rules: u32,
+    /// the world's AI scripts: `FUN_140aed180` builds an AIExpert from the save ("Creating AIExpert system via load game"), when `load_ai_rules` is not 0
+    #[br(if(!(load_ai_rules == 0)), args(ver))]
+    pub ai_scripts: Option<Box<AiExpertEngine>>,
     /// the AI state `FUN_140b0e060` loads right after the scripts: the AI version float and the tables it enables
-    #[br(if(!(load_airules == 0)), args(ver))]
+    #[br(if(!(load_ai_rules == 0)), args(ver))]
     pub ai_state: Option<Box<AiExpertState>>,
     /// unnamed in the binary
     /// read by 0x141537e30
@@ -12253,9 +12253,9 @@ pub struct World {
     pub trigger_system_result: TriggerSystem,
     /// game: `isXSEnabled`
     /// read at 0x1415d3f55
-    pub is_xsenabled: u8,
+    pub is_xs_enabled: u8,
     /// read by 0x1415c7950; named by the save's write in the same place (0x1415e25e0)
-    #[br(if(is_xsenabled != 0), args(ver))]
+    #[br(if(is_xs_enabled != 0), args(ver))]
     pub scripted_trigger_system: Option<Box<BxsRuntime>>,
     /// game: `size`
     /// read at 0x1415d4035
@@ -12265,10 +12265,10 @@ pub struct World {
     pub rms_module_filenames: Vec<SigString>,
     /// game: `isRMSXSEnabled`
     /// read at 0x1415d4165
-    pub is_rmsxsenabled: u8,
+    pub is_rmsxs_enabled: u8,
     /// read by 0x1415c72c0; named by the save's write in the same place (0x1415e25e0)
-    #[br(if(is_rmsxsenabled != 0), args(ver))]
-    pub scripted_rmssystem: Option<Box<BxsRuntime>>,
+    #[br(if(is_rmsxs_enabled != 0), args(ver))]
+    pub scripted_rms_system: Option<Box<BxsRuntime>>,
     /// game: `&playerTeams[i]`
     /// read by 0x141310780, a routine of one read
     #[br(count = 8)]
@@ -12340,7 +12340,7 @@ pub struct World {
 impl Default for World {
     fn default() -> Self {
         Self {
-            load_airules: Default::default(),
+            load_ai_rules: Default::default(),
             ai_scripts: Default::default(),
             ai_state: Default::default(),
             base_world: Default::default(),
@@ -12390,12 +12390,12 @@ impl Default for World {
             guard_state_delta: Default::default(),
             guard_state_flags: Default::default(),
             trigger_system_result: Default::default(),
-            is_xsenabled: Default::default(),
+            is_xs_enabled: Default::default(),
             scripted_trigger_system: Default::default(),
             size: Default::default(),
             rms_module_filenames: Default::default(),
-            is_rmsxsenabled: Default::default(),
-            scripted_rmssystem: Default::default(),
+            is_rmsxs_enabled: Default::default(),
+            scripted_rms_system: Default::default(),
             player_teams: vec![Default::default(); 8],
             vis_set: Default::default(),
             fog_set: Default::default(),

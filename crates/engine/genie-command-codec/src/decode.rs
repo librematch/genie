@@ -109,7 +109,7 @@ fn typed(packet: &Packet) -> Result<Option<Command>, GenieError> {
 macro_rules! interact {
     ($c:expr) => {
         Interact {
-            target: ObjectId::of_field($c.t_id),
+            target: ObjectId::of_field($c.tid),
             point: Point::new($c.x, $c.y),
             carry_test: $c.field_0x12 != 0,
             queued: $c.field_0x13 != 0,
@@ -137,7 +137,7 @@ fn orders(packet: &Packet) -> Result<Option<Command>, GenieError> {
         ),
         Packet::Move(c) => {
             let order = MoveOrder {
-                target: ObjectId::of_field(c.t_id),
+                target: ObjectId::of_field(c.tid),
                 point: Point::new(c.x, c.y),
                 queued: c.field_0x13 != 0,
                 direct: c.field_0x14 != 0,
@@ -207,9 +207,9 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         Packet::UnitOrder(c) => Command::UnitOrder(UnitOrderCommand {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
-            target: ObjectId::of_field(c.t_id),
+            target: ObjectId::of_field(c.tid),
             point: Point::new(c.x, c.y),
-            q_id: QueueId::of_data(c.q_id),
+            q_id: QueueId::of_data(c.qid),
             through_ai: c.field_0x1d != 0,
             nearby: c.field_0x1e != 0,
             action: UnitOrderAction::of(c.action),
@@ -307,9 +307,9 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
     Ok(Some(match packet {
         Packet::Build(c) => Command::Build(BuildCommand {
             player: PlayerId::from(c.commp_id),
-            master: MasterId::try_from(short(c.o_id))?,
+            master: MasterId::try_from(short(c.oid))?,
             position: Point::new(c.x, c.y),
-            q_id: QueueId::of_data(c.q_id),
+            q_id: QueueId::of_data(c.qid),
             sprite_override: SpriteOverride::of_data(c.field_0x18.cast_signed()),
             builders: listed(c.num, &c.ids),
             queued: c.field_0x1e != 0,
@@ -318,10 +318,10 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         }),
         Packet::BuildWall(c) => Command::BuildWall(BuildWallCommand {
             player: PlayerId::from(c.commp_id),
-            master: MasterId::try_from(short(c.o_id))?,
+            master: MasterId::try_from(short(c.oid))?,
             from: Tile::new(i32::from(c.x1), i32::from(c.y1)),
             to: Tile::new(i32::from(c.x2), i32::from(c.y2)),
-            q_id: QueueId::of_data(c.q_id),
+            q_id: QueueId::of_data(c.qid),
             builders: listed(c.num, &c.ids),
             queued: c.field_0x1a != 0,
             commits: c.field_0x1b == 0,
@@ -329,32 +329,32 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         Packet::MultiQueue(c) => Command::Queue(QueueCommand {
             player: PlayerId::from(c.commp_id),
             buildings: listed(c.num, &c.ids),
-            building_master: MasterId::try_from(c.b_id)?,
-            unit: MasterId::try_from(c.t_id)?,
+            building_master: MasterId::try_from(c.bid)?,
+            unit: MasterId::try_from(c.tid)?,
             amount: genie_core::production::QueuedUnits::of_data(c.count),
             button: genie_core::production::QueueButton::of_data(c.button_location_id),
         }),
         Packet::Research(c) => Command::Research(ResearchCommand {
             player: PlayerId::from(c.commp_id),
-            building: ObjectId::of_field(c.u_id),
+            building: ObjectId::of_field(c.uid),
             count: c.field_0x08.cast_signed(),
             buildings: object_ids(&c.ids),
-            tech: TechId::of_data(c.t_id),
-            q_id: QueueId::of_data(c.q_id),
+            tech: TechId::of_data(c.tid),
+            q_id: QueueId::of_data(c.qid),
             shift: c.field_0x10 != 0,
         }),
         Packet::SetGatherPoint(c) => Command::GatherPoint(GatherPointCommand {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
             point: Point::new(c.x, c.y),
-            target: ObjectId::of_field(c.t_id),
+            target: ObjectId::of_field(c.tid),
             target_master: MasterId::of_field(short(c.tm_id))?,
             own: c.field_0x18 != 0,
         }),
         Packet::BuildingCommandQueue(c) => Command::CommandQueue(BuildingQueueCommand {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
-            target: ObjectId::of_field(c.t_id),
+            target: ObjectId::of_field(c.tid),
             point: Point::new(c.x, c.y),
         }),
         _ => return Ok(None),
@@ -375,28 +375,28 @@ fn single_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         }),
         Packet::CancelBuild(c) => Command::Delete(DeleteCommand {
             player: PlayerId::from(c.commp_id),
-            id: ObjectId::try_from(c.u_id)?,
+            id: ObjectId::try_from(c.uid)?,
         }),
         Packet::GoBackToWork(c) => Command::GoBackToWork(GoBackToWorkCommand {
             player: PlayerId::from(c.commp_id),
-            id: ObjectId::try_from(c.u_id)?,
+            id: ObjectId::try_from(c.uid)?,
         }),
         Packet::AllBackToWork(c) => Command::AllBackToWork(AllBackToWorkCommand {
             player: PlayerId::from(c.commp_id),
-            id: ObjectId::try_from(c.u_id)?,
+            id: ObjectId::try_from(c.uid)?,
         }),
         Packet::TownBell(c) => Command::TownBell(TownBellCommand {
             player: PlayerId::from(c.commp_id),
-            id: ObjectId::try_from(c.u_id)?,
+            id: ObjectId::try_from(c.uid)?,
             activate: c.activate != 0,
         }),
         Packet::Gate(c) => Command::Gate(GateCommand {
             player: PlayerId::from(c.commp_id),
-            id: ObjectId::try_from(c.u_id)?,
+            id: ObjectId::try_from(c.uid)?,
         }),
         Packet::TribeGiveAttributes(c) => tribute(c),
-        Packet::SellCommodity(c) => trade(c.commp_id, c.attr, c.amt, c.u_id, false),
-        Packet::BuyCommodity(c) => trade(c.commp_id, c.attr, c.amt, c.u_id, true),
+        Packet::SellCommodity(c) => trade(c.commp_id, c.attr, c.amt, c.uid, false),
+        Packet::BuyCommodity(c) => trade(c.commp_id, c.attr, c.amt, c.uid, true),
         Packet::Flare(c) => Command::Flare(FlareCommand {
             player: PlayerId::from(c.commp_id),
             target: ObjectId::of_field(c.field_0x04.cast_signed()),

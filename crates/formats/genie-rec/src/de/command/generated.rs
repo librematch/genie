@@ -10,7 +10,7 @@ pub struct Interact {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x08`, formatter
     pub x: f32,
     /// `+0x0c`, formatter
@@ -43,7 +43,7 @@ impl Interact {
         fits(p, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            t_id: get(p, 0x04)?,
+            tid: get(p, 0x04)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
             num: get(p, 0x10)?,
@@ -63,7 +63,7 @@ impl Interact {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.x);
         put(&mut out, self.y);
         put(&mut out, self.num);
@@ -130,7 +130,7 @@ pub struct Work {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x08`, formatter
     pub x: f32,
     /// `+0x0c`, formatter
@@ -163,7 +163,7 @@ impl Work {
         fits(p, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            t_id: get(p, 0x04)?,
+            tid: get(p, 0x04)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
             num: get(p, 0x10)?,
@@ -183,7 +183,7 @@ impl Work {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.x);
         put(&mut out, self.y);
         put(&mut out, self.num);
@@ -203,7 +203,7 @@ pub struct Move {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x08`, formatter
     pub x: f32,
     /// `+0x0c`, formatter
@@ -236,7 +236,7 @@ impl Move {
         fits(p, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            t_id: get(p, 0x04)?,
+            tid: get(p, 0x04)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
             num: get(p, 0x10)?,
@@ -256,7 +256,7 @@ impl Move {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.x);
         put(&mut out, self.y);
         put(&mut out, self.num);
@@ -419,13 +419,13 @@ pub struct AiOrder {
     /// `+0x08`, formatter
     pub recipient: i32,
     /// `+0x0c`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x10`, gap
     pub gap_0x10: [u8; 4],
     /// `+0x14`, formatter
     pub order: i32,
     /// `+0x18`, formatter
-    pub t_pos: f32,
+    pub tpos: f32,
     /// `+0x1c`, formatter
     pub field_0x1c: f32,
     /// `+0x20`, formatter
@@ -435,7 +435,7 @@ pub struct AiOrder {
     /// `+0x28`, formatter
     pub pri: u8,
     /// `+0x29`, formatter
-    pub t_owner: u8,
+    pub towner: u8,
     /// `+0x2a`, formatter
     pub immediate: u8,
     /// `+0x2b`, formatter
@@ -459,15 +459,15 @@ impl AiOrder {
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
             recipient: get(p, 0x08)?,
-            t_id: get(p, 0x0c)?,
+            tid: get(p, 0x0c)?,
             gap_0x10: get(p, 0x10)?,
             order: get(p, 0x14)?,
-            t_pos: get(p, 0x18)?,
+            tpos: get(p, 0x18)?,
             field_0x1c: get(p, 0x1c)?,
             field_0x20: get(p, 0x20)?,
             range: get(p, 0x24)?,
             pri: get(p, 0x28)?,
-            t_owner: get(p, 0x29)?,
+            towner: get(p, 0x29)?,
             immediate: get(p, 0x2a)?,
             front: get(p, 0x2b)?,
             rest: bytes(p, Self::FIXED)?,
@@ -484,15 +484,15 @@ impl AiOrder {
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
         put(&mut out, self.recipient);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.gap_0x10);
         put(&mut out, self.order);
-        put(&mut out, self.t_pos);
+        put(&mut out, self.tpos);
         put(&mut out, self.field_0x1c);
         put(&mut out, self.field_0x20);
         put(&mut out, self.range);
         put(&mut out, self.pri);
-        put(&mut out, self.t_owner);
+        put(&mut out, self.towner);
         put(&mut out, self.immediate);
         put(&mut out, self.front);
         out.extend_from_slice(&self.rest);
@@ -688,13 +688,13 @@ pub struct GroupAiOrder {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 2],
     /// `+0x08`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x0c`, gap
     pub gap_0x0c: [u8; 4],
     /// `+0x10`, formatter
     pub order: i32,
     /// `+0x14`, formatter
-    pub t_pos: f32,
+    pub tpos: f32,
     /// `+0x18`, formatter
     pub field_0x18: f32,
     /// `+0x1c`, formatter
@@ -704,7 +704,7 @@ pub struct GroupAiOrder {
     /// `+0x24`, formatter
     pub pri: u8,
     /// `+0x25`, formatter
-    pub t_owner: u8,
+    pub towner: u8,
     /// `+0x26`, formatter
     pub immediate: u8,
     /// `+0x27`, formatter
@@ -727,15 +727,15 @@ impl GroupAiOrder {
             commp_id: get(p, 0x01)?,
             recipient_count: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            t_id: get(p, 0x08)?,
+            tid: get(p, 0x08)?,
             gap_0x0c: get(p, 0x0c)?,
             order: get(p, 0x10)?,
-            t_pos: get(p, 0x14)?,
+            tpos: get(p, 0x14)?,
             field_0x18: get(p, 0x18)?,
             field_0x1c: get(p, 0x1c)?,
             range: get(p, 0x20)?,
             pri: get(p, 0x24)?,
-            t_owner: get(p, 0x25)?,
+            towner: get(p, 0x25)?,
             immediate: get(p, 0x26)?,
             front: get(p, 0x27)?,
             rest: bytes(p, Self::FIXED)?,
@@ -751,15 +751,15 @@ impl GroupAiOrder {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.recipient_count);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.gap_0x0c);
         put(&mut out, self.order);
-        put(&mut out, self.t_pos);
+        put(&mut out, self.tpos);
         put(&mut out, self.field_0x18);
         put(&mut out, self.field_0x1c);
         put(&mut out, self.range);
         put(&mut out, self.pri);
-        put(&mut out, self.t_owner);
+        put(&mut out, self.towner);
         put(&mut out, self.immediate);
         put(&mut out, self.front);
         out.extend_from_slice(&self.rest);
@@ -1651,7 +1651,7 @@ pub struct AttackMoveTarget {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 2],
     /// `+0x08`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x0c`, gap
     pub gap_0x0c: [u8; 3],
     /// `+0x0f`, formatter
@@ -1674,7 +1674,7 @@ impl AttackMoveTarget {
             commp_id: get(p, 0x01)?,
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            t_id: get(p, 0x08)?,
+            tid: get(p, 0x08)?,
             gap_0x0c: get(p, 0x0c)?,
             waypoints_count: get(p, 0x0f)?,
             rest: bytes(p, Self::FIXED)?,
@@ -1690,7 +1690,7 @@ impl AttackMoveTarget {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.gap_0x0c);
         put(&mut out, self.waypoints_count);
         out.extend_from_slice(&self.rest);
@@ -1706,7 +1706,7 @@ pub struct Retreat {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x08`, formatter
     pub x: f32,
     /// `+0x0c`, formatter
@@ -1739,7 +1739,7 @@ impl Retreat {
         fits(p, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            t_id: get(p, 0x04)?,
+            tid: get(p, 0x04)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
             num: get(p, 0x10)?,
@@ -1759,7 +1759,7 @@ impl Retreat {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.x);
         put(&mut out, self.y);
         put(&mut out, self.num);
@@ -2070,7 +2070,7 @@ pub struct BuildingCommandQueue {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x08`, formatter
     pub x: f32,
     /// `+0x0c`, formatter
@@ -2095,7 +2095,7 @@ impl BuildingCommandQueue {
         fits(p, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            t_id: get(p, 0x04)?,
+            tid: get(p, 0x04)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
             num: get(p, 0x10)?,
@@ -2111,7 +2111,7 @@ impl BuildingCommandQueue {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.x);
         put(&mut out, self.y);
         put(&mut out, self.num);
@@ -2203,11 +2203,11 @@ pub struct Make {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
     /// `+0x08`, formatter
-    pub q_id: i32,
+    pub qid: i32,
     /// `+0x0c`, formatter
-    pub o_id: i32,
+    pub oid: i32,
     /// `+0x10..`: the bytes after the fixed part, which no layout here splits
     pub rest: Vec<u8>,
 }
@@ -2224,9 +2224,9 @@ impl Make {
         fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
-            q_id: get(p, 0x08)?,
-            o_id: get(p, 0x0c)?,
+            uid: get(p, 0x04)?,
+            qid: get(p, 0x08)?,
+            oid: get(p, 0x0c)?,
             rest: bytes(p, Self::FIXED)?,
         })
     }
@@ -2238,9 +2238,9 @@ impl Make {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
-        put(&mut out, self.q_id);
-        put(&mut out, self.o_id);
+        put(&mut out, self.uid);
+        put(&mut out, self.qid);
+        put(&mut out, self.oid);
         out.extend_from_slice(&self.rest);
         finish(out)
     }
@@ -2252,13 +2252,13 @@ pub struct Research {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
     /// `+0x08`, handler
     pub field_0x08: u16,
     /// `+0x0a`, formatter
-    pub t_id: i16,
+    pub tid: i16,
     /// `+0x0c`, formatter
-    pub q_id: i32,
+    pub qid: i32,
     /// `+0x10`, handler
     pub field_0x10: u8,
     /// `+0x11..`: the 32-bit words after the fixed part: object ids (`cade_api`'s `unitIds`, `buildingIds`)
@@ -2277,10 +2277,10 @@ impl Research {
         fits(p, Self::FIXED, Tail::Words).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
             field_0x08: get(p, 0x08)?,
-            t_id: get(p, 0x0a)?,
-            q_id: get(p, 0x0c)?,
+            tid: get(p, 0x0a)?,
+            qid: get(p, 0x0c)?,
             field_0x10: get(p, 0x10)?,
             ids: words(p, Self::FIXED)?,
         })
@@ -2293,10 +2293,10 @@ impl Research {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         put(&mut out, self.field_0x08);
-        put(&mut out, self.t_id);
-        put(&mut out, self.q_id);
+        put(&mut out, self.tid);
+        put(&mut out, self.qid);
         put(&mut out, self.field_0x10);
         self.ids.iter().for_each(|&w| put(&mut out, w));
         finish(out)
@@ -2317,9 +2317,9 @@ pub struct Build {
     /// `+0x0c`, formatter
     pub y: f32,
     /// `+0x10`, formatter
-    pub o_id: i32,
+    pub oid: i32,
     /// `+0x14`, formatter
-    pub q_id: i32,
+    pub qid: i32,
     /// `+0x18`, handler
     pub field_0x18: u32,
     /// `+0x1c`, formatter
@@ -2350,8 +2350,8 @@ impl Build {
             gap_0x06: get(p, 0x06)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
-            o_id: get(p, 0x10)?,
-            q_id: get(p, 0x14)?,
+            oid: get(p, 0x10)?,
+            qid: get(p, 0x14)?,
             field_0x18: get(p, 0x18)?,
             frame: get(p, 0x1c)?,
             gap_0x1d: get(p, 0x1d)?,
@@ -2372,8 +2372,8 @@ impl Build {
         put(&mut out, self.gap_0x06);
         put(&mut out, self.x);
         put(&mut out, self.y);
-        put(&mut out, self.o_id);
-        put(&mut out, self.q_id);
+        put(&mut out, self.oid);
+        put(&mut out, self.qid);
         put(&mut out, self.field_0x18);
         put(&mut out, self.frame);
         put(&mut out, self.gap_0x1d);
@@ -2512,9 +2512,9 @@ pub struct BuildWall {
     /// `+0x0e`, formatter
     pub y2: u16,
     /// `+0x10`, formatter
-    pub o_id: i32,
+    pub oid: i32,
     /// `+0x14`, formatter
-    pub q_id: i32,
+    pub qid: i32,
     /// `+0x18`, gap
     pub gap_0x18: [u8; 2],
     /// `+0x1a`, handler
@@ -2543,8 +2543,8 @@ impl BuildWall {
             y1: get(p, 0x0a)?,
             x2: get(p, 0x0c)?,
             y2: get(p, 0x0e)?,
-            o_id: get(p, 0x10)?,
-            q_id: get(p, 0x14)?,
+            oid: get(p, 0x10)?,
+            qid: get(p, 0x14)?,
             gap_0x18: get(p, 0x18)?,
             field_0x1a: get(p, 0x1a)?,
             field_0x1b: get(p, 0x1b)?,
@@ -2565,8 +2565,8 @@ impl BuildWall {
         put(&mut out, self.y1);
         put(&mut out, self.x2);
         put(&mut out, self.y2);
-        put(&mut out, self.o_id);
-        put(&mut out, self.q_id);
+        put(&mut out, self.oid);
+        put(&mut out, self.qid);
         put(&mut out, self.gap_0x18);
         put(&mut out, self.field_0x1a);
         put(&mut out, self.field_0x1b);
@@ -2581,7 +2581,7 @@ pub struct CancelBuild {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl CancelBuild {
@@ -2596,7 +2596,7 @@ impl CancelBuild {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
         })
     }
 
@@ -2607,7 +2607,7 @@ impl CancelBuild {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -2781,7 +2781,7 @@ pub struct Repair {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 2],
     /// `+0x08`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x0c`, gap
     pub gap_0x0c: [u8; 2],
     /// `+0x0e`, handler
@@ -2806,7 +2806,7 @@ impl Repair {
             commp_id: get(p, 0x01)?,
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            t_id: get(p, 0x08)?,
+            tid: get(p, 0x08)?,
             gap_0x0c: get(p, 0x0c)?,
             field_0x0e: get(p, 0x0e)?,
             field_0x0f: get(p, 0x0f)?,
@@ -2823,7 +2823,7 @@ impl Repair {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.gap_0x0c);
         put(&mut out, self.field_0x0e);
         put(&mut out, self.field_0x0f);
@@ -2907,7 +2907,7 @@ pub struct Gate {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl Gate {
@@ -2922,7 +2922,7 @@ impl Gate {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
         })
     }
 
@@ -2933,7 +2933,7 @@ impl Gate {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -3015,7 +3015,7 @@ pub struct Special {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 2],
     /// `+0x08`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x0c`, formatter
     pub action: u8,
     /// `+0x0d..`: the bytes after the fixed part, which no layout here splits
@@ -3036,7 +3036,7 @@ impl Special {
             commp_id: get(p, 0x01)?,
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            t_id: get(p, 0x08)?,
+            tid: get(p, 0x08)?,
             action: get(p, 0x0c)?,
             rest: bytes(p, Self::FIXED)?,
         })
@@ -3051,7 +3051,7 @@ impl Special {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.action);
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -3068,13 +3068,13 @@ pub struct UnitOrder {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 2],
     /// `+0x08`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x0c`, formatter
     pub x: f32,
     /// `+0x10`, formatter
     pub y: f32,
     /// `+0x14`, formatter
-    pub q_id: i32,
+    pub qid: i32,
     /// `+0x18`, formatter
     pub param: i32,
     /// `+0x1c`, formatter
@@ -3105,10 +3105,10 @@ impl UnitOrder {
             commp_id: get(p, 0x01)?,
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            t_id: get(p, 0x08)?,
+            tid: get(p, 0x08)?,
             x: get(p, 0x0c)?,
             y: get(p, 0x10)?,
-            q_id: get(p, 0x14)?,
+            qid: get(p, 0x14)?,
             param: get(p, 0x18)?,
             action: get(p, 0x1c)?,
             field_0x1d: get(p, 0x1d)?,
@@ -3128,10 +3128,10 @@ impl UnitOrder {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.x);
         put(&mut out, self.y);
-        put(&mut out, self.q_id);
+        put(&mut out, self.qid);
         put(&mut out, self.param);
         put(&mut out, self.action);
         put(&mut out, self.field_0x1d);
@@ -3149,7 +3149,7 @@ pub struct Diplomacy {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub p_id2: u8,
+    pub pid2: u8,
     /// `+0x05`, formatter
     pub seq: u8,
     /// `+0x06`, formatter
@@ -3184,7 +3184,7 @@ impl Diplomacy {
         fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            p_id2: get(p, 0x04)?,
+            pid2: get(p, 0x04)?,
             seq: get(p, 0x05)?,
             status: get(p, 0x06)?,
             declare: get(p, 0x07)?,
@@ -3205,7 +3205,7 @@ impl Diplomacy {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.p_id2);
+        put(&mut out, self.pid2);
         put(&mut out, self.seq);
         put(&mut out, self.status);
         put(&mut out, self.declare);
@@ -3226,9 +3226,9 @@ pub struct Queue {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub b_id: i32,
+    pub bid: i32,
     /// `+0x08`, formatter
-    pub t_id: i16,
+    pub tid: i16,
     /// `+0x0a`, formatter
     pub count: i16,
     /// `+0x0c..`: the bytes after the fixed part, which no layout here splits
@@ -3247,8 +3247,8 @@ impl Queue {
         fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            b_id: get(p, 0x04)?,
-            t_id: get(p, 0x08)?,
+            bid: get(p, 0x04)?,
+            tid: get(p, 0x08)?,
             count: get(p, 0x0a)?,
             rest: bytes(p, Self::FIXED)?,
         })
@@ -3261,8 +3261,8 @@ impl Queue {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.b_id);
-        put(&mut out, self.t_id);
+        put(&mut out, self.bid);
+        put(&mut out, self.tid);
         put(&mut out, self.count);
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -3283,7 +3283,7 @@ pub struct SetGatherPoint {
     /// `+0x0c`, formatter
     pub y: f32,
     /// `+0x10`, formatter
-    pub t_id: i32,
+    pub tid: i32,
     /// `+0x14`, formatter
     pub tm_id: i32,
     /// `+0x18`, handler
@@ -3308,7 +3308,7 @@ impl SetGatherPoint {
             gap_0x06: get(p, 0x06)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
-            t_id: get(p, 0x10)?,
+            tid: get(p, 0x10)?,
             tm_id: get(p, 0x14)?,
             field_0x18: get(p, 0x18)?,
             ids: words(p, Self::FIXED)?,
@@ -3326,7 +3326,7 @@ impl SetGatherPoint {
         put(&mut out, self.gap_0x06);
         put(&mut out, self.x);
         put(&mut out, self.y);
-        put(&mut out, self.t_id);
+        put(&mut out, self.tid);
         put(&mut out, self.tm_id);
         put(&mut out, self.field_0x18);
         self.ids.iter().for_each(|&w| put(&mut out, w));
@@ -3342,7 +3342,7 @@ pub struct SetRetreatPoint {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl SetRetreatPoint {
@@ -3357,7 +3357,7 @@ impl SetRetreatPoint {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
         })
     }
 
@@ -3368,7 +3368,7 @@ impl SetRetreatPoint {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -3383,7 +3383,7 @@ pub struct SellCommodity {
     /// `+0x06`, formatter
     pub amt: u16,
     /// `+0x08`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl SellCommodity {
@@ -3400,7 +3400,7 @@ impl SellCommodity {
             commp_id: get(p, 0x01)?,
             attr: get(p, 0x04)?,
             amt: get(p, 0x06)?,
-            u_id: get(p, 0x08)?,
+            uid: get(p, 0x08)?,
         })
     }
 
@@ -3413,7 +3413,7 @@ impl SellCommodity {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.attr);
         put(&mut out, self.amt);
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -3428,7 +3428,7 @@ pub struct BuyCommodity {
     /// `+0x06`, formatter
     pub amt: u16,
     /// `+0x08`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl BuyCommodity {
@@ -3445,7 +3445,7 @@ impl BuyCommodity {
             commp_id: get(p, 0x01)?,
             attr: get(p, 0x04)?,
             amt: get(p, 0x06)?,
-            u_id: get(p, 0x08)?,
+            uid: get(p, 0x08)?,
         })
     }
 
@@ -3458,7 +3458,7 @@ impl BuyCommodity {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.attr);
         put(&mut out, self.amt);
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -3469,7 +3469,7 @@ pub struct OffboardTrade {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
     /// `+0x08`, formatter
     pub trade_route: i32,
     /// `+0x0c..`: the bytes after the fixed part, which no layout here splits
@@ -3488,7 +3488,7 @@ impl OffboardTrade {
         fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
             trade_route: get(p, 0x08)?,
             rest: bytes(p, Self::FIXED)?,
         })
@@ -3501,7 +3501,7 @@ impl OffboardTrade {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         put(&mut out, self.trade_route);
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -3518,9 +3518,9 @@ pub struct UnitTransform {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 2],
     /// `+0x08`, formatter
-    pub u_id: i32,
+    pub uid: i32,
     /// `+0x0c`, formatter
-    pub q_id: i32,
+    pub qid: i32,
     /// `+0x10..`: the bytes after the fixed part, which no layout here splits
     pub rest: Vec<u8>,
 }
@@ -3539,8 +3539,8 @@ impl UnitTransform {
             commp_id: get(p, 0x01)?,
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            u_id: get(p, 0x08)?,
-            q_id: get(p, 0x0c)?,
+            uid: get(p, 0x08)?,
+            qid: get(p, 0x0c)?,
             rest: bytes(p, Self::FIXED)?,
         })
     }
@@ -3554,8 +3554,8 @@ impl UnitTransform {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.u_id);
-        put(&mut out, self.q_id);
+        put(&mut out, self.uid);
+        put(&mut out, self.qid);
         out.extend_from_slice(&self.rest);
         finish(out)
     }
@@ -3567,7 +3567,7 @@ pub struct DropRelic {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl DropRelic {
@@ -3582,7 +3582,7 @@ impl DropRelic {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
         })
     }
 
@@ -3593,7 +3593,7 @@ impl DropRelic {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -3604,7 +3604,7 @@ pub struct TownBell {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
     /// `+0x08`, formatter
     pub activate: u8,
 }
@@ -3621,7 +3621,7 @@ impl TownBell {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
             activate: get(p, 0x08)?,
         })
     }
@@ -3633,7 +3633,7 @@ impl TownBell {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         put(&mut out, self.activate);
         finish(out)
     }
@@ -3645,7 +3645,7 @@ pub struct GoBackToWork {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl GoBackToWork {
@@ -3660,7 +3660,7 @@ impl GoBackToWork {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
         })
     }
 
@@ -3671,7 +3671,7 @@ impl GoBackToWork {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }
@@ -3686,9 +3686,9 @@ pub struct MultiQueue {
     /// `+0x06`, gap
     pub gap_0x06: [u8; 4],
     /// `+0x0a`, formatter
-    pub b_id: i16,
+    pub bid: i16,
     /// `+0x0c`, formatter
-    pub t_id: i16,
+    pub tid: i16,
     /// `+0x0e`, formatter
     pub count: i16,
     /// `+0x10`, formatter
@@ -3711,8 +3711,8 @@ impl MultiQueue {
             commp_id: get(p, 0x01)?,
             num: get(p, 0x04)?,
             gap_0x06: get(p, 0x06)?,
-            b_id: get(p, 0x0a)?,
-            t_id: get(p, 0x0c)?,
+            bid: get(p, 0x0a)?,
+            tid: get(p, 0x0c)?,
             count: get(p, 0x0e)?,
             button_location_id: get(p, 0x10)?,
             ids: words(p, Self::FIXED)?,
@@ -3728,8 +3728,8 @@ impl MultiQueue {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.num);
         put(&mut out, self.gap_0x06);
-        put(&mut out, self.b_id);
-        put(&mut out, self.t_id);
+        put(&mut out, self.bid);
+        put(&mut out, self.tid);
         put(&mut out, self.count);
         put(&mut out, self.button_location_id);
         self.ids.iter().for_each(|&w| put(&mut out, w));
@@ -4132,7 +4132,7 @@ pub struct AllBackToWork {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub u_id: i32,
+    pub uid: i32,
 }
 
 impl AllBackToWork {
@@ -4147,7 +4147,7 @@ impl AllBackToWork {
         fits(p, Self::FIXED, Tail::None).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            u_id: get(p, 0x04)?,
+            uid: get(p, 0x04)?,
         })
     }
 
@@ -4158,7 +4158,7 @@ impl AllBackToWork {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.u_id);
+        put(&mut out, self.uid);
         finish(out)
     }
 }

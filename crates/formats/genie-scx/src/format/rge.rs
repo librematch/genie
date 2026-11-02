@@ -1,4 +1,4 @@
-//! The RGE part of the scenario data ([`RGEScen`]), read and written.
+//! The RGE part of the scenario data ([`RgeScen`]), read and written.
 
 use crate::Result;
 use crate::bitmap::Bitmap;
@@ -10,7 +10,7 @@ use genie_support::{ReadStringsExt, StringKey, read_opt_u32, write_opt_str, writ
 use std::io::{Read, Write};
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct RGEScen {
+pub(crate) struct RgeScen {
     /// Data version.
     pub(crate) version: f32,
     /// Names for each player.
@@ -45,7 +45,7 @@ pub(crate) struct RGEScen {
     pub(super) ai_rules_types: Vec<i8>,
 }
 
-impl RGEScen {
+impl RgeScen {
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let version = input.read_f32::<LE>()?;
         log::debug!("RGEScen version {version}");
@@ -400,9 +400,9 @@ mod tests {
     use super::*;
 
     /// Scenario data of `version` with 16 players' lists, each named and with its files.
-    fn scenario(version: f32) -> RGEScen {
+    fn scenario(version: f32) -> RgeScen {
         let named = |what: &str| (0..16).map(|i| Some(format!("{what}{i}"))).collect();
-        RGEScen {
+        RgeScen {
             version,
             player_names: named("player"),
             player_string_table: (0..16u32).map(|i| Some(StringKey::from(i * 10))).collect(),
@@ -434,7 +434,7 @@ mod tests {
                 })
                 .collect(),
             ai_rules_types: (0..16).collect(),
-            ..RGEScen::default()
+            ..RgeScen::default()
         }
     }
 
@@ -442,13 +442,13 @@ mod tests {
     fn round_trip(
         version: f32,
         write: impl FnOnce(&mut Vec<u8>) -> Result<()>,
-        read: impl FnOnce(&mut RGEScen, &mut &[u8]) -> Result<()>,
-    ) -> RGEScen {
+        read: impl FnOnce(&mut RgeScen, &mut &[u8]) -> Result<()>,
+    ) -> RgeScen {
         let mut bytes = vec![];
         write(&mut bytes).unwrap();
-        let mut back = RGEScen {
+        let mut back = RgeScen {
             version,
-            ..RGEScen::default()
+            ..RgeScen::default()
         };
         let mut input = bytes.as_slice();
         read(&mut back, &mut input).unwrap();
@@ -569,13 +569,13 @@ mod tests {
     /// A whole RGE part written and read back.
     #[test]
     fn the_rge_part_reads_back_what_it_wrote() {
-        let scen = RGEScen {
+        let scen = RgeScen {
             name: "map.scx".to_owned(),
             ..scenario(1.22)
         };
         let mut bytes = vec![];
         scen.write_to(&mut bytes, 1.22).unwrap();
-        let back = RGEScen::read_from(bytes.as_slice()).unwrap();
+        let back = RgeScen::read_from(bytes.as_slice()).unwrap();
         assert_eq!((back.version, back.name.as_str()), (1.22, "map.scx"));
         assert_eq!(back.player_names[15].as_deref(), Some("player15"));
     }

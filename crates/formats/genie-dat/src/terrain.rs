@@ -3,9 +3,9 @@
 use crate::FileVersion;
 use crate::conv::invalid_data;
 use crate::conv::opt_fits;
-use crate::sound::SoundID;
-use crate::sprite::{GraphicID, SpriteID};
-use crate::unit_type::UnitTypeID;
+use crate::sound::SoundId;
+use crate::sprite::{GraphicId, SpriteId};
+use crate::unit_type::UnitTypeId;
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{
@@ -15,36 +15,36 @@ use std::io::{Read, Result, Write};
 
 /// An ID identifying a terrain.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct TerrainID(u16);
+pub struct TerrainId(u16);
 
-impl From<u8> for TerrainID {
+impl From<u8> for TerrainId {
     fn from(n: u8) -> Self {
         Self(n.into())
     }
 }
 
-impl From<u16> for TerrainID {
+impl From<u16> for TerrainId {
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<TerrainID> for u16 {
-    fn from(n: TerrainID) -> Self {
+impl From<TerrainId> for u16 {
+    fn from(n: TerrainId) -> Self {
         n.0
     }
 }
 
-impl From<TerrainID> for usize {
-    fn from(n: TerrainID) -> Self {
+impl From<TerrainId> for usize {
+    fn from(n: TerrainId) -> Self {
         n.0.into()
     }
 }
 
-fallible_try_into!(TerrainID, i16);
-infallible_try_into!(TerrainID, u32);
-fallible_try_from!(TerrainID, i32);
-fallible_try_from!(TerrainID, u32);
+fallible_try_into!(TerrainId, i16);
+infallible_try_into!(TerrainId, u32);
+fallible_try_from!(TerrainId, i32);
+fallible_try_from!(TerrainId, u32);
 
 type TerrainName = ArrayString<13>;
 
@@ -52,9 +52,9 @@ type TerrainName = ArrayString<13>;
 /// enters and walks on a tile of that terrain (genieutils' `TerrainPassGraphic`).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TerrainPassGraphic {
-    exit_tile_sprite: Option<SpriteID>,
-    enter_tile_sprite: Option<SpriteID>,
-    walk_tile_sprite: Option<SpriteID>,
+    exit_tile_sprite: Option<SpriteId>,
+    enter_tile_sprite: Option<SpriteId>,
+    walk_tile_sprite: Option<SpriteId>,
     walk_rate: Option<f32>,
     replication_amount: Option<i32>,
 }
@@ -109,7 +109,7 @@ pub struct TerrainSpriteFrame {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TerrainObject {
     /// The unit type placed.
-    pub object_id: UnitTypeID,
+    pub object_id: UnitTypeId,
     /// How densely it is placed.
     pub density: i16,
     /// Whether the object is centred on its tile (genieutils' `TerrainUnitCentering`).
@@ -127,9 +127,9 @@ pub struct Terrain {
     /// Internal name of the SLP graphic.
     slp_name: TerrainName,
     /// SLP graphic ID for this terrain.
-    pub slp_id: Option<GraphicID>,
+    pub slp_id: Option<GraphicId>,
     /// The Sound ID for this terrain.
-    pub sound_id: Option<SoundID>,
+    pub sound_id: Option<SoundId>,
     wwise_sound_id: Option<u32>,
     wwise_stop_sound_id: Option<u32>,
     blend_priority: Option<i32>,
@@ -153,7 +153,7 @@ pub struct Terrain {
     /// The frames of each of the 19 tile shapes (the flat tile and the slopes).
     pub elevation_sprites: Vec<TerrainSpriteFrame>,
     /// The terrain whose graphics are drawn for this one, or `None`.
-    pub terrain_id_to_draw: Option<TerrainID>,
+    pub terrain_id_to_draw: Option<TerrainId>,
     rows: i16,
     cols: i16,
     /// For each terrain, the terrain border drawn between this terrain and that one.
@@ -172,9 +172,9 @@ pub struct TerrainBorder {
     name: TerrainName,
     slp_name: TerrainName,
     /// SLP graphic ID of the border, or `None`.
-    pub slp_id: Option<GraphicID>,
+    pub slp_id: Option<GraphicId>,
     /// Sound ID of the border, or `None`.
-    pub sound_id: Option<SoundID>,
+    pub sound_id: Option<SoundId>,
     /// Three palette indices (genieutils' `Colors`), like a terrain's minimap colours.
     pub color: (u8, u8, u8),
     /// How the border is animated.

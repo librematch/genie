@@ -12,7 +12,7 @@ const MAGIC: &[u8; 8] = b"GRTICK1\0";
 #[derive(Debug)]
 pub enum TraceError {
     /// The bytes are not a trace (no magic).
-    NotATrace,
+    NotTrace,
     /// The rows would not inflate.
     Inflate(std::io::Error),
     /// The rows hold fewer bytes than the header announces.
@@ -22,7 +22,7 @@ pub enum TraceError {
 impl std::fmt::Display for TraceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotATrace => write!(f, "not a GRTICK1 trace"),
+            Self::NotTrace => write!(f, "not a GRTICK1 trace"),
             Self::Inflate(e) => write!(f, "the rows do not inflate: {e}"),
             Self::Truncated => write!(f, "the rows end before the last tick"),
         }
@@ -65,12 +65,12 @@ impl TickTrace {
     /// [`TraceError`] when the bytes are not a trace, do not inflate or end early.
     pub fn decode(data: &[u8]) -> Result<Self, TraceError> {
         if data.get(..8) != Some(MAGIC.as_slice()) {
-            return Err(TraceError::NotATrace);
+            return Err(TraceError::NotTrace);
         }
-        let ticks = word_at(data, 8).ok_or(TraceError::NotATrace)? as usize;
-        let lane_count = word_at(data, 12).ok_or(TraceError::NotATrace)? as usize;
+        let ticks = word_at(data, 8).ok_or(TraceError::NotTrace)? as usize;
+        let lane_count = word_at(data, 12).ok_or(TraceError::NotTrace)? as usize;
         let mut rows = Vec::new();
-        let _ = ZlibDecoder::new(data.get(16..).ok_or(TraceError::NotATrace)?)
+        let _ = ZlibDecoder::new(data.get(16..).ok_or(TraceError::NotTrace)?)
             .read_to_end(&mut rows)
             .map_err(TraceError::Inflate)?;
         let row = 4 * (1 + 11 * lane_count);

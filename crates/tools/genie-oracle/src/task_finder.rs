@@ -235,7 +235,7 @@ fn finder_object(
             .and_then(|a| a.entries().next())
             .map(|(kind, _)| ActionType::try_from(kind))
             .transpose()?,
-        position: Position::new(s.t_x, s.t_y, s.t_z),
+        position: Position::new(s.tx, s.ty, s.tz),
     })
 }
 

@@ -1,6 +1,6 @@
 //! A trigger effect ([`TriggerEffect`]): the response when a trigger fires.
 
-use crate::{Result, UnitTypeID};
+use crate::{Result, UnitTypeId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{ReadStringsExt, write_opt_i32_str};
 use std::convert::TryInto;
@@ -163,12 +163,12 @@ impl TriggerEffect {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn unit_type(&self) -> Option<UnitTypeID> {
+    pub fn unit_type(&self) -> Option<UnitTypeId> {
         self.properties[6].try_into().ok()
     }
 
     /// Set the "Unit Type" value for this trigger effect.
-    pub fn set_unit_type(&mut self, unit_type: UnitTypeID) {
+    pub fn set_unit_type(&mut self, unit_type: UnitTypeId) {
         self.properties[6] = i32::from(unit_type);
     }
 
@@ -295,12 +295,12 @@ impl TriggerEffect {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn object_type(&self) -> Option<UnitTypeID> {
+    pub fn object_type(&self) -> Option<UnitTypeId> {
         self.properties[21].try_into().ok()
     }
 
     /// Set the "Object Type" value for this trigger effect.
-    pub fn set_object_type(&mut self, object_type: UnitTypeID) {
+    pub fn set_object_type(&mut self, object_type: UnitTypeId) {
         self.properties[21] = i32::from(object_type);
     }
 

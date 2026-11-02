@@ -1,11 +1,11 @@
 //! The animated, moving and action parts of a unit type.
 
 use crate::conv::opt_fits;
-use crate::sound::SoundID;
-use crate::sprite::SpriteID;
+use crate::sound::SoundId;
+use crate::sprite::SpriteId;
 use crate::task::TaskList;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{UnitTypeID, read_opt_u16};
+use genie_support::{UnitTypeId, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// The attribute of animated unit types.
@@ -42,16 +42,16 @@ impl AnimatedUnitTypeAttributes {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MovingUnitTypeAttributes {
     /// Sprite shown while walking, or `None`.
-    pub move_sprite: Option<SpriteID>,
+    pub move_sprite: Option<SpriteId>,
     /// Sprite shown while running, or `None`.
-    pub run_sprite: Option<SpriteID>,
+    pub run_sprite: Option<SpriteId>,
     /// Rotation speed.
     pub turn_speed: f32,
     /// Old size class (genieutils' `OldSizeClass`).
     pub size_class: u8,
     /// Unit type left behind as a trail while moving (e.g. footprints; genieutils' `TrackingUnit`),
     /// or `None`.
-    pub trailing_unit: Option<UnitTypeID>,
+    pub trailing_unit: Option<UnitTypeId>,
     /// When the trailing unit is left (genieutils' `TrackingUnitMode`).
     pub trailing_options: u8,
     /// Spacing of the trailing units (genieutils' `TrackingUnitDensity`).
@@ -129,16 +129,16 @@ pub struct ActionUnitTypeAttributes {
     /// Base rate of the unit's work (gathering, building, …).
     pub work_rate: f32,
     /// Unit type at which the unit drops off resources, or `None`.
-    pub drop_site: Option<UnitTypeID>,
+    pub drop_site: Option<UnitTypeId>,
     /// A second drop site, or `None`.
-    pub backup_drop_site: Option<UnitTypeID>,
+    pub backup_drop_site: Option<UnitTypeId>,
     /// Task swap group (genieutils' `TaskSwapGroup`): units of one group turn into each other with
     /// the task, like the kinds of villager.
     pub task_by_group: u8,
     /// Sound played when the unit is given a command (genieutils' `AttackSound`), or `None`.
-    pub command_sound: Option<SoundID>,
+    pub command_sound: Option<SoundId>,
     /// Sound played when the unit is ordered to move, or `None`.
-    pub move_sound: Option<SoundID>,
+    pub move_sound: Option<SoundId>,
     /// Task list for older versions; newer game versions store the task list at the root of the
     /// dat file, and use `unit_type.copy_id` to refer to one of those task lists.
     pub tasks: Option<TaskList>,

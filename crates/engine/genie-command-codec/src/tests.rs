@@ -77,7 +77,7 @@ fn raw(packet: &[u8]) -> GenieError {
 fn interact(num: u16, human: u8, ids: Vec<i32>) -> Vec<u8> {
     packets::Interact {
         commp_id: 2,
-        t_id: 500,
+        tid: 500,
         x: 1.0,
         y: 2.0,
         num,
@@ -126,7 +126,7 @@ fn an_interact_keeps_its_order_and_units() {
     );
     let work = packets::Work {
         commp_id: 4,
-        t_id: 600,
+        tid: 600,
         x: 0.0,
         y: 0.0,
         num: 1,
@@ -154,7 +154,7 @@ fn an_interact_keeps_its_order_and_units() {
     );
     let retreat = packets::Retreat {
         commp_id: 1,
-        t_id: 0,
+        tid: 0,
         x: 0.0,
         y: 0.0,
         num: 1,
@@ -187,7 +187,7 @@ fn move_follow_and_guard_keep_their_orders() {
     let many: Vec<i32> = (0..70).collect();
     let moved = packets::Move {
         commp_id: 1,
-        t_id: -1,
+        tid: -1,
         x: 5.0,
         y: 6.0,
         num: 70,
@@ -254,7 +254,7 @@ fn the_buildings_lists_keep_their_counted_ids() {
         gap_0x06: [0; 2],
         x: 1.0,
         y: 2.0,
-        t_id: 40,
+        tid: 40,
         tm_id: 83,
         field_0x18: 1,
         ids: vec![30, 31],
@@ -277,7 +277,7 @@ fn the_buildings_lists_keep_their_counted_ids() {
     );
     let queue = packets::BuildingCommandQueue {
         commp_id: 3,
-        t_id: 41,
+        tid: 41,
         x: 3.0,
         y: 4.0,
         num: 2,
@@ -529,10 +529,10 @@ fn unload_and_unit_order_keep_their_lists_and_counts() {
             commp_id: 2,
             num,
             gap_0x06: [0; 2],
-            t_id: 70,
+            tid: 70,
             x: 3.0,
             y: 4.0,
-            q_id: 71,
+            qid: 71,
             param: -1,
             action: 5,
             field_0x1d: 1,
@@ -608,8 +608,8 @@ fn build_and_build_wall_keep_their_fields() {
         gap_0x06: [0; 2],
         x: 10.5,
         y: 11.5,
-        o_id: 70,
-        q_id: -1,
+        oid: 70,
+        qid: -1,
         field_0x18: 0x2c9,
         frame: 3,
         gap_0x1d: [0],
@@ -641,8 +641,8 @@ fn build_and_build_wall_keep_their_fields() {
         y1: 2,
         x2: 3,
         y2: 4,
-        o_id: 72,
-        q_id: -1,
+        oid: 72,
+        qid: -1,
         gap_0x18: [0; 2],
         field_0x1a: 0,
         field_0x1b: 0,
@@ -672,8 +672,8 @@ fn queue_and_research_keep_their_fields() {
         commp_id: 1,
         num: 1,
         gap_0x06: [0; 4],
-        b_id: 109,
-        t_id: 83,
+        bid: 109,
+        tid: 83,
         count: 5,
         button_location_id: 2,
         ids: vec![9],
@@ -693,10 +693,10 @@ fn queue_and_research_keep_their_fields() {
     );
     let research = packets::Research {
         commp_id: 1,
-        u_id: 90,
+        uid: 90,
         field_0x08: 1,
-        t_id: 22,
-        q_id: -1,
+        tid: 22,
+        qid: -1,
         field_0x10: 1,
         ids: vec![90],
     }
@@ -749,7 +749,7 @@ fn the_object_commands_keep_their_fields() {
         (
             packets::CancelBuild {
                 commp_id: 2,
-                u_id: 92,
+                uid: 92,
             }
             .encode()
             .unwrap(),
@@ -761,7 +761,7 @@ fn the_object_commands_keep_their_fields() {
         (
             packets::GoBackToWork {
                 commp_id: 2,
-                u_id: 93,
+                uid: 93,
             }
             .encode()
             .unwrap(),
@@ -773,7 +773,7 @@ fn the_object_commands_keep_their_fields() {
         (
             packets::AllBackToWork {
                 commp_id: 2,
-                u_id: 93,
+                uid: 93,
             }
             .encode()
             .unwrap(),
@@ -785,7 +785,7 @@ fn the_object_commands_keep_their_fields() {
         (
             packets::TownBell {
                 commp_id: 2,
-                u_id: 94,
+                uid: 94,
                 activate: 1,
             }
             .encode()
@@ -799,7 +799,7 @@ fn the_object_commands_keep_their_fields() {
         (
             packets::Gate {
                 commp_id: 2,
-                u_id: 95,
+                uid: 95,
             }
             .encode()
             .unwrap(),
@@ -845,7 +845,7 @@ fn flare_trade_and_game_keep_their_fields() {
                 commp_id: 2,
                 attr: 1,
                 amt: 2,
-                u_id: 96,
+                uid: 96,
             }
             .encode()
             .unwrap(),
@@ -862,7 +862,7 @@ fn flare_trade_and_game_keep_their_fields() {
                 commp_id: 2,
                 attr: 0x0102,
                 amt: 1,
-                u_id: 97,
+                uid: 97,
             }
             .encode()
             .unwrap(),
@@ -954,7 +954,7 @@ fn a_packet_its_command_does_not_write_back_stays_raw() {
     );
     let queue = packets::BuildingCommandQueue {
         commp_id: 3,
-        t_id: 41,
+        tid: 41,
         x: 3.0,
         y: 4.0,
         num: 1,
@@ -972,15 +972,15 @@ fn a_packet_its_command_does_not_write_back_stays_raw() {
 /// and decodes: in a unit list (a computer's BUILD without builders lists −1), as a target.
 #[test]
 fn a_packet_of_a_value_its_types_refuse_stays_raw() {
-    let build = |o_id| {
+    let build = |oid| {
         packets::Build {
             commp_id: 1,
             num: 1,
             gap_0x06: [0; 2],
             x: 1.0,
             y: 2.0,
-            o_id,
-            q_id: -1,
+            oid,
+            qid: -1,
             field_0x18: u32::MAX,
             frame: 0,
             gap_0x1d: [0],
@@ -1005,7 +1005,7 @@ fn a_packet_of_a_value_its_types_refuse_stays_raw() {
     assert_eq!(units.ids, object_ids([-1, 5]));
     let delete = packets::CancelBuild {
         commp_id: 1,
-        u_id: -1,
+        uid: -1,
     }
     .encode()
     .unwrap();

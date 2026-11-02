@@ -62,7 +62,7 @@ pub(super) fn object_state(s: &RgeStaticObject) -> Result<CheckpointObject, Geni
             .ok_or(GenieError::invalid_input("a live object of no master"))?,
         state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
         amount_held: Amount::new(s.attribute_amount_held),
-        position: Position::new(s.t_x, s.t_y, s.t_z),
+        position: Position::new(s.tx, s.ty, s.tz),
         top_action: None,
         retarget_timer: None,
     })

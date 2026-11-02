@@ -1,9 +1,9 @@
 //! The weapons ([`WeaponInfo`]), the combat part and the projectile part.
 
 use crate::conv::fits;
-use crate::sprite::SpriteID;
+use crate::sprite::SpriteId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{MapInto, UnitTypeID, read_opt_u16};
+use genie_support::{MapInto, UnitTypeId, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// One attack or armour value: a class and the amount for it.
@@ -59,7 +59,7 @@ pub struct BaseCombatUnitTypeAttributes {
     /// Time between attacks (reload time).
     pub attack_speed: f32,
     /// Projectile unit type fired, or `None`.
-    pub missile_id: Option<UnitTypeID>,
+    pub missile_id: Option<UnitTypeId>,
     /// Chance to hit, in percent (genieutils' `AccuracyPercent`).
     pub base_hit_chance: i16,
     /// genieutils' `BreakOffCombat`; its use is not known yet.
@@ -75,7 +75,7 @@ pub struct BaseCombatUnitTypeAttributes {
     /// How far missed projectiles scatter (genieutils' `AccuracyDispersion`).
     pub missed_missile_spread: f32,
     /// Sprite shown while attacking, or `None`.
-    pub fight_sprite: Option<SpriteID>,
+    pub fight_sprite: Option<SpriteId>,
     /// Melee armour shown in the interface.
     pub displayed_armor: i16,
     /// Attack shown in the interface.

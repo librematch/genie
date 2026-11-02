@@ -212,7 +212,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 allied_vision: p.world_player().base.allied_los_enable != 0,
                 // the reveal of the enemies' town centres (attribute 209) is done once any
                 // mTCFlared bit is set; the saved map then already holds the revealed tiles
-                tc_flared: p.world_player().tcflared.iter().map(|&b| b != 0).collect(),
+                tc_flared: p.world_player().tc_flared.iter().map(|&b| b != 0).collect(),
                 sharing: p.world_player().sharing_is_caring != 0,
                 commodity_volume: LotVolume::of_data(p.world_player().commodity_volumn_delta),
                 victory: VictoryState::of_data(victory.get(i).map_or(0, |v| v.victory)),
@@ -314,7 +314,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             continue;
         }
         if let Some(m) = wp.scout_map.as_deref() {
-            let width = m.x_size_value.max(0) as usize;
+            let width = m.xsize_value.max(0) as usize;
             let cells = m
                 .row_value
                 .iter()
@@ -326,8 +326,8 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             turns.spatial.set_scout_map(
                 i,
                 genie_core::movement::explore::InfluenceMap {
-                    size: GridSize::new(m.x_size_value, m.y_size_value),
-                    origin: Tile::new(m.x_reference_point_value, m.y_reference_point_value),
+                    size: GridSize::new(m.xsize_value, m.ysize_value),
+                    origin: Tile::new(m.xreference_point_value, m.yreference_point_value),
                     limit: m.unchangeable_limit_value,
                     cells,
                 },
@@ -336,7 +336,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     }
     // the computer players' AI modules (player+0x7a8, saved only where the AI was created)
     for (i, p) in PlayerId::each(header.players().len()).zip(header.players()) {
-        if let Some(m) = p.world_player().tribe_main_decision_aimodule.as_deref() {
+        if let Some(m) = p.world_player().tribe_main_decision_ai_module.as_deref() {
             turns.ai.set(i, ai_module(m));
         }
     }
@@ -556,8 +556,8 @@ pub(super) fn saved_ghosts(
                 original_master: MasterId::of_data(d.long_val_2 as i16),
                 original_owner: u8::try_from(d.doppled_player)
                     .map_or(PlayerId::GAIA, PlayerId::from),
-                position: Position::new(s.t_x, s.t_y, s.t_z),
-                tile: Tile::new(s.t_x as i32, s.t_y as i32),
+                position: Position::new(s.tx, s.ty, s.tz),
+                tile: Tile::new(s.tx as i32, s.ty as i32),
                 footprint: d.multi_unified_points,
                 bits: VisionBits::NONE,
                 cant_see: genie_core::players::PlayerSet::from_bits_retain(d.cant_see_bits),

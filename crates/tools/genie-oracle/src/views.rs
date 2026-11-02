@@ -70,7 +70,7 @@ fn group_lines(out: &mut String, u: &UnitGroup) {
         u.id,
         u.owner.to_bits(),
         u.state,
-        u.group_flags_m_bits,
+        u.group_flags_bits,
         vec3(&u.centroid),
         u.hibernating,
         u.idle_timer
@@ -191,9 +191,9 @@ fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> Result
             s.master_obj,
             s.object_state,
             s.hp,
-            s.t_x,
-            s.t_y,
-            s.t_z,
+            s.tx,
+            s.ty,
+            s.tz,
             action,
             state,
             retarget,
@@ -279,7 +279,7 @@ fn moving_lines(
     let _ = writeln!(
         out,
         "{} master {} at ({}, {}, {}) facet {} sprite {}",
-        s.id, s.master_obj, s.t_x, s.t_y, s.t_z, s.facet, s.sprite
+        s.id, s.master_obj, s.tx, s.ty, s.tz, s.facet, s.sprite
     );
     let _ = writeln!(
         out,
@@ -313,15 +313,15 @@ fn moving_lines(
     );
     for d in m.temp_path_data.iter().chain(m.future_path_data.as_deref()) {
         let _ = writeln!(out, "  path data {d:?}");
-        for p in paths.iter().filter(|p| p.idvalue == d.path_id) {
-            let points: Vec<[f32; 3]> = p.m_waypoints.iter().map(f3).collect();
+        for p in paths.iter().filter(|p| p.id_value == d.path_id) {
+            let points: Vec<[f32; 3]> = p.waypoints.iter().map(f3).collect();
             let _ = writeln!(
                 out,
                 "    path {} points {points:?} length {} created {} flags {:#x} refs {}",
-                p.idvalue,
+                p.id_value,
                 p.path_length_value,
                 p.creation_time_value,
-                p.flags_m_bits,
+                p.flags_bits,
                 p.reference_count
             );
         }
@@ -360,7 +360,7 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
         let _ = writeln!(
             out,
             "{} master {} at ({}, {}) state {} unit-AI type {}",
-            s.id, s.master_obj, s.t_x, s.t_y, s.object_state, combat.need_unit_ai
+            s.id, s.master_obj, s.tx, s.ty, s.object_state, combat.need_unit_ai
         );
         if let Some(e) = combat.tribe_elephant_unit_ai_module.as_deref() {
             let _ = writeln!(
@@ -436,7 +436,7 @@ pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> Result<String
         map.rows
             .get(r)
             .and_then(|row| row.tiles.get(c))
-            .map(|t| t.t_m_elevation)
+            .map(|t| t.elevation)
     };
     for (name, transposed) in [("rows[y][x]", false), ("rows[x][y]", true)] {
         let _ = writeln!(out, "{name}: y down, x across {}..={}", x.0, x.1);

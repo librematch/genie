@@ -37,7 +37,7 @@ impl DatFile {
         let game_version = game_version(file_version, num_terrains);
         // AoC hardcodes to 42 terrains, but says 41 terrains in the data file.
         // The 42nd terrain is zeroed out.
-        let num_terrains_fixed = if game_version == GameVersion::AoC && num_terrains == 41 {
+        let num_terrains_fixed = if game_version == GameVersion::Aoc && num_terrains == 41 {
             42
         } else {
             num_terrains
@@ -103,13 +103,13 @@ fn read_array<T>(num: usize, mut read: impl FnMut() -> Result<T>) -> Result<Vec<
 fn game_version(file_version: FileVersion, num_terrains: u16) -> GameVersion {
     if file_version == FileVersion(*b"VER 5.7\0") {
         match num_terrains {
-            32 => GameVersion::AoK,
-            100 => GameVersion::HD,
+            32 => GameVersion::Aok,
+            100 => GameVersion::Hd,
             // 41 terrains is AoC. TODO support different versions
-            _ => GameVersion::AoC,
+            _ => GameVersion::Aoc,
         }
     } else {
-        GameVersion::AoC // TODO support different versions
+        GameVersion::Aoc // TODO support different versions
     }
 }
 
@@ -270,12 +270,12 @@ mod tests {
     #[test]
     fn the_game_follows_the_version_and_terrain_count() {
         let v57 = FileVersion(*b"VER 5.7\0");
-        assert_eq!(game_version(v57, 32), GameVersion::AoK);
-        assert_eq!(game_version(v57, 100), GameVersion::HD);
-        assert_eq!(game_version(v57, 41), GameVersion::AoC);
+        assert_eq!(game_version(v57, 32), GameVersion::Aok);
+        assert_eq!(game_version(v57, 100), GameVersion::Hd);
+        assert_eq!(game_version(v57, 41), GameVersion::Aoc);
         assert_eq!(
             game_version(FileVersion(*b"VER 5.8\0"), 32),
-            GameVersion::AoC
+            GameVersion::Aoc
         );
     }
 

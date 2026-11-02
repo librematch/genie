@@ -37,11 +37,11 @@ use std::str;
 mod read;
 mod write;
 
-pub use read::DRSReader;
-pub use write::{DRSWriter, InMemoryStrategy, ReserveDirectoryStrategy, Strategy as WriteStrategy};
+pub use read::DrsReader;
+pub use write::{DrsWriter, InMemoryStrategy, ReserveDirectoryStrategy, Strategy as WriteStrategy};
 
 /// A DRS version string.
-type DRSVersion = [u8; 4];
+type DrsVersion = [u8; 4];
 
 /// A resource type name.
 ///
@@ -148,7 +148,7 @@ impl TryFrom<&str> for ResourceType {
     }
 }
 
-/// What names a resource type for [`DRSWriter::add`]: a [`ResourceType`] itself, or its name as
+/// What names a resource type for [`DrsWriter::add`]: a [`ResourceType`] itself, or its name as
 /// a string (at most 4 bytes) or as bytes.
 pub trait IntoResourceType {
     /// The resource type.
@@ -179,11 +179,11 @@ impl IntoResourceType for &[u8] {
 
 /// The DRS archive header.
 #[derive(Clone, Copy)]
-pub struct DRSHeader {
+pub struct DrsHeader {
     /// A copyright message.
     banner_msg: [u8; 40],
     /// File version. (always "1.00")
-    version: DRSVersion,
+    version: DrsVersion,
     /// File password / identifier.
     password: [u8; 12],
     /// The amount of resource types (tables).
@@ -192,7 +192,7 @@ pub struct DRSHeader {
     directory_size: u32,
 }
 
-impl Default for DRSHeader {
+impl Default for DrsHeader {
     fn default() -> Self {
         Self {
             banner_msg: *b"Copyright (c) 1997 Ensemble Studios.\x1a\x00\x00\x00",
@@ -204,7 +204,7 @@ impl Default for DRSHeader {
     }
 }
 
-impl DRSHeader {
+impl DrsHeader {
     #[inline]
     /// Read a DRS archive header from a `Read`able handle.
     fn from<R: Read>(source: &mut R) -> Result<Self, Error> {
@@ -236,7 +236,7 @@ impl DRSHeader {
     }
 }
 
-impl std::fmt::Debug for DRSHeader {
+impl std::fmt::Debug for DrsHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -251,7 +251,7 @@ impl std::fmt::Debug for DRSHeader {
 }
 
 /// A table containing resource entries.
-pub struct DRSTable {
+pub struct DrsTable {
     /// Type of the resource as a little-endian char array.
     pub resource_type: ResourceType,
     /// Offset in the DRS archive where this table's resource entries can be found.
@@ -259,12 +259,12 @@ pub struct DRSTable {
     /// Number of resource entries in this table.
     num_resources: u32,
     /// Resources.
-    resources: Vec<DRSResource>,
+    resources: Vec<DrsResource>,
     /// Resource IDs.
     resource_ids: SortedVec<u32>,
 }
 
-impl DRSTable {
+impl DrsTable {
     fn new(resource_type: ResourceType, offset: u32, num_resources: u32) -> Self {
         Self {
             resource_type,
@@ -297,7 +297,7 @@ impl DRSTable {
     #[inline]
     fn read_resources<R: Read>(&mut self, source: &mut R) -> Result<(), Error> {
         for _ in 0..self.num_resources {
-            let resource = DRSResource::from(source)?;
+            let resource = DrsResource::from(source)?;
             let _discard = self.resource_ids.insert(resource.id);
             self.resources.push(resource);
         }
@@ -320,14 +320,14 @@ impl DRSTable {
 
     /// Iterate over the resources in this table.
     #[inline]
-    pub fn resources(&self) -> DRSResourceIterator<'_> {
+    pub fn resources(&self) -> DrsResourceIterator<'_> {
         self.resources.iter()
     }
 
     /// Find a resource by ID.
     #[inline]
     #[must_use]
-    pub fn get_resource(&self, id: u32) -> Option<&DRSResource> {
+    pub fn get_resource(&self, id: u32) -> Option<&DrsResource> {
         self.resource_ids
             .binary_search(&id)
             .ok()
@@ -350,13 +350,13 @@ impl DRSTable {
 
     /// Add a resource to this table.
     #[inline]
-    pub(crate) fn add(&mut self, res: DRSResource) {
+    pub(crate) fn add(&mut self, res: DrsResource) {
         self.resources.push(res);
         self.num_resources += 1;
     }
 }
 
-impl std::fmt::Debug for DRSTable {
+impl std::fmt::Debug for DrsTable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -368,7 +368,7 @@ impl std::fmt::Debug for DRSTable {
 
 /// A single resource in a DRS archive.
 #[derive(Debug, Clone, Copy)]
-pub struct DRSResource {
+pub struct DrsResource {
     /// The resource ID.
     pub id: u32,
     /// The offset into the DRS archive where the resource can be found.
@@ -377,7 +377,7 @@ pub struct DRSResource {
     pub size: u32,
 }
 
-impl DRSResource {
+impl DrsResource {
     /// Read DRS resource metadata from a `Read`able handle.
     #[inline]
     fn from<R: Read>(source: &mut R) -> Result<Self, Error> {
@@ -397,9 +397,9 @@ impl DRSResource {
 }
 
 /// An iterator over DRS table metadata structs.
-pub type DRSTableIterator<'a> = slice::Iter<'a, DRSTable>;
+pub type DrsTableIterator<'a> = slice::Iter<'a, DrsTable>;
 /// An iterator over DRS resource metadata structs.
-pub type DRSResourceIterator<'a> = slice::Iter<'a, DRSResource>;
+pub type DrsResourceIterator<'a> = slice::Iter<'a, DrsResource>;
 
 impl From<ParseResourceTypeError> for genie_error::GenieError {
     /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn it_works() -> anyhow::Result<()> {
         let mut file = File::open("test.drs")?;
-        let drs = DRSReader::new(&mut file)?;
+        let drs = DrsReader::new(&mut file)?;
         let mut expected = vec![
             // (reversed_type, id, size)
             ("js".parse()?, 1, 632),

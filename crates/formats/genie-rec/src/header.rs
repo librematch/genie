@@ -8,13 +8,13 @@ use crate::{GameVersion, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_scx::TribeScen;
 use genie_support::ReadSkipExt;
-pub use genie_support::SpriteID;
+pub use genie_support::SpriteId;
 use std::fmt::{self, Debug};
 use std::io::Read;
 
 /// A fact or an action of an AI rule.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AICommand {
+pub struct AiCommand {
     /// The kind of command.
     pub command_type: i32,
     /// The fact or action id.
@@ -23,7 +23,7 @@ pub struct AICommand {
     pub parameters: [i32; 4],
 }
 
-impl ReadableHeaderElement for AICommand {
+impl ReadableHeaderElement for AiCommand {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut cmd = Self {
             command_type: input.read_i32::<LE>()?,
@@ -40,16 +40,16 @@ impl ReadableHeaderElement for AICommand {
 /// A rule of an AI script: its facts (conditions) and actions.
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
-pub struct AIListRule {
+pub struct AiListRule {
     in_use: bool,
     enable: bool,
     rule_id: u16,
     next_in_group: u16,
-    facts: Vec<AICommand>,
-    actions: Vec<AICommand>,
+    facts: Vec<AiCommand>,
+    actions: Vec<AiCommand>,
 }
 
-impl ReadableHeaderElement for AIListRule {
+impl ReadableHeaderElement for AiListRule {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut rule = Self {
             in_use: input.read_u32::<LE>()? != 0,
@@ -62,7 +62,7 @@ impl ReadableHeaderElement for AIListRule {
         let num_facts_actions = input.read_u8()?;
         let _padding = input.read_u16::<LE>()?;
         for i in 0..16 {
-            let cmd = AICommand::read_from(input)?;
+            let cmd = AiCommand::read_from(input)?;
             if i < num_facts {
                 rule.facts.push(cmd);
             } else if i < num_facts_actions {
@@ -76,14 +76,14 @@ impl ReadableHeaderElement for AIListRule {
 /// The rule list of an AI script.
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
-pub struct AIList {
+pub struct AiList {
     in_use: bool,
     id: i32,
     max_rules: u16,
-    rules: Vec<AIListRule>,
+    rules: Vec<AiListRule>,
 }
 
-impl ReadableHeaderElement for AIList {
+impl ReadableHeaderElement for AiList {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut list = Self {
             in_use: input.read_u32::<LE>()? != 0,
@@ -95,7 +95,7 @@ impl ReadableHeaderElement for AIList {
         // Not known yet; probably the in-memory list pointer, as in the string table.
         let _rules_ptr = input.read_u32::<LE>()?;
         for _ in 0..num_rules {
-            list.rules.push(AIListRule::read_from(input)?);
+            list.rules.push(AiListRule::read_from(input)?);
         }
         Ok(list)
     }
@@ -103,13 +103,13 @@ impl ReadableHeaderElement for AIList {
 
 /// The rule groups of an AI script.
 #[derive(Debug, Default, Clone)]
-pub struct AIGroupTable {
+pub struct AiGroupTable {
     #[allow(dead_code)]
     max_groups: u16,
     groups: Vec<u16>,
 }
 
-impl ReadableHeaderElement for AIGroupTable {
+impl ReadableHeaderElement for AiGroupTable {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut table = Self {
             max_groups: input.read_u16::<LE>()?,
@@ -128,7 +128,7 @@ impl ReadableHeaderElement for AIGroupTable {
 
 /// The game settings and AI state the AI scripts' facts read.
 #[derive(Clone)]
-pub struct AIFactState {
+pub struct AiFactState {
     /// The save version of the AI state.
     pub save_version: f32,
     /// The version of the AI state.
@@ -161,7 +161,7 @@ pub struct AIFactState {
     pub taunts: [[i8; 256]; 8],
 }
 
-impl Debug for AIFactState {
+impl Debug for AiFactState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AIFactState")
             .field("save_version", &self.save_version)
@@ -183,7 +183,7 @@ impl Debug for AIFactState {
     }
 }
 
-impl ReadableHeaderElement for AIFactState {
+impl ReadableHeaderElement for AiFactState {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let save_version = input.read_f32::<LE>()?;
         let version = input.read_f32::<LE>()?;
@@ -232,18 +232,18 @@ impl ReadableHeaderElement for AIFactState {
 
 /// The AI scripts the game runs, with their state.
 #[derive(Debug, Clone)]
-pub struct AIScripts {
+pub struct AiScripts {
     /// The strings the scripts use.
     pub string_table: StringTable,
     /// The rule lists, one per script.
-    pub lists: Vec<AIList>,
+    pub lists: Vec<AiList>,
     /// The group tables, one per rule list.
-    pub groups: Vec<AIGroupTable>,
+    pub groups: Vec<AiGroupTable>,
     /// The game settings and AI state the scripts read.
-    pub fact_state: AIFactState,
+    pub fact_state: AiFactState,
 }
 
-impl ReadableHeaderElement for AIScripts {
+impl ReadableHeaderElement for AiScripts {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let string_table = StringTable::read_from(input)?;
         let _max_facts = input.read_u16::<LE>()?;
@@ -252,15 +252,15 @@ impl ReadableHeaderElement for AIScripts {
 
         let mut lists = vec![];
         for _ in 0..max_lists {
-            lists.push(AIList::read_from(input)?);
+            lists.push(AiList::read_from(input)?);
         }
 
         let mut groups = vec![];
         for _ in 0..max_lists {
-            groups.push(AIGroupTable::read_from(input)?);
+            groups.push(AiGroupTable::read_from(input)?);
         }
 
-        let fact_state = AIFactState::read_from(input)?;
+        let fact_state = AiFactState::read_from(input)?;
 
         Ok(Self {
             string_table,
@@ -277,7 +277,7 @@ impl ReadableHeaderElement for AIScripts {
 pub struct Header {
     game_version: GameVersion,
     save_version: f32,
-    ai_scripts: Option<AIScripts>,
+    ai_scripts: Option<AiScripts>,
     map: Map,
     particle_system: ParticleSystem,
     players: Vec<Player>,
@@ -305,7 +305,7 @@ impl ReadableHeaderElement for Header {
 
         let includes_ai = input.read_u32::<LE>()? != 0;
         if includes_ai {
-            header.ai_scripts = Some(AIScripts::read_from(input)?);
+            header.ai_scripts = Some(AiScripts::read_from(input)?);
         }
 
         skip_world_clock(input)?;
@@ -438,7 +438,7 @@ struct Particle {
     pub start: u32,
     pub facet: u32,
     pub update: u32,
-    pub sprite_id: SpriteID,
+    pub sprite_id: SpriteId,
     pub location: (f32, f32, f32),
     pub flags: u8,
 }

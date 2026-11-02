@@ -1,23 +1,23 @@
 //! The buildings' commands: make, research, build, build wall and cancel build.
 
 use crate::actions::{Location2, ObjectsList};
-use crate::{ObjectID, PlayerID, Result};
+use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, TechID, UnitTypeID, read_opt_u32};
+use genie_support::{ReadSkipExt, TechId, UnitTypeId, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Train a unit at a building (command `0x64`; aoc-mgz calls it the AI queue command).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MakeCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The building that trains the unit.
-    pub building_id: ObjectID,
+    pub building_id: ObjectId,
     /// The type of unit to train.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// Not known yet; read as an optional object ID (-1 for none).
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
 }
 
 impl MakeCommand {
@@ -63,13 +63,13 @@ impl MakeCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ResearchCommand {
     /// The ID of the player starting the research.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The building where the research is taking place.
-    pub building_id: ObjectID,
+    pub building_id: ObjectId,
     /// The tech ID of the research.
-    pub tech_id: TechID,
+    pub tech_id: TechId,
     /// Not known yet; read as an optional object ID (-1 for none).
-    pub target_id: Option<ObjectID>,
+    pub target_id: Option<ObjectId>,
 }
 
 impl ResearchCommand {
@@ -115,9 +115,9 @@ impl ResearchCommand {
 #[derive(Debug, Default, Clone)]
 pub struct BuildCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The type of building to place.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// The location of the new building foundation.
     pub location: Location2,
     /// The index of the frame to use, for buildings with multiple graphics like houses.
@@ -156,13 +156,13 @@ impl BuildCommand {
 #[derive(Debug, Default, Clone)]
 pub struct BuildWallCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The tile (x, y) where the wall starts.
     pub start: (u8, u8),
     /// The tile (x, y) where the wall ends.
     pub end: (u8, u8),
     /// The type of wall to build.
-    pub unit_type_id: UnitTypeID,
+    pub unit_type_id: UnitTypeId,
     /// The villagers that are tasked to build the wall.
     pub builders: ObjectsList,
 }
@@ -205,9 +205,9 @@ impl BuildWallCommand {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CancelBuildCommand {
     /// The ID of the player issuing this command.
-    pub player_id: PlayerID,
+    pub player_id: PlayerId,
     /// The ID of the building to cancel.
-    pub building_id: ObjectID,
+    pub building_id: ObjectId,
 }
 
 impl CancelBuildCommand {

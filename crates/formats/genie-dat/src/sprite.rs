@@ -1,10 +1,10 @@
 //! Types related to sprites and graphics.
 
 use crate::conv::{fits, invalid_data, opt_fits};
-use crate::sound::SoundID;
+use crate::sound::SoundId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-pub use genie_support::SpriteID;
+pub use genie_support::SpriteId;
 use genie_support::{MapInto, fallible_try_into, infallible_try_into, read_opt_u16};
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Result, Write};
@@ -12,36 +12,36 @@ use std::num::TryFromIntError;
 
 /// An ID identifying a string resource.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct GraphicID(u32);
+pub struct GraphicId(u32);
 
-impl From<u16> for GraphicID {
+impl From<u16> for GraphicId {
     fn from(n: u16) -> Self {
         Self(n.into())
     }
 }
 
-impl From<u32> for GraphicID {
+impl From<u32> for GraphicId {
     fn from(n: u32) -> Self {
         Self(n)
     }
 }
 
-impl TryFrom<i32> for GraphicID {
+impl TryFrom<i32> for GraphicId {
     type Error = TryFromIntError;
     fn try_from(n: i32) -> std::result::Result<Self, Self::Error> {
         Ok(Self(n.try_into()?))
     }
 }
 
-fallible_try_into!(GraphicID, i16);
-infallible_try_into!(GraphicID, u32);
-fallible_try_into!(GraphicID, i32);
+fallible_try_into!(GraphicId, i16);
+infallible_try_into!(GraphicId, u32);
+fallible_try_into!(GraphicId, i32);
 
 /// Another sprite drawn as part of this one, at an offset (e.g. the parts of a building).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SpriteDelta {
     /// The sprite to draw, or `None` (-1).
-    pub sprite_id: Option<SpriteID>,
+    pub sprite_id: Option<SpriteId>,
     /// Horizontal offset from this sprite's anchor, in pixels.
     pub offset_x: i16,
     /// Vertical offset from this sprite's anchor, in pixels.
@@ -56,7 +56,7 @@ pub struct SoundProp {
     /// How long into the animation the sound starts.
     pub sound_delay: i16,
     /// The sound to play; 0xFFFF marks an unused slot.
-    pub sound_id: SoundID,
+    pub sound_id: SoundId,
     #[allow(dead_code)]
     wwise_sound_id: Option<u32>,
 }
@@ -73,13 +73,13 @@ pub struct SpriteAttackSound {
 #[derive(Debug, Default, Clone)]
 pub struct Sprite {
     /// ID of this sprite.
-    pub id: SpriteID,
+    pub id: SpriteId,
     /// Internal name (at most 21 bytes in the file).
     pub name: String,
     /// File name of the SLP (at most 13 bytes in the file).
     pub filename: String,
     /// The SLP resource ID for this sprite.
-    pub slp_id: Option<GraphicID>,
+    pub slp_id: Option<GraphicId>,
     /// Whether the game has loaded the image: a runtime flag the file keeps unused.
     pub is_loaded: bool,
     /// If `Some(id)`, the sprite will always be rendered with this player colour.
@@ -112,7 +112,7 @@ pub struct Sprite {
     /// The sprite's extent as four coordinates (genieutils' `Coordinates`).
     pub bounding_box: (i16, i16, i16, i16),
     /// Sound played with the animation, or `None`.
-    pub sound_id: Option<SoundID>,
+    pub sound_id: Option<SoundId>,
     /// Number of frames per angle animation
     pub num_frames: u16,
     /// Number of angles tored in slp and also the number of extra structures.

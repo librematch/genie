@@ -308,7 +308,7 @@ fn priming_sets_the_update_count_and_the_last_commanded_units() {
     let mut turns = slice(&save, None);
     let moved = genie_rec::de::command::Move {
         commp_id: 1,
-        t_id: -1,
+        tid: -1,
         x: 5.0,
         y: 6.0,
         num: 1,
