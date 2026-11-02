@@ -77,10 +77,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            &self.c.w.masters,
+            &self.c.w.parts,
         );
         self.c.w.spatial.point_clear(
             unit.id,
@@ -212,7 +210,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             hp: u.life.hp,
             master: u.life.master_id,
             kind: m.kind,
-            main: u.building.annex_of,
+            main: self.c.w.parts.building_of(u.id).annex_of,
             allied: crate::unit_ai::task_finder::allied(
                 &self.c.w.players.player(self.player)?.relations,
                 self.player,
@@ -262,10 +260,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            &self.c.w.masters,
+            &self.c.w.parts,
         );
         mover.reaches_object(
             &walker,
@@ -304,14 +300,12 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 &self.c.w.masters,
                 &self.c.w.parts.own_master,
             ),
-            ais: &self.c.w.parts.unit_ai,
+            parts: &self.c.w.parts,
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                &self.c.w.masters,
+                &self.c.w.parts,
             ),
             restriction: self
                 .unit
@@ -347,10 +341,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            &self.c.w.masters,
+            &self.c.w.parts,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             let m = mover.ok_or(GenieError::unsupported(

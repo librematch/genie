@@ -455,10 +455,11 @@ impl World {
             object_rng: Some(object),
             posts: Posts::Ais(&mut parts.unit_ai),
             graphics,
-            by_id: crate::world::index::ObjectsRef::new(
+            by_id: crate::world::index::ObjectsRef::of_tables(
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+                &parts.building,
             ),
         }
     }

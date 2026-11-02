@@ -280,6 +280,10 @@ impl World {
         )?;
         self.set_part(id, crate::world::parts::Part::Missile(g.parts.missile))?;
         self.set_part(id, crate::world::parts::Part::TownBell(g.parts.town_bell))?;
+        self.set_part(
+            id,
+            crate::world::parts::Part::Building(Box::new(g.parts.building.clone())),
+        )?;
         let mut ai = g.parts.unit_ai.clone();
         keep_unsaved_ai(self.parts.unit_ai.get(id), ai.as_mut());
         self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;

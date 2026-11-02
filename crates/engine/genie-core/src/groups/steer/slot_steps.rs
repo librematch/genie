@@ -113,10 +113,8 @@ impl World {
                     crate::world::index::ObjectsRef::new(
                         &self.players,
                         &self.index,
-                        crate::objects::masters::MasterTables::new(
-                            &self.masters,
-                            &self.parts.own_master,
-                        ),
+                        &self.masters,
+                        &self.parts,
                     ),
                 ),
                 &mut plan,
@@ -146,10 +144,8 @@ impl World {
                 crate::world::index::ObjectsRef::new(
                     &self.players,
                     &self.index,
-                    crate::objects::masters::MasterTables::new(
-                        &self.masters,
-                        &self.parts.own_master,
-                    ),
+                    &self.masters,
+                    &self.parts,
                 ),
             )?
             .0

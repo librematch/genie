@@ -308,37 +308,6 @@ impl World {
                 default_make,
                 default_artifact: false,
             },
-            building: crate::objects::layers::Building {
-                construction: Some(Construction {
-                    progress,
-                    desolid,
-                    builders: crate::construction::BuilderCount::of_data(0),
-                    hit_points: made.hit_points,
-                    build_time: made.build_time,
-                    record: crate::map::spatial::Obstruction {
-                        kind: made.obstruction_type,
-                        class: made.obstruction_class,
-                    },
-                    snow,
-                    sprite_override: false,
-                }),
-                annex_of: None,
-                annexes: crate::construction::Annexes::NONE,
-                garrison_time: WorldTime::ZERO,
-                relics: Relics::NONE,
-                livestock_summation: Amount::ZERO,
-                livestock: Vec::new(),
-                pasture_workers: Vec::new(),
-                build_frame: crate::objects::Frame::ZERO,
-                // every building holds a gate's lock, open
-                gate: Some(Gate {
-                    first_update: true,
-                    ..Gate::default()
-                }),
-                rice,
-                stack_made: None,
-                attacking_units: Vec::new(),
-            },
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             body: crate::objects::layers::Body::new(
                 position,
@@ -361,8 +330,40 @@ impl World {
             idle_variant: 0,
             roo_called: false,
         };
+        let layer = crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress,
+                desolid,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: made.hit_points,
+                build_time: made.build_time,
+                record: crate::map::spatial::Obstruction {
+                    kind: made.obstruction_type,
+                    class: made.obstruction_class,
+                },
+                snow,
+                sprite_override: false,
+            }),
+            annex_of: None,
+            annexes: crate::construction::Annexes::NONE,
+            garrison_time: WorldTime::ZERO,
+            relics: Relics::NONE,
+            livestock_summation: Amount::ZERO,
+            livestock: Vec::new(),
+            pasture_workers: Vec::new(),
+            build_frame: crate::objects::Frame::ZERO,
+            // every building holds a gate's lock, open
+            gate: Some(Gate {
+                first_update: true,
+                ..Gate::default()
+            }),
+            rice,
+            stack_made: None,
+            attacking_units: Vec::new(),
+        };
         let parts = ObjectParts {
             unit_ai: ai,
+            building: layer,
             ..ObjectParts::default()
         };
         let _ = self.push_live(player, Object { unit, parts })?;
@@ -427,17 +428,18 @@ impl World {
         am: &Master,
     ) -> Result<(), GenieError> {
         let not_held = crate::construction::build::NOT_HELD;
-        let (_, main) = self.object_mut(id).ok_or_else(|| not_held.clone())?;
-        main.building.annexes.link(slot, aid)?;
-        let (_, a) = self.object_mut(aid).ok_or_else(|| not_held.clone())?;
-        a.building.annex_of = Some(crate::construction::MainBuildingId::new(id));
+        if self.object(id).is_none() || self.object(aid).is_none() {
+            return Err(not_held);
+        }
+        self.parts.building_mut(id)?.annexes.link(slot, aid)?;
+        self.parts.building_mut(aid)?.annex_of = Some(crate::construction::MainBuildingId::new(id));
         if made.class != class::GATE {
             self.unwatch(player, aid)?;
         }
         if Distance::ZERO < am.height {
-            let (_, a) = self.object_mut(aid).ok_or_else(|| not_held.clone())?;
-            let c = a
-                .building
+            let c = self
+                .parts
+                .building_mut(aid)?
                 .construction
                 .as_mut()
                 .ok_or(crate::construction::build::NO_CONSTRUCTION)?;

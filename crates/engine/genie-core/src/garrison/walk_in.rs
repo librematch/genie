@@ -480,11 +480,7 @@ impl EnterAction {
                 reads.start,
                 meeting,
                 &moves,
-                crate::world::index::ObjectsRef::new(
-                    &w.players,
-                    &w.index,
-                    crate::objects::masters::MasterTables::new(&w.masters, &w.parts.own_master),
-                ),
+                crate::world::index::ObjectsRef::new(&w.players, &w.index, &w.masters, &w.parts),
             )?
         };
         match walking {

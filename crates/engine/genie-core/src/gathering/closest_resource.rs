@@ -212,10 +212,8 @@ impl UnitView<'_, '_> {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            &self.c.w.masters,
+            &self.c.w.parts,
         );
         let mut w = ResourceWorld {
             player: self.player,
@@ -308,7 +306,8 @@ impl Unit {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current =

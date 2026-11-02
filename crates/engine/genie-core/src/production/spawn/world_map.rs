@@ -110,7 +110,11 @@ impl PlaceMap for WorldMap<'_> {
                     obstruction_type: placed.obstruction_type,
                     auto_gather: master.auto_gather,
                     state: unit.life.state,
-                    desolid: unit.building.construction.is_some_and(|c| c.desolid),
+                    desolid: t
+                        .parts
+                        .building_of(id)
+                        .construction
+                        .is_some_and(|c| c.desolid),
                     player: owner,
                     moving: master
                         .moving

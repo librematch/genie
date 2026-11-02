@@ -292,7 +292,8 @@ impl Unit {
             objects: crate::world::index::ObjectsRef::new(
                 &c.w.players,
                 &c.w.index,
-                crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                &c.w.masters,
+                &c.w.parts,
             ),
         })?;
         let mut met = Vec::new();
@@ -380,7 +381,11 @@ impl Unit {
         }
         let terrain = spatial.terrain.as_ref();
         let mut own = victim_of(
-            (shooter, parts.unit_ai.contains(shooter.id)),
+            (
+                shooter,
+                parts.unit_ai.contains(shooter.id),
+                parts.building_of(shooter.id),
+            ),
             master,
             attributes,
             p,
@@ -444,7 +449,11 @@ impl Unit {
         }
         let terrain = c.w.spatial.terrain.as_ref();
         let mut own = victim_of(
-            (self, c.w.parts.unit_ai.contains(self.id)),
+            (
+                self,
+                c.w.parts.unit_ai.contains(self.id),
+                c.w.parts.building_of(self.id),
+            ),
             master,
             &c.w.players.player(c.player)?.attributes,
             c.player,

@@ -6,6 +6,7 @@ use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
+use crate::objects::layers::Building;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::master_type::{BUILDING, RGE_COMBAT};
@@ -21,14 +22,14 @@ use crate::unit_ai::task_finder::Diplomacy;
 /// `spatial` holds it as unknown, or not at all), its place in its tile's list and a building's
 /// annexes (the world's links).
 pub(crate) fn victim_in(
-    (u, unit_ai): (&Unit, bool),
+    (u, unit_ai, building): (&Unit, bool, &Building),
     (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: crate::world::Mode680,
 ) -> Victim {
     let mut v = victim_of(
-        (u, unit_ai),
+        (u, unit_ai, building),
         master,
         attributes,
         p,
@@ -39,18 +40,19 @@ pub(crate) fn victim_in(
     v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
     v.tile_place = spatial.tile_place(u.id);
     if let Some(b) = v.building.as_mut() {
-        b.annexes = u.building.annexes.ids().collect();
+        b.annexes = building.annexes.ids().collect();
     }
     v
 }
 
-/// What a hit reads of the object `u` of player `p` ([`Victim`]): its master's values and its
-/// own, its player's elevation attributes, the terrain defense of its tile (`terrain`, the map's;
+/// What a hit reads of the object `u` of player `p` ([`Victim`]), whether it has a unit AI
+/// (`unit_ai`) and its building layer (`building`): its master's values and its own, its
+/// player's elevation attributes, the terrain defense of its tile (`terrain`, the map's;
 /// 1 for an object inside another, which has no tile) and the game's setting `mode_680`. Its
 /// relations to an attacker (`allied`) and whether its place is a guess (`uncertain`) are the
 /// caller's. The slice holds neither its unit AI's alert mode and attackers nor its facing.
 pub(crate) fn victim_of(
-    (u, unit_ai): (&Unit, bool),
+    (u, unit_ai, building): (&Unit, bool, &Building),
     master: &Master,
     attributes: &[Amount],
     p: PlayerId,
@@ -168,7 +170,7 @@ pub(crate) fn victim_of(
         killed: None,
         // a building's slot 0xe8 is FUN_1411cea90
         building: (kind == BUILDING).then(|| crate::combat::damage::Building {
-            main: u.building.annex_of,
+            main: building.annex_of,
             // the caller's, which holds the world's annex links
             annexes: Vec::new(),
             // +0xb90 is not saved and not held: a blast resets it on every building of its tiles
@@ -181,7 +183,7 @@ pub(crate) fn victim_of(
             cost: paid_cost(master),
             damaged_lately: u.damaged_lately,
             struck: false,
-            relics: u.building.relics,
+            relics: building.relics,
             razed: Vec::new(),
         }),
     }

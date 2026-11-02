@@ -72,11 +72,11 @@ impl BuildCommand {
         }
         let (id, position) = w.found(player, master, Position::new(x, y, 0.0))?;
         let sprite_override = self.sprite_override_of(w.players.player(player)?.civ);
-        if let Some((_, u)) = w.object_mut(id) {
-            if let Some(c) = u.building.construction.as_mut() {
+        if let Some((_, layer)) = w.object_and_layer_mut(id)? {
+            if let Some(c) = layer.construction.as_mut() {
                 c.sprite_override = sprite_override != crate::commands::SpriteOverride::NONE;
             }
-            u.building.build_frame = self.frame;
+            layer.build_frame = self.frame;
         }
         w.task_builders(
             player,

@@ -131,7 +131,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let site_at = self
             .spatial
@@ -299,6 +300,7 @@ impl World {
         };
         Ok(Some(clear_look_of(
             u,
+            self.parts.building_of(id),
             crate::objects::masters::OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
         )?))
     }

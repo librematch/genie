@@ -405,6 +405,7 @@ impl World {
             foundation.id(),
             1,
             &find,
+            &self.parts.building,
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
@@ -412,6 +413,7 @@ impl World {
             foundation.id(),
             2,
             &find,
+            &self.parts.building,
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;

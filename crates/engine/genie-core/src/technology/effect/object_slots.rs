@@ -318,8 +318,8 @@ impl World {
         match (attribute, change) {
             (a::BUILDING_ICON_OVERRIDE, Change::Set) => Ok(()),
             (a::TRAIN_TIME, _) => {
-                let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                if let Some(c) = u.building.construction.as_mut() {
+                let (_, layer) = self.object_and_layer_mut(id)?.ok_or(OBJECT_GONE)?;
+                if let Some(c) = layer.construction.as_mut() {
                     c.progress = build_points_after(c.progress, master.build_time, change, v);
                 }
                 Ok(())

@@ -16,6 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::layers::Building;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
@@ -448,6 +449,14 @@ fn built() -> crate::construction::build::Construction {
     }
 }
 
+/// A building layer holding a built construction ([`built`]).
+fn built_layer() -> Building {
+    Building {
+        construction: Some(built()),
+        ..Building::default()
+    }
+}
+
 fn unit_of(id: i32, master: MasterId, hp: HitPoints) -> Unit {
     let mut u = Unit {
         id: object_id(id),
@@ -582,12 +591,17 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
 fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
     let mut main = unit_of(20, master_id(30), HitPoints::new(100.0));
     main.life.master_id = master_id(30);
-    main.building.construction = Some(built());
-    main.building.annexes =
-        crate::construction::Annexes::new([Some(object_id(21)), None, None, None]);
-    let mut annex = unit_of(21, master_id(31), HitPoints::new(50.0));
-    annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
-    annex.building.construction = Some(built());
+    let main_layer = Building {
+        construction: Some(built()),
+        annexes: crate::construction::Annexes::new([Some(object_id(21)), None, None, None]),
+        ..Building::default()
+    };
+    let annex = unit_of(21, master_id(31), HitPoints::new(50.0));
+    let annex_layer = Building {
+        annex_of: Some(MainBuildingId::new(object_id(20))),
+        construction: Some(built()),
+        ..Building::default()
+    };
     let mut foundation = unit_of(22, master_id(30), HitPoints::new(10.0));
     foundation.life.state = ObjectState::Foundation;
     let player = Player {
@@ -600,7 +614,8 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_buildings([(object_id(20), main_layer), (object_id(21), annex_layer)]);
     let building = |id: i16, hit_points, head_unit: i16, annexes| Master {
         id: master_id(id),
         kind: master_type::BUILDING,
@@ -929,8 +944,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
 #[test]
 fn an_object_s_copies_of_its_master_follow_its_change() {
     use crate::objects::masters::attribute as a;
-    let mut site = unit_of(1, master_id(4), HitPoints::new(30.0));
-    site.building.construction = Some(built());
+    let site = unit_of(1, master_id(4), HitPoints::new(30.0));
     let player = Player {
         objects: vec![site, unit_of(3, master_id(5), HitPoints::new(30.0))].into(),
         sleeping: vec![unit_of(2, master_id(4), HitPoints::new(30.0))].into(),
@@ -942,7 +956,8 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_buildings([(object_id(1), built_layer())]);
     let mut m = combat(master_id(4), class::CLASS_6, 60);
     (m.death_sprite, m.death_spawns) = (
         Some(SpriteId::named(7)),
@@ -1021,7 +1036,11 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
         (Some(SpriteId::named(7)), true)
     );
     assert_eq!(follows(&p.objects[ListIndex::new(1)]), (None, false));
-    let c = p.objects[ListIndex::new(0)].building.construction.unwrap();
+    let c = t
+        .parts
+        .building_of(p.objects[ListIndex::new(0)].id)
+        .construction
+        .unwrap();
     assert_eq!(c.build_time, WholeSeconds::of_data(33));
     assert_eq!(
         c.record,
@@ -1134,7 +1153,6 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
 fn a_farm_food_change_grows_the_farms_food() {
     let mut farm = unit_of(5, ids::FARM, HitPoints::new(480.0));
     farm.life.amount = Amount::new(75.0);
-    farm.building.construction = Some(built());
     farm.actions
         .list
         .set_make(Some(crate::gathering::make::MakeAction {
@@ -1154,7 +1172,8 @@ fn a_farm_food_change_grows_the_farms_food() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_buildings([(object_id(5), built_layer())]);
     let mut master = combat(ids::FARM, class::FARM, 480);
     master.kind = master_type::BUILDING;
     t.masters = vec![Masters::new([master])];
@@ -2088,7 +2107,6 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
 fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     let mut house = unit_of(1, ids::HOUSE, HitPoints::new(550.0));
     house.place_for_test(Position::new(5.5, 5.5, 0.0));
-    house.building.construction = Some(built());
     let mut soldier = unit_of(2, master_id(4), HitPoints::new(30.0));
     soldier.group.id = Some(group_id(7));
     let player = Player {
@@ -2101,7 +2119,8 @@ fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_buildings([(object_id(1), built_layer())]);
     t.masters = vec![Masters::new([
         combat(master_id(4), class::CLASS_6, 60),
         Master {

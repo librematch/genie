@@ -144,7 +144,11 @@ impl World {
                         continue;
                     };
                     let kind = u.master(self.master_tables(), owner)?.kind;
-                    let desolid = u.building.construction.is_some_and(|c| c.desolid);
+                    let desolid = self
+                        .parts
+                        .building_of(u.id)
+                        .construction
+                        .is_some_and(|c| c.desolid);
                     if kind != BUILDING
                         || !desolid
                         || !self.spatial.sees_and_explored(owner, Tile::new(tx, ty))
@@ -224,7 +228,7 @@ impl World {
         let master = unit.master(self.master_tables(), owner)?;
         let cost = master.cost;
         let (state, hp) = (unit.life.state, unit.life.hp);
-        let site = unit.building.construction;
+        let site = self.parts.building_of(unit.id).construction;
         let desolid = site.is_some_and(|c| c.desolid);
         let share = if state < ObjectState::Alive && HitPoints::new(1.0) <= hp {
             let c = site.ok_or(crate::construction::build::NO_CONSTRUCTION)?;
@@ -433,10 +437,11 @@ impl World {
             return self.base_set_state(owner, id, new, master);
         };
         let u = held(&mut self.players, place)?;
-        let (state, main) = (u.life.state, u.building.annex_of);
+        let (state, main) = (u.life.state, self.parts.building_of(u.id).annex_of);
         if ObjectState::Dying <= new && state < ObjectState::Dying {
             crate::objects::lifecycle::death_parts::combat_dies(
                 u,
+                self.parts.building_of(id),
                 master,
                 &mut self.spatial,
                 &mut self.pathing,
@@ -534,10 +539,11 @@ impl World {
         master: &Master,
     ) -> Result<(), GenieError> {
         let computer = self.players.player(owner)?.computer;
-        let (_, u) = self
-            .object_mut(id)
+        let (u, layer) = self
+            .object_mut_and_layer(id)
             .ok_or(crate::construction::build::NOT_HELD)?;
-        let death = crate::objects::lifecycle::death_parts::built_death(u, master, computer)?;
+        let death =
+            crate::objects::lifecycle::death_parts::built_death(u, layer, master, computer)?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?
@@ -611,23 +617,23 @@ mod tests {
     fn game(progress: f32, desolid: bool) -> World {
         let house = Unit {
             id: object_id(11),
-            building: crate::objects::layers::Building {
-                construction: Some(Construction {
-                    progress: Seconds::new(progress),
-                    desolid,
-                    builders: crate::construction::BuilderCount::of_data(0),
-                    hit_points: MasterHitPoints::of_data(550),
-                    build_time: WholeSeconds::of_data(25),
-                    record: Obstruction {
-                        kind: ObstructionType::TYPE_2,
-                        class: ObstructionClass::NONE,
-                    },
-                    snow: false,
-                    sprite_override: false,
-                }),
-                ..Default::default()
-            },
             ..Unit::default()
+        };
+        let layer = crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::new(progress),
+                desolid,
+                builders: crate::construction::BuilderCount::of_data(0),
+                hit_points: MasterHitPoints::of_data(550),
+                build_time: WholeSeconds::of_data(25),
+                record: Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::NONE,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
@@ -661,7 +667,8 @@ mod tests {
                     ..Player::default()
                 },
             ],
-        );
+        )
+        .with_buildings([(object_id(11), layer)]);
         for (p, objects) in [
             (1, [(0, 83), (1, 70), (2, 594)].as_slice()),
             (2, &[(0, 83)]),

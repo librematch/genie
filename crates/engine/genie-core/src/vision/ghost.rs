@@ -241,9 +241,9 @@ impl World {
             return Ok(false);
         };
         let m = u.master(self.master_tables(), p)?;
-        let annex = linked && u.building.annex_of.is_some();
+        let annex = linked && self.parts.building_of(u.id).annex_of.is_some();
         Ok(!UNWATCHED_CLASSES.contains(&m.class)
-            && !u.building.construction.is_some_and(|c| c.desolid)
+            && !self.parts.building_of(u.id).construction.is_some_and(|c| c.desolid)
             // The master a building's watch leaves out (`FUN_1411cc980`).
             && (!annex || m.class == class::GATE)
             && m.id != MASTER_1808)
@@ -318,7 +318,10 @@ impl World {
                 let held = self.players.player(p)?;
                 let objects = if list { &held.sleeping } else { &held.objects };
                 let mut annexes: Vec<ObjectId> = Vec::new();
-                for u in objects.iter().filter(|u| u.building.annex_of.is_some()) {
+                for u in objects
+                    .iter()
+                    .filter(|u| self.parts.building_of(u.id).annex_of.is_some())
+                {
                     if u.master(self.master_tables(), p)?.class != class::GATE {
                         annexes.push(u.id);
                     }
@@ -1299,20 +1302,18 @@ mod tests {
         // Gaia's mine 5 dead (state 3), house 9's annexes 10 (a gate) and 11, a class-51
         // building 12, master 1808's 13, a desolid foundation 14 in the sleeping list
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
-        let mut g = object(
+        let g = object(
             10,
             master_id(88),
             ObjectState::Alive,
             Position::new(2.5, 2.5, 0.0),
         );
-        g.building.annex_of = Some(MainBuildingId::new(object_id(9)));
-        let mut a = object(
+        let a = object(
             11,
             master_id(89),
             ObjectState::Alive,
             Position::new(3.5, 2.5, 0.0),
         );
-        a.building.annex_of = Some(MainBuildingId::new(object_id(9)));
         t.extend_live(
             PlayerId::new(1),
             [
@@ -1333,21 +1334,26 @@ mod tests {
             ],
         )
         .unwrap();
-        let mut foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
-        foundation.building.construction = Some(crate::construction::build::Construction {
-            progress: Seconds::ZERO,
-            desolid: true,
-            builders: crate::construction::BuilderCount::NONE,
-            hit_points: MasterHitPoints::of_data(0),
-            build_time: WholeSeconds::ZERO,
-            record: crate::map::spatial::Obstruction {
-                kind: ObstructionType::TYPE_2,
-                class: ObstructionClass::UNIT,
-            },
-            snow: false,
-            sprite_override: false,
-        });
+        for annex in [10, 11] {
+            t.parts.building_mut(object_id(annex)).unwrap().annex_of =
+                Some(MainBuildingId::new(object_id(9)));
+        }
+        let foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
         let _ = t.push_asleep(PlayerId::new(1), foundation).unwrap();
+        t.parts.building_mut(object_id(14)).unwrap().construction =
+            Some(crate::construction::build::Construction {
+                progress: Seconds::ZERO,
+                desolid: true,
+                builders: crate::construction::BuilderCount::NONE,
+                hit_points: MasterHitPoints::of_data(0),
+                build_time: WholeSeconds::ZERO,
+                record: crate::map::spatial::Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            });
         t.build_watched().unwrap();
         let ids = |t: &World, p: usize| {
             t.players[p]

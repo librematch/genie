@@ -98,10 +98,12 @@ impl World {
             return Ok(());
         }
         let now = self.world_time;
-        let (_, unit) = self.object_mut(id).ok_or_else(|| object_gone(id))?;
+        let (unit, layer) = self
+            .object_and_layer_mut(id)?
+            .ok_or_else(|| object_gone(id))?;
         // slot 0x668: the lock's value (a building without its gate state is lock_gate's)
-        let locked = unit.building.gate.is_some_and(|g| g.locked);
-        lock_gate(unit, !locked, now)?;
+        let locked = layer.gate.is_some_and(|g| g.locked);
+        lock_gate((unit, layer), !locked, now)?;
         Ok(())
     }
 

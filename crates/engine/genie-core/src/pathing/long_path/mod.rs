@@ -110,8 +110,12 @@ pub fn gate_lets_pass(
             continue;
         };
         if master.class == crate::objects::masters::class::GATE {
+            let layer = objects.building(id).ok_or_else(|| {
+                GenieError::unreachable("a gate whose layer the view does not find")
+                    .with("object", id)
+            })?;
             return Ok(crate::construction::gates::lets_pass(
-                (gate, master),
+                (gate, layer, master),
                 owner,
                 player,
                 spatial,

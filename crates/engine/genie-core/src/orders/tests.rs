@@ -336,14 +336,17 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         },
         ..Unit::default()
     };
-    let foundation = Unit {
-        id: object_id(600),
-        body: crate::objects::layers::Body::at(Position::new(5.0, 10.0, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
-            master_id: ids::HOUSE,
-            ..crate::objects::lifecycle::Lifecycle::default()
+    let foundation = Object::with_building(
+        Unit {
+            id: object_id(600),
+            body: crate::objects::layers::Body::at(Position::new(5.0, 10.0, 0.0)),
+            life: crate::objects::lifecycle::Lifecycle {
+                master_id: ids::HOUSE,
+                ..crate::objects::lifecycle::Lifecycle::default()
+            },
+            ..Unit::default()
         },
-        building: crate::objects::layers::Building {
+        crate::objects::layers::Building {
             construction: Some(crate::construction::build::Construction {
                 progress: Seconds::new(1.0),
                 desolid: false,
@@ -359,8 +362,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             }),
             ..Default::default()
         },
-        ..Unit::default()
-    };
+    );
     let mill = Unit {
         id: object_id(503),
         body: crate::objects::layers::Body::at(Position::new(15.0, 10.0, 0.0)),
@@ -378,10 +380,11 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![crate::world::Player {
-                objects: vec![villager.clone(), foundation.clone(), mill.clone()].into(),
+                objects: vec![villager.clone(), foundation.unit.clone(), mill.clone()].into(),
                 ..crate::world::Player::default()
             }],
-        );
+        )
+        .with_buildings([(foundation.unit.id, foundation.parts.building.clone())]);
         t.masters = vec![crate::objects::masters::Masters::new([
             Master {
                 id: ids::VILLAGER_MALE,
@@ -482,8 +485,8 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         )
     );
     assert_eq!(
-        t.players[0].objects[ListIndex::new(1)]
-            .building
+        t.parts
+            .building_of(t.players[0].objects[ListIndex::new(1)].id)
             .construction
             .map(|k| k.builders.get()),
         Some(0)
@@ -712,8 +715,10 @@ fn an_attack_task_aims_at_its_target_or_an_annex_s_main_building() {
         r.err().map(|e| e.reason()),
         Some("an attack task's target the slice does not hold")
     );
-    t.players[0].objects[ListIndex::new(2)].building.annex_of =
-        Some(MainBuildingId::new(object_id(99)));
+    t.parts
+        .building_mut(t.players[0].objects[ListIndex::new(2)].id)
+        .unwrap()
+        .annex_of = Some(MainBuildingId::new(object_id(99)));
     let r = t.attack_aim(object_id(61));
     assert_eq!(
         r.err().map(|e| e.reason()),
@@ -862,19 +867,23 @@ fn annexed(t: &mut World) {
             ..Master::default()
         },
     ]);
-    let building = |id, master_id, position, annex_of| Unit {
-        id,
-        body: crate::objects::layers::Body::at(position),
-        building: crate::objects::layers::Building {
-            annex_of,
-            ..Default::default()
-        },
-        life: crate::objects::lifecycle::Lifecycle {
-            master_id,
-            state: ObjectState::Alive,
-            ..crate::objects::lifecycle::Lifecycle::default()
-        },
-        ..Unit::default()
+    let building = |id, master_id, position, annex_of| {
+        Object::with_building(
+            Unit {
+                id,
+                body: crate::objects::layers::Body::at(position),
+                life: crate::objects::lifecycle::Lifecycle {
+                    master_id,
+                    state: ObjectState::Alive,
+                    ..crate::objects::lifecycle::Lifecycle::default()
+                },
+                ..Unit::default()
+            },
+            crate::objects::layers::Building {
+                annex_of,
+                ..Default::default()
+            },
+        )
     };
     let _ = t
         .push_live(
@@ -1588,26 +1597,30 @@ fn a_gate_command_toggles_the_lock_of_a_building_of_its_player() {
     let _ = t
         .push_live(
             PlayerId::new(1),
-            Unit {
-                id: object_id(50),
-                building: crate::objects::layers::Building {
+            Object::with_building(
+                Unit {
+                    id: object_id(50),
+                    body: crate::objects::layers::Body::Moving(
+                        crate::gathering::hunt::tests::walker(),
+                    ),
+                    life: crate::objects::lifecycle::Lifecycle {
+                        master_id: master_id(79),
+                        state: ObjectState::Alive,
+                        ..crate::objects::lifecycle::Lifecycle::default()
+                    },
+                    ..Unit::default()
+                },
+                crate::objects::layers::Building {
                     gate: Some(crate::world::Gate::default()),
                     ..Default::default()
                 },
-                body: crate::objects::layers::Body::Moving(crate::gathering::hunt::tests::walker()),
-                life: crate::objects::lifecycle::Lifecycle {
-                    master_id: master_id(79),
-                    state: ObjectState::Alive,
-                    ..crate::objects::lifecycle::Lifecycle::default()
-                },
-                ..Unit::default()
-            },
+            ),
         )
         .unwrap();
     let building = |t: &World| {
         let b = &t.players[1].objects[ListIndex::new(1)];
         (
-            b.building.gate.unwrap().locked,
+            t.parts.building_of(b.id).gate.unwrap().locked,
             b.body.mover().unwrap().last_move,
         )
     };
@@ -1621,7 +1634,12 @@ fn a_gate_command_toggles_the_lock_of_a_building_of_its_player() {
     assert_eq!(building(&t), (false, WorldTime::from_millis(401)));
     t.gate(player_id(1), object_id(11)).unwrap();
     t.gate(player_id(1), object_id(99)).unwrap();
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].building.gate, None);
+    assert_eq!(
+        t.parts
+            .building_of(t.players[1].objects[ListIndex::new(0)].id)
+            .gate,
+        None
+    );
 }
 
 /// `TRANSFORM_OBJECT` and `FUN_1411e6d90`: player 1's trophy 60 (master 1649) takes trophy
@@ -1643,56 +1661,58 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         master(TROPHY, WholeSeconds::of_data(10)),
         master(master_id(1650), WholeSeconds::of_data(30)),
     ]);
-    let trophy = |state| Unit {
-        id: object_id(60),
-        combat: crate::objects::layers::Combat {
-            firepower: crate::combat::Firepower::new(7.0),
-            ..Default::default()
-        },
-        building: crate::objects::layers::Building {
-            construction: Some(crate::construction::build::Construction {
-                progress: Seconds::new(10.0),
-                desolid: false,
-                builders: crate::construction::BuilderCount::of_data(0),
-                hit_points: MasterHitPoints::of_data(100),
-                build_time: WholeSeconds::of_data(10),
-                record: crate::map::spatial::Obstruction {
-                    kind: ObstructionType::TYPE_2,
-                    class: ObstructionClass::UNIT,
+    let trophy = |state| {
+        Object::with_building(
+            Unit {
+                id: object_id(60),
+                combat: crate::objects::layers::Combat {
+                    firepower: crate::combat::Firepower::new(7.0),
+                    ..Default::default()
                 },
-                snow: false,
-                sprite_override: false,
-            }),
-            ..Default::default()
-        },
-        life: crate::objects::lifecycle::Lifecycle {
-            master_id: TROPHY,
-            state,
-            hp: HitPoints::new(50.0),
-            ..crate::objects::lifecycle::Lifecycle::default()
-        },
-        ..Unit::default()
+                life: crate::objects::lifecycle::Lifecycle {
+                    master_id: TROPHY,
+                    state,
+                    hp: HitPoints::new(50.0),
+                    ..crate::objects::lifecycle::Lifecycle::default()
+                },
+                ..Unit::default()
+            },
+            crate::objects::layers::Building {
+                construction: Some(crate::construction::build::Construction {
+                    progress: Seconds::new(10.0),
+                    desolid: false,
+                    builders: crate::construction::BuilderCount::of_data(0),
+                    hit_points: MasterHitPoints::of_data(100),
+                    build_time: WholeSeconds::of_data(10),
+                    record: crate::map::spatial::Obstruction {
+                        kind: ObstructionType::TYPE_2,
+                        class: ObstructionClass::UNIT,
+                    },
+                    snow: false,
+                    sprite_override: false,
+                }),
+                ..Default::default()
+            },
+        )
     };
-    t.players[1].objects = vec![trophy(ObjectState::Alive)].into();
-    t.reindex();
+    t.set_live_for_test(player_id(1), [trophy(ObjectState::Alive)]);
     t.transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
     let unit = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(unit.life.master_id, master_id(1650));
     assert_eq!(unit.life.hp, HitPoints::new(50.0));
     assert_eq!(
-        unit.building.construction.unwrap().progress,
+        t.parts.building_of(unit.id).construction.unwrap().progress,
         Seconds::new(30.0)
     );
     // FUN_141225b70 in state 2: the volleys are the new master's volley fire
     assert_eq!(unit.combat.firepower, crate::combat::Firepower::new(2.0));
-    t.players[1].objects = vec![trophy(ObjectState::Unfinished)].into();
-    t.reindex();
+    t.set_live_for_test(player_id(1), [trophy(ObjectState::Unfinished)]);
     t.transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)]
-            .building
+        t.parts
+            .building_of(t.players[1].objects[ListIndex::new(0)].id)
             .construction
             .unwrap()
             .progress,
@@ -2916,29 +2936,34 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
         snow: false,
         sprite_override: false,
     };
-    let building = |id, annex_of| Unit {
-        id,
-        building: crate::objects::layers::Building {
-            annex_of,
-            construction: Some(construction),
-            ..Default::default()
-        },
-        life: crate::objects::lifecycle::Lifecycle {
-            master_id: master_id(79),
-            ..crate::objects::lifecycle::Lifecycle::default()
-        },
-        ..Unit::default()
+    let building = |id, annex_of| {
+        Object::with_building(
+            Unit {
+                id,
+                life: crate::objects::lifecycle::Lifecycle {
+                    master_id: master_id(79),
+                    ..crate::objects::lifecycle::Lifecycle::default()
+                },
+                ..Unit::default()
+            },
+            crate::objects::layers::Building {
+                annex_of,
+                construction: Some(construction),
+                ..Default::default()
+            },
+        )
     };
-    t.players[1].objects = vec![
-        building(object_id(60), None),
-        building(object_id(70), Some(MainBuildingId::new(object_id(60)))),
-    ]
-    .into();
-    t.reindex();
+    t.set_live_for_test(
+        player_id(1),
+        [
+            building(object_id(60), None),
+            building(object_id(70), Some(MainBuildingId::new(object_id(60)))),
+        ],
+    );
     t.leave_builders(object_id(70)).unwrap();
     let builders = |t: &World, i: ListIndex| {
-        t.players[1].objects[i]
-            .building
+        t.parts
+            .building_of(t.players[1].objects[i].id)
             .construction
             .unwrap()
             .builders
@@ -3109,30 +3134,34 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
             ..Master::default()
         },
     ]);
-    let foundation = |id, builders| Unit {
-        id,
-        building: crate::objects::layers::Building {
-            construction: Some(crate::construction::build::Construction {
-                progress: Seconds::ZERO,
-                desolid: true,
-                builders,
-                hit_points: MasterHitPoints::of_data(100),
-                build_time: WholeSeconds::of_data(10),
-                record: crate::map::spatial::Obstruction {
-                    kind: ObstructionType::TYPE_2,
-                    class: ObstructionClass::UNIT,
+    let foundation = |id, builders| {
+        Object::with_building(
+            Unit {
+                id,
+                workers: crate::objects::WorkerCount::of_data(1),
+                life: crate::objects::lifecycle::Lifecycle {
+                    master_id: master_id(79),
+                    ..crate::objects::lifecycle::Lifecycle::default()
                 },
-                snow: false,
-                sprite_override: false,
-            }),
-            ..Default::default()
-        },
-        workers: crate::objects::WorkerCount::of_data(1),
-        life: crate::objects::lifecycle::Lifecycle {
-            master_id: master_id(79),
-            ..crate::objects::lifecycle::Lifecycle::default()
-        },
-        ..Unit::default()
+                ..Unit::default()
+            },
+            crate::objects::layers::Building {
+                construction: Some(crate::construction::build::Construction {
+                    progress: Seconds::ZERO,
+                    desolid: true,
+                    builders,
+                    hit_points: MasterHitPoints::of_data(100),
+                    build_time: WholeSeconds::of_data(10),
+                    record: crate::map::spatial::Obstruction {
+                        kind: ObstructionType::TYPE_2,
+                        class: ObstructionClass::UNIT,
+                    },
+                    snow: false,
+                    sprite_override: false,
+                }),
+                ..Default::default()
+            },
+        )
     };
     let _ = t
         .push_live(
@@ -3203,7 +3232,12 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
     let site = |t: &World, i: ListIndex| {
         let u = &t.players[1].objects[i];
         (
-            u.building.construction.unwrap().builders.get(),
+            t.parts
+                .building_of(u.id)
+                .construction
+                .unwrap()
+                .builders
+                .get(),
             u.workers.get(),
         )
     };
@@ -4633,21 +4667,25 @@ fn a_gather_takes_a_farm_but_no_other_building() {
             radius: Footprint::new(1.5, 1.5),
             ..Master::default()
         }]));
-    let farm = |id, state, annex_of| Unit {
-        id,
-        body: crate::objects::layers::Body::at(Position::new(26.5, 89.5, 0.0)),
-        building: crate::objects::layers::Building {
-            annex_of,
-            ..Default::default()
-        },
-        life: crate::objects::lifecycle::Lifecycle {
-            state,
-            master_id: ids::FARM,
-            ..crate::objects::lifecycle::Lifecycle::default()
-        },
-        pasture: None,
-        my_pasture: None,
-        ..Unit::default()
+    let farm = |id, state, annex_of| {
+        Object::with_building(
+            Unit {
+                id,
+                body: crate::objects::layers::Body::at(Position::new(26.5, 89.5, 0.0)),
+                life: crate::objects::lifecycle::Lifecycle {
+                    state,
+                    master_id: ids::FARM,
+                    ..crate::objects::lifecycle::Lifecycle::default()
+                },
+                pasture: None,
+                my_pasture: None,
+                ..Unit::default()
+            },
+            crate::objects::layers::Building {
+                annex_of,
+                ..Default::default()
+            },
+        )
     };
     let _ = t
         .push_live(

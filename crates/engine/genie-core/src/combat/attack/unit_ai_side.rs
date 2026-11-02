@@ -245,7 +245,7 @@ impl UnitView<'_, '_> {
             self.new_owner,
         )?
         .get(target)
-        .and_then(|u| u.building.annex_of)
+        .and_then(|u| self.c.w.parts.building_of(u.id).annex_of)
         {
             Some(m) => match self.c.w.spatial.get(m).copied() {
                 Some(p) => Some(mark(m.id(), &p)?),
@@ -314,7 +314,11 @@ impl UnitView<'_, '_> {
             drop_sites: &self.c.w.drop_sites,
         };
         Ok(Some(victim_in(
-            (t, self.c.w.parts.unit_ai.contains(t.id)),
+            (
+                t,
+                self.c.w.parts.unit_ai.contains(t.id),
+                self.c.w.parts.building_of(t.id),
+            ),
             (q, master, attributes),
             (self.player, &dip),
             &self.c.w.spatial,
@@ -338,7 +342,11 @@ impl UnitView<'_, '_> {
         };
         let unit = &*self.unit;
         let own = victim_of(
-            (unit, self.c.w.parts.unit_ai.contains(unit.id)),
+            (
+                unit,
+                self.c.w.parts.unit_ai.contains(unit.id),
+                self.c.w.parts.building_of(unit.id),
+            ),
             master,
             &self.c.w.players.player(self.player)?.attributes,
             self.player,

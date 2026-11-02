@@ -34,7 +34,8 @@ impl Unit {
         // FUN_1411dbb70 to state 3 from 2: the storage leaves (FUN_1411e63f0), the owner's
         // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
         // a monastery's, wonder's or castle's count leaves, at least 0 left
-        let death = built_death(self, master, c.w.players.player(c.player)?.computer)?;
+        let computer = c.w.players.player(c.player)?.computer;
+        let death = built_death(self, c.w.parts.building_of(self.id), master, computer)?;
         c.w.players
             .player_mut(c.player)?
             .add_attributes(death.adds)?;
@@ -70,11 +71,11 @@ impl Unit {
             // each slot (`+0xbc0`..) clears and its annex's `+0xbb8` with it, and each annex takes
             // the building's hit points (`+0x278`), so it dies in its own update; the set_state
             // (FUN_1411dbb70) then finds no annex to take along
-            let annexes = self.building.annexes;
-            self.building.annexes.clear();
+            let annexes = c.w.parts.building_of(self.id).annexes;
+            c.w.parts.building_mut(self.id)?.annexes.clear();
             for annex in annexes.ids() {
-                if let Some((_, a)) = c.w.object_mut(annex) {
-                    a.building.annex_of = None;
+                if let Some((a, layer)) = c.w.object_and_layer_mut(annex)? {
+                    layer.annex_of = None;
                     a.life.hp = self.life.hp;
                 }
             }
@@ -96,12 +97,18 @@ impl Unit {
             }
             return Ok(());
         }
-        combat_dies(self, master, &mut c.w.spatial, &mut c.w.pathing)?;
+        combat_dies(
+            self,
+            c.w.parts.building_of(self.id),
+            master,
+            &mut c.w.spatial,
+            &mut c.w.pathing,
+        )?;
         if before == ObjectState::Alive {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
             // 165), each at least 0 (slots 0xf8, then 0xf0 with 0)
             let owner = c.w.players.player_mut(c.player)?;
-            for (kind, cost) in refund_of(master, self.building.annex_of) {
+            for (kind, cost) in refund_of(master, c.w.parts.building_of(self.id).annex_of) {
                 owner.take_at_least_zero(kind, cost)?;
             }
         }
@@ -115,10 +122,11 @@ impl Unit {
         // points (its destruction sprite unbuilt), any other combat object's slot 0x7a0's
         let look = self.combat.abilities.look.as_ref();
         let shown = if master.kind == BUILDING {
-            let built = self
-                .building
-                .construction
-                .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+            let built =
+                c.w.parts
+                    .building_of(self.id)
+                    .construction
+                    .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
             crate::objects::sprite::building_death(master, look, built.progress)
         } else {
             crate::objects::sprite::dying(master, look)
@@ -157,17 +165,19 @@ impl Unit {
         c: &mut Step<'_>,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let construction = self
-            .building
-            .construction
-            .as_mut()
-            .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+        let ai = c.w.parts.unit_ai.contains(self.id);
+        let construction =
+            c.w.parts
+                .building_mut(self.id)?
+                .construction
+                .as_mut()
+                .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
             masters: c.w.masters.of(c.player),
             computer: c.w.players.player(c.player)?.computer,
-            ai: c.w.parts.unit_ai.contains(self.id),
+            ai,
         };
         let part = completion.first_part(construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
@@ -194,11 +204,12 @@ impl Unit {
                 Ok(())
             })?;
         }
-        let construction = self
-            .building
-            .construction
-            .as_mut()
-            .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+        let construction =
+            c.w.parts
+                .building_mut(self.id)?
+                .construction
+                .as_mut()
+                .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
         let started = Construction::begin(
             self.id,
             construction,

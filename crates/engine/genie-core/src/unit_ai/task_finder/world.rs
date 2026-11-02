@@ -7,6 +7,7 @@ use crate::map::TerrainId;
 use crate::map::terrain::Terrain;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::layers::Building;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskGroup;
@@ -17,6 +18,7 @@ use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskTarget};
 use crate::unit_ai::world_view::Foreign;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
+use crate::world::parts::PartTable;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
 
@@ -79,11 +81,15 @@ impl Diplomacy for SideWorld<'_> {
 /// other players' lists: None when the world does not hold it. Its target is the building that
 /// sent the unit off (the unit AI's notify 0x216), whose build points are its construction's;
 /// the world never gives its id to another object, so an object without a construction is not
-/// met.
-pub(crate) fn wait_progress(id: ObjectId, others: OthersRef<'_>) -> Option<Seconds> {
+/// met. `buildings` holds the objects' building layers.
+pub(crate) fn wait_progress(
+    id: ObjectId,
+    others: OthersRef<'_>,
+    buildings: &PartTable<Building>,
+) -> Option<Seconds> {
     others
         .get(id)
-        .and_then(|u| u.building.construction.map(|k| k.progress))
+        .and_then(|u| buildings.get(u.id)?.construction.map(|k| k.progress))
 }
 
 /// The state (`+0x640`) of object `id` among its owner's other objects and the other players'
@@ -97,17 +103,19 @@ pub(crate) fn state_of(
 }
 
 /// What the task finder reads of object `id`, as `find` holds the objects (with their owners)
-/// and `every` the players' masters; an annex stands for its main building (`+0xbb8`), `steps`
-/// times (`World::task_target`'s reading). None when `find` does not hold it.
+/// and `every` the players' masters; an annex stands for its main building (`+0xbb8` of its
+/// layer in `buildings`), `steps` times (`World::task_target`'s reading). None when `find` does
+/// not hold it.
 pub(crate) fn task_target_with<'a>(
     id: ObjectId,
     steps: usize,
     find: &impl Fn(ObjectId) -> Option<(PlayerId, &'a Unit)>,
+    buildings: &PartTable<Building>,
     every: crate::objects::masters::MasterTables<'a>,
 ) -> Result<Option<TaskTarget<'a>>, GenieError> {
     let mut id = id;
     for _ in 0..steps {
-        match find(id).and_then(|(_, u)| u.building.annex_of) {
+        match find(id).and_then(|(_, u)| buildings.get(u.id)?.annex_of) {
             Some(main) => id = main.id(),
             None => break,
         }

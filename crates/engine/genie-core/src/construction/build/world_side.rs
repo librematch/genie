@@ -56,7 +56,11 @@ impl crate::world::World {
         master: &Master,
     ) -> Result<(), GenieError> {
         let (_, u) = self.object(id).ok_or(NOT_HELD)?;
-        let construction = u.building.construction.ok_or(NO_CONSTRUCTION)?;
+        let construction = self
+            .parts
+            .building_of(u.id)
+            .construction
+            .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
             farm_bonus: crate::objects::lifecycle::death_parts::farm_bonus(
@@ -106,7 +110,7 @@ impl crate::world::World {
             .volley_fire;
         let now = self.world_time;
         let u = held(&mut self.players, place)?;
-        let Some(c) = u.building.construction.as_mut() else {
+        let Some(c) = self.parts.building_mut(u.id)?.construction.as_mut() else {
             return Ok(());
         };
         if Construction::begin(
@@ -179,14 +183,21 @@ impl crate::world::World {
                 let Some((q, a)) = self.object(annex) else {
                     continue;
                 };
-                let desolid = a.building.construction.is_some_and(|c| c.desolid);
+                let desolid = self
+                    .parts
+                    .building_of(a.id)
+                    .construction
+                    .is_some_and(|c| c.desolid);
                 if a.master(self.master_tables(), q)?.kind < BUILDING || !desolid {
                     continue;
                 }
                 self.clear_foundations_under(annex)?;
                 self.construction_starts(q, annex)?;
             }
-            let Some(main) = self.object(at).and_then(|(_, u)| u.building.annex_of) else {
+            let Some(main) = self
+                .object(at)
+                .and_then(|(_, u)| self.parts.building_of(u.id).annex_of)
+            else {
                 break;
             };
             match self.object(main) {
@@ -205,12 +216,18 @@ impl crate::world::World {
         {
             return Ok(false);
         }
-        if u.building.construction.is_some_and(|c| c.desolid) {
+        if self
+            .parts
+            .building_of(u.id)
+            .construction
+            .is_some_and(|c| c.desolid)
+        {
             self.clear_foundations_under(at)?;
             self.construction_starts(q, at)?;
         }
-        let (q, u) = self.object_mut(at).ok_or(NOT_HELD)?;
-        let c = u.building.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        let q = self.object(at).ok_or(NOT_HELD)?.0;
+        let (u, layer) = self.object_and_layer_mut(at)?.ok_or(NOT_HELD)?;
+        let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         if !c.add_work(&mut u.life.hp, amount) {
             return Ok(true);
         }
@@ -251,11 +268,12 @@ impl crate::world::World {
             self.parts.gather_point.get(building).copied(),
         );
         let old_class = old.master(self.master_tables(), p)?.class;
-        let old_lock = old.building.gate.map(|g| g.locked);
+        let old_lock = self.parts.building_of(old.id).gate.map(|g| g.locked);
         // its attacking units (+0xce0) the world still holds each hear of the new object (their
         // slot 0x140), which is not modelled
-        let enemies = old
-            .building
+        let enemies = self
+            .parts
+            .building_of(old.id)
             .attacking_units
             .iter()
             .any(|&id| self.object(id).is_some());
@@ -268,8 +286,8 @@ impl crate::world::World {
             return Ok(());
         };
         // the old building keeps the new object's id (`+0xcb0`, FUN_1411c5f70)
-        if let Some((_, b)) = self.object_mut(building) {
-            b.building.stack_made = Some(new);
+        if self.object(building).is_some() {
+            self.parts.building_mut(building)?.stack_made = Some(new);
         }
         let (q, nu) = self.object(new).ok_or(NOT_HELD)?;
         let new_master = nu.master(self.master_tables(), q)?;
@@ -277,7 +295,12 @@ impl crate::world::World {
         let building_made = new_master.kind == BUILDING;
         let gate_lock =
             (building_made && old_class == class::GATE && new_master.class == class::GATE)
-                .then_some(old_lock);
+                .then(|| {
+                    old_lock.ok_or(GenieError::unreachable(
+                        "a building without its gate state (every building holds one)",
+                    ))
+                })
+                .transpose()?;
         if building_made {
             // a gather point on the old building names the new one; one whose target the world
             // no longer holds keeps its point, none at x or y −1 (compared as floats)
@@ -305,10 +328,30 @@ impl crate::world::World {
                 }
             });
         }
-        let now = self.world_time;
         if let Some(g) = point.filter(|_| building_made) {
             self.set_part(new, crate::world::parts::Part::GatherPoint(g))?;
         }
+        self.stack_takes_over(new, building_made, (orders, gate_lock))?;
+        let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
+        nu.life.hp -= stack.hp_lost;
+        Ok(())
+    }
+
+    /// What the new object `new` of a stack unit takes from the old building
+    /// ([`World::stack_unit`]): a new building (`building_made`) the command queue `orders` (not
+    /// empty, into its unit AI), a stack gate the old gate's lock `gate_lock` (its slot 0x670
+    /// with `+0xc7c`, [`crate::orders::lock_gate`]).
+    ///
+    /// # Errors
+    ///
+    /// A new object the world does not hold.
+    fn stack_takes_over(
+        &mut self,
+        new: ObjectId,
+        building_made: bool,
+        (orders, gate_lock): (Vec<crate::unit_ai::QueuedOrder>, Option<bool>),
+    ) -> Result<(), GenieError> {
+        let now = self.world_time;
         if building_made
             && let Some(ai) = self
                 .parts
@@ -318,15 +361,11 @@ impl crate::world::World {
         {
             ai.building_orders.extend(orders);
         }
-        let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
         // a gate's stack gate takes the old one's lock (its slot 0x670 with `+0xc7c`)
-        if let Some(lock) = gate_lock {
-            let locked = lock.ok_or(GenieError::unreachable(
-                "a building without its gate state (every building holds one)",
-            ))?;
+        if let Some(locked) = gate_lock {
+            let nu = self.object_and_layer_mut(new)?.ok_or(NOT_HELD)?;
             crate::orders::lock_gate(nu, locked, now)?;
         }
-        nu.life.hp -= stack.hp_lost;
         Ok(())
     }
 

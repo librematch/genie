@@ -276,7 +276,7 @@ impl Unit {
                         .ok_or(GenieError::unreachable(
                             "an object found above its player lost",
                         ))?;
-                u.taken(false, by.id);
+                u.taken(None, by.id);
             } else {
                 let by = self.releaser(c)?;
                 crate::world::lets::take(c, self, new, by)?;
@@ -330,7 +330,8 @@ impl Unit {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let w = DropWorld {
             masters: crate::objects::masters::OwnerMasters::new(

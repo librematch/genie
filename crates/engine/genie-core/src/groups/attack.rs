@@ -185,8 +185,9 @@ impl World {
     fn main_object(&self, target: ObjectId) -> Result<ObjectId, GenieError> {
         let (player, unit) = self.object(target).ok_or_else(|| member_gone(target))?;
         let building = unit.master(self.master_tables(), player)?.kind == BUILDING;
-        Ok(unit
-            .building
+        Ok(self
+            .parts
+            .building_of(unit.id)
             .annex_of
             .filter(|_| building)
             .map_or(target, crate::construction::MainBuildingId::id))

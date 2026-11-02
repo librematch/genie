@@ -254,28 +254,49 @@ impl ObjectIndex {
 }
 
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
-/// spatial index and the planners): the players' lists, the table by id and the players'
-/// masters. An object out for its update is none.
+/// spatial index and the planners): the players' lists, the table by id, the players' masters
+/// and the objects' parts. An object out for its update is none.
 #[derive(Clone, Copy, Debug)]
 pub struct ObjectsRef<'a> {
     players: &'a [Player],
     index: &'a ObjectIndex,
     masters: crate::objects::masters::MasterTables<'a>,
+    buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
 }
 
 impl<'a> ObjectsRef<'a> {
-    /// The objects of `players`, which the world's table `index` finds, with the world's
-    /// `masters` (the players' and the objects' own).
+    /// The objects of `players`, which the world's table `index` finds, with the players'
+    /// `masters` and the objects' `parts` (their own masters, their building layers).
     #[must_use]
     pub const fn new(
         players: &'a [Player],
         index: &'a ObjectIndex,
+        masters: &'a [crate::objects::masters::Masters],
+        parts: &'a crate::world::parts::Parts,
+    ) -> Self {
+        Self::of_tables(
+            players,
+            index,
+            crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+            &parts.building,
+        )
+    }
+
+    /// [`ObjectsRef::new`] of the two part tables it reads, for a caller that holds another
+    /// part table to change: the world's `masters` (the players' and the objects' own) and the
+    /// building layers `buildings`.
+    #[must_use]
+    pub const fn of_tables(
+        players: &'a [Player],
+        index: &'a ObjectIndex,
         masters: crate::objects::masters::MasterTables<'a>,
+        buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
     ) -> Self {
         Self {
             players,
             index,
             masters,
+            buildings,
         }
     }
 
@@ -285,7 +306,8 @@ impl<'a> ObjectsRef<'a> {
         ObjectsRef::new(
             &[],
             ObjectIndex::scanning(),
-            crate::objects::masters::MasterTables::new(&[], crate::world::parts::no_own_masters()),
+            &[],
+            crate::world::parts::no_parts(),
         )
     }
 
@@ -318,11 +340,18 @@ impl<'a> ObjectsRef<'a> {
         self.get(id)?.gait()
     }
 
+    /// The building layer of object `id` ([`crate::world::parts::Parts::building_of`]); none
+    /// for an object the world does not hold or one out for its update.
+    #[must_use]
+    pub fn building(&self, id: impl ObjectKey) -> Option<&'a crate::objects::layers::Building> {
+        Some(self.buildings.of(self.get(id)?.id))
+    }
+
     /// The main building of the annex `id` (its `+0xbb8`); none for an object that is no annex,
     /// one the world does not hold or one out for its update.
     #[must_use]
     pub fn annex_of(&self, id: impl ObjectKey) -> Option<crate::construction::MainBuildingId> {
-        self.get(id)?.building.annex_of
+        self.buildings.get(self.get(id)?.id)?.annex_of
     }
 
     /// The annexes of the building `main` ([`crate::construction::Annexes`]): none for an
@@ -330,7 +359,8 @@ impl<'a> ObjectsRef<'a> {
     #[must_use]
     pub fn annexes(&self, main: impl ObjectKey) -> crate::construction::Annexes {
         self.get(main)
-            .map_or(crate::construction::Annexes::NONE, |u| u.building.annexes)
+            .and_then(|u| self.buildings.get(u.id))
+            .map_or(crate::construction::Annexes::NONE, |b| b.annexes)
     }
 
     /// The obstruction query's ignore list for `ids` (−1 for none), as `FUN_14114e8a0` adds each
@@ -364,13 +394,13 @@ pub(crate) struct TestObjects {
     players: Vec<Player>,
     index: ObjectIndex,
     masters: Vec<crate::objects::masters::Masters>,
-    own: crate::world::parts::PartTable<Master>,
+    parts: crate::world::parts::Parts,
 }
 
 #[cfg(test)]
 impl TestObjects {
     /// Unit `id` gives `gait` ([`crate::movement::tests::unit_with_gait`]), its building layer
-    /// kept; none leaves no unit of the id.
+    /// kept; none leaves no unit of the id (nor its layer).
     pub(crate) fn set_gait(&mut self, id: ObjectId, gait: Option<crate::map::spatial::Gait>) {
         if self.players.is_empty() {
             self.players.push(Player::default());
@@ -378,18 +408,10 @@ impl TestObjects {
         let Some(player) = self.players.first_mut() else {
             return;
         };
-        let building = player
-            .objects
-            .iter()
-            .find(|u| u.id == id)
-            .map(|u| u.building.clone());
-        let made = gait.map(|g| {
-            let mut u = crate::movement::tests::unit_with_gait(id, g);
-            if let Some(b) = building {
-                u.building = b;
-            }
-            u
-        });
+        let made = gait.map(|g| crate::movement::tests::unit_with_gait(id, g));
+        if made.is_none() {
+            let _ = self.parts.building.remove(id);
+        }
         player.objects = player
             .objects
             .iter()
@@ -417,25 +439,23 @@ impl TestObjects {
                 });
             }
         }
-        for u in &mut player.objects {
-            if u.id == annex {
-                u.building.annex_of = Some(crate::construction::MainBuildingId::new(main));
-            }
-            if u.id == main {
-                let slot = u.building.annexes.ids().count();
-                let _ = u.building.annexes.link(slot, annex);
-            }
-        }
+        let annexed = self
+            .parts
+            .building_mut(annex)
+            .expect("a test's annex layer");
+        annexed.annex_of = Some(crate::construction::MainBuildingId::new(main));
+        let building = self
+            .parts
+            .building_mut(main)
+            .expect("a test's building layer");
+        let slot = building.annexes.ids().count();
+        let _ = building.annexes.link(slot, annex);
         self.index = ObjectIndex::of(&self.players);
     }
 
     /// The units by id.
     pub(crate) fn view(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(
-            &self.players,
-            &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.own),
-        )
+        ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts)
     }
 }
 
@@ -444,12 +464,12 @@ impl World {
     /// A test's link of `annex` to the building `main`: the annex's `+0xbb8` and the building's
     /// first empty slot, as far as the world holds each.
     pub(crate) fn link_test_annex(&mut self, annex: ObjectId, main: ObjectId) {
-        if let Some((_, a)) = self.object_mut(annex) {
-            a.building.annex_of = Some(crate::construction::MainBuildingId::new(main));
+        if let Ok(Some((_, a))) = self.object_and_layer_mut(annex) {
+            a.annex_of = Some(crate::construction::MainBuildingId::new(main));
         }
-        if let Some((_, m)) = self.object_mut(main) {
-            let slot = m.building.annexes.ids().count();
-            let _ = m.building.annexes.link(slot, annex);
+        if let Ok(Some((_, m))) = self.object_and_layer_mut(main) {
+            let slot = m.annexes.ids().count();
+            let _ = m.annexes.link(slot, annex);
         }
     }
 }
@@ -480,11 +500,7 @@ impl World {
     /// The objects by id, to read ([`ObjectsRef`]).
     #[must_use]
     pub fn objects(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(
-            &self.players,
-            &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
-        )
+        ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts)
     }
 
     /// The table by id again from the players' lists (after a list changed in place).

@@ -106,8 +106,20 @@ impl BuildAction {
         };
         let every = crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master);
         let task = match (
-            crate::unit_ai::task_finder::world::task_target_with(id.id(), 1, &find, every)?,
-            crate::unit_ai::task_finder::world::task_target_with(id.id(), 2, &find, every)?,
+            crate::unit_ai::task_finder::world::task_target_with(
+                id.id(),
+                1,
+                &find,
+                &c.w.parts.building,
+                every,
+            )?,
+            crate::unit_ai::task_finder::world::task_target_with(
+                id.id(),
+                2,
+                &find,
+                &c.w.parts.building,
+                every,
+            )?,
         ) {
             (Some(t), Some(general)) => {
                 use crate::unit_ai::task_finder::world::SideWorld;

@@ -56,16 +56,16 @@ impl Unit {
     /// # Errors
     ///
     /// A link to an object the world does not file.
-    pub(crate) fn let_removed_links_go(&mut self, c: &Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn let_removed_links_go(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind != BUILDING || walls_branch(master) {
             return Ok(());
         }
-        let objects = c.w.objects();
+        let (players, index) = (&c.w.players, &c.w.index);
         let removed = |id: ObjectId| {
-            objects
-                .get(id)
-                .map(|u| ObjectState::Removed <= u.life.state)
+            index
+                .locate(players, id)
+                .map(|(_, u, _)| ObjectState::Removed <= u.life.state)
                 .ok_or_else(|| {
                     GenieError::unreachable(
                         "a building's link to an object the world does not file",
@@ -73,12 +73,12 @@ impl Unit {
                     .with("object", id)
                 })
         };
-        if let Some(main) = self.building.annex_of
+        if let Some(main) = c.w.parts.building_of(self.id).annex_of
             && removed(main.id())?
         {
-            self.building.annex_of = None;
+            c.w.parts.building_mut(self.id)?.annex_of = None;
         }
-        self.building.annexes.let_go(removed)
+        c.w.parts.building_mut(self.id)?.annexes.let_go(removed)
     }
 
     /// The gate's update (`FUN_1411e7730`, `TRIBE_Building_Object::update` for a master of class
@@ -92,11 +92,6 @@ impl Unit {
     /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
     /// of at most 0).
     pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
-        );
         let master = self.master(c.w.master_tables(), c.player)?;
         let transforms = master
             .building
@@ -106,21 +101,34 @@ impl Unit {
             return Ok(());
         }
         let height = master.height.get();
-        let gate = self
-            .building
-            .gate
-            .as_mut()
-            .ok_or(GenieError::unsupported("a gate without its gate state"))?;
+        let gate =
+            c.w.parts
+                .building_mut(self.id)?
+                .gate
+                .as_mut()
+                .ok_or(GenieError::unsupported("a gate without its gate state"))?;
         gate.first_update = false;
         let shut = GATE_EPSILON < height;
         if gate.locked && shut {
             return Ok(());
         }
         let locked = gate.locked;
-        let (total, allied) = self.gate_count(&mut c.w.spatial, by_id)?;
-        let gate = self.building.gate.as_mut().ok_or(GenieError::unreachable(
-            "a gate whose state went during its update",
-        ))?;
+        let annexes = c.w.parts.building_of(self.id).annexes;
+        let by_id = crate::world::index::ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.masters,
+            &c.w.parts,
+        );
+        let (total, allied) = self.gate_count(annexes, &mut c.w.spatial, by_id)?;
+        let gate =
+            c.w.parts
+                .building_mut(self.id)?
+                .gate
+                .as_mut()
+                .ok_or(GenieError::unreachable(
+                    "a gate whose state went during its update",
+                ))?;
         if shut && 0 < allied && !locked {
             gate.close_timer = Seconds::ZERO;
             return self.toggle_own_gate(c, GATE_SHUT_HEIGHT <= height);
@@ -158,14 +166,15 @@ impl Unit {
         })
     }
 
-    /// [`gate_units`] of this gate between its annexes (its slots, `+0xbc0`..): the units in it
-    /// and how many of them are of an ally.
+    /// [`gate_units`] of this gate between its `annexes` (its slots, `+0xbc0`..): the units in
+    /// it and how many of them are of an ally.
     pub(crate) fn gate_count(
         &self,
+        annexes: crate::construction::Annexes,
         spatial: &mut Spatial,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(usize, usize), GenieError> {
-        let annexes: Vec<ObjectId> = self.building.annexes.ids().collect();
+        let annexes: Vec<ObjectId> = annexes.ids().collect();
         let (units, allied) = gate_units(spatial, self.id, &annexes, by_id)?;
         Ok((units.len(), allied))
     }
@@ -180,7 +189,7 @@ impl Unit {
     /// own (`+0x2e8`'s `+10`), which the slice does not hold; the masters' foundations (7, 63,
     /// 117) never give them.
     pub(crate) fn farm_stage(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let Some(cons) = self.building.construction.filter(|k| {
+        let Some(cons) = c.w.parts.building_of(self.id).construction.filter(|k| {
             self.life.state == ObjectState::Foundation && WholeSeconds::ZERO < k.build_time
         }) else {
             return Ok(());
@@ -189,7 +198,7 @@ impl Unit {
         let foundation = m.building.as_ref().and_then(|b| b.foundation_terrain);
         let Some(terrain) = farm_stage_terrain(
             m.id,
-            (self.building.rice, foundation),
+            (c.w.parts.building_of(self.id).rice, foundation),
             cons.progress,
             cons.build_time,
         ) else {
@@ -234,15 +243,16 @@ impl Unit {
     pub(crate) fn complete_on_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         self.farm_stage(c)?;
         let due = self.life.state == ObjectState::Foundation
-            && self
-                .building
+            && c.w
+                .parts
+                .building_of(self.id)
                 .construction
                 .is_some_and(|cons| Seconds::of_master(cons.build_time) <= cons.progress);
         if !due {
             return Ok(());
         }
         let master = self.master(c.w.master_tables(), c.player)?;
-        if !walls_branch(master) && self.building.annex_of.is_some() {
+        if !walls_branch(master) && c.w.parts.building_of(self.id).annex_of.is_some() {
             return Ok(());
         }
         let (p, id) = (c.player, self.id);
@@ -300,18 +310,22 @@ impl Unit {
                 "a building whose master attribute 255 names (FUN_1411c39b0)",
             ));
         }
-        let seconds = c.w.world_time.since(self.building.garrison_time).get() / 1000;
+        let seconds =
+            c.w.world_time
+                .since(c.w.parts.building_of(self.id).garrison_time)
+                .get()
+                / 1000;
         if seconds == 0 {
             return Ok(());
         }
-        self.building.garrison_time = self
-            .building
-            .garrison_time
-            .after(Millis::new(seconds * 1000));
+        // the master's own copy lives beside the layer: what the rest reads of it, first
+        let (master_id, master_hp) = (master.id, master.hit_points);
+        let layer = c.w.parts.building_mut(self.id)?;
+        layer.garrison_time = layer.garrison_time.after(Millis::new(seconds * 1000));
         if self.damaged_lately.running() {
             self.damaged_lately = self.damaged_lately.tick();
         }
-        if master.id == MONASTERY && self.building.relics != Relics::NONE {
+        if master_id == MONASTERY && c.w.parts.building_of(self.id).relics != Relics::NONE {
             return Err(GenieError::unsupported(
                 "a monastery's relics' goods (its seconds)",
             ));
@@ -351,7 +365,7 @@ impl Unit {
         }
         if 0 < villagers
             && HitPoints::ZERO < bm.garrison_repair_rate
-            && self.life.hp < HitPoints::new(HitPoints::of_master(master.hit_points).get())
+            && self.life.hp < HitPoints::new(HitPoints::of_master(master_hp).get())
         {
             return Err(GenieError::unsupported(
                 "a building its villagers inside repair (FUN_1411d33e0)",
@@ -434,7 +448,11 @@ impl Unit {
         }
         let terrain = c.w.spatial.terrain.as_ref();
         let mut own = victim_of(
-            (self, c.w.parts.unit_ai.contains(self.id)),
+            (
+                self,
+                c.w.parts.unit_ai.contains(self.id),
+                c.w.parts.building_of(self.id),
+            ),
             master,
             &c.w.players.player(c.player)?.attributes,
             c.player,

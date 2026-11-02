@@ -348,6 +348,58 @@ impl World {
         Some((place.player(), u))
     }
 
+    /// [`World::object_mut`] with the object's construction to change beside it (none for an
+    /// object without one).
+    pub(crate) fn object_and_site_mut(
+        &mut self,
+        id: impl ObjectKey,
+    ) -> Option<(
+        &mut Unit,
+        Option<&mut crate::construction::build::Construction>,
+    )> {
+        let place = self.place(id)?;
+        let u = self.players.at_mut(place).ok()?;
+        let site = self
+            .parts
+            .building
+            .get_mut(u.id)
+            .and_then(|b| b.construction.as_mut());
+        Some((u, site))
+    }
+
+    /// [`World::object_mut`] with the object's building layer to read beside it
+    /// ([`crate::world::parts::Parts::building_of`]: [`Building::NONE`] where the table holds
+    /// none).
+    ///
+    /// [`Building::NONE`]: crate::objects::layers::Building::NONE
+    pub(crate) fn object_mut_and_layer(
+        &mut self,
+        id: impl ObjectKey,
+    ) -> Option<(&mut Unit, &crate::objects::layers::Building)> {
+        let place = self.place(id)?;
+        let u = self.players.at_mut(place).ok()?;
+        let layer = self.parts.building_of(u.id);
+        Some((u, layer))
+    }
+
+    /// [`World::object_mut`] with the object's building layer to change beside it, put in where
+    /// the table holds none ([`crate::world::parts::Parts::building_mut`]).
+    ///
+    /// # Errors
+    ///
+    /// The layer's.
+    pub(crate) fn object_and_layer_mut(
+        &mut self,
+        id: impl ObjectKey,
+    ) -> Result<Option<(&mut Unit, &mut crate::objects::layers::Building)>, GenieError> {
+        let Some(place) = self.place(id) else {
+            return Ok(None);
+        };
+        let u = self.players.at_mut(place)?;
+        let layer = self.parts.building_mut(u.id)?;
+        Ok(Some((u, layer)))
+    }
+
     /// Player `player`'s master `master` ([`player_master`]), which the caller's object or
     /// command has.
     ///
@@ -372,7 +424,10 @@ impl World {
     ) -> Result<TaskTarget<'_>, GenieError> {
         let mut id = id;
         for _ in 0..steps {
-            match self.object(id).and_then(|(_, u)| u.building.annex_of) {
+            match self
+                .object(id)
+                .and_then(|(_, u)| self.parts.building_of(u.id).annex_of)
+            {
                 Some(main) => id = main.id(),
                 None => break,
             }
@@ -511,10 +566,15 @@ pub(crate) fn set_stance(
 }
 
 /// A building's slot 0x670 (`FUN_1411dba30`): its gate lock (`mGateLocked`, `+0xc7c`, an int its
-/// callers set to 0 or 1) takes `locked`; a lock also sets its last move time (`+0x870`,
-/// [`crate::movement::Mover::last_move`]) to the world time (`FUN_1415300d0`) plus 1.
-pub(crate) fn lock_gate(unit: &mut Unit, locked: bool, now: WorldTime) -> Result<(), GenieError> {
-    let gate = unit.building.gate.as_mut().ok_or(GenieError::unsupported(
+/// callers set to 0 or 1, in its building layer `layer`) takes `locked`; a lock also sets its
+/// last move time (`+0x870`, [`crate::movement::Mover::last_move`]) to the world time
+/// (`FUN_1415300d0`) plus 1.
+pub(crate) fn lock_gate(
+    (unit, layer): (&mut Unit, &mut crate::objects::layers::Building),
+    locked: bool,
+    now: WorldTime,
+) -> Result<(), GenieError> {
+    let gate = layer.gate.as_mut().ok_or(GenieError::unsupported(
         "a GATE of a building without its gate state",
     ))?;
     gate.locked = locked;

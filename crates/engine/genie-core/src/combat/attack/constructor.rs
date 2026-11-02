@@ -216,7 +216,8 @@ impl Attack {
                 by_id: crate::world::index::ObjectsRef::new(
                     &c.w.players,
                     &c.w.index,
-                    crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                    &c.w.masters,
+                    &c.w.parts,
                 ),
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;

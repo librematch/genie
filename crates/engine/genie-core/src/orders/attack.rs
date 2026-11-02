@@ -64,7 +64,11 @@ impl World {
             (held.computer, world_time),
         );
         let own = crate::combat::victims::victim_of(
-            (u, self.parts.unit_ai.contains(u.id)),
+            (
+                u,
+                self.parts.unit_ai.contains(u.id),
+                self.parts.building_of(u.id),
+            ),
             master,
             &held.attributes,
             player,
@@ -194,7 +198,10 @@ impl World {
         let tm = t.master(self.master_tables(), owner)?;
         // A building's master type (`'P'`); types below 30 do not move.
         let aimed = if tm.kind == BUILDING {
-            t.building.annex_of.map_or(target, MainBuildingId::id)
+            self.parts
+                .building_of(t.id)
+                .annex_of
+                .map_or(target, MainBuildingId::id)
         } else {
             target
         };

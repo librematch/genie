@@ -46,8 +46,8 @@ impl Unit {
             && !allied
     }
 
-    /// Slot 0x178 on this object of its player's live list, taken by the object `by` (`listed`,
-    /// [`Unit::lists_taker`]). A building's (`FUN_1411dba70`) first lists the taker among its attacking
+    /// Slot 0x178 on this object of its player's live list, taken by the object `by` (`listed`:
+    /// its building layer, which lists it, [`Unit::lists_taker`]). A building's (`FUN_1411dba70`) first lists the taker among its attacking
     /// units (`+0xce0`, [`Building::attacking_units`](crate::objects::layers::Building::attacking_units); once per take). Then the base take
     /// (`FUN_14119d3e0`): its worker count (`+0x644`) rises, to at most 550, and a live object flagged
     /// to sleep drops the flags (a sleeping one's wake is [`crate::world::World::take`]'s). The
@@ -55,9 +55,13 @@ impl Unit {
     /// load (`FUN_1411df160` -> `FUN_1411ddd20`) sets that flag, from the save's
     /// `temp_semi_asleep`, which no saved building of the 158041 recordings has (1473 headers
     /// read); the slice does not hold it.
-    pub(crate) fn taken(&mut self, listed: bool, by: ObjectId) {
-        if listed {
-            self.building.attacking_units.push(by);
+    pub(crate) fn taken(
+        &mut self,
+        listed: Option<&mut crate::objects::layers::Building>,
+        by: ObjectId,
+    ) {
+        if let Some(layer) = listed {
+            layer.attacking_units.push(by);
         }
         if self.workers < crate::objects::WorkerCount::MOST {
             self.workers = self.workers.plus(1);

@@ -87,7 +87,8 @@ impl World {
             return Ok(());
         };
         let target = t.id;
-        let (target_master, target_annex) = (t.life.master_id, t.building.annex_of);
+        let (target_master, target_annex) =
+            (t.life.master_id, self.parts.building_of(t.id).annex_of);
         let mut units = Vec::with_capacity(ids.len());
         for &id in ids.iter().flatten() {
             let Some((p, u)) = self.object(id) else {
@@ -219,7 +220,7 @@ impl World {
             let om = o.master(self.master_tables(), op)?;
             if om.kind < BUILDING {
                 shelters.transports.push(ContainerId::new(id));
-            } else if om.class != class::GATE && o.building.annex_of.is_none() {
+            } else if om.class != class::GATE && self.parts.building_of(o.id).annex_of.is_none() {
                 shelters.buildings.push(ContainerId::new(id));
             }
             shelters.counts.push(self.garrisoned(id)?);

@@ -33,6 +33,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::world::Millis;
 use crate::world::WorldTime;
+use crate::world::parts::Object;
 use crate::world::{Player, World};
 use std::collections::BTreeMap;
 
@@ -665,10 +666,17 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
     assert_eq!(c.builders, crate::construction::BuilderCount::of_data(1));
 }
 
-/// A world of player 1 holding the foundations `units` on `spatial`, `masters` its masters'
+/// A world of player 1 holding the foundations `objects` on `spatial`, `masters` its masters'
 /// table (and Gaia's): the work and the completion on the world.
-fn site_world(spatial: Spatial, masters: Vec<Master>, units: Vec<Unit>) -> World {
+fn site_world(spatial: Spatial, masters: Vec<Master>, objects: Vec<Object>) -> World {
     let ms = crate::objects::masters::Masters::new(masters);
+    let (units, layers): (Vec<Unit>, Vec<_>) = objects
+        .into_iter()
+        .map(|o| {
+            let id = o.unit.id;
+            (o.unit, (id, o.parts.building))
+        })
+        .unzip();
     let mut t = World::new(
         WorldTime::ZERO,
         crate::world::FrameSeed::of_data(1),
@@ -682,26 +690,29 @@ fn site_world(spatial: Spatial, masters: Vec<Master>, units: Vec<Unit>) -> World
                 ..Player::default()
             },
         ],
-    );
+    )
+    .with_buildings(layers);
     t.spatial = spatial;
     t.masters = vec![ms.clone(), ms];
     t
 }
 
 /// The foundation `id` at `at` with its life cycle and construction.
-fn foundation_at(id: i32, at: Position, life: Lifecycle, construction: Construction) -> Unit {
-    Unit {
-        id: object_id(id),
-        body: crate::objects::layers::Body::at(at),
-        life,
-        building: crate::objects::layers::Building {
+fn foundation_at(id: i32, at: Position, life: Lifecycle, construction: Construction) -> Object {
+    Object::with_building(
+        Unit {
+            id: object_id(id),
+            body: crate::objects::layers::Body::at(at),
+            life,
+            pasture: None,
+            my_pasture: None,
+            ..Unit::default()
+        },
+        crate::objects::layers::Building {
             construction: Some(construction),
             ..Default::default()
         },
-        pasture: None,
-        my_pasture: None,
-        ..Unit::default()
-    }
+    )
 }
 
 /// A building master `id` of class 3 without a stack unit, a foundation terrain or a
@@ -830,7 +841,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         Ok(false)
     );
     let h = t.players[1].objects.by_id(object_id(10026)).unwrap();
-    let c = h.building.construction.unwrap();
+    let c = t.parts.building_of(h.id).construction.unwrap();
     assert_eq!(
         (h.life.state, c.progress, c.snow),
         (ObjectState::Alive, Seconds::new(25.0), true)
@@ -894,7 +905,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             sprite_override: false,
         };
         let mut h = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
-        h.building.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
+        h.parts.building.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
         let mut t = site_world(world, vec![built_master(id, cost)], vec![h]);
         // a history records events from its first time slice on
         t.players[1].history.add_entry(
@@ -998,7 +1009,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         Ok(true)
     );
     let h = t.players[1].objects.by_id(object_id(10028)).unwrap();
-    let c = h.building.construction.unwrap();
+    let c = t.parts.building_of(h.id).construction.unwrap();
     assert_eq!(h.life.hp, HitPoints::new(1.462));
     assert!(!c.desolid);
     assert_eq!(c.progress, Seconds::new(f32::from_bits(STARTED) + rate));
@@ -1056,7 +1067,7 @@ fn the_work_starts_the_desolid_annexes_first() {
             life(master),
             foundation(desolid),
         );
-        u.building.annex_of =
+        u.parts.building.annex_of =
             (master == master_id(1192)).then_some(MainBuildingId::new(object_id(10028)));
         u
     };
@@ -1079,7 +1090,8 @@ fn the_work_starts_the_desolid_annexes_first() {
         Ok(true)
     );
     let u = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
-    let post = u(object_id(10029)).building.construction.unwrap();
+    let site = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
+    let post = site(object_id(10029));
     assert!(!post.desolid);
     assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
     assert_eq!(
@@ -1094,13 +1106,10 @@ fn the_work_starts_the_desolid_annexes_first() {
             .is_some()
     );
     assert_eq!(
-        (
-            u(object_id(10030)).building.construction.unwrap(),
-            u(object_id(10030)).combat.firepower
-        ),
+        (site(object_id(10030)), u(object_id(10030)).combat.firepower),
         (foundation(false), crate::combat::Firepower::new(0.0))
     );
-    assert!(!u(object_id(10028)).building.construction.unwrap().desolid);
+    assert!(!site(object_id(10028)).desolid);
 }
 
 /// The construction's start (`FUN_1411e5670`) sets the foundation's last move time to the
@@ -1183,7 +1192,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
             ..Lifecycle::default()
         };
         let mut post = foundation_at(10029, Position::new(1.0, 2.0, 0.0), life, foundation);
-        post.building.annex_of = Some(MainBuildingId::new(object_id(10028)));
+        post.parts.building.annex_of = Some(MainBuildingId::new(object_id(10028)));
         let gate = foundation_at(
             10028,
             Position::new(2.0, 2.0, 0.0),
@@ -1201,7 +1210,7 @@ fn an_annex_s_work_goes_to_its_main_building() {
         let going = t.work_building(object_id(10029), Seconds::new(amount));
         let post = t.players[1].objects.by_id(object_id(10029)).unwrap();
         assert_eq!(
-            (post.building.construction, post.life.hp),
+            (t.parts.building_of(post.id).construction, post.life.hp),
             (Some(foundation), HitPoints::new(1.0)),
             "the post itself is not worked"
         );

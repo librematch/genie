@@ -93,7 +93,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
@@ -317,8 +318,9 @@ impl World {
                 id: t,
                 building: m.kind == BUILDING,
                 class: m.class,
-                built: o
-                    .building
+                built: self
+                    .parts
+                    .building_of(o.id)
                     .construction
                     .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
             }))

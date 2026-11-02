@@ -594,7 +594,7 @@ impl Unit {
         crate::world::lets::take(c, self, aimed.target, missile)?;
         if shot.shooter {
             // the shooter, of the missile's own player: never listed
-            self.taken(false, id);
+            self.taken(None, id);
         }
         Ok(())
     }

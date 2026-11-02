@@ -103,10 +103,11 @@ impl World {
                 object,
                 groups,
             }),
-            by_id: ObjectsRef::new(
+            by_id: ObjectsRef::of_tables(
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+                &parts.building,
             ),
         };
         let beside = Beside {
@@ -273,10 +274,8 @@ impl Step<'_> {
                 by_id: ObjectsRef::new(
                     &self.w.players,
                     &self.w.index,
-                    crate::objects::masters::MasterTables::new(
-                        &self.w.masters,
-                        &self.w.parts.own_master,
-                    ),
+                    &self.w.masters,
+                    &self.w.parts,
                 ),
             },
             sprite,

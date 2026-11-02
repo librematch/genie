@@ -32,6 +32,7 @@ use genie_core::objects::RelicCount;
 use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
 use genie_core::objects::WorkerCount;
+use genie_core::objects::layers::Building;
 use genie_core::objects::lifecycle::Lifecycle;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::ClassId;
@@ -61,7 +62,7 @@ pub(super) fn object(
     masters: Option<&MasterTable>,
     players: usize,
 ) -> Object {
-    let (unit, (unit_ai, town_bell)) = row(object, objects, paths, civ, masters, players);
+    let (unit, (unit_ai, town_bell, building)) = row(object, objects, paths, civ, masters, players);
     Object {
         unit,
         parts: ObjectParts {
@@ -72,6 +73,7 @@ pub(super) fn object(
             own_master: None,
             town_bell,
             unit_ai,
+            building,
         },
     }
 }
@@ -135,7 +137,7 @@ fn row(
     civ: CivId,
     masters: Option<&MasterTable>,
     players: usize,
-) -> (Unit, (Option<UnitAi>, TownBell)) {
+) -> (Unit, (Option<UnitAi>, TownBell, Building)) {
     let saved = object.static_part();
     let named = saved.and_then(|s| ObjectId::try_from(s.id).ok());
     let (Some(s), Some(id)) = (saved, named) else {
@@ -147,7 +149,7 @@ fn row(
             },
             ..Unit::default()
         };
-        return (unit, (None, TownBell::default()));
+        return (unit, (None, TownBell::default(), Building::NONE));
     };
     let Ok(master) = MasterId::try_from(s.master_obj) else {
         let unit = Unit {
@@ -160,7 +162,7 @@ fn row(
             },
             ..Unit::default()
         };
-        return (unit, (None, TownBell::default()));
+        return (unit, (None, TownBell::default(), Building::NONE));
     };
     let saved = object
         .actions()
@@ -179,6 +181,51 @@ fn row(
         Err(e) => (BuildingLists::default(), Err(e)),
     };
     let gather_read = gather_point(object).map(|_| ());
+    let building = Building {
+        construction: construction(object, s, objects),
+        annex_of: object
+            .tribe_building_object
+            .as_deref()
+            .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
+            .map(MainBuildingId::new),
+        annexes: object
+            .tribe_building_object
+            .as_deref()
+            .map_or(Annexes::NONE, |b| {
+                annexes(&b.mupt_linked_object_references_linked_object_ids)
+            }),
+        garrison_time: object
+            .tribe_building_object
+            .as_deref()
+            .map_or(WorldTime::ZERO, |b| {
+                WorldTime::from_millis(b.last_garrison_time)
+            }),
+        relics: object
+            .tribe_building_object
+            .as_deref()
+            .map_or(Relics::NONE, |b| {
+                Relics::new(
+                    RelicCount::of_data(b.relic_count),
+                    RelicCount::of_data(b.specific_relic_count),
+                )
+            }),
+        livestock_summation: object
+            .tribe_building_object
+            .as_deref()
+            .map_or(Amount::ZERO, |b| Amount::new(b.livestock_summation)),
+        livestock: lists.livestock,
+        pasture_workers: lists.pasture_workers,
+        attacking_units: lists.attacking_units,
+        gate: saved_gate(object),
+        // mIsOnMangroveShallows (+0xcd0); build 158041's saves all hold it (its version gate
+        // 0x421999 lies before them)
+        rice: object
+            .tribe_building_object
+            .as_deref()
+            .and_then(|b| b.is_on_mangrove_shallows)
+            .is_some_and(|v| v != 0),
+        ..Default::default()
+    };
     let mut unit = Unit {
         id,
         life,
@@ -293,51 +340,6 @@ fn row(
                 })
                 .unwrap_or_default(),
         },
-        building: genie_core::objects::layers::Building {
-            construction: construction(object, s, objects),
-            annex_of: object
-                .tribe_building_object
-                .as_deref()
-                .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id))
-                .map(MainBuildingId::new),
-            annexes: object
-                .tribe_building_object
-                .as_deref()
-                .map_or(Annexes::NONE, |b| {
-                    annexes(&b.mupt_linked_object_references_linked_object_ids)
-                }),
-            garrison_time: object
-                .tribe_building_object
-                .as_deref()
-                .map_or(WorldTime::ZERO, |b| {
-                    WorldTime::from_millis(b.last_garrison_time)
-                }),
-            relics: object
-                .tribe_building_object
-                .as_deref()
-                .map_or(Relics::NONE, |b| {
-                    Relics::new(
-                        RelicCount::of_data(b.relic_count),
-                        RelicCount::of_data(b.specific_relic_count),
-                    )
-                }),
-            livestock_summation: object
-                .tribe_building_object
-                .as_deref()
-                .map_or(Amount::ZERO, |b| Amount::new(b.livestock_summation)),
-            livestock: lists.livestock,
-            pasture_workers: lists.pasture_workers,
-            attacking_units: lists.attacking_units,
-            gate: saved_gate(object),
-            // mIsOnMangroveShallows (+0xcd0); build 158041's saves all hold it (its version gate
-            // 0x421999 lies before them)
-            rice: object
-                .tribe_building_object
-                .as_deref()
-                .and_then(|b| b.is_on_mangrove_shallows)
-                .is_some_and(|v| v != 0),
-            ..Default::default()
-        },
         attackable: s.unit_attackable_flag != 0,
         untargetable: s.unit_targeting_flag == 0,
         under_attack: s.under_attack_value != 0,
@@ -408,7 +410,7 @@ fn row(
         .and(production)
         .and(moving)
         .err();
-    (unit, (ai, town_bell))
+    (unit, (ai, town_bell, building))
 }
 
 /// A saved building's lists of objects (none for another object).

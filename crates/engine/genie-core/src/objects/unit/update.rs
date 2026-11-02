@@ -110,9 +110,10 @@ impl Unit {
             Some(Action::Repair(_)) => self.repair_part(c, me),
             Some(Action::Enter(_)) => self.enter_part(c, me),
             Some(Action::Transport(_)) => self.transport_update(c, me),
-            Some(Action::WaitSolidify(_)) => {
-                Ok(self.wait_solidify_part(OthersRef::of(&c.w.players, &c.w.index, c.player)?))
-            }
+            Some(Action::WaitSolidify(_)) => Ok(self.wait_solidify_part(
+                OthersRef::of(&c.w.players, &c.w.index, c.player)?,
+                &c.w.parts.building,
+            )),
             Some(Action::Missile(_)) => self.fly(c).map(|()| HeadCode::Keeps),
             Some(Action::MoveTo(_)) => self.move_to_part(c, me),
             Some(Action::Explore(_)) => self.explore_part(c, me).map(|()| HeadCode::Keeps),
@@ -150,12 +151,16 @@ impl Unit {
 
     /// The wait for a foundation in its update (`FUN_140ae8b70`) on its build points, none when
     /// the world does not hold it; its 1 deletes it (its destructor lets no target go).
-    fn wait_solidify_part(&self, others: OthersRef<'_>) -> HeadCode {
+    fn wait_solidify_part(
+        &self,
+        others: OthersRef<'_>,
+        buildings: &crate::world::parts::PartTable<crate::objects::layers::Building>,
+    ) -> HeadCode {
         let ended = self
             .actions
             .list
             .wait_solidify()
-            .is_some_and(|w| w.update(wait_progress(w.target, others)));
+            .is_some_and(|w| w.update(wait_progress(w.target, others, buildings)));
         HeadCode::ended(ended)
     }
 

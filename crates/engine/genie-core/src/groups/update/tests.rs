@@ -2118,10 +2118,11 @@ fn gate_world() -> World {
     t.players[2].objects[ListIndex::new(0)].life.master_id = master_id(5);
     let mut annex = soldier(21, 2.5, 2.5);
     annex.life.master_id = master_id(5);
-    annex.building.annex_of = Some(MainBuildingId::new(object_id(20)));
     let _ = t
         .push_live(PlayerId::new(2), Object::with_ai(annex, soldier_ai()))
         .unwrap();
+    t.parts.building_mut(object_id(21)).unwrap().annex_of =
+        Some(MainBuildingId::new(object_id(20)));
     t.link_test_annex(object_id(21), object_id(20));
     t
 }
@@ -2137,12 +2138,7 @@ fn a_gate_out_of_reach_is_struck_at_its_nearest_part() {
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(21)
     );
-    t.object_mut(object_id(20))
-        .unwrap()
-        .1
-        .building
-        .annexes
-        .clear();
+    t.parts.building_mut(object_id(20)).unwrap().annexes.clear();
     assert_eq!(
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(20)

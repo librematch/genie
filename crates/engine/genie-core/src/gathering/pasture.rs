@@ -133,8 +133,8 @@ impl World {
             };
             if let Some(new) = self.make_new_object(p, kind, Position::new(x, y, at.z()), false)? {
                 let _ = points.remove(i);
-                if let Some((_, u)) = self.object_mut(id) {
-                    u.building.livestock.push(new);
+                if let Some((_, layer)) = self.object_and_layer_mut(id)? {
+                    layer.livestock.push(new);
                 }
                 let (_, u) = self
                     .object_mut(new)
@@ -167,7 +167,8 @@ impl World {
         pasture: crate::gathering::PastureId,
     ) -> crate::objects::WorkerCount {
         crate::objects::WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
-            b.building
+            self.parts
+                .building_of(b.id)
                 .livestock
                 .iter()
                 .filter_map(|&id| self.object(id))
@@ -200,7 +201,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let reach = unit.master(self.master_tables(), p)?.radius;
         let mut tended = Vec::new();
-        for &id in &b.building.livestock {
+        for &id in &self.parts.building_of(b.id).livestock {
             let Some((r, l)) = self.object(id) else {
                 continue;
             };
@@ -252,11 +253,11 @@ impl World {
             Some((q, b)) => b.master(self.master_tables(), q)?.kind == BUILDING,
             None => false,
         };
-        if building && let Some((_, b)) = self.object_mut(named) {
+        if building && let Some((_, layer)) = self.object_and_layer_mut(named)? {
             if pasture.is_none() {
-                b.building.pasture_workers.retain(|&w| w != id);
-            } else if !b.building.pasture_workers.contains(&id) {
-                b.building.pasture_workers.push(id);
+                layer.pasture_workers.retain(|&w| w != id);
+            } else if !layer.pasture_workers.contains(&id) {
+                layer.pasture_workers.push(id);
             }
         }
         self.players.live_mut(p, idx)?.my_pasture = pasture;

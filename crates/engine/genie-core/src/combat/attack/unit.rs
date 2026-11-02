@@ -190,7 +190,11 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player)?;
         let terrain = c.w.spatial.terrain.as_ref();
         Ok(Some(victim_of(
-            (self, c.w.parts.unit_ai.contains(self.id)),
+            (
+                self,
+                c.w.parts.unit_ai.contains(self.id),
+                c.w.parts.building_of(self.id),
+            ),
             master,
             &c.w.players.player(c.player)?.attributes,
             c.player,

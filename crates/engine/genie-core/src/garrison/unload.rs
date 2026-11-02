@@ -411,8 +411,9 @@ impl World {
                 id: t,
                 building: m.kind == BUILDING,
                 class: m.class,
-                built: o
-                    .building
+                built: self
+                    .parts
+                    .building_of(o.id)
                     .construction
                     .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
             }))

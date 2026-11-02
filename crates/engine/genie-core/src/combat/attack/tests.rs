@@ -722,10 +722,11 @@ impl Rig {
         } = &mut self.t;
         let (object, sprite) = streams.object_and_sprite();
         let mut g = Ground {
-            by_id: crate::world::index::ObjectsRef::new(
+            by_id: crate::world::index::ObjectsRef::of_tables(
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+                &parts.building,
             ),
             map: spatial,
             sprite_rng: sprite,

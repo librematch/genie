@@ -601,25 +601,25 @@ mod stack_tests {
                 master_id: ids::TOWN_CENTRE_621,
                 ..Lifecycle::default()
             },
-            building: crate::objects::layers::Building {
-                construction: Some(Construction {
-                    progress: Seconds::new(149.99),
-                    desolid: false,
-                    builders: crate::construction::BuilderCount::of_data(1),
-                    hit_points: MasterHitPoints::of_data(2400),
-                    build_time: WholeSeconds::of_data(150),
-                    record: Obstruction {
-                        kind: ObstructionType::TYPE_2,
-                        class: ObstructionClass::UNIT,
-                    },
-                    snow: false,
-                    sprite_override: false,
-                }),
-                ..Default::default()
-            },
             pasture: None,
             my_pasture: None,
             ..Unit::default()
+        };
+        let layer = crate::objects::layers::Building {
+            construction: Some(Construction {
+                progress: Seconds::new(149.99),
+                desolid: false,
+                builders: crate::construction::BuilderCount::of_data(1),
+                hit_points: MasterHitPoints::of_data(2400),
+                build_time: WholeSeconds::of_data(150),
+                record: Obstruction {
+                    kind: ObstructionType::TYPE_2,
+                    class: ObstructionClass::UNIT,
+                },
+                snow: false,
+                sprite_override: false,
+            }),
+            ..Default::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
@@ -634,7 +634,8 @@ mod stack_tests {
                     ..Player::default()
                 },
             ],
-        );
+        )
+        .with_buildings([(object_id(8759), layer)]);
         t.spatial = Spatial::with_tiles(
             GridSize::new(200, 200),
             Tiles::new(GridSize::new(200, 200), vec![0; 200 * 200]),
@@ -765,10 +766,10 @@ mod stack_tests {
                 Position::new(53.0, 148.0, 0.0)
             ]
         );
-        let unit = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
         assert_eq!(
-            [8769, 8770, 8771, 8772, 8773].map(|a| unit(object_id(a))
-                .building
+            [8769, 8770, 8771, 8772, 8773].map(|a| t
+                .parts
+                .building_of(object_id(a))
                 .annex_of
                 .map(crate::construction::MainBuildingId::id)),
             [
@@ -791,6 +792,7 @@ mod stack_tests {
         // the foundation lacked 0.84 of its 2400 hit points after its last work: the town
         // centre lacks them too
         let lacked = 2400.0 - (2399.0 + (0.01_f32 * 2400.0) / 150.0);
+        let unit = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
         assert_eq!(
             (
                 unit(object_id(8768)).life.hp,
@@ -879,7 +881,10 @@ mod stack_tests {
                     }
                 }
             }
-            t.players[1].objects[ListIndex::new(0)].building.gate = Some(crate::world::Gate {
+            t.parts
+                .building_mut(t.players[1].objects[ListIndex::new(0)].id)
+                .unwrap()
+                .gate = Some(crate::world::Gate {
                 locked,
                 ..crate::world::Gate::default()
             });
@@ -894,7 +899,10 @@ mod stack_tests {
             )
             .unwrap();
             let gate = t.players[1].objects.by_id(object_id(8768)).unwrap();
-            assert_eq!(gate.building.gate.map(|g| g.locked), Some(locked));
+            assert_eq!(
+                t.parts.building_of(gate.id).gate.map(|g| g.locked),
+                Some(locked)
+            );
             let last_move = gate.body.mover().map(|m| m.last_move);
             assert_eq!(
                 last_move,
@@ -910,8 +918,9 @@ mod stack_tests {
     #[test]
     fn a_stack_unit_s_completion_reads_the_foundation_s_attacking_units() {
         let mut gone = world();
-        gone.players[1].objects[ListIndex::new(0)]
-            .building
+        gone.parts
+            .building_mut(gone.players[1].objects[ListIndex::new(0)].id)
+            .unwrap()
             .attacking_units = vec![object_id(99_999)];
         assert_eq!(
             gone.work_building(object_id(8759), Seconds::new(1.0)),
@@ -919,8 +928,9 @@ mod stack_tests {
         );
         let mut held = world();
         let first = held.players[1].objects[ListIndex::new(0)].id;
-        held.players[1].objects[ListIndex::new(0)]
-            .building
+        held.parts
+            .building_mut(held.players[1].objects[ListIndex::new(0)].id)
+            .unwrap()
             .attacking_units = vec![first];
         assert_eq!(
             held.work_building(object_id(8759), Seconds::new(1.0)),

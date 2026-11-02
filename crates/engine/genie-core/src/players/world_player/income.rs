@@ -57,7 +57,7 @@ impl World {
                 // The buildings' type (the object's `+0xf`, `'P'`).
                 .is_ok_and(|m| m.kind == BUILDING);
             if building {
-                sum += unit.building.livestock_summation.get();
+                sum += self.parts.building_of(unit.id).livestock_summation.get();
             }
         }
         let grows = crate::math::fmath::log(sum / LIVESTOCK_SCALE + SECOND);

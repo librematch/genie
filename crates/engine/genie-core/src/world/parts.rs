@@ -15,6 +15,7 @@ use crate::combat::missile::Missile;
 use crate::commands::GatherPoint;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
+use crate::objects::layers::Building;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
@@ -95,6 +96,24 @@ impl<T> PartTable<T> {
         None
     }
 
+    /// Object `id`'s part to change, `make`'s put in first where it holds none (the world's
+    /// writers alone).
+    ///
+    /// # Errors
+    ///
+    /// None: a part put in is there (the error is unreachable).
+    pub(in crate::world) fn get_or_insert_with(
+        &mut self,
+        id: ObjectId,
+        make: impl FnOnce() -> T,
+    ) -> Result<&mut T, GenieError> {
+        if !self.contains(id) {
+            let _ = self.insert(id, make());
+        }
+        self.get_mut(id)
+            .ok_or_else(|| GenieError::unreachable("a part the table just took").with("object", id))
+    }
+
     /// Object `id`'s part taken out of the table (the world's list operations and
     /// [`World::set_part`] alone).
     pub(in crate::world) fn remove(&mut self, id: ObjectId) -> Option<T> {
@@ -111,8 +130,13 @@ impl<T> PartTable<T> {
 /// No own masters: a test's master lookups without a world.
 #[cfg(test)]
 pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
-    static NONE: std::sync::LazyLock<PartTable<Master>> =
-        std::sync::LazyLock::new(PartTable::default);
+    &no_parts().own_master
+}
+
+/// No parts: a test's reads by id without a world.
+#[cfg(test)]
+pub(crate) fn no_parts() -> &'static Parts {
+    static NONE: std::sync::LazyLock<Parts> = std::sync::LazyLock::new(Parts::default);
     &NONE
 }
 
@@ -128,6 +152,14 @@ impl Parts {
                 let _ = self.unit_ai.remove(id);
             }
         }
+    }
+}
+
+impl PartTable<Building> {
+    /// Object `id`'s building layer: [`Building::NONE`] where the table holds none.
+    #[must_use]
+    pub fn of(&self, id: ObjectId) -> &Building {
+        self.get(id).unwrap_or(&NO_BUILDING)
     }
 }
 
@@ -170,6 +202,73 @@ impl World {
         for (id, ai) in ais {
             self.set_part(id, Part::UnitAi(Some(Box::new(ai))))
                 .expect("a unit AI of an object the world holds");
+        }
+        self
+    }
+
+    /// A test's live list of player `p`: `objects` with their parts; the old list's objects
+    /// leave the world with theirs.
+    ///
+    /// # Panics
+    ///
+    /// A player the world does not hold.
+    #[cfg(test)]
+    pub(crate) fn set_live_for_test(
+        &mut self,
+        p: crate::players::PlayerId,
+        objects: impl IntoIterator<Item = Object>,
+    ) {
+        let list = &mut self
+            .players
+            .get_mut(p.index())
+            .expect("a player the world holds")
+            .objects;
+        let old: Vec<ObjectId> = list.iter().map(|u| u.id).collect();
+        let mut units = Vec::new();
+        for id in old {
+            let _ = self.parts.take(id);
+        }
+        let mut parts = Vec::new();
+        for o in objects {
+            parts.push((o.unit.id, o.parts));
+            units.push(o.unit);
+        }
+        *list = units.into();
+        for (id, part) in parts {
+            self.parts.file(id, part);
+        }
+        self.reindex();
+    }
+
+    /// A test's objects `objects` apart: their units (a player's list) and their building
+    /// layers ([`World::with_buildings`]).
+    #[cfg(test)]
+    pub(crate) fn split_layers(
+        objects: impl IntoIterator<Item = Object>,
+    ) -> (Vec<Unit>, Vec<(ObjectId, Building)>) {
+        objects
+            .into_iter()
+            .map(|o| {
+                let id = o.unit.id;
+                (o.unit, (id, o.parts.building))
+            })
+            .unzip()
+    }
+
+    /// A test's world with the building layers `layers` set on the objects it holds.
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn with_buildings(
+        mut self,
+        layers: impl IntoIterator<Item = (ObjectId, Building)>,
+    ) -> Self {
+        for (id, layer) in layers {
+            self.set_part(id, Part::Building(Box::new(layer)))
+                .expect("a building layer of an object the world holds");
         }
         self
     }
@@ -220,7 +319,15 @@ pub struct Parts {
     pub town_bell: PartTable<TownBell>,
     /// A unit's AI (`+0x9e0`, `TRIBE_Unit_AI`): its orders, its notifies and its targets.
     pub unit_ai: PartTable<UnitAi>,
+    /// A building's layer (`TRIBE_Building_Object`, `+0xb78`..`+0xce0`): its construction,
+    /// links, gate, livestock and relics. An object the table does not hold reads
+    /// [`Building::NONE`] ([`Parts::building_of`]); a write puts one in
+    /// ([`Parts::building_mut`]), so the table may hold a layer equal to it.
+    pub building: PartTable<Building>,
 }
+
+/// The building layer of an object the table does not hold.
+static NO_BUILDING: Building = Building::NONE;
 
 /// One object's parts as a value, outside the world's tables: what it enters the world with and
 /// what a removal for good returns. Each part compares as the field it was on the object.
@@ -249,6 +356,9 @@ pub struct ObjectParts {
     /// Its unit AI ([`Parts::unit_ai`]).
     #[diff(path = "combat.ai")]
     pub unit_ai: Option<UnitAi>,
+    /// Its building layer ([`Parts::building`]), [`Building::NONE`] where the table holds none.
+    #[diff(path = "building")]
+    pub building: Building,
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -315,6 +425,17 @@ impl Object {
             },
         }
     }
+
+    /// A test's object: row `unit` with the building layer `layer`.
+    pub(crate) fn with_building(unit: Unit, layer: Building) -> Self {
+        Self {
+            unit,
+            parts: ObjectParts {
+                building: layer,
+                ..ObjectParts::default()
+            },
+        }
+    }
 }
 
 impl From<Unit> for Object {
@@ -337,6 +458,7 @@ impl Parts {
             own_master,
             town_bell,
             unit_ai,
+            building,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -359,6 +481,9 @@ impl Parts {
         if let Some(ai) = unit_ai {
             let _ = self.unit_ai.insert(id, ai);
         }
+        if building != Building::NONE {
+            let _ = self.building.insert(id, building);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -371,6 +496,7 @@ impl Parts {
             own_master: self.own_master.remove(id),
             town_bell: self.town_bell.remove(id).unwrap_or_default(),
             unit_ai: self.unit_ai.remove(id),
+            building: self.building.remove(id).unwrap_or_default(),
         }
     }
 
@@ -385,7 +511,25 @@ impl Parts {
             own_master: self.own_master.get(id).cloned(),
             town_bell: self.town_bell.get(id).copied().unwrap_or_default(),
             unit_ai: self.unit_ai.get(id).cloned(),
+            building: self.building_of(id).clone(),
         }
+    }
+
+    /// Object `id`'s building layer: [`Building::NONE`] where the table holds none.
+    #[must_use]
+    pub fn building_of(&self, id: ObjectId) -> &Building {
+        self.building.of(id)
+    }
+
+    /// Object `id`'s building layer to change, [`Building::NONE`] put in where the table holds
+    /// none. The caller holds the object: its row is borrowed from the world's lists, which this
+    /// borrow leaves alone ([`World::set_part`] checks the id where no row is held).
+    ///
+    /// # Errors
+    ///
+    /// None (an unreachable error where the table lost the layer it took).
+    pub(crate) fn building_mut(&mut self, id: ObjectId) -> Result<&mut Building, GenieError> {
+        self.building.get_or_insert_with(id, || Building::NONE)
     }
 
     /// Object `id`'s town bell ([`Parts::town_bell`]): a new unit's where the table holds none.
@@ -425,6 +569,7 @@ impl Parts {
             .chain(self.own_master.iter().map(|(id, _)| id))
             .chain(self.town_bell.iter().map(|(id, _)| id))
             .chain(self.unit_ai.iter().map(|(id, _)| id))
+            .chain(self.building.iter().map(|(id, _)| id))
     }
 }
 
@@ -445,6 +590,8 @@ pub enum Part {
     TownBell(TownBell),
     /// The unit AI ([`Parts::unit_ai`]), boxed, none clearing it.
     UnitAi(Option<Box<UnitAi>>),
+    /// The building layer ([`Parts::building`]), boxed; [`Building::NONE`] leaves the table.
+    Building(Box<Building>),
 }
 
 impl World {
@@ -492,6 +639,12 @@ impl World {
             }
             Part::UnitAi(None) => {
                 let _ = self.parts.unit_ai.remove(id);
+            }
+            Part::Building(b) if *b == Building::NONE => {
+                let _ = self.parts.building.remove(id);
+            }
+            Part::Building(b) => {
+                let _ = self.parts.building.insert(id, *b);
             }
         }
         Ok(())

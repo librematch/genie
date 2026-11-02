@@ -88,7 +88,8 @@ impl Unit {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {

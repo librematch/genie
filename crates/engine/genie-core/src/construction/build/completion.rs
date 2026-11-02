@@ -102,8 +102,8 @@ impl crate::world::World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        let c = u.building.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        let (u, layer) = self.object_and_layer_mut(id)?.ok_or(NOT_HELD)?;
+        let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         c.progress = Seconds::of_master(c.build_time);
         let mut gains = Vec::new();
         hand_storage(master, &mut gains, Some(&mut u.combat.store));
@@ -134,6 +134,7 @@ impl crate::world::World {
             players,
             graphics,
             streams,
+            parts,
             ..
         } = self;
         let u = held(players, place)?;
@@ -141,7 +142,7 @@ impl crate::world::World {
             &mut u.sprite,
             u.body.move_stats_mut(),
             master,
-            u.building.build_frame,
+            parts.building_of(id).build_frame,
             graphics,
             streams.get(crate::math::rng::Stream::Sprite),
         );
@@ -171,8 +172,10 @@ impl crate::world::World {
         self.pathing.removed(id);
         self.spatial.drop_record(id);
         self.pathing.tiles_changed(self.spatial.take_changes());
+        let layer = self.parts.building_of(id);
+        let (main, rice) = (layer.annex_of.is_some(), layer.rice);
         let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        let (main, rice, hp) = (u.building.annex_of.is_some(), u.building.rice, u.life.hp);
+        let hp = u.life.hp;
         u.roo_called = true;
         if !main && let Some(v) = self.spatial.sight.as_mut() {
             v.unlink_building(placed.position, master.radius)?;
@@ -208,11 +211,15 @@ impl crate::world::World {
         let mode_680 = self.mode_680;
         let place = self.place(id).ok_or(NOT_HELD)?;
         let Self {
-            players, spatial, ..
+            players,
+            spatial,
+            parts,
+            ..
         } = self;
         let u = held(players, place)?;
-        let (main, rice) = (u.building.annex_of.is_some(), u.building.rice);
-        let c = u.building.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        let layer = parts.building_mut(u.id)?;
+        let (main, rice) = (layer.annex_of.is_some(), layer.rice);
+        let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let laid = stack_master(master, building, rice);
         lay_foundation(c, spatial, placed, master, building, laid, mode_680)?;
         let mut counts = Vec::new();

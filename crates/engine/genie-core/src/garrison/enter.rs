@@ -173,7 +173,10 @@ impl World {
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
         let target = ContainerId::new(if t.master(self.master_tables(), tp)?.kind == BUILDING {
-            t.building.annex_of.map_or(target, MainBuildingId::id)
+            self.parts
+                .building_of(t.id)
+                .annex_of
+                .map_or(target, MainBuildingId::id)
         } else {
             target
         });
@@ -318,7 +321,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
@@ -354,7 +358,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(self.master_tables(), tp)?.clone();
@@ -393,7 +398,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
@@ -424,7 +430,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let Some(crate::world::index::Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);

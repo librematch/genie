@@ -480,11 +480,12 @@ impl World {
         };
         // FUN_140aaddb0's building: an annex's main building
         let counted = match self.counted_building(Some(target))? {
-            Some(id) if id != target => self.object_mut(id).map(|(_, b)| b),
-            _ => Some(self.players.live_mut(fp, fi)?),
+            Some(id) if id != target => self.object(id).map(|(_, b)| b.id),
+            _ => Some(self.players.live(fp, fi)?.id),
         };
         let builders = counted
-            .and_then(|b| b.building.construction.as_mut())
+            .and_then(|id| self.parts.building.get_mut(id))
+            .and_then(|b| b.construction.as_mut())
             .map(|k| &mut k.builders);
         let r =
             build
@@ -534,7 +535,10 @@ impl World {
         };
         let kind = f.master(self.master_tables(), p)?.kind;
         Ok(Some(if kind == BUILDING {
-            f.building.annex_of.map_or(id, MainBuildingId::id)
+            self.parts
+                .building_of(f.id)
+                .annex_of
+                .map_or(id, MainBuildingId::id)
         } else {
             id
         }))

@@ -61,8 +61,9 @@ pub(crate) struct WorldPicker<'a> {
     pub(crate) foreign: Foreign<'a>,
     /// Every player's masters.
     pub(crate) every: crate::objects::masters::MasterTables<'a>,
-    /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]); the unit's own is out of it.
-    pub(crate) ais: &'a crate::world::parts::PartTable<crate::unit_ai::UnitAi>,
+    /// The world's parts by id ([`crate::world::parts::Parts`]): the units' AIs (the unit's own
+    /// is out of the table) and the buildings' layers.
+    pub(crate) parts: &'a crate::world::parts::Parts,
     /// The unit's master's terrain restriction (`+0x606`).
     pub(crate) restriction: Option<crate::map::RestrictionId>,
     /// The unit itself.
@@ -120,7 +121,8 @@ impl WorldPicker<'_> {
             "a priest's conversion test of an object the slice does not hold",
         ))?;
         if self
-            .ais
+            .parts
+            .unit_ai
             .get(p.id)
             .is_none_or(|a| a.ai_type != crate::unit_ai::PRIEST_AI)
         {
@@ -163,7 +165,11 @@ impl WorldPicker<'_> {
         let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
         let terrain = spatial.terrain.as_ref();
         let target = victim_of(
-            (t, self.ais.contains(t.id)),
+            (
+                t,
+                self.parts.unit_ai.contains(t.id),
+                self.parts.building_of(t.id),
+            ),
             tm,
             ta,
             tq,
@@ -171,7 +177,11 @@ impl WorldPicker<'_> {
             self.mode_680,
         );
         let unit = victim_of(
-            (f, self.ais.contains(f.id)),
+            (
+                f,
+                self.parts.unit_ai.contains(f.id),
+                self.parts.building_of(f.id),
+            ),
             fm,
             fa,
             fq,
@@ -186,9 +196,9 @@ impl WorldPicker<'_> {
         if fm.kind == BUILDING {
             factor = crate::combat::damage::building_elevation_factor(
                 factor,
-                f.building.relics,
+                self.parts.building_of(f.id).relics,
                 tm.kind,
-                t.building.relics,
+                self.parts.building_of(t.id).relics,
             );
         }
         let bonus = crate::combat::damage::bonus_damage(&unit, &target);
@@ -226,7 +236,11 @@ impl WorldPicker<'_> {
         }
         let terrain = spatial.terrain.as_ref();
         let v = victim_of(
-            (o, self.ais.contains(o.id)),
+            (
+                o,
+                self.parts.unit_ai.contains(o.id),
+                self.parts.building_of(o.id),
+            ),
             om,
             attributes,
             q,
@@ -239,7 +253,11 @@ impl WorldPicker<'_> {
         let target = match attacked {
             Some(t) => self.held(t)?.map(|(tq, t, ta, tm)| {
                 victim_of(
-                    (t, self.ais.contains(t.id)),
+                    (
+                        t,
+                        self.parts.unit_ai.contains(t.id),
+                        self.parts.building_of(t.id),
+                    ),
                     tm,
                     ta,
                     tq,
@@ -282,7 +300,7 @@ impl WorldPicker<'_> {
         let Some((_, t, _, tm)) = self.held(target)? else {
             return Ok(NearestAttacker::NoUnitAi);
         };
-        let Some(ai) = self.ais.get(t.id) else {
+        let Some(ai) = self.parts.unit_ai.get(t.id) else {
             return Ok(NearestAttacker::NoUnitAi);
         };
         let mut best: Option<(f32, ObjectId)> = None;
@@ -325,11 +343,16 @@ impl WorldPicker<'_> {
             master: t.life.master_id,
             combat_level: m.combat_level,
             capture,
-            has_ai: self.ais.contains(t.id),
+            has_ai: self.parts.unit_ai.contains(t.id),
             inside: t.life.inside.is_some(),
             targeting: !t.untargetable,
             attackable: t.attackable,
-            desolid: t.building.construction.as_ref().is_some_and(|c| c.desolid),
+            desolid: self
+                .parts
+                .building_of(t.id)
+                .construction
+                .as_ref()
+                .is_some_and(|c| c.desolid),
             position: placed.position,
             radius: placed.radius,
         };
@@ -401,7 +424,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             owner,
             allied: crate::unit_ai::task_finder::allied(self.relations, self.player, owner, true),
             state: t.life.state,
-            has_ai: self.ais.contains(t.id),
+            has_ai: self.parts.unit_ai.contains(t.id),
             inside: t.life.inside.is_some(),
             master: t.life.master_id,
             class: m.class,

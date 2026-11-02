@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::layers::Building;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -91,6 +92,7 @@ pub(crate) fn forget_resource(
 /// What it does not model.
 pub(crate) fn combat_dies(
     u: &mut Unit,
+    layer: &Building,
     master: &Master,
     spatial: &mut Spatial,
     pathing: &mut Pathing,
@@ -110,7 +112,7 @@ pub(crate) fn combat_dies(
     if u.roo_called {
         return Ok(());
     }
-    let desolid = u.building.construction.is_some_and(|c| c.desolid);
+    let desolid = layer.construction.is_some_and(|c| c.desolid);
     if master.kind < BUILDING || (!desolid && crate::map::Distance::ZERO < master.height) {
         pathing.removed(u.id);
         spatial.drop_record(u.id);
@@ -119,7 +121,7 @@ pub(crate) fn combat_dies(
         spatial.set_tall(u.id, false);
     }
     if master.kind == BUILDING
-        && u.building.annex_of.is_none()
+        && layer.annex_of.is_none()
         && u.life.inside.is_none()
         && let Some(v) = spatial.sight.as_mut()
     {
@@ -193,6 +195,7 @@ pub(crate) struct BuiltDeath {
 /// [`World::withdraw_tech`]: crate::world::World::withdraw_tech
 pub(crate) fn built_death(
     u: &mut Unit,
+    layer: &Building,
     master: &Master,
     computer: bool,
 ) -> Result<BuiltDeath, GenieError> {
@@ -210,7 +213,7 @@ pub(crate) fn built_death(
             "a dying building of foundation terrain 28 (its terrain 1, FUN_1411ce250)",
         ));
     }
-    let unlink = (u.building.annex_of.is_none() && u.life.inside.is_none()).then_some(u.position());
+    let unlink = (layer.annex_of.is_none() && u.life.inside.is_none()).then_some(u.position());
     let count = match master.id {
         MONASTERY => Some(MONASTERIES),
         WONDER => Some(WONDERS),
@@ -267,6 +270,7 @@ pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId,
 /// An object of a master its owner lacks.
 pub(crate) fn clear_look_of(
     u: &Unit,
+    layer: &Building,
     masters: crate::objects::masters::OwnerMasters<'_>,
 ) -> Result<crate::construction::build::ClearLook, GenieError> {
     let m = u.master_in(masters)?;
@@ -276,7 +280,7 @@ pub(crate) fn clear_look_of(
         roo_called: u.roo_called,
         kind: m.kind,
         state: u.life.state,
-        desolid: u.building.construction.is_some_and(|c| c.desolid),
+        desolid: layer.construction.is_some_and(|c| c.desolid),
     })
 }
 

@@ -29,7 +29,6 @@ use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::UnitAiType;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
-use crate::world::parts::PartTable;
 
 /// Slot 0x228 (`FUN_141084070`): the attacks above 0 add up in their order from +0; none
 /// (or none above 0) is +0.
@@ -135,7 +134,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
             &every,
             crate::world::parts::no_own_masters(),
         ),
-        ais: &PartTable::default(),
+        parts: crate::world::parts::no_parts(),
         restriction: None,
         unit: &me,
         attributes: &[],
@@ -177,15 +176,12 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
         unit(object_id(21), 12.0, master_id(4)),
         unit(object_id(22), 12.0, master_id(4)),
     ]);
-    let ais: PartTable<UnitAi> = [
-        (
-            object_id(20),
-            attacked(Attackers::of_saved(&[50, 51, 52, 53])),
-        ),
-        (object_id(22), attacked(Attackers::of_saved(&[99]))),
-    ]
-    .into_iter()
-    .collect();
+    let mut parts = crate::world::parts::Parts::default();
+    parts.set_unit_ai(
+        object_id(20),
+        Some(attacked(Attackers::of_saved(&[50, 51, 52, 53]))),
+    );
+    parts.set_unit_ai(object_id(22), Some(attacked(Attackers::of_saved(&[99]))));
     let enemy = Player {
         // 50 at a gap of 4.4, 51 of 2.4 (its radius 1), 53 of 2.4 too
         objects: vec![
@@ -253,7 +249,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
             &every,
             crate::world::parts::no_own_masters(),
         ),
-        ais: &ais,
+        parts: &parts,
         restriction: None,
         unit: &me,
         attributes: &[],
@@ -416,7 +412,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
             &every,
             crate::world::parts::no_own_masters(),
         ),
-        ais: &PartTable::default(),
+        parts: crate::world::parts::no_parts(),
         restriction: None,
         unit: &me,
         attributes: &[],

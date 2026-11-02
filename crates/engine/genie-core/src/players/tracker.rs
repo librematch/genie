@@ -433,7 +433,9 @@ impl crate::world::World {
                 }
                 let building = u.master(self.master_tables(), p)?.kind == BUILDING;
                 if building
-                    && u.building
+                    && self
+                        .parts
+                        .building_of(u.id)
                         .construction
                         .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress)
                 {
@@ -885,42 +887,45 @@ mod tests {
     fn world() -> crate::world::World {
         use crate::objects::unit::Unit;
         use crate::world::{Player, World};
-        let unit = |id: i32, master: MasterId, progress: Option<f32>| {
+        let unit = |id: i32, master: MasterId| {
             let mut u = Unit {
                 id: object_id(id),
-                building: crate::objects::layers::Building {
-                    construction: progress.map(|progress| {
-                        crate::construction::build::Construction {
-                            progress: Seconds::new(progress),
-                            desolid: false,
-                            builders: crate::construction::BuilderCount::of_data(0),
-                            hit_points: MasterHitPoints::of_data(2400),
-                            build_time: WholeSeconds::of_data(150),
-                            record: crate::map::spatial::Obstruction {
-                                kind: ObstructionType::NONE,
-                                class: ObstructionClass::NONE,
-                            },
-                            snow: false,
-                            sprite_override: false,
-                        }
-                    }),
-                    ..Default::default()
-                },
                 ..Unit::default()
             };
             u.life.master_id = master;
             u
         };
+        let site = |id: i32, progress: f32| {
+            (
+                object_id(id),
+                crate::objects::layers::Building {
+                    construction: Some(crate::construction::build::Construction {
+                        progress: Seconds::new(progress),
+                        desolid: false,
+                        builders: crate::construction::BuilderCount::of_data(0),
+                        hit_points: MasterHitPoints::of_data(2400),
+                        build_time: WholeSeconds::of_data(150),
+                        record: crate::map::spatial::Obstruction {
+                            kind: ObstructionType::NONE,
+                            class: ObstructionClass::NONE,
+                        },
+                        snow: false,
+                        sprite_override: false,
+                    }),
+                    ..Default::default()
+                },
+            )
+        };
         let player = Player {
             objects: vec![
-                unit(10, ids::TOWN_CENTRE, Some(150.0)),
-                unit(11, ids::VILLAGER_MALE, None),
-                unit(12, ids::TOWN_CENTRE, Some(149.9)),
-                unit(13, ids::BUILDER, None),
-                unit(14, ids::TOWN_CENTRE, Some(f32::NAN)),
+                unit(10, ids::TOWN_CENTRE),
+                unit(11, ids::VILLAGER_MALE),
+                unit(12, ids::TOWN_CENTRE),
+                unit(13, ids::BUILDER),
+                unit(14, ids::TOWN_CENTRE),
             ]
             .into(),
-            sleeping: vec![unit(15, ids::VILLAGER_MALE, None)].into(),
+            sleeping: vec![unit(15, ids::VILLAGER_MALE)].into(),
             ..Player::default()
         };
         let mut t = World::new(
@@ -929,7 +934,8 @@ mod tests {
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![Player::default(), player],
-        );
+        )
+        .with_buildings([site(10, 150.0), site(12, 149.9), site(14, f32::NAN)]);
         t.masters = vec![masters(), masters()];
         t.lines = lines();
         t

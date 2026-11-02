@@ -53,11 +53,11 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        let desolid = Self::site_unit(c, reads)?
-            .ok_or(FOREIGN_SITE)?
-            .building
-            .construction
-            .is_some_and(|k| k.desolid);
+        let desolid =
+            c.w.parts
+                .building_of(Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?.id)
+                .construction
+                .is_some_and(|k| k.desolid);
         // every set_state first takes the builder out of FUN_140aaddb0's building's builders
         self.uncount(c)?;
         self.move_to = None;
@@ -171,7 +171,11 @@ impl BuildAction {
             let placed = *c.w.spatial.get_known(part)?.ok_or(SITE_GONE)?;
             let own = with_annexes(c, part);
             let (_, unit) = c.w.object(part).ok_or(SITE_GONE)?;
-            let desolid = unit.building.construction.is_some_and(|k| k.desolid);
+            let desolid =
+                c.w.parts
+                    .building_of(unit.id)
+                    .construction
+                    .is_some_and(|k| k.desolid);
             let code = self.lend(c, builder, |w, _, _| {
                 w.foundation_code(&placed, desolid, &own)
             })?;
@@ -364,7 +368,8 @@ impl BuildAction {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let mover = builder.body.mover().ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(self.target).ok_or(SITE_GONE)?;

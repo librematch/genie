@@ -51,7 +51,9 @@ impl Unit {
         let combat = crate::objects::masters::master_type::COMBAT
             <= self.master(c.w.master_tables(), c.player)?.kind;
         if combat
-            && let Some(mask) = c.w.spatial.combat_sight(self.id, self.building.annex_of)?
+            && let Some(mask) =
+                c.w.spatial
+                    .combat_sight(self.id, c.w.parts.building_of(self.id).annex_of)?
             && let Some(q) = crate::vision::visibility::sight_taker(
                 mask,
                 c.player,
@@ -537,7 +539,7 @@ impl Unit {
                 hp: u.life.hp,
                 master: u.life.master_id,
                 kind: m.kind,
-                main: u.building.annex_of,
+                main: c.w.parts.building_of(u.id).annex_of,
                 allied: crate::unit_ai::task_finder::allied(
                     view.relations(c.w)?,
                     view.player,

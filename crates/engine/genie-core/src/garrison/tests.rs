@@ -203,9 +203,10 @@ fn garrison_world() -> World {
     let _ = t
         .push_live(PlayerId::new(1), unit(200, SHIP, HitPoints::new(100.0)))
         .unwrap();
-    let mut gate = unit(300, GATE, HitPoints::new(2750.0));
-    gate.building.annex_of = Some(MainBuildingId::new(object_id(100)));
+    let gate = unit(300, GATE, HitPoints::new(2750.0));
     let _ = t.push_live(PlayerId::new(1), gate).unwrap();
+    t.parts.building_mut(object_id(300)).unwrap().annex_of =
+        Some(MainBuildingId::new(object_id(100)));
     t
 }
 
@@ -2283,8 +2284,8 @@ pub(crate) fn building_at(
 ) {
     let mut b = unit(id, m, HitPoints::new(2400.0));
     b.place_for_test(at.with_height(0.0));
-    b.building.annex_of = annex_of.map(MainBuildingId::new);
     let _ = t.push_live(PlayerId::new(1), b).unwrap();
+    t.parts.building_mut(object_id(id)).unwrap().annex_of = annex_of.map(MainBuildingId::new);
     t.spatial.insert(
         object_id(id),
         crate::map::spatial::Placed {

@@ -16,14 +16,16 @@ use crate::world::slots::PlayerSlots;
 use crate::world::{GATE_COUNT_CAP, GATE_GROW, GATE_QUERY_RECORDS, World};
 
 /// `FUN_1411d4a30`, a building's slot 0x678 (any other object's answers no): whether the gate
-/// `gate` (master `master`, of player `owner`) lets a unit of `player` pass. It does below state
+/// `gate` (its building layer `layer`, master `master`, of player `owner`) lets a unit of
+/// `player` pass. It does below state
 /// 3, as a gate (class 39) whose master transforms (`+0x9ba`) and that is not locked (`+0xc7c`),
 /// when its owner counts the player as an ally (`FUN_141663dc0`) and the player its owner
 /// (`FUN_141663d90`), each with the ally flag.
 #[must_use]
 pub fn lets_pass(
-    (gate, master): (
+    (gate, layer, master): (
         &crate::objects::unit::Unit,
+        &crate::objects::layers::Building,
         &crate::objects::masters::Master,
     ),
     owner: PlayerId,
@@ -38,7 +40,7 @@ pub fn lets_pass(
         && gate.life.state < ObjectState::Dying
         && master.class == class::GATE
         && transforms
-        && !gate.building.gate.is_some_and(|g| g.locked)
+        && !layer.gate.is_some_and(|g| g.locked)
         && spatial.allied_with(owner, player)
         && spatial.allied_with(player, owner)
 }
@@ -147,7 +149,8 @@ impl World {
     ) -> Result<bool, GenieError> {
         let gate = self.players.live(q, i)?;
         let m = gate.master(self.master_tables(), q)?;
-        Ok(lets_pass((gate, m), q, p, &self.spatial))
+        let layer = self.parts.building_of(gate.id);
+        Ok(lets_pass((gate, layer, m), q, p, &self.spatial))
     }
 
     /// `BaseWorld::update` before player `p` updates (not Gaia): the gates of each player `q`

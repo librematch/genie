@@ -239,7 +239,12 @@ impl World {
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             &self.index,
         );
-        let by_id = crate::world::index::ObjectsRef::new(players, index, masters);
+        let by_id = crate::world::index::ObjectsRef::of_tables(
+            players,
+            index,
+            masters,
+            &self.parts.building,
+        );
         let candidate = |spatial: &crate::map::spatial::Spatial,
                          id: ObjectId|
          -> Result<Candidate, GenieError> {

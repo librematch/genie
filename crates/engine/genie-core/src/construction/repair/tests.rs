@@ -392,7 +392,8 @@ fn sprite_of(t: &crate::world::World) -> Option<SpriteId> {
 /// The house's hit points, repairers and holders (its slot 0x180 count).
 fn the_house(t: &crate::world::World) -> (f32, u8, i32) {
     let h = t.object(object_id(10028)).unwrap().1;
-    (h.life.hp.get(), h.repairers().get(), h.workers.get())
+    let site = t.parts.building_of(h.id).construction.as_ref();
+    (h.life.hp.get(), h.repairers(site).get(), h.workers.get())
 }
 
 /// The sprite its `MoveTo` shows: the task's moving sprite, else the default of its
@@ -665,8 +666,9 @@ fn a_repairer_at_its_target_faces_it_or_waits_or_fails() {
 fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     let working = |r: &mut RepairAction| (r.state, r.move_to) = (RepairState::Work, None);
     let mut t = repair_at(NEAR, working);
-    t.players[1].objects[ListIndex::new(1)]
-        .building
+    t.parts
+        .building_mut(t.players[1].objects[ListIndex::new(1)].id)
+        .unwrap()
         .construction
         .as_mut()
         .unwrap()
@@ -720,8 +722,9 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     assert_eq!(the_house(&t).0, 300.0);
     // the house moved out of reach: the repairer walks again, no longer counted
     let mut t = repair_at(NEAR, working);
-    t.players[1].objects[ListIndex::new(1)]
-        .building
+    t.parts
+        .building_mut(t.players[1].objects[ListIndex::new(1)].id)
+        .unwrap()
         .construction
         .as_mut()
         .unwrap()

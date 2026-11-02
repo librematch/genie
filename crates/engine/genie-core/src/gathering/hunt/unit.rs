@@ -129,7 +129,8 @@ impl Unit {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let hunt = self
@@ -447,7 +448,8 @@ impl Unit {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object(&me, (spatial, by_id), &mut plan, id, range, master_id)
@@ -665,7 +667,8 @@ impl Unit {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let w = DropWorld {
             masters: crate::objects::masters::OwnerMasters::new(

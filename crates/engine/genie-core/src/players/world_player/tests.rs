@@ -226,12 +226,9 @@ fn a_mill_s_livestock_makes_food() {
         master(master_id(5), master_type::COMBAT, class::LIVESTOCK),
     ]);
     t.masters = vec![masters.clone(), masters.clone(), masters.clone(), masters];
-    let mut mill = object(10, master_id(68), ObjectState::Alive);
-    mill.building.livestock_summation = Amount::new(100.0);
-    let mut other = object(11, master_id(68), ObjectState::Alive);
-    other.building.livestock_summation = Amount::new(300.0);
-    let mut sheep = object(12, master_id(5), ObjectState::Alive);
-    sheep.building.livestock_summation = Amount::new(1000.0);
+    let mill = object(10, master_id(68), ObjectState::Alive);
+    let other = object(11, master_id(68), ObjectState::Alive);
+    let sheep = object(12, master_id(5), ObjectState::Alive);
     let key = Key {
         master: Some(ids::MILL),
         class: Some(class::BUILDING),
@@ -246,6 +243,12 @@ fn a_mill_s_livestock_makes_food() {
     p.attributes[254] = Amount::new(15.0);
     p.update_time = Seconds::new(0.5);
     t.reindex();
+    for (id, sum) in [(10, 100.0), (11, 300.0), (12, 1000.0)] {
+        t.parts
+            .building_mut(object_id(id))
+            .unwrap()
+            .livestock_summation = Amount::new(sum);
+    }
     t.update_world_player(PlayerId::new(1)).unwrap();
     let grows = crate::math::fmath::log(400.0 / 200.0 + 1.0);
     let food = 15.0 / 60.0 * (1.5 * grows);

@@ -181,10 +181,6 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             master_id: ids::HOUSE,
             ..Lifecycle::default()
         },
-        building: crate::objects::layers::Building {
-            construction: Some(construction(0.0, 0, true)),
-            ..Default::default()
-        },
         workers: crate::objects::WorkerCount::of_data(1),
         pasture: None,
         my_pasture: None,
@@ -205,6 +201,13 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             },
         ],
     )
+    .with_buildings([(
+        HOUSE,
+        crate::objects::layers::Building {
+            construction: Some(construction(0.0, 0, true)),
+            ..Default::default()
+        },
+    )])
     .with_ais([(
         BUILDER,
         UnitAi {
@@ -320,7 +323,13 @@ const SEARCH: (NotifyKind, [i32; 3]) = (
 /// The house's builders, workers and state.
 fn house(t: &World) -> (u8, i32, ObjectState) {
     let u = t.players[1].objects.by_id(HOUSE).unwrap();
-    (u.repairers().get(), u.workers.get(), u.life.state)
+    let site = t.parts.building_of(HOUSE).construction.as_ref();
+    (u.repairers(site).get(), u.workers.get(), u.life.state)
+}
+
+/// A copy of player 1's object `id` with its parts, to put in under another id.
+fn copy_of(t: &World, id: ObjectId) -> Object {
+    t.object_of(t.players[1].objects.by_id(id).unwrap())
 }
 
 /// Moves object `id` of player 1 to `at`, its body and its place on the map.
@@ -353,18 +362,14 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     };
     let mut t = site_world(class::VILLAGER, Position::new(12.0, 10.5, 0.0), b);
     // another builder works on the main building, below 1 hit point: the work stays the annex's
-    let main = own(&mut t, HOUSE);
-    main.building.construction = Some(construction(1.0, 1, false));
-    main.life.hp = HitPoints::new(0.5);
-    let mut annex = own(&mut t, HOUSE).clone();
-    let annex_ai = t.parts.unit_ai.get(HOUSE).cloned();
-    annex.id = ANNEX;
-    annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
-    annex.life.hp = HitPoints::new(1.0);
-    annex.building.construction = Some(construction(1.0, 0, false));
-    let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(annex, annex_ai))
-        .unwrap();
+    t.parts.building_mut(HOUSE).unwrap().construction = Some(construction(1.0, 1, false));
+    own(&mut t, HOUSE).life.hp = HitPoints::new(0.5);
+    let mut annex = copy_of(&t, HOUSE);
+    annex.unit.id = ANNEX;
+    annex.parts.building.annex_of = Some(MainBuildingId::new(HOUSE));
+    annex.unit.life.hp = HitPoints::new(1.0);
+    annex.parts.building.construction = Some(construction(1.0, 0, false));
+    let _ = t.push_live(PlayerId::new(1), annex).unwrap();
     t.spatial.insert(
         ANNEX,
         placed(
@@ -376,11 +381,8 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
     );
     let _ = code(&mut t, 30);
     let annex_of = |t: &World| {
-        t.players[1]
-            .objects
-            .by_id(ANNEX)
-            .unwrap()
-            .building
+        t.parts
+            .building_of(t.players[1].objects.by_id(ANNEX).unwrap().id)
             .construction
     };
     let b = build(&t);
@@ -399,7 +401,13 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
         ))
     );
     let mut b = build(&t);
-    let main = own(&mut t, HOUSE).building.construction.as_mut().unwrap();
+    let main = t
+        .parts
+        .building_mut(HOUSE)
+        .unwrap()
+        .construction
+        .as_mut()
+        .unwrap();
     b.retake(
         Position::ORIGIN,
         None,
@@ -479,9 +487,8 @@ fn a_builder_whose_foundation_dies_walks_to_its_point() {
         ..started(HOUSE, AT_HOUSE, Distance::new(0.8), TASK)
     };
     let mut t = site_world(class::VILLAGER, Position::new(8.0, 9.0, 0.0), b);
-    let h = own(&mut t, HOUSE);
-    (h.life.state, h.building.construction) =
-        (ObjectState::Removed, Some(construction(3.0, 1, false)));
+    own(&mut t, HOUSE).life.state = ObjectState::Removed;
+    t.parts.building_mut(HOUSE).unwrap().construction = Some(construction(3.0, 1, false));
     assert_eq!(code(&mut t, 20), HeadCode::Keeps);
     let b = build(&t);
     assert_eq!(
@@ -567,9 +574,8 @@ fn a_waiting_builder_whose_foundation_dies_walks_to_its_place() {
     };
     // within the task's range of the place, so the walk ends without a path
     let mut t = site_world(class::VILLAGER, Position::new(10.55, 10.5, 0.0), b);
-    let h = own(&mut t, HOUSE);
-    (h.life.state, h.building.construction) =
-        (ObjectState::Gone, Some(construction(0.0, 0, false)));
+    own(&mut t, HOUSE).life.state = ObjectState::Gone;
+    t.parts.building_mut(HOUSE).unwrap().construction = Some(construction(0.0, 0, false));
     let _ = code(&mut t, 20);
     let b = build(&t);
     let walk = b.move_to.unwrap();
@@ -1038,14 +1044,11 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         stump(&mut t);
         sighted(&mut t);
         own(&mut t, BUILDER).footprint_waits = crate::construction::FootprintWaits::of_data(waits);
-        let mut other = own(&mut t, BUILDER).clone();
-        let other_ai = t.parts.unit_ai.get(BUILDER).cloned();
-        other.id = object_id(6);
-        other.actions.list = ActionList::default();
-        other.place_for_test(Position::new(10.6, 10.6, 0.0));
-        let _ = t
-            .push_live(PlayerId::new(1), Object::with_ai(other, other_ai))
-            .unwrap();
+        let mut other = copy_of(&t, BUILDER);
+        other.unit.id = object_id(6);
+        other.unit.actions.list = ActionList::default();
+        other.unit.place_for_test(Position::new(10.6, 10.6, 0.0));
+        let _ = t.push_live(PlayerId::new(1), other).unwrap();
         let me = *t.spatial.get(BUILDER).unwrap();
         t.spatial.insert(
             object_id(6),
@@ -1096,11 +1099,12 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
     let h = own(&mut t, HOUSE);
     h.life.master_id = PASTURE_1889;
     h.life.state = ObjectState::Alive;
-    h.building.construction = Some(Construction {
+    let layer = t.parts.building_mut(HOUSE).unwrap();
+    layer.construction = Some(Construction {
         build_time: WholeSeconds::of_data(20),
         ..construction(20.0, 1, false)
     });
-    h.building.stack_made = Some(object_id(10031));
+    layer.stack_made = Some(object_id(10031));
     let v = own(&mut t, BUILDER);
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(7.0));
     let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
@@ -1196,7 +1200,7 @@ fn a_builder_lets_a_dead_foundation_go() {
         let h = own(&mut t, HOUSE);
         h.life.master_id = master;
         h.life.state = state;
-        h.building.construction = Some(construction(progress, 2, false));
+        t.parts.building_mut(HOUSE).unwrap().construction = Some(construction(progress, 2, false));
         let _ = code(&mut t, 20);
         let b = build(&t);
         (
@@ -1283,17 +1287,14 @@ fn a_builder_at_the_foundation_works_in_its_first_update_the_others_walk_to_it()
 /// The mill 300 at (15.5, 10.5) beside [`site_world`]'s house, done in its owner's tracker, a
 /// drop site of the table for the villagers' wood (resource 1).
 fn with_mill(t: &mut World) {
-    let mut mill = own(t, HOUSE).clone();
-    let mill_ai = t.parts.unit_ai.get(HOUSE).cloned();
-    mill.id = object_id(300);
-    mill.life.master_id = master_id(68);
-    mill.life.state = ObjectState::Alive;
-    mill.workers = crate::objects::WorkerCount::of_data(0);
-    mill.building.construction = Some(construction(25.0, 0, false));
-    mill.place_for_test(Position::new(15.5, 10.5, 0.0));
-    let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(mill, mill_ai))
-        .unwrap();
+    let mut mill = copy_of(t, HOUSE);
+    mill.unit.id = object_id(300);
+    mill.unit.life.master_id = master_id(68);
+    mill.unit.life.state = ObjectState::Alive;
+    mill.unit.workers = crate::objects::WorkerCount::of_data(0);
+    mill.parts.building.construction = Some(construction(25.0, 0, false));
+    mill.unit.place_for_test(Position::new(15.5, 10.5, 0.0));
+    let _ = t.push_live(PlayerId::new(1), mill).unwrap();
     t.spatial.insert(
         object_id(300),
         placed(
@@ -1337,7 +1338,7 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
     };
     let mut t = site_world(class::VILLAGER, Position::new(2.5, 2.5, 0.0), b);
     with_mill(&mut t);
-    own(&mut t, HOUSE).building.construction = Some(construction(0.0, 3, true));
+    t.parts.building_mut(HOUSE).unwrap().construction = Some(construction(0.0, 3, true));
     let mill = |t: &World| {
         t.players[1]
             .objects
@@ -1641,16 +1642,13 @@ fn a_drop_off_whose_site_went_past_state_6_searches_again() {
 
 /// Player 1's standing lumber camp 30 (master 562, built) at `at`.
 fn camp(t: &mut World, at: Position) {
-    let mut camp = own(t, HOUSE).clone();
-    let camp_ai = t.parts.unit_ai.get(HOUSE).cloned();
-    camp.id = object_id(30);
-    camp.life.master_id = master_id(562);
-    camp.life.state = ObjectState::Alive;
-    camp.building.construction = Some(construction(25.0, 0, false));
-    camp.place_for_test(at);
-    let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(camp, camp_ai))
-        .unwrap();
+    let mut camp = copy_of(t, HOUSE);
+    camp.unit.id = object_id(30);
+    camp.unit.life.master_id = master_id(562);
+    camp.unit.life.state = ObjectState::Alive;
+    camp.parts.building.construction = Some(construction(25.0, 0, false));
+    camp.unit.place_for_test(at);
+    let _ = t.push_live(PlayerId::new(1), camp).unwrap();
     t.spatial.insert(
         object_id(30),
         placed(at, 1.0, class::BUILDING, master_id(562)),
@@ -1659,14 +1657,11 @@ fn camp(t: &mut World, at: Position) {
 
 /// Player 1's villager 6, a copy of the builder without actions, standing at `at`.
 fn villager(t: &mut World, at: Position) {
-    let mut other = own(t, BUILDER).clone();
-    let other_ai = t.parts.unit_ai.get(BUILDER).cloned();
-    other.id = object_id(6);
-    other.actions.list = ActionList::default();
-    other.place_for_test(at);
-    let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(other, other_ai))
-        .unwrap();
+    let mut other = copy_of(t, BUILDER);
+    other.unit.id = object_id(6);
+    other.unit.actions.list = ActionList::default();
+    other.unit.place_for_test(at);
+    let _ = t.push_live(PlayerId::new(1), other).unwrap();
     let me = *t.spatial.get(BUILDER).unwrap();
     t.spatial.insert(
         object_id(6),
@@ -1681,14 +1676,11 @@ fn villager(t: &mut World, at: Position) {
 /// The house's desolid annex 10029 (a copy of the house, `+0xbb8` the house) at `at`.
 fn annex(t: &mut World, at: Position) -> i32 {
     const ANNEX: i32 = 10029;
-    let mut annex = own(t, HOUSE).clone();
-    let annex_ai = t.parts.unit_ai.get(HOUSE).cloned();
-    annex.id = object_id(ANNEX);
-    annex.building.annex_of = Some(MainBuildingId::new(HOUSE));
-    annex.place_for_test(at);
-    let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(annex, annex_ai))
-        .unwrap();
+    let mut annex = copy_of(t, HOUSE);
+    annex.unit.id = object_id(ANNEX);
+    annex.parts.building.annex_of = Some(MainBuildingId::new(HOUSE));
+    annex.unit.place_for_test(at);
+    let _ = t.push_live(PlayerId::new(1), annex).unwrap();
     t.spatial.insert(
         object_id(ANNEX),
         placed(at, 1.0, class::BUILDING, ids::HOUSE),

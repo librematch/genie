@@ -250,7 +250,7 @@ impl World {
                 Some((_, u))
                     if u.master(self.master_tables(), p)?.kind == master_type::BUILDING =>
                 {
-                    u.building.annexes
+                    self.parts.building_of(u.id).annexes
                 }
                 _ => continue,
             };
@@ -259,8 +259,8 @@ impl World {
                     continue;
                 };
                 let am = a.master(self.master_tables(), p)?;
-                let own_annexes =
-                    am.kind == master_type::BUILDING && a.building.annexes.ids().next().is_some();
+                let own_annexes = am.kind == master_type::BUILDING
+                    && self.parts.building_of(a.id).annexes.ids().next().is_some();
                 if !own_annexes && am.class == class {
                     let _ = self.change_object(annex, change, v, attribute)?;
                 }
@@ -356,7 +356,7 @@ impl World {
                 a::SIZE_Z => {
                     let desolid = self
                         .object(id)
-                        .and_then(|(_, u)| u.building.construction.as_ref())
+                        .and_then(|(_, u)| self.parts.building_of(u.id).construction.as_ref())
                         .is_some_and(|c| c.desolid);
                     if master.kind == master_type::BUILDING
                         && !desolid
@@ -491,7 +491,7 @@ impl World {
                 a::DEAD_UNIT_ID => u.life.death_spawn = master.death_spawns[0].is_some(),
                 _ => {}
             }
-            if let Some(c) = u.building.construction.as_mut() {
+            if let Some(c) = self.parts.building_mut(u.id)?.construction.as_mut() {
                 match attribute {
                     a::HIT_POINTS => c.hit_points = master.hit_points,
                     a::TRAIN_TIME

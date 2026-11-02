@@ -81,6 +81,7 @@ impl UnitView<'_, '_> {
                 target,
                 1,
                 &find,
+                &self.c.w.parts.building,
                 crate::objects::masters::MasterTables::new(
                     &self.c.w.masters,
                     &self.c.w.parts.own_master,
@@ -90,6 +91,7 @@ impl UnitView<'_, '_> {
                 target,
                 2,
                 &find,
+                &self.c.w.parts.building,
                 crate::objects::masters::MasterTables::new(
                     &self.c.w.masters,
                     &self.c.w.parts.own_master,
@@ -196,6 +198,7 @@ impl UnitView<'_, '_> {
                 target,
                 1,
                 &find,
+                &self.c.w.parts.building,
                 crate::objects::masters::MasterTables::new(
                     &self.c.w.masters,
                     &self.c.w.parts.own_master,
@@ -205,6 +208,7 @@ impl UnitView<'_, '_> {
                 target,
                 2,
                 &find,
+                &self.c.w.parts.building,
                 crate::objects::masters::MasterTables::new(
                     &self.c.w.masters,
                     &self.c.w.parts.own_master,
@@ -299,10 +303,8 @@ impl UnitView<'_, '_> {
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                &self.c.w.masters,
+                &self.c.w.parts,
             ),
             zones,
             plan: Planning {

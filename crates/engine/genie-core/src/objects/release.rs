@@ -6,6 +6,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Building;
 use crate::objects::lifecycle::death_parts::{count_class, forget_resource};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
@@ -37,30 +38,34 @@ pub(crate) struct Releaser {
 /// 699, the releaser's master class as its first parameter; none from an object of a negative
 /// id). A building's (`FUN_1411d6020`) first drops the releaser's first entry from its attacking
 /// units (`+0xce0`, the rest keeping their order) when it lists it (`listed`, [`Unit::lists_taker`]).
-/// `ai` is the object's unit AI.
+/// `ai` is the object's unit AI, `layer` its building layer (none: no attacking units).
 pub(crate) fn released(
     u: &mut Unit,
-    ai: Option<&mut crate::unit_ai::UnitAi>,
+    (ai, layer): (Option<&mut crate::unit_ai::UnitAi>, Option<&mut Building>),
     (kind, listed): (MasterKind, bool),
     by: Releaser,
 ) -> Result<(), GenieError> {
     let state = u.life.state;
-    match (released_fields(u, kind, listed, by), ai) {
+    match (released_fields(u, layer, (kind, listed), by), ai) {
         (Some(n), Some(ai)) => ai.post(n, state),
         _ => Ok(()),
     }
 }
 
-/// [`released`] on the object `u` itself; returns the notify 699 a combat object's unit AI is
-/// told (none for a releaser of a negative id), which [`released`] posts.
+/// [`released`] on the object `u` itself and its building layer `layer`; returns the notify
+/// 699 a combat object's unit AI is told (none for a releaser of a negative id), which
+/// [`released`] posts.
 pub(crate) fn released_fields(
     u: &mut Unit,
-    kind: MasterKind,
-    listed: bool,
+    layer: Option<&mut Building>,
+    (kind, listed): (MasterKind, bool),
     by: Releaser,
 ) -> Option<Notify> {
-    if listed && let Some(i) = u.building.attacking_units.iter().position(|&t| t == by.id) {
-        let _ = u.building.attacking_units.remove(i);
+    if listed
+        && let Some(layer) = layer
+        && let Some(i) = layer.attacking_units.iter().position(|&t| t == by.id)
+    {
+        let _ = layer.attacking_units.remove(i);
     }
     if crate::objects::WorkerCount::ZERO < u.workers {
         u.workers = u.workers.plus(-1);

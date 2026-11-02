@@ -307,7 +307,8 @@ impl RepairAction {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            &c.w.masters,
+            &c.w.parts,
         );
         let spatial = &mut c.w.spatial;
         let terrain = spatial
@@ -420,9 +421,9 @@ impl RepairAction {
     /// once; nothing without one.
     fn count(c: &mut Step<'_>, reads: &RepairReads, by: i8) {
         if let Some((id, _)) = reads.counted_in
-            && let Some((_, u)) = c.w.object_mut(id)
+            && let Some((u, site)) = c.w.object_and_site_mut(id)
         {
-            let n = u.repairers_mut();
+            let n = u.repairers_mut(site);
             *n = n.changed_by(by);
         }
     }

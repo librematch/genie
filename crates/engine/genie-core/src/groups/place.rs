@@ -179,10 +179,8 @@ impl World {
                 crate::world::index::ObjectsRef::new(
                     &self.players,
                     &self.index,
-                    crate::objects::masters::MasterTables::new(
-                        &self.masters,
-                        &self.parts.own_master,
-                    ),
+                    &self.masters,
+                    &self.parts,
                 ),
             )? {
                 return Ok(at);
@@ -266,7 +264,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let Some(g) = self.groups.get(group) else {
             return Ok(());

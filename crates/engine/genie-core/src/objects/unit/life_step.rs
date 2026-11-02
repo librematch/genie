@@ -130,7 +130,7 @@ impl Unit {
             && !(before == ObjectState::DyingSprite && after == ObjectState::Dead)
             && self.master(c.w.master_tables(), c.player)?.kind == BUILDING
         {
-            let annexes = self.building.annexes;
+            let annexes = c.w.parts.building_of(self.id).annexes;
             for annex in annexes.ids() {
                 if let Some((q, _)) = c.w.object(annex) {
                     c.lend(self, |w| w.set_state(q, annex, after))?;

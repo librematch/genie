@@ -34,6 +34,8 @@ pub(crate) struct Lets<'l> {
     pub(crate) masters: crate::objects::masters::MasterTables<'l>,
     /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]).
     pub(crate) ais: &'l mut crate::world::parts::PartTable<crate::unit_ai::UnitAi>,
+    /// The buildings' layers ([`crate::world::parts::Parts::building`]).
+    pub(crate) buildings: &'l mut crate::world::parts::PartTable<crate::objects::layers::Building>,
     pub(crate) lines: &'l UnitLines,
     pub(crate) tracker: &'l mut Tracker,
     pub(crate) own_notifies: &'l mut Vec<(Notify, crate::objects::ObjectState)>,
@@ -92,6 +94,7 @@ impl World {
                 &self.parts.own_master,
             ),
             ais: &mut self.parts.unit_ai,
+            buildings: &mut self.parts.building,
             lines: &self.lines,
             tracker,
             own_notifies,
@@ -244,12 +247,19 @@ impl Lets<'_> {
     /// its worker ([`crate::objects::unit::Unit::taken`]; a building first lists an unallied
     /// taker of a foundation with a stack unit).
     fn taken_live(
-        &self,
+        &mut self,
         u: &mut Unit,
         (p, allied): (PlayerId, bool),
         by: Releaser,
     ) -> Result<(), GenieError> {
-        let listed = u.lists_taker(u.master(self.masters, p)?, allied);
+        let listed = if u.lists_taker(u.master(self.masters, p)?, allied) {
+            Some(
+                self.buildings
+                    .get_or_insert_with(u.id, || crate::objects::layers::Building::NONE)?,
+            )
+        } else {
+            None
+        };
         u.taken(listed, by.id);
         Ok(())
     }
@@ -292,7 +302,12 @@ impl Lets<'_> {
         let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
         let m = u.master(self.masters, p)?;
         let (kind, listed) = (m.kind, u.lists_taker(m, allied));
-        released(u, self.ais.get_mut(id), (kind, listed), by)
+        released(
+            u,
+            (self.ais.get_mut(id), self.buildings.get_mut(id)),
+            (kind, listed),
+            by,
+        )
     }
 
     /// [`Lets::release`] on the updating object `me` itself, of the lets' player: a live
@@ -312,7 +327,7 @@ impl Lets<'_> {
         let allied = self.allied(others.view(), by.player, owner);
         let m = me.master(self.masters, owner)?;
         let (kind, listed) = (m.kind, me.lists_taker(m, allied));
-        let Some(n) = released_fields(me, kind, listed, by) else {
+        let Some(n) = released_fields(me, self.buildings.get_mut(me.id), (kind, listed), by) else {
             return Ok(());
         };
         let state = me.life.state;
@@ -335,7 +350,7 @@ impl Lets<'_> {
     ///
     /// [`World::leave_builders`]: crate::world::World::leave_builders
     pub(crate) fn leave_builders(
-        &self,
+        &mut self,
         others: &mut Others<'_>,
         me: Option<&mut Unit>,
         id: ObjectId,
@@ -348,10 +363,14 @@ impl Lets<'_> {
             };
             self.site_of(f, p, id)?
         };
+        let construction = self
+            .buildings
+            .get_mut(site)
+            .and_then(|b| b.construction.as_mut());
         if let Some(u) = me.filter(|u| u.id == site) {
-            leave_site(u);
+            leave_site(u, construction);
         } else if let Some((_, b)) = others.get_mut(site) {
-            leave_site(b);
+            leave_site(b, construction);
         }
         Ok(())
     }
@@ -361,7 +380,10 @@ impl Lets<'_> {
     fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> Result<ObjectId, GenieError> {
         // The building master type RESEARCH asks for (`'P'`, 80).
         Ok(if f.master(self.masters, p)?.kind == BUILDING {
-            f.building.annex_of.map_or(id, MainBuildingId::id)
+            self.buildings
+                .get(f.id)
+                .and_then(|b| b.annex_of)
+                .map_or(id, MainBuildingId::id)
         } else {
             id
         })
@@ -380,8 +402,8 @@ impl Lets<'_> {
     }
 }
 
-/// A counted builder leaves the building `b` (`+0x9e8` one less).
-const fn leave_site(b: &mut Unit) {
-    let n = b.repairers_mut();
+/// A counted builder leaves the building `b` with its construction `site` (`+0x9e8` one less).
+const fn leave_site(b: &mut Unit, site: Option<&mut crate::construction::build::Construction>) {
+    let n = b.repairers_mut(site);
     *n = n.left();
 }

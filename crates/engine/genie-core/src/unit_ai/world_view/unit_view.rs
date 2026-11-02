@@ -44,14 +44,12 @@ impl UnitView<'_, '_> {
                 &self.c.w.masters,
                 &self.c.w.parts.own_master,
             ),
-            ais: &self.c.w.parts.unit_ai,
+            parts: &self.c.w.parts,
             by_id: crate::world::index::ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                &self.c.w.masters,
+                &self.c.w.parts,
             ),
             restriction: None,
             unit: &*self.unit,

@@ -191,7 +191,8 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
             crate::world::index::ObjectsRef::new(
                 &c.w.players,
                 &c.w.index,
-                crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                &c.w.masters,
+                &c.w.parts,
             )
             .gait(object_id(600))
             .and_then(|g| g.pause),

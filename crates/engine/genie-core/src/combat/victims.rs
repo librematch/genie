@@ -46,7 +46,11 @@ impl World {
             drop_sites: &self.drop_sites,
         };
         Ok(Some(victim_in(
-            (u, self.parts.unit_ai.contains(u.id)),
+            (
+                u,
+                self.parts.unit_ai.contains(u.id),
+                self.parts.building_of(u.id),
+            ),
             (p, master, &self.players.player(p)?.attributes),
             (attacker, &world),
             &self.spatial,
@@ -224,7 +228,11 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
         drop_sites: &c.w.drop_sites,
     };
     Ok(Some(victim_in(
-        (u, c.w.parts.unit_ai.contains(u.id)),
+        (
+            u,
+            c.w.parts.unit_ai.contains(u.id),
+            c.w.parts.building_of(u.id),
+        ),
         (p, master, attributes),
         (c.player, &sides),
         &c.w.spatial,

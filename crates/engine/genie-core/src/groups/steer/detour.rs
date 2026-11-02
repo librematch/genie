@@ -192,7 +192,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         self.spatial
             .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
@@ -367,7 +368,8 @@ impl World {
         let by_id = crate::world::index::ObjectsRef::new(
             &self.players,
             &self.index,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            &self.masters,
+            &self.parts,
         );
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
@@ -421,7 +423,8 @@ impl World {
             crate::world::index::ObjectsRef::new(
                 &self.players,
                 &self.index,
-                crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+                &self.masters,
+                &self.parts,
             ),
         )
     }

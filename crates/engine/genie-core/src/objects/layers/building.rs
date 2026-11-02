@@ -1,6 +1,7 @@
 //! `TRIBE_Building_Object` (type 80, FD-045-D06): the building layer, its fields in the save's
-//! order (`TribeBuildingObject`), then the two the save does not hold. Every object holds it for
-//! now, with the game's defaults below type 80 (T4 step 2).
+//! order (`TribeBuildingObject`), then the two the save does not hold. It is an object's part
+//! (`World::parts.building`, FD-045-D56): an object the table does not hold reads
+//! [`Building::NONE`], the game's defaults below type 80.
 
 use crate::construction::build::Construction;
 use crate::objects::ObjectId;
@@ -53,4 +54,24 @@ pub struct Building {
     /// `+0x1c`), which its standing sprite takes once built; 0 from its constructor and the load.
     #[diff(unsaved)]
     pub build_frame: crate::objects::Frame,
+}
+
+impl Building {
+    /// The layer of an object that has none (below type 80), or of a new building: no
+    /// construction, links, gate, livestock or relics.
+    pub const NONE: Self = Self {
+        construction: None,
+        garrison_time: WorldTime::ZERO,
+        relics: Relics::NONE,
+        annex_of: None,
+        annexes: crate::construction::Annexes::NONE,
+        gate: None,
+        livestock_summation: Amount::ZERO,
+        livestock: Vec::new(),
+        pasture_workers: Vec::new(),
+        attacking_units: Vec::new(),
+        rice: false,
+        stack_made: None,
+        build_frame: crate::objects::Frame::ZERO,
+    };
 }
