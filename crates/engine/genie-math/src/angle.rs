@@ -4,7 +4,7 @@ use std::fmt::{Display, Error, Formatter};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 /// An angle on the map in radians, as the game's `f32` holds it: where an object faces
-/// (`+0x7e8`, 0 to 2π, [`crate::objects::facing`]), a turn or a yaw, a missile's spawn angle,
+/// (`+0x7e8`, 0 to 2π, genie-core's `objects::facing`), a turn or a yaw, a missile's spawn angle,
 /// a blast's cone. Each operator is the one `f32` operation the game does, in its order; a
 /// comparison is `f32`'s (a NaN compares false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
@@ -86,7 +86,7 @@ impl genie_diff::Diff for Angle {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Angle;
+    use crate::Angle;
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]

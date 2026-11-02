@@ -1,7 +1,7 @@
 //! A tile of the map as one type ([`Tile`]): x and y in whole tiles, apart from a point on the
 //! ground ([`Point`]) and a step from one tile to another ([`TileOffset`]).
 
-use crate::map::Point;
+use crate::geometry::Point;
 
 /// A tile of the map, x and y in whole tiles: the tile a place's x and y fall in (each cut to a
 /// whole number the way its routine cuts it), a search's or a path's tile, a landing's.
@@ -195,8 +195,8 @@ impl TileOffset {
 
 #[cfg(test)]
 mod tests {
-    use crate::map::Point;
-    use crate::map::{Tile, TileOffset, TileRect};
+    use crate::geometry::Point;
+    use crate::geometry::{Tile, TileOffset, TileRect};
 
     /// A tile keeps its x and y, orders by x then y, and steps by an offset.
     #[test]

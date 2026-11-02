@@ -1,9 +1,9 @@
 //! A point on the ground as one type ([`Point`]): x and y, apart from a place with its height
-//! ([`crate::map::Position`]) and an object's radii ([`crate::map::Footprint`]).
+//! ([`crate::geometry::Position`]) and an object's radii (genie-core's `map::Footprint`).
 
-use crate::map::Position;
-use crate::map::Tile;
-use crate::math::conversions::cvttss2si;
+use crate::conversions::cvttss2si;
+use crate::geometry::Position;
+use crate::geometry::Tile;
 
 /// An axis of the ground: a routine that runs along either one names it, not a number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,7 +110,7 @@ impl genie_diff::Diff for Point {
 
 #[cfg(test)]
 mod tests {
-    use crate::map::{Axis, Point, Position, Tile};
+    use crate::geometry::{Axis, Point, Position, Tile};
 
     /// A point's x and y keep their bits, and a height makes it a place.
     #[test]

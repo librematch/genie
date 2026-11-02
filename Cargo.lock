@@ -473,6 +473,7 @@ dependencies = [
  "bitflags 2.13.2",
  "genie-diff",
  "genie-error",
+ "genie-math",
  "getset",
  "libm",
  "tracing",
@@ -593,6 +594,13 @@ dependencies = [
  "genie-support",
  "pelite",
  "thiserror",
+]
+
+[[package]]
+name = "genie-math"
+version = "0.1.0"
+dependencies = [
+ "genie-diff",
 ]
 
 [[package]]

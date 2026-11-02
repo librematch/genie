@@ -1,0 +1,14 @@
+[package]
+name = "genie-math"
+version = "0.1.0"
+description = "The f32 operations of Age of Empires II: Definitive Edition as its code does them, its image's constants and the map's geometry, for the genie engine"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository.workspace = true
+
+[dependencies]
+# the geometry's and the angle's field differences (genie-core's per-object diff, FD-045-D14)
+genie-diff = { path = "../../base/genie-diff" }
+
+[lints]
+workspace = true

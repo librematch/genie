@@ -1,7 +1,7 @@
 //! The argument reduction modulo π/2 (`__rem_pio2f`, `__kernel_rem_pio2`) and the floor and
 //! scalbn it uses.
 
-use crate::math::fmath::{HALF_F64, MINUS_ONE_F64, ONE_F64, sse_nan, widen};
+use crate::fmath::{HALF_F64, MINUS_ONE_F64, ONE_F64, sse_nan, widen};
 
 /// floor's 2^52, added and taken off to round away the fraction (`DAT_142ec8bf0`).
 pub(super) const FLOOR_TO_INT: f64 = f64::from_bits(0x4330_0000_0000_0000);

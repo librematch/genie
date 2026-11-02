@@ -1,6 +1,6 @@
 //! The sine and the cosine (cosf, sinf) with their kernels.
 
-use crate::math::fmath::{ONE, narrow, rem_pio2, sse_nan, sse_nan_f64};
+use crate::fmath::{ONE, narrow, rem_pio2, sse_nan, sse_nan_f64};
 
 /// 1 in double (`DAT_142ea7c58`).
 pub(super) const ONE_F64: f64 = f64::from_bits(0x3ff0_0000_0000_0000);

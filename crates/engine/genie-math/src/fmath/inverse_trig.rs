@@ -1,6 +1,6 @@
 //! The inverse trigonometry: acosf, atanf and atan2f (msun's).
 
-use crate::math::fmath::{HALF, ONE, fabs, is_nan, sqrt, sse_nan};
+use crate::fmath::{HALF, ONE, fabs, is_nan, sqrt, sse_nan};
 
 /// π/2's leading bits (`DAT_142ec89f0`): acosf near 0, also atanf's bound.
 pub(super) const PIO2_HI: f32 = f32::from_bits(0x3fc9_0fda);

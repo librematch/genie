@@ -1,6 +1,6 @@
 //! fmodf, and logf with the double logarithm it rounds.
 
-use crate::math::fmath::{narrow, sse_nan, sse_nan_f64, widen};
+use crate::fmath::{narrow, sse_nan, sse_nan_f64, widen};
 
 /// fmodf: the remainder of x / y with x's sign, exact. The game calls the CRT's
 /// (`api-ms-win-crt-math-l1-1-0.dll!fmodf`, through the import thunk `0x142a8e7fa`), whose body is

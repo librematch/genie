@@ -14,6 +14,9 @@ genie-diff = { path = "../../base/genie-diff" }
 # the getters of the newtypes (an object id, a player, a master, a point): their values are
 # private, so only the constructors that check them set them (FD-001-D23)
 getset.workspace = true
+# the f32 operations as the game's code does them, the image's constants and the map's geometry
+# (FD-046-D28)
+genie-math = { path = "../genie-math" }
 # the bit sets the game tests bit by bit (the vision's player bits): every bit kept (`_ = !0`)
 bitflags.workspace = true
 # floorf, which the game imports from the CRT (api-ms-win-crt-math): an exact operation, so libm's

@@ -1,9 +1,9 @@
 //! The game's 3-vectors (`BVector`): sums, products, length, angle, line distance and
 //! rotation.
 
-use crate::map::Point;
-use crate::map::Position;
-use crate::math::fmath::{acos, cos, sin, sqrt};
+use crate::fmath::{acos, cos, sin, sqrt};
+use crate::geometry::Point;
+use crate::geometry::Position;
 use std::f32::consts::{FRAC_PI_2, PI};
 use std::ops::Neg;
 
@@ -217,8 +217,8 @@ pub fn rotate(m: &Rotation, v: BVector) -> BVector {
 
 #[cfg(test)]
 mod tests {
-    use crate::map::Position;
-    use crate::math::fmath::BVector;
+    use crate::fmath::BVector;
+    use crate::geometry::Position;
 
     /// A vector keeps its components' bits in the game's order (x, height, y): its accessors,
     /// its place on the map (x, y, z) and back, its ground, the `with_` copies and the save's

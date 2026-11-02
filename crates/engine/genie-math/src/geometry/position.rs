@@ -1,9 +1,9 @@
 //! A place on the map as one type ([`Position`]): x, y and z, apart from the game's vectors
-//! (x, height, y, [`crate::math::fmath::BVector`]).
+//! (x, height, y, [`crate::fmath::BVector`]).
 
-use crate::map::Point;
-use crate::map::Tile;
-use crate::math::fmath::BVector;
+use crate::fmath::BVector;
+use crate::geometry::Point;
+use crate::geometry::Tile;
 
 /// A place on the map: x and y in tiles, z its height. An object holds its place so (`+0x3c8`,
 /// `+0x4c8`, `+0x5a8`), and so do the places the systems pass on; the game's vector routines
@@ -101,10 +101,10 @@ impl genie_diff::Diff for Position {
 
 #[cfg(test)]
 mod tests {
-    use crate::map::Position;
+    use crate::fmath::BVector;
+    use crate::geometry::Position;
     #[cfg(test)]
-    use crate::map::Tile;
-    use crate::math::fmath::BVector;
+    use crate::geometry::Tile;
 
     /// A place's tile is its ground point's: x and y cut toward zero, the height left out.
     #[test]

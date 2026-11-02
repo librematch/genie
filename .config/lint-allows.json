@@ -5,6 +5,7 @@
  "clippy::cast_possible_truncation": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-core/tests/crt_math.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
   "crates/formats/genie-dat/src/dat_write.rs": 4,
   "crates/formats/genie-dat/src/tech.rs": 4,
@@ -34,6 +35,7 @@
  },
  "clippy::cast_possible_wrap": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/formats/genie-scx/src/format/scx.rs": 3,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
   "crates/formats/genie-scx/src/player.rs": 1,
@@ -45,11 +47,13 @@
  },
  "clippy::cast_precision_loss": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1,
   "crates/tools/genie-oracle/tests/tick_trace.rs": 1
  },
  "clippy::cast_sign_loss": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
   "crates/formats/genie-scx/src/format/rge.rs": 1,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
@@ -67,10 +71,10 @@
  },
  "clippy::eq_op": {
   "crates/engine/genie-core/src/map/spatial/pather.rs": 1,
-  "crates/engine/genie-core/src/math/fmath/fmod_and_log.rs": 2,
-  "crates/engine/genie-core/src/math/fmath/inverse_trig.rs": 1,
-  "crates/engine/genie-core/src/math/fmath/reduction.rs": 1,
-  "crates/engine/genie-core/src/math/fmath/sin_cos.rs": 2
+  "crates/engine/genie-math/src/fmath/fmod_and_log.rs": 2,
+  "crates/engine/genie-math/src/fmath/inverse_trig.rs": 1,
+  "crates/engine/genie-math/src/fmath/reduction.rs": 1,
+  "crates/engine/genie-math/src/fmath/sin_cos.rs": 2
  },
  "clippy::float_cmp": {
   "crates/engine/genie-core/src/lib.rs": 1,
@@ -94,6 +98,7 @@
  "clippy::many_single_char_names": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-core/src/map/terrain.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::match_same_arms": {
@@ -142,6 +147,7 @@
  },
  "clippy::suboptimal_flops": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::suspicious_operation_groupings": {
@@ -150,6 +156,7 @@
  },
  "clippy::too_long_first_doc_paragraph": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::too_many_arguments": {
@@ -161,6 +168,7 @@
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-core/src/unit_ai/unit.rs": 1,
   "crates/engine/genie-core/src/world/object_step.rs": 1,
+  "crates/engine/genie-math/src/lib.rs": 1,
   "crates/formats/genie-rec/tests/de_oracle.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1,
   "crates/tools/genie-oracle/tests/tick_trace.rs": 1

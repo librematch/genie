@@ -30,7 +30,7 @@ Start with these files:
 | [`gathering/`](gathering/) | Gathering resources: the Gather and Hunt actions with each gatherer's part of its update, a farm's food, the searches for a resource, the drop sites and drop-offs, the mill's and the dock's queues and the pastures. |
 | [`groups/`](groups/) | Unit groups and formations (FD-036): the game's `BUnitGroup` (`group.cpp`) with its motion (`BMotion`) and formations (`BFormation`). |
 | [`map/`](map/) | The map: the terrain of each tile and where the world's objects stand (their places, radii, footprints and the grid that finds them). |
-| [`math/`](math/) | The bit-for-bit foundations: the game's f32 math, its random generators, the MSVC algorithms whose order shows in the simulation, and the image's constants. |
+| [`math/`](math/) | The bit-for-bit foundations: the game's random generators and the MSVC algorithms whose order shows in the simulation, beside genie-math's f32 math and image constants, re-exported here. |
 | [`movement/`](movement/) | A unit's movement (`RGE_Moving_Object`, MovingObject.cpp in 158041): the velocity step that moves it along its forward vector, and the motion step that steers it along its path. |
 | [`objects/`](objects/) | One object and what every object has and runs: the object the engine tracks (`unit::Unit`) with its update, its actions' holdings and stops, its life and death, its release, its sprite and facing, and the masters it is made from. |
 | [`orders/`](orders/) | The orders a command gives its units: INTERACT and its splitter into loose units and groups, the moves, patrols and follows, the work, gather, hunt and build orders, the drop-offs, the town bell and the Empire Wars start. |

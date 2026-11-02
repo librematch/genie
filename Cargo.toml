@@ -25,6 +25,7 @@ members = [
   "crates/formats/jascpal",
   "crates/engine/genie-command-codec",
   "crates/engine/genie-core",
+  "crates/engine/genie-math",
   "crates/tools/genie-oracle",
   "crates/tools/genie-swiss-knife",
 ]

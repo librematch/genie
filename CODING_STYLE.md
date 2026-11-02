@@ -45,7 +45,7 @@ data-oriented architect makes it.
 | --- | --- | --- |
 | `crates/base/` | `genie-error`, `genie-diff`: below every other crate | GPL-3.0 |
 | `crates/formats/` | the readers and writers of the game's files | GPL-3.0 |
-| `crates/engine/` | the engine: `genie-core`, `genie-command-codec` | AGPL-3.0 |
+| `crates/engine/` | the engine: `genie-core`, `genie-command-codec`; its foundation `genie-math` (FD-046) | AGPL-3.0 |
 | `crates/tools/` | command-line tools and the oracle library | AGPL-3.0 |
 
 - Dependencies point inward. Engine and tool crates can depend on format crates. A format crate
@@ -53,8 +53,13 @@ data-oriented architect makes it.
   such a dependency. An adapter depends on the core, never the reverse.
 - Every crate's `Cargo.toml` carries `[lints] workspace = true`.
 - Add a new engine crate to the wasm32 build line of `.github/workflows/ci.yml`.
-- Split a crate only at a stable seam: an adapter, or a foundation crate without dependencies
-  back into the engine.
+- Give each concern its own crate. A crate is Rust's compilation unit: code outside the
+  simulation core (an adapter, an importer, a tool, a foundation of plain data or math) in a
+  crate of its own recompiles alone and keeps genie-core's build small, and its dependencies
+  show and enforce the separation. Cut a crate where the dependencies point one way: a
+  foundation crate has no dependency back into the engine, an adapter depends on the core.
+- Keep a crate's dependencies to what its own code needs. A foundation crate that the core
+  depends on pulls in no reader of the game's files: an import lives in an adapter crate.
 - Add no module without a caller that exists now.
 
 ## 3. Naming

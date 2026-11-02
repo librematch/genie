@@ -1,6 +1,6 @@
 //! powf (musl's) with its log2 and exp2 tables.
 
-use crate::math::fmath::{INDEFINITE, ONE, sse_nan};
+use crate::fmath::{INDEFINITE, ONE, sse_nan};
 
 /// `checkint` (`FUN_14099e9a0`) of powf's exponent bits: 0 not an integer, 1 an odd one, 2 an
 /// even one.

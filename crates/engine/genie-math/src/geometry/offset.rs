@@ -1,9 +1,9 @@
 //! A displacement on the map as one type ([`Offset`]): x, y and z, apart from a place
-//! ([`crate::map::Position`]) and the game's vectors (x, height, y,
-//! [`crate::math::fmath::BVector`]); and one on the ground ([`GroundOffset`]): x and y, apart
+//! ([`crate::geometry::Position`]) and the game's vectors (x, height, y,
+//! [`crate::fmath::BVector`]); and one on the ground ([`GroundOffset`]): x and y, apart
 //! from a point ([`Point`]).
 
-use crate::map::{Point, Position};
+use crate::geometry::{Point, Position};
 
 /// A displacement on the map in the map's order: x and y in tiles, z the height. A missile's
 /// direction (`+0x68`..`+0x70`) and its step of an update (`+0x7dc`..`+0x7e4`), a master's
@@ -176,7 +176,7 @@ impl Point {
 
 #[cfg(test)]
 mod tests {
-    use crate::map::{GroundOffset, Offset, Point, Position};
+    use crate::geometry::{GroundOffset, Offset, Point, Position};
 
     /// An offset keeps its components' bits in the map's order, scales each by the factor
     /// first and moves a place by its components.
